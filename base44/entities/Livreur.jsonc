@@ -40,7 +40,7 @@
         "hors_ligne"
       ],
       "default": "hors_ligne",
-      "description": "Statut actuel du livreur (actif uniquement si valid\u00e9)"
+      "description": "Statut actuel du livreur"
     },
     "latitude": {
       "type": "number",
@@ -74,6 +74,28 @@
       ],
       "default": "moto",
       "description": "Type de v\u00e9hicule"
+    },
+    "statut_paiement": {
+      "type": "string",
+      "enum": [
+        "non_paye",
+        "paye"
+      ],
+      "default": "non_paye",
+      "description": "Statut du versement journalier \u00e0 Silga"
+    },
+    "montant_paye": {
+      "type": "number",
+      "description": "Montant vers\u00e9 \u00e0 Silga aujourd'hui"
+    },
+    "heure_paiement": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure du versement valid\u00e9"
+    },
+    "admin_paiement": {
+      "type": "string",
+      "description": "Nom de l'admin ayant valid\u00e9 le paiement"
     }
   },
   "required": [

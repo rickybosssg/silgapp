@@ -48,7 +48,11 @@
     },
     "prix": {
       "type": "number",
-      "description": "Prix de la course en FCFA"
+      "description": "Prix estim\u00e9 de la course en FCFA"
+    },
+    "prix_reel": {
+      "type": "number",
+      "description": "Prix r\u00e9el pay\u00e9 par le client (renseign\u00e9 par le livreur \u00e0 la livraison)"
     },
     "urgence": {
       "type": "string",
