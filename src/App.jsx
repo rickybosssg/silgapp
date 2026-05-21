@@ -16,6 +16,7 @@ import RapportJour from './pages/RapportJour';
 import Notifications from './pages/Notifications';
 import LivreurApp from './pages/LivreurApp';
 import InscriptionLivreur from './pages/InscriptionLivreur';
+import LivreurLogin from './pages/LivreurLogin';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();

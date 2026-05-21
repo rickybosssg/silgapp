@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Truck, MapPin, Phone, User, Check, X, Navigation, ArrowDown, Package, AlertTriangle } from "lucide-react";
+import { Truck, MapPin, Phone, User, Check, X, Navigation, ArrowDown, Package, AlertTriangle, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import LivreurLogin from "./LivreurLogin";
+import { getLivreurSession, setLivreurSession, clearLivreurSession } from "@/lib/livreurAuth";
 
 // Vibration répétée tant qu'une course est en attente
 function useVibration(active) {
@@ -299,26 +301,41 @@ function CourseActive({ course, onColisRecupere, onColisLivre, isPending }) {
 
 export default function LivreurApp() {
   const queryClient = useQueryClient();
-  const [currentUser, setCurrentUser] = useState(null);
-  const [livreurProfil, setLivreurProfil] = useState(null);
+  const [livreurProfil, setLivreurProfil] = useState(() => getLivreurSession());
 
-  useEffect(() => {
-    base44.auth.me().then(setCurrentUser).catch(() => {});
-  }, []);
+  const handleLogin = (livreur) => {
+    setLivreurProfil(livreur);
+  };
 
-  const { data: livreurs = [] } = useQuery({
-    queryKey: ["livreurs"],
-    queryFn: () => base44.entities.Livreur.list(),
-    initialData: [],
+  const handleLogout = async () => {
+    if (livreurProfil) {
+      await base44.entities.Livreur.update(livreurProfil.id, { statut: "hors_ligne" });
+    }
+    clearLivreurSession();
+    setLivreurProfil(null);
+  };
+
+  // Sync session avec la DB toutes les 10s
+  const { data: livreurDB } = useQuery({
+    queryKey: ["livreur-profil", livreurProfil?.id],
+    queryFn: () => base44.entities.Livreur.filter({ telephone: livreurProfil.telephone }),
+    enabled: !!livreurProfil,
     refetchInterval: 10000,
+    select: (data) => data[0],
   });
 
   useEffect(() => {
-    if (currentUser && livreurs.length > 0) {
-      const found = livreurs.find(l => l.user_email === currentUser.email);
-      setLivreurProfil(found || null);
+    if (livreurDB) {
+      if (livreurDB.actif === false) {
+        toast.error("Votre compte a été désactivé.");
+        handleLogout();
+        return;
+      }
+      const updated = { ...livreurDB };
+      setLivreurSession(updated);
+      setLivreurProfil(updated);
     }
-  }, [currentUser, livreurs]);
+  }, [livreurDB]);
 
   const { data: mesCourses = [] } = useQuery({
     queryKey: ["mes-courses", livreurProfil?.id],
@@ -418,18 +435,7 @@ export default function LivreurApp() {
   }, [livreurProfil?.id, livreurProfil?.statut]);
 
   if (!livreurProfil) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="text-center space-y-4 max-w-sm">
-          <Truck className="w-16 h-16 text-muted-foreground mx-auto" />
-          <h1 className="text-xl font-bold">Espace Livreur</h1>
-          <p className="text-sm text-muted-foreground">
-            Votre compte n'est pas encore lié à un profil livreur.<br />
-            Contactez l'administrateur Silga.
-          </p>
-        </div>
-      </div>
-    );
+    return <LivreurLogin onLogin={handleLogin} />;
   }
 
   const isEnLigne = livreurProfil.statut !== "hors_ligne";
@@ -457,14 +463,19 @@ export default function LivreurApp() {
               <p className="text-xs text-muted-foreground">{livreurProfil.telephone}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">{isEnLigne ? "En ligne" : "Hors ligne"}</span>
-            <Switch
-              checked={isEnLigne}
-              onCheckedChange={(checked) =>
-                toggleDispoMutation.mutate(checked ? "disponible" : "hors_ligne")
-              }
-            />
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">{isEnLigne ? "En ligne" : "Hors ligne"}</span>
+              <Switch
+                checked={isEnLigne}
+                onCheckedChange={(checked) =>
+                  toggleDispoMutation.mutate(checked ? "disponible" : "hors_ligne")
+                }
+              />
+            </div>
+            <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={handleLogout} title="Déconnexion">
+              <LogOut className="w-4 h-4" />
+            </Button>
           </div>
         </div>
 

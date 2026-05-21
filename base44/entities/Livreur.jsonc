@@ -14,6 +14,10 @@
       "type": "string",
       "description": "Num\u00e9ro de t\u00e9l\u00e9phone"
     },
+    "mot_de_passe": {
+      "type": "string",
+      "description": "Mot de passe du livreur"
+    },
     "quartier": {
       "type": "string",
       "description": "Quartier principal d'activit\u00e9"
@@ -31,6 +35,11 @@
       ],
       "default": "en_attente",
       "description": "Statut de validation par l'admin"
+    },
+    "actif": {
+      "type": "boolean",
+      "default": true,
+      "description": "Compte actif ou d\u00e9sactiv\u00e9 par l'admin"
     },
     "statut": {
       "type": "string",

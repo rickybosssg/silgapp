@@ -5,14 +5,14 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Truck, Phone, MapPin, Check, X, Clock, UserCheck, Copy, Banknote } from "lucide-react";
+import { Truck, Phone, MapPin, Check, X, Clock, UserCheck, Copy, Banknote, Plus, Pencil, UserX } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import LivreurFormDialog from "@/components/livreurs/LivreurFormDialog";
 
-function LivreurCard({ livreur, courses, onValider, onRefuser, onToggleStatut, onValiderPaiement, isPending }) {
+function LivreurCard({ livreur, courses, onValider, onRefuser, onToggleStatut, onValiderPaiement, onEdit, isPending }) {
   const nomComplet = `${livreur.prenom || ""} ${livreur.nom}`.trim();
 
   // Calcul montant dû à partir des prix réels des courses du jour livrées
@@ -93,7 +93,7 @@ function LivreurCard({ livreur, courses, onValider, onRefuser, onToggleStatut, o
 
       {/* Actions statut livreur validé */}
       {livreur.validation === "valide" && (
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {livreur.statut !== "disponible" && (
             <Button size="sm" variant="outline" className="flex-1 text-xs h-7" onClick={() => onToggleStatut(livreur, "disponible")} disabled={isPending}>
               Marquer disponible
@@ -104,6 +104,19 @@ function LivreurCard({ livreur, courses, onValider, onRefuser, onToggleStatut, o
               Hors ligne
             </Button>
           )}
+          <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1" onClick={() => onEdit(livreur)} disabled={isPending}>
+            <Pencil className="w-3 h-3" /> Modifier
+          </Button>
+          <Button
+            size="sm"
+            variant={livreur.actif === false ? "outline" : "destructive"}
+            className="h-7 px-2 text-xs gap-1"
+            onClick={() => onToggleStatut(livreur, null, livreur.actif !== false)}
+            disabled={isPending}
+          >
+            <UserX className="w-3 h-3" />
+            {livreur.actif === false ? "Réactiver" : "Désactiver"}
+          </Button>
         </div>
       )}
 
@@ -151,6 +164,8 @@ export default function Livreurs() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState("en_attente");
   const [currentUser, setCurrentUser] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [editingLivreur, setEditingLivreur] = useState(null);
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(() => {});
@@ -184,8 +199,14 @@ export default function Livreurs() {
     toast("Livreur refusé");
   };
 
-  const handleToggleStatut = (livreur, statut) => {
-    updateMutation.mutate({ id: livreur.id, data: { statut } });
+  const handleToggleStatut = (livreur, statut, desactiver) => {
+    if (desactiver !== undefined) {
+      // toggle actif/inactif
+      updateMutation.mutate({ id: livreur.id, data: { actif: !desactiver } });
+      toast(desactiver ? `${livreur.prenom || livreur.nom} désactivé` : `${livreur.prenom || livreur.nom} réactivé`);
+    } else {
+      updateMutation.mutate({ id: livreur.id, data: { statut } });
+    }
   };
 
   const handleValiderPaiement = (livreur, montant) => {
@@ -216,12 +237,20 @@ export default function Livreurs() {
           <Truck className="w-6 h-6 text-primary" />
           <h1 className="text-2xl font-bold">Livreurs</h1>
         </div>
-        <Button
-          variant="outline" size="sm" className="gap-1.5 text-xs"
-          onClick={() => { navigator.clipboard.writeText(inscriptionLink); toast.success("Lien copié !"); }}
-        >
-          <Copy className="w-3.5 h-3.5" /> Copier lien inscription
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline" size="sm" className="gap-1.5 text-xs"
+            onClick={() => { navigator.clipboard.writeText(inscriptionLink); toast.success("Lien copié !"); }}
+          >
+            <Copy className="w-3.5 h-3.5" /> Copier lien inscription
+          </Button>
+          <Button
+            size="sm" className="gap-1.5 text-xs bg-primary"
+            onClick={() => { setEditingLivreur(null); setShowForm(true); }}
+          >
+            <Plus className="w-3.5 h-3.5" /> Ajouter un livreur
+          </Button>
+        </div>
       </div>
 
       {/* Légende couleurs */}
@@ -273,10 +302,17 @@ export default function Livreurs() {
             onRefuser={handleRefuser}
             onToggleStatut={handleToggleStatut}
             onValiderPaiement={handleValiderPaiement}
+            onEdit={(l) => { setEditingLivreur(l); setShowForm(true); }}
             isPending={updateMutation.isPending}
           />
         ))}
       </div>
+
+      <LivreurFormDialog
+        open={showForm}
+        onClose={() => { setShowForm(false); setEditingLivreur(null); }}
+        livreur={editingLivreur}
+      />
     </div>
   );
 }
