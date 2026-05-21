@@ -142,10 +142,21 @@ export default function NouvelleCourse() {
             <div className="space-y-1.5">
               <Label className="text-xs">Téléphone *</Label>
               <Input
-                placeholder="Ex: +226 70 12 34 56"
+                placeholder="+226 70 12 34 56"
                 value={form.client_telephone}
-                onChange={(e) => handleChange("client_telephone", e.target.value)}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/[^\d+]/g, "");
+                  let formatted = raw;
+                  if (raw.startsWith("+226")) {
+                    const local = raw.slice(4).replace(/(\d{2})(?=\d)/g, "$1 ").trim();
+                    formatted = "+226 " + local;
+                  } else {
+                    formatted = raw.replace(/(\d{2})(?=\d)/g, "$1 ").trim();
+                  }
+                  handleChange("client_telephone", formatted);
+                }}
                 required
+                type="tel"
               />
             </div>
           </CardContent>
