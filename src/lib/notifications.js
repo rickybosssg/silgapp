@@ -283,8 +283,9 @@ export async function registerPushToken(livreurId = null) {
         });
 
       } catch (error) {
-        console.error('[registerPushToken] Erreur FCM:', error);
-        throw error;
+        // Ne pas propager l'erreur FCM → l'app doit démarrer même sans notifications
+        console.error('[registerPushToken] Erreur FCM (non bloquante):', error);
+        return null;
       }
     }
 

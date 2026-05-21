@@ -1,15 +1,13 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { appParams } from '@/lib/app-params';
-import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
 import { redirectToLogin as safeRedirectToLogin } from '@/lib/authRedirect';
 
 const AuthContext = createContext();
 
-// Dans Capacitor, l'API base44 doit être appelée avec une URL absolue
-const BASE44_API = appParams.isCapacitor
-  ? `${appParams.appBaseUrl || 'https://app.base44.com'}/api/apps/public`
-  : '/api/apps/public';
+// URL absolue pour les appels API hors-SDK (public-settings)
+const BASE44_SERVER = 'https://app.base44.com';
+const BASE44_API_BASE = `${BASE44_SERVER}/api/apps/public`;
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -29,42 +27,51 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingPublicSettings(true);
       setAuthError(null);
 
-      const appClient = createAxiosClient({
-        baseURL: BASE44_API,
-        headers: { 'X-App-Id': appParams.appId },
-        token: appParams.token,
-        interceptResponses: true
-      });
+      // Utiliser fetch natif (sans dépendance SDK interne) — fonctionne dans Capacitor
+      const url = `${BASE44_API_BASE}/prod/public-settings/by-id/${appParams.appId}`;
+      const headers = { 'Content-Type': 'application/json', 'X-App-Id': appParams.appId };
+      if (appParams.token) headers['Authorization'] = `Bearer ${appParams.token}`;
 
+      let publicSettings = null;
       try {
-        const publicSettings = await appClient.get(`/prod/public-settings/by-id/${appParams.appId}`);
-        setAppPublicSettings(publicSettings);
-
-        if (appParams.token) {
-          await checkUserAuth();
-        } else {
-          setIsLoadingAuth(false);
-          setIsAuthenticated(false);
-          setAuthChecked(true);
-        }
-        setIsLoadingPublicSettings(false);
-      } catch (appError) {
-        console.error('[AuthContext] App state check failed:', appError);
-
-        if (appError.status === 403 && appError.data?.extra_data?.reason) {
-          const reason = appError.data.extra_data.reason;
-          setAuthError({ type: reason, message: appError.message });
-        } else if (appError.status === 401) {
+        const res = await fetch(url, { headers });
+        if (res.ok) {
+          publicSettings = await res.json();
+          setAppPublicSettings(publicSettings);
+        } else if (res.status === 401) {
           setAuthError({ type: 'auth_required', message: 'Session expirée' });
-        } else {
-          // Erreur réseau / timeout → montrer l'écran de connexion plutôt que bloquer
-          setAuthError({ type: 'auth_required', message: 'Connexion requise' });
+          setIsLoadingPublicSettings(false);
+          setIsLoadingAuth(false);
+          return;
+        } else if (res.status === 403) {
+          let body = {};
+          try { body = await res.json(); } catch (_) {}
+          const reason = body?.extra_data?.reason || 'forbidden';
+          setAuthError({ type: reason, message: body?.message || 'Accès refusé' });
+          setIsLoadingPublicSettings(false);
+          setIsLoadingAuth(false);
+          return;
         }
-        setIsLoadingPublicSettings(false);
+        // Erreur réseau non bloquante → continuer vers auth
+      } catch (fetchError) {
+        console.warn('[AuthContext] public-settings fetch failed (réseau?):', fetchError.message);
+        // Ne pas bloquer : continuer pour tenter l'auth
+      }
+
+      setIsLoadingPublicSettings(false);
+
+      // Vérifier l'auth utilisateur si token présent
+      if (appParams.token) {
+        await checkUserAuth();
+      } else {
         setIsLoadingAuth(false);
+        setIsAuthenticated(false);
+        setAuthChecked(true);
+        // Pas de token → forcer affichage login
+        setAuthError({ type: 'auth_required', message: 'Non connecté' });
       }
     } catch (error) {
-      console.error('[AuthContext] Unexpected error:', error);
+      console.error('[AuthContext] Unexpected error in checkAppState:', error);
       setAuthError({ type: 'auth_required', message: error?.message || 'Erreur au démarrage' });
       setIsLoadingPublicSettings(false);
       setIsLoadingAuth(false);
@@ -77,27 +84,22 @@ export const AuthProvider = ({ children }) => {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
       setIsAuthenticated(true);
+      setAuthError(null);
     } catch (error) {
       console.error('[AuthContext] User auth check failed:', error);
       setIsAuthenticated(false);
-      setAuthChecked(true);
-      if (error.status === 401 || error.status === 403) {
-        setAuthError({ type: 'auth_required', message: 'Session expirée' });
-      }
+      setAuthError({ type: 'auth_required', message: 'Session expirée' });
     } finally {
       setIsLoadingAuth(false);
       setAuthChecked(true);
     }
   };
 
-  const logout = (shouldRedirect = true) => {
+  const logout = () => {
     setUser(null);
     setIsAuthenticated(false);
-    if (shouldRedirect) {
-      base44.auth.logout(window.location.href);
-    } else {
-      base44.auth.logout();
-    }
+    // base44.auth.logout() utilise redirectToLogin en interne — on passe par safeRedirectToLogin
+    safeRedirectToLogin();
   };
 
   const navigateToLogin = (returnUrl) => {
