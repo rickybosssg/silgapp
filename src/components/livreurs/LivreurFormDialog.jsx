@@ -14,7 +14,7 @@ const emptyForm = {
   prenom: "",
   nom: "",
   telephone: "",
-  mot_de_passe: "",
+  user_email: "",
   quartier: "",
   vehicule: "moto",
   photo_url: "",
@@ -33,7 +33,7 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
         prenom: livreur.prenom || "",
         nom: livreur.nom || "",
         telephone: livreur.telephone || "",
-        mot_de_passe: livreur.mot_de_passe || "",
+        user_email: livreur.user_email || "",
         quartier: livreur.quartier || "",
         vehicule: livreur.vehicule || "moto",
         photo_url: livreur.photo_url || "",
@@ -68,8 +68,8 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!form.nom || !form.telephone || !form.mot_de_passe) {
-      toast.error("Nom, téléphone et mot de passe sont obligatoires");
+    if (!form.nom || !form.telephone) {
+      toast.error("Nom et téléphone sont obligatoires");
       return;
     }
     mutation.mutate(form);
@@ -99,8 +99,9 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs">Mot de passe *</Label>
-            <Input placeholder="Créer un mot de passe" value={form.mot_de_passe} onChange={(e) => setForm((p) => ({ ...p, mot_de_passe: e.target.value }))} required />
+            <Label className="text-xs">Email Base44 du livreur</Label>
+            <Input placeholder="email@exemple.com" type="email" value={form.user_email} onChange={(e) => setForm((p) => ({ ...p, user_email: e.target.value }))} />
+            <p className="text-[10px] text-muted-foreground">Email du compte Base44 invité pour ce livreur</p>
           </div>
 
           <div className="space-y-1.5">

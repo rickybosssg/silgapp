@@ -10,8 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Truck, MapPin, Phone, User, Check, X, Navigation, ArrowDown, Package, AlertTriangle, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import LivreurLogin from "./LivreurLogin";
-import { getLivreurSession, setLivreurSession, clearLivreurSession } from "@/lib/livreurAuth";
 import { useAuth } from "@/lib/AuthContext";
 
 // Vibration répétée tant qu'une course est en attente
@@ -163,7 +161,6 @@ function CourseActive({ course, onColisRecupere, onColisLivre, onClientAnnule, i
 
   return (
     <>
-      {/* Modal saisie prix réel */}
       {showPrixModal && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <Card className="w-full max-w-sm p-6 space-y-4">
@@ -184,11 +181,7 @@ function CourseActive({ course, onColisRecupere, onColisLivre, onClientAnnule, i
             </div>
             <div className="grid grid-cols-2 gap-3">
               <Button variant="outline" onClick={() => setShowPrixModal(false)}>Annuler</Button>
-              <Button
-                className="bg-primary font-bold"
-                onClick={handleConfirmerLivraison}
-                disabled={isPending}
-              >
+              <Button className="bg-primary font-bold" onClick={handleConfirmerLivraison} disabled={isPending}>
                 Confirmer ✅
               </Button>
             </div>
@@ -235,32 +228,18 @@ function CourseActive({ course, onColisRecupere, onColisLivre, onClientAnnule, i
             </div>
           </div>
 
-          {course.prix && (
-            <p className="font-bold text-base">{course.prix.toLocaleString()} FCFA</p>
-          )}
-          {course.notes && (
-            <p className="text-xs text-muted-foreground bg-muted/40 p-2 rounded">{course.notes}</p>
-          )}
+          {course.prix && <p className="font-bold text-base">{course.prix.toLocaleString()} FCFA</p>}
+          {course.notes && <p className="text-xs text-muted-foreground bg-muted/40 p-2 rounded">{course.notes}</p>}
 
           <div className="space-y-2 pt-1">
             {!colisRecupere && (
-              <Button
-                className="w-full h-12 text-sm font-bold bg-amber-500 hover:bg-amber-600 text-white gap-2"
-                onClick={() => onColisRecupere(course)}
-                disabled={isPending}
-              >
-                <Package className="w-5 h-5" />
-                Colis récupéré
+              <Button className="w-full h-12 text-sm font-bold bg-amber-500 hover:bg-amber-600 text-white gap-2" onClick={() => onColisRecupere(course)} disabled={isPending}>
+                <Package className="w-5 h-5" /> Colis récupéré
               </Button>
             )}
             {colisRecupere && !colisLivre && (
-              <Button
-                className="w-full h-12 text-sm font-bold bg-primary gap-2"
-                onClick={() => setShowPrixModal(true)}
-                disabled={isPending}
-              >
-                <Check className="w-5 h-5" />
-                Colis livré ✅
+              <Button className="w-full h-12 text-sm font-bold bg-primary gap-2" onClick={() => setShowPrixModal(true)} disabled={isPending}>
+                <Check className="w-5 h-5" /> Colis livré ✅
               </Button>
             )}
             {colisLivre && (
@@ -281,20 +260,12 @@ function CourseActive({ course, onColisRecupere, onColisLivre, onClientAnnule, i
                 <X className="w-3.5 h-3.5" /> Le client a annulé
               </Button>
               {!showRemarque ? (
-                <button
-                  className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground"
-                  onClick={() => setShowRemarque(true)}
-                >
+                <button className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground" onClick={() => setShowRemarque(true)}>
                   <AlertTriangle className="w-3 h-3" /> Signaler un problème
                 </button>
               ) : (
                 <div className="flex gap-2">
-                  <Textarea
-                    placeholder="Décrivez le problème..."
-                    value={remarque}
-                    onChange={(e) => setRemarque(e.target.value)}
-                    className="text-xs min-h-[60px]"
-                  />
+                  <Textarea placeholder="Décrivez le problème..." value={remarque} onChange={(e) => setRemarque(e.target.value)} className="text-xs min-h-[60px]" />
                   <div className="flex flex-col gap-1">
                     <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleRemarque}>OK</Button>
                     <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowRemarque(false)}>✕</Button>
@@ -309,75 +280,46 @@ function CourseActive({ course, onColisRecupere, onColisLivre, onClientAnnule, i
   );
 }
 
-
 export default function LivreurApp() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { user, isAuthenticated, isLoadingAuth } = useAuth();
-  const [livreurProfil, setLivreurProfil] = useState(() => getLivreurSession());
+  const { user, isAuthenticated, isLoadingAuth, navigateToLogin, logout } = useAuth();
 
-  // Si un admin est connecté sur cette page, le rediriger vers le dashboard admin
+  // Rediriger les admins vers le dashboard
   useEffect(() => {
     if (!isLoadingAuth && isAuthenticated && user?.role === "admin") {
       navigate("/", { replace: true });
     }
   }, [isLoadingAuth, isAuthenticated, user, navigate]);
 
-  const handleLogin = (livreur) => {
-    setLivreurProfil(livreur);
-  };
-
-  const handleLogout = async () => {
-    if (livreurProfil) {
-      await base44.entities.Livreur.update(livreurProfil.id, { statut: "hors_ligne" });
-    }
-    clearLivreurSession();
-    setLivreurProfil(null);
-  };
-
-  // Sync session avec la DB toutes les 10s
-  const { data: livreurDB } = useQuery({
-    queryKey: ["livreur-profil", livreurProfil?.id],
-    queryFn: () => base44.entities.Livreur.filter({ telephone: livreurProfil.telephone }),
-    enabled: !!livreurProfil,
+  // Charger le profil livreur lié à l'email de l'utilisateur connecté
+  const { data: livreurProfil } = useQuery({
+    queryKey: ["livreur-profil", user?.email],
+    queryFn: () => base44.entities.Livreur.filter({ user_email: user.email }),
+    enabled: !!user,
     refetchInterval: 10000,
-    select: (data) => data[0],
+    select: (data) => data[0] || null,
   });
 
+  // Vérifier si le compte est désactivé
   useEffect(() => {
-    if (livreurDB) {
-      if (livreurDB.actif === false) {
-        toast.error("Votre compte a été désactivé.");
-        handleLogout();
-        return;
-      }
-      const updated = { ...livreurDB };
-      setLivreurSession(updated);
-      setLivreurProfil(updated);
+    if (livreurProfil?.actif === false) {
+      toast.error("Votre compte a été désactivé.");
+      logout();
     }
-  }, [livreurDB]);
+  }, [livreurProfil?.actif]);
 
   const { data: mesCourses = [] } = useQuery({
     queryKey: ["mes-courses", livreurProfil?.id],
-    queryFn: () => livreurProfil
-      ? base44.entities.Course.filter({ livreur_id: livreurProfil.id }, "-created_date", 50)
-      : [],
-    enabled: !!livreurProfil,
+    queryFn: () => base44.entities.Course.filter({ livreur_id: livreurProfil.id }, "-created_date", 50),
+    enabled: !!livreurProfil?.id,
     initialData: [],
     refetchInterval: 5000,
   });
 
-  const courseEnAttente = useMemo(
-    () => mesCourses.find(c => c.statut === "en_attente_livreur"),
-    [mesCourses]
-  );
+  const courseEnAttente = useMemo(() => mesCourses.find(c => c.statut === "en_attente_livreur"), [mesCourses]);
+  const coursesActives = useMemo(() => mesCourses.filter(c => ["acceptee", "colis_recupere", "en_livraison"].includes(c.statut)), [mesCourses]);
 
-  const coursesActives = useMemo(
-    () => mesCourses.filter(c => ["acceptee", "colis_recupere", "en_livraison"].includes(c.statut)),
-    [mesCourses]
-  );
-
-  // Calcul total du jour
   const totalEncaisse = useMemo(() => {
     const today = new Date().toDateString();
     return mesCourses
@@ -387,7 +329,7 @@ export default function LivreurApp() {
 
   const toggleDispoMutation = useMutation({
     mutationFn: (newStatut) => base44.entities.Livreur.update(livreurProfil.id, { statut: newStatut }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["livreurs"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["livreur-profil"] }),
   });
 
   const updateCourseMutation = useMutation({
@@ -399,47 +341,32 @@ export default function LivreurApp() {
   });
 
   const handleAccepter = (course) => {
-    updateCourseMutation.mutate({
-      id: course.id,
-      data: { statut: "acceptee", heure_acceptation: new Date().toISOString() },
-    });
+    updateCourseMutation.mutate({ id: course.id, data: { statut: "acceptee", heure_acceptation: new Date().toISOString() } });
     base44.entities.Livreur.update(livreurProfil.id, { statut: "en_course" });
     toast.success("Course acceptée !");
   };
 
   const handleRefuser = (course) => {
-    updateCourseMutation.mutate({
-      id: course.id,
-      data: { statut: "nouvelle", livreur_id: "", livreur_nom: "" },
-    });
+    updateCourseMutation.mutate({ id: course.id, data: { statut: "nouvelle", livreur_id: "", livreur_nom: "" } });
     toast("Course refusée");
   };
 
   const handleColisRecupere = (course) => {
-    updateCourseMutation.mutate({
-      id: course.id,
-      data: { statut: "colis_recupere", heure_recuperation: new Date().toISOString() },
-    });
+    updateCourseMutation.mutate({ id: course.id, data: { statut: "colis_recupere", heure_recuperation: new Date().toISOString() } });
     toast.success("Colis récupéré !");
   };
 
   const handleColisLivre = (course, prixReel) => {
-    updateCourseMutation.mutate({
-      id: course.id,
-      data: { statut: "livree", heure_livraison: new Date().toISOString(), prix_reel: prixReel },
-    });
+    updateCourseMutation.mutate({ id: course.id, data: { statut: "livree", heure_livraison: new Date().toISOString(), prix_reel: prixReel } });
     base44.entities.Livreur.update(livreurProfil.id, { statut: "disponible" });
-    queryClient.invalidateQueries({ queryKey: ["livreurs"] });
+    queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
     toast.success(`Livraison terminée ! 🎉 ${prixReel.toLocaleString()} FCFA encaissés`);
   };
 
   const handleClientAnnule = (course) => {
-    updateCourseMutation.mutate({
-      id: course.id,
-      data: { statut: "annulee", remarque_livreur: "Annulé par le client" },
-    });
+    updateCourseMutation.mutate({ id: course.id, data: { statut: "annulee", remarque_livreur: "Annulé par le client" } });
     base44.entities.Livreur.update(livreurProfil.id, { statut: "disponible" });
-    queryClient.invalidateQueries({ queryKey: ["livreurs"] });
+    queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
     toast("Course annulée par le client");
   };
 
@@ -464,8 +391,39 @@ export default function LivreurApp() {
     return () => clearInterval(interval);
   }, [livreurProfil?.id, livreurProfil?.statut]);
 
+  // Chargement
+  if (isLoadingAuth) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
+        <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Non connecté → rediriger vers login Base44
+  if (!isAuthenticated) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-8 text-center">
+        <Truck className="w-14 h-14 text-primary" />
+        <h1 className="text-2xl font-bold">Silga Livraison</h1>
+        <p className="text-muted-foreground">Connectez-vous pour accéder à votre espace livreur</p>
+        <Button className="mt-2 bg-primary" onClick={() => navigateToLogin()}>Se connecter</Button>
+      </div>
+    );
+  }
+
+  // Connecté mais aucun profil livreur trouvé
   if (!livreurProfil) {
-    return <LivreurLogin onLogin={handleLogin} />;
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-8 text-center">
+        <Truck className="w-14 h-14 text-muted-foreground opacity-40" />
+        <h1 className="text-xl font-bold">Compte non configuré</h1>
+        <p className="text-muted-foreground text-sm max-w-sm">
+          Votre compte n'est pas encore lié à un profil livreur. Contactez un administrateur Silga.
+        </p>
+        <Button variant="outline" onClick={() => logout()}>Se déconnecter</Button>
+      </div>
+    );
   }
 
   const isEnLigne = livreurProfil.statut !== "hors_ligne";
@@ -498,12 +456,10 @@ export default function LivreurApp() {
               <span className="text-xs text-muted-foreground">{isEnLigne ? "En ligne" : "Hors ligne"}</span>
               <Switch
                 checked={isEnLigne}
-                onCheckedChange={(checked) =>
-                  toggleDispoMutation.mutate(checked ? "disponible" : "hors_ligne")
-                }
+                onCheckedChange={(checked) => toggleDispoMutation.mutate(checked ? "disponible" : "hors_ligne")}
               />
             </div>
-            <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={handleLogout} title="Déconnexion">
+            <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => logout()} title="Déconnexion">
               <LogOut className="w-4 h-4" />
             </Button>
           </div>
