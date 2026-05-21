@@ -1,0 +1,290 @@
+import React, { useState } from "react";
+import { MapPin, Phone, Navigation, Package, Check, X, AlertTriangle, ChevronRight } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import { base44 } from "@/api/base44Client";
+import { cn } from "@/lib/utils";
+
+const STEPS = [
+  { key: "acceptee", label: "Acceptée", icon: "✅" },
+  { key: "colis_recupere", label: "Récupéré", icon: "📦" },
+  { key: "en_livraison", label: "En livraison", icon: "🏃" },
+  { key: "livree", label: "Livré", icon: "🎉" },
+];
+
+function ProgressBar({ statut }) {
+  const idx = STEPS.findIndex(s => s.key === statut);
+  const current = idx === -1 ? 0 : idx;
+
+  return (
+    <div className="flex items-center gap-1 py-1">
+      {STEPS.map((step, i) => (
+        <React.Fragment key={step.key}>
+          <div className={cn(
+            "flex flex-col items-center gap-1 flex-shrink-0",
+          )}>
+            <div className={cn(
+              "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all",
+              i <= current ? "bg-primary text-white shadow-md shadow-primary/30" : "bg-gray-100 text-gray-400"
+            )}>
+              {i <= current ? step.icon : <span className="text-xs">{i + 1}</span>}
+            </div>
+            <p className={cn("text-[9px] font-semibold", i <= current ? "text-primary" : "text-gray-300")}>
+              {step.label}
+            </p>
+          </div>
+          {i < STEPS.length - 1 && (
+            <div className={cn(
+              "flex-1 h-0.5 rounded mb-4 transition-all",
+              i < current ? "bg-primary" : "bg-gray-100"
+            )} />
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+export default function CourseActiveCard({ course, onColisRecupere, onColisLivre, onClientAnnule, isPending }) {
+  const [prixReel, setPrixReel] = useState("");
+  const [showPrixModal, setShowPrixModal] = useState(false);
+  const [remarque, setRemarque] = useState("");
+  const [showRemarque, setShowRemarque] = useState(false);
+
+  const colisRecupere = course.statut === "colis_recupere" || course.statut === "en_livraison";
+  const colisLivre = course.statut === "livree";
+
+  const handleConfirmerLivraison = () => {
+    const montant = parseFloat(prixReel);
+    if (!prixReel || isNaN(montant) || montant <= 0) {
+      toast.error("Entrez le montant reçu du client");
+      return;
+    }
+    onColisLivre(course, montant);
+    setShowPrixModal(false);
+    setPrixReel("");
+  };
+
+  const handleRemarque = () => {
+    if (!remarque.trim()) return;
+    base44.entities.Course.update(course.id, { remarque_livreur: remarque });
+    setRemarque("");
+    setShowRemarque(false);
+    toast.success("Remarque enregistrée");
+  };
+
+  return (
+    <>
+      {/* Modal montant */}
+      {showPrixModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
+        >
+          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl space-y-5">
+            <div className="text-center">
+              <div className="w-14 h-14 rounded-2xl bg-amber-50 flex items-center justify-center mx-auto mb-3 text-3xl">
+                💰
+              </div>
+              <p className="text-xl font-black text-gray-900">Montant reçu</p>
+              <p className="text-sm text-gray-500 mt-1">Entrez le montant exact payé par le client</p>
+            </div>
+            <div className="relative">
+              <Input
+                type="number"
+                placeholder="1 500"
+                value={prixReel}
+                onChange={(e) => setPrixReel(e.target.value)}
+                className="text-center text-2xl font-black h-16 rounded-2xl border-2 border-gray-100 focus:border-primary pr-16"
+                autoFocus
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400">FCFA</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                className="h-12 rounded-2xl border border-gray-200 text-gray-600 font-bold text-sm"
+                onClick={() => setShowPrixModal(false)}
+              >
+                Annuler
+              </button>
+              <button
+                className="h-12 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-sm shadow-lg shadow-red-200 disabled:opacity-50"
+                onClick={handleConfirmerLivraison}
+                disabled={isPending}
+              >
+                Confirmer ✅
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Carte principale */}
+      <div className="bg-white rounded-3xl overflow-hidden shadow-lg border border-gray-100">
+        {/* Header de la carte */}
+        <div className="bg-gradient-to-r from-gray-900 to-gray-800 px-5 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+            <p className="text-white text-sm font-bold">Course en cours</p>
+          </div>
+          <span className="text-white/50 text-xs">#{course.id?.slice(-6)}</span>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Barre de progression */}
+          <ProgressBar statut={course.statut} />
+
+          {/* Client */}
+          <div className="flex items-center justify-between bg-gray-50 rounded-2xl p-3">
+            <div>
+              <p className="text-[10px] text-gray-400 font-semibold uppercase">Client</p>
+              <p className="font-black text-gray-900 text-base">{course.client_nom}</p>
+              <p className="text-xs text-gray-500">{course.client_telephone}</p>
+            </div>
+            <a href={`tel:${course.client_telephone}`}>
+              <div className="w-11 h-11 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center">
+                <Phone className="w-5 h-5 text-blue-600" />
+              </div>
+            </a>
+          </div>
+
+          {/* Trajet */}
+          <div className="space-y-2">
+            <div className={cn(
+              "flex items-center gap-3 p-3 rounded-2xl transition-all",
+              colisRecupere ? "bg-gray-50 opacity-60" : "bg-primary/5 border border-primary/20"
+            )}>
+              <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0",
+                colisRecupere ? "bg-gray-200" : "bg-primary/10"
+              )}>
+                <MapPin className={cn("w-4 h-4", colisRecupere ? "text-gray-400" : "text-primary")} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] text-gray-400 font-semibold uppercase">Récupérer</p>
+                <p className={cn("text-sm font-bold", colisRecupere ? "line-through text-gray-400" : "text-gray-800")}>
+                  {course.adresse_depart}
+                </p>
+              </div>
+              {course.gps_depart_lat && !colisRecupere && (
+                <a href={`https://www.google.com/maps?q=${course.gps_depart_lat},${course.gps_depart_lng}`} target="_blank" rel="noreferrer">
+                  <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <Navigation className="w-4 h-4 text-primary" />
+                  </div>
+                </a>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3 px-4">
+              <div className="w-0.5 h-4 bg-gray-200 ml-4 rounded" />
+            </div>
+
+            <div className={cn(
+              "flex items-center gap-3 p-3 rounded-2xl",
+              colisRecupere ? "bg-green-50 border border-green-200" : "bg-gray-50"
+            )}>
+              <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0",
+                colisRecupere ? "bg-green-100" : "bg-gray-200"
+              )}>
+                <MapPin className={cn("w-4 h-4", colisRecupere ? "text-green-600" : "text-gray-400")} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] text-gray-400 font-semibold uppercase">Livrer</p>
+                <p className="text-sm font-bold text-gray-800">{course.adresse_arrivee}</p>
+              </div>
+              {course.gps_arrivee_lat && colisRecupere && (
+                <a href={`https://www.google.com/maps?q=${course.gps_arrivee_lat},${course.gps_arrivee_lng}`} target="_blank" rel="noreferrer">
+                  <div className="w-9 h-9 rounded-xl bg-green-100 flex items-center justify-center">
+                    <Navigation className="w-4 h-4 text-green-600" />
+                  </div>
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Prix */}
+          {course.prix && (
+            <div className="flex items-center justify-between px-1">
+              <span className="text-gray-500 text-sm">Prix estimé</span>
+              <span className="text-xl font-black text-gray-900">{course.prix.toLocaleString()} <span className="text-sm font-semibold text-gray-400">FCFA</span></span>
+            </div>
+          )}
+
+          {course.notes && (
+            <p className="text-xs text-gray-500 bg-amber-50 border border-amber-100 p-3 rounded-2xl leading-relaxed">
+              📝 {course.notes}
+            </p>
+          )}
+
+          {/* Boutons d'action */}
+          {!colisLivre && (
+            <div className="space-y-3 pt-1">
+              {!colisRecupere ? (
+                <button
+                  className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                  onClick={() => onColisRecupere(course)}
+                  disabled={isPending}
+                >
+                  <Package className="w-6 h-6" />
+                  Colis récupéré
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              ) : (
+                <button
+                  className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                  onClick={() => setShowPrixModal(true)}
+                  disabled={isPending}
+                >
+                  <Check className="w-6 h-6" />
+                  Colis livré ✅
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              )}
+
+              <button
+                className="w-full h-11 rounded-2xl border border-red-200 text-red-500 font-semibold text-sm flex items-center justify-center gap-2 active:bg-red-50 transition-colors disabled:opacity-50"
+                onClick={() => onClientAnnule(course)}
+                disabled={isPending}
+              >
+                <X className="w-4 h-4" /> Le client a annulé
+              </button>
+
+              {!showRemarque ? (
+                <button
+                  className="w-full text-xs text-gray-400 flex items-center justify-center gap-1.5 py-1 hover:text-gray-600 transition-colors"
+                  onClick={() => setShowRemarque(true)}
+                >
+                  <AlertTriangle className="w-3.5 h-3.5" /> Signaler un problème
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  <Textarea
+                    placeholder="Décrivez le problème..."
+                    value={remarque}
+                    onChange={(e) => setRemarque(e.target.value)}
+                    className="text-sm rounded-2xl border-gray-200 min-h-[70px]"
+                  />
+                  <div className="flex gap-2">
+                    <button className="flex-1 h-10 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold" onClick={() => setShowRemarque(false)}>Annuler</button>
+                    <button className="flex-1 h-10 rounded-xl bg-gray-800 text-white text-sm font-semibold" onClick={handleRemarque}>Envoyer</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {colisLivre && (
+            <div className="text-center py-4 bg-green-50 rounded-2xl border border-green-200">
+              <p className="text-2xl mb-1">🎉</p>
+              <p className="font-black text-green-700 text-base">Course terminée !</p>
+              {course.prix_reel && (
+                <p className="text-green-600 text-sm font-semibold mt-0.5">
+                  {course.prix_reel.toLocaleString()} FCFA encaissés
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}

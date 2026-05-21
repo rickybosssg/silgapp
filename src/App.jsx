@@ -14,7 +14,7 @@ import ToutesCourses from './pages/ToutesCourses';
 import Livreurs from './pages/Livreurs';
 import RapportJour from './pages/RapportJour';
 import Notifications from './pages/Notifications';
-import LivreurApp from './pages/LivreurApp';
+import LivreurApp from './pages/LivreurApp.jsx';
 import InscriptionLivreur from './pages/InscriptionLivreur';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';

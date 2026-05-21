@@ -1,0 +1,55 @@
+import React from "react";
+import { cn } from "@/lib/utils";
+
+export default function LivreurStatutCard({ statut }) {
+  const isDisponible = statut === "disponible";
+  const isEnCourse = statut === "en_course";
+  const isHorsLigne = statut === "hors_ligne";
+
+  return (
+    <div className={cn(
+      "rounded-2xl p-4 flex items-center gap-4 shadow-sm transition-all duration-500",
+      isDisponible && "bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-green-200",
+      isEnCourse && "bg-gradient-to-r from-primary to-red-600 text-white shadow-red-200",
+      isHorsLigne && "bg-gray-100 text-gray-500",
+    )}>
+      {/* Animated dot */}
+      <div className="relative flex-shrink-0">
+        <div className={cn(
+          "w-12 h-12 rounded-2xl flex items-center justify-center text-2xl",
+          isDisponible && "bg-white/20",
+          isEnCourse && "bg-white/20",
+          isHorsLigne && "bg-gray-200",
+        )}>
+          {isDisponible && "✅"}
+          {isEnCourse && "🚀"}
+          {isHorsLigne && "⏸️"}
+        </div>
+        {(isDisponible || isEnCourse) && (
+          <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-white/80 animate-ping" />
+        )}
+      </div>
+
+      <div>
+        <p className={cn(
+          "font-bold text-base leading-tight",
+          isHorsLigne && "text-gray-600"
+        )}>
+          {isDisponible && "Disponible"}
+          {isEnCourse && "En course"}
+          {isHorsLigne && "Hors ligne"}
+        </p>
+        <p className={cn(
+          "text-xs mt-0.5",
+          isDisponible && "text-white/70",
+          isEnCourse && "text-white/70",
+          isHorsLigne && "text-gray-400",
+        )}>
+          {isDisponible && "En attente de nouvelles courses…"}
+          {isEnCourse && "Vous êtes en déplacement"}
+          {isHorsLigne && "Activez le switch pour être en ligne"}
+        </p>
+      </div>
+    </div>
+  );
+}
