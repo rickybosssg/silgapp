@@ -15,6 +15,7 @@ import Livreurs from './pages/Livreurs';
 import RapportJour from './pages/RapportJour';
 import Notifications from './pages/Notifications';
 import LivreurApp from './pages/LivreurApp';
+import InscriptionLivreur from './pages/InscriptionLivreur';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -51,6 +52,7 @@ const AuthenticatedApp = () => {
         <Route path="/notifications" element={<Notifications />} />
       </Route>
       <Route path="/livreur" element={<LivreurApp />} />
+      <Route path="/inscription-livreur" element={<InscriptionLivreur />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

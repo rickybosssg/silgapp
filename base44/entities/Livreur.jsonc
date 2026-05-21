@@ -2,13 +2,35 @@
   "name": "Livreur",
   "type": "object",
   "properties": {
+    "prenom": {
+      "type": "string",
+      "description": "Pr\u00e9nom du livreur"
+    },
     "nom": {
       "type": "string",
-      "description": "Nom complet du livreur"
+      "description": "Nom de famille du livreur"
     },
     "telephone": {
       "type": "string",
       "description": "Num\u00e9ro de t\u00e9l\u00e9phone"
+    },
+    "quartier": {
+      "type": "string",
+      "description": "Quartier principal d'activit\u00e9"
+    },
+    "photo_url": {
+      "type": "string",
+      "description": "Photo de profil du livreur"
+    },
+    "validation": {
+      "type": "string",
+      "enum": [
+        "en_attente",
+        "valide",
+        "refuse"
+      ],
+      "default": "en_attente",
+      "description": "Statut de validation par l'admin"
     },
     "statut": {
       "type": "string",
@@ -18,7 +40,7 @@
         "hors_ligne"
       ],
       "default": "hors_ligne",
-      "description": "Statut actuel du livreur"
+      "description": "Statut actuel du livreur (actif uniquement si valid\u00e9)"
     },
     "latitude": {
       "type": "number",
@@ -52,10 +74,6 @@
       ],
       "default": "moto",
       "description": "Type de v\u00e9hicule"
-    },
-    "photo_url": {
-      "type": "string",
-      "description": "Photo de profil du livreur"
     }
   },
   "required": [
