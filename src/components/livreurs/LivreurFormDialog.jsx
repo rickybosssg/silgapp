@@ -95,7 +95,26 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
 
           <div className="space-y-1.5">
             <Label className="text-xs">Téléphone *</Label>
-            <Input placeholder="+226 70 00 00 00" value={form.telephone} onChange={(e) => setForm((p) => ({ ...p, telephone: e.target.value }))} required type="tel" />
+            <Input
+              placeholder="+226 70 00 00 00"
+              value={form.telephone}
+              onChange={(e) => {
+                // Garder uniquement + et chiffres, puis formater
+                const raw = e.target.value.replace(/[^\d+]/g, "");
+                let formatted = raw;
+                if (raw.startsWith("+226")) {
+                  const local = raw.slice(4).replace(/(\d{2})(?=\d)/g, "$1 ").trim();
+                  formatted = "+226 " + local;
+                } else if (raw.startsWith("+")) {
+                  formatted = raw;
+                } else {
+                  formatted = raw.replace(/(\d{2})(?=\d)/g, "$1 ").trim();
+                }
+                setForm((p) => ({ ...p, telephone: formatted }));
+              }}
+              required
+              type="tel"
+            />
           </div>
 
           <div className="space-y-1.5">
