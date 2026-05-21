@@ -137,30 +137,7 @@ export default function InscriptionLivreur() {
                   required
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Véhicule</Label>
-                <div className="grid grid-cols-4 gap-2">
-                  {[
-                    { value: "moto", label: "🏍️ Moto" },
-                    { value: "velo", label: "🚲 Vélo" },
-                    { value: "voiture", label: "🚗 Voiture" },
-                    { value: "a_pied", label: "🚶 À pied" },
-                  ].map(v => (
-                    <button
-                      key={v.value}
-                      type="button"
-                      onClick={() => setForm(p => ({ ...p, vehicule: v.value }))}
-                      className={`p-2 rounded-lg border text-xs font-medium transition-all ${
-                        form.vehicule === v.value
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-muted-foreground"
-                      }`}
-                    >
-                      {v.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+
             </CardContent>
           </Card>
 
