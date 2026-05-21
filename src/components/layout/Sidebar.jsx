@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
-  ChevronLeft, ChevronRight, Package 
+  ChevronLeft, ChevronRight, Package, TrendingUp 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
