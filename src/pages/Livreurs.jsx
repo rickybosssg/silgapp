@@ -5,14 +5,14 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Truck, Phone, MapPin, Check, X, Clock, UserCheck, Copy, Banknote, Plus, Pencil, UserX } from "lucide-react";
+import { Truck, Phone, MapPin, Check, X, Clock, UserCheck, Copy, Banknote, Plus, Pencil, UserX, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import LivreurFormDialog from "@/components/livreurs/LivreurFormDialog";
 
-function LivreurCard({ livreur, courses, onValider, onRefuser, onToggleStatut, onValiderPaiement, onEdit, isPending }) {
+function LivreurCard({ livreur, courses, onValider, onRefuser, onToggleStatut, onValiderPaiement, onEdit, onSupprimer, isPending }) {
   const nomComplet = `${livreur.prenom || ""} ${livreur.nom}`.trim();
 
   // Calcul montant dû à partir des prix réels des courses du jour livrées
@@ -88,7 +88,17 @@ function LivreurCard({ livreur, courses, onValider, onRefuser, onToggleStatut, o
           <Button size="sm" variant="destructive" className="flex-1 h-8 gap-1 text-xs" onClick={() => onRefuser(livreur)} disabled={isPending}>
             <X className="w-3.5 h-3.5" /> Refuser
           </Button>
+          <Button size="sm" variant="ghost" className="h-8 px-2 text-xs gap-1 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => onSupprimer(livreur)} disabled={isPending}>
+            <Trash2 className="w-3 h-3" />
+          </Button>
         </div>
+      )}
+
+      {/* Suppression pour livreurs refusés */}
+      {livreur.validation === "refuse" && (
+        <Button size="sm" variant="ghost" className="w-full h-7 text-xs gap-1 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => onSupprimer(livreur)} disabled={isPending}>
+          <Trash2 className="w-3 h-3" /> Supprimer définitivement
+        </Button>
       )}
 
       {/* Actions statut livreur validé */}
@@ -116,6 +126,15 @@ function LivreurCard({ livreur, courses, onValider, onRefuser, onToggleStatut, o
           >
             <UserX className="w-3 h-3" />
             {livreur.actif === false ? "Réactiver" : "Désactiver"}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-xs gap-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => onSupprimer(livreur)}
+            disabled={isPending}
+          >
+            <Trash2 className="w-3 h-3" /> Supprimer
           </Button>
         </div>
       )}
@@ -189,6 +208,11 @@ export default function Livreurs() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["livreurs"] }),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.Livreur.delete(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["livreurs"] }),
+  });
+
   const handleValider = (livreur) => {
     updateMutation.mutate({ id: livreur.id, data: { validation: "valide", statut: "hors_ligne" } });
     toast.success(`${livreur.prenom || livreur.nom} validé ✅`);
@@ -207,6 +231,13 @@ export default function Livreurs() {
     } else {
       updateMutation.mutate({ id: livreur.id, data: { statut } });
     }
+  };
+
+  const handleSupprimer = (livreur) => {
+    const nomComplet = `${livreur.prenom || ""} ${livreur.nom}`.trim();
+    if (!window.confirm(`Supprimer définitivement ${nomComplet} ? Cette action est irréversible.`)) return;
+    deleteMutation.mutate(livreur.id);
+    toast.success(`${nomComplet} supprimé`);
   };
 
   const handleValiderPaiement = (livreur, montant) => {
@@ -303,7 +334,8 @@ export default function Livreurs() {
             onToggleStatut={handleToggleStatut}
             onValiderPaiement={handleValiderPaiement}
             onEdit={(l) => { setEditingLivreur(l); setShowForm(true); }}
-            isPending={updateMutation.isPending}
+            onSupprimer={handleSupprimer}
+            isPending={updateMutation.isPending || deleteMutation.isPending}
           />
         ))}
       </div>
