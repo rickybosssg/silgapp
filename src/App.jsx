@@ -14,6 +14,7 @@ import ToutesCourses from './pages/ToutesCourses';
 import Livreurs from './pages/Livreurs';
 import RapportJour from './pages/RapportJour';
 import Notifications from './pages/Notifications';
+import RecapitulatifAdmin from './pages/RecapitulatifAdmin';
 import LivreurApp from './pages/LivreurApp.jsx';
 import InscriptionLivreur from './pages/InscriptionLivreur';
 import { useQuery } from '@tanstack/react-query';
@@ -83,6 +84,7 @@ const AuthenticatedApp = () => {
         <Route path="/courses" element={<ToutesCourses />} />
         <Route path="/livreurs" element={<Livreurs />} />
         <Route path="/rapport" element={<RapportJour />} />
+        <Route path="/recapitulatif" element={<RecapitulatifAdmin />} />
         <Route path="/notifications" element={<Notifications />} />
       </Route>
 

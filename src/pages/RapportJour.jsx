@@ -7,6 +7,7 @@ import { isToday, getHours, format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import StatCard from "../components/dashboard/StatCard";
+import LivreurPerformanceTable from "../components/livreurs/LivreurPerformanceTable";
 
 const COLORS = ["#dc2626", "#f59e0b", "#16a34a", "#3b82f6", "#8b5cf6", "#ec4899"];
 
@@ -187,6 +188,9 @@ export default function RapportJour() {
           )}
         </CardContent>
       </Card>
+
+      {/* Tableau performance livreurs */}
+      <LivreurPerformanceTable />
     </div>
   );
 }

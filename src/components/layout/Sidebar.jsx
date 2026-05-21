@@ -14,6 +14,7 @@ const navItems = [
   { path: "/courses", label: "Toutes les courses", icon: Package },
   { path: "/livreurs", label: "Livreurs", icon: Truck },
   { path: "/rapport", label: "Rapport du jour", icon: BarChart3 },
+  { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp },
   { path: "/notifications", label: "Notifications", icon: Bell },
 ];
 

@@ -13,11 +13,14 @@ import LivreurStatutCard from "@/components/livreur/LivreurStatutCard";
 import EmptyStateAttente from "@/components/livreur/EmptyStateAttente";
 import CourseEnAttenteModal from "@/components/livreur/CourseEnAttenteModal";
 import CourseActiveCard from "@/components/livreur/CourseActiveCard";
+import LivreurHistorique from "@/components/livreur/LivreurHistorique";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function LivreurApp() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { user, isAuthenticated, isLoadingAuth, navigateToLogin, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState("courses");
 
   // Rediriger les admins
   useEffect(() => {
@@ -203,7 +206,18 @@ export default function LivreurApp() {
         />
       )}
 
-      <div className="max-w-lg mx-auto p-4 pb-12 space-y-4">
+      <div className="max-w-lg mx-auto p-4 pb-12">
+        {/* Onglets */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
+          <TabsList className="w-full">
+            <TabsTrigger value="courses" className="flex-1 text-xs">Courses</TabsTrigger>
+            <TabsTrigger value="historique" className="flex-1 text-xs">Historique</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {/* Contenu onglet Courses */}
+        {activeTab === "courses" && (
+          <div className="space-y-4">
         {/* Header */}
         <LivreurHeader
           livreur={livreurProfil}
@@ -245,6 +259,15 @@ export default function LivreurApp() {
             <p className="text-xs text-amber-600 font-bold uppercase tracking-wide mb-1">Bilan du jour</p>
             <p className="text-3xl font-black text-amber-700">{totalEncaisse.toLocaleString()} <span className="text-base font-semibold text-amber-500">FCFA</span></p>
             <p className="text-xs text-amber-500 mt-1">Montant à reverser à Silga Livraison</p>
+          </div>
+        )}
+          </div>
+        )}
+
+        {/* Contenu onglet Historique */}
+        {activeTab === "historique" && (
+          <div>
+            <LivreurHistorique mesCourses={mesCourses} livreurProfil={livreurProfil} />
           </div>
         )}
       </div>
