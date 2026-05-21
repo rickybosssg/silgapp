@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Bell, Send, CheckCircle2, XCircle, Loader2, Smartphone, User, AlertTriangle, Wifi, WifiOff } from "lucide-react";
 import { toast } from "sonner";
-import { detectEnvironment, checkNotificationSupport, requestNotificationPermission, registerPushToken, showLocalNotification, getCurrentFCMToken } from "@/lib/notifications";
+import { detectEnvironment, checkNotificationSupport, requestNotificationPermission, registerPushToken, showLocalNotification } from "@/lib/notifications";
 
 export default function TestNotificationsPush() {
   const [env, setEnv] = useState(null);
