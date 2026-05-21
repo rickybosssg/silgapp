@@ -1,33 +1,259 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { 
-  Truck, MapPin, Phone, User, Package, ArrowDown, 
-  Check, X, Navigation, Clock, AlertTriangle 
-} from "lucide-react";
-import { format } from "date-fns";
-import { fr } from "date-fns/locale";
-import CourseStatusBadge from "../components/courses/CourseStatusBadge";
+import { Textarea } from "@/components/ui/textarea";
+import { Truck, MapPin, Phone, User, Check, X, Navigation, ArrowDown, Package, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-const etapes = [
-  { statut: "acceptee", label: "Accepter la course", next: "en_route_recuperation" },
-  { statut: "en_route_recuperation", label: "Je pars récupérer", next: "colis_recupere" },
-  { statut: "colis_recupere", label: "Colis récupéré", next: "en_livraison" },
-  { statut: "en_livraison", label: "En route livraison", next: "livree" },
-];
+// Vibration répétée tant qu'une course est en attente
+function useVibration(active) {
+  const intervalRef = useRef(null);
+  useEffect(() => {
+    if (active && navigator.vibrate) {
+      // Vibrer immédiatement puis toutes les 3 secondes
+      navigator.vibrate([400, 200, 400, 200, 400]);
+      intervalRef.current = setInterval(() => {
+        navigator.vibrate([400, 200, 400, 200, 400]);
+      }, 3000);
+    } else {
+      navigator.vibrate?.(0);
+      clearInterval(intervalRef.current);
+    }
+    return () => {
+      navigator.vibrate?.(0);
+      clearInterval(intervalRef.current);
+    };
+  }, [active]);
+}
+
+function CourseEnAttente({ course, onAccepter, onRefuser, isPending }) {
+  useVibration(true);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+      <Card className="w-full max-w-sm bg-white border-4 border-primary shadow-2xl animate-pulse">
+        <div className="bg-primary text-white text-center py-3 rounded-t-lg">
+          <p className="text-lg font-bold">🚨 NOUVELLE COURSE !</p>
+          <p className="text-xs opacity-80">Répondez maintenant</p>
+        </div>
+        <div className="p-5 space-y-4">
+          {/* Client */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <User className="w-4 h-4 text-muted-foreground" />
+              <span className="font-bold text-base">{course.client_nom}</span>
+            </div>
+            <a href={`tel:${course.client_telephone}`}>
+              <Button size="icon" variant="outline" className="h-9 w-9">
+                <Phone className="w-4 h-4" />
+              </Button>
+            </a>
+          </div>
+
+          {/* Trajet */}
+          <div className="bg-muted/60 rounded-lg p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-primary flex-shrink-0" />
+              <div>
+                <p className="text-[10px] text-muted-foreground uppercase">Récupérer ici</p>
+                <p className="text-sm font-semibold">{course.adresse_depart}</p>
+              </div>
+              {course.gps_depart_lat && (
+                <a href={`https://www.google.com/maps?q=${course.gps_depart_lat},${course.gps_depart_lng}`} target="_blank" rel="noreferrer" className="ml-auto">
+                  <Navigation className="w-4 h-4 text-primary" />
+                </a>
+              )}
+            </div>
+            <ArrowDown className="w-4 h-4 text-muted-foreground mx-auto" />
+            <div className="flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-accent flex-shrink-0" />
+              <div>
+                <p className="text-[10px] text-muted-foreground uppercase">Livrer ici</p>
+                <p className="text-sm font-semibold">{course.adresse_arrivee}</p>
+              </div>
+              {course.gps_arrivee_lat && (
+                <a href={`https://www.google.com/maps?q=${course.gps_arrivee_lat},${course.gps_arrivee_lng}`} target="_blank" rel="noreferrer" className="ml-auto">
+                  <Navigation className="w-4 h-4 text-accent" />
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Prix + urgence */}
+          <div className="flex items-center justify-between">
+            {course.prix ? (
+              <span className="text-xl font-bold text-foreground">{course.prix.toLocaleString()} FCFA</span>
+            ) : <span />}
+            {course.urgence === "tres_urgente" && (
+              <span className="text-xs bg-red-100 text-red-700 font-bold px-2 py-1 rounded">⚡ TRÈS URGENT</span>
+            )}
+            {course.urgence === "urgente" && (
+              <span className="text-xs bg-amber-100 text-amber-700 font-bold px-2 py-1 rounded">⚡ URGENT</span>
+            )}
+          </div>
+
+          {course.notes && (
+            <p className="text-xs text-muted-foreground bg-muted/40 p-2 rounded">{course.notes}</p>
+          )}
+
+          {/* Boutons décision */}
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <Button
+              className="h-14 text-base font-bold bg-primary hover:bg-primary/90 flex flex-col gap-0.5"
+              onClick={() => onAccepter(course)}
+              disabled={isPending}
+            >
+              <Check className="w-5 h-5" />
+              <span className="text-xs">Oui, je prends</span>
+            </Button>
+            <Button
+              variant="destructive"
+              className="h-14 text-base font-bold flex flex-col gap-0.5"
+              onClick={() => onRefuser(course)}
+              disabled={isPending}
+            >
+              <X className="w-5 h-5" />
+              <span className="text-xs">Non, occupé</span>
+            </Button>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function CourseActive({ course, onColisRecupere, onColisLivre, isPending }) {
+  const [remarque, setRemarque] = useState("");
+  const [showRemarque, setShowRemarque] = useState(false);
+
+  const handleRemarque = () => {
+    if (!remarque.trim()) return;
+    base44.entities.Course.update(course.id, { remarque_livreur: remarque });
+    setRemarque("");
+    setShowRemarque(false);
+    toast.success("Remarque enregistrée");
+  };
+
+  const colisRecupere = course.statut === "colis_recupere" || course.statut === "en_livraison";
+  const colisLivre = course.statut === "livree";
+
+  return (
+    <Card className="overflow-hidden border-2 border-accent/30">
+      <div className="bg-accent/10 px-4 py-2 border-b border-accent/20">
+        <p className="text-xs font-semibold text-accent uppercase tracking-wide">Course acceptée ✅</p>
+      </div>
+      <div className="p-4 space-y-3">
+        {/* Client */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <User className="w-4 h-4 text-muted-foreground" />
+            <span className="font-bold">{course.client_nom}</span>
+          </div>
+          <a href={`tel:${course.client_telephone}`}>
+            <Button size="icon" variant="outline" className="h-8 w-8">
+              <Phone className="w-4 h-4" />
+            </Button>
+          </a>
+        </div>
+
+        {/* Trajet */}
+        <div className="space-y-1 text-sm">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+            <span className={cn(colisRecupere && "line-through text-muted-foreground")}>{course.adresse_depart}</span>
+            {course.gps_depart_lat && (
+              <a href={`https://www.google.com/maps?q=${course.gps_depart_lat},${course.gps_depart_lng}`} target="_blank" rel="noreferrer">
+                <Navigation className="w-3 h-3 text-primary" />
+              </a>
+            )}
+          </div>
+          <ArrowDown className="w-3 h-3 text-muted-foreground ml-1.5" />
+          <div className="flex items-center gap-2">
+            <MapPin className="w-3.5 h-3.5 text-accent flex-shrink-0" />
+            <span>{course.adresse_arrivee}</span>
+            {course.gps_arrivee_lat && (
+              <a href={`https://www.google.com/maps?q=${course.gps_arrivee_lat},${course.gps_arrivee_lng}`} target="_blank" rel="noreferrer">
+                <Navigation className="w-3 h-3 text-accent" />
+              </a>
+            )}
+          </div>
+        </div>
+
+        {course.prix && (
+          <p className="font-bold text-base">{course.prix.toLocaleString()} FCFA</p>
+        )}
+        {course.notes && (
+          <p className="text-xs text-muted-foreground bg-muted/40 p-2 rounded">{course.notes}</p>
+        )}
+
+        {/* Boutons de suivi — seulement 2 */}
+        <div className="space-y-2 pt-1">
+          {!colisRecupere && (
+            <Button
+              className="w-full h-12 text-sm font-bold bg-amber-500 hover:bg-amber-600 text-white gap-2"
+              onClick={() => onColisRecupere(course)}
+              disabled={isPending}
+            >
+              <Package className="w-5 h-5" />
+              Colis récupéré
+            </Button>
+          )}
+          {colisRecupere && !colisLivre && (
+            <Button
+              className="w-full h-12 text-sm font-bold bg-primary gap-2"
+              onClick={() => onColisLivre(course)}
+              disabled={isPending}
+            >
+              <Check className="w-5 h-5" />
+              Colis livré ✅
+            </Button>
+          )}
+          {colisLivre && (
+            <div className="text-center text-sm font-semibold text-accent py-2">
+              ✅ Course terminée !
+            </div>
+          )}
+        </div>
+
+        {/* Remarque problème */}
+        {!colisLivre && (
+          <div>
+            {!showRemarque ? (
+              <button
+                className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground"
+                onClick={() => setShowRemarque(true)}
+              >
+                <AlertTriangle className="w-3 h-3" /> Signaler un problème
+              </button>
+            ) : (
+              <div className="flex gap-2">
+                <Textarea
+                  placeholder="Décrivez le problème..."
+                  value={remarque}
+                  onChange={(e) => setRemarque(e.target.value)}
+                  className="text-xs min-h-[60px]"
+                />
+                <div className="flex flex-col gap-1">
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleRemarque}>OK</Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowRemarque(false)}>✕</Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
 
 export default function LivreurApp() {
   const queryClient = useQueryClient();
   const [currentUser, setCurrentUser] = useState(null);
   const [livreurProfil, setLivreurProfil] = useState(null);
-  const [remarque, setRemarque] = useState("");
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(() => {});
@@ -37,6 +263,7 @@ export default function LivreurApp() {
     queryKey: ["livreurs"],
     queryFn: () => base44.entities.Livreur.list(),
     initialData: [],
+    refetchInterval: 10000,
   });
 
   useEffect(() => {
@@ -48,16 +275,23 @@ export default function LivreurApp() {
 
   const { data: mesCourses = [] } = useQuery({
     queryKey: ["mes-courses", livreurProfil?.id],
-    queryFn: () => livreurProfil 
+    queryFn: () => livreurProfil
       ? base44.entities.Course.filter({ livreur_id: livreurProfil.id }, "-created_date", 50)
       : [],
     enabled: !!livreurProfil,
     initialData: [],
-    refetchInterval: 10000,
+    refetchInterval: 5000,
   });
 
+  const courseEnAttente = useMemo(
+    () => mesCourses.find(c => c.statut === "en_attente_livreur"),
+    [mesCourses]
+  );
+
   const coursesActives = useMemo(
-    () => mesCourses.filter(c => !["livree", "annulee"].includes(c.statut)),
+    () => mesCourses.filter(c =>
+      ["acceptee", "colis_recupere", "en_livraison"].includes(c.statut)
+    ),
     [mesCourses]
   );
 
@@ -70,14 +304,47 @@ export default function LivreurApp() {
     mutationFn: ({ id, data }) => base44.entities.Course.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mes-courses"] });
-      toast.success("Course mise à jour");
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
     },
   });
+
+  const handleAccepter = (course) => {
+    updateCourseMutation.mutate({
+      id: course.id,
+      data: { statut: "acceptee", heure_acceptation: new Date().toISOString() },
+    });
+    base44.entities.Livreur.update(livreurProfil.id, { statut: "en_course" });
+    toast.success("Course acceptée !");
+  };
+
+  const handleRefuser = (course) => {
+    updateCourseMutation.mutate({
+      id: course.id,
+      data: { statut: "nouvelle", livreur_id: "", livreur_nom: "" },
+    });
+    toast("Course refusée");
+  };
+
+  const handleColisRecupere = (course) => {
+    updateCourseMutation.mutate({
+      id: course.id,
+      data: { statut: "colis_recupere", heure_recuperation: new Date().toISOString() },
+    });
+    toast.success("Colis récupéré !");
+  };
+
+  const handleColisLivre = (course) => {
+    updateCourseMutation.mutate({
+      id: course.id,
+      data: { statut: "livree", heure_livraison: new Date().toISOString() },
+    });
+    base44.entities.Livreur.update(livreurProfil.id, { statut: "disponible" });
+    toast.success("Livraison terminée ! 🎉");
+  };
 
   // GPS tracking
   useEffect(() => {
     if (!livreurProfil || livreurProfil.statut === "hors_ligne") return;
-
     const updatePos = () => {
       navigator.geolocation?.getCurrentPosition(
         (pos) => {
@@ -96,207 +363,89 @@ export default function LivreurApp() {
     return () => clearInterval(interval);
   }, [livreurProfil?.id, livreurProfil?.statut]);
 
-  const handleAvancer = (course) => {
-    const etape = etapes.find(e => e.statut === course.statut);
-    if (!etape) return;
-    const data = { statut: etape.next };
-    if (etape.next === "acceptee" || course.statut === "en_attente_livreur") {
-      data.statut = "acceptee";
-      data.heure_acceptation = new Date().toISOString();
-    }
-    if (etape.next === "colis_recupere") data.heure_recuperation = new Date().toISOString();
-    if (etape.next === "livree") data.heure_livraison = new Date().toISOString();
-    updateCourseMutation.mutate({ id: course.id, data });
-  };
-
-  const handleAccepter = (course) => {
-    updateCourseMutation.mutate({
-      id: course.id,
-      data: { statut: "acceptee", heure_acceptation: new Date().toISOString() },
-    });
-    if (livreurProfil) {
-      base44.entities.Livreur.update(livreurProfil.id, { statut: "en_course" });
-    }
-  };
-
-  const handleRefuser = (course) => {
-    updateCourseMutation.mutate({
-      id: course.id,
-      data: { statut: "nouvelle", livreur_id: "", livreur_nom: "" },
-    });
-  };
-
-  const handleRemarque = (course) => {
-    if (!remarque.trim()) return;
-    updateCourseMutation.mutate({
-      id: course.id,
-      data: { remarque_livreur: remarque },
-    });
-    setRemarque("");
-  };
-
   if (!livreurProfil) {
     return (
-      <div className="p-6 text-center space-y-4 max-w-md mx-auto mt-20">
-        <Truck className="w-12 h-12 text-muted-foreground mx-auto" />
-        <h1 className="text-xl font-bold">Espace Livreur</h1>
-        <p className="text-sm text-muted-foreground">
-          Votre compte n'est pas lié à un profil livreur. Contactez l'administrateur Silga.
-        </p>
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="text-center space-y-4 max-w-sm">
+          <Truck className="w-16 h-16 text-muted-foreground mx-auto" />
+          <h1 className="text-xl font-bold">Espace Livreur</h1>
+          <p className="text-sm text-muted-foreground">
+            Votre compte n'est pas encore lié à un profil livreur.<br />
+            Contactez l'administrateur Silga.
+          </p>
+        </div>
       </div>
     );
   }
 
-  const isDisponible = livreurProfil.statut === "disponible" || livreurProfil.statut === "en_course";
+  const isEnLigne = livreurProfil.statut !== "hors_ligne";
 
   return (
-    <div className="p-4 space-y-4 max-w-lg mx-auto pb-24">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-            <Truck className="w-5 h-5 text-primary" />
-          </div>
-          <div>
-            <p className="font-bold text-sm">{livreurProfil.nom}</p>
-            <p className="text-xs text-muted-foreground">{livreurProfil.telephone}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">En ligne</span>
-          <Switch
-            checked={isDisponible}
-            onCheckedChange={(checked) =>
-              toggleDispoMutation.mutate(checked ? "disponible" : "hors_ligne")
-            }
-          />
-        </div>
-      </div>
-
-      {/* Status */}
-      <Card className={cn(
-        "p-3 text-center",
-        isDisponible ? "bg-accent/10 border-accent" : "bg-muted"
-      )}>
-        <p className="text-sm font-medium">
-          {livreurProfil.statut === "disponible" && "✅ Vous êtes disponible"}
-          {livreurProfil.statut === "en_course" && "🚀 En course"}
-          {livreurProfil.statut === "hors_ligne" && "⏸️ Hors ligne"}
-        </p>
-      </Card>
-
-      {/* Active courses */}
-      <h2 className="font-semibold text-sm">
-        Courses actives ({coursesActives.length})
-      </h2>
-
-      {coursesActives.length === 0 && (
-        <p className="text-center text-muted-foreground text-sm py-8">
-          Aucune course active pour le moment
-        </p>
+    <div className="min-h-screen bg-background">
+      {/* Course en attente — overlay plein écran */}
+      {courseEnAttente && (
+        <CourseEnAttente
+          course={courseEnAttente}
+          onAccepter={handleAccepter}
+          onRefuser={handleRefuser}
+          isPending={updateCourseMutation.isPending}
+        />
       )}
 
-      {coursesActives.map(course => {
-        const nextEtape = etapes.find(e => e.statut === course.statut);
-        return (
-          <Card key={course.id} className="p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <CourseStatusBadge statut={course.statut} />
-              <span className="text-xs text-muted-foreground">
-                {format(new Date(course.created_date), "HH:mm", { locale: fr })}
-              </span>
+      <div className="p-4 space-y-4 max-w-lg mx-auto pb-10">
+        {/* Header */}
+        <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
+              <Truck className="w-5 h-5 text-white" />
             </div>
-
-            {/* Client */}
-            <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-muted-foreground" />
-              <span className="font-medium text-sm">{course.client_nom}</span>
-              <a href={`tel:${course.client_telephone}`} className="ml-auto">
-                <Button size="icon" variant="outline" className="h-8 w-8">
-                  <Phone className="w-4 h-4" />
-                </Button>
-              </a>
+            <div>
+              <p className="font-bold">{livreurProfil.nom}</p>
+              <p className="text-xs text-muted-foreground">{livreurProfil.telephone}</p>
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">{isEnLigne ? "En ligne" : "Hors ligne"}</span>
+            <Switch
+              checked={isEnLigne}
+              onCheckedChange={(checked) =>
+                toggleDispoMutation.mutate(checked ? "disponible" : "hors_ligne")
+              }
+            />
+          </div>
+        </div>
 
-            {/* Route */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 text-xs">
-                <MapPin className="w-3.5 h-3.5 text-primary" />
-                <span>{course.adresse_depart}</span>
-                {course.gps_depart_lat && (
-                  <a
-                    href={`https://www.google.com/maps?q=${course.gps_depart_lat},${course.gps_depart_lng}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <Navigation className="w-3 h-3 text-primary" />
-                  </a>
-                )}
-              </div>
-              <div className="ml-2"><ArrowDown className="w-3 h-3 text-muted-foreground" /></div>
-              <div className="flex items-center gap-2 text-xs">
-                <MapPin className="w-3.5 h-3.5 text-accent" />
-                <span>{course.adresse_arrivee}</span>
-                {course.gps_arrivee_lat && (
-                  <a
-                    href={`https://www.google.com/maps?q=${course.gps_arrivee_lat},${course.gps_arrivee_lng}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <Navigation className="w-3 h-3 text-accent" />
-                  </a>
-                )}
-              </div>
-            </div>
+        {/* Statut */}
+        <div className={cn(
+          "rounded-xl p-3 text-center font-semibold text-sm",
+          livreurProfil.statut === "disponible" && "bg-green-100 text-green-700",
+          livreurProfil.statut === "en_course" && "bg-amber-100 text-amber-700",
+          livreurProfil.statut === "hors_ligne" && "bg-slate-100 text-slate-500",
+        )}>
+          {livreurProfil.statut === "disponible" && "✅ Disponible — en attente de courses"}
+          {livreurProfil.statut === "en_course" && "🚀 En course"}
+          {livreurProfil.statut === "hors_ligne" && "⏸️ Hors ligne"}
+        </div>
 
-            {course.prix && (
-              <p className="text-sm font-bold">{course.prix.toLocaleString()} FCFA</p>
-            )}
+        {/* Courses actives */}
+        {coursesActives.length === 0 && isEnLigne && (
+          <div className="text-center text-muted-foreground text-sm py-12 space-y-2">
+            <Package className="w-10 h-10 mx-auto opacity-30" />
+            <p>Aucune course en cours</p>
+            <p className="text-xs">Vous serez notifié dès qu'une course vous est assignée</p>
+          </div>
+        )}
 
-            {course.notes && (
-              <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">{course.notes}</p>
-            )}
-
-            {/* Actions */}
-            {course.statut === "en_attente_livreur" && (
-              <div className="flex gap-2">
-                <Button className="flex-1 bg-accent gap-1.5" onClick={() => handleAccepter(course)}>
-                  <Check className="w-4 h-4" /> Accepter
-                </Button>
-                <Button variant="destructive" className="flex-1 gap-1.5" onClick={() => handleRefuser(course)}>
-                  <X className="w-4 h-4" /> Refuser
-                </Button>
-              </div>
-            )}
-
-            {nextEtape && course.statut !== "en_attente_livreur" && (
-              <Button
-                className="w-full bg-primary gap-1.5"
-                onClick={() => handleAvancer(course)}
-              >
-                {nextEtape.next === "livree" ? <Check className="w-4 h-4" /> : <Truck className="w-4 h-4" />}
-                {nextEtape.next === "en_route_recuperation" && "Je pars récupérer"}
-                {nextEtape.next === "colis_recupere" && "Colis récupéré"}
-                {nextEtape.next === "en_livraison" && "En route livraison"}
-                {nextEtape.next === "livree" && "Marquer comme livré"}
-              </Button>
-            )}
-
-            {/* Remarque */}
-            <div className="flex gap-2">
-              <Textarea
-                placeholder="Ajouter une remarque..."
-                value={remarque}
-                onChange={(e) => setRemarque(e.target.value)}
-                className="text-xs h-8 min-h-[32px]"
-              />
-              <Button size="sm" variant="outline" className="h-8" onClick={() => handleRemarque(course)}>
-                <AlertTriangle className="w-3 h-3" />
-              </Button>
-            </div>
-          </Card>
-        );
-      })}
+        {coursesActives.map(course => (
+          <CourseActive
+            key={course.id}
+            course={course}
+            onColisRecupere={handleColisRecupere}
+            onColisLivre={handleColisLivre}
+            isPending={updateCourseMutation.isPending}
+          />
+        ))}
+      </div>
     </div>
   );
 }
