@@ -20,7 +20,8 @@ import InscriptionLivreur from './pages/InscriptionLivreur';
 import TestNotificationsPush from './pages/TestNotificationsPush';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Truck } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Truck, LogIn } from 'lucide-react';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user, isAuthenticated } = useAuth();
@@ -50,8 +51,36 @@ const AuthenticatedApp = () => {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
-      navigateToLogin();
-      return null;
+      // Dans l'APK Android, on ne peut pas rediriger vers /login (page inexistante)
+      // On affiche directement un écran de connexion avec appel à base44.auth.redirectToLogin()
+      return (
+        <div className="fixed inset-0 flex flex-col items-center justify-center bg-background gap-6 p-8 text-center">
+          <div className="space-y-2">
+            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+              <LogIn className="w-10 h-10 text-primary" />
+            </div>
+            <h1 className="text-2xl font-bold">Silga Livraison</h1>
+            <p className="text-muted-foreground text-sm max-w-xs">
+              Connectez-vous pour accéder à votre espace admin ou livreur
+            </p>
+          </div>
+          <Button
+            onClick={() => base44.auth.redirectToLogin(window.location.href)}
+            className="h-12 px-8 text-base font-semibold gap-2"
+          >
+            <LogIn className="w-5 h-5" />
+            Se connecter
+          </Button>
+          <div className="space-y-2 text-xs text-muted-foreground max-w-xs">
+            <p>
+              <strong>Admin :</strong> utilisez vos identifiants Base44
+            </p>
+            <p>
+              <strong>Livreur :</strong> votre compte doit être créé par un administrateur avec votre email
+            </p>
+          </div>
+        </div>
+      );
     }
   }
 
@@ -76,6 +105,9 @@ const AuthenticatedApp = () => {
 
   return (
     <Routes>
+      {/* Routes publiques (sans authentification requise) */}
+      <Route path="/inscription-livreur" element={<InscriptionLivreur />} />
+
       {/* Routes Admin */}
       <Route element={<AppLayout />}>
         {/* Racine : admin → Dashboard, sinon → espace livreur */}
@@ -92,7 +124,6 @@ const AuthenticatedApp = () => {
 
       {/* Route Livreur */}
       <Route path="/livreur" element={<LivreurApp />} />
-      <Route path="/inscription-livreur" element={<InscriptionLivreur />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
