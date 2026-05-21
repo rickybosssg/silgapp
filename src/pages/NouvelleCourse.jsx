@@ -132,12 +132,11 @@ export default function NouvelleCourse() {
           </CardHeader>
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs">Nom du client *</Label>
+              <Label className="text-xs">Nom du client</Label>
               <Input
                 placeholder="Ex: Amadou Diallo"
                 value={form.client_nom}
                 onChange={(e) => handleChange("client_nom", e.target.value)}
-                required
               />
             </div>
             <div className="space-y-1.5">
@@ -170,22 +169,6 @@ export default function NouvelleCourse() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Lien GPS départ (optionnel)</Label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Coller le lien Google Maps ici"
-                  value={gpsLinkDepart}
-                  onChange={(e) => handleGPSDepart(e.target.value)}
-                  className="flex-1"
-                />
-                {form.gps_depart_lat && (
-                  <div className="flex items-center gap-1 text-xs text-accent">
-                    <Navigation className="w-3 h-3" /> OK
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="space-y-1.5">
               <Label className="text-xs">Adresse d'arrivée (quartier) *</Label>
               <Input
                 placeholder="Ex: Pissy"
@@ -193,22 +176,6 @@ export default function NouvelleCourse() {
                 onChange={(e) => handleChange("adresse_arrivee", e.target.value)}
                 required
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Lien GPS arrivée (optionnel)</Label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Coller le lien Google Maps ici"
-                  value={gpsLinkArrivee}
-                  onChange={(e) => handleGPSArrivee(e.target.value)}
-                  className="flex-1"
-                />
-                {form.gps_arrivee_lat && (
-                  <div className="flex items-center gap-1 text-xs text-accent">
-                    <Navigation className="w-3 h-3" /> OK
-                  </div>
-                )}
-              </div>
             </div>
           </CardContent>
         </Card>
