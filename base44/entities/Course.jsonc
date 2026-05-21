@@ -112,8 +112,6 @@
     }
   },
   "required": [
-    "client_telephone",
-    "adresse_depart",
-    "adresse_arrivee"
+    "client_telephone"
   ]
 }
