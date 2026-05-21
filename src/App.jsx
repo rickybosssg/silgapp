@@ -20,8 +20,7 @@ import InscriptionLivreur from './pages/InscriptionLivreur';
 import TestNotificationsPush from './pages/TestNotificationsPush';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Button } from '@/components/ui/button';
-import { Truck, LogIn } from 'lucide-react';
+import { Truck } from 'lucide-react';
 import { redirectToLogin as safeRedirectToLogin } from '@/lib/authRedirect';
 
 const AuthenticatedApp = () => {
@@ -61,34 +60,16 @@ const AuthenticatedApp = () => {
       return <UserNotRegisteredError />;
     }
 
-    // auth_required, unknown, ou toute autre erreur → écran de connexion
+    // auth_required → redirection automatique vers la page de connexion Base44
+    safeRedirectToLogin(window.location.href);
     return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center bg-background gap-6 p-8 text-center">
-        <div className="space-y-3">
-          <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
-            <Truck className="w-10 h-10 text-primary" />
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+            <Truck className="w-8 h-8 text-primary animate-pulse" />
           </div>
-          <h1 className="text-2xl font-bold">SILGAPP</h1>
-          <p className="text-muted-foreground text-sm max-w-xs">
-            Connectez-vous pour accéder à votre espace admin ou livreur
-          </p>
+          <p className="text-xs text-muted-foreground">Redirection vers la connexion…</p>
         </div>
-        <Button
-          onClick={() => safeRedirectToLogin(window.location.href)}
-          className="h-12 px-8 text-base font-semibold gap-2"
-        >
-          <LogIn className="w-5 h-5" />
-          Se connecter
-        </Button>
-        <div className="space-y-2 text-xs text-muted-foreground max-w-xs">
-          <p><strong>Admin :</strong> identifiants Base44</p>
-          <p><strong>Livreur :</strong> compte créé par un administrateur</p>
-        </div>
-        {authError.type !== 'auth_required' && (
-          <p className="text-xs text-destructive max-w-xs">
-            Erreur : {authError.message || authError.type}
-          </p>
-        )}
       </div>
     );
   }

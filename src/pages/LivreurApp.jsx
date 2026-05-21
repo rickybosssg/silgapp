@@ -170,27 +170,12 @@ export default function LivreurApp() {
     );
   }
 
-  // ---- NON CONNECTÉ ----
+  // ---- NON CONNECTÉ → redirection automatique ----
   if (!isAuthenticated) {
+    navigateToLogin("/livreur");
     return (
-      <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-8 text-center">
-        <div className="space-y-8 w-full max-w-xs">
-          <div className="space-y-4">
-            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-primary to-red-700 flex items-center justify-center shadow-2xl shadow-red-900/50 mx-auto">
-              <Truck className="w-10 h-10 text-white" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-black text-white">Silga Livraison</h1>
-              <p className="text-white/40 text-sm mt-1">Espace livreur professionnel</p>
-            </div>
-          </div>
-          <Button
-            className="w-full h-14 text-base font-black bg-gradient-to-b from-primary to-red-700 border-0 rounded-2xl shadow-xl shadow-red-900/40"
-            onClick={() => navigateToLogin("/livreur")}
-          >
-            Se connecter
-          </Button>
-        </div>
+      <div className="fixed inset-0 flex items-center justify-center bg-gray-900">
+        <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin"></div>
       </div>
     );
   }
