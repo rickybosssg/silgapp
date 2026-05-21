@@ -4,9 +4,9 @@ import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Send, CheckCircle2, XCircle, Loader2, Smartphone, User, AlertTriangle, Wifi, WifiOff } from "lucide-react";
+import { Bell, Send, CheckCircle2, XCircle, Loader2, Smartphone, User, AlertTriangle, Wifi } from "lucide-react";
 import { toast } from "sonner";
-import { detectEnvironment, checkNotificationSupport, requestNotificationPermission, registerPushToken, showLocalNotification } from "@/lib/notifications";
+import { detectEnvironment, checkNotificationSupport, requestNotificationPermission, registerPushToken, showLocalNotification, getCurrentFCMToken } from "@/lib/notifications";
 
 export default function TestNotificationsPush() {
   const [env, setEnv] = useState(null);
@@ -62,15 +62,10 @@ export default function TestNotificationsPush() {
         // 3. Permission
         if (supp.supported) {
           if (detectedEnv.isNative && detectedEnv.os === 'android') {
-            try {
-              const { PushNotifications } = await import('@capacitor/push-notifications');
-              const permResult = await PushNotifications.checkPermissions();
-              setPermission(permResult.receive === 'granted' || permResult.display === 'granted' ? 'granted' : 'denied');
-              addLog(`📱 Permission Android: ${permResult.receive || permResult.display}`);
-            } catch (err) {
-              setPermission('unknown');
-              addLog(`⚠️ Impossible de vérifier permission: ${err.message}`);
-            }
+            // Utiliser la fonction helper qui gère les imports dynamiques
+            const permResult = await checkNotificationSupport();
+            setPermission(permResult.error ? 'unknown' : 'granted');
+            addLog(`📱 Permission Android: vérifiée`);
           } else {
             const perm = Notification.permission || 'default';
             setPermission(perm);

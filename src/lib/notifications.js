@@ -22,19 +22,60 @@ export function detectEnvironment() {
 }
 
 /**
+ * Obtenir un plugin Capacitor de manière sécurisée (évite les erreurs de build)
+ */
+async function getCapacitorPlugin(pluginName, packageName) {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  
+  // Vérifier si Capacitor est disponible
+  if (!window.Capacitor) {
+    return null;
+  }
+  
+  try {
+    // Import dynamique pour éviter les erreurs de build
+    const module = await import(/* @vite-ignore */ packageName);
+    return module[pluginName];
+  } catch (error) {
+    console.warn(`Plugin ${packageName} non disponible:`, error.message);
+    return null;
+  }
+}
+
+/**
  * Vérifier si les notifications sont supportées dans l'environnement actuel
  */
 export async function checkNotificationSupport() {
   const env = detectEnvironment();
   
   if (env.isNative && env.os === 'android') {
-    // Android natif - le plugin sera disponible dans l'APK build
-    // En développement web, retourner faux avec message explicatif
+    // Android natif - vérifier si PushNotifications plugin est disponible
+    const PushNotifications = await getCapacitorPlugin('PushNotifications', '@capacitor/push-notifications');
+    if (PushNotifications) {
+      try {
+        await PushNotifications.requestPermissions();
+        return { 
+          supported: true, 
+          type: 'native',
+          platform: 'android',
+          error: null 
+        };
+      } catch (error) {
+        return { 
+          supported: true, 
+          type: 'native',
+          platform: 'android',
+          error: 'Permission check failed: ' + error.message 
+        };
+      }
+    }
     return { 
-      supported: true, // On suppose que ce sera disponible dans l'APK
+      supported: false, 
       type: 'native',
       platform: 'android',
-      error: env.isNative ? null : 'Disponible uniquement dans APK Android' 
+      error: 'Plugin PushNotifications non disponible (APK build requis)' 
     };
   }
   
@@ -63,34 +104,29 @@ export async function requestNotificationPermission() {
   const env = detectEnvironment();
   
   if (env.isNative && env.os === 'android') {
-    // Dans l'APK, utiliser Capacitor PushNotifications
-    // En web, retourner erreur
-    if (!env.isNative) {
-      return { 
-        granted: false, 
-        type: 'native',
-        error: 'Disponible uniquement dans APK Android' 
-      };
+    const PushNotifications = await getCapacitorPlugin('PushNotifications', '@capacitor/push-notifications');
+    if (PushNotifications) {
+      try {
+        const result = await PushNotifications.requestPermissions();
+        const granted = result.receive === 'granted' || result.display === 'granted';
+        return { 
+          granted, 
+          type: 'native',
+          error: granted ? null : 'Permission refusée' 
+        };
+      } catch (error) {
+        return { 
+          granted: false, 
+          type: 'native',
+          error: 'Erreur: ' + error.message 
+        };
+      }
     }
-    
-    try {
-      const PushNotificationsModule = await import('@capacitor/push-notifications');
-      const PushNotifications = PushNotificationsModule.PushNotifications;
-      const result = await PushNotifications.requestPermissions();
-      
-      const granted = result.receive === 'granted' || result.display === 'granted';
-      return { 
-        granted, 
-        type: 'native',
-        error: granted ? null : 'Permission refusée' 
-      };
-    } catch (error) {
-      return { 
-        granted: false, 
-        type: 'native',
-        error: 'Plugin non disponible: ' + error.message 
-      };
-    }
+    return { 
+      granted: false, 
+      type: 'native',
+      error: 'Plugin non disponible' 
+    };
   }
   
   // Web
@@ -148,40 +184,33 @@ export function showLocalNotification(titre, message, options = {}) {
  * Afficher une notification native (Android/iOS)
  */
 async function showNativeNotification(titre, message, options = {}) {
-  if (!detectEnvironment().isNative) {
-    return; // Skip if not in native environment
+  // Essayer LocalNotifications d'abord
+  const LocalNotifications = await getCapacitorPlugin('LocalNotifications', '@capacitor/local-notifications');
+  if (LocalNotifications) {
+    try {
+      await LocalNotifications.schedule({
+        notifications: [{
+          title: titre,
+          body: message,
+          id: Date.now(),
+          icon: options.icon || 'ic_launcher',
+          sound: options.sound || 'beep.wav',
+          data: options.data || {},
+        }]
+      });
+      return;
+    } catch (err) {
+      console.warn('Erreur LocalNotifications:', err.message);
+    }
   }
   
-  try {
-    // Pour les notifications locales en natif
-    try {
-      const LocalNotificationsModule = await import('@capacitor/local-notifications');
-      const LocalNotifications = LocalNotificationsModule.LocalNotifications;
-      if (LocalNotifications) {
-        await LocalNotifications.schedule({
-          notifications: [{
-            title: titre,
-            body: message,
-            id: Date.now(),
-            icon: options.icon || 'ic_launcher',
-            sound: options.sound || 'beep.wav',
-            data: options.data || {},
-          }]
-        });
-        return;
-      }
-    } catch (err) {
-      console.warn('LocalNotifications non disponible');
-    }
-  } catch (error) {
-    console.error('Erreur notification native:', error);
-  }
+  console.log('Notifications locales non disponibles');
 }
 
 /**
  * Enregistrer le token pour les notifications push
  * Web: token factice
- * Android: vrai token FCM via Capacitor (dans APK uniquement)
+ * Android: vrai token FCM via Capacitor
  */
 export async function registerPushToken(livreurId = null) {
   try {
@@ -190,21 +219,14 @@ export async function registerPushToken(livreurId = null) {
 
     // Environnement natif (Android APK)
     if (env.isNative && env.os === 'android') {
-      // Vérifier que Capacitor est vraiment disponible (APK build)
-      if (!window.Capacitor) {
-        console.warn('[registerPushToken] Capacitor non disponible - besoin build APK');
+      const PushNotifications = await getCapacitorPlugin('PushNotifications', '@capacitor/push-notifications');
+      
+      if (!PushNotifications) {
+        console.warn('[registerPushToken] PushNotifications non disponible');
         return null;
       }
       
       try {
-        const PushNotificationsModule = await import('@capacitor/push-notifications');
-        const PushNotifications = PushNotificationsModule.PushNotifications;
-        
-        if (!PushNotifications) {
-          console.warn('[registerPushToken] PushNotifications non disponible');
-          return null;
-        }
-        
         // Demander permission
         const permResult = await PushNotifications.requestPermissions();
         console.log('[registerPushToken] Permission:', permResult);
@@ -301,20 +323,21 @@ export async function registerPushToken(livreurId = null) {
 export async function getCurrentFCMToken() {
   const env = detectEnvironment();
   
-  if (env.isNative && env.os === 'android' && window.Capacitor) {
-    try {
-      const PushNotificationsModule = await import('@capacitor/push-notifications');
-      const PushNotifications = PushNotificationsModule.PushNotifications;
-      
-      if (PushNotifications) {
+  if (env.isNative && env.os === 'android') {
+    const PushNotifications = await getCapacitorPlugin('PushNotifications', '@capacitor/push-notifications');
+    
+    if (PushNotifications) {
+      try {
         const result = await PushNotifications.checkPermissions();
         
         if (result.receive === 'granted' || result.display === 'granted') {
+          // Note: Capacitor ne permet pas de récupérer le token directement
+          // Il faut le stocker lors de l'enregistrement
           return null; // Sera récupéré depuis la DB
         }
+      } catch (error) {
+        console.error('Erreur check token:', error);
       }
-    } catch (error) {
-      console.error('Erreur check token:', error);
     }
   }
   
