@@ -124,7 +124,7 @@ export default function InscriptionLivreur() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-primary" /> Zone d'activité
+                <MapPin className="w-4 h-4 text-primary" /> Quartier de résidence
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
