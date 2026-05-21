@@ -133,7 +133,7 @@ function CourseEnAttente({ course, onAccepter, onRefuser, isPending }) {
   );
 }
 
-function CourseActive({ course, onColisRecupere, onColisLivre, isPending }) {
+function CourseActive({ course, onColisRecupere, onColisLivre, onClientAnnule, isPending }) {
   const [remarque, setRemarque] = useState("");
   const [showRemarque, setShowRemarque] = useState(false);
   const [prixReel, setPrixReel] = useState("");
@@ -271,7 +271,15 @@ function CourseActive({ course, onColisRecupere, onColisLivre, isPending }) {
           </div>
 
           {!colisLivre && (
-            <div>
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                className="w-full h-9 text-xs border-destructive text-destructive hover:bg-destructive/10 gap-1.5"
+                onClick={() => onClientAnnule(course)}
+                disabled={isPending}
+              >
+                <X className="w-3.5 h-3.5" /> Le client a annulé
+              </Button>
               {!showRemarque ? (
                 <button
                   className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground"
@@ -300,6 +308,7 @@ function CourseActive({ course, onColisRecupere, onColisLivre, isPending }) {
     </>
   );
 }
+
 
 export default function LivreurApp() {
   const queryClient = useQueryClient();
@@ -424,6 +433,16 @@ export default function LivreurApp() {
     toast.success(`Livraison terminée ! 🎉 ${prixReel.toLocaleString()} FCFA encaissés`);
   };
 
+  const handleClientAnnule = (course) => {
+    updateCourseMutation.mutate({
+      id: course.id,
+      data: { statut: "annulee", remarque_livreur: "Annulé par le client" },
+    });
+    base44.entities.Livreur.update(livreurProfil.id, { statut: "disponible" });
+    queryClient.invalidateQueries({ queryKey: ["livreurs"] });
+    toast("Course annulée par le client");
+  };
+
   // GPS tracking
   useEffect(() => {
     if (!livreurProfil || livreurProfil.statut === "hors_ligne") return;
@@ -525,6 +544,7 @@ export default function LivreurApp() {
             course={course}
             onColisRecupere={handleColisRecupere}
             onColisLivre={handleColisLivre}
+            onClientAnnule={handleClientAnnule}
             isPending={updateCourseMutation.isPending}
           />
         ))}
