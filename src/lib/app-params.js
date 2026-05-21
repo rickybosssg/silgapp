@@ -39,7 +39,8 @@ const detectCapacitor = () => {
 	try {
 		if (typeof window === 'undefined') return false;
 		if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) return true;
-		if (window.location.hostname === 'localhost' || window.location.hostname === 'silgaapp') return true;
+		// Capacitor sert le WebView sur localhost
+		if (window.location.hostname === 'localhost') return true;
 		return false;
 	} catch (e) {
 		return false;
@@ -56,7 +57,8 @@ const getAppParams = () => {
 
 	// Dans Capacitor, window.location.href = "https://localhost/" → pas utile comme fromUrl
 	// On utilise une valeur stable pour éviter les crashes
-	const safeHref = isCapacitor ? 'https://silgaapp/' : (typeof window !== 'undefined' ? window.location.href : '/');
+	// Dans Capacitor, le WebView est servi sur https://localhost/
+	const safeHref = isCapacitor ? 'https://localhost/' : (typeof window !== 'undefined' ? window.location.href : '/');
 
 	return {
 		appId: getAppParamValue("app_id", { defaultValue: import.meta.env.VITE_BASE44_APP_ID }),

@@ -10,9 +10,9 @@ import { appParams } from "@/lib/app-params";
  */
 export default function ConnexionInterne() {
   useEffect(() => {
-    // Construire l'URL de retour après connexion
+    // Dans Capacitor, le WebView tourne sur https://localhost/
     const returnUrl = appParams.isCapacitor
-      ? "https://silgaapp/"
+      ? "https://localhost/"
       : window.location.origin + "/";
 
     // Redirection vers la page d'auth native Base44
