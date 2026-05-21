@@ -1,0 +1,116 @@
+{
+  "name": "Course",
+  "type": "object",
+  "properties": {
+    "client_nom": {
+      "type": "string",
+      "description": "Nom du client"
+    },
+    "client_telephone": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone du client"
+    },
+    "adresse_depart": {
+      "type": "string",
+      "description": "Adresse ou quartier de r\u00e9cup\u00e9ration"
+    },
+    "adresse_arrivee": {
+      "type": "string",
+      "description": "Adresse ou quartier de livraison"
+    },
+    "gps_depart_lat": {
+      "type": "number",
+      "description": "Latitude du point de d\u00e9part"
+    },
+    "gps_depart_lng": {
+      "type": "number",
+      "description": "Longitude du point de d\u00e9part"
+    },
+    "gps_arrivee_lat": {
+      "type": "number",
+      "description": "Latitude du point d'arriv\u00e9e"
+    },
+    "gps_arrivee_lng": {
+      "type": "number",
+      "description": "Longitude du point d'arriv\u00e9e"
+    },
+    "type_colis": {
+      "type": "string",
+      "enum": [
+        "petit_colis",
+        "moyen_colis",
+        "gros_colis",
+        "document",
+        "nourriture",
+        "autre"
+      ],
+      "description": "Type de colis"
+    },
+    "prix": {
+      "type": "number",
+      "description": "Prix de la course en FCFA"
+    },
+    "urgence": {
+      "type": "string",
+      "enum": [
+        "normale",
+        "urgente",
+        "tres_urgente"
+      ],
+      "default": "normale",
+      "description": "Niveau d'urgence"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "nouvelle",
+        "en_attente_livreur",
+        "acceptee",
+        "en_route_recuperation",
+        "colis_recupere",
+        "en_livraison",
+        "livree",
+        "annulee"
+      ],
+      "default": "nouvelle",
+      "description": "Statut de la course"
+    },
+    "livreur_id": {
+      "type": "string",
+      "description": "ID du livreur assign\u00e9"
+    },
+    "livreur_nom": {
+      "type": "string",
+      "description": "Nom du livreur assign\u00e9"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notes suppl\u00e9mentaires"
+    },
+    "remarque_livreur": {
+      "type": "string",
+      "description": "Remarque du livreur en cas de probl\u00e8me"
+    },
+    "heure_acceptation": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure d'acceptation par le livreur"
+    },
+    "heure_recuperation": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure de r\u00e9cup\u00e9ration du colis"
+    },
+    "heure_livraison": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure de livraison effective"
+    }
+  },
+  "required": [
+    "client_nom",
+    "client_telephone",
+    "adresse_depart",
+    "adresse_arrivee"
+  ]
+}

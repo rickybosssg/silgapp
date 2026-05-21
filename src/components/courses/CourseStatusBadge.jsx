@@ -1,0 +1,23 @@
+import React from "react";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+
+const statusConfig = {
+  nouvelle: { label: "Nouvelle", className: "bg-blue-100 text-blue-700 border-blue-200" },
+  en_attente_livreur: { label: "En attente livreur", className: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+  acceptee: { label: "Acceptée", className: "bg-emerald-100 text-emerald-700 border-emerald-200" },
+  en_route_recuperation: { label: "En route récup.", className: "bg-orange-100 text-orange-700 border-orange-200" },
+  colis_recupere: { label: "Colis récupéré", className: "bg-indigo-100 text-indigo-700 border-indigo-200" },
+  en_livraison: { label: "En livraison", className: "bg-purple-100 text-purple-700 border-purple-200" },
+  livree: { label: "Livrée", className: "bg-green-100 text-green-700 border-green-200" },
+  annulee: { label: "Annulée", className: "bg-red-100 text-red-700 border-red-200" },
+};
+
+export default function CourseStatusBadge({ statut }) {
+  const config = statusConfig[statut] || { label: statut, className: "bg-muted text-muted-foreground" };
+  return (
+    <Badge variant="outline" className={cn("text-[11px] font-medium border", config.className)}>
+      {config.label}
+    </Badge>
+  );
+}

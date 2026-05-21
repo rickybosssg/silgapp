@@ -1,0 +1,45 @@
+{
+  "name": "Notification",
+  "type": "object",
+  "properties": {
+    "titre": {
+      "type": "string",
+      "description": "Titre de la notification"
+    },
+    "message": {
+      "type": "string",
+      "description": "Contenu de la notification"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "nouvelle_course",
+        "course_assignee",
+        "course_acceptee",
+        "course_refusee",
+        "course_livree",
+        "course_bloquee",
+        "course_annulee"
+      ],
+      "description": "Type de notification"
+    },
+    "course_id": {
+      "type": "string",
+      "description": "ID de la course li\u00e9e"
+    },
+    "destinataire_email": {
+      "type": "string",
+      "description": "Email du destinataire"
+    },
+    "lue": {
+      "type": "boolean",
+      "default": false,
+      "description": "Notification lue ou non"
+    }
+  },
+  "required": [
+    "titre",
+    "message",
+    "type"
+  ]
+}

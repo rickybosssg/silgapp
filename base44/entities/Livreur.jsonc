@@ -1,0 +1,65 @@
+{
+  "name": "Livreur",
+  "type": "object",
+  "properties": {
+    "nom": {
+      "type": "string",
+      "description": "Nom complet du livreur"
+    },
+    "telephone": {
+      "type": "string",
+      "description": "Num\u00e9ro de t\u00e9l\u00e9phone"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "disponible",
+        "en_course",
+        "hors_ligne"
+      ],
+      "default": "hors_ligne",
+      "description": "Statut actuel du livreur"
+    },
+    "latitude": {
+      "type": "number",
+      "description": "Latitude actuelle"
+    },
+    "longitude": {
+      "type": "number",
+      "description": "Longitude actuelle"
+    },
+    "derniere_position_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de la derni\u00e8re mise \u00e0 jour de position"
+    },
+    "courses_du_jour": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de courses effectu\u00e9es aujourd'hui"
+    },
+    "user_email": {
+      "type": "string",
+      "description": "Email du compte utilisateur li\u00e9"
+    },
+    "vehicule": {
+      "type": "string",
+      "enum": [
+        "moto",
+        "velo",
+        "voiture",
+        "a_pied"
+      ],
+      "default": "moto",
+      "description": "Type de v\u00e9hicule"
+    },
+    "photo_url": {
+      "type": "string",
+      "description": "Photo de profil du livreur"
+    }
+  },
+  "required": [
+    "nom",
+    "telephone"
+  ]
+}
