@@ -4,11 +4,13 @@ import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Send, CheckCircle2, XCircle, Loader2, Smartphone, User, AlertTriangle } from "lucide-react";
+import { Bell, Send, CheckCircle2, XCircle, Loader2, Smartphone, User, AlertTriangle, Wifi, WifiOff } from "lucide-react";
 import { toast } from "sonner";
-import { requestNotificationPermission, registerPushToken, showLocalNotification } from "@/lib/notifications";
+import { detectEnvironment, checkNotificationSupport, requestNotificationPermission, registerPushToken, showLocalNotification, getCurrentFCMToken } from "@/lib/notifications";
 
 export default function TestNotificationsPush() {
+  const [env, setEnv] = useState(null);
+  const [support, setSupport] = useState(null);
   const [permission, setPermission] = useState('default');
   const [token, setToken] = useState(null);
   const [sending, setSending] = useState(false);
@@ -33,14 +35,19 @@ export default function TestNotificationsPush() {
         setLoading(true);
         addLog('Initialisation...');
 
-        // Vérifier support notifications
-        if (!('Notification' in window)) {
-          addLog('❌ Notifications non supportées par ce navigateur');
-          setError('Notifications non supportées');
-          setLoading(false);
-          return;
+        // 1. Détecter l'environnement
+        const detectedEnv = detectEnvironment();
+        setEnv(detectedEnv);
+        addLog(`📱 Environnement: ${detectedEnv.platform} (${detectedEnv.os})`);
+        addLog(`🔌 Natif: ${detectedEnv.isNative ? 'Oui' : 'Non'}`);
+
+        // 2. Vérifier support notifications
+        const supp = await checkNotificationSupport();
+        setSupport(supp);
+        addLog(`✅ Support: ${supp.supported ? 'Oui' : 'Non'} (${supp.type})`);
+        if (!supp.supported) {
+          addLog(`❌ Erreur: ${supp.error}`);
         }
-        addLog('✅ Notifications supportées');
 
         // Auth
         const user = await base44.auth.me();
@@ -52,22 +59,36 @@ export default function TestNotificationsPush() {
         }
         addLog(`✅ Connecté: ${user.email}`);
 
-        // Permission
-        const perm = Notification.permission || 'default';
-        setPermission(perm);
-        addLog(`📱 Permission: ${perm}`);
+        // 3. Permission
+        if (supp.supported) {
+          if (detectedEnv.isNative && detectedEnv.os === 'android') {
+            try {
+              const { PushNotifications } = await import('@capacitor/push-notifications');
+              const permResult = await PushNotifications.checkPermissions();
+              setPermission(permResult.receive === 'granted' || permResult.display === 'granted' ? 'granted' : 'denied');
+              addLog(`📱 Permission Android: ${permResult.receive || permResult.display}`);
+            } catch (err) {
+              setPermission('unknown');
+              addLog(`⚠️ Impossible de vérifier permission: ${err.message}`);
+            }
+          } else {
+            const perm = Notification.permission || 'default';
+            setPermission(perm);
+            addLog(`📱 Permission Web: ${perm}`);
+          }
+        }
 
-        // Token existant
+        // 4. Token existant
         try {
           const tokens = await base44.entities.NotificationToken.filter({
             user_email: user.email,
             actif: true,
           });
-          addLog(`🔍 Tokens trouvés: ${tokens.length}`);
+          addLog(`🔍 Tokens DB: ${tokens.length}`);
           
           if (tokens.length > 0) {
             setToken(tokens[0].token);
-            addLog('✅ Token chargé');
+            addLog(`✅ Token trouvé: ${tokens[0].platform}`);
           } else {
             addLog('ℹ️ Aucun token enregistré');
           }
@@ -97,6 +118,7 @@ export default function TestNotificationsPush() {
         toast.success('Permission accordée ✅');
         
         try {
+          addLog('Enregistrement token...');
           const registeredToken = await registerPushToken();
           if (registeredToken) {
             setToken(registeredToken);
@@ -172,19 +194,6 @@ export default function TestNotificationsPush() {
     );
   }
 
-  if (error && !token && permission === 'default') {
-    return (
-      <div className="p-6 flex flex-col items-center justify-center min-h-[400px]">
-        <AlertTriangle className="w-16 h-16 text-destructive mb-4" />
-        <h1 className="text-xl font-bold text-destructive">Erreur de chargement</h1>
-        <p className="text-muted-foreground mt-2">{error}</p>
-        <Button variant="outline" className="mt-4" onClick={() => window.location.reload()}>
-          Réessayer
-        </Button>
-      </div>
-    );
-  }
-
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
       <div className="flex items-center gap-3">
@@ -206,17 +215,54 @@ export default function TestNotificationsPush() {
         </div>
       </Card>
 
-      {/* Statut permission */}
+      {/* Environnement */}
       <Card className="p-4">
         <h2 className="font-semibold mb-3 flex items-center gap-2">
           <Smartphone className="w-5 h-5" />
+          Environnement
+        </h2>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Plateforme</span>
+            <Badge variant={env?.isNative ? 'default' : 'secondary'}>
+              {env?.platform} ({env?.os})
+            </Badge>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Mode</span>
+            {env?.isNative ? (
+              <Badge className="bg-green-500 text-white">Natif APK</Badge>
+            ) : (
+              <Badge variant="outline">Web</Badge>
+            )}
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Support notifications</span>
+            {support?.supported ? (
+              <Badge className="bg-green-500 text-white">✅ Oui ({support.type})</Badge>
+            ) : (
+              <Badge variant="destructive">❌ Non</Badge>
+            )}
+          </div>
+          {support?.error && (
+            <div className="text-xs text-red-600 mt-2 p-2 bg-red-50 rounded">
+              {support.error}
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Statut permission */}
+      <Card className="p-4">
+        <h2 className="font-semibold mb-3 flex items-center gap-2">
+          <Wifi className="w-5 h-5" />
           Permission Notifications
         </h2>
         <div className="flex items-center gap-3 mb-4">
           <Badge variant={permission === 'granted' ? 'default' : permission === 'denied' ? 'destructive' : 'secondary'}>
             {permission === 'granted' ? '✅ Accordée' : permission === 'denied' ? '❌ Refusée' : '⏳ Non demandée'}
           </Badge>
-          {permission !== 'granted' && (
+          {permission !== 'granted' && support?.supported && (
             <Button size="sm" onClick={handleRequestPermission}>
               Demander la permission
             </Button>
@@ -225,7 +271,10 @@ export default function TestNotificationsPush() {
         {permission === 'denied' && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
             <AlertTriangle className="w-4 h-4 inline mr-2 text-amber-600" />
-            Pour activer les notifications, allez dans les paramètres de votre navigateur et autorisez les notifications pour ce site.
+            {env?.isNative 
+              ? 'Allez dans Paramètres → Applications → Silga → Notifications et activez-les.'
+              : 'Allez dans les paramètres de votre navigateur et autorisez les notifications pour ce site.'
+            }
           </div>
         )}
       </Card>
@@ -234,7 +283,7 @@ export default function TestNotificationsPush() {
       <Card className="p-4">
         <h2 className="font-semibold mb-3 flex items-center gap-2">
           <User className="w-5 h-5" />
-          Token Push
+          Token FCM
         </h2>
         {token ? (
           <div className="bg-green-50 border border-green-200 rounded-lg p-3">
@@ -243,7 +292,10 @@ export default function TestNotificationsPush() {
           </div>
         ) : (
           <div className="bg-muted rounded-lg p-3 text-sm text-muted-foreground">
-            Aucun token enregistré
+            {support?.supported 
+              ? 'Aucun token enregistré (cliquez sur "Demander la permission")'
+              : 'Notifications non supportées'
+            }
           </div>
         )}
       </Card>
@@ -257,7 +309,7 @@ export default function TestNotificationsPush() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Button
             onClick={() => handleSendTest('Admin')}
-            disabled={sending}
+            disabled={sending || !token}
             className="gap-2"
           >
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
@@ -265,13 +317,18 @@ export default function TestNotificationsPush() {
           </Button>
           <Button
             onClick={() => handleSendTest('Livreur')}
-            disabled={sending}
+            disabled={sending || !token}
             className="gap-2"
           >
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
             Test Livreur
           </Button>
         </div>
+        {!token && (
+          <p className="text-xs text-muted-foreground mt-2">
+            Enregistrez un token d'abord
+          </p>
+        )}
         {testResult && (
           <div className={`mt-4 p-3 rounded-lg text-sm ${testResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
             {testResult.success ? (
