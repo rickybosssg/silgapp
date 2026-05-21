@@ -1,0 +1,24 @@
+{
+  "appId": "com.silgalivraison.app",
+  "appName": "Silga Livraison",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": [
+      "*.base44.com",
+      "base44.com",
+      "*.base44.app",
+      "base44.app"
+    ]
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  }
+}

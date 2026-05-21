@@ -22,6 +22,7 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Truck, LogIn } from 'lucide-react';
+import { redirectToLogin as safeRedirectToLogin } from '@/lib/authRedirect';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user, isAuthenticated } = useAuth();
@@ -65,7 +66,7 @@ const AuthenticatedApp = () => {
             </p>
           </div>
           <Button
-            onClick={() => base44.auth.redirectToLogin(window.location.href)}
+            onClick={() => safeRedirectToLogin(window.location.href)}
             className="h-12 px-8 text-base font-semibold gap-2"
           >
             <LogIn className="w-5 h-5" />
