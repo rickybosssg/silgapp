@@ -257,7 +257,11 @@ export default function Livreurs() {
   const valides = livreurs.filter(l => l.validation === "valide");
   const refuses = livreurs.filter(l => l.validation === "refuse");
 
-  const currentList = tab === "en_attente" ? enAttente : tab === "valide" ? valides : refuses;
+  const disponibles = valides.filter(l => l.statut === "disponible");
+  const enCourse = valides.filter(l => l.statut === "en_course");
+  const horsLigne = valides.filter(l => l.statut === "hors_ligne" || !l.statut);
+
+  const currentList = tab === "en_attente" ? enAttente : tab === "refuse" ? refuses : [];
 
   const inscriptionLink = `${window.location.origin}/inscription-livreur`;
 
@@ -313,32 +317,78 @@ export default function Livreurs() {
         </TabsList>
       </Tabs>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {isLoading && (
-          <p className="col-span-2 text-center text-muted-foreground text-sm py-12">Chargement...</p>
-        )}
-        {!isLoading && currentList.length === 0 && (
-          <p className="col-span-2 text-center text-muted-foreground text-sm py-12">
-            {tab === "en_attente" && "Aucune candidature en attente"}
-            {tab === "valide" && "Aucun livreur validé"}
-            {tab === "refuse" && "Aucun livreur refusé"}
-          </p>
-        )}
-        {currentList.map(livreur => (
-          <LivreurCard
-            key={livreur.id}
-            livreur={livreur}
-            courses={courses}
-            onValider={handleValider}
-            onRefuser={handleRefuser}
-            onToggleStatut={handleToggleStatut}
-            onValiderPaiement={handleValiderPaiement}
-            onEdit={(l) => { setEditingLivreur(l); setShowForm(true); }}
-            onSupprimer={handleSupprimer}
-            isPending={updateMutation.isPending || deleteMutation.isPending}
-          />
-        ))}
-      </div>
+      {/* Vue 3 colonnes pour les livreurs validés */}
+      {tab === "valide" && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Colonne Disponibles */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 pb-1 border-b-2 border-green-400">
+              <span className="w-3 h-3 rounded-full bg-green-400 inline-block" />
+              <h3 className="font-semibold text-sm text-green-700">Disponibles</h3>
+              <span className="ml-auto text-xs font-bold text-green-600 bg-green-100 px-2 py-0.5 rounded-full">{disponibles.length}</span>
+            </div>
+            {isLoading && <p className="text-xs text-muted-foreground text-center py-4">Chargement...</p>}
+            {!isLoading && disponibles.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">Aucun livreur disponible</p>}
+            {disponibles.map(livreur => (
+              <LivreurCard key={livreur.id} livreur={livreur} courses={courses}
+                onValider={handleValider} onRefuser={handleRefuser} onToggleStatut={handleToggleStatut}
+                onValiderPaiement={handleValiderPaiement} onEdit={(l) => { setEditingLivreur(l); setShowForm(true); }}
+                onSupprimer={handleSupprimer} isPending={updateMutation.isPending || deleteMutation.isPending} />
+            ))}
+          </div>
+
+          {/* Colonne En course */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 pb-1 border-b-2 border-red-400">
+              <span className="w-3 h-3 rounded-full bg-red-400 inline-block" />
+              <h3 className="font-semibold text-sm text-red-700">En course</h3>
+              <span className="ml-auto text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">{enCourse.length}</span>
+            </div>
+            {!isLoading && enCourse.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">Aucun livreur en course</p>}
+            {enCourse.map(livreur => (
+              <LivreurCard key={livreur.id} livreur={livreur} courses={courses}
+                onValider={handleValider} onRefuser={handleRefuser} onToggleStatut={handleToggleStatut}
+                onValiderPaiement={handleValiderPaiement} onEdit={(l) => { setEditingLivreur(l); setShowForm(true); }}
+                onSupprimer={handleSupprimer} isPending={updateMutation.isPending || deleteMutation.isPending} />
+            ))}
+          </div>
+
+          {/* Colonne Hors ligne */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 pb-1 border-b-2 border-slate-300">
+              <span className="w-3 h-3 rounded-full bg-slate-300 inline-block" />
+              <h3 className="font-semibold text-sm text-slate-500">Hors ligne</h3>
+              <span className="ml-auto text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{horsLigne.length}</span>
+            </div>
+            {!isLoading && horsLigne.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">Aucun livreur hors ligne</p>}
+            {horsLigne.map(livreur => (
+              <LivreurCard key={livreur.id} livreur={livreur} courses={courses}
+                onValider={handleValider} onRefuser={handleRefuser} onToggleStatut={handleToggleStatut}
+                onValiderPaiement={handleValiderPaiement} onEdit={(l) => { setEditingLivreur(l); setShowForm(true); }}
+                onSupprimer={handleSupprimer} isPending={updateMutation.isPending || deleteMutation.isPending} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Vue liste pour en attente et refusés */}
+      {tab !== "valide" && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {isLoading && <p className="col-span-2 text-center text-muted-foreground text-sm py-12">Chargement...</p>}
+          {!isLoading && currentList.length === 0 && (
+            <p className="col-span-2 text-center text-muted-foreground text-sm py-12">
+              {tab === "en_attente" && "Aucune candidature en attente"}
+              {tab === "refuse" && "Aucun livreur refusé"}
+            </p>
+          )}
+          {currentList.map(livreur => (
+            <LivreurCard key={livreur.id} livreur={livreur} courses={courses}
+              onValider={handleValider} onRefuser={handleRefuser} onToggleStatut={handleToggleStatut}
+              onValiderPaiement={handleValiderPaiement} onEdit={(l) => { setEditingLivreur(l); setShowForm(true); }}
+              onSupprimer={handleSupprimer} isPending={updateMutation.isPending || deleteMutation.isPending} />
+          ))}
+        </div>
+      )}
 
       <LivreurFormDialog
         open={showForm}
