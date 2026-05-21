@@ -37,52 +37,60 @@ const AuthenticatedApp = () => {
     select: (data) => data[0] || null,
   });
 
+  // ── ÉCRAN CHARGEMENT ──────────────────────────────────────────────
   if (isLoadingPublicSettings || isLoadingAuth || (!isAdmin && isAuthenticated && isLoadingLivreur)) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">
-        <div className="text-center space-y-3">
-          <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto"></div>
-          <p className="text-sm text-muted-foreground">Chargement de Silga Livraison...</p>
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+            <Truck className="w-8 h-8 text-primary animate-pulse" />
+          </div>
+          <div>
+            <p className="text-base font-bold text-foreground">SILGAPP</p>
+            <p className="text-xs text-muted-foreground mt-1">Chargement en cours…</p>
+          </div>
+          <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin mx-auto"></div>
         </div>
       </div>
     );
   }
 
+  // ── ERREURS D'AUTH ─────────────────────────────────────────────────
   if (authError) {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
-    } else if (authError.type === 'auth_required') {
-      // Dans l'APK Android, on ne peut pas rediriger vers /login (page inexistante)
-      // On affiche directement un écran de connexion avec appel à base44.auth.redirectToLogin()
-      return (
-        <div className="fixed inset-0 flex flex-col items-center justify-center bg-background gap-6 p-8 text-center">
-          <div className="space-y-2">
-            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
-              <LogIn className="w-10 h-10 text-primary" />
-            </div>
-            <h1 className="text-2xl font-bold">Silga Livraison</h1>
-            <p className="text-muted-foreground text-sm max-w-xs">
-              Connectez-vous pour accéder à votre espace admin ou livreur
-            </p>
-          </div>
-          <Button
-            onClick={() => safeRedirectToLogin(window.location.href)}
-            className="h-12 px-8 text-base font-semibold gap-2"
-          >
-            <LogIn className="w-5 h-5" />
-            Se connecter
-          </Button>
-          <div className="space-y-2 text-xs text-muted-foreground max-w-xs">
-            <p>
-              <strong>Admin :</strong> utilisez vos identifiants Base44
-            </p>
-            <p>
-              <strong>Livreur :</strong> votre compte doit être créé par un administrateur avec votre email
-            </p>
-          </div>
-        </div>
-      );
     }
+
+    // auth_required, unknown, ou toute autre erreur → écran de connexion
+    return (
+      <div className="fixed inset-0 flex flex-col items-center justify-center bg-background gap-6 p-8 text-center">
+        <div className="space-y-3">
+          <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+            <Truck className="w-10 h-10 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold">SILGAPP</h1>
+          <p className="text-muted-foreground text-sm max-w-xs">
+            Connectez-vous pour accéder à votre espace admin ou livreur
+          </p>
+        </div>
+        <Button
+          onClick={() => safeRedirectToLogin(window.location.href)}
+          className="h-12 px-8 text-base font-semibold gap-2"
+        >
+          <LogIn className="w-5 h-5" />
+          Se connecter
+        </Button>
+        <div className="space-y-2 text-xs text-muted-foreground max-w-xs">
+          <p><strong>Admin :</strong> identifiants Base44</p>
+          <p><strong>Livreur :</strong> compte créé par un administrateur</p>
+        </div>
+        {authError.type !== 'auth_required' && (
+          <p className="text-xs text-destructive max-w-xs">
+            Erreur : {authError.message || authError.type}
+          </p>
+        )}
+      </div>
+    );
   }
 
   // Utilisateur connecté mais inconnu (ni admin, ni livreur)

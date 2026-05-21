@@ -1,40 +1,68 @@
-import { appParams } from '@/lib/app-params';
-
 /**
  * Détecte si l'app tourne dans un contexte Capacitor (APK Android/iOS).
- * Dans ce cas, window.location est "https://localhost" et les routes internes
- * comme "/login" n'existent pas — il faut utiliser l'URL externe Base44.
  */
 export const isCapacitor = () => {
-  if (typeof window === 'undefined') return false;
-  return (
-    window.Capacitor !== undefined ||
-    window.location.hostname === 'localhost' && window.location.protocol === 'https:'
-  );
+  try {
+    if (typeof window === 'undefined') return false;
+    // Capacitor injecte window.Capacitor avec isNativePlatform
+    if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+      return true;
+    }
+    // Fallback : dans Capacitor la WebView utilise https://localhost
+    if (window.location.hostname === 'localhost') {
+      return true;
+    }
+    return false;
+  } catch (e) {
+    return false;
+  }
+};
+
+/**
+ * Récupère l'appId de façon sûre, sans importer app-params
+ * pour éviter les dépendances circulaires ou crashes au boot.
+ */
+const getAppId = () => {
+  try {
+    // Depuis localStorage (stocké par app-params au premier chargement web)
+    const stored = localStorage.getItem('base44_app_id');
+    if (stored) return stored;
+  } catch (e) { /* ignore */ }
+
+  // Fallback : variable d'environnement Vite
+  return import.meta.env.VITE_BASE44_APP_ID || '';
+};
+
+/**
+ * Récupère l'URL de base Base44.
+ */
+const getAppBaseUrl = () => {
+  try {
+    const stored = localStorage.getItem('base44_app_base_url');
+    if (stored) return stored;
+  } catch (e) { /* ignore */ }
+  return import.meta.env.VITE_BASE44_APP_BASE_URL || 'https://app.base44.com';
 };
 
 /**
  * Construit l'URL de login Base44 externe.
- * Le SDK fait "window.location.href = '/login'" (route interne),
- * ce qui cause un 404 dans la WebView Capacitor.
- * On construit ici l'URL absolue correcte.
+ * Le SDK fait window.location.href = "/login" (route interne inexistante dans Capacitor).
  */
 const buildLoginUrl = (nextUrl) => {
-  const appId = appParams.appId;
-  const appBaseUrl = appParams.appBaseUrl || 'https://app.base44.com';
-  // L'URL de login Base44 redirige vers l'app après auth avec access_token
+  const appId = getAppId();
+  const appBaseUrl = getAppBaseUrl();
   const returnUrl = nextUrl || (isCapacitor() ? 'https://localhost/' : window.location.href);
   return `${appBaseUrl}/login?app_id=${appId}&next=${encodeURIComponent(returnUrl)}`;
 };
 
 /**
- * Redirige vers la page de login Base44 de façon compatible
- * avec la WebView Capacitor Android ET le navigateur web.
- *
- * - Dans Capacitor : navigue directement vers l'URL absolue Base44
- * - Sur le web : même chose (évite la route "/login" interne du SDK)
+ * Redirige vers la page de login Base44, compatible Capacitor et navigateur web.
  */
 export const redirectToLogin = (nextUrl) => {
-  const loginUrl = buildLoginUrl(nextUrl);
-  window.location.href = loginUrl;
+  try {
+    const loginUrl = buildLoginUrl(nextUrl);
+    window.location.href = loginUrl;
+  } catch (e) {
+    console.error('[authRedirect] Erreur redirection login:', e);
+  }
 };
