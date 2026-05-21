@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -11,6 +12,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import LivreurLogin from "./LivreurLogin";
 import { getLivreurSession, setLivreurSession, clearLivreurSession } from "@/lib/livreurAuth";
+import { useAuth } from "@/lib/AuthContext";
 
 // Vibration répétée tant qu'une course est en attente
 function useVibration(active) {
@@ -301,7 +303,16 @@ function CourseActive({ course, onColisRecupere, onColisLivre, isPending }) {
 
 export default function LivreurApp() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { user, isAuthenticated, isLoadingAuth } = useAuth();
   const [livreurProfil, setLivreurProfil] = useState(() => getLivreurSession());
+
+  // Si un admin est connecté sur cette page, le rediriger vers le dashboard admin
+  useEffect(() => {
+    if (!isLoadingAuth && isAuthenticated && user?.role === "admin") {
+      navigate("/", { replace: true });
+    }
+  }, [isLoadingAuth, isAuthenticated, user, navigate]);
 
   const handleLogin = (livreur) => {
     setLivreurProfil(livreur);

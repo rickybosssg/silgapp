@@ -21,7 +21,11 @@ import LivreurLogin from './pages/LivreurLogin';
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
 
-  if (isLoadingPublicSettings || isLoadingAuth) {
+  // Les routes livreur sont toujours accessibles (auth propre via livreurAuth)
+  const isLivreurRoute = window.location.pathname.startsWith("/livreur") ||
+    window.location.pathname.startsWith("/inscription-livreur");
+
+  if (!isLivreurRoute && (isLoadingPublicSettings || isLoadingAuth)) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">
         <div className="text-center space-y-3">
@@ -32,7 +36,7 @@ const AuthenticatedApp = () => {
     );
   }
 
-  if (authError) {
+  if (!isLivreurRoute && authError) {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
@@ -43,6 +47,7 @@ const AuthenticatedApp = () => {
 
   return (
     <Routes>
+      {/* Routes Admin — protégées par AdminGuard dans AppLayout */}
       <Route element={<AppLayout />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/nouvelle-course" element={<NouvelleCourse />} />
@@ -52,6 +57,7 @@ const AuthenticatedApp = () => {
         <Route path="/rapport" element={<RapportJour />} />
         <Route path="/notifications" element={<Notifications />} />
       </Route>
+      {/* Routes Livreur — auth propre via localStorage (livreurAuth) */}
       <Route path="/livreur" element={<LivreurApp />} />
       <Route path="/inscription-livreur" element={<InscriptionLivreur />} />
       <Route path="*" element={<PageNotFound />} />
