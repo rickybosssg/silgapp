@@ -6,6 +6,7 @@ import { Truck, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/AuthContext";
+import { requestNotificationPermission, registerPushToken, subscribeToNotifications } from "@/lib/notifications";
 
 import LivreurHeader from "@/components/livreur/LivreurHeader";
 import LivreurStatsBanner from "@/components/livreur/LivreurStatsBanner";
@@ -43,6 +44,31 @@ export default function LivreurApp() {
       logout();
     }
   }, [livreurProfil?.actif]);
+
+  // Enregistrer token push et s'abonner aux notifications
+  useEffect(() => {
+    if (!livreurProfil?.id || !user?.email) return;
+
+    const setupNotifications = async () => {
+      // Enregistrer le token
+      const token = await registerPushToken(livreurProfil.id);
+      if (token) {
+        console.log('Token push livreur enregistré:', token);
+      }
+
+      // S'abonner aux notifications
+      const unsubscribe = subscribeToNotifications(
+        (notification) => {
+          toast.info(`${notification.titre}: ${notification.message}`);
+        },
+        user.email
+      );
+
+      return () => unsubscribe();
+    };
+
+    setupNotifications();
+  }, [livreurProfil?.id, user?.email]);
 
   const { data: mesCourses = [] } = useQuery({
     queryKey: ["mes-courses", livreurProfil?.id],

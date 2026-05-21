@@ -17,6 +17,7 @@ import Notifications from './pages/Notifications';
 import RecapitulatifAdmin from './pages/RecapitulatifAdmin';
 import LivreurApp from './pages/LivreurApp.jsx';
 import InscriptionLivreur from './pages/InscriptionLivreur';
+import TestNotificationsPush from './pages/TestNotificationsPush';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Truck } from 'lucide-react';
@@ -86,6 +87,7 @@ const AuthenticatedApp = () => {
         <Route path="/rapport" element={<RapportJour />} />
         <Route path="/recapitulatif" element={<RecapitulatifAdmin />} />
         <Route path="/notifications" element={<Notifications />} />
+        <Route path="/test-notifications" element={<TestNotificationsPush />} />
       </Route>
 
       {/* Route Livreur */}

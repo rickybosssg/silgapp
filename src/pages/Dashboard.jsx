@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
+import { toast } from "sonner";
 import StatCard from "../components/dashboard/StatCard";
 import CourseListItem from "../components/courses/CourseListItem";
 import CourseDetailDialog from "../components/courses/CourseDetailDialog";
@@ -18,6 +19,7 @@ import AssignLivreurDialog from "../components/courses/AssignLivreurDialog";
 import DispatchModeSelector from "../components/dispatch/DispatchModeSelector";
 import DispatchMonitor from "../components/dispatch/DispatchMonitor";
 import BatterieAlertesPanel from "../components/admin/BatterieAlertesPanel";
+import { requestNotificationPermission, registerPushToken, subscribeToNotifications } from "@/lib/notifications";
 
 const statusFilters = [
   { value: "toutes", label: "Toutes" },
@@ -31,6 +33,30 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState("toutes");
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [assignCourse, setAssignCourse] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    base44.auth.me().then(async (user) => {
+      setCurrentUser(user);
+      if (!user) return;
+      
+      // Enregistrer le token push pour admin
+      const token = await registerPushToken();
+      if (token) {
+        console.log('Token push admin enregistré:', token);
+      }
+
+      // S'abonner aux notifications
+      const unsubscribe = subscribeToNotifications(
+        (notification) => {
+          toast.info(`${notification.titre}: ${notification.message}`);
+        },
+        user.email
+      );
+
+      return () => unsubscribe();
+    }).catch(() => {});
+  }, []);
 
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ["courses"],

@@ -16,6 +16,7 @@ const navItems = [
   { path: "/rapport", label: "Rapport du jour", icon: BarChart3 },
   { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp },
   { path: "/notifications", label: "Notifications", icon: Bell },
+  { path: "/test-notifications", label: "Test Push", icon: Bell },
 ];
 
 export default function Sidebar({ notificationCount = 0 }) {
