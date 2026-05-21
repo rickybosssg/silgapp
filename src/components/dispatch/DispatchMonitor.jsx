@@ -39,10 +39,12 @@ export default function DispatchMonitor() {
     onError: (e) => toast.error("Erreur moteur: " + e.message),
   });
 
-  // Tick automatique toutes les 15s si mode auto
+  // Tick automatique toutes les 8s si mode auto
   useEffect(() => {
     if (!isAuto) return;
-    const interval = setInterval(() => tickMutation.mutate(), 15000);
+    // Tick immédiat au démarrage
+    tickMutation.mutate();
+    const interval = setInterval(() => tickMutation.mutate(), 8000);
     return () => clearInterval(interval);
   }, [isAuto]);
 
