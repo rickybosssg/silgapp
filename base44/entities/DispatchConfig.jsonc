@@ -1,0 +1,45 @@
+{
+  "name": "DispatchConfig",
+  "type": "object",
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": [
+        "manuel",
+        "automatique"
+      ],
+      "default": "manuel",
+      "description": "Mode de dispatch actif"
+    },
+    "moteur_actif": {
+      "type": "boolean",
+      "default": false,
+      "description": "Moteur de dispatch automatique actif"
+    },
+    "course_en_dispatch_id": {
+      "type": "string",
+      "description": "ID de la course actuellement en cours de dispatch"
+    },
+    "livreur_sollicite_id": {
+      "type": "string",
+      "description": "ID du livreur actuellement sollicit\u00e9"
+    },
+    "livreur_sollicite_nom": {
+      "type": "string",
+      "description": "Nom du livreur actuellement sollicit\u00e9"
+    },
+    "heure_sollicitation": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure \u00e0 laquelle le livreur a \u00e9t\u00e9 sollicit\u00e9"
+    },
+    "timeout_secondes": {
+      "type": "number",
+      "default": 60,
+      "description": "D\u00e9lai en secondes avant de passer au livreur suivant"
+    }
+  },
+  "required": [
+    "mode"
+  ]
+}

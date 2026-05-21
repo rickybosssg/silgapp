@@ -1,0 +1,27 @@
+{
+  "name": "QuartierOuaga",
+  "type": "object",
+  "properties": {
+    "nom_quartier": {
+      "type": "string",
+      "description": "Nom officiel du quartier"
+    },
+    "latitude_centre": {
+      "type": "number",
+      "description": "Latitude du centre du quartier"
+    },
+    "longitude_centre": {
+      "type": "number",
+      "description": "Longitude du centre du quartier"
+    },
+    "variantes_nom": {
+      "type": "string",
+      "description": "Variantes orthographiques s\u00e9par\u00e9es par des virgules (ex: Ouaga 2000, Ouaga2000)"
+    }
+  },
+  "required": [
+    "nom_quartier",
+    "latitude_centre",
+    "longitude_centre"
+  ]
+}

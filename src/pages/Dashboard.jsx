@@ -15,6 +15,8 @@ import StatCard from "../components/dashboard/StatCard";
 import CourseListItem from "../components/courses/CourseListItem";
 import CourseDetailDialog from "../components/courses/CourseDetailDialog";
 import AssignLivreurDialog from "../components/courses/AssignLivreurDialog";
+import DispatchModeSelector from "../components/dispatch/DispatchModeSelector";
+import DispatchMonitor from "../components/dispatch/DispatchMonitor";
 
 const statusFilters = [
   { value: "toutes", label: "Toutes" },
@@ -91,6 +93,10 @@ export default function Dashboard() {
           </Link>
         </div>
       </div>
+
+      {/* Dispatch Mode Selector */}
+      <DispatchModeSelector />
+      <DispatchMonitor />
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
