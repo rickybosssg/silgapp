@@ -160,21 +160,19 @@ export default function NouvelleCourse() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-1.5">
-              <Label className="text-xs">Adresse de départ (quartier) *</Label>
+              <Label className="text-xs">Adresse de départ (quartier)</Label>
               <Input
                 placeholder="Ex: Ouaga 2000"
                 value={form.adresse_depart}
                 onChange={(e) => handleChange("adresse_depart", e.target.value)}
-                required
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Adresse d'arrivée (quartier) *</Label>
+              <Label className="text-xs">Adresse d'arrivée (quartier)</Label>
               <Input
                 placeholder="Ex: Pissy"
                 value={form.adresse_arrivee}
                 onChange={(e) => handleChange("adresse_arrivee", e.target.value)}
-                required
               />
             </div>
           </CardContent>
