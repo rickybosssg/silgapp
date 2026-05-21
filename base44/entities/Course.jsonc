@@ -112,7 +112,6 @@
     }
   },
   "required": [
-    "client_nom",
     "client_telephone",
     "adresse_depart",
     "adresse_arrivee"

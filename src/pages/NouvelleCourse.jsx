@@ -98,7 +98,6 @@ export default function NouvelleCourse() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!form.client_nom) return toast.error("Le nom du client est obligatoire");
     if (!form.client_telephone) return toast.error("Le téléphone est obligatoire");
     if (!form.adresse_depart) return toast.error("L'adresse de départ est obligatoire");
     if (!form.adresse_arrivee) return toast.error("L'adresse d'arrivée est obligatoire");
