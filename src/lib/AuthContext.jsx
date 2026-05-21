@@ -2,9 +2,14 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { appParams } from '@/lib/app-params';
 import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
-import { redirectToLogin as safeRedirectToLogin, isCapacitor } from '@/lib/authRedirect';
+import { redirectToLogin as safeRedirectToLogin } from '@/lib/authRedirect';
 
 const AuthContext = createContext();
+
+// Dans Capacitor, l'API base44 doit être appelée avec une URL absolue
+const BASE44_API = appParams.isCapacitor
+  ? `${appParams.appBaseUrl || 'https://app.base44.com'}/api/apps/public`
+  : '/api/apps/public';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -24,17 +29,9 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingPublicSettings(true);
       setAuthError(null);
 
-      // Dans Capacitor, les URLs relatives "/api/..." ne fonctionnent pas.
-      // Il faut l'URL absolue de l'API Base44.
-      const apiBase = isCapacitor()
-        ? (import.meta.env.VITE_BASE44_APP_BASE_URL || 'https://app.base44.com')
-        : '';
-
       const appClient = createAxiosClient({
-        baseURL: `${apiBase}/api/apps/public`,
-        headers: {
-          'X-App-Id': appParams.appId
-        },
+        baseURL: BASE44_API,
+        headers: { 'X-App-Id': appParams.appId },
         token: appParams.token,
         interceptResponses: true
       });
@@ -58,10 +55,9 @@ export const AuthProvider = ({ children }) => {
           const reason = appError.data.extra_data.reason;
           setAuthError({ type: reason, message: appError.message });
         } else if (appError.status === 401) {
-          // Token expiré → besoin de reconnexion
           setAuthError({ type: 'auth_required', message: 'Session expirée' });
         } else {
-          // Erreur réseau ou autre → ne pas bloquer, afficher l'écran connexion
+          // Erreur réseau / timeout → montrer l'écran de connexion plutôt que bloquer
           setAuthError({ type: 'auth_required', message: 'Connexion requise' });
         }
         setIsLoadingPublicSettings(false);
@@ -69,8 +65,7 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('[AuthContext] Unexpected error:', error);
-      // Toujours fallback sur auth_required (affiche l'écran de connexion)
-      setAuthError({ type: 'auth_required', message: error?.message || 'Erreur inattendue' });
+      setAuthError({ type: 'auth_required', message: error?.message || 'Erreur au démarrage' });
       setIsLoadingPublicSettings(false);
       setIsLoadingAuth(false);
     }
@@ -82,17 +77,16 @@ export const AuthProvider = ({ children }) => {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
       setIsAuthenticated(true);
-      setIsLoadingAuth(false);
-      setAuthChecked(true);
     } catch (error) {
       console.error('[AuthContext] User auth check failed:', error);
-      setIsLoadingAuth(false);
       setIsAuthenticated(false);
       setAuthChecked(true);
-
       if (error.status === 401 || error.status === 403) {
         setAuthError({ type: 'auth_required', message: 'Session expirée' });
       }
+    } finally {
+      setIsLoadingAuth(false);
+      setAuthChecked(true);
     }
   };
 

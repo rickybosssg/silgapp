@@ -4,17 +4,19 @@
   "webDir": "dist",
   "server": {
     "androidScheme": "https",
+    "hostname": "silgaapp",
     "allowNavigation": [
       "*.base44.com",
       "base44.com",
       "*.base44.app",
-      "base44.app"
+      "base44.app",
+      "app.base44.com"
     ]
   },
   "android": {
     "allowMixedContent": true,
     "captureInput": true,
-    "webContentsDebuggingEnabled": false
+    "webContentsDebuggingEnabled": true
   },
   "plugins": {
     "PushNotifications": {

@@ -34,20 +34,39 @@ const getAppParamValue = (paramName, { defaultValue = undefined, removeFromUrl =
 	return null;
 }
 
+// Détecte Capacitor (APK Android/iOS) pour adapter les URLs
+const detectCapacitor = () => {
+	try {
+		if (typeof window === 'undefined') return false;
+		if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) return true;
+		if (window.location.hostname === 'localhost' || window.location.hostname === 'silgaapp') return true;
+		return false;
+	} catch (e) {
+		return false;
+	}
+};
+
 const getAppParams = () => {
 	if (getAppParamValue("clear_access_token") === 'true') {
 		storage.removeItem('base44_access_token');
 		storage.removeItem('token');
 	}
+
+	const isCapacitor = detectCapacitor();
+
+	// Dans Capacitor, window.location.href = "https://localhost/" → pas utile comme fromUrl
+	// On utilise une valeur stable pour éviter les crashes
+	const safeHref = isCapacitor ? 'https://silgaapp/' : (typeof window !== 'undefined' ? window.location.href : '/');
+
 	return {
 		appId: getAppParamValue("app_id", { defaultValue: import.meta.env.VITE_BASE44_APP_ID }),
 		token: getAppParamValue("access_token", { removeFromUrl: true }),
-		fromUrl: getAppParamValue("from_url", { defaultValue: window.location.href }),
+		fromUrl: getAppParamValue("from_url", { defaultValue: safeHref }),
 		functionsVersion: getAppParamValue("functions_version", { defaultValue: import.meta.env.VITE_BASE44_FUNCTIONS_VERSION }),
 		appBaseUrl: getAppParamValue("app_base_url", { defaultValue: import.meta.env.VITE_BASE44_APP_BASE_URL }),
+		isCapacitor,
 	}
 }
-
 
 export const appParams = {
 	...getAppParams()
