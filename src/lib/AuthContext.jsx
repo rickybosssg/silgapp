@@ -97,8 +97,10 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setUser(null);
     setIsAuthenticated(false);
+    setAuthError({ type: 'auth_required', message: 'Déconnecté' });
     localStorage.removeItem("base44_access_token");
-    window.location.reload(); // Réaffiche ConnexionInterne sans sortir de l'APK
+    // Ne pas faire reload() : cela retomberait sur localhost dans Capacitor.
+    // On force l'état auth_required → App.jsx affiche ConnexionInterne → redirige vers Base44.
   };
 
   const navigateToLogin = (returnUrl) => {

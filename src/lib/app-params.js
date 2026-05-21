@@ -55,10 +55,10 @@ const getAppParams = () => {
 
 	const isCapacitor = detectCapacitor();
 
-	// Dans Capacitor, window.location.href = "https://localhost/" → pas utile comme fromUrl
-	// On utilise une valeur stable pour éviter les crashes
-	// Dans Capacitor, le WebView est servi sur https://localhost/
-	const safeHref = isCapacitor ? 'https://localhost/' : (typeof window !== 'undefined' ? window.location.href : '/');
+	// Dans Capacitor, ne jamais utiliser localhost comme fromUrl — utiliser l'URL publique de l'app
+	const safeHref = isCapacitor
+		? 'https://silgapp.base44.app'
+		: (typeof window !== 'undefined' ? window.location.href : '/');
 
 	return {
 		appId: getAppParamValue("app_id", { defaultValue: import.meta.env.VITE_BASE44_APP_ID }),
