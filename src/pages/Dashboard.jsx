@@ -17,6 +17,7 @@ import CourseDetailDialog from "../components/courses/CourseDetailDialog";
 import AssignLivreurDialog from "../components/courses/AssignLivreurDialog";
 import DispatchModeSelector from "../components/dispatch/DispatchModeSelector";
 import DispatchMonitor from "../components/dispatch/DispatchMonitor";
+import BatterieAlertesPanel from "../components/admin/BatterieAlertesPanel";
 
 const statusFilters = [
   { value: "toutes", label: "Toutes" },
@@ -97,6 +98,7 @@ export default function Dashboard() {
       {/* Dispatch Mode Selector */}
       <DispatchModeSelector />
       <DispatchMonitor />
+      <BatterieAlertesPanel />
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">

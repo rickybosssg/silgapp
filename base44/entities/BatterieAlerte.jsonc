@@ -1,0 +1,63 @@
+{
+  "name": "BatterieAlerte",
+  "type": "object",
+  "properties": {
+    "livreur_id": {
+      "type": "string",
+      "description": "ID du livreur"
+    },
+    "livreur_nom": {
+      "type": "string",
+      "description": "Nom du livreur"
+    },
+    "livreur_telephone": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone du livreur"
+    },
+    "latitude": {
+      "type": "number",
+      "description": "Latitude au moment du signalement"
+    },
+    "longitude": {
+      "type": "number",
+      "description": "Longitude au moment du signalement"
+    },
+    "quartier": {
+      "type": "string",
+      "description": "Quartier du livreur"
+    },
+    "statut_livreur": {
+      "type": "string",
+      "enum": [
+        "disponible",
+        "en_course",
+        "hors_ligne"
+      ],
+      "description": "Statut du livreur au moment du signalement"
+    },
+    "traitee": {
+      "type": "boolean",
+      "default": false,
+      "description": "Alerte trait\u00e9e par l'admin"
+    },
+    "heure_signalement": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure du signalement"
+    },
+    "heure_traitement": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure de traitement par l'admin"
+    },
+    "admin_traitement": {
+      "type": "string",
+      "description": "Nom de l'admin ayant trait\u00e9 l'alerte"
+    }
+  },
+  "required": [
+    "livreur_id",
+    "livreur_nom",
+    "livreur_telephone"
+  ]
+}

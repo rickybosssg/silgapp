@@ -5,14 +5,14 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Truck, Phone, MapPin, Check, X, Clock, UserCheck, Copy, Banknote, Plus, Pencil, UserX, Trash2 } from "lucide-react";
+import { Truck, Phone, MapPin, Check, X, Clock, UserCheck, Copy, Banknote, Plus, Pencil, UserX, Trash2, BatteryWarning } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import LivreurFormDialog from "@/components/livreurs/LivreurFormDialog";
 
-function LivreurCard({ livreur, courses, onValider, onRefuser, onToggleStatut, onValiderPaiement, onEdit, onSupprimer, isPending }) {
+function LivreurCard({ livreur, courses, onValider, onRefuser, onToggleStatut, onValiderPaiement, onEdit, onSupprimer, isPending, hasAlerteBatterie }) {
   const nomComplet = `${livreur.prenom || ""} ${livreur.nom}`.trim();
 
   // Calcul montant dû à partir des prix réels des courses du jour livrées
@@ -61,13 +61,20 @@ function LivreurCard({ livreur, courses, onValider, onRefuser, onToggleStatut, o
         </div>
         <div className="flex flex-col items-end gap-1">
           {livreur.validation === "valide" && (
-            <Badge variant="outline" className={cn("text-[10px]",
-              isDisponible && "bg-green-100 text-green-700 border-green-200",
-              isEnCourse && "bg-red-100 text-red-700 border-red-200",
-              livreur.statut === "hors_ligne" && "bg-slate-100 text-slate-500 border-slate-200"
-            )}>
-              {isDisponible ? "Disponible" : isEnCourse ? "En course" : "Hors ligne"}
-            </Badge>
+            <div className="flex flex-col items-end gap-1">
+              {hasAlerteBatterie(livreur.id) && (
+                <Badge className="bg-orange-500 text-white text-[10px] gap-1 animate-pulse">
+                  <BatteryWarning className="w-3 h-3" /> Batterie faible
+                </Badge>
+              )}
+              <Badge variant="outline" className={cn("text-[10px]",
+                isDisponible && "bg-green-100 text-green-700 border-green-200",
+                isEnCourse && "bg-red-100 text-red-700 border-red-200",
+                livreur.statut === "hors_ligne" && "bg-slate-100 text-slate-500 border-slate-200"
+              )}>
+                {isDisponible ? "Disponible" : isEnCourse ? "En course" : "Hors ligne"}
+              </Badge>
+            </div>
           )}
           {livreur.validation === "en_attente" && (
             <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200">En attente</Badge>
@@ -203,6 +210,18 @@ export default function Livreurs() {
     refetchInterval: 30000,
   });
 
+  const { data: alertes = [] } = useQuery({
+    queryKey: ["batterie-alertes"],
+    queryFn: () => base44.entities.BatterieAlerte.list("-heure_signalement", 50),
+    initialData: [],
+    refetchInterval: 10000,
+  });
+
+  // Vérifier si un livreur a une alerte non traitée
+  const hasAlerteBatterie = (livreurId) => {
+    return alertes.some(a => a.livreur_id === livreurId && !a.traitee);
+  };
+
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Livreur.update(id, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["livreurs"] }),
@@ -333,7 +352,8 @@ export default function Livreurs() {
               <LivreurCard key={livreur.id} livreur={livreur} courses={courses}
                 onValider={handleValider} onRefuser={handleRefuser} onToggleStatut={handleToggleStatut}
                 onValiderPaiement={handleValiderPaiement} onEdit={(l) => { setEditingLivreur(l); setShowForm(true); }}
-                onSupprimer={handleSupprimer} isPending={updateMutation.isPending || deleteMutation.isPending} />
+                onSupprimer={handleSupprimer} isPending={updateMutation.isPending || deleteMutation.isPending}
+                hasAlerteBatterie={hasAlerteBatterie} />
             ))}
           </div>
 
@@ -349,7 +369,8 @@ export default function Livreurs() {
               <LivreurCard key={livreur.id} livreur={livreur} courses={courses}
                 onValider={handleValider} onRefuser={handleRefuser} onToggleStatut={handleToggleStatut}
                 onValiderPaiement={handleValiderPaiement} onEdit={(l) => { setEditingLivreur(l); setShowForm(true); }}
-                onSupprimer={handleSupprimer} isPending={updateMutation.isPending || deleteMutation.isPending} />
+                onSupprimer={handleSupprimer} isPending={updateMutation.isPending || deleteMutation.isPending}
+                hasAlerteBatterie={hasAlerteBatterie} />
             ))}
           </div>
 
@@ -365,7 +386,8 @@ export default function Livreurs() {
               <LivreurCard key={livreur.id} livreur={livreur} courses={courses}
                 onValider={handleValider} onRefuser={handleRefuser} onToggleStatut={handleToggleStatut}
                 onValiderPaiement={handleValiderPaiement} onEdit={(l) => { setEditingLivreur(l); setShowForm(true); }}
-                onSupprimer={handleSupprimer} isPending={updateMutation.isPending || deleteMutation.isPending} />
+                onSupprimer={handleSupprimer} isPending={updateMutation.isPending || deleteMutation.isPending}
+                hasAlerteBatterie={hasAlerteBatterie} />
             ))}
           </div>
         </div>
@@ -385,7 +407,8 @@ export default function Livreurs() {
             <LivreurCard key={livreur.id} livreur={livreur} courses={courses}
               onValider={handleValider} onRefuser={handleRefuser} onToggleStatut={handleToggleStatut}
               onValiderPaiement={handleValiderPaiement} onEdit={(l) => { setEditingLivreur(l); setShowForm(true); }}
-              onSupprimer={handleSupprimer} isPending={updateMutation.isPending || deleteMutation.isPending} />
+              onSupprimer={handleSupprimer} isPending={updateMutation.isPending || deleteMutation.isPending}
+              hasAlerteBatterie={hasAlerteBatterie} />
           ))}
         </div>
       )}

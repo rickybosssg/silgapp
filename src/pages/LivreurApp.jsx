@@ -230,7 +230,7 @@ export default function LivreurApp() {
         <LivreurStatsBanner mesCourses={mesCourses} totalEncaisse={totalEncaisse} />
 
         {/* Carte statut */}
-        <LivreurStatutCard statut={livreurProfil.statut} />
+        <LivreurStatutCard statut={livreurProfil.statut} livreur={livreurProfil} />
 
         {/* Courses actives */}
         {coursesActives.length > 0 && (
