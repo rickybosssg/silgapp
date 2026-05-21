@@ -400,14 +400,29 @@ export default function LivreurApp() {
     );
   }
 
-  // Non connecté → rediriger vers login Base44
+  // Non connecté → page de login simplifiée
   if (!isAuthenticated) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-8 text-center">
-        <Truck className="w-14 h-14 text-primary" />
-        <h1 className="text-2xl font-bold">Silga Livraison</h1>
-        <p className="text-muted-foreground">Connectez-vous pour accéder à votre espace livreur</p>
-        <Button className="mt-2 bg-primary" onClick={() => navigateToLogin()}>Se connecter</Button>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background gap-6 p-8 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center shadow-lg">
+          <Truck className="w-8 h-8 text-white" />
+        </div>
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold">Silga Livraison</h1>
+          <p className="text-muted-foreground text-sm">Espace livreur</p>
+        </div>
+        <div className="w-full max-w-xs space-y-3">
+          <Button
+            className="w-full h-12 text-base font-semibold bg-primary gap-2"
+            onClick={() => navigateToLogin("/livreur")}
+          >
+            <LogOut className="w-4 h-4 rotate-180" />
+            Se connecter
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Vous recevrez un lien de connexion par email — aucun mot de passe nécessaire.
+          </p>
+        </div>
       </div>
     );
   }
