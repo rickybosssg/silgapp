@@ -6,6 +6,7 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 
+import ConnexionInterne from './pages/ConnexionInterne';
 import AppLayout from './components/layout/AppLayout';
 import Dashboard from './pages/Dashboard';
 import NouvelleCourse from './pages/NouvelleCourse';
@@ -21,10 +22,9 @@ import TestNotificationsPush from './pages/TestNotificationsPush';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Truck } from 'lucide-react';
-import { redirectToLogin as safeRedirectToLogin } from '@/lib/authRedirect';
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user, isAuthenticated } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, user, isAuthenticated } = useAuth();
 
   const isAdmin = user?.role === "admin";
 
@@ -60,18 +60,8 @@ const AuthenticatedApp = () => {
       return <UserNotRegisteredError />;
     }
 
-    // auth_required → redirection automatique vers la page de connexion Base44
-    safeRedirectToLogin(window.location.href);
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-background">
-        <div className="text-center space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
-            <Truck className="w-8 h-8 text-primary animate-pulse" />
-          </div>
-          <p className="text-xs text-muted-foreground">Redirection vers la connexion…</p>
-        </div>
-      </div>
-    );
+    // auth_required → page de connexion interne (sans navigateur externe)
+    return <ConnexionInterne />;
   }
 
   // Utilisateur connecté mais inconnu (ni admin, ni livreur)
@@ -85,7 +75,7 @@ const AuthenticatedApp = () => {
         </p>
         <button
           className="text-xs text-muted-foreground underline mt-2"
-          onClick={() => base44.auth.logout()}
+          onClick={() => { localStorage.removeItem("base44_access_token"); window.location.reload(); }}
         >
           Se déconnecter
         </button>

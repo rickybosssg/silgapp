@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
-import { Truck, LogOut } from "lucide-react";
+import { Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/AuthContext";
@@ -20,7 +20,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 export default function LivreurApp() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { user, isAuthenticated, isLoadingAuth, navigateToLogin, logout } = useAuth();
+  const { user, isAuthenticated, isLoadingAuth, logout } = useAuth();
   const [activeTab, setActiveTab] = useState("courses");
 
   // Rediriger les admins
@@ -170,15 +170,8 @@ export default function LivreurApp() {
     );
   }
 
-  // ---- NON CONNECTÉ → redirection automatique ----
-  if (!isAuthenticated) {
-    navigateToLogin("/livreur");
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-gray-900">
-        <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-      </div>
-    );
-  }
+  // ---- NON CONNECTÉ → géré par App.jsx (ConnexionInterne) ----
+  if (!isAuthenticated) return null;
 
   // ---- PAS DE PROFIL LIVREUR ----
   if (livreurProfil === null) {

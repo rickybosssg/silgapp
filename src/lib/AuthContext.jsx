@@ -1,7 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { appParams } from '@/lib/app-params';
-import { redirectToLogin as safeRedirectToLogin } from '@/lib/authRedirect';
 
 const AuthContext = createContext();
 
@@ -98,12 +97,13 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setUser(null);
     setIsAuthenticated(false);
-    // base44.auth.logout() utilise redirectToLogin en interne — on passe par safeRedirectToLogin
-    safeRedirectToLogin();
+    localStorage.removeItem("base44_access_token");
+    window.location.reload(); // Réaffiche ConnexionInterne sans sortir de l'APK
   };
 
   const navigateToLogin = (returnUrl) => {
-    safeRedirectToLogin(returnUrl || window.location.href);
+    // No-op: connexion gérée par ConnexionInterne dans l'APK
+    console.warn('[AuthContext] navigateToLogin appelé — utiliser ConnexionInterne à la place');
   };
 
   return (
