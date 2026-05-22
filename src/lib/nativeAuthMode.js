@@ -31,5 +31,5 @@ export const isNativeFirebaseAuthEnabled = () => {
   if (requestedMode === AUTH_MODE_BASE44) return false;
   if (requestedMode === AUTH_MODE_NATIVE_FIREBASE) return true;
 
-  return appParams.isCapacitor && import.meta.env.VITE_ENABLE_NATIVE_FIREBASE_AUTH === 'true';
+  return appParams.isCapacitor;
 };
