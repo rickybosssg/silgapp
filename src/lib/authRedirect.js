@@ -1,64 +1,59 @@
 /**
- * URL publique de l'app Base44 publiée.
- * Utilisée comme returnUrl dans Capacitor car "localhost" n'est
- * pas résolvable depuis Chrome Android après une auth externe (Google).
+ * authRedirect.js — redirection login Base44
+ * RÈGLE ABSOLUE : ne jamais construire une URL avec localhost, null, undefined.
+ * Toutes les URLs sont hardcodées ou validées avant utilisation.
  */
-const APP_PUBLIC_URL = "https://silgapp.base44.app";
-const BASE44_LOGIN_BASE = "https://app.base44.com";
 
-/**
- * Détecte si l'app tourne dans un contexte Capacitor (APK Android/iOS).
- */
+const BASE44_LOGIN_URL = "https://app.base44.com/login";
+const APP_PUBLIC_URL = "https://silgapp.base44.app";
+const INVALID_PATTERNS = ["localhost", "null", "undefined", "silgaapp"];
+
+const isUrlSafe = (url) => {
+  if (!url || typeof url !== "string") return false;
+  return !INVALID_PATTERNS.some((p) => url.includes(p));
+};
+
 export const isCapacitor = () => {
   try {
-    if (typeof window === 'undefined') return false;
+    if (typeof window === "undefined") return false;
     if (window.Capacitor?.isNativePlatform?.()) return true;
-    if (window.location.hostname === 'localhost') return true;
+    if (window.location.hostname === "localhost") return true;
     return false;
   } catch (e) {
     return false;
   }
-};
-
-const getAppId = () => {
-  try {
-    const stored = localStorage.getItem('base44_app_id');
-    if (stored) return stored;
-  } catch (e) { /* ignore */ }
-  return import.meta.env.VITE_BASE44_APP_ID || '';
-};
-
-const getAppBaseUrl = () => {
-  try {
-    const stored = localStorage.getItem('base44_app_base_url');
-    if (stored) return stored;
-  } catch (e) { /* ignore */ }
-  return import.meta.env.VITE_BASE44_APP_BASE_URL || BASE44_LOGIN_BASE;
 };
 
 /**
- * Redirige vers la page de login Base44.
- * - Capacitor : returnUrl = APP_PUBLIC_URL (URL résolvable depuis Chrome Android)
- * - Web       : returnUrl = window.location.href
+ * Construit et retourne l'URL de login Base44.
+ * Dans Capacitor : returnUrl = APP_PUBLIC_URL (jamais localhost).
+ * En web : returnUrl = window.location.href si valide, sinon APP_PUBLIC_URL.
  */
-export const redirectToLogin = (nextUrl) => {
-  try {
-    const appId = getAppId();
-    const appBaseUrl = getAppBaseUrl();
+export const getLoginUrl = () => {
+  const appId = import.meta.env.VITE_BASE44_APP_ID;
 
-    if (!appId) {
-      console.error('[authRedirect] appId manquant — redirection annulée');
-      return;
-    }
-
-    // Dans Capacitor, ne jamais utiliser localhost ni window.location.href
-    const returnUrl = nextUrl && !nextUrl.includes('localhost')
-      ? nextUrl
-      : (isCapacitor() ? APP_PUBLIC_URL : window.location.href);
-
-    const loginUrl = `${appBaseUrl}/login?app_id=${encodeURIComponent(appId)}&next=${encodeURIComponent(returnUrl)}`;
-    window.location.href = loginUrl;
-  } catch (e) {
-    console.error('[authRedirect] Erreur redirection login:', e);
+  if (!appId || !isUrlSafe(appId)) {
+    console.error("[authRedirect] VITE_BASE44_APP_ID invalide:", appId);
+    return null;
   }
+
+  let returnUrl;
+  if (isCapacitor()) {
+    returnUrl = APP_PUBLIC_URL;
+  } else {
+    const href = typeof window !== "undefined" ? window.location.href : APP_PUBLIC_URL;
+    returnUrl = isUrlSafe(href) ? href : APP_PUBLIC_URL;
+  }
+
+  return `${BASE44_LOGIN_URL}?app_id=${encodeURIComponent(appId)}&next=${encodeURIComponent(returnUrl)}`;
+};
+
+export const redirectToLogin = () => {
+  const url = getLoginUrl();
+  if (!url) {
+    console.error("[authRedirect] URL de login invalide — redirection annulée");
+    return;
+  }
+  console.log("[authRedirect] Redirection vers:", url);
+  window.location.href = url;
 };
