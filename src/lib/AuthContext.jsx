@@ -1,10 +1,25 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { appParams, APP_PUBLIC_URL } from '@/lib/app-params';
+import { buildNativeAuthCallbackUrl } from '@/lib/authRedirect';
 
 const AuthContext = createContext();
 
 const isValidToken = (token) => token && token !== 'null' && token !== 'undefined';
+const TOKEN_STORAGE_KEYS = ['base44_access_token', 'token', 'base44_token'];
+
+const getStoredToken = () => {
+  return TOKEN_STORAGE_KEYS.map((key) => localStorage.getItem(key)).find(isValidToken);
+};
+
+const saveAuthToken = (token) => {
+  TOKEN_STORAGE_KEYS.forEach((key) => localStorage.setItem(key, token));
+  base44.auth.setToken(token);
+};
+
+const clearAuthTokens = () => {
+  TOKEN_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -27,9 +42,7 @@ export const AuthProvider = ({ children }) => {
       const token = url.searchParams.get('access_token') || url.searchParams.get('token');
 
       if (isValidToken(token)) {
-        localStorage.setItem('base44_access_token', token);
-        localStorage.setItem('token', token);
-        base44.auth.setToken(token);
+        saveAuthToken(token);
       }
 
       if (url.protocol === 'com.silgapp.app:' || url.hostname === publicHost || isValidToken(token)) {
@@ -38,7 +51,33 @@ export const AuthProvider = ({ children }) => {
       }
     };
 
+    const redirectHostedLoginBackToAndroid = () => {
+      if (appParams.isCapacitor || typeof window === 'undefined') return false;
+
+      const url = new URL(window.location.href);
+      const isSilgappHostedPage = url.hostname === publicHost;
+      const isNativeReturnPage = url.pathname === '/auth/native-callback' || url.searchParams.get('native_return') === '1';
+      const isAndroidBrowser = /Android/i.test(window.navigator.userAgent);
+
+      if (!isSilgappHostedPage || !isNativeReturnPage || !isAndroidBrowser) return false;
+
+      const token = url.searchParams.get('access_token') || url.searchParams.get('token') || getStoredToken();
+      if (!isValidToken(token)) {
+        console.warn('[AuthContext] Native return requested, but no Base44 token is available yet.');
+        return false;
+      }
+
+      const deepLinkUrl = buildNativeAuthCallbackUrl(token);
+      if (sessionStorage.getItem('silgapp_native_return_url') === deepLinkUrl) return true;
+
+      sessionStorage.setItem('silgapp_native_return_url', deepLinkUrl);
+      window.location.replace(deepLinkUrl);
+      return true;
+    };
+
     const checkUrlToken = async () => {
+      if (redirectHostedLoginBackToAndroid()) return;
+
       const token = new URLSearchParams(window.location.search).get('access_token');
       if (isValidToken(token)) {
         await consumeAuthUrl(window.location.href);
@@ -78,9 +117,7 @@ export const AuthProvider = ({ children }) => {
       setAuthError(null);
 
       const token = appParams.token
-        || localStorage.getItem('base44_access_token')
-        || localStorage.getItem('token')
-        || localStorage.getItem('base44_token');
+        || getStoredToken();
 
       if (!isValidToken(token)) {
         setIsLoadingAuth(false);
@@ -110,9 +147,7 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('[AuthContext] Auth check failed:', error);
       setIsAuthenticated(false);
-      localStorage.removeItem('base44_access_token');
-      localStorage.removeItem('token');
-      localStorage.removeItem('base44_token');
+      clearAuthTokens();
       setAuthError({ type: 'auth_required', message: 'Session expiree' });
     } finally {
       setIsLoadingAuth(false);
@@ -124,9 +159,7 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setIsAuthenticated(false);
     setAuthError({ type: 'auth_required', message: 'Deconnecte' });
-    localStorage.removeItem('base44_access_token');
-    localStorage.removeItem('token');
-    localStorage.removeItem('base44_token');
+    clearAuthTokens();
   };
 
   const navigateToLogin = () => {
