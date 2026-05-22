@@ -11,6 +11,12 @@ const CORRUPT_VALUES = ['null', 'undefined', '', 'NaN'];
 
 const isValidValue = (v) => v && !CORRUPT_VALUES.includes(String(v).trim());
 
+export const BASE44_SERVER_URL = 'https://app.base44.com';
+export const APP_PUBLIC_URL =
+	import.meta.env.VITE_BASE44_APP_PUBLIC_URL ||
+	import.meta.env.VITE_BASE44_APP_BASE_URL ||
+	'https://silga-dispatch-go.base44.app';
+
 const getAppParamValue = (paramName, { defaultValue = undefined, removeFromUrl = false } = {}) => {
 	if (isNode) {
 		return defaultValue;
@@ -62,14 +68,14 @@ const getAppParams = () => {
 
 	// Dans Capacitor, ne jamais utiliser localhost comme fromUrl — utiliser l'URL publique de l'app
 	const safeHref = isCapacitor
-		? 'https://silgapp.base44.app'
+		? APP_PUBLIC_URL
 		: (typeof window !== 'undefined' ? window.location.href : '/');
 
 	// Ne jamais laisser appBaseUrl à null — le SDK Base44 l'utilise pour les appels API
 	const rawAppBaseUrl = getAppParamValue("app_base_url", { defaultValue: import.meta.env.VITE_BASE44_APP_BASE_URL });
 	const appBaseUrl = rawAppBaseUrl && rawAppBaseUrl !== 'null' && rawAppBaseUrl !== 'undefined'
 		? rawAppBaseUrl
-		: 'https://app.base44.com';
+		: APP_PUBLIC_URL;
 
 	return {
 		appId: getAppParamValue("app_id", { defaultValue: import.meta.env.VITE_BASE44_APP_ID || "silgapp" }),

@@ -9,16 +9,17 @@ import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { notifyNouvelleCourse } from "@/lib/notificationsHelpers";
 
 function getDistance(lat1, lng1, lat2, lng2) {
   if (!lat1 || !lng1 || !lat2 || !lng2) return null;
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLng/2) * Math.sin(dLng/2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 export default function AssignLivreurDialog({ course, open, onClose }) {
@@ -37,17 +38,18 @@ export default function AssignLivreurDialog({ course, open, onClose }) {
         livreur_nom: livreur.nom,
         statut: "en_attente_livreur",
       });
-      await base44.entities.Notification.create({
-        titre: "Course assignée",
-        message: `Course de ${course.client_nom} vous est assignée. Départ: ${course.adresse_depart}`,
-        type: "course_assignee",
-        course_id: courseId,
-        destinataire_email: livreur.user_email || "",
-      });
+
+      if (livreur.user_email) {
+        await notifyNouvelleCourse(livreur.user_email, {
+          ...course,
+          id: courseId,
+          livreur_id: livreur.id,
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["courses"] });
-      toast.success("Livreur assigné avec succès");
+      toast.success("Livreur assigne avec succes");
       onClose();
     },
   });
@@ -75,7 +77,7 @@ export default function AssignLivreurDialog({ course, open, onClose }) {
         {course && (
           <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
             <MapPin className="w-3 h-3" />
-            {course.adresse_depart} → {course.adresse_arrivee}
+            {course.adresse_depart} {"->"} {course.adresse_arrivee}
           </div>
         )}
 
@@ -86,7 +88,7 @@ export default function AssignLivreurDialog({ course, open, onClose }) {
             </p>
           )}
           {sorted.map((livreur, index) => {
-            const dist = course?.gps_depart_lat 
+            const dist = course?.gps_depart_lat
               ? getDistance(course.gps_depart_lat, course.gps_depart_lng, livreur.latitude, livreur.longitude)
               : null;
             return (
@@ -105,7 +107,7 @@ export default function AssignLivreurDialog({ course, open, onClose }) {
                     <span className="font-medium text-sm">{livreur.nom}</span>
                     {index === 0 && (
                       <Badge className="bg-accent text-accent-foreground text-[10px] h-4">
-                        <Star className="w-2.5 h-2.5 mr-0.5" /> Recommandé
+                        <Star className="w-2.5 h-2.5 mr-0.5" /> Recommande
                       </Badge>
                     )}
                   </div>

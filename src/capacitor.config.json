@@ -5,7 +5,7 @@
   "server": {
     "androidScheme": "https",
     "allowNavigation": [
-      "silgapp.base44.app",
+      "silga-dispatch-go.base44.app",
       "*.base44.com",
       "base44.com",
       "*.base44.app",

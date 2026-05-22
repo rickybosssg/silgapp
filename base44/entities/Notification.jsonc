@@ -13,13 +13,20 @@
     "type": {
       "type": "string",
       "enum": [
+        "generic",
+        "test",
         "nouvelle_course",
         "course_assignee",
         "course_acceptee",
         "course_refusee",
         "course_livree",
         "course_bloquee",
-        "course_annulee"
+        "course_annulee",
+        "batterie_faible",
+        "livreur_hors_ligne",
+        "paiement_valide",
+        "course_proximite",
+        "rappel_reponse"
       ],
       "description": "Type de notification"
     },

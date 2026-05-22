@@ -4,14 +4,14 @@ import { BatteryWarning } from "lucide-react";
 import { toast } from "sonner";
 import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { notifyBatterieFaible } from "@/lib/notificationsHelpers";
 
 export default function BatterieFaibleButton({ livreur }) {
   const queryClient = useQueryClient();
 
   const alerterMutation = useMutation({
     mutationFn: async () => {
-      // Créer l'alerte
-      await base44.entities.BatterieAlerte.create({
+      const alerte = await base44.entities.BatterieAlerte.create({
         livreur_id: livreur.id,
         livreur_nom: `${livreur.prenom} ${livreur.nom}`,
         livreur_telephone: livreur.telephone,
@@ -22,17 +22,16 @@ export default function BatterieFaibleButton({ livreur }) {
         heure_signalement: new Date().toISOString(),
       });
 
-      // Créer une notification pour l'admin
-      await base44.entities.Notification.create({
-        titre: "🔋 Batterie faible",
-        message: `Le livreur ${livreur.prenom} ${livreur.nom} a signalé une batterie faible.`,
-        type: "course_bloquee",
-        destinataire_email: "admin@silga.bf",
-      });
+      await notifyBatterieFaible({
+        ...alerte,
+        livreur_id: livreur.id,
+        livreur_nom: `${livreur.prenom} ${livreur.nom}`,
+        quartier: livreur.quartier,
+      }, "admin@silga.bf");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["batterie-alertes"] });
-      toast.success("Alerte batterie faible envoyée à l'admin ✅");
+      toast.success("Alerte batterie faible envoyee a l'admin");
     },
     onError: () => {
       toast.error("Erreur lors de l'envoi de l'alerte");

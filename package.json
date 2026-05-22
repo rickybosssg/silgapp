@@ -14,8 +14,11 @@
   "dependencies": {
     "@base44/sdk": "^0.8.30",
     "@base44/vite-plugin": "^1.0.18",
+    "@capacitor/android": "^5.7.8",
     "@capacitor/app": "^5.0.8",
     "@capacitor/browser": "^5.2.1",
+    "@capacitor/cli": "^5.7.8",
+    "@capacitor/core": "^5.7.8",
     "@capacitor/local-notifications": "^5.0.8",
     "@capacitor/push-notifications": "^5.1.2",
     "@hello-pangea/dnd": "^17.0.0",

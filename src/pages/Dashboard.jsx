@@ -19,7 +19,7 @@ import AssignLivreurDialog from "../components/courses/AssignLivreurDialog";
 import DispatchModeSelector from "../components/dispatch/DispatchModeSelector";
 import DispatchMonitor from "../components/dispatch/DispatchMonitor";
 import BatterieAlertesPanel from "../components/admin/BatterieAlertesPanel";
-import { requestNotificationPermission, registerPushToken, subscribeToNotifications } from "@/lib/notifications";
+import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
 
 const statusFilters = [
   { value: "toutes", label: "Toutes" },
@@ -36,7 +36,11 @@ export default function Dashboard() {
   const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
+    let unsubscribe = null;
+    let cancelled = false;
+
     base44.auth.me().then(async (user) => {
+      if (cancelled) return;
       setCurrentUser(user);
       if (!user) return;
       
@@ -47,15 +51,18 @@ export default function Dashboard() {
       }
 
       // S'abonner aux notifications
-      const unsubscribe = subscribeToNotifications(
+      unsubscribe = subscribeToNotifications(
         (notification) => {
           toast.info(`${notification.titre}: ${notification.message}`);
         },
         user.email
       );
-
-      return () => unsubscribe();
     }).catch(() => {});
+
+    return () => {
+      cancelled = true;
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const { data: courses = [], isLoading } = useQuery({
