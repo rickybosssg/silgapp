@@ -5,7 +5,7 @@ import { Truck, Loader2, AlertTriangle } from "lucide-react";
 // appParams peut retourner null si les variables d'env ne sont pas chargées,
 // ce qui produit des URLs comme "null/login?app_id=null&next=..." → écran blanc.
 const BASE44_LOGIN_URL = "https://app.base44.com/login";
-const APP_ID = import.meta.env.VITE_BASE44_APP_ID;
+const APP_ID = import.meta.env.VITE_BASE44_APP_ID || "silgapp";
 // URL de retour après auth — URL publique de l'app (jamais localhost)
 const RETURN_URL = "https://silgapp.base44.app";
 

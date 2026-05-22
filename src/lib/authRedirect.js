@@ -30,7 +30,7 @@ export const isCapacitor = () => {
  * En web : returnUrl = window.location.href si valide, sinon APP_PUBLIC_URL.
  */
 export const getLoginUrl = () => {
-  const appId = import.meta.env.VITE_BASE44_APP_ID;
+  const appId = import.meta.env.VITE_BASE44_APP_ID || "silgapp";
 
   if (!appId || !isUrlSafe(appId)) {
     console.error("[authRedirect] VITE_BASE44_APP_ID invalide:", appId);

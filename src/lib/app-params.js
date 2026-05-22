@@ -67,7 +67,7 @@ const getAppParams = () => {
 		: 'https://app.base44.com';
 
 	return {
-		appId: getAppParamValue("app_id", { defaultValue: import.meta.env.VITE_BASE44_APP_ID }),
+		appId: getAppParamValue("app_id", { defaultValue: import.meta.env.VITE_BASE44_APP_ID || "silgapp" }),
 		token: getAppParamValue("access_token", { removeFromUrl: true }),
 		fromUrl: safeHref,
 		functionsVersion: getAppParamValue("functions_version", { defaultValue: import.meta.env.VITE_BASE44_FUNCTIONS_VERSION }),
