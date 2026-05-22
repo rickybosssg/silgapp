@@ -23,6 +23,11 @@ export const getRequestedAuthMode = () => {
 
 export const isNativeFirebaseAuthEnabled = () => {
   const requestedMode = getRequestedAuthMode();
+
+  if (!appParams.isCapacitor && import.meta.env.VITE_ALLOW_NATIVE_AUTH_ON_WEB !== 'true') {
+    return false;
+  }
+
   if (requestedMode === AUTH_MODE_BASE44) return false;
   if (requestedMode === AUTH_MODE_NATIVE_FIREBASE) return true;
 
