@@ -17,9 +17,7 @@ const isValidUrl = (url) => {
 };
 
 const getReturnUrl = () => {
-  if (appParams.isCapacitor && typeof window !== "undefined") {
-    return `${window.location.origin}/?domain=dispatch`;
-  }
+  if (appParams.isCapacitor) return "com.silgapp.app://auth?domain=dispatch";
 
   const currentUrl = typeof window !== "undefined" ? window.location.href : APP_PUBLIC_URL;
   if (!isValidUrl(currentUrl)) return APP_PUBLIC_URL;
@@ -39,12 +37,33 @@ export default function ConnexionInterne() {
   const loginUrl = useMemo(() => getLoginUrl(getReturnUrl()), []);
 
   useEffect(() => {
+    let cancelled = false;
+
     if (!isValidUrl(appParams.appBaseUrl)) {
       setError(`URL Base44 invalide : "${appParams.appBaseUrl}"`);
       return;
     }
 
-    window.location.replace(loginUrl);
+    const openLogin = async () => {
+      try {
+        if (appParams.isCapacitor && window.Capacitor?.isNativePlatform?.()) {
+          const { Browser } = await import("@capacitor/browser");
+          if (!cancelled) await Browser.open({ url: loginUrl, windowName: "_self" });
+          return;
+        }
+
+        window.location.replace(loginUrl);
+      } catch (e) {
+        console.error("[ConnexionInterne] Base44 login open failed:", e);
+        window.location.replace(loginUrl);
+      }
+    };
+
+    openLogin();
+
+    return () => {
+      cancelled = true;
+    };
   }, [loginUrl]);
 
   if (error) {

@@ -24,13 +24,15 @@ export const AuthProvider = ({ children }) => {
 
     const consumeAuthUrl = async (rawUrl) => {
       const url = new URL(rawUrl, window.location.origin);
-      const token = url.searchParams.get('access_token');
+      const token = url.searchParams.get('access_token') || url.searchParams.get('token');
 
       if (isValidToken(token)) {
         localStorage.setItem('base44_access_token', token);
+        localStorage.setItem('token', token);
+        base44.auth.setToken(token);
       }
 
-      if (url.hostname === publicHost || isValidToken(token)) {
+      if (url.protocol === 'com.silgapp.app:' || url.hostname === publicHost || isValidToken(token)) {
         window.history.replaceState({}, document.title, '/');
         await checkUserAuth();
       }
@@ -77,6 +79,7 @@ export const AuthProvider = ({ children }) => {
 
       const token = appParams.token
         || localStorage.getItem('base44_access_token')
+        || localStorage.getItem('token')
         || localStorage.getItem('base44_token');
 
       if (!isValidToken(token)) {
@@ -87,6 +90,7 @@ export const AuthProvider = ({ children }) => {
         return;
       }
 
+      base44.auth.setToken(token, false);
       await checkUserAuth();
     } catch (error) {
       console.error('[AuthContext] Startup auth check failed:', error);
@@ -107,6 +111,7 @@ export const AuthProvider = ({ children }) => {
       console.error('[AuthContext] Auth check failed:', error);
       setIsAuthenticated(false);
       localStorage.removeItem('base44_access_token');
+      localStorage.removeItem('token');
       localStorage.removeItem('base44_token');
       setAuthError({ type: 'auth_required', message: 'Session expiree' });
     } finally {
@@ -120,6 +125,7 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(false);
     setAuthError({ type: 'auth_required', message: 'Deconnecte' });
     localStorage.removeItem('base44_access_token');
+    localStorage.removeItem('token');
     localStorage.removeItem('base44_token');
   };
 
