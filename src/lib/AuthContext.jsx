@@ -56,7 +56,7 @@ export const AuthProvider = ({ children }) => {
 
       const url = new URL(window.location.href);
       const isSilgappHostedPage = url.hostname === publicHost;
-      const isNativeReturnPage = url.pathname === '/auth/native-callback' || url.searchParams.get('native_return') === '1';
+      const isNativeReturnPage = url.searchParams.get('native_return') === '1';
       const isAndroidBrowser = /Android/i.test(window.navigator.userAgent);
 
       if (!isSilgappHostedPage || !isNativeReturnPage || !isAndroidBrowser) return false;

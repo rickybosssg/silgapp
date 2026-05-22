@@ -7,7 +7,6 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 
 import ConnexionInterne from './pages/ConnexionInterne';
-import NativeAuthCallback from './pages/NativeAuthCallback';
 import AppLayout from './components/layout/AppLayout';
 import Dashboard from './pages/Dashboard';
 import NouvelleCourse from './pages/NouvelleCourse';
@@ -26,15 +25,6 @@ import { Truck } from 'lucide-react';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, user, isAuthenticated } = useAuth();
-  const isNativeAuthCallback = window.location.pathname === '/auth/native-callback';
-
-  if (isNativeAuthCallback) {
-    return (
-      <Routes>
-        <Route path="/auth/native-callback" element={<NativeAuthCallback />} />
-      </Routes>
-    );
-  }
 
   const isAdmin = user?.role === "admin";
 
@@ -97,7 +87,6 @@ const AuthenticatedApp = () => {
     <Routes>
       {/* Routes publiques (sans authentification requise) */}
       <Route path="/inscription-livreur" element={<InscriptionLivreur />} />
-      <Route path="/auth/native-callback" element={<NativeAuthCallback />} />
 
       {/* Routes Admin */}
       <Route element={<AppLayout />}>

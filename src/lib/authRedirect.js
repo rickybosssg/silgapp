@@ -13,7 +13,7 @@ export const buildNativeAuthCallbackUrl = (token) => {
 
 export const getWebNativeReturnUrl = () => {
   const loginBaseUrl = (appParams.appBaseUrl || APP_PUBLIC_URL).replace(/\/$/, "");
-  const url = new URL(`${loginBaseUrl}/auth/native-callback`);
+  const url = new URL(`${loginBaseUrl}/`);
   url.searchParams.set("native_return", "1");
   url.searchParams.set("domain", "dispatch");
   return url.toString();
