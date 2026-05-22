@@ -12,6 +12,11 @@ export const getLoginReturnUrl = () => {
 };
 
 export const redirectToLogin = (returnUrl = getLoginReturnUrl()) => {
+  if (appParams.isCapacitor) {
+    window.location.replace(APP_PUBLIC_URL);
+    return;
+  }
+
   const loginBaseUrl = appParams.appBaseUrl || APP_PUBLIC_URL;
   window.location.href = `${loginBaseUrl.replace(/\/$/, "")}/login?from_url=${encodeURIComponent(returnUrl)}`;
 };
