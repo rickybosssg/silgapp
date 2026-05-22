@@ -20,6 +20,7 @@ import DispatchModeSelector from "../components/dispatch/DispatchModeSelector";
 import DispatchMonitor from "../components/dispatch/DispatchMonitor";
 import BatterieAlertesPanel from "../components/admin/BatterieAlertesPanel";
 import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
+import { useAuth } from "@/lib/AuthContext";
 
 const statusFilters = [
   { value: "toutes", label: "Toutes" },
@@ -33,19 +34,18 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState("toutes");
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [assignCourse, setAssignCourse] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
+  const { user: currentUser } = useAuth();
 
   useEffect(() => {
     let unsubscribe = null;
     let cancelled = false;
 
-    base44.auth.me().then(async (user) => {
+    const setupNotifications = async () => {
       if (cancelled) return;
-      setCurrentUser(user);
-      if (!user) return;
+      if (!currentUser?.email) return;
       
       // Enregistrer le token push pour admin
-      const token = await registerPushToken();
+      const token = await registerPushToken(null, currentUser);
       if (token) {
         console.log('Token push admin enregistré:', token);
       }
@@ -55,15 +55,17 @@ export default function Dashboard() {
         (notification) => {
           toast.info(`${notification.titre}: ${notification.message}`);
         },
-        user.email
+        currentUser.email
       );
-    }).catch(() => {});
+    };
+
+    setupNotifications().catch(() => {});
 
     return () => {
       cancelled = true;
       if (unsubscribe) unsubscribe();
     };
-  }, []);
+  }, [currentUser]);
 
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ["courses"],
@@ -131,7 +133,7 @@ export default function Dashboard() {
       {/* Dispatch Mode Selector */}
       <DispatchModeSelector />
       <DispatchMonitor />
-      <BatterieAlertesPanel />
+      <BatterieAlertesPanel currentUser={currentUser} />
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">

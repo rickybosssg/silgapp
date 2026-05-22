@@ -148,7 +148,7 @@ async function showNativeNotification(titre, message, options = {}) {
   }
 }
 
-export async function registerPushToken(livreurId = null) {
+export async function registerPushToken(livreurId = null, currentUser = null) {
   try {
     const env = detectEnvironment();
     console.log("[registerPushToken] Environment:", env);
@@ -231,7 +231,11 @@ export async function registerPushToken(livreurId = null) {
       return null;
     }
 
-    const user = await base44.auth.me();
+    const user = currentUser;
+    if (!user?.email) {
+      console.warn("[registerPushToken] Aucun utilisateur fourni pour le token web");
+      return null;
+    }
     const token = `web_${user.email}_${Date.now()}`;
 
     await base44.functions.invoke("enregistrerTokenPush", {

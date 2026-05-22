@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { format, startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { fr } from "date-fns/locale";
 import LivreurDetailDialog from "./LivreurDetailDialog";
+import { useAuth } from "@/lib/AuthContext";
 
 const periodOptions = [
   { value: "today", label: "Aujourd'hui" },
@@ -37,6 +38,7 @@ const periodOptions = [
 
 export default function LivreurPerformanceTable() {
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
   const [selectedPeriod, setSelectedPeriod] = useState("today");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
@@ -53,11 +55,6 @@ export default function LivreurPerformanceTable() {
     queryKey: ["courses-all"],
     queryFn: () => base44.entities.Course.list("-created_date", 1000),
     initialData: [],
-  });
-
-  const { data: currentUser } = useQuery({
-    queryKey: ["current-user"],
-    queryFn: () => base44.auth.me(),
   });
 
   const updateMutation = useMutation({

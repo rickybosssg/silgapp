@@ -9,7 +9,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 
-export default function BatterieAlertesPanel() {
+export default function BatterieAlertesPanel({ currentUser }) {
   const queryClient = useQueryClient();
 
   const { data: alertes = [] } = useQuery({
@@ -23,11 +23,10 @@ export default function BatterieAlertesPanel() {
 
   const traiterMutation = useMutation({
     mutationFn: async (id) => {
-      const user = await base44.auth.me();
       await base44.entities.BatterieAlerte.update(id, {
         traitee: true,
         heure_traitement: new Date().toISOString(),
-        admin_traitement: user?.full_name || user?.email || "admin",
+        admin_traitement: currentUser?.full_name || currentUser?.email || "admin",
       });
     },
     onSuccess: () => {

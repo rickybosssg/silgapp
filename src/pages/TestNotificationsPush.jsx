@@ -7,8 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Bell, Send, CheckCircle2, XCircle, Loader2, Smartphone, User, AlertTriangle, Wifi } from "lucide-react";
 import { toast } from "sonner";
 import { detectEnvironment, checkNotificationSupport, requestNotificationPermission, registerPushToken, showLocalNotification, getCurrentFCMToken } from "@/lib/notifications";
+import { useAuth } from "@/lib/AuthContext";
 
 export default function TestNotificationsPush() {
+  const { user } = useAuth();
   const [env, setEnv] = useState(null);
   const [support, setSupport] = useState(null);
   const [permission, setPermission] = useState('default');
@@ -49,8 +51,6 @@ export default function TestNotificationsPush() {
           addLog(`❌ Erreur: ${supp.error}`);
         }
 
-        // Auth
-        const user = await base44.auth.me();
         if (!user) {
           addLog('❌ Utilisateur non connecté');
           setError('Utilisateur non connecté');
@@ -100,7 +100,7 @@ export default function TestNotificationsPush() {
     };
 
     init();
-  }, []);
+  }, [user]);
 
   const handleRequestPermission = async () => {
     try {
@@ -114,7 +114,7 @@ export default function TestNotificationsPush() {
         
         try {
           addLog('Enregistrement token...');
-          const registeredToken = await registerPushToken();
+          const registeredToken = await registerPushToken(null, user);
           if (registeredToken) {
             setToken(registeredToken);
             addLog('✅ Token enregistré');
@@ -142,7 +142,6 @@ export default function TestNotificationsPush() {
     addLog(`Envoi test ${type}...`);
 
     try {
-      const user = await base44.auth.me();
       if (!user) {
         throw new Error('Utilisateur non connecté');
       }

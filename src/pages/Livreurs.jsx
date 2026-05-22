@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import LivreurFormDialog from "@/components/livreurs/LivreurFormDialog";
+import { useAuth } from "@/lib/AuthContext";
 
 function LivreurCard({ livreur, courses, onValider, onRefuser, onToggleStatut, onValiderPaiement, onEdit, onSupprimer, isPending, hasAlerteBatterie }) {
   const nomComplet = `${livreur.prenom || ""} ${livreur.nom}`.trim();
@@ -189,13 +190,9 @@ function LivreurCard({ livreur, courses, onValider, onRefuser, onToggleStatut, o
 export default function Livreurs() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState("en_attente");
-  const [currentUser, setCurrentUser] = useState(null);
+  const { user: currentUser } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [editingLivreur, setEditingLivreur] = useState(null);
-
-  useEffect(() => {
-    base44.auth.me().then(setCurrentUser).catch(() => {});
-  }, []);
 
   const { data: livreurs = [], isLoading } = useQuery({
     queryKey: ["livreurs"],

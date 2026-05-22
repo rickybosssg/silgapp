@@ -15,6 +15,7 @@ import { fr } from "date-fns/locale";
 import LivreurPerformanceCard from "@/components/livreurs/LivreurPerformanceCard";
 import LivreurDetailDialog from "@/components/livreurs/LivreurDetailDialog";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/AuthContext";
 
 const periodFilters = [
   { value: "today", label: "Aujourd'hui" },
@@ -27,11 +28,7 @@ export default function RecapitulatifAdmin() {
   const queryClient = useQueryClient();
   const [period, setPeriod] = useState("today");
   const [selectedLivreur, setSelectedLivreur] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
-
-  React.useEffect(() => {
-    base44.auth.me().then(setCurrentUser).catch(() => {});
-  }, []);
+  const { user: currentUser } = useAuth();
 
   const { data: livreurs = [], isLoading } = useQuery({
     queryKey: ["livreurs"],
