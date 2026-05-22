@@ -5,6 +5,7 @@
   "server": {
     "androidScheme": "https",
     "allowNavigation": [
+      "silgapp.base44.app",
       "*.base44.com",
       "base44.com",
       "*.base44.app",
@@ -16,7 +17,7 @@
     ]
   },
   "android": {
-    "allowMixedContent": true,
+    "allowMixedContent": false,
     "captureInput": true,
     "webContentsDebuggingEnabled": true
   },

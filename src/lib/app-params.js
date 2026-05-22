@@ -6,6 +6,11 @@ const toSnakeCase = (str) => {
 	return str.replace(/([A-Z])/g, '_$1').toLowerCase();
 }
 
+// Valeurs corrompues à ignorer dans localStorage
+const CORRUPT_VALUES = ['null', 'undefined', '', 'NaN'];
+
+const isValidValue = (v) => v && !CORRUPT_VALUES.includes(String(v).trim());
+
 const getAppParamValue = (paramName, { defaultValue = undefined, removeFromUrl = false } = {}) => {
 	if (isNode) {
 		return defaultValue;
@@ -19,16 +24,16 @@ const getAppParamValue = (paramName, { defaultValue = undefined, removeFromUrl =
 			}${window.location.hash}`;
 		window.history.replaceState({}, document.title, newUrl);
 	}
-	if (searchParam) {
+	if (searchParam && isValidValue(searchParam)) {
 		storage.setItem(storageKey, searchParam);
 		return searchParam;
 	}
-	if (defaultValue) {
+	if (defaultValue && isValidValue(defaultValue)) {
 		storage.setItem(storageKey, defaultValue);
 		return defaultValue;
 	}
 	const storedValue = storage.getItem(storageKey);
-	if (storedValue) {
+	if (storedValue && isValidValue(storedValue)) {
 		return storedValue;
 	}
 	return null;

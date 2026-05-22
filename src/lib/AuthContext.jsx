@@ -26,10 +26,15 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingPublicSettings(true);
       setAuthError(null);
 
+      // Lire le token FRAIS depuis localStorage à chaque appel
+      // (appParams est figé au module load — ne pas l'utiliser pour le token)
+      const appId = appParams.appId || "silgapp";
+      const freshToken = localStorage.getItem('base44_access_token') || appParams.token;
+
       // Utiliser fetch natif (sans dépendance SDK interne) — fonctionne dans Capacitor
-      const url = `${BASE44_API_BASE}/prod/public-settings/by-id/${appParams.appId}`;
-      const headers = { 'Content-Type': 'application/json', 'X-App-Id': appParams.appId };
-      if (appParams.token) headers['Authorization'] = `Bearer ${appParams.token}`;
+      const url = `${BASE44_API_BASE}/prod/public-settings/by-id/${appId}`;
+      const headers = { 'Content-Type': 'application/json', 'X-App-Id': appId };
+      if (freshToken) headers['Authorization'] = `Bearer ${freshToken}`;
 
       let publicSettings = null;
       try {
@@ -59,8 +64,9 @@ export const AuthProvider = ({ children }) => {
 
       setIsLoadingPublicSettings(false);
 
-      // Vérifier l'auth utilisateur si token présent
-      if (appParams.token) {
+      // Vérifier l'auth utilisateur si token présent (lire depuis localStorage, pas appParams figé)
+      const currentToken = localStorage.getItem('base44_access_token') || appParams.token;
+      if (currentToken) {
         await checkUserAuth();
       } else {
         setIsLoadingAuth(false);
