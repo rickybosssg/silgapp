@@ -17,6 +17,30 @@ export const AuthProvider = ({ children }) => {
     checkAppState();
   }, []);
 
+  // Écouter les navigations vers l'app avec ?access_token=... dans l'URL
+  // (cas APK : Base44 redirige vers silgapp.base44.app?access_token=XXX)
+  useEffect(() => {
+    const handleUrlToken = () => {
+      const params = new URLSearchParams(window.location.search);
+      const urlToken = params.get('access_token');
+      if (urlToken && urlToken !== 'null' && urlToken !== 'undefined') {
+        // Stocker le token et nettoyer l'URL
+        localStorage.setItem('base44_access_token', urlToken);
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+        // Re-vérifier l'auth
+        checkUserAuth();
+      }
+    };
+
+    // Vérifier au montage (cas reload depuis URL avec token)
+    handleUrlToken();
+
+    // Écouter les changements de navigation (retour OAuth dans WebView)
+    window.addEventListener('popstate', handleUrlToken);
+    return () => window.removeEventListener('popstate', handleUrlToken);
+  }, []);
+
   const checkAppState = async () => {
     try {
       setIsLoadingAuth(true);

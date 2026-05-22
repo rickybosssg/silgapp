@@ -1,130 +1,72 @@
-import React, { useEffect, useState } from "react";
-import { Truck, Loader2, AlertTriangle } from "lucide-react";
+import React, { useState } from "react";
+import { Truck, AlertTriangle, LogIn } from "lucide-react";
 
-// ─── CONSTANTES HARDCODÉES — NE PAS UTILISER appParams ICI ───────────────────
-// appParams peut retourner null si les variables d'env ne sont pas chargées,
-// ce qui produit des URLs comme "null/login?app_id=null&next=..." → écran blanc.
 const BASE44_LOGIN_URL = "https://app.base44.com/login";
 const APP_ID = import.meta.env.VITE_BASE44_APP_ID || "silgapp";
-// URL de retour après auth — URL publique de l'app (jamais localhost)
 const RETURN_URL = "https://silgapp.base44.app";
 
-// Mots interdits dans une URL de redirection
-const INVALID_PATTERNS = ["localhost", "null", "undefined", "silgaapp"];
-
-function isUrlSafe(url) {
-  if (!url || typeof url !== "string") return false;
-  return !INVALID_PATTERNS.some((p) => url.includes(p));
-}
-
 function buildLoginUrl() {
-  const appId = APP_ID;
-
-  if (!appId || appId === "null" || appId === "undefined" || appId.trim() === "") {
-    return {
-      url: null,
-      error: `VITE_BASE44_APP_ID manquant ou invalide : "${appId}"`,
-    };
+  if (!APP_ID || APP_ID === "null" || APP_ID === "undefined") {
+    return { url: null, error: `APP_ID invalide: "${APP_ID}"` };
   }
-
-  const returnUrl = RETURN_URL;
-
-  if (!isUrlSafe(returnUrl)) {
-    return {
-      url: null,
-      error: `URL de retour invalide bloquée : "${returnUrl}"`,
-    };
-  }
-
-  const loginUrl = `${BASE44_LOGIN_URL}?app_id=${encodeURIComponent(appId)}&next=${encodeURIComponent(returnUrl)}`;
-
-  // Vérification finale
-  if (!isUrlSafe(loginUrl)) {
-    return {
-      url: null,
-      error: `URL de login invalide bloquée : "${loginUrl}"`,
-    };
-  }
-
-  return { url: loginUrl, error: null };
+  const url = `${BASE44_LOGIN_URL}?app_id=${encodeURIComponent(APP_ID)}&next=${encodeURIComponent(RETURN_URL)}`;
+  return { url, error: null };
 }
 
 export default function ConnexionInterne() {
-  const [loginUrl, setLoginUrl] = useState(null);
-  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const { url: loginUrl, error } = buildLoginUrl();
 
-  useEffect(() => {
-    const { url, error: buildError } = buildLoginUrl();
+  const handleLogin = () => {
+    if (!loginUrl) return;
+    setLoading(true);
+    // Sur Capacitor Android, window.location.href navigue dans le WebView
+    // et le retour sur RETURN_URL rechargera l'app avec le token dans l'URL
+    window.location.href = loginUrl;
+  };
 
-    console.log("[ConnexionInterne] APP_ID =", APP_ID);
-    console.log("[ConnexionInterne] RETURN_URL =", RETURN_URL);
-    console.log("[ConnexionInterne] loginUrl =", url);
-    console.log("[ConnexionInterne] error =", buildError);
-
-    if (buildError || !url) {
-      setError(buildError || "URL de connexion invalide.");
-      return;
-    }
-
-    setLoginUrl(url);
-
-    // Délai court pour que l'écran s'affiche avant la redirection
-    const t = setTimeout(() => {
-      window.location.href = url;
-    }, 300);
-
-    return () => clearTimeout(t);
-  }, []);
-
-  // ── ERREUR : afficher au lieu de rediriger ────────────────────────────────
   if (error) {
     return (
       <div className="fixed inset-0 flex flex-col items-center justify-center bg-gray-950 p-6 gap-6">
         <div className="w-16 h-16 rounded-2xl bg-red-900/40 flex items-center justify-center">
           <AlertTriangle className="w-8 h-8 text-red-400" />
         </div>
-        <div className="text-center space-y-3 max-w-sm">
+        <div className="text-center space-y-2 max-w-sm">
           <h1 className="text-white font-bold text-lg">Erreur de configuration</h1>
-          <p className="text-red-400 text-xs font-mono break-all bg-red-950/40 p-3 rounded-xl">
-            {error}
-          </p>
-          <p className="text-white/30 text-xs">
-            APP_ID: {APP_ID || "⚠️ VIDE"}
-          </p>
-          <p className="text-white/30 text-xs">
-            RETURN: {RETURN_URL}
-          </p>
+          <p className="text-red-400 text-xs font-mono break-all bg-red-950/40 p-3 rounded-xl">{error}</p>
         </div>
-        <button
-          className="px-5 py-2.5 rounded-xl bg-white/10 text-white text-sm font-semibold"
-          onClick={() => { setError(null); }}
-        >
-          Réessayer
-        </button>
       </div>
     );
   }
 
-  // ── CHARGEMENT / REDIRECTION EN COURS ────────────────────────────────────
   return (
     <div className="fixed inset-0 flex flex-col items-center justify-center bg-gray-950 p-6">
-      <div className="text-center space-y-5">
-        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-primary to-red-700 flex items-center justify-center shadow-2xl shadow-red-900/50 mx-auto">
-          <Truck className="w-10 h-10 text-white" />
+      <div className="text-center space-y-8 w-full max-w-sm">
+
+        {/* Logo */}
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary to-red-700 flex items-center justify-center shadow-2xl shadow-red-900/50">
+            <Truck className="w-12 h-12 text-white" />
+          </div>
+          <div>
+            <h1 className="text-4xl font-black text-white tracking-tight">SILGAPP</h1>
+            <p className="text-white/40 text-sm mt-1">Silga Livraison — Espace pro</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-3xl font-black text-white tracking-tight">SILGAPP</h1>
-          <p className="text-white/40 text-sm mt-1">Silga Livraison — Espace pro</p>
-        </div>
-        <div className="flex flex-col items-center gap-3 mt-4">
-          <Loader2 className="w-6 h-6 text-white/40 animate-spin" />
-          <p className="text-white/30 text-xs">Connexion en cours…</p>
-          {loginUrl && (
-            <p className="text-white/15 text-[10px] font-mono max-w-[280px] break-all">
-              {loginUrl.substring(0, 80)}…
-            </p>
-          )}
-        </div>
+
+        {/* Bouton connexion */}
+        <button
+          onClick={handleLogin}
+          disabled={loading}
+          className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-lg shadow-2xl shadow-red-900/50 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-70"
+        >
+          <LogIn className="w-6 h-6" />
+          {loading ? "Connexion…" : "Se connecter"}
+        </button>
+
+        <p className="text-white/20 text-xs">
+          Vous serez redirigé vers la page de connexion sécurisée Base44
+        </p>
       </div>
     </div>
   );
