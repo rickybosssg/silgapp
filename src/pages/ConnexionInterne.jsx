@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Truck, AlertTriangle, LogIn } from "lucide-react";
 
 const BASE44_LOGIN_URL = "https://app.base44.com/login";
@@ -13,16 +13,39 @@ function buildLoginUrl() {
   return { url, error: null };
 }
 
+// Détecte si on est dans Capacitor (APK)
+function isCapacitorApp() {
+  return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+}
+
 export default function ConnexionInterne() {
   const [loading, setLoading] = useState(false);
-  const { url: loginUrl, error } = buildLoginUrl();
+  const [error, setError] = useState(null);
+  const { url: loginUrl, error: buildError } = buildLoginUrl();
 
-  const handleLogin = () => {
+  useEffect(() => {
+    if (buildError) setError(buildError);
+  }, [buildError]);
+
+  const handleLogin = async () => {
     if (!loginUrl) return;
     setLoading(true);
-    // Sur Capacitor Android, window.location.href navigue dans le WebView
-    // et le retour sur RETURN_URL rechargera l'app avec le token dans l'URL
-    window.location.href = loginUrl;
+
+    try {
+      if (isCapacitorApp()) {
+        // Sur Android : ouvrir via Custom Chrome Tab (autorisé par Google pour OAuth)
+        const { Browser } = await import("@capacitor/browser");
+        await Browser.open({ url: loginUrl, windowName: "_self" });
+        // Le retour sera capté par AuthContext via App.addListener('appUrlOpen')
+      } else {
+        // Sur web : redirection normale
+        window.location.href = loginUrl;
+      }
+    } catch (e) {
+      console.error("[ConnexionInterne] Erreur ouverture browser:", e);
+      // Fallback : redirection directe
+      window.location.href = loginUrl;
+    }
   };
 
   if (error) {
@@ -61,11 +84,11 @@ export default function ConnexionInterne() {
           className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-lg shadow-2xl shadow-red-900/50 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-70"
         >
           <LogIn className="w-6 h-6" />
-          {loading ? "Connexion…" : "Se connecter"}
+          {loading ? "Connexion en cours…" : "Se connecter"}
         </button>
 
         <p className="text-white/20 text-xs">
-          Vous serez redirigé vers la page de connexion sécurisée Base44
+          Connexion sécurisée via Google
         </p>
       </div>
     </div>

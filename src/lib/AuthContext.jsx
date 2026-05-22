@@ -17,28 +17,51 @@ export const AuthProvider = ({ children }) => {
     checkAppState();
   }, []);
 
-  // Écouter les navigations vers l'app avec ?access_token=... dans l'URL
-  // (cas APK : Base44 redirige vers silgapp.base44.app?access_token=XXX)
+  // Écouter le retour OAuth via deep link (Capacitor) ou URL directe (web)
   useEffect(() => {
-    const handleUrlToken = () => {
+    // Vérifier le token dans l'URL au montage (web ou reload APK)
+    const checkUrlToken = () => {
       const params = new URLSearchParams(window.location.search);
       const urlToken = params.get('access_token');
       if (urlToken && urlToken !== 'null' && urlToken !== 'undefined') {
-        // Stocker le token et nettoyer l'URL
         localStorage.setItem('base44_access_token', urlToken);
-        const cleanUrl = window.location.pathname;
-        window.history.replaceState({}, document.title, cleanUrl);
-        // Re-vérifier l'auth
+        window.history.replaceState({}, document.title, window.location.pathname);
         checkUserAuth();
       }
     };
+    checkUrlToken();
 
-    // Vérifier au montage (cas reload depuis URL avec token)
-    handleUrlToken();
+    // Sur Capacitor Android : écouter le deep link de retour après OAuth
+    // Base44 redirige vers https://silgapp.base44.app?access_token=XXX
+    // @capacitor/app intercepte cet appUrlOpen avant que le WebView le charge
+    let appListenerHandle = null;
+    const setupCapacitorListener = async () => {
+      try {
+        if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+          const { App } = await import('@capacitor/app');
+          const { Browser } = await import('@capacitor/browser');
+          appListenerHandle = await App.addListener('appUrlOpen', async (data) => {
+            console.log('[AuthContext] appUrlOpen reçu:', data.url);
+            try {
+              await Browser.close();
+            } catch (_) {}
+            const url = new URL(data.url);
+            const token = url.searchParams.get('access_token');
+            if (token && token !== 'null' && token !== 'undefined') {
+              localStorage.setItem('base44_access_token', token);
+              checkUserAuth();
+            }
+          });
+        }
+      } catch (e) {
+        console.error('[AuthContext] Erreur setup Capacitor listener:', e);
+      }
+    };
+    setupCapacitorListener();
 
-    // Écouter les changements de navigation (retour OAuth dans WebView)
-    window.addEventListener('popstate', handleUrlToken);
-    return () => window.removeEventListener('popstate', handleUrlToken);
+    return () => {
+      if (appListenerHandle) appListenerHandle.remove();
+    };
   }, []);
 
   const checkAppState = async () => {
