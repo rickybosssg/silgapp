@@ -30,9 +30,10 @@ export default function LivreurApp() {
   }, [isLoadingAuth, isAuthenticated, user, navigate]);
 
   const { data: livreurProfil } = useQuery({
-    queryKey: ["livreur-profil", user?.email],
+    queryKey: ["livreur-profil", user?.livreur_id || user?.email],
     queryFn: async () => {
       if (user?.livreur) return [user.livreur];
+      if (!user?.email) return [];
       const direct = await base44.entities.Livreur.filter({ user_email: user.email });
       if (direct?.[0]) return direct;
       const allLivreurs = await base44.entities.Livreur.list("-created_date", 500);
@@ -52,7 +53,9 @@ export default function LivreurApp() {
 
   // Enregistrer token push et s'abonner aux notifications
   useEffect(() => {
-    if (!livreurProfil?.id || !user?.email) return;
+    if (!livreurProfil?.id) return;
+
+    const notificationEmail = user?.email || livreurProfil?.user_email;
 
     const setupNotifications = async () => {
       // Enregistrer le token
@@ -61,19 +64,21 @@ export default function LivreurApp() {
         console.log('Token push livreur enregistré:', token);
       }
 
+      if (!notificationEmail) return undefined;
+
       // S'abonner aux notifications
       const unsubscribe = subscribeToNotifications(
         (notification) => {
           toast.info(`${notification.titre}: ${notification.message}`);
         },
-        user.email
+        notificationEmail
       );
 
       return () => unsubscribe();
     };
 
     setupNotifications();
-  }, [livreurProfil?.id, user?.email]);
+  }, [livreurProfil?.id, user?.email, livreurProfil?.user_email]);
 
   const { data: mesCourses = [] } = useQuery({
     queryKey: ["mes-courses", livreurProfil?.id],

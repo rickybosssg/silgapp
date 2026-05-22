@@ -7,14 +7,16 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { User, Upload } from "lucide-react";
+import { KeyRound, User, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { isIdentificationCodeAlreadyUsed } from "@/lib/codeIdentificationAuth";
 
 const emptyForm = {
   prenom: "",
   nom: "",
   telephone: "",
   user_email: "",
+  code_identification: "",
   quartier: "",
   vehicule: "moto",
   photo_url: "",
@@ -34,6 +36,7 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
         nom: livreur.nom || "",
         telephone: livreur.telephone || "",
         user_email: livreur.user_email || "",
+        code_identification: livreur.code_identification || "",
         quartier: livreur.quartier || "",
         vehicule: livreur.vehicule || "moto",
         photo_url: livreur.photo_url || "",
@@ -66,13 +69,30 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
     setUploadingPhoto(false);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.nom || !form.telephone) {
       toast.error("Nom et téléphone sont obligatoires");
       return;
     }
-    mutation.mutate(form);
+
+    const codeIdentification = form.code_identification.trim().toUpperCase();
+    if (!codeIdentification) {
+      toast.error("Code d'identification obligatoire");
+      return;
+    }
+
+    try {
+      const codeExists = await isIdentificationCodeAlreadyUsed(codeIdentification, livreur?.id);
+      if (codeExists) {
+        toast.error("Ce code d'identification est deja utilise");
+        return;
+      }
+      mutation.mutate({ ...form, code_identification: codeIdentification });
+    } catch (error) {
+      console.error("[LivreurFormDialog] Code uniqueness check failed:", error);
+      toast.error("Impossible de verifier le code. Reessayez.");
+    }
   };
 
   return (
@@ -121,6 +141,21 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
             <Label className="text-xs">Email Base44 du livreur</Label>
             <Input placeholder="email@exemple.com" type="email" value={form.user_email} onChange={(e) => setForm((p) => ({ ...p, user_email: e.target.value }))} />
             <p className="text-[10px] text-muted-foreground">Email du compte Base44 invité pour ce livreur</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Code d'identification *</Label>
+            <div className="relative">
+              <KeyRound className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Ex: LVR-001"
+                value={form.code_identification}
+                onChange={(e) => setForm((p) => ({ ...p, code_identification: e.target.value.toUpperCase() }))}
+                className="pl-9 uppercase"
+                required
+              />
+            </div>
+            <p className="text-[10px] text-muted-foreground">Code unique utilise par le livreur pour se connecter dans l'APK</p>
           </div>
 
           <div className="space-y-1.5">

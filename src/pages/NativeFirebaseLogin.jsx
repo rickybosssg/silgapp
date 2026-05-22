@@ -1,54 +1,25 @@
 import { useState } from 'react';
-import { LogIn, Mail, Lock, UserPlus } from 'lucide-react';
+import { KeyRound, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/lib/AuthContext';
 
 export default function NativeFirebaseLogin() {
-  const { signInWithEmailAndPassword, createUserWithEmailAndPassword, isLoadingAuth } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const { signInWithIdentificationCode, isLoadingAuth } = useAuth();
+  const [code, setCode] = useState('');
   const [error, setError] = useState('');
 
-  const friendlyError = (message) => {
-    const value = message || '';
-    if (value.includes('Compte non autorise') || value.includes('Compte non autorisé')) {
-      return 'Compte non autorisé. Contactez l’administrateur.';
-    }
-    if (value.includes('Compte livreur desactive') || value.includes('Compte livreur désactivé')) {
-      return 'Compte livreur désactivé. Contactez l’administrateur.';
-    }
-    if (value.includes('EMAIL_NOT_FOUND') || value.includes('INVALID_LOGIN_CREDENTIALS')) {
-      return 'Email ou mot de passe incorrect.';
-    }
-    if (value.includes('INVALID_PASSWORD')) return 'Mot de passe incorrect.';
-    if (value.includes('EMAIL_EXISTS')) return 'Ce compte existe deja. Utilisez Se connecter.';
-    if (value.includes('WEAK_PASSWORD')) return 'Le mot de passe doit contenir au moins 6 caracteres.';
-    if (value.includes('OPERATION_NOT_ALLOWED')) return 'Email/mot de passe n est pas active dans Firebase.';
-    if (value.includes('API key not valid')) return 'Clé Firebase invalide. Vérifiez google-services.json.';
-    if (value.includes('NetworkError') || value.includes('Failed to fetch')) return 'Connexion Firebase impossible. Vérifiez internet.';
-    return value || 'Connexion impossible.';
-  };
+  const submitLogin = async (event) => {
+    event.preventDefault();
+    if (!code.trim() || isLoadingAuth) return;
 
-  const runAuthAction = async (action) => {
     try {
       setError('');
-      await action();
+      await signInWithIdentificationCode(code.trim());
     } catch (authError) {
-      console.error('[NativeFirebaseLogin] Auth failed:', authError);
-      setError(friendlyError(authError?.message));
+      console.error('[NativeFirebaseLogin] Identification code login failed:', authError);
+      setError(authError?.message || "Code d'identification incorrect.");
     }
-  };
-
-  const submitLogin = (event) => {
-    event.preventDefault();
-    if (!email || !password || isLoadingAuth) return;
-    runAuthAction(() => signInWithEmailAndPassword(email.trim(), password));
-  };
-
-  const submitCreateAccount = () => {
-    if (!email || !password || isLoadingAuth) return;
-    runAuthAction(() => createUserWithEmailAndPassword(email.trim(), password));
   };
 
   return (
@@ -60,40 +31,27 @@ export default function NativeFirebaseLogin() {
           </div>
           <div>
             <h1 className="text-4xl font-black tracking-normal">SILGAPP</h1>
-            <p className="text-slate-400 mt-2">Connexion securisee Firebase</p>
+            <p className="text-slate-400 mt-2">Connexion livreur</p>
           </div>
         </div>
 
         <form className="space-y-4" onSubmit={submitLogin}>
-          <div className="space-y-3">
-            <div className="relative">
-              <Mail className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
-              <Input
-                type="email"
-                inputMode="email"
-                autoComplete="email"
-                placeholder="Email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                className="h-14 pl-12 bg-white/10 border-white/15 text-white placeholder:text-slate-500 rounded-xl"
-              />
-            </div>
-            <div className="relative">
-              <Lock className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
-              <Input
-                type="password"
-                autoComplete="current-password"
-                placeholder="Mot de passe"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className="h-14 pl-12 bg-white/10 border-white/15 text-white placeholder:text-slate-500 rounded-xl"
-              />
-            </div>
+          <div className="relative">
+            <KeyRound className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+            <Input
+              type="text"
+              inputMode="text"
+              autoCapitalize="characters"
+              autoComplete="one-time-code"
+              placeholder="Code d'identification"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              className="h-14 pl-12 bg-white/10 border-white/15 text-white placeholder:text-slate-500 rounded-xl uppercase"
+            />
           </div>
 
           {error && (
             <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-100">
-              <p className="font-semibold mb-1">Erreur de connexion</p>
               {error}
             </div>
           )}
@@ -101,21 +59,10 @@ export default function NativeFirebaseLogin() {
           <Button
             type="submit"
             className="w-full h-14 bg-red-600 hover:bg-red-700 rounded-xl text-base font-bold"
-            disabled={isLoadingAuth || !email || !password}
+            disabled={isLoadingAuth || !code.trim()}
           >
             <LogIn className="w-5 h-5 mr-2" />
             {isLoadingAuth ? 'Connexion...' : 'Se connecter'}
-          </Button>
-
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full h-12 bg-transparent border-white/20 text-white hover:bg-white/10 hover:text-white rounded-xl"
-            disabled={isLoadingAuth || !email || !password}
-            onClick={submitCreateAccount}
-          >
-            <UserPlus className="w-5 h-5 mr-2" />
-            Creer un compte
           </Button>
         </form>
       </div>

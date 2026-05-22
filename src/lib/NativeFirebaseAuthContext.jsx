@@ -2,6 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { NativeFirebaseAuth } from '@/lib/nativeFirebaseAuthClient';
 import { AuthContext } from '@/lib/AuthContext';
 import { resolveNativeAuthorizedUser } from '@/lib/nativeAccessResolver';
+import {
+  clearIdentificationSession,
+  getStoredIdentificationSession,
+  signInWithIdentificationCode as signInWithStoredIdentificationCode,
+} from '@/lib/codeIdentificationAuth';
 
 export const NativeFirebaseAuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -43,6 +48,14 @@ export const NativeFirebaseAuthProvider = ({ children }) => {
   const checkAppState = async () => {
     try {
       setIsLoadingAuth(true);
+      const codeSessionUser = await getStoredIdentificationSession();
+      if (codeSessionUser) {
+        setUser(codeSessionUser);
+        setIsAuthenticated(true);
+        setAuthError(null);
+        return;
+      }
+
       const result = await NativeFirebaseAuth.getCurrentUser();
       await applyFirebaseUser(result.user);
     } catch (error) {
@@ -93,7 +106,22 @@ export const NativeFirebaseAuthProvider = ({ children }) => {
     }
   };
 
+  const signInWithIdentificationCode = async (code) => {
+    setIsLoadingAuth(true);
+    try {
+      const codeUser = await signInWithStoredIdentificationCode(code);
+      setUser(codeUser);
+      setIsAuthenticated(true);
+      setAuthError(null);
+      return codeUser;
+    } finally {
+      setIsLoadingAuth(false);
+      setAuthChecked(true);
+    }
+  };
+
   const logout = async () => {
+    clearIdentificationSession();
     await NativeFirebaseAuth.signOut();
     setUser(null);
     setIsAuthenticated(false);
@@ -116,6 +144,7 @@ export const NativeFirebaseAuthProvider = ({ children }) => {
     signInWithGoogle,
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
+    signInWithIdentificationCode,
     isNativeFirebaseAuth: true,
   }), [user, isAuthenticated, isLoadingAuth, authError, authChecked]);
 

@@ -93,6 +93,9 @@ export default function LivreurHeader({ livreur, isEnLigne, onToggleLigne, onLog
             <p className="text-sm text-white/60 font-medium">{getGreeting(prenom)}</p>
             <p className="text-lg font-bold truncate">{nomComplet}</p>
             <p className="text-xs text-white/40">{livreur.telephone}</p>
+            {livreur.code_identification && (
+              <p className="text-xs text-white/40">Code: {livreur.code_identification}</p>
+            )}
           </div>
 
           {/* Toggle En ligne */}
