@@ -3,7 +3,7 @@ import { appParams, APP_PUBLIC_URL } from "@/lib/app-params";
 export const isCapacitor = () => appParams.isCapacitor;
 
 export const getLoginReturnUrl = () => {
-  if (appParams.isCapacitor) return APP_PUBLIC_URL;
+  if (appParams.isCapacitor) return `${APP_PUBLIC_URL.replace(/\/$/, "")}/`;
   if (typeof window === "undefined") return APP_PUBLIC_URL;
 
   const url = new URL(window.location.href);

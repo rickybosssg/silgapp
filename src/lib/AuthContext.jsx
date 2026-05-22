@@ -1,8 +1,10 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { appParams } from '@/lib/app-params';
+import { appParams, APP_PUBLIC_URL } from '@/lib/app-params';
 
 const AuthContext = createContext();
+
+const isValidToken = (token) => token && token !== 'null' && token !== 'undefined';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -17,44 +19,48 @@ export const AuthProvider = ({ children }) => {
     checkAppState();
   }, []);
 
-  // Écouter le retour OAuth via deep link (Capacitor) ou URL directe (web)
   useEffect(() => {
-    // Vérifier le token dans l'URL au montage (web ou reload APK)
-    const checkUrlToken = () => {
-      const params = new URLSearchParams(window.location.search);
-      const urlToken = params.get('access_token');
-      if (urlToken && urlToken !== 'null' && urlToken !== 'undefined') {
-        localStorage.setItem('base44_access_token', urlToken);
-        window.history.replaceState({}, document.title, window.location.pathname);
-        checkUserAuth();
+    const publicHost = new URL(APP_PUBLIC_URL).hostname;
+
+    const consumeAuthUrl = async (rawUrl) => {
+      const url = new URL(rawUrl, window.location.origin);
+      const token = url.searchParams.get('access_token');
+
+      if (isValidToken(token)) {
+        localStorage.setItem('base44_access_token', token);
+      }
+
+      if (url.hostname === publicHost || isValidToken(token)) {
+        window.history.replaceState({}, document.title, '/');
+        await checkUserAuth();
+      }
+    };
+
+    const checkUrlToken = async () => {
+      const token = new URLSearchParams(window.location.search).get('access_token');
+      if (isValidToken(token)) {
+        await consumeAuthUrl(window.location.href);
       }
     };
     checkUrlToken();
 
-    // Sur Capacitor Android : écouter le deep link de retour après OAuth
-    // Base44 redirige vers https://silgapp.base44.app?access_token=XXX
-    // @capacitor/app intercepte cet appUrlOpen avant que le WebView le charge
     let appListenerHandle = null;
     const setupCapacitorListener = async () => {
       try {
         if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
           const { App } = await import('@capacitor/app');
           const { Browser } = await import('@capacitor/browser');
+
           appListenerHandle = await App.addListener('appUrlOpen', async (data) => {
-            console.log('[AuthContext] appUrlOpen reçu:', data.url);
+            console.log('[AuthContext] appUrlOpen received:', data.url);
             try {
               await Browser.close();
             } catch (_) {}
-            const url = new URL(data.url);
-            const token = url.searchParams.get('access_token');
-            if (token && token !== 'null' && token !== 'undefined') {
-              localStorage.setItem('base44_access_token', token);
-              checkUserAuth();
-            }
+            await consumeAuthUrl(data.url);
           });
         }
       } catch (e) {
-        console.error('[AuthContext] Erreur setup Capacitor listener:', e);
+        console.error('[AuthContext] Capacitor listener setup failed:', e);
       }
     };
     setupCapacitorListener();
@@ -69,28 +75,22 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingAuth(true);
       setAuthError(null);
 
-      // Lire le token depuis toutes les sources possibles
-      // appParams.token = token depuis URL (retour OAuth)
-      // localStorage = token déjà persisté par le SDK
       const token = appParams.token
         || localStorage.getItem('base44_access_token')
         || localStorage.getItem('base44_token');
 
-      if (!token) {
-        // Pas de token → afficher login
+      if (!isValidToken(token)) {
         setIsLoadingAuth(false);
         setIsAuthenticated(false);
         setAuthChecked(true);
-        setAuthError({ type: 'auth_required', message: 'Non connecté' });
+        setAuthError({ type: 'auth_required', message: 'Non connecte' });
         return;
       }
 
-      // Token présent → vérifier avec le SDK
       await checkUserAuth();
-
     } catch (error) {
-      console.error('[AuthContext] Erreur au démarrage:', error);
-      setAuthError({ type: 'auth_required', message: error?.message || 'Erreur au démarrage' });
+      console.error('[AuthContext] Startup auth check failed:', error);
+      setAuthError({ type: 'auth_required', message: error?.message || 'Erreur au demarrage' });
       setIsLoadingAuth(false);
       setAuthChecked(true);
     }
@@ -106,10 +106,9 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('[AuthContext] Auth check failed:', error);
       setIsAuthenticated(false);
-      // Nettoyer les tokens corrompus
       localStorage.removeItem('base44_access_token');
       localStorage.removeItem('base44_token');
-      setAuthError({ type: 'auth_required', message: 'Session expirée' });
+      setAuthError({ type: 'auth_required', message: 'Session expiree' });
     } finally {
       setIsLoadingAuth(false);
       setAuthChecked(true);
@@ -119,13 +118,13 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setUser(null);
     setIsAuthenticated(false);
-    setAuthError({ type: 'auth_required', message: 'Déconnecté' });
-    localStorage.removeItem("base44_access_token");
-    localStorage.removeItem("base44_token");
+    setAuthError({ type: 'auth_required', message: 'Deconnecte' });
+    localStorage.removeItem('base44_access_token');
+    localStorage.removeItem('base44_token');
   };
 
-  const navigateToLogin = (returnUrl) => {
-    console.warn('[AuthContext] navigateToLogin appelé — utiliser ConnexionInterne à la place');
+  const navigateToLogin = () => {
+    console.warn('[AuthContext] navigateToLogin called. Use ConnexionInterne instead.');
   };
 
   return (

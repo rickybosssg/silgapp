@@ -4,6 +4,7 @@
   "webDir": "dist",
   "server": {
     "androidScheme": "https",
+    "hostname": "silga-dispatch-go.base44.app",
     "allowNavigation": [
       "silga-dispatch-go.base44.app",
       "*.base44.com",

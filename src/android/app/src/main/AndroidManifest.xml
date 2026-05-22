@@ -22,14 +22,22 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Deep link OAuth : intercepte https://silgapp.base44.app après connexion Base44/Google -->
+            <!-- Deep link OAuth : intercepte https://silga-dispatch-go.base44.app apres connexion Base44/Google -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:scheme="https"
-                    android:host="silgapp.base44.app" />
+                    android:host="silga-dispatch-go.base44.app" />
+            </intent-filter>
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.silgapp.app" />
+                <data android:scheme="silgapp" />
             </intent-filter>
 
         </activity>
