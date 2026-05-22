@@ -1,32 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { NativeFirebaseAuth } from '@/lib/nativeFirebaseAuthClient';
 import { AuthContext } from '@/lib/AuthContext';
-
-const ROLE_STORAGE_KEY = 'silgapp_native_user_role';
-
-const normalizeFirebaseUser = (firebaseUser) => {
-  if (!firebaseUser) return null;
-
-  const adminEmails = (import.meta.env.VITE_NATIVE_AUTH_ADMIN_EMAILS || '')
-    .split(',')
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-  const email = firebaseUser.email || '';
-  const storedRole = localStorage.getItem(ROLE_STORAGE_KEY);
-  const defaultRole = import.meta.env.VITE_NATIVE_AUTH_DEFAULT_ROLE || 'admin';
-  const role = storedRole || (adminEmails.includes(email.toLowerCase()) ? 'admin' : defaultRole);
-
-  return {
-    id: firebaseUser.uid,
-    firebase_uid: firebaseUser.uid,
-    email,
-    full_name: firebaseUser.displayName || email,
-    name: firebaseUser.displayName || email,
-    photo_url: firebaseUser.photoUrl,
-    role,
-    auth_provider: 'firebase-native',
-  };
-};
+import { resolveNativeAuthorizedUser } from '@/lib/nativeAccessResolver';
 
 export const NativeFirebaseAuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -35,19 +10,38 @@ export const NativeFirebaseAuthProvider = ({ children }) => {
   const [authError, setAuthError] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
 
-  const applyFirebaseUser = (firebaseUser) => {
-    const normalizedUser = normalizeFirebaseUser(firebaseUser);
-    setUser(normalizedUser);
-    setIsAuthenticated(!!normalizedUser);
-    setAuthError(normalizedUser ? null : { type: 'auth_required', message: 'Non connecte' });
-    return normalizedUser;
+  const applyFirebaseUser = async (firebaseUser) => {
+    if (!firebaseUser) {
+      setUser(null);
+      setIsAuthenticated(false);
+      setAuthError({ type: 'auth_required', message: 'Non connecte' });
+      return null;
+    }
+
+    try {
+      const authorizedUser = await resolveNativeAuthorizedUser(firebaseUser);
+      setUser(authorizedUser);
+      setIsAuthenticated(true);
+      setAuthError(null);
+      return authorizedUser;
+    } catch (error) {
+      console.error('[NativeFirebaseAuth] Access resolution failed:', error);
+      await NativeFirebaseAuth.signOut();
+      setUser(null);
+      setIsAuthenticated(false);
+      setAuthError({
+        type: error?.code === 'user_not_registered' ? 'user_not_registered' : 'auth_required',
+        message: error?.message || 'Compte non autorise. Contactez l administrateur.',
+      });
+      return null;
+    }
   };
 
   const checkAppState = async () => {
     try {
       setIsLoadingAuth(true);
       const result = await NativeFirebaseAuth.getCurrentUser();
-      applyFirebaseUser(result.user);
+      await applyFirebaseUser(result.user);
     } catch (error) {
       console.error('[NativeFirebaseAuth] Startup auth check failed:', error);
       setUser(null);

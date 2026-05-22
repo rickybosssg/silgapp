@@ -31,7 +31,13 @@ export default function LivreurApp() {
 
   const { data: livreurProfil } = useQuery({
     queryKey: ["livreur-profil", user?.email],
-    queryFn: () => base44.entities.Livreur.filter({ user_email: user.email }),
+    queryFn: async () => {
+      if (user?.livreur) return [user.livreur];
+      const direct = await base44.entities.Livreur.filter({ user_email: user.email });
+      if (direct?.[0]) return direct;
+      const allLivreurs = await base44.entities.Livreur.list("-created_date", 500);
+      return allLivreurs.filter((livreur) => (livreur.user_email || '').trim().toLowerCase() === user.email.trim().toLowerCase());
+    },
     enabled: !!user,
     refetchInterval: 10000,
     select: (data) => data[0] || null,

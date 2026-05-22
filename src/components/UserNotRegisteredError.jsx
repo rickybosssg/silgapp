@@ -1,9 +1,11 @@
 import React from 'react';
 import { Truck, AlertTriangle, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 
 const UserNotRegisteredError = () => {
+  const { logout } = useAuth();
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background p-6">
       <div className="max-w-md w-full space-y-6 text-center">
@@ -38,7 +40,7 @@ const UserNotRegisteredError = () => {
 
         <div className="flex flex-col gap-3">
           <Button
-            onClick={() => base44.auth.logout()}
+            onClick={() => logout()}
             variant="outline"
             className="gap-2"
           >

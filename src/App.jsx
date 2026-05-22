@@ -35,12 +35,13 @@ const AuthenticatedApp = () => {
   const { data: livreurMatch, isLoading: isLoadingLivreur } = useQuery({
     queryKey: ["livreur-check", user?.email],
     queryFn: () => base44.entities.Livreur.filter({ user_email: user.email }),
-    enabled: !!user && !isAdmin,
+    enabled: !!user && !isAdmin && !user?.livreur,
     select: (data) => data[0] || null,
   });
+  const resolvedLivreurMatch = user?.livreur || livreurMatch;
 
   // ── ÉCRAN CHARGEMENT ──────────────────────────────────────────────
-  if (isLoadingPublicSettings || isLoadingAuth || (!isAdmin && isAuthenticated && isLoadingLivreur)) {
+  if (isLoadingPublicSettings || isLoadingAuth || (!isAdmin && isAuthenticated && !user?.livreur && isLoadingLivreur)) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
@@ -72,7 +73,7 @@ const AuthenticatedApp = () => {
   }
 
   // Utilisateur connecté mais inconnu (ni admin, ni livreur)
-  if (isAuthenticated && !isAdmin && livreurMatch === null) {
+  if (isAuthenticated && !isAdmin && resolvedLivreurMatch === null) {
     return (
       <div className="fixed inset-0 flex flex-col items-center justify-center bg-background gap-4 p-8 text-center">
         <Truck className="w-14 h-14 text-muted-foreground opacity-30" />

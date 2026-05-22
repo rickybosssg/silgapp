@@ -5,10 +5,22 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/lib/AuthContext';
 
 export default function NativeFirebaseLogin() {
-  const { signInWithGoogle, signInWithEmailAndPassword, createUserWithEmailAndPassword, isLoadingAuth } = useAuth();
+  const { signInWithEmailAndPassword, createUserWithEmailAndPassword, isLoadingAuth } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+
+  const friendlyError = (message) => {
+    const value = message || '';
+    if (value.includes('EMAIL_NOT_FOUND') || value.includes('INVALID_LOGIN_CREDENTIALS')) {
+      return 'Email ou mot de passe incorrect.';
+    }
+    if (value.includes('INVALID_PASSWORD')) return 'Mot de passe incorrect.';
+    if (value.includes('EMAIL_EXISTS')) return 'Ce compte existe deja. Utilisez Se connecter.';
+    if (value.includes('WEAK_PASSWORD')) return 'Le mot de passe doit contenir au moins 6 caracteres.';
+    if (value.includes('OPERATION_NOT_ALLOWED')) return 'Email/mot de passe n est pas active dans Firebase.';
+    return value || 'Connexion impossible.';
+  };
 
   const runAuthAction = async (action) => {
     try {
@@ -16,8 +28,19 @@ export default function NativeFirebaseLogin() {
       await action();
     } catch (authError) {
       console.error('[NativeFirebaseLogin] Auth failed:', authError);
-      setError(authError?.message || 'Connexion impossible');
+      setError(friendlyError(authError?.message));
     }
+  };
+
+  const submitLogin = (event) => {
+    event.preventDefault();
+    if (!email || !password || isLoadingAuth) return;
+    runAuthAction(() => signInWithEmailAndPassword(email.trim(), password));
+  };
+
+  const submitCreateAccount = () => {
+    if (!email || !password || isLoadingAuth) return;
+    runAuthAction(() => createUserWithEmailAndPassword(email.trim(), password));
   };
 
   return (
@@ -33,17 +56,7 @@ export default function NativeFirebaseLogin() {
           </div>
         </div>
 
-        <div className="space-y-4">
-          <Button
-            type="button"
-            className="w-full h-14 bg-white text-slate-950 hover:bg-slate-100 rounded-xl text-base font-bold"
-            disabled={isLoadingAuth}
-            onClick={() => runAuthAction(signInWithGoogle)}
-          >
-            <LogIn className="w-5 h-5 mr-2" />
-            Continuer avec Google
-          </Button>
-
+        <form className="space-y-4" onSubmit={submitLogin}>
           <div className="space-y-3">
             <div className="relative">
               <Mail className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
@@ -77,13 +90,12 @@ export default function NativeFirebaseLogin() {
           )}
 
           <Button
-            type="button"
+            type="submit"
             className="w-full h-14 bg-red-600 hover:bg-red-700 rounded-xl text-base font-bold"
             disabled={isLoadingAuth || !email || !password}
-            onClick={() => runAuthAction(() => signInWithEmailAndPassword(email, password))}
           >
             <LogIn className="w-5 h-5 mr-2" />
-            Se connecter
+            {isLoadingAuth ? 'Connexion...' : 'Se connecter'}
           </Button>
 
           <Button
@@ -91,12 +103,12 @@ export default function NativeFirebaseLogin() {
             variant="outline"
             className="w-full h-12 bg-transparent border-white/20 text-white hover:bg-white/10 hover:text-white rounded-xl"
             disabled={isLoadingAuth || !email || !password}
-            onClick={() => runAuthAction(() => createUserWithEmailAndPassword(email, password))}
+            onClick={submitCreateAccount}
           >
             <UserPlus className="w-5 h-5 mr-2" />
             Creer un compte
           </Button>
-        </div>
+        </form>
       </div>
     </div>
   );

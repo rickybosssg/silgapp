@@ -38,12 +38,27 @@ const firebaseRequest = async (url, payload) => {
   return data;
 };
 
+const firebaseTokenRequest = async (url, payload) => {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams(payload).toString(),
+  });
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data?.error?.message || 'Erreur Firebase Auth');
+  }
+
+  return data;
+};
+
 const authUrl = (method) => `https://identitytoolkit.googleapis.com/v1/accounts:${method}?key=${FIREBASE_API_KEY}`;
 
 const refreshSession = async (session) => {
   if (!isValid(session?.refreshToken)) return null;
 
-  const data = await firebaseRequest(`https://securetoken.googleapis.com/v1/token?key=${FIREBASE_API_KEY}`, {
+  const data = await firebaseTokenRequest(`https://securetoken.googleapis.com/v1/token?key=${FIREBASE_API_KEY}`, {
     grant_type: 'refresh_token',
     refresh_token: session.refreshToken,
   });
