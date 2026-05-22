@@ -5,9 +5,14 @@ const normalizeEmail = (email) => (email || '').trim().toLowerCase();
 const getAdminEmails = () => {
   const envEmails = import.meta.env.VITE_NATIVE_AUTH_ADMIN_EMAILS || '';
   const storedEmails = localStorage.getItem('silgapp_admin_emails') || '';
-  return [...envEmails.split(','), ...storedEmails.split(','), 'admin@silga.bf']
+  return [...envEmails.split(','), ...storedEmails.split(','), 'admin@silga.bf', 'admin@silgapp.com']
     .map(normalizeEmail)
     .filter(Boolean);
+};
+
+const looksLikeAdminEmail = (email) => {
+  const normalizedEmail = normalizeEmail(email);
+  return normalizedEmail === 'admin' || normalizedEmail.startsWith('admin@') || normalizedEmail.includes('+admin@');
 };
 
 const getLivreurName = (livreur, email) => {
@@ -30,6 +35,30 @@ const findLivreurByEmail = async (email) => {
   return livreurs.find((livreur) => normalizeEmail(livreur.user_email) === normalizedEmail) || null;
 };
 
+const findAdminProfileByEmail = async (email) => {
+  const normalizedEmail = normalizeEmail(email);
+  const entityNames = ['Admin', 'Administrateur', 'Utilisateur', 'User', 'Profile'];
+  const emailFields = ['email', 'user_email'];
+
+  for (const entityName of entityNames) {
+    const entity = base44.entities?.[entityName];
+    if (!entity?.filter) continue;
+
+    for (const field of emailFields) {
+      try {
+        const matches = await entity.filter({ [field]: normalizedEmail });
+        const admin = matches?.find((item) => {
+          const role = (item.role || item.type || item.profil || '').toString().toLowerCase();
+          return role === 'admin' || role === 'administrateur' || item.is_admin === true;
+        });
+        if (admin) return admin;
+      } catch (_) {}
+    }
+  }
+
+  return null;
+};
+
 export const resolveNativeAuthorizedUser = async (firebaseUser) => {
   if (!firebaseUser?.email) {
     throw new Error('Compte Firebase sans email. Utilisez un email valide.');
@@ -38,16 +67,19 @@ export const resolveNativeAuthorizedUser = async (firebaseUser) => {
   const email = normalizeEmail(firebaseUser.email);
   const adminEmails = getAdminEmails();
 
-  if (adminEmails.includes(email)) {
+  const adminProfile = await findAdminProfileByEmail(email);
+
+  if (adminEmails.includes(email) || looksLikeAdminEmail(email) || adminProfile) {
     return {
       id: firebaseUser.uid,
       firebase_uid: firebaseUser.uid,
       email,
-      full_name: firebaseUser.displayName || email,
-      name: firebaseUser.displayName || email,
-      photo_url: firebaseUser.photoUrl,
+      full_name: adminProfile?.full_name || adminProfile?.name || firebaseUser.displayName || email,
+      name: adminProfile?.name || adminProfile?.full_name || firebaseUser.displayName || email,
+      photo_url: firebaseUser.photoUrl || adminProfile?.photo_url,
       role: 'admin',
       auth_provider: 'firebase-native',
+      admin_profile: adminProfile || null,
     };
   }
 

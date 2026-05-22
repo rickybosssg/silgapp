@@ -12,6 +12,12 @@ export default function NativeFirebaseLogin() {
 
   const friendlyError = (message) => {
     const value = message || '';
+    if (value.includes('Compte non autorise') || value.includes('Compte non autorisé')) {
+      return 'Compte non autorisé. Contactez l’administrateur.';
+    }
+    if (value.includes('Compte livreur desactive') || value.includes('Compte livreur désactivé')) {
+      return 'Compte livreur désactivé. Contactez l’administrateur.';
+    }
     if (value.includes('EMAIL_NOT_FOUND') || value.includes('INVALID_LOGIN_CREDENTIALS')) {
       return 'Email ou mot de passe incorrect.';
     }
@@ -19,6 +25,8 @@ export default function NativeFirebaseLogin() {
     if (value.includes('EMAIL_EXISTS')) return 'Ce compte existe deja. Utilisez Se connecter.';
     if (value.includes('WEAK_PASSWORD')) return 'Le mot de passe doit contenir au moins 6 caracteres.';
     if (value.includes('OPERATION_NOT_ALLOWED')) return 'Email/mot de passe n est pas active dans Firebase.';
+    if (value.includes('API key not valid')) return 'Clé Firebase invalide. Vérifiez google-services.json.';
+    if (value.includes('NetworkError') || value.includes('Failed to fetch')) return 'Connexion Firebase impossible. Vérifiez internet.';
     return value || 'Connexion impossible.';
   };
 
@@ -85,6 +93,7 @@ export default function NativeFirebaseLogin() {
 
           {error && (
             <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-100">
+              <p className="font-semibold mb-1">Erreur de connexion</p>
               {error}
             </div>
           )}

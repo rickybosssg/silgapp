@@ -10,7 +10,9 @@ export const NativeFirebaseAuthProvider = ({ children }) => {
   const [authError, setAuthError] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
 
-  const applyFirebaseUser = async (firebaseUser) => {
+  const applyFirebaseUser = async (firebaseUser, options = {}) => {
+    const { throwOnDenied = false } = options;
+
     if (!firebaseUser) {
       setUser(null);
       setIsAuthenticated(false);
@@ -33,6 +35,7 @@ export const NativeFirebaseAuthProvider = ({ children }) => {
         type: error?.code === 'user_not_registered' ? 'user_not_registered' : 'auth_required',
         message: error?.message || 'Compte non autorise. Contactez l administrateur.',
       });
+      if (throwOnDenied) throw error;
       return null;
     }
   };
@@ -61,7 +64,7 @@ export const NativeFirebaseAuthProvider = ({ children }) => {
     setIsLoadingAuth(true);
     try {
       const result = await NativeFirebaseAuth.signInWithGoogle();
-      return applyFirebaseUser(result.user);
+      return applyFirebaseUser(result.user, { throwOnDenied: true });
     } finally {
       setIsLoadingAuth(false);
       setAuthChecked(true);
@@ -72,7 +75,7 @@ export const NativeFirebaseAuthProvider = ({ children }) => {
     setIsLoadingAuth(true);
     try {
       const result = await NativeFirebaseAuth.signInWithEmailAndPassword({ email, password });
-      return applyFirebaseUser(result.user);
+      return applyFirebaseUser(result.user, { throwOnDenied: true });
     } finally {
       setIsLoadingAuth(false);
       setAuthChecked(true);
@@ -83,7 +86,7 @@ export const NativeFirebaseAuthProvider = ({ children }) => {
     setIsLoadingAuth(true);
     try {
       const result = await NativeFirebaseAuth.createUserWithEmailAndPassword({ email, password });
-      return applyFirebaseUser(result.user);
+      return applyFirebaseUser(result.user, { throwOnDenied: true });
     } finally {
       setIsLoadingAuth(false);
       setAuthChecked(true);
