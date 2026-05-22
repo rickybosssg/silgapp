@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { appParams, APP_PUBLIC_URL } from '@/lib/app-params';
 import { buildNativeAuthCallbackUrl } from '@/lib/authRedirect';
 
-const AuthContext = createContext();
+export const AuthContext = createContext();
 
 const isValidToken = (token) => token && token !== 'null' && token !== 'undefined';
 const TOKEN_STORAGE_KEYS = ['base44_access_token', 'token', 'base44_token'];

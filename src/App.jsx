@@ -4,9 +4,12 @@ import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import { NativeFirebaseAuthProvider } from '@/lib/NativeFirebaseAuthContext';
+import { isNativeFirebaseAuthEnabled } from '@/lib/nativeAuthMode';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 
 import ConnexionInterne from './pages/ConnexionInterne';
+import NativeFirebaseLogin from './pages/NativeFirebaseLogin';
 import AppLayout from './components/layout/AppLayout';
 import Dashboard from './pages/Dashboard';
 import NouvelleCourse from './pages/NouvelleCourse';
@@ -24,7 +27,7 @@ import { base44 } from '@/api/base44Client';
 import { Truck } from 'lucide-react';
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, user, isAuthenticated } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, user, isAuthenticated, isNativeFirebaseAuth } = useAuth();
 
   const isAdmin = user?.role === "admin";
 
@@ -58,6 +61,10 @@ const AuthenticatedApp = () => {
   if (authError) {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
+    }
+
+    if (isNativeFirebaseAuth) {
+      return <NativeFirebaseLogin />;
     }
 
     // auth_required → page de connexion interne (sans navigateur externe)
@@ -110,15 +117,17 @@ const AuthenticatedApp = () => {
 };
 
 function App() {
+  const SelectedAuthProvider = isNativeFirebaseAuthEnabled() ? NativeFirebaseAuthProvider : AuthProvider;
+
   return (
-    <AuthProvider>
+    <SelectedAuthProvider>
       <QueryClientProvider client={queryClientInstance}>
         <Router>
           <AuthenticatedApp />
         </Router>
         <Toaster />
       </QueryClientProvider>
-    </AuthProvider>
+    </SelectedAuthProvider>
   )
 }
 
