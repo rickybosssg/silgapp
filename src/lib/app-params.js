@@ -68,7 +68,7 @@ const getAppParams = () => {
 
 	// Dans Capacitor, ne jamais utiliser localhost comme fromUrl — utiliser l'URL publique de l'app
 	const safeHref = isCapacitor
-		? APP_PUBLIC_URL
+		? (typeof window !== 'undefined' ? window.location.href : APP_PUBLIC_URL)
 		: (typeof window !== 'undefined' ? window.location.href : '/');
 
 	// Ne jamais laisser appBaseUrl à null — le SDK Base44 l'utilise pour les appels API

@@ -17,7 +17,9 @@ const isValidUrl = (url) => {
 };
 
 const getReturnUrl = () => {
-  if (appParams.isCapacitor) return `${APP_PUBLIC_URL.replace(/\/$/, "")}/`;
+  if (appParams.isCapacitor && typeof window !== "undefined") {
+    return `${window.location.origin}/?domain=dispatch`;
+  }
 
   const currentUrl = typeof window !== "undefined" ? window.location.href : APP_PUBLIC_URL;
   if (!isValidUrl(currentUrl)) return APP_PUBLIC_URL;
