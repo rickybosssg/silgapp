@@ -1,9 +1,9 @@
 import React, { useEffect } from "react";
-import { APP_PUBLIC_URL } from "@/lib/app-params";
+import { getLoginUrl } from "@/lib/authRedirect";
 
 export default function ConnexionInterne() {
   useEffect(() => {
-    window.location.replace(APP_PUBLIC_URL);
+    window.location.replace(getLoginUrl());
   }, []);
 
   return null;

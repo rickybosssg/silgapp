@@ -11,12 +11,11 @@ export const getLoginReturnUrl = () => {
   return url.toString();
 };
 
-export const redirectToLogin = (returnUrl = getLoginReturnUrl()) => {
-  if (appParams.isCapacitor) {
-    window.location.replace(APP_PUBLIC_URL);
-    return;
-  }
-
+export const getLoginUrl = (returnUrl = getLoginReturnUrl()) => {
   const loginBaseUrl = appParams.appBaseUrl || APP_PUBLIC_URL;
-  window.location.href = `${loginBaseUrl.replace(/\/$/, "")}/login?from_url=${encodeURIComponent(returnUrl)}`;
+  return `${loginBaseUrl.replace(/\/$/, "")}/login?from_url=${encodeURIComponent(returnUrl)}`;
+};
+
+export const redirectToLogin = (returnUrl = getLoginReturnUrl()) => {
+  window.location.href = getLoginUrl(returnUrl);
 };
