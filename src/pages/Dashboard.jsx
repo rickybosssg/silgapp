@@ -117,6 +117,11 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Link to="/test-code-livreur">
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <Truck className="w-4 h-4" /> Test Code Livreur
+            </Button>
+          </Link>
           <Link to="/carte">
             <Button variant="outline" size="sm" className="gap-1.5">
               <MapPin className="w-4 h-4" /> Carte
