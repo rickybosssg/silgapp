@@ -14,6 +14,7 @@ const RecapitulatifAdmin = lazy(() => import('./pages/RecapitulatifAdmin'));
 const LivreurApp = lazy(() => import('./pages/LivreurApp.jsx'));
 const InscriptionLivreur = lazy(() => import('./pages/InscriptionLivreur'));
 const TestNotificationsPush = lazy(() => import('./pages/TestNotificationsPush'));
+const TestLivreurCode = lazy(() => import('./pages/TestLivreurCode'));
 
 export default function AuthenticatedRoutes({ isAdmin }) {
   return (
@@ -30,6 +31,7 @@ export default function AuthenticatedRoutes({ isAdmin }) {
         <Route path="/recapitulatif" element={<RecapitulatifAdmin />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/test-notifications" element={<TestNotificationsPush />} />
+        <Route path="/test-code-livreur" element={<TestLivreurCode />} />
       </Route>
 
       <Route path="/livreur" element={<LivreurApp />} />
