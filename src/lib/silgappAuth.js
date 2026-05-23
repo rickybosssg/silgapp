@@ -130,9 +130,12 @@ export const SilgappAuthProvider = ({ children }) => {
     setIsLoadingAuth(true);
     try {
       localStorage.removeItem(ADMIN_SESSION_KEY);
-      console.log('[SilgappAuth] Signing in livreur with code:', code);
+      console.log('[SilgappAuth] ========== SIGN IN FLOW ==========');
+      console.log('[SilgappAuth] START_LOGIN: Signing in livreur with code:', code);
       const codeUser = await signInWithStoredIdentificationCode(code);
       console.log('[SilgappAuth] ✅ Livreur signed in:', codeUser.full_name, 'role:', codeUser.role, 'livreur_id:', codeUser.livreur_id);
+      console.log('[SilgappAuth] SESSION_CREATED: Session saved for', codeUser.full_name);
+      console.log('[SilgappAuth] NAVIGATION: Redirecting to dashboard...');
       applyUser(codeUser);
       return codeUser;
     } finally {
