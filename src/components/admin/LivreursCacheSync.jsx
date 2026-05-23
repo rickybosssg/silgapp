@@ -11,17 +11,29 @@ export default function LivreursCacheSync() {
 
   const syncMutation = useMutation({
     mutationFn: async () => {
-      const result = await base44.functions.invoke('syncLivreursLocaux', {});
-      if (!result.data?.success) {
-        throw new Error(result.data?.error || 'Échec de la synchronisation');
+      console.log('[LivreursCacheSync] Starting sync...');
+      try {
+        const result = await base44.functions.invoke('triggerSyncLivreursLocaux', {});
+        console.log('[LivreursCacheSync] Result:', result);
+        
+        if (!result.data?.success) {
+          console.error('[LivreursCacheSync] Sync failed:', result.data?.error);
+          throw new Error(result.data?.error || 'Échec de la synchronisation');
+        }
+        
+        return result.data;
+      } catch (error) {
+        console.error('[LivreursCacheSync] Error:', error.message);
+        throw error;
       }
-      return result.data;
     },
     onSuccess: (data) => {
+      console.log('[LivreursCacheSync] Success:', data.count, 'livreurs');
       setLastSync(new Date());
       toast.success(`${data.count} codes livreurs synchronisés`);
     },
     onError: (error) => {
+      console.error('[LivreursCacheSync] onError:', error.message);
       toast.error(error.message);
     },
   });
