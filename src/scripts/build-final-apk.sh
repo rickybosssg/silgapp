@@ -5,8 +5,9 @@
 
 set -e
 
+echo "========================================="
 echo "🔧 BUILD FINAL APK - SILGAPP 2"
-echo "================================"
+echo "========================================="
 echo ""
 
 # 1. Nettoyage complet
@@ -72,14 +73,14 @@ adb shell am start -n com.silgapp2.app/.MainActivity
 echo "✅ Application lancée"
 echo ""
 
-echo "================================"
+echo "========================================="
 echo "✅ BUILD ET INSTALLATION TERMINÉS"
-echo "================================"
+echo "========================================="
 echo ""
 echo "📱 APK installée: com.silgapp2.app"
 echo "📍 Location: android/app/build/outputs/apk/debug/app-debug.apk"
 echo ""
-echo "🧪 PROCHAINES ÉTAPES:"
+echo "🧪 PROCHAINES ÉTAPES (À FAIRE MANUELLEMENT):"
 echo "1. Ouvrir l'APK sur votre appareil Android"
 echo "2. Tester connexion admin (admin / <PIN>)"
 echo "3. Tester connexion livreur (LVR-TES666)"
