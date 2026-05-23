@@ -1,6 +1,7 @@
 import { base44 } from '@/api/base44Client';
 import { isNativeLivreurRuntime, verifyNativeLivreurCode } from '@/lib/nativeLivreurApi';
 import { saveSessionNative, getSessionNative, removeSessionNative, isCapacitorAvailable } from '@/lib/capacitorStorage';
+import { verifyCodeLocalement } from '@/lib/livreursLocaux';
 
 const SESSION_KEY = 'silgapp_code_identification_session';
 
@@ -78,74 +79,46 @@ export const findLivreurByIdentificationCode = async (code) => {
 
   console.log('[CodeIdentificationAuth] ========== FIND LIVREUR START ==========');
   console.log('[CodeIdentificationAuth] Code normalized:', normalizedCode);
-  console.log('[CodeIdentificationAuth] isNativeLivreurRuntime:', isNativeLivreurRuntime());
 
+  // ÉTAPE 1: Vérification LOCALE (priorité - comme admin)
+  console.log('[CodeIdentificationAuth] ÉTAPE 1: Vérification LOCALE...');
+  const livreurLocal = await verifyCodeLocalement(normalizedCode);
+  
+  if (livreurLocal) {
+    console.log('[CodeIdentificationAuth] ✅ MATCH LOCAL TROUVÉ:', livreurLocal.nom, livreurLocal.prenom);
+    console.log('[CodeIdentificationAuth] ========== FIND LIVREUR SUCCESS (LOCAL) ==========');
+    return livreurLocal;
+  }
+
+  console.log('[CodeIdentificationAuth] ❌ Pas de match local, fallback vers backend...');
+
+  // ÉTAPE 2: Backend (fallback)
   try {
     if (isNativeLivreurRuntime()) {
       console.log('[CodeIdentificationAuth] Using NATIVE path (verifyNativeLivreurCode)');
-      console.log('[CodeIdentificationAuth] Calling verifyNativeLivreurCode...');
       const livreur = await verifyNativeLivreurCode(normalizedCode);
-      console.log('[CodeIdentificationAuth] Native path result:', livreur ? `SUCCESS - ${livreur.nom} ${livreur.prenom} (ID: ${livreur.id})` : 'FAILED - null');
-      console.log('[CodeIdentificationAuth] ========== FIND LIVREUR END ==========');
-      return livreur;
+      if (livreur) {
+        console.log('[CodeIdentificationAuth] ✅ Native path SUCCESS:', livreur.nom);
+        console.log('[CodeIdentificationAuth] ========== FIND LIVREUR SUCCESS ==========');
+        return livreur;
+      }
     }
 
     console.log('[CodeIdentificationAuth] Using WEB path (findLivreurByCode)');
-    console.log('[CodeIdentificationAuth] Calling backend function findLivreurByCode...');
     const response = await base44.functions.invoke('findLivreurByCode', { code: normalizedCode });
-    console.log('[CodeIdentificationAuth] Backend function called');
-    console.log('[CodeIdentificationAuth] Backend response DATA:', JSON.stringify(response));
     
     if (response?.success === true && response?.livreur) {
-      console.log('[CodeIdentificationAuth] ✅ Backend returned livreur:', response.livreur.nom, response.livreur.prenom);
-      console.log('[CodeIdentificationAuth] Code in DB:', response.livreur.code_identification);
+      console.log('[CodeIdentificationAuth] ✅ Backend SUCCESS:', response.livreur.nom);
       console.log('[CodeIdentificationAuth] ========== FIND LIVREUR SUCCESS ==========');
       return response.livreur;
     }
-    
-    console.log('[CodeIdentificationAuth] Backend returned no livreur (success:', response?.success, ')');
-    console.log('[CodeIdentificationAuth] Full response:', JSON.stringify(response, null, 2));
-    throw new Error('Backend returned no livreur');
   } catch (error) {
-    console.error('[CodeIdentificationAuth] Primary lookup failed:', error?.message);
-    
-    try {
-      console.log('[CodeIdentificationAuth] FALLBACK 1: direct filter...');
-      const directMatches = await base44.asServiceRole.entities.Livreur.filter({ code_identification: normalizedCode });
-      console.log('[CodeIdentificationAuth] Fallback 1 results:', directMatches?.length);
-      if (directMatches && directMatches.length > 0) {
-        console.log('[CodeIdentificationAuth] First match:', directMatches[0].nom, directMatches[0].code_identification);
-        const directMatch = directMatches.find(
-          (livreur) => normalizeCode(livreur.code_identification) === normalizedCode
-        );
-        if (directMatch) {
-          console.log('[CodeIdentificationAuth] ✅ FALLBACK 1 SUCCESS:', directMatch.nom);
-          console.log('[CodeIdentificationAuth] ========== FIND LIVREUR SUCCESS (FALLBACK 1) ==========');
-          return directMatch;
-        }
-      }
-    } catch (fallbackError) {
-      console.error('[CodeIdentificationAuth] Fallback 1 failed:', fallbackError?.message);
-    }
-
-    try {
-      console.log('[CodeIdentificationAuth] FALLBACK 2: list predicate...');
-      const result = await findLivreurByPredicate(
-        (livreur) => normalizeCode(livreur.code_identification) === normalizedCode
-      );
-      if (result) {
-        console.log('[CodeIdentificationAuth] ✅ FALLBACK 2 SUCCESS:', result.nom);
-        console.log('[CodeIdentificationAuth] ========== FIND LIVREUR SUCCESS (FALLBACK 2) ==========');
-        return result;
-      }
-    } catch (fallbackError) {
-      console.error('[CodeIdentificationAuth] Fallback 2 failed:', fallbackError?.message);
-    }
-
-    console.log('[CodeIdentificationAuth] ❌ ALL LOOKUPS FAILED');
-    console.log('[CodeIdentificationAuth] ========== FIND LIVREUR FAILED ==========');
-    return null;
+    console.error('[CodeIdentificationAuth] Backend lookup failed:', error?.message);
   }
+
+  console.log('[CodeIdentificationAuth] ❌ ALL LOOKUPS FAILED');
+  console.log('[CodeIdentificationAuth] ========== FIND LIVREUR FAILED ==========');
+  return null;
 };
 
 export const signInWithIdentificationCode = async (code) => {

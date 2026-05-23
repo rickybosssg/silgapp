@@ -5,6 +5,7 @@ import {
   signInWithIdentificationCode as signInWithStoredIdentificationCode,
 } from '@/lib/codeIdentificationAuth';
 import { clearAllSessions } from '@/lib/capacitorStorage';
+import { verifyCodeLocalement, syncLivreursLocaux, getLivreursLocaux, isCacheValide } from '@/lib/livreursLocaux';
 
 const AuthContext = createContext(null);
 
@@ -98,6 +99,35 @@ export const SilgappAuthProvider = ({ children }) => {
     }
   };
 
+  /**
+   * Synchronise les codes livreurs depuis la base de données
+   * À appeler après connexion admin ou manuellement
+   */
+  const syncLivreursCodes = async () => {
+    console.log('[SilgappAuth] ========== SYNC LIVREURS ==========');
+    try {
+      const result = await syncLivreursLocaux();
+      console.log('[SilgappAuth] ✅ Sync complete:', result.count, 'livreurs');
+      return result;
+    } catch (error) {
+      console.error('[SilgappAuth] ❌ Sync failed:', error.message);
+      throw error;
+    }
+  };
+
+  /**
+   * Vérifie si le cache des livreurs est valide
+   */
+  const checkLivreursCache = async () => {
+    const isValid = await isCacheValide(60); // 60 minutes
+    const livreurs = await getLivreursLocaux();
+    return {
+      valid: isValid,
+      count: livreurs?.length || 0,
+      empty: !livreurs || livreurs.length === 0
+    };
+  };
+
   useEffect(() => {
     checkAppState();
   }, []);
@@ -134,24 +164,49 @@ export const SilgappAuthProvider = ({ children }) => {
       localStorage.removeItem(ADMIN_SESSION_KEY);
       console.log('[SilgappAuth] Admin session cleared');
       
-      console.log('[SilgappAuth] APPEL findLivreurByCode...');
-      const codeUser = await signInWithStoredIdentificationCode(code);
+      // ÉTAPE 1: Vérification LOCALE (comme admin)
+      console.log('[SilgappAuth] ÉTAPE 1: Vérification LOCALE du code...');
+      const livreurLocal = await verifyCodeLocalement(code);
       
-      console.log('[SilgappAuth] RÉPONSE backend: Livreur trouvé:', codeUser.full_name);
-      console.log('[SilgappAuth] User data:', JSON.stringify({
-        id: codeUser.id,
-        role: codeUser.role,
-        livreur_id: codeUser.livreur_id,
-        code_identification: codeUser.code_identification
-      }));
+      if (livreurLocal) {
+        console.log('[SilgappAuth] ✅ MATCH LOCAL TROUVÉ:', livreurLocal.nom, livreurLocal.prenom);
+        console.log('[SilgappAuth] Livreur ID:', livreurLocal.id);
+        
+        // Créer l'utilisateur directement depuis le cache local
+        const codeUser = {
+          id: `livreur:${livreurLocal.id}`,
+          role: 'livreur',
+          full_name: `${livreurLocal.prenom} ${livreurLocal.nom}`.trim(),
+          name: `${livreurLocal.prenom} ${livreurLocal.nom}`.trim(),
+          email: livreurLocal.user_email || `livreur-${livreurLocal.id}@silgapp2.local`,
+          livreur_id: livreurLocal.id,
+          code_identification: livreurLocal.code_identification,
+          auth_provider: 'code_identification_local',
+          livreur: livreurLocal
+        };
+        
+        console.log('[SilgappAuth] ✅ User object created from LOCAL cache');
+        applyUser(codeUser);
+        console.log('[SilgappAuth] ========== SIGN IN FLOW COMPLETE (LOCAL) ==========');
+        return codeUser;
+      }
       
-      console.log('[SilgappAuth] SESSION_CREATED: Application du user...');
-      applyUser(codeUser);
+      // ÉTAPE 2: Si cache vide, essayer de synchroniser
+      console.log('[SilgappAuth] ❌ Pas de match local');
+      const livreurs = await getLivreursLocaux();
       
-      console.log('[SilgappAuth] NAVIGATION dashboard: isAuthenticated=', !!codeUser);
-      console.log('[SilgappAuth] ========== SIGN IN FLOW COMPLETE ==========');
+      if (!livreurs || livreurs.length === 0) {
+        console.warn('[SilgappAuth] ⚠️ Cache local VIDE');
+        const error = new Error("Aucun code livreur enregistré. Synchronisation nécessaire.");
+        error.code = 'livreurs_cache_empty';
+        throw error;
+      }
       
-      return codeUser;
+      // ÉTAPE 3: Code incorrect
+      console.log('[SilgappAuth] ❌ Code incorrect dans le cache');
+      const error = new Error("Code d'identification incorrect.");
+      error.code = 'invalid_identification_code';
+      throw error;
     } catch (error) {
       console.error('[SilgappAuth] ❌ SIGN IN FAILED:', error.message);
       console.error('[SilgappAuth] Stack:', error.stack);
@@ -173,7 +228,18 @@ export const SilgappAuthProvider = ({ children }) => {
   };
 
   return React.createElement(AuthContext.Provider, {
-    value: { user, isAuthenticated, isLoadingAuth, authChecked, checkAppState, signInAsAdmin, signInWithIdentificationCode, logout },
+    value: { 
+      user, 
+      isAuthenticated, 
+      isLoadingAuth, 
+      authChecked, 
+      checkAppState, 
+      signInAsAdmin, 
+      signInWithIdentificationCode, 
+      logout,
+      syncLivreursCodes,
+      checkLivreursCache
+    },
     children,
   });
 };

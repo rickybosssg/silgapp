@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { KeyRound, LogIn, ShieldCheck, Truck, Activity, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { KeyRound, LogIn, ShieldCheck, Truck, Activity, CheckCircle2, XCircle, Loader2, Database } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSilgappAuth } from '@/lib/silgappAuth';
 import { isCapacitorAvailable } from '@/lib/capacitorStorage';
 import { getSessionNative } from '@/lib/capacitorStorage';
+import { getLivreursLocaux } from '@/lib/livreursLocaux';
 
 export default function Silgapp2Login() {
   const { signInAsAdmin, signInWithIdentificationCode, isLoadingAuth } = useSilgappAuth();
@@ -21,12 +22,39 @@ export default function Silgapp2Login() {
   const [debugLogs, setDebugLogs] = useState([]);
   const [isCapacitor, setIsCapacitor] = useState(false);
   const [buttonDisabled, setButtonDisabled] = useState(false);
+  const [livreursCacheStatus, setLivreursCacheStatus] = useState({ loaded: false, count: 0, empty: false });
   
   useEffect(() => {
     const capacitorStatus = isCapacitorAvailable();
     setIsCapacitor(capacitorStatus);
     addLog('INIT', `APK Mode: ${capacitorStatus ? 'NATIVE' : 'WEB'}`);
+    
+    // Vérifier le cache des livreurs au démarrage
+    checkLivreursCache();
   }, []);
+  
+  const checkLivreursCache = async () => {
+    try {
+      const livreurs = await getLivreursLocaux();
+      const count = livreurs?.length || 0;
+      const isEmpty = count === 0;
+      
+      setLivreursCacheStatus({
+        loaded: true,
+        count,
+        empty: isEmpty
+      });
+      
+      addLog('CACHE_LIVREURS', `${count} livreurs en cache ${isEmpty ? '(VIDE!)' : ''}`);
+      
+      if (isEmpty && isCapacitor) {
+        addLog('WARNING', '⚠️ Cache livreurs VIDE - synchronisation requise');
+      }
+    } catch (error) {
+      console.error('[Login] Failed to check livreurs cache:', error);
+      setLivreursCacheStatus({ loaded: true, count: 0, empty: true });
+    }
+  };
   
   // Update button disabled state
   useEffect(() => {
@@ -233,6 +261,21 @@ export default function Silgapp2Login() {
               {error}
             </div>
           )}
+          
+          {/* Alert if livreurs cache is empty */}
+          {mode === 'livreur' && livreursCacheStatus.loaded && livreursCacheStatus.empty && (
+            <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-3 text-sm text-amber-100">
+              <div className="flex items-start gap-2">
+                <Database className="w-4 h-4 mt-0.5" />
+                <div>
+                  <p className="font-bold mb-1">Synchronisation requise</p>
+                  <p className="text-xs opacity-90">
+                    Aucun code livreur enregistré. Un administrateur doit synchroniser les codes dans Paramètres.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <Button
             type="submit"
@@ -247,6 +290,17 @@ export default function Silgapp2Login() {
           {buttonDisabled && mode === 'livreur' && (
             <div className="text-xs text-center text-red-400">
               ⚠️ Bouton désactivé: {isLoadingAuth ? 'Chargement...' : !code ? 'Code vide' : `Code: "${code}" (trim: "${code.trim()}")`}
+            </div>
+          )}
+          
+          {/* Cache status indicator */}
+          {mode === 'livreur' && livreursCacheStatus.loaded && (
+            <div className="text-xs text-center text-slate-400">
+              {livreursCacheStatus.count > 0 ? (
+                <span className="text-green-400">✅ {livreursCacheStatus.count} codes livreurs synchronisés</span>
+              ) : (
+                <span className="text-amber-400">⚠️ Cache vide</span>
+              )}
             </div>
           )}
         </form>

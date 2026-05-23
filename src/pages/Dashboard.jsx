@@ -19,6 +19,7 @@ import AssignLivreurDialog from "../components/courses/AssignLivreurDialog";
 import DispatchModeSelector from "../components/dispatch/DispatchModeSelector";
 import DispatchMonitor from "../components/dispatch/DispatchMonitor";
 import BatterieAlertesPanel from "../components/admin/BatterieAlertesPanel";
+import LivreursCacheSync from "../components/admin/LivreursCacheSync";
 import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
 import { useSilgappAuth } from "@/lib/silgappAuth";
 
@@ -139,6 +140,7 @@ export default function Dashboard() {
       <DispatchModeSelector />
       <DispatchMonitor />
       <BatterieAlertesPanel currentUser={currentUser} />
+      <LivreursCacheSync />
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
