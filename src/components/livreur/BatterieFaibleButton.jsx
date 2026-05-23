@@ -40,11 +40,11 @@ export default function BatterieFaibleButton({ livreur }) {
 
   return (
     <Button
-      variant="outline"
+      variant="default"
       size="sm"
       onClick={() => alerterMutation.mutate()}
       disabled={alerterMutation.isPending}
-      className="gap-2 border-pink-300 bg-pink-50 hover:bg-pink-100 text-pink-700"
+      className="gap-2 bg-pink-500 hover:bg-pink-600 text-white"
     >
       <BatteryWarning className="w-4 h-4" />
       Signaler Batterie moto Faible
