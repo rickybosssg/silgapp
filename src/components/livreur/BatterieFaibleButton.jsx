@@ -47,7 +47,7 @@ export default function BatterieFaibleButton({ livreur }) {
       className="gap-2 border-orange-300 bg-orange-50 hover:bg-orange-100 text-orange-700"
     >
       <BatteryWarning className="w-4 h-4" />
-      Batterie faible
+      Signaler Batterie moto Faible
     </Button>
   );
 }
