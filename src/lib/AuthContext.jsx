@@ -49,6 +49,15 @@ const saveAdminSession = () => {
   }));
 };
 
+const withTimeout = (promise, timeoutMs, timeoutMessage) => {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timeoutId));
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -73,7 +82,11 @@ export const AuthProvider = ({ children }) => {
         return;
       }
 
-      const codeSessionUser = await getStoredIdentificationSession();
+      const codeSessionUser = await withTimeout(
+        getStoredIdentificationSession(),
+        3000,
+        'Session livreur locale indisponible'
+      );
       if (codeSessionUser) {
         applyUser(codeSessionUser);
         return;
@@ -82,6 +95,7 @@ export const AuthProvider = ({ children }) => {
       applyUser(null);
     } catch (error) {
       console.error('[SILGAPP2 Auth] Startup auth check failed:', error);
+      clearIdentificationSession();
       applyUser(null);
     } finally {
       setIsLoadingAuth(false);
