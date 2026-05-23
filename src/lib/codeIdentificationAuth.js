@@ -28,14 +28,21 @@ const toCodeUser = (livreur) => ({
 });
 
 const saveSession = (livreur) => {
-  localStorage.setItem(SESSION_KEY, JSON.stringify({
+  const sessionData = {
     livreur_id: livreur.id,
     nom: getLivreurName(livreur),
     role: 'livreur',
     code_identification: livreur.code_identification || '',
     email: getLivreurNotificationEmail(livreur),
     created_at: new Date().toISOString(),
-  }));
+  };
+  
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
+    console.log('[CodeIdentificationAuth] Session saved:', sessionData.livreur_id);
+  } catch (error) {
+    console.error('[CodeIdentificationAuth] Failed to save session:', error);
+  }
 };
 
 const findLivreurByPredicate = async (predicate) => {
@@ -63,32 +70,52 @@ export const findLivreurByIdentificationCode = async (code) => {
 };
 
 export const signInWithIdentificationCode = async (code) => {
+  console.log('[CodeIdentificationAuth] Attempting sign in with code:', code);
+  
   const livreur = await findLivreurByIdentificationCode(code);
   if (!livreur) {
+    console.warn('[CodeIdentificationAuth] No livreur found with code:', code);
     const error = new Error("Code d'identification incorrect.");
     error.code = 'invalid_identification_code';
     throw error;
   }
 
+  console.log('[CodeIdentificationAuth] Livreur found:', livreur.nom, livreur.prenom);
+  
   if (livreur.validation !== 'valide') {
+    console.warn('[CodeIdentificationAuth] Livreur not validated:', livreur.id);
     const error = new Error("Compte livreur non valide. Attendez la validation de l'administrateur.");
     error.code = 'invalid_livreur_validation';
     throw error;
   }
 
   if (livreur.actif === false) {
+    console.warn('[CodeIdentificationAuth] Livreur account inactive:', livreur.id);
     const error = new Error("Compte livreur desactive. Contactez l'administrateur.");
     error.code = 'disabled_livreur';
     throw error;
   }
 
   saveSession(livreur);
-  return toCodeUser(livreur);
+  const user = toCodeUser(livreur);
+  console.log('[CodeIdentificationAuth] Sign in successful for:', user.full_name);
+  return user;
 };
 
 export const getStoredIdentificationSession = async () => {
-  const rawSession = localStorage.getItem(SESSION_KEY);
-  if (!rawSession) return null;
+  let rawSession = null;
+  
+  try {
+    rawSession = localStorage.getItem(SESSION_KEY);
+  } catch (error) {
+    console.warn('[CodeIdentificationAuth] Session read failed:', error?.message);
+    return null;
+  }
+  
+  if (!rawSession) {
+    console.log('[CodeIdentificationAuth] No stored session found');
+    return null;
+  }
 
   try {
     const session = JSON.parse(rawSession);
@@ -98,13 +125,22 @@ export const getStoredIdentificationSession = async () => {
     }
 
     const livreur = await findLivreurByPredicate((item) => item.id === session.livreur_id);
-    if (!livreur || livreur.actif === false) {
+    if (!livreur) {
+      console.warn('[CodeIdentificationAuth] Livreur not found for session:', session.livreur_id);
+      clearIdentificationSession();
+      return null;
+    }
+    
+    if (livreur.actif === false) {
+      console.warn('[CodeIdentificationAuth] Livreur account is inactive:', session.livreur_id);
       clearIdentificationSession();
       return null;
     }
 
     saveSession(livreur);
-    return toCodeUser(livreur);
+    const user = toCodeUser(livreur);
+    console.log('[CodeIdentificationAuth] Session restored for:', user.full_name);
+    return user;
   } catch (error) {
     console.warn('[CodeIdentificationAuth] Stored session restore failed:', error?.message);
     clearIdentificationSession();
@@ -113,7 +149,12 @@ export const getStoredIdentificationSession = async () => {
 };
 
 export const clearIdentificationSession = () => {
-  localStorage.removeItem(SESSION_KEY);
+  try {
+    localStorage.removeItem(SESSION_KEY);
+    console.log('[CodeIdentificationAuth] Session cleared');
+  } catch (error) {
+    console.error('[CodeIdentificationAuth] Failed to clear session:', error);
+  }
 };
 
 export const isIdentificationCodeAlreadyUsed = async (code, ignoredLivreurId = null) => {
