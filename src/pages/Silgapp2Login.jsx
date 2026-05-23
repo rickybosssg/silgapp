@@ -20,6 +20,7 @@ export default function Silgapp2Login() {
   // Debug state for APK
   const [debugLogs, setDebugLogs] = useState([]);
   const [isCapacitor, setIsCapacitor] = useState(false);
+  const [buttonDisabled, setButtonDisabled] = useState(false);
   
   useEffect(() => {
     const capacitorStatus = isCapacitorAvailable();
@@ -27,22 +28,64 @@ export default function Silgapp2Login() {
     addLog('INIT', `APK Mode: ${capacitorStatus ? 'NATIVE' : 'WEB'}`);
   }, []);
   
+  // Update button disabled state
+  useEffect(() => {
+    const isDisabled = isLoadingAuth || (mode === 'livreur' ? !code.trim() : !adminIdentifier.trim() || !adminPin.trim());
+    setButtonDisabled(isDisabled);
+    if (mode === 'livreur') {
+      addLog('BTN_STATE', `Bouton ${isDisabled ? 'DÉSACTIVÉ' : 'ACTIF'} - code: "${code}", trim: "${code.trim()}", empty: ${!code.trim()}`);
+    }
+  }, [code, adminIdentifier, adminPin, isLoadingAuth, mode]);
+  
   const addLog = (step, message, data = null) => {
     const timestamp = new Date().toLocaleTimeString('fr-FR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
+    console.log(`[DEBUG] ${step}: ${message}`, data || '');
     setDebugLogs(prev => [...prev, { timestamp, step, message, data }]);
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    if (isLoadingAuth) return;
+  const handleCodeChange = (event) => {
+    const newValue = event.target.value.toUpperCase();
+    console.log('[DEBUG] CODE_CHANGE_EVENT:', newValue);
+    addLog('CODE_CHANGE', `Code changé: "${newValue}"`);
+    setCode(newValue);
+  };
 
+  const handleButtonClick = async (event) => {
+    console.log('[DEBUG] BUTTON_CLICKED - mode:', mode, 'code:', code, 'isLoadingAuth:', isLoadingAuth);
+    addLog('CLICK_LOGIN', `🖱️ BOUTON CLIQUÉ! mode=${mode}, code="${code}", isLoadingAuth=${isLoadingAuth}`);
+    
+    if (isLoadingAuth) {
+      addLog('BLOCKED', '❌ Bloqué: isLoadingAuth=true');
+      return;
+    }
+    
+    if (mode === 'livreur' && !code.trim()) {
+      addLog('BLOCKED', '❌ Bloqué: code vide');
+      addLog('CODE_VIDE', '⚠️ Code vide détecté!');
+      event.preventDefault();
+      return;
+    }
+  };
+
+  const handleSubmit = async (event) => {
+    console.log('[DEBUG] FORM_SUBMIT_START');
+    addLog('SUBMIT_START', '📝 FORMULAIRE SOUMIS!');
+    
+    event.preventDefault();
+    addLog('PREVENT_DEFAULT', '✅ event.preventDefault() appelé');
+    
+    if (isLoadingAuth) {
+      addLog('BLOCKED', '❌ Bloqué: isLoadingAuth=true');
+      console.log('[DEBUG] BLOCKED - isLoadingAuth');
+      return;
+    }
+    
+    addLog('START', `✅ Connexion ${mode} demandée`);
     setDebugLogs([]);
     setError('');
     
-    addLog('START', `Connexion ${mode} demandée`);
-    
     if (mode === 'livreur') {
-      addLog('CODE', `Code saisi: "${code}"`);
+      addLog('CODE', `Code saisi: "${code}" (length: ${code.length})`);
       addLog('CAPACITOR', `Disponible: ${isCapacitor}`);
     }
 
@@ -55,10 +98,11 @@ export default function Silgapp2Login() {
         return;
       }
 
-      addLog('LIVREUR', 'Appel à signInWithIdentificationCode...');
+      addLog('LIVREUR', '📡 Appel à signInWithIdentificationCode...');
+      console.log('[DEBUG] Calling signInWithIdentificationCode with code:', code);
       const user = await signInWithIdentificationCode(code);
       
-      addLog('USER_FOUND', `Livreur trouvé: ${user.full_name}`);
+      addLog('USER_FOUND', `✅ Livreur trouvé: ${user.full_name}`);
       addLog('USER_DATA', null, {
         id: user.id,
         role: user.role,
@@ -75,11 +119,12 @@ export default function Silgapp2Login() {
         addLog('SESSION_REREAD', sessionRaw ? '✅ Session lue après sauvegarde' : '❌ Session NON trouvée');
       }
       
-      addLog('REDIRECT', 'Redirection vers dashboard livreur...');
+      addLog('REDIRECT', '➡️ Redirection vers dashboard livreur...');
       toast.success('Connexion livreur reussie');
     } catch (authError) {
       const message = authError?.message || 'Connexion impossible.';
-      addLog('ERROR', `Échec: ${message}`, { code: authError?.code });
+      addLog('ERROR', `❌ Échec: ${message}`, { code: authError?.code, stack: authError?.stack });
+      console.error('[DEBUG] AUTH_ERROR:', authError);
       setError(message);
       toast.error(message);
     }
@@ -111,7 +156,7 @@ export default function Silgapp2Login() {
           </TabsList>
         </Tabs>
 
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        <form className="space-y-4" onSubmit={handleSubmit} onClick={(e) => console.log('[DEBUG] FORM_CLICK', e.target)}>
           {mode === 'livreur' ? (
             <div className="space-y-2">
               <Label className="text-slate-300">Code d'identification</Label>
@@ -124,9 +169,12 @@ export default function Silgapp2Login() {
                   autoComplete="one-time-code"
                   placeholder="Ex: LIV-001"
                   value={code}
-                  onChange={(event) => setCode(event.target.value.toUpperCase())}
+                  onChange={handleCodeChange}
                   className="h-14 pl-12 bg-white/10 border-white/15 text-white placeholder:text-slate-500 rounded-xl uppercase"
                 />
+              </div>
+              <div className="text-xs text-slate-400">
+                Code actuel: <span className="text-white font-mono">{code || '(vide)'}</span> (length: {code.length})
               </div>
             </div>
           ) : (
@@ -170,12 +218,19 @@ export default function Silgapp2Login() {
 
           <Button
             type="submit"
+            onClick={handleButtonClick}
             className="w-full h-14 bg-red-600 hover:bg-red-700 rounded-xl text-base font-bold"
-            disabled={isLoadingAuth || (mode === 'livreur' ? !code.trim() : !adminIdentifier.trim() || !adminPin.trim())}
+            disabled={buttonDisabled}
           >
             {isLoadingAuth ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <LogIn className="w-5 h-5 mr-2" />}
             {isLoadingAuth ? 'Connexion...' : 'Se connecter'}
           </Button>
+          
+          {buttonDisabled && mode === 'livreur' && (
+            <div className="text-xs text-center text-red-400">
+              ⚠️ Bouton désactivé: {isLoadingAuth ? 'Chargement...' : !code ? 'Code vide' : `Code: "${code}" (trim: "${code.trim()}")`}
+            </div>
+          )}
         </form>
 
         {/* DEBUG PANEL - APK ONLY */}
