@@ -9,12 +9,18 @@ const getLivreurName = (livreur) => {
   return fullName || livreur?.nom || 'Livreur';
 };
 
+export const getLivreurNotificationEmail = (livreur) => {
+  if (livreur?.user_email) return livreur.user_email.trim().toLowerCase();
+  if (livreur?.id) return `livreur-${livreur.id}@silgapp2.local`;
+  return '';
+};
+
 const toCodeUser = (livreur) => ({
   id: `livreur:${livreur.id}`,
   role: 'livreur',
   full_name: getLivreurName(livreur),
   name: getLivreurName(livreur),
-  email: livreur.user_email || '',
+  email: getLivreurNotificationEmail(livreur),
   livreur_id: livreur.id,
   code_identification: livreur.code_identification || '',
   auth_provider: 'code_identification',
@@ -27,7 +33,7 @@ const saveSession = (livreur) => {
     nom: getLivreurName(livreur),
     role: 'livreur',
     code_identification: livreur.code_identification || '',
-    email: livreur.user_email || '',
+    email: getLivreurNotificationEmail(livreur),
     created_at: new Date().toISOString(),
   }));
 };

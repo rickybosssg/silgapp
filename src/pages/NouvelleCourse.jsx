@@ -9,8 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
-  User, Phone, MapPin, Package, DollarSign, 
-  AlertTriangle, FileText, ArrowLeft, Send, Navigation
+  User, MapPin, Package, FileText, ArrowLeft, Send
 } from "lucide-react";
 import { toast } from "sonner";
 

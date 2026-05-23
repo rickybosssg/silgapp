@@ -20,8 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Truck, CheckCircle2, XCircle, Clock, Banknote, Eye, Calendar, TrendingUp } from "lucide-react";
+import { Truck, CheckCircle2, Banknote, Eye, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { fr } from "date-fns/locale";

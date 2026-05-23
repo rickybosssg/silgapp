@@ -3,6 +3,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const APP_NOTIFICATIONS_URL = 'https://silga-dispatch-go.base44.app/notifications';
+const ANDROID_CHANNEL_ID = 'silgapp_default';
 
 function base64UrlEncode(input: string | ArrayBuffer): string {
   const bytes = typeof input === 'string'
@@ -107,11 +108,6 @@ async function sendFcmMessage(projectId: string, accessToken: string, token: str
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-
-    if (!user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
 
     if (req.method !== 'POST') {
       return Response.json({ error: 'Method not allowed' }, { status: 405 });
@@ -119,22 +115,35 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const { titre, message, type, destinataire_email, livreur_id, course_id } = body;
+    const targetEmail = String(destinataire_email || (livreur_id ? `livreur-${livreur_id}@silgapp2.local` : '')).trim().toLowerCase();
 
-    if (!titre || !message || !destinataire_email) {
+    if (!titre || !message || !targetEmail) {
       return Response.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const tokens = await base44.entities.NotificationToken.filter({
-      user_email: destinataire_email,
-      actif: true,
-    });
+    const [emailTokens, livreurTokens] = await Promise.all([
+      base44.asServiceRole.entities.NotificationToken.filter({
+        user_email: targetEmail,
+        actif: true,
+      }),
+      livreur_id
+        ? base44.asServiceRole.entities.NotificationToken.filter({
+          livreur_id,
+          actif: true,
+        })
+        : Promise.resolve([]),
+    ]);
 
-    const notification = await base44.entities.Notification.create({
+    const tokenMap = new Map();
+    for (const item of [...emailTokens, ...livreurTokens]) tokenMap.set(item.token, item);
+    const tokens = [...tokenMap.values()];
+
+    const notification = await base44.asServiceRole.entities.Notification.create({
       titre,
       message,
       type: type || 'generic',
       course_id: course_id || '',
-      destinataire_email,
+      destinataire_email: targetEmail,
       lue: false,
     });
 
@@ -182,7 +191,7 @@ Deno.serve(async (req) => {
         priority: 'HIGH',
         notification: {
           click_action: APP_NOTIFICATIONS_URL,
-          channel_id: 'default',
+          channel_id: ANDROID_CHANNEL_ID,
         },
       },
       webpush: {
@@ -198,7 +207,7 @@ Deno.serve(async (req) => {
         const errorCode = response.result?.error?.details?.[0]?.errorCode || response.result?.error?.status;
         if (['UNREGISTERED', 'INVALID_ARGUMENT'].includes(errorCode)) {
           try {
-            await base44.entities.NotificationToken.update(item.id, { actif: false });
+            await base44.asServiceRole.entities.NotificationToken.update(item.id, { actif: false });
           } catch (_) {}
         }
       }

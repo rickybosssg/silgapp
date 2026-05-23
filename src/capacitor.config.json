@@ -1,6 +1,6 @@
 {
-  "appId": "com.silgapp.app",
-  "appName": "SILGAPP",
+  "appId": "com.silgapp2.app",
+  "appName": "SILGAPP 2",
   "webDir": "dist",
   "server": {
     "androidScheme": "https",
@@ -9,10 +9,7 @@
       "*.base44.com",
       "base44.com",
       "*.base44.app",
-      "base44.app",
-      "accounts.google.com",
-      "*.google.com",
-      "oauth2.googleapis.com"
+      "base44.app"
     ]
   },
   "android": {

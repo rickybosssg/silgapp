@@ -59,7 +59,7 @@ export default function LivreurApp() {
 
     const setupNotifications = async () => {
       // Enregistrer le token
-      const token = await registerPushToken(livreurProfil.id);
+      const token = await registerPushToken(livreurProfil.id, user);
       if (token) {
         console.log('Token push livreur enregistré:', token);
       }
@@ -180,7 +180,7 @@ export default function LivreurApp() {
     );
   }
 
-  // ---- NON CONNECTÉ → géré par App.jsx (ConnexionInterne) ----
+  // ---- NON CONNECTE : gere par App.jsx (Silgapp2Login) ----
   if (!isAuthenticated) return null;
 
   // ---- PAS DE PROFIL LIVREUR ----

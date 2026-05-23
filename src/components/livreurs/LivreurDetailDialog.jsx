@@ -4,7 +4,6 @@ import { base44 } from "@/api/base44Client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Truck, Phone, MapPin, Calendar, Clock, CheckCircle2, XCircle, Banknote } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";

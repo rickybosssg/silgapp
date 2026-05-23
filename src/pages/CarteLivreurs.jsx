@@ -1,9 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Truck, Phone, RefreshCw, MapPin, Package, Clock, Circle } from "lucide-react";
+import { Truck, Phone, RefreshCw, MapPin, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const statusColors = {

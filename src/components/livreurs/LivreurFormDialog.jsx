@@ -15,7 +15,6 @@ const emptyForm = {
   prenom: "",
   nom: "",
   telephone: "",
-  user_email: "",
   code_identification: "",
   quartier: "",
   vehicule: "moto",
@@ -35,7 +34,6 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
         prenom: livreur.prenom || "",
         nom: livreur.nom || "",
         telephone: livreur.telephone || "",
-        user_email: livreur.user_email || "",
         code_identification: livreur.code_identification || "",
         quartier: livreur.quartier || "",
         vehicule: livreur.vehicule || "moto",
@@ -135,12 +133,6 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
               required
               type="tel"
             />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-xs">Email Base44 du livreur</Label>
-            <Input placeholder="email@exemple.com" type="email" value={form.user_email} onChange={(e) => setForm((p) => ({ ...p, user_email: e.target.value }))} />
-            <p className="text-[10px] text-muted-foreground">Email du compte Base44 invité pour ce livreur</p>
           </div>
 
           <div className="space-y-1.5">

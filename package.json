@@ -1,5 +1,5 @@
 {
-  "name": "base44-app",
+  "name": "silgapp2",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -16,7 +16,6 @@
     "@base44/vite-plugin": "^1.0.18",
     "@capacitor/android": "^5.7.8",
     "@capacitor/app": "^5.0.8",
-    "@capacitor/browser": "^5.2.1",
     "@capacitor/cli": "^5.7.8",
     "@capacitor/core": "^5.7.8",
     "@capacitor/local-notifications": "^5.0.8",

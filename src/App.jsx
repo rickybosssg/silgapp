@@ -4,12 +4,9 @@ import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
-import { NativeFirebaseAuthProvider } from '@/lib/NativeFirebaseAuthContext';
-import { isNativeFirebaseAuthEnabled } from '@/lib/nativeAuthMode';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 
-import ConnexionInterne from './pages/ConnexionInterne';
-import NativeFirebaseLogin from './pages/NativeFirebaseLogin';
+import Silgapp2Login from './pages/Silgapp2Login';
 import AppLayout from './components/layout/AppLayout';
 import Dashboard from './pages/Dashboard';
 import NouvelleCourse from './pages/NouvelleCourse';
@@ -27,7 +24,7 @@ import { base44 } from '@/api/base44Client';
 import { Truck } from 'lucide-react';
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, user, isAuthenticated, isNativeFirebaseAuth } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, user, isAuthenticated, logout } = useAuth();
 
   const isAdmin = user?.role === "admin";
 
@@ -49,7 +46,7 @@ const AuthenticatedApp = () => {
             <Truck className="w-8 h-8 text-primary animate-pulse" />
           </div>
           <div>
-            <p className="text-base font-bold text-foreground">SILGAPP</p>
+            <p className="text-base font-bold text-foreground">SILGAPP 2</p>
             <p className="text-xs text-muted-foreground mt-1">Chargement en cours…</p>
           </div>
           <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin mx-auto"></div>
@@ -64,12 +61,7 @@ const AuthenticatedApp = () => {
       return <UserNotRegisteredError />;
     }
 
-    if (isNativeFirebaseAuth) {
-      return <NativeFirebaseLogin />;
-    }
-
-    // auth_required → page de connexion interne (sans navigateur externe)
-    return <ConnexionInterne />;
+    return <Silgapp2Login />;
   }
 
   // Utilisateur connecté mais inconnu (ni admin, ni livreur)
@@ -83,7 +75,7 @@ const AuthenticatedApp = () => {
         </p>
         <button
           className="text-xs text-muted-foreground underline mt-2"
-          onClick={() => { localStorage.removeItem("base44_access_token"); window.location.reload(); }}
+          onClick={logout}
         >
           Se déconnecter
         </button>
@@ -97,7 +89,7 @@ const AuthenticatedApp = () => {
       <Route path="/inscription-livreur" element={<InscriptionLivreur />} />
 
       {/* Routes Admin */}
-      <Route element={<AppLayout />}>
+      <Route element={isAdmin ? <AppLayout /> : <Navigate to="/livreur" replace />}>
         {/* Racine : admin → Dashboard, sinon → espace livreur */}
         <Route path="/" element={isAdmin ? <Dashboard /> : <Navigate to="/livreur" replace />} />
         <Route path="/nouvelle-course" element={<NouvelleCourse />} />
@@ -118,17 +110,15 @@ const AuthenticatedApp = () => {
 };
 
 function App() {
-  const SelectedAuthProvider = isNativeFirebaseAuthEnabled() ? NativeFirebaseAuthProvider : AuthProvider;
-
   return (
-    <SelectedAuthProvider>
+    <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
         <Router>
           <AuthenticatedApp />
         </Router>
         <Toaster />
       </QueryClientProvider>
-    </SelectedAuthProvider>
+    </AuthProvider>
   )
 }
 

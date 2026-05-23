@@ -1,14 +1,9 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Truck, Users, CheckCircle2, Banknote, TrendingUp, 
-  Clock, MapPin, Phone, Eye, Calendar 
+import { Users, TrendingUp, Calendar
 } from "lucide-react";
 import { format, subDays, startOfWeek, startOfMonth, isWithinInterval } from "date-fns";
 import { fr } from "date-fns/locale";

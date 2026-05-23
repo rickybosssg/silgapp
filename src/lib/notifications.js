@@ -1,5 +1,8 @@
 import { base44 } from "@/api/base44Client";
 
+const ANDROID_CHANNEL_ID = "silgapp_default";
+let nativeListenersReady = false;
+
 export function detectEnvironment() {
   if (typeof window !== "undefined" && window.Capacitor) {
     return {
@@ -28,6 +31,53 @@ async function getCapacitorPlugin(pluginName, packageName) {
   }
 }
 
+function resolveNotificationIdentity(livreurId = null, currentUser = null) {
+  const userType = currentUser?.role === "admin" ? "admin" : "livreur";
+  const resolvedLivreurId = livreurId || currentUser?.livreur_id || currentUser?.livreur?.id || null;
+  const fallbackEmail = userType === "admin"
+    ? "admin@silgapp2.local"
+    : `livreur-${resolvedLivreurId || "unknown"}@silgapp2.local`;
+
+  return {
+    user_email: (currentUser?.email || currentUser?.livreur?.user_email || fallbackEmail).trim().toLowerCase(),
+    user_type: userType,
+    livreur_id: resolvedLivreurId,
+  };
+}
+
+async function ensureNativePushListeners() {
+  if (nativeListenersReady) return;
+
+  const PushNotifications = await getCapacitorPlugin("PushNotifications", "@capacitor/push-notifications");
+  if (!PushNotifications) return;
+
+  nativeListenersReady = true;
+
+  try {
+    await PushNotifications.createChannel?.({
+      id: ANDROID_CHANNEL_ID,
+      name: "SILGAPP",
+      description: "Notifications SILGAPP",
+      importance: 5,
+      visibility: 1,
+      lights: true,
+      vibration: true,
+    });
+  } catch (error) {
+    console.warn("[Notifications] Channel creation skipped:", error?.message);
+  }
+
+  try {
+    await PushNotifications.addListener("pushNotificationReceived", (notification) => {
+      const title = notification.title || notification.notification?.title || "SILGAPP";
+      const body = notification.body || notification.notification?.body || "";
+      showLocalNotification(title, body, { data: notification.data || {} });
+    });
+  } catch (error) {
+    console.warn("[Notifications] pushNotificationReceived listener failed:", error?.message);
+  }
+}
+
 export async function checkNotificationSupport() {
   const env = detectEnvironment();
 
@@ -44,6 +94,7 @@ export async function checkNotificationSupport() {
 
     try {
       await PushNotifications.checkPermissions();
+      await ensureNativePushListeners();
       return { supported: true, type: "native", platform: "android", error: null };
     } catch (error) {
       return {
@@ -77,6 +128,7 @@ export async function requestNotificationPermission() {
     }
 
     try {
+      await ensureNativePushListeners();
       const result = await PushNotifications.requestPermissions();
       const granted = result.receive === "granted" || result.display === "granted";
       return { granted, type: "native", error: granted ? null : "Permission refusee" };
@@ -127,24 +179,74 @@ export function showLocalNotification(titre, message, options = {}) {
 
 async function showNativeNotification(titre, message, options = {}) {
   const LocalNotifications = await getCapacitorPlugin("LocalNotifications", "@capacitor/local-notifications");
-  if (!LocalNotifications) {
-    console.log("Notifications locales non disponibles");
-    return;
-  }
+  if (!LocalNotifications) return;
 
   try {
+    await LocalNotifications.createChannel?.({
+      id: ANDROID_CHANNEL_ID,
+      name: "SILGAPP",
+      description: "Notifications SILGAPP",
+      importance: 5,
+      visibility: 1,
+      lights: true,
+      vibration: true,
+    });
+
     await LocalNotifications.schedule({
       notifications: [{
         title: titre,
         body: message,
-        id: Date.now(),
-        icon: options.icon || "ic_launcher",
-        sound: options.sound || "beep.wav",
+        id: Math.floor(Date.now() % 2147483647),
+        channelId: ANDROID_CHANNEL_ID,
+        iconColor: "#dc2626",
+        sound: options.sound || "default",
         data: options.data || {},
       }],
     });
   } catch (err) {
     console.warn("Erreur LocalNotifications:", err.message);
+  }
+}
+
+async function saveTokenDirectly({ token, platform, livreurId, currentUser }) {
+  const identity = resolveNotificationIdentity(livreurId, currentUser);
+  const payload = {
+    user_email: identity.user_email,
+    token,
+    platform,
+    user_type: identity.user_type,
+    livreur_id: identity.livreur_id || "",
+    actif: true,
+    derniere_utilisation: new Date().toISOString(),
+  };
+
+  const existing = await base44.entities.NotificationToken.filter({ token });
+  if (existing?.[0]) {
+    await base44.entities.NotificationToken.update(existing[0].id, payload);
+    return { success: true, action: "updated-direct", ...payload };
+  }
+
+  await base44.entities.NotificationToken.create(payload);
+  return { success: true, action: "created-direct", ...payload };
+}
+
+async function persistPushToken({ token, platform, livreurId, currentUser }) {
+  const identity = resolveNotificationIdentity(livreurId, currentUser);
+  const payload = {
+    token,
+    platform,
+    livreur_id: identity.livreur_id,
+    user_email: identity.user_email,
+    user_type: identity.user_type,
+  };
+
+  try {
+    const result = await base44.functions.invoke("enregistrerTokenPush", payload);
+    if (result?.error) throw new Error(result.error);
+    return result;
+  } catch (error) {
+    console.warn("[registerPushToken] Backend function failed, using entity fallback:", error?.message);
+    return saveTokenDirectly({ token, platform, livreurId: identity.livreur_id, currentUser });
   }
 }
 
@@ -161,6 +263,7 @@ export async function registerPushToken(livreurId = null, currentUser = null) {
       }
 
       try {
+        await ensureNativePushListeners();
         const permResult = await PushNotifications.requestPermissions();
         console.log("[registerPushToken] Permission:", permResult);
 
@@ -187,15 +290,11 @@ export async function registerPushToken(livreurId = null, currentUser = null) {
             console.log("[registerPushToken] Token FCM recu:", token);
 
             try {
-              await base44.functions.invoke("enregistrerTokenPush", {
-                token,
-                platform: "android",
-                livreur_id: livreurId,
-              });
+              await persistPushToken({ token, platform: "android", livreurId, currentUser });
               console.log("[registerPushToken] Token enregistre en DB");
               finish(token);
             } catch (err) {
-              console.error("[registerPushToken] Erreur backend:", err);
+              console.error("[registerPushToken] Erreur sauvegarde token:", err);
               finish(err, true);
             }
           });
@@ -231,18 +330,9 @@ export async function registerPushToken(livreurId = null, currentUser = null) {
       return null;
     }
 
-    const user = currentUser;
-    if (!user?.email) {
-      console.warn("[registerPushToken] Aucun utilisateur fourni pour le token web");
-      return null;
-    }
-    const token = `web_${user.email}_${Date.now()}`;
-
-    await base44.functions.invoke("enregistrerTokenPush", {
-      token,
-      platform: "web",
-      livreur_id: livreurId,
-    });
+    const identity = resolveNotificationIdentity(livreurId, currentUser);
+    const token = `web_${identity.user_email}_${Date.now()}`;
+    await persistPushToken({ token, platform: "web", livreurId: identity.livreur_id, currentUser });
 
     return token;
   } catch (error) {
@@ -252,20 +342,6 @@ export async function registerPushToken(livreurId = null, currentUser = null) {
 }
 
 export async function getCurrentFCMToken() {
-  const env = detectEnvironment();
-
-  if (env.isNative && env.os === "android") {
-    const PushNotifications = await getCapacitorPlugin("PushNotifications", "@capacitor/push-notifications");
-    if (PushNotifications) {
-      try {
-        const result = await PushNotifications.checkPermissions();
-        if (result.receive === "granted" || result.display === "granted") return null;
-      } catch (error) {
-        console.error("Erreur check token:", error);
-      }
-    }
-  }
-
   return null;
 }
 

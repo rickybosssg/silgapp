@@ -18,6 +18,10 @@
       "type": "string",
       "description": "Mot de passe du livreur"
     },
+    "code_identification": {
+      "type": "string",
+      "description": "Code court utilise par SILGAPP 2 pour connecter le livreur sans navigateur"
+    },
     "quartier": {
       "type": "string",
       "description": "Quartier principal d'activit\u00e9"

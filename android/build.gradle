@@ -4,6 +4,9 @@ buildscript {
     
     repositories {
         maven {
+            url uri("$rootDir/local-gradle-cache")
+        }
+        maven {
             url uri("$rootDir/local-maven")
             metadataSources {
                 mavenPom()
@@ -26,6 +29,9 @@ apply from: "variables.gradle"
 
 allprojects {
     repositories {
+        maven {
+            url uri("$rootDir/local-gradle-cache")
+        }
         maven {
             url uri("$rootDir/local-maven")
             metadataSources {

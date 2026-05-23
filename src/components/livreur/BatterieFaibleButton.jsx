@@ -27,7 +27,7 @@ export default function BatterieFaibleButton({ livreur }) {
         livreur_id: livreur.id,
         livreur_nom: `${livreur.prenom} ${livreur.nom}`,
         quartier: livreur.quartier,
-      }, "admin@silga.bf");
+      }, "admin@silgapp2.local");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["batterie-alertes"] });

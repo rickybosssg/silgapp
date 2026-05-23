@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { MapPin, Phone, Navigation, ArrowDown, Check, X, Package } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { MapPin, Phone, Navigation, Check, X, Package } from "lucide-react";
 
 function useVibration(active) {
   const intervalRef = useRef(null);
