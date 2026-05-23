@@ -17,6 +17,7 @@ const TestNotificationsPush = lazy(() => import('./pages/TestNotificationsPush')
 const TestLivreurCode = lazy(() => import('./pages/TestLivreurCode'));
 const DiagnosticAPK = lazy(() => import('./pages/DiagnosticAPK'));
 const DiagnosticCompletAPK = lazy(() => import('./pages/DiagnosticCompletAPK'));
+const DiagnosticBase44 = lazy(() => import('./pages/DiagnosticBase44'));
 
 export default function AuthenticatedRoutes({ isAdmin }) {
   return (
@@ -36,6 +37,7 @@ export default function AuthenticatedRoutes({ isAdmin }) {
         <Route path="/test-code-livreur" element={<TestLivreurCode />} />
         <Route path="/diagnostic-apk" element={<DiagnosticAPK />} />
         <Route path="/diagnostic-complet" element={<DiagnosticCompletAPK />} />
+        <Route path="/diagnostic-base44" element={<DiagnosticBase44 />} />
       </Route>
 
       <Route path="/livreur" element={<LivreurApp />} />
