@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import {
   clearIdentificationSession,
   getStoredIdentificationSession,
@@ -151,7 +151,7 @@ export const SilgappAuthProvider = ({ children }) => {
     console.log('[SilgappAuth] ✅ Logged out');
   };
 
-  return AuthContext.Provider({
+  return React.createElement(AuthContext.Provider, {
     value: { user, isAuthenticated, isLoadingAuth, authChecked, checkAppState, signInAsAdmin, signInWithIdentificationCode, logout },
     children,
   });
