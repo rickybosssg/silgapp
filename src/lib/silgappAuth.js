@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import {
   clearIdentificationSession,
   getStoredIdentificationSession,
   signInWithIdentificationCode as signInWithStoredIdentificationCode,
 } from '@/lib/codeIdentificationAuth';
 import { clearAllSessions } from '@/lib/capacitorStorage';
+
+const AuthContext = createContext(null);
 
 const ADMIN_SESSION_KEY = 'silgapp2_admin_session';
 const LEGACY_TOKEN_KEYS = ['base44_access_token', 'token', 'base44_token'];
@@ -53,7 +55,7 @@ const saveAdminSession = () => {
   }));
 };
 
-export const useSilgappAuth = () => {
+export const SilgappAuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
@@ -149,14 +151,16 @@ export const useSilgappAuth = () => {
     console.log('[SilgappAuth] ✅ Logged out');
   };
 
-  return {
-    user,
-    isAuthenticated,
-    isLoadingAuth,
-    authChecked,
-    checkAppState,
-    signInAsAdmin,
-    signInWithIdentificationCode,
-    logout,
-  };
+  return AuthContext.Provider({
+    value: { user, isAuthenticated, isLoadingAuth, authChecked, checkAppState, signInAsAdmin, signInWithIdentificationCode, logout },
+    children,
+  });
+};
+
+export const useSilgappAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useSilgappAuth must be used within a SilgappAuthProvider');
+  }
+  return context;
 };

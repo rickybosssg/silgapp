@@ -7,7 +7,7 @@ import Silgapp2Login from './pages/Silgapp2Login';
 import { queryClientInstance } from '@/lib/query-client';
 import { base44 } from '@/api/base44Client';
 import { Truck } from 'lucide-react';
-import { useSilgappAuth } from '@/lib/silgappAuth';
+import { SilgappAuthProvider, useSilgappAuth } from '@/lib/silgappAuth';
 
 const AuthenticatedRoutes = lazy(() => import('./AuthenticatedRoutes.jsx'));
 
@@ -80,10 +80,12 @@ const AuthenticatedApp = () => {
 function App() {
   return (
     <QueryClientProvider client={queryClientInstance}>
-      <Router>
-        <AuthenticatedApp />
-        <Toaster />
-      </Router>
+      <SilgappAuthProvider>
+        <Router>
+          <AuthenticatedApp />
+          <Toaster />
+        </Router>
+      </SilgappAuthProvider>
     </QueryClientProvider>
   );
 }
