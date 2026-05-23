@@ -2,10 +2,11 @@ import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
-  ChevronLeft, ChevronRight, Package, TrendingUp 
+  ChevronLeft, ChevronRight, Package, TrendingUp, LogOut 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/lib/AuthContext";
 
 const navItems = [
   { path: "/", label: "Tableau de bord", icon: LayoutDashboard },
@@ -22,6 +23,7 @@ const navItems = [
 export default function Sidebar({ notificationCount = 0 }) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const { logout } = useAuth();
 
   return (
     <aside className={cn(
@@ -77,6 +79,18 @@ export default function Sidebar({ notificationCount = 0 }) {
         className="h-12 flex items-center justify-center border-t border-border text-muted-foreground hover:text-foreground transition-colors"
       >
         {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+      </button>
+
+      {/* Logout button */}
+      <button
+        onClick={logout}
+        className={cn(
+          "h-12 flex items-center gap-3 px-4 text-sm font-medium transition-colors border-t border-border",
+          "text-destructive hover:bg-destructive/10"
+        )}
+      >
+        <LogOut className="w-4 h-4 flex-shrink-0" />
+        {!collapsed && <span>Déconnexion</span>}
       </button>
     </aside>
   );
