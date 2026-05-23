@@ -21,15 +21,25 @@ const getPreferences = async () => {
 export const saveSessionNative = async (sessionData) => {
   try {
     console.log('[CapacitorStorage] Saving session:', sessionData.livreur_id);
+    console.log('[CapacitorStorage] Session data:', JSON.stringify(sessionData));
     const Preferences = await getPreferences();
+    console.log('[CapacitorStorage] Calling Preferences.set...');
     await Preferences.set({
       key: SESSION_KEY,
       value: JSON.stringify(sessionData),
     });
     console.log('[CapacitorStorage] ✅ Session saved successfully');
+    
+    // Immediate verification
+    const { value } = await Preferences.get({ key: SESSION_KEY });
+    console.log('[CapacitorStorage] Immediate verification:', value ? '✅ Session found' : '❌ Session NOT found');
+    if (value) {
+      console.log('[CapacitorStorage] Verified content:', value.substring(0, 100) + '...');
+    }
+    
     return true;
   } catch (error) {
-    console.error('[CapacitorStorage] ❌ Failed to save session:', error);
+    console.error('[CapacitorStorage] ❌ Failed to save session:', error.message, error.stack);
     return false;
   }
 };

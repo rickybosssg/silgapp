@@ -41,15 +41,21 @@ const saveSession = async (livreur) => {
   
   const isNative = isCapacitorAvailable();
   console.log('[CodeIdentificationAuth] saveSession - isNative:', isNative);
+  console.log('[CodeIdentificationAuth] Session data to save:', JSON.stringify(sessionData));
   
   if (isNative) {
     console.log('[CodeIdentificationAuth] Using NATIVE storage (Capacitor Preferences)');
-    await saveSessionNative(sessionData);
+    const saveResult = await saveSessionNative(sessionData);
+    console.log('[CodeIdentificationAuth] Capacitor save result:', saveResult);
   } else {
     console.log('[CodeIdentificationAuth] Using WEB storage (localStorage)');
     try {
       localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
       console.log('[CodeIdentificationAuth] Session saved to localStorage');
+      
+      // Immediate verification
+      const verify = localStorage.getItem(SESSION_KEY);
+      console.log('[CodeIdentificationAuth] Immediate verification:', verify ? '✅ Session found' : '❌ Session NOT found');
     } catch (error) {
       console.error('[CodeIdentificationAuth] localStorage save failed:', error);
     }
@@ -70,33 +76,40 @@ export const findLivreurByIdentificationCode = async (code) => {
     return null;
   }
 
-  console.log('[CodeIdentificationAuth] findLivreurByIdentificationCode - code:', normalizedCode);
+  console.log('[CodeIdentificationAuth] ========== FIND LIVREUR START ==========');
+  console.log('[CodeIdentificationAuth] Code normalized:', normalizedCode);
   console.log('[CodeIdentificationAuth] isNativeLivreurRuntime:', isNativeLivreurRuntime());
 
   if (isNativeLivreurRuntime()) {
     console.log('[CodeIdentificationAuth] Using NATIVE path (verifyNativeLivreurCode)');
     try {
+      console.log('[CodeIdentificationAuth] Calling verifyNativeLivreurCode...');
       const livreur = await verifyNativeLivreurCode(normalizedCode);
-      console.log('[CodeIdentificationAuth] Native path result:', livreur ? `SUCCESS - ${livreur.nom} ${livreur.prenom}` : 'FAILED - null');
+      console.log('[CodeIdentificationAuth] Native path result:', livreur ? `SUCCESS - ${livreur.nom} ${livreur.prenom} (ID: ${livreur.id})` : 'FAILED - null');
+      console.log('[CodeIdentificationAuth] ========== FIND LIVREUR END ==========');
       return livreur;
     } catch (error) {
       console.error('[CodeIdentificationAuth] Native path exception:', error.message);
+      console.log('[CodeIdentificationAuth] ========== FIND LIVREUR FAILED ==========');
       throw error;
     }
   }
 
   console.log('[CodeIdentificationAuth] Using WEB path (findLivreurByCode)');
   try {
-    console.log('[CodeIdentificationAuth] Calling backend function findLivreurByCode:', normalizedCode);
+    console.log('[CodeIdentificationAuth] Calling backend function findLivreurByCode...');
     const response = await base44.functions.invoke('findLivreurByCode', { code: normalizedCode });
-    console.log('[CodeIdentificationAuth] Backend response:', response);
+    console.log('[CodeIdentificationAuth] Backend function called');
+    console.log('[CodeIdentificationAuth] Backend response:', JSON.stringify(response));
     
     if (response?.success === true && response?.livreur) {
-      console.log('[CodeIdentificationAuth] ✅ Backend returned livreur:', response.livreur.nom);
+      console.log('[CodeIdentificationAuth] ✅ Backend returned livreur:', response.livreur.nom, response.livreur.prenom);
+      console.log('[CodeIdentificationAuth] Code in DB:', response.livreur.code_identification);
+      console.log('[CodeIdentificationAuth] ========== FIND LIVREUR SUCCESS ==========');
       return response.livreur;
     }
     
-    console.log('[CodeIdentificationAuth] Backend returned no livreur, trying fallback...');
+    console.log('[CodeIdentificationAuth] Backend returned no livreur (success:', response?.success, ')');
     throw new Error('Backend returned no livreur');
   } catch (error) {
     console.warn('[CodeIdentificationAuth] Backend lookup failed:', error?.message);
@@ -105,11 +118,15 @@ export const findLivreurByIdentificationCode = async (code) => {
       console.log('[CodeIdentificationAuth] Fallback: direct filter...');
       const directMatches = await base44.asServiceRole.entities.Livreur.filter({ code_identification: normalizedCode });
       console.log('[CodeIdentificationAuth] Fallback filter results:', directMatches?.length);
+      if (directMatches && directMatches.length > 0) {
+        console.log('[CodeIdentificationAuth] First match:', directMatches[0].nom, directMatches[0].code_identification);
+      }
       const directMatch = directMatches?.find(
         (livreur) => normalizeCode(livreur.code_identification) === normalizedCode
       );
       if (directMatch) {
         console.log('[CodeIdentificationAuth] ✅ Fallback filter succeeded:', directMatch.nom);
+        console.log('[CodeIdentificationAuth] ========== FIND LIVREUR SUCCESS (FALLBACK) ==========');
         return directMatch;
       }
     } catch (fallbackError) {
@@ -117,9 +134,11 @@ export const findLivreurByIdentificationCode = async (code) => {
     }
 
     console.log('[CodeIdentificationAuth] Fallback: list predicate...');
-    return findLivreurByPredicate(
+    const result = findLivreurByPredicate(
       (livreur) => normalizeCode(livreur.code_identification) === normalizedCode
     );
+    console.log('[CodeIdentificationAuth] ========== FIND LIVREUR END ==========');
+    return result;
   }
 };
 
@@ -130,6 +149,7 @@ export const signInWithIdentificationCode = async (code) => {
   const livreur = await findLivreurByIdentificationCode(code);
   if (!livreur) {
     console.error('[CodeIdentificationAuth] ❌ FAILED - No livreur found with code:', code);
+    console.log('[CodeIdentificationAuth] Backend response: NULL');
     console.log('[CodeIdentificationAuth] ========== SIGN IN FAILED ==========');
     const error = new Error("Code d'identification incorrect.");
     error.code = 'invalid_identification_code';
@@ -137,6 +157,7 @@ export const signInWithIdentificationCode = async (code) => {
   }
 
   console.log('[CodeIdentificationAuth] ✅ Livreur found:', livreur.nom, livreur.prenom, '(ID:', livreur.id + ')');
+  console.log('[CodeIdentificationAuth] Code registered:', livreur.code_identification);
   console.log('[CodeIdentificationAuth] Validation status:', livreur.validation);
   console.log('[CodeIdentificationAuth] Account active:', livreur.actif);
   
@@ -156,6 +177,7 @@ export const signInWithIdentificationCode = async (code) => {
     throw error;
   }
 
+  console.log('[CodeIdentificationAuth] Saving session...');
   await saveSession(livreur);
   const user = toCodeUser(livreur);
   console.log('[CodeIdentificationAuth] ✅ Session saved for:', user.full_name);

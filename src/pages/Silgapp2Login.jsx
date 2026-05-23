@@ -1,11 +1,13 @@
-import { useState } from 'react';
-import { KeyRound, LogIn, ShieldCheck, Truck } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { KeyRound, LogIn, ShieldCheck, Truck, Activity, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSilgappAuth } from '@/lib/silgappAuth';
+import { isCapacitorAvailable } from '@/lib/capacitorStorage';
+import { getSessionNative } from '@/lib/capacitorStorage';
 
 export default function Silgapp2Login() {
   const { signInAsAdmin, signInWithIdentificationCode, isLoadingAuth } = useSilgappAuth();
@@ -14,23 +16,70 @@ export default function Silgapp2Login() {
   const [adminPin, setAdminPin] = useState('');
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
+  
+  // Debug state for APK
+  const [debugLogs, setDebugLogs] = useState([]);
+  const [isCapacitor, setIsCapacitor] = useState(false);
+  
+  useEffect(() => {
+    const capacitorStatus = isCapacitorAvailable();
+    setIsCapacitor(capacitorStatus);
+    addLog('INIT', `APK Mode: ${capacitorStatus ? 'NATIVE' : 'WEB'}`);
+  }, []);
+  
+  const addLog = (step, message, data = null) => {
+    const timestamp = new Date().toLocaleTimeString('fr-FR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
+    setDebugLogs(prev => [...prev, { timestamp, step, message, data }]);
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (isLoadingAuth) return;
 
+    setDebugLogs([]);
+    setError('');
+    
+    addLog('START', `Connexion ${mode} demandée`);
+    
+    if (mode === 'livreur') {
+      addLog('CODE', `Code saisi: "${code}"`);
+      addLog('CAPACITOR', `Disponible: ${isCapacitor}`);
+    }
+
     try {
-      setError('');
       if (mode === 'admin') {
+        addLog('ADMIN', `Tentative avec identifier: "${adminIdentifier}"`);
         await signInAsAdmin({ identifier: adminIdentifier, pin: adminPin });
+        addLog('SUCCESS', 'Connexion admin réussie');
         toast.success('Connexion admin reussie');
         return;
       }
 
-      await signInWithIdentificationCode(code);
+      addLog('LIVREUR', 'Appel à signInWithIdentificationCode...');
+      const user = await signInWithIdentificationCode(code);
+      
+      addLog('USER_FOUND', `Livreur trouvé: ${user.full_name}`);
+      addLog('USER_DATA', null, {
+        id: user.id,
+        role: user.role,
+        livreur_id: user.livreur_id,
+        code_identification: user.code_identification
+      });
+      
+      // Re-read session immediately
+      if (isCapacitor) {
+        const session = await getSessionNative();
+        addLog('SESSION_REREAD', session ? '✅ Session lue après sauvegarde' : '❌ Session NON trouvée', session);
+      } else {
+        const sessionRaw = localStorage.getItem('silgapp_code_identification_session');
+        addLog('SESSION_REREAD', sessionRaw ? '✅ Session lue après sauvegarde' : '❌ Session NON trouvée');
+      }
+      
+      addLog('REDIRECT', 'Redirection vers dashboard livreur...');
       toast.success('Connexion livreur reussie');
     } catch (authError) {
       const message = authError?.message || 'Connexion impossible.';
+      addLog('ERROR', `Échec: ${message}`, { code: authError?.code });
       setError(message);
       toast.error(message);
     }
@@ -124,10 +173,69 @@ export default function Silgapp2Login() {
             className="w-full h-14 bg-red-600 hover:bg-red-700 rounded-xl text-base font-bold"
             disabled={isLoadingAuth || (mode === 'livreur' ? !code.trim() : !adminIdentifier.trim() || !adminPin.trim())}
           >
-            <LogIn className="w-5 h-5 mr-2" />
+            {isLoadingAuth ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <LogIn className="w-5 h-5 mr-2" />}
             {isLoadingAuth ? 'Connexion...' : 'Se connecter'}
           </Button>
         </form>
+
+        {/* DEBUG PANEL - APK ONLY */}
+        {mode === 'livreur' && debugLogs.length > 0 && (
+          <div className="rounded-xl bg-slate-900/50 border border-slate-700 p-4 space-y-2">
+            <div className="flex items-center gap-2 mb-3">
+              <Activity className="w-4 h-4 text-blue-400" />
+              <h3 className="text-sm font-bold text-blue-400">DEBUG APK - Flux de connexion</h3>
+            </div>
+            
+            <div className="max-h-96 overflow-y-auto space-y-1.5 text-xs font-mono">
+              {debugLogs.map((log, idx) => (
+                <div key={idx} className="flex gap-2 items-start">
+                  <span className="text-slate-500 shrink-0">[{log.timestamp}]</span>
+                  <span className={`shrink-0 font-bold ${
+                    log.step === 'ERROR' ? 'text-red-400' :
+                    log.step === 'SUCCESS' ? 'text-green-400' :
+                    log.step === 'CODE' || log.step === 'LIVREUR' ? 'text-yellow-400' :
+                    'text-blue-400'
+                  }`}>
+                    {log.step}:
+                  </span>
+                  <span className="text-slate-300 break-all">{log.message}</span>
+                </div>
+              ))}
+              
+              {debugLogs.some(log => log.step === 'USER_DATA') && (
+                <div className="pt-2 mt-2 border-t border-slate-700">
+                  <div className="text-green-400 font-bold mb-1">📊 Données session:</div>
+                  {(() => {
+                    const userDataLog = debugLogs.find(log => log.step === 'USER_DATA');
+                    return userDataLog?.data ? (
+                      <div className="space-y-1 text-slate-400">
+                        <div>ID: <span className="text-white">{userDataLog.data.id}</span></div>
+                        <div>Role: <span className="text-white">{userDataLog.data.role}</span></div>
+                        <div>Livreur ID: <span className="text-white">{userDataLog.data.livreur_id}</span></div>
+                        <div>Code: <span className="text-white">{userDataLog.data.code_identification}</span></div>
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+              )}
+              
+              {debugLogs.some(log => log.step === 'SESSION_REREAD') && (
+                <div className="pt-2 mt-2 border-t border-slate-700">
+                  {(() => {
+                    const sessionLog = debugLogs.find(log => log.step === 'SESSION_REREAD');
+                    const isSuccess = sessionLog?.message?.includes('✅');
+                    return (
+                      <div className={`font-bold ${isSuccess ? 'text-green-400' : 'text-red-400'}`}>
+                        {isSuccess ? <CheckCircle2 className="w-3 h-3 inline mr-1" /> : <XCircle className="w-3 h-3 inline mr-1" />}
+                        {sessionLog?.message}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
