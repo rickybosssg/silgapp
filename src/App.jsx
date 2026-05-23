@@ -2,12 +2,12 @@ import { Suspense, lazy } from 'react';
 import { Toaster } from '@/components/ui/toaster';
 import { QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { BrowserRouter as Router } from 'react-router-dom';
-import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import Silgapp2Login from './pages/Silgapp2Login';
 import { queryClientInstance } from '@/lib/query-client';
 import { base44 } from '@/api/base44Client';
 import { Truck } from 'lucide-react';
+import { useSilgappAuth } from '@/lib/silgappAuth';
 
 const AuthenticatedRoutes = lazy(() => import('./AuthenticatedRoutes.jsx'));
 
@@ -43,7 +43,7 @@ const UnauthorizedLivreur = ({ user, logout }) => (
 );
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, user, isAuthenticated, logout } = useAuth();
+  const { isLoadingAuth, authChecked, user, isAuthenticated, logout } = useSilgappAuth();
   const isAdmin = user?.role === 'admin';
 
   const { data: livreurMatch, isLoading: isLoadingLivreur } = useQuery({
@@ -54,15 +54,15 @@ const AuthenticatedApp = () => {
   });
   const resolvedLivreurMatch = user?.livreur || livreurMatch;
 
-  if (isLoadingPublicSettings || isLoadingAuth || (!isAdmin && isAuthenticated && !user?.livreur && isLoadingLivreur)) {
+  if (isLoadingAuth) {
     return <LoadingScreen />;
   }
 
-  if (authError) {
-    if (authError.type === 'user_not_registered') {
-      return <UserNotRegisteredError />;
-    }
+  if (!authChecked) {
+    return <LoadingScreen />;
+  }
 
+  if (!isAuthenticated) {
     return <Silgapp2Login />;
   }
 
@@ -79,14 +79,12 @@ const AuthenticatedApp = () => {
 
 function App() {
   return (
-    <AuthProvider>
-      <QueryClientProvider client={queryClientInstance}>
-        <Router>
-          <AuthenticatedApp />
-        </Router>
+    <QueryClientProvider client={queryClientInstance}>
+      <Router>
+        <AuthenticatedApp />
         <Toaster />
-      </QueryClientProvider>
-    </AuthProvider>
+      </Router>
+    </QueryClientProvider>
   );
 }
 

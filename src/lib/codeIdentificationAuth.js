@@ -1,5 +1,6 @@
 import { base44 } from '@/api/base44Client';
 import { isNativeLivreurRuntime, verifyNativeLivreurCode } from '@/lib/nativeLivreurApi';
+import { saveSessionNative, getSessionNative, removeSessionNative, isCapacitorAvailable } from '@/lib/capacitorStorage';
 
 const SESSION_KEY = 'silgapp_code_identification_session';
 
@@ -28,7 +29,7 @@ const toCodeUser = (livreur) => ({
   livreur,
 });
 
-const saveSession = (livreur) => {
+const saveSession = async (livreur) => {
   const sessionData = {
     livreur_id: livreur.id,
     nom: getLivreurName(livreur),
@@ -38,12 +39,23 @@ const saveSession = (livreur) => {
     created_at: new Date().toISOString(),
   };
   
-  try {
-    localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
-    console.log('[CodeIdentificationAuth] Session saved:', sessionData.livreur_id, sessionData.code_identification);
-  } catch (error) {
-    console.error('[CodeIdentificationAuth] Failed to save session:', error);
+  const isNative = isCapacitorAvailable();
+  console.log('[CodeIdentificationAuth] saveSession - isNative:', isNative);
+  
+  if (isNative) {
+    console.log('[CodeIdentificationAuth] Using NATIVE storage (Capacitor Preferences)');
+    await saveSessionNative(sessionData);
+  } else {
+    console.log('[CodeIdentificationAuth] Using WEB storage (localStorage)');
+    try {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
+      console.log('[CodeIdentificationAuth] Session saved to localStorage');
+    } catch (error) {
+      console.error('[CodeIdentificationAuth] localStorage save failed:', error);
+    }
   }
+  
+  console.log('[CodeIdentificationAuth] ✅ Session saved for:', sessionData.livreur_id, sessionData.code_identification);
 };
 
 const findLivreurByPredicate = async (predicate) => {
@@ -135,7 +147,7 @@ export const signInWithIdentificationCode = async (code) => {
     throw error;
   }
 
-  saveSession(livreur);
+  await saveSession(livreur);
   const user = toCodeUser(livreur);
   console.log('[CodeIdentificationAuth] ✅ Session saved for:', user.full_name);
   console.log('[CodeIdentificationAuth] ✅ User object created:', {
@@ -150,29 +162,48 @@ export const signInWithIdentificationCode = async (code) => {
 
 export const getStoredIdentificationSession = async () => {
   console.log('[CodeIdentificationAuth] ========== SESSION RESTORE CHECK ==========');
-  let rawSession = null;
+  const isNative = isCapacitorAvailable();
+  console.log('[CodeIdentificationAuth] isNative:', isNative);
   
-  try {
-    rawSession = localStorage.getItem(SESSION_KEY);
-    if (rawSession) {
-      console.log('[CodeIdentificationAuth] ✅ Raw session found in localStorage:', rawSession.substring(0, 100) + '...');
-    } else {
-      console.log('[CodeIdentificationAuth] ❌ No session in localStorage');
-      console.log('[CodeIdentificationAuth] ========== SESSION RESTORE: NO SESSION ==========');
+  let session = null;
+  
+  if (isNative) {
+    console.log('[CodeIdentificationAuth] Using NATIVE storage (Capacitor Preferences)');
+    try {
+      session = await getSessionNative();
+      if (session) {
+        console.log('[CodeIdentificationAuth] ✅ Session found in Capacitor:', session.livreur_id);
+      } else {
+        console.log('[CodeIdentificationAuth] ❌ No session in Capacitor');
+      }
+    } catch (error) {
+      console.error('[CodeIdentificationAuth] Capacitor session read failed:', error?.message);
+      console.log('[CodeIdentificationAuth] ========== SESSION RESTORE FAILED ==========');
       return null;
     }
-  } catch (error) {
-    console.error('[CodeIdentificationAuth] Session read failed:', error?.message);
-    console.log('[CodeIdentificationAuth] ========== SESSION RESTORE FAILED ==========');
-    return null;
+  } else {
+    console.log('[CodeIdentificationAuth] Using WEB storage (localStorage)');
+    try {
+      const rawSession = localStorage.getItem(SESSION_KEY);
+      if (rawSession) {
+        console.log('[CodeIdentificationAuth] ✅ Raw session found in localStorage:', rawSession.substring(0, 100) + '...');
+        session = JSON.parse(rawSession);
+      } else {
+        console.log('[CodeIdentificationAuth] ❌ No session in localStorage');
+      }
+    } catch (error) {
+      console.error('[CodeIdentificationAuth] localStorage read failed:', error?.message);
+      console.log('[CodeIdentificationAuth] ========== SESSION RESTORE FAILED ==========');
+      return null;
+    }
   }
   
-  if (!rawSession) {
+  if (!session) {
+    console.log('[CodeIdentificationAuth] ========== SESSION RESTORE: NO SESSION ==========');
     return null;
   }
 
   try {
-    const session = JSON.parse(rawSession);
     console.log('[CodeIdentificationAuth] Parsed session:', JSON.stringify(session, null, 2));
     
     if (!session?.livreur_id) {
@@ -199,7 +230,7 @@ export const getStoredIdentificationSession = async () => {
       return null;
     }
 
-    saveSession(livreur);
+    await saveSession(livreur);
     const user = toCodeUser(livreur);
     console.log('[CodeIdentificationAuth] ✅ Session restored successfully for:', user.full_name, user.code_identification);
     console.log('[CodeIdentificationAuth] ========== SESSION RESTORE SUCCESS ==========');
@@ -212,13 +243,24 @@ export const getStoredIdentificationSession = async () => {
   }
 };
 
-export const clearIdentificationSession = () => {
-  try {
-    localStorage.removeItem(SESSION_KEY);
-    console.log('[CodeIdentificationAuth] Session cleared');
-  } catch (error) {
-    console.error('[CodeIdentificationAuth] Failed to clear session:', error);
+export const clearIdentificationSession = async () => {
+  const isNative = isCapacitorAvailable();
+  console.log('[CodeIdentificationAuth] clearIdentificationSession - isNative:', isNative);
+  
+  if (isNative) {
+    console.log('[CodeIdentificationAuth] Using NATIVE storage clear (Capacitor Preferences)');
+    await removeSessionNative();
+  } else {
+    console.log('[CodeIdentificationAuth] Using WEB storage clear (localStorage)');
+    try {
+      localStorage.removeItem(SESSION_KEY);
+      console.log('[CodeIdentificationAuth] localStorage session cleared');
+    } catch (error) {
+      console.error('[CodeIdentificationAuth] localStorage clear failed:', error);
+    }
   }
+  
+  console.log('[CodeIdentificationAuth] ✅ Session cleared');
 };
 
 export const isIdentificationCodeAlreadyUsed = async (code, ignoredLivreurId = null) => {

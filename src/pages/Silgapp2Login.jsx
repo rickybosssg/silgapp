@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useAuth } from '@/lib/AuthContext';
+import { useSilgappAuth } from '@/lib/silgappAuth';
 
 export default function Silgapp2Login() {
-  const { signInAsAdmin, signInWithIdentificationCode, isLoadingAuth } = useAuth();
+  const { signInAsAdmin, signInWithIdentificationCode, isLoadingAuth } = useSilgappAuth();
   const [mode, setMode] = useState('livreur');
   const [adminIdentifier, setAdminIdentifier] = useState('admin');
   const [adminPin, setAdminPin] = useState('');
