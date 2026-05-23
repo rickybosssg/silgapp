@@ -6,6 +6,12 @@ import { Truck } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/AuthContext";
 import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
+import {
+  getNativeLivreurState,
+  isNativeLivreurRuntime,
+  updateNativeLivreur,
+  updateNativeLivreurCourse,
+} from "@/lib/nativeLivreurApi";
 
 import LivreurHeader from "@/components/livreur/LivreurHeader";
 import LivreurStatsBanner from "@/components/livreur/LivreurStatsBanner";
@@ -21,6 +27,7 @@ export default function LivreurApp() {
   const navigate = useNavigate();
   const { user, isAuthenticated, isLoadingAuth, logout } = useAuth();
   const [activeTab, setActiveTab] = useState("courses");
+  const isNativeLivreur = isNativeLivreurRuntime();
 
   // Rediriger les admins
   useEffect(() => {
@@ -29,9 +36,17 @@ export default function LivreurApp() {
     }
   }, [isLoadingAuth, isAuthenticated, user, navigate]);
 
+  const { data: nativeState } = useQuery({
+    queryKey: ["native-livreur-state", user?.livreur_id],
+    queryFn: () => getNativeLivreurState(user.livreur_id),
+    enabled: isNativeLivreur && !!user?.livreur_id,
+    refetchInterval: 5000,
+  });
+
   const { data: livreurProfil } = useQuery({
-    queryKey: ["livreur-profil", user?.livreur_id || user?.email],
+    queryKey: ["livreur-profil", user?.livreur_id || user?.email, isNativeLivreur],
     queryFn: async () => {
+      if (isNativeLivreur) return [nativeState?.livreur || user?.livreur].filter(Boolean);
       if (user?.livreur) return [user.livreur];
       if (!user?.email) return [];
       const direct = await base44.entities.Livreur.filter({ user_email: user.email });
@@ -43,6 +58,12 @@ export default function LivreurApp() {
     refetchInterval: 10000,
     select: (data) => data[0] || null,
   });
+
+  useEffect(() => {
+    if (isNativeLivreur && nativeState?.livreur) {
+      queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
+    }
+  }, [isNativeLivreur, nativeState?.livreur?.id, nativeState?.livreur?.statut, nativeState?.livreur?.updated_date, queryClient]);
 
   useEffect(() => {
     if (livreurProfil?.actif === false) {
@@ -80,13 +101,14 @@ export default function LivreurApp() {
     setupNotifications();
   }, [livreurProfil?.id, user?.email, livreurProfil?.user_email]);
 
-  const { data: mesCourses = [] } = useQuery({
-    queryKey: ["mes-courses", livreurProfil?.id],
+  const { data: webMesCourses = [] } = useQuery({
+    queryKey: ["mes-courses", livreurProfil?.id, isNativeLivreur],
     queryFn: () => base44.entities.Course.filter({ livreur_id: livreurProfil.id }, "-created_date", 50),
-    enabled: !!livreurProfil?.id,
+    enabled: !!livreurProfil?.id && !isNativeLivreur,
     initialData: [],
     refetchInterval: 5000,
   });
+  const mesCourses = isNativeLivreur ? (nativeState?.courses || []) : webMesCourses;
 
   const courseEnAttente = useMemo(() => mesCourses.find(c => c.statut === "en_attente_livreur"), [mesCourses]);
   const coursesActives = useMemo(() => mesCourses.filter(c => ["acceptee", "colis_recupere", "en_livraison"].includes(c.statut)), [mesCourses]);
@@ -99,13 +121,25 @@ export default function LivreurApp() {
   }, [mesCourses]);
 
   const toggleDispoMutation = useMutation({
-    mutationFn: (newStatut) => base44.entities.Livreur.update(livreurProfil.id, { statut: newStatut }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["livreur-profil"] }),
+    mutationFn: (newStatut) => (
+      isNativeLivreur
+        ? updateNativeLivreur(livreurProfil.id, { statut: newStatut })
+        : base44.entities.Livreur.update(livreurProfil.id, { statut: newStatut })
+    ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["native-livreur-state"] });
+      queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
+    },
   });
 
   const updateCourseMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Course.update(id, data),
+    mutationFn: ({ id, data }) => (
+      isNativeLivreur
+        ? updateNativeLivreurCourse(livreurProfil.id, id, data)
+        : base44.entities.Course.update(id, data)
+    ),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["native-livreur-state"] });
       queryClient.invalidateQueries({ queryKey: ["mes-courses"] });
       queryClient.invalidateQueries({ queryKey: ["courses"] });
     },
@@ -113,7 +147,11 @@ export default function LivreurApp() {
 
   const handleAccepter = (course) => {
     updateCourseMutation.mutate({ id: course.id, data: { statut: "acceptee", heure_acceptation: new Date().toISOString() } });
-    base44.entities.Livreur.update(livreurProfil.id, { statut: "en_course" });
+    if (isNativeLivreur) {
+      updateNativeLivreur(livreurProfil.id, { statut: "en_course" });
+    } else {
+      base44.entities.Livreur.update(livreurProfil.id, { statut: "en_course" });
+    }
     toast.success("Course acceptée ! 🚀");
   };
 
@@ -129,14 +167,22 @@ export default function LivreurApp() {
 
   const handleColisLivre = (course, prixReel) => {
     updateCourseMutation.mutate({ id: course.id, data: { statut: "livree", heure_livraison: new Date().toISOString(), prix_reel: prixReel } });
-    base44.entities.Livreur.update(livreurProfil.id, { statut: "disponible" });
+    if (isNativeLivreur) {
+      updateNativeLivreur(livreurProfil.id, { statut: "disponible" });
+    } else {
+      base44.entities.Livreur.update(livreurProfil.id, { statut: "disponible" });
+    }
     queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
     toast.success(`Livraison terminée ! 🎉 ${prixReel.toLocaleString()} FCFA encaissés`);
   };
 
   const handleClientAnnule = (course) => {
     updateCourseMutation.mutate({ id: course.id, data: { statut: "annulee", remarque_livreur: "Annulé par le client" } });
-    base44.entities.Livreur.update(livreurProfil.id, { statut: "disponible" });
+    if (isNativeLivreur) {
+      updateNativeLivreur(livreurProfil.id, { statut: "disponible" });
+    } else {
+      base44.entities.Livreur.update(livreurProfil.id, { statut: "disponible" });
+    }
     queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
     toast("Course annulée par le client");
   };
@@ -151,11 +197,16 @@ export default function LivreurApp() {
     const updatePos = () => {
       navigator.geolocation?.getCurrentPosition(
         (pos) => {
-          base44.entities.Livreur.update(livreurProfil.id, {
+          const positionData = {
             latitude: pos.coords.latitude,
             longitude: pos.coords.longitude,
             derniere_position_date: new Date().toISOString(),
-          });
+          };
+          if (isNativeLivreur) {
+            updateNativeLivreur(livreurProfil.id, positionData);
+          } else {
+            base44.entities.Livreur.update(livreurProfil.id, positionData);
+          }
         },
         () => {},
         { enableHighAccuracy: true }
@@ -164,7 +215,7 @@ export default function LivreurApp() {
     updatePos();
     const interval = setInterval(updatePos, 30000);
     return () => clearInterval(interval);
-  }, [livreurProfil?.id, livreurProfil?.statut]);
+  }, [livreurProfil?.id, livreurProfil?.statut, isNativeLivreur]);
 
   // ---- LOADING ----
   if (isLoadingAuth) {

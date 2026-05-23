@@ -12,6 +12,7 @@ const CORRUPT_VALUES = ['null', 'undefined', '', 'NaN'];
 const isValidValue = (v) => v && !CORRUPT_VALUES.includes(String(v).trim());
 
 export const BASE44_SERVER_URL = 'https://app.base44.com';
+export const BASE44_APP_ID = '6a0ec08f3af5e1d1284254c1';
 export const APP_PUBLIC_URL =
 	import.meta.env.VITE_BASE44_APP_PUBLIC_URL ||
 	import.meta.env.VITE_BASE44_APP_BASE_URL ||
@@ -78,7 +79,7 @@ const getAppParams = () => {
 		: APP_PUBLIC_URL;
 
 	return {
-		appId: getAppParamValue("app_id", { defaultValue: import.meta.env.VITE_BASE44_APP_ID || "silgapp" }),
+		appId: getAppParamValue("app_id", { defaultValue: import.meta.env.VITE_BASE44_APP_ID || BASE44_APP_ID }),
 		token: getAppParamValue("access_token", { removeFromUrl: true }),
 		fromUrl: safeHref,
 		functionsVersion: getAppParamValue("functions_version", { defaultValue: import.meta.env.VITE_BASE44_FUNCTIONS_VERSION }),

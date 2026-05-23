@@ -1,4 +1,5 @@
 import { base44 } from '@/api/base44Client';
+import { isNativeLivreurRuntime, verifyNativeLivreurCode } from '@/lib/nativeLivreurApi';
 
 const SESSION_KEY = 'silgapp_code_identification_session';
 
@@ -53,6 +54,10 @@ const findLivreurByPredicate = async (predicate) => {
 export const findLivreurByIdentificationCode = async (code) => {
   const normalizedCode = normalizeCode(code);
   if (!normalizedCode) return null;
+
+  if (isNativeLivreurRuntime()) {
+    return verifyNativeLivreurCode(normalizedCode);
+  }
 
   try {
     const directMatches = await base44.entities.Livreur.filter({ code_identification: normalizedCode });
