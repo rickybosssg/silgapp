@@ -60,18 +60,27 @@ export const findLivreurByIdentificationCode = async (code) => {
   }
 
   try {
-    const directMatches = await base44.entities.Livreur.filter({ code_identification: normalizedCode });
-    const directMatch = directMatches?.find(
+    console.log('[CodeIdentificationAuth] Calling backend function findLivreurByCode:', normalizedCode);
+    const response = await base44.functions.invoke('findLivreurByCode', { code: normalizedCode });
+    console.log('[CodeIdentificationAuth] Backend response:', response.data);
+    return response.data || null;
+  } catch (error) {
+    console.warn('[CodeIdentificationAuth] Backend lookup failed:', error?.message);
+    
+    try {
+      const directMatches = await base44.entities.Livreur.filter({ code_identification: normalizedCode });
+      const directMatch = directMatches?.find(
+        (livreur) => normalizeCode(livreur.code_identification) === normalizedCode
+      );
+      if (directMatch) return directMatch;
+    } catch (fallbackError) {
+      console.warn('[CodeIdentificationAuth] Fallback list lookup also failed:', fallbackError?.message);
+    }
+
+    return findLivreurByPredicate(
       (livreur) => normalizeCode(livreur.code_identification) === normalizedCode
     );
-    if (directMatch) return directMatch;
-  } catch (error) {
-    console.warn('[CodeIdentificationAuth] Direct lookup failed, falling back to list:', error?.message);
   }
-
-  return findLivreurByPredicate(
-    (livreur) => normalizeCode(livreur.code_identification) === normalizedCode
-  );
 };
 
 export const signInWithIdentificationCode = async (code) => {
