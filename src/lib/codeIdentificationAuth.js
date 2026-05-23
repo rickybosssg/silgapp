@@ -70,6 +70,12 @@ export const signInWithIdentificationCode = async (code) => {
     throw error;
   }
 
+  if (livreur.validation !== 'valide') {
+    const error = new Error("Compte livreur non valide. Attendez la validation de l'administrateur.");
+    error.code = 'invalid_livreur_validation';
+    throw error;
+  }
+
   if (livreur.actif === false) {
     const error = new Error("Compte livreur desactive. Contactez l'administrateur.");
     error.code = 'disabled_livreur';
