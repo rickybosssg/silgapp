@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { KeyRound, User, Upload } from "lucide-react";
+import { KeyRound, User, Upload, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { isIdentificationCodeAlreadyUsed } from "@/lib/codeIdentificationAuth";
 
@@ -20,6 +20,12 @@ const emptyForm = {
   vehicule: "moto",
   photo_url: "",
   actif: true,
+};
+
+const generateCode = (nom, telephone) => {
+  const nomPart = nom.substring(0, 3).toUpperCase();
+  const telPart = telephone.replace(/\D/g, "").slice(-3);
+  return `LVR-${nomPart}${telPart}`;
 };
 
 export default function LivreurFormDialog({ open, onClose, livreur }) {
@@ -44,6 +50,16 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
       setForm(emptyForm);
     }
   }, [livreur, open]);
+
+  const autoGenerateCode = () => {
+    if (form.nom && form.telephone) {
+      const newCode = generateCode(form.nom, form.telephone);
+      setForm((p) => ({ ...p, code_identification: newCode }));
+      toast.success("Code généré automatiquement");
+    } else {
+      toast.error("Veuillez remplir le nom et le téléphone d'abord");
+    }
+  };
 
   const mutation = useMutation({
     mutationFn: (data) =>
@@ -136,7 +152,19 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs">Code d'identification *</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Code d'identification *</Label>
+              {!isEdit && (
+                <button
+                  type="button"
+                  onClick={autoGenerateCode}
+                  className="text-[10px] text-primary hover:underline flex items-center gap-1"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  Générer auto.
+                </button>
+              )}
+            </div>
             <div className="relative">
               <KeyRound className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input

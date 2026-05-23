@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Truck, Phone, MapPin, Check, X, Clock, UserCheck, Copy, Banknote, Plus, Pencil, UserX, Trash2, BatteryWarning } from "lucide-react";
+import { Truck, Phone, MapPin, Check, X, Clock, UserCheck, Copy, Banknote, Plus, Pencil, UserX, Trash2, BatteryWarning, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -269,6 +269,15 @@ export default function Livreurs() {
     toast.success(`Paiement de ${montant.toLocaleString()} FCFA validé ✅`);
   };
 
+  const genererCodesMutation = useMutation({
+    mutationFn: () => base44.functions.invoke("genererCodesLivreurs", {}),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["livreurs"] });
+      toast.success(`${data.results?.length || 0} codes générés avec succès`);
+    },
+    onError: () => toast.error("Erreur lors de la génération des codes"),
+  });
+
   const enAttente = livreurs.filter(l => l.validation === "en_attente" || !l.validation);
   const valides = livreurs.filter(l => l.validation === "valide");
   const refuses = livreurs.filter(l => l.validation === "refuse");
@@ -294,6 +303,13 @@ export default function Livreurs() {
             onClick={() => { navigator.clipboard.writeText(inscriptionLink); toast.success("Lien copié !"); }}
           >
             <Copy className="w-3.5 h-3.5" /> Copier lien inscription
+          </Button>
+          <Button
+            variant="outline" size="sm" className="gap-1.5 text-xs"
+            onClick={() => genererCodesMutation.mutate()}
+            disabled={genererCodesMutation.isPending}
+          >
+            <KeyRound className="w-3.5 h-3.5" /> {genererCodesMutation.isPending ? "Génération..." : "Générer codes"}
           </Button>
           <Button
             size="sm" className="gap-1.5 text-xs bg-primary"
