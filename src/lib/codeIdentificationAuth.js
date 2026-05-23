@@ -89,25 +89,34 @@ export const findLivreurByIdentificationCode = async (code) => {
   try {
     console.log('[CodeIdentificationAuth] Calling backend function findLivreurByCode:', normalizedCode);
     const response = await base44.functions.invoke('findLivreurByCode', { code: normalizedCode });
-    console.log('[CodeIdentificationAuth] Backend response:', response.data);
-    return response.data || null;
+    console.log('[CodeIdentificationAuth] Backend response:', response);
+    
+    if (response?.success === true && response?.livreur) {
+      console.log('[CodeIdentificationAuth] ✅ Backend returned livreur:', response.livreur.nom);
+      return response.livreur;
+    }
+    
+    console.log('[CodeIdentificationAuth] Backend returned no livreur, trying fallback...');
+    throw new Error('Backend returned no livreur');
   } catch (error) {
     console.warn('[CodeIdentificationAuth] Backend lookup failed:', error?.message);
     
     try {
-      const directMatches = await base44.entities.Livreur.filter({ code_identification: normalizedCode });
+      console.log('[CodeIdentificationAuth] Fallback: direct filter...');
+      const directMatches = await base44.asServiceRole.entities.Livreur.filter({ code_identification: normalizedCode });
+      console.log('[CodeIdentificationAuth] Fallback filter results:', directMatches?.length);
       const directMatch = directMatches?.find(
         (livreur) => normalizeCode(livreur.code_identification) === normalizedCode
       );
       if (directMatch) {
-        console.log('[CodeIdentificationAuth] Fallback filter succeeded:', directMatch.nom);
+        console.log('[CodeIdentificationAuth] ✅ Fallback filter succeeded:', directMatch.nom);
         return directMatch;
       }
     } catch (fallbackError) {
       console.warn('[CodeIdentificationAuth] Fallback filter failed:', fallbackError?.message);
     }
 
-    console.log('[CodeIdentificationAuth] Trying list predicate fallback...');
+    console.log('[CodeIdentificationAuth] Fallback: list predicate...');
     return findLivreurByPredicate(
       (livreur) => normalizeCode(livreur.code_identification) === normalizedCode
     );
