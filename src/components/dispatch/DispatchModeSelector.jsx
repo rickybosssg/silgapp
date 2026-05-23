@@ -34,7 +34,7 @@ export default function DispatchModeSelector() {
     },
     onSuccess: (_, newMode) => {
       queryClient.invalidateQueries({ queryKey: ["dispatch-config"] });
-      toast.success(newMode === "automatique" ? "Mode automatique activé 🤖" : "Mode manuel activé ✋");
+      toast.success(newMode === "automatique" ? "Pilote Automatique Activé 🤖" : "Pilote Automatique Désactivé ✋");
     },
   });
 
@@ -56,7 +56,7 @@ export default function DispatchModeSelector() {
           </div>
           <div>
             <p className="text-white font-black text-lg leading-tight">
-              {isAuto ? "Mode automatique activé" : "Mode manuel activé"}
+              {isAuto ? "Pilote Automatique Activé" : "Pilote Automatique Désactivé"}
             </p>
             <p className="text-white/70 text-xs mt-0.5">
               {isAuto
