@@ -4,10 +4,7 @@ import { appParams } from '@/lib/app-params';
 export const isNativeLivreurRuntime = () => !!appParams.isCapacitor;
 
 export const nativeLivreurInvoke = async (payload) => {
-  const result = await base44.functions.invoke('getNotificationStats', {
-    ...payload,
-    native_livreur: true,
-  });
+  const result = await base44.functions.invoke('nativeLivreur', payload);
   if (result?.error) {
     throw new Error(result.error);
   }
