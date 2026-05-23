@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import LivreurFormDialog from "@/components/livreurs/LivreurFormDialog";
-import { useAuth } from "@/lib/AuthContext";
+import { useSilgappAuth } from "@/lib/silgappAuth";
 
 function LivreurCard({ livreur, courses, onValider, onRefuser, onToggleStatut, onValiderPaiement, onEdit, onSupprimer, isPending, hasAlerteBatterie }) {
   const nomComplet = `${livreur.prenom || ""} ${livreur.nom}`.trim();
@@ -190,7 +190,7 @@ function LivreurCard({ livreur, courses, onValider, onRefuser, onToggleStatut, o
 export default function Livreurs() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState("en_attente");
-  const { user: currentUser } = useAuth();
+  const { user: currentUser } = useSilgappAuth();
   const [showForm, setShowForm] = useState(false);
   const [editingLivreur, setEditingLivreur] = useState(null);
 

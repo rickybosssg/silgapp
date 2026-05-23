@@ -1,10 +1,10 @@
 import React from 'react';
 import { Truck, AlertTriangle, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/lib/AuthContext';
+import { useSilgappAuth } from '@/lib/silgappAuth';
 
 const UserNotRegisteredError = () => {
-  const { logout } = useAuth();
+  const { logout } = useSilgappAuth();
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background p-6">

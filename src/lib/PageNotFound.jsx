@@ -1,11 +1,11 @@
 import { useLocation } from 'react-router-dom';
-import { useAuth } from '@/lib/AuthContext';
+import { useSilgappAuth } from '@/lib/silgappAuth';
 
 
 export default function PageNotFound({}) {
     const location = useLocation();
     const pageName = location.pathname.substring(1);
-    const { user, isAuthenticated, authChecked } = useAuth();
+    const { user, isAuthenticated, authChecked } = useSilgappAuth();
     
     return (
         <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">

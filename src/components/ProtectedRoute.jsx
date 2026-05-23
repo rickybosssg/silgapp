@@ -1,6 +1,5 @@
-import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
-import { useAuth } from '@/lib/AuthContext';
+import { useSilgappAuth } from '@/lib/silgappAuth';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 
 const DefaultFallback = () => (
@@ -10,23 +9,10 @@ const DefaultFallback = () => (
 );
 
 export default function ProtectedRoute({ fallback = <DefaultFallback />, unauthenticatedElement }) {
-  const { isAuthenticated, isLoadingAuth, authChecked, authError, checkUserAuth } = useAuth();
-
-  useEffect(() => {
-    if (!authChecked && !isLoadingAuth) {
-      checkUserAuth();
-    }
-  }, [authChecked, isLoadingAuth, checkUserAuth]);
+  const { isAuthenticated, isLoadingAuth, authChecked } = useSilgappAuth();
 
   if (isLoadingAuth || !authChecked) {
     return fallback;
-  }
-
-  if (authError) {
-    if (authError.type === 'user_not_registered') {
-      return <UserNotRegisteredError />;
-    }
-    return unauthenticatedElement;
   }
 
   if (!isAuthenticated) {

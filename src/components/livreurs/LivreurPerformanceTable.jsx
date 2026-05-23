@@ -25,7 +25,7 @@ import { toast } from "sonner";
 import { format, startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { fr } from "date-fns/locale";
 import LivreurDetailDialog from "./LivreurDetailDialog";
-import { useAuth } from "@/lib/AuthContext";
+import { useSilgappAuth } from "@/lib/silgappAuth";
 
 const periodOptions = [
   { value: "today", label: "Aujourd'hui" },
@@ -37,7 +37,7 @@ const periodOptions = [
 
 export default function LivreurPerformanceTable() {
   const queryClient = useQueryClient();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser } = useSilgappAuth();
   const [selectedPeriod, setSelectedPeriod] = useState("today");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");

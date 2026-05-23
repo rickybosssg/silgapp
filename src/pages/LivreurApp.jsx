@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
 import { Truck } from "lucide-react";
 import { toast } from "sonner";
-import { useAuth } from "@/lib/AuthContext";
+import { useSilgappAuth } from "@/lib/silgappAuth";
 import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
 import {
   getNativeLivreurState,
@@ -25,7 +25,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 export default function LivreurApp() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { user, isAuthenticated, isLoadingAuth, logout } = useAuth();
+  const { user, isAuthenticated, isLoadingAuth, logout } = useSilgappAuth();
   const [activeTab, setActiveTab] = useState("courses");
   const isNativeLivreur = isNativeLivreurRuntime();
 

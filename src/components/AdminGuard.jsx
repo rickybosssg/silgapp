@@ -1,4 +1,4 @@
-import { useAuth } from "@/lib/AuthContext";
+import { useSilgappAuth } from "@/lib/silgappAuth";
 
 /**
  * Protège les routes admin.
@@ -6,12 +6,12 @@ import { useAuth } from "@/lib/AuthContext";
  * (La redirection rôle livreur est gérée dans App.jsx)
  */
 export default function AdminGuard({ children }) {
-  const { isLoadingAuth, isAuthenticated, navigateToLogin } = useAuth();
+  const { isLoadingAuth, isAuthenticated, logout } = useSilgappAuth();
 
   if (isLoadingAuth) return null;
 
   if (!isAuthenticated) {
-    navigateToLogin();
+    logout();
     return null;
   }
 

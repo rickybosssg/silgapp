@@ -7,10 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Bell, Send, CheckCircle2, XCircle, Loader2, Smartphone, User, AlertTriangle, Wifi } from "lucide-react";
 import { toast } from "sonner";
 import { detectEnvironment, checkNotificationSupport, requestNotificationPermission, registerPushToken, showLocalNotification } from "@/lib/notifications";
-import { useAuth } from "@/lib/AuthContext";
+import { useSilgappAuth } from "@/lib/silgappAuth";
 
 export default function TestNotificationsPush() {
-  const { user } = useAuth();
+  const { user } = useSilgappAuth();
   const [env, setEnv] = useState(null);
   const [support, setSupport] = useState(null);
   const [permission, setPermission] = useState('default');
