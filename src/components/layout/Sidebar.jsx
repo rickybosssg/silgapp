@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { useAuth } from "@/lib/AuthContext";
+import { useSilgappAuth } from "@/lib/silgappAuth";
 
 const navItems = [
   { path: "/", label: "Tableau de bord", icon: LayoutDashboard },
@@ -23,7 +23,7 @@ const navItems = [
 export default function Sidebar({ notificationCount = 0 }) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
-  const { logout } = useAuth();
+  const { logout } = useSilgappAuth();
 
   return (
     <aside className={cn(
