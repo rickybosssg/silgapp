@@ -127,17 +127,35 @@ export const SilgappAuthProvider = ({ children }) => {
   };
 
   const signInWithIdentificationCode = async (code) => {
+    console.log('[SilgappAuth] ========== SIGN IN FLOW START ==========');
+    console.log('[SilgappAuth] START_LOGIN: Code reçu:', code);
     setIsLoadingAuth(true);
     try {
       localStorage.removeItem(ADMIN_SESSION_KEY);
-      console.log('[SilgappAuth] ========== SIGN IN FLOW ==========');
-      console.log('[SilgappAuth] START_LOGIN: Signing in livreur with code:', code);
+      console.log('[SilgappAuth] Admin session cleared');
+      
+      console.log('[SilgappAuth] APPEL findLivreurByCode...');
       const codeUser = await signInWithStoredIdentificationCode(code);
-      console.log('[SilgappAuth] ✅ Livreur signed in:', codeUser.full_name, 'role:', codeUser.role, 'livreur_id:', codeUser.livreur_id);
-      console.log('[SilgappAuth] SESSION_CREATED: Session saved for', codeUser.full_name);
-      console.log('[SilgappAuth] NAVIGATION: Redirecting to dashboard...');
+      
+      console.log('[SilgappAuth] RÉPONSE backend: Livreur trouvé:', codeUser.full_name);
+      console.log('[SilgappAuth] User data:', JSON.stringify({
+        id: codeUser.id,
+        role: codeUser.role,
+        livreur_id: codeUser.livreur_id,
+        code_identification: codeUser.code_identification
+      }));
+      
+      console.log('[SilgappAuth] SESSION_CREATED: Application du user...');
       applyUser(codeUser);
+      
+      console.log('[SilgappAuth] NAVIGATION dashboard: isAuthenticated=', !!codeUser);
+      console.log('[SilgappAuth] ========== SIGN IN FLOW COMPLETE ==========');
+      
       return codeUser;
+    } catch (error) {
+      console.error('[SilgappAuth] ❌ SIGN IN FAILED:', error.message);
+      console.error('[SilgappAuth] Stack:', error.stack);
+      throw error;
     } finally {
       setIsLoadingAuth(false);
       setAuthChecked(true);

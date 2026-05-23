@@ -68,18 +68,20 @@ export default function Silgapp2Login() {
   };
 
   const handleSubmit = async (event) => {
-    console.log('[DEBUG] FORM_SUBMIT_START');
+    console.log('========== FORM_SUBMIT_START ==========');
     addLog('SUBMIT_START', '📝 FORMULAIRE SOUMIS!');
     
     event.preventDefault();
     addLog('PREVENT_DEFAULT', '✅ event.preventDefault() appelé');
     
+    console.log('[DEBUG] Checking isLoadingAuth:', isLoadingAuth);
     if (isLoadingAuth) {
       addLog('BLOCKED', '❌ Bloqué: isLoadingAuth=true');
       console.log('[DEBUG] BLOCKED - isLoadingAuth');
       return;
     }
     
+    console.log('[DEBUG] Starting connection for mode:', mode);
     addLog('START', `✅ Connexion ${mode} demandée`);
     setDebugLogs([]);
     setError('');
@@ -92,39 +94,55 @@ export default function Silgapp2Login() {
     try {
       if (mode === 'admin') {
         addLog('ADMIN', `Tentative avec identifier: "${adminIdentifier}"`);
+        console.log('[DEBUG] Calling signInAsAdmin...');
         await signInAsAdmin({ identifier: adminIdentifier, pin: adminPin });
         addLog('SUCCESS', 'Connexion admin réussie');
+        console.log('[DEBUG] Admin login success');
         toast.success('Connexion admin reussie');
         return;
       }
 
       addLog('LIVREUR', '📡 Appel à signInWithIdentificationCode...');
       console.log('[DEBUG] Calling signInWithIdentificationCode with code:', code);
-      const user = await signInWithIdentificationCode(code);
       
-      addLog('USER_FOUND', `✅ Livreur trouvé: ${user.full_name}`);
-      addLog('USER_DATA', null, {
-        id: user.id,
-        role: user.role,
-        livreur_id: user.livreur_id,
-        code_identification: user.code_identification
-      });
-      
-      // Re-read session immediately
-      if (isCapacitor) {
-        const session = await getSessionNative();
-        addLog('SESSION_REREAD', session ? '✅ Session lue après sauvegarde' : '❌ Session NON trouvée', session);
-      } else {
-        const sessionRaw = localStorage.getItem('silgapp_code_identification_session');
-        addLog('SESSION_REREAD', sessionRaw ? '✅ Session lue après sauvegarde' : '❌ Session NON trouvée');
+      try {
+        const user = await signInWithIdentificationCode(code);
+        
+        console.log('[DEBUG] User returned:', user);
+        addLog('USER_FOUND', `✅ Livreur trouvé: ${user.full_name}`);
+        addLog('USER_DATA', null, {
+          id: user.id,
+          role: user.role,
+          livreur_id: user.livreur_id,
+          code_identification: user.code_identification
+        });
+        
+        // Re-read session immediately
+        if (isCapacitor) {
+          console.log('[DEBUG] Reading native session...');
+          const session = await getSessionNative();
+          addLog('SESSION_REREAD', session ? '✅ Session lue après sauvegarde' : '❌ Session NON trouvée', session);
+        } else {
+          const sessionRaw = localStorage.getItem('silgapp_code_identification_session');
+          addLog('SESSION_REREAD', sessionRaw ? '✅ Session lue après sauvegarde' : '❌ Session NON trouvée');
+        }
+        
+        addLog('REDIRECT', '➡️ Redirection vers dashboard livreur...');
+        console.log('[DEBUG] Login complete, navigation should happen');
+        toast.success('Connexion livreur reussie');
+      } catch (innerError) {
+        console.error('[DEBUG] Inner error in signInWithIdentificationCode:', innerError);
+        throw innerError;
       }
-      
-      addLog('REDIRECT', '➡️ Redirection vers dashboard livreur...');
-      toast.success('Connexion livreur reussie');
     } catch (authError) {
+      console.error('[DEBUG] Outer catch - AUTH_ERROR:', authError);
       const message = authError?.message || 'Connexion impossible.';
-      addLog('ERROR', `❌ Échec: ${message}`, { code: authError?.code, stack: authError?.stack });
-      console.error('[DEBUG] AUTH_ERROR:', authError);
+      addLog('ERROR', `❌ Échec: ${message}`, { 
+        code: authError?.code, 
+        stack: authError?.stack,
+        fullError: JSON.stringify(authError, Object.getOwnPropertyNames(authError))
+      });
+      console.error('[DEBUG] AUTH_ERROR details:', authError);
       setError(message);
       toast.error(message);
     }

@@ -8,6 +8,7 @@ import { queryClientInstance } from '@/lib/query-client';
 import { base44 } from '@/api/base44Client';
 import { Truck } from 'lucide-react';
 import { SilgappAuthProvider, useSilgappAuth } from '@/lib/silgappAuth';
+import { GlobalErrorDisplay } from '@/lib/GlobalErrorDisplay';
 
 const AuthenticatedRoutes = lazy(() => import('./AuthenticatedRoutes.jsx'));
 
@@ -82,6 +83,7 @@ function App() {
     <QueryClientProvider client={queryClientInstance}>
       <SilgappAuthProvider>
         <Router>
+          <GlobalErrorDisplay />
           <AuthenticatedApp />
           <Toaster />
         </Router>
