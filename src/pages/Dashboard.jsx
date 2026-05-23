@@ -20,7 +20,7 @@ import DispatchModeSelector from "../components/dispatch/DispatchModeSelector";
 import DispatchMonitor from "../components/dispatch/DispatchMonitor";
 import BatterieAlertesPanel from "../components/admin/BatterieAlertesPanel";
 import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
-import { useAuth } from "@/lib/AuthContext";
+import { useSilgappAuth } from "@/lib/silgappAuth";
 
 const statusFilters = [
   { value: "toutes", label: "Toutes" },
@@ -34,7 +34,7 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState("toutes");
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [assignCourse, setAssignCourse] = useState(null);
-  const { user: currentUser } = useAuth();
+  const { user: currentUser } = useSilgappAuth();
 
   useEffect(() => {
     let unsubscribe = null;
