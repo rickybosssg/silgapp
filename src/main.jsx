@@ -3,6 +3,11 @@ import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import '@/index.css'
 
+const notifyBase44Mounted = () => {
+  if (window.self === window.top) return;
+  window.parent?.postMessage({ type: 'sandbox:onMounted' }, '*');
+};
+
 // ErrorBoundary global — évite l'écran blanc si une erreur JS non gérée survient
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -56,8 +61,14 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+const rootElement = document.getElementById('root');
+rootElement?.setAttribute('data-dynamic-content', 'silgapp2-root');
+
+ReactDOM.createRoot(rootElement).render(
   <ErrorBoundary>
     <App />
   </ErrorBoundary>
 )
+
+window.setTimeout(notifyBase44Mounted, 250);
+window.setTimeout(notifyBase44Mounted, 1500);

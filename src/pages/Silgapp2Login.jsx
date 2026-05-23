@@ -37,7 +37,7 @@ export default function Silgapp2Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050914] text-white flex items-center justify-center p-6">
+    <div className="min-h-screen bg-[#050914] text-white flex items-center justify-center p-6" data-dynamic-content="silgapp2-login">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center space-y-4">
           <div className="w-24 h-24 rounded-3xl bg-red-600 mx-auto flex items-center justify-center shadow-2xl shadow-red-600/25">
