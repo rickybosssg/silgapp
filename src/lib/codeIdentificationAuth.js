@@ -39,7 +39,7 @@ const saveSession = (livreur) => {
   
   try {
     localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
-    console.log('[CodeIdentificationAuth] Session saved:', sessionData.livreur_id);
+    console.log('[CodeIdentificationAuth] Session saved:', sessionData.livreur_id, sessionData.code_identification);
   } catch (error) {
     console.error('[CodeIdentificationAuth] Failed to save session:', error);
   }
@@ -98,7 +98,7 @@ export const signInWithIdentificationCode = async (code) => {
 
   saveSession(livreur);
   const user = toCodeUser(livreur);
-  console.log('[CodeIdentificationAuth] Sign in successful for:', user.full_name);
+  console.log('[CodeIdentificationAuth] Sign in successful for:', user.full_name, user.code_identification);
   return user;
 };
 
@@ -107,18 +107,24 @@ export const getStoredIdentificationSession = async () => {
   
   try {
     rawSession = localStorage.getItem(SESSION_KEY);
+    if (rawSession) {
+      console.log('[CodeIdentificationAuth] Raw session found:', rawSession.substring(0, 100));
+    } else {
+      console.log('[CodeIdentificationAuth] No session in localStorage');
+    }
   } catch (error) {
     console.warn('[CodeIdentificationAuth] Session read failed:', error?.message);
     return null;
   }
   
   if (!rawSession) {
-    console.log('[CodeIdentificationAuth] No stored session found');
     return null;
   }
 
   try {
     const session = JSON.parse(rawSession);
+    console.log('[CodeIdentificationAuth] Parsed session:', session);
+    
     if (!session?.livreur_id) {
       clearIdentificationSession();
       return null;
@@ -139,7 +145,7 @@ export const getStoredIdentificationSession = async () => {
 
     saveSession(livreur);
     const user = toCodeUser(livreur);
-    console.log('[CodeIdentificationAuth] Session restored for:', user.full_name);
+    console.log('[CodeIdentificationAuth] Session restored for:', user.full_name, user.code_identification);
     return user;
   } catch (error) {
     console.warn('[CodeIdentificationAuth] Stored session restore failed:', error?.message);
