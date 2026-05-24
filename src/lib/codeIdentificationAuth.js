@@ -1,6 +1,6 @@
-import { base44 } from '@/api/base44Client';
 import { saveSessionNative, getSessionNative, removeSessionNative, isCapacitorAvailable } from '@/lib/capacitorStorage';
 import { verifyCodeLocalement } from '@/lib/livreursLocaux';
+import { APP_PUBLIC_URL } from '@/lib/app-params';
 
 const SESSION_KEY = 'silgapp_code_identification_session';
 
@@ -47,15 +47,29 @@ const saveSession = async (livreur) => {
 };
 
 /**
+ * Appel HTTP direct à une fonction backend (sans token Base44).
+ * Nécessaire car les livreurs n'ont pas de session Base44.
+ */
+const callFunctionDirect = async (functionName, payload) => {
+  const baseUrl = APP_PUBLIC_URL.replace(/\/$/, '');
+  const res = await fetch(`${baseUrl}/functions/${functionName}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`HTTP ${res.status}: ${text}`);
+  }
+  return res.json();
+};
+
+/**
  * Cherche un livreur par code via la fonction backend sécurisée.
- * Ne jamais appeler base44.entities ou asServiceRole directement ici.
  */
 const findLivreurViaBackend = async (code) => {
-  const response = await base44.functions.invoke('findLivreurByCode', { code });
-  const data = response?.data;
-  if (data?.success === true && data?.livreur) {
-    return data.livreur;
-  }
+  const data = await callFunctionDirect('findLivreurByCode', { code });
+  if (data?.success === true && data?.livreur) return data.livreur;
   return null;
 };
 
@@ -63,11 +77,8 @@ const findLivreurViaBackend = async (code) => {
  * Cherche un livreur par son ID via la fonction backend sécurisée.
  */
 const findLivreurByIdViaBackend = async (livreurId) => {
-  const response = await base44.functions.invoke('findLivreurByCode', { livreur_id: livreurId });
-  const data = response?.data;
-  if (data?.success === true && data?.livreur) {
-    return data.livreur;
-  }
+  const data = await callFunctionDirect('findLivreurByCode', { livreur_id: livreurId });
+  if (data?.success === true && data?.livreur) return data.livreur;
   return null;
 };
 
