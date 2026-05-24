@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
-import { KeyRound, LogIn, ShieldCheck, Truck, Loader2, Database } from 'lucide-react';
+import { KeyRound, LogIn, ShieldCheck, Truck, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSilgappAuth } from '@/lib/silgappAuth';
-import { isCapacitorAvailable } from '@/lib/capacitorStorage';
 import { getLivreursLocaux } from '@/lib/livreursLocaux';
 
 export default function Silgapp2Login() {
@@ -16,20 +15,14 @@ export default function Silgapp2Login() {
   const [adminPin, setAdminPin] = useState('');
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
-  const [livreursCacheEmpty, setLivreursCacheEmpty] = useState(false);
 
   useEffect(() => {
-    checkLivreursCache();
+    getLivreursLocaux().then((livreurs) => {
+      if ((livreurs?.length || 0) === 0) {
+        toast('Codes indisponibles', { duration: 2000 });
+      }
+    }).catch(() => {});
   }, []);
-
-  const checkLivreursCache = async () => {
-    try {
-      const livreurs = await getLivreursLocaux();
-      setLivreursCacheEmpty((livreurs?.length || 0) === 0 && isCapacitorAvailable());
-    } catch {
-      // silently ignore
-    }
-  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -135,20 +128,6 @@ export default function Silgapp2Login() {
           {error && (
             <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-100">
               {error}
-            </div>
-          )}
-
-          {mode === 'livreur' && livreursCacheEmpty && (
-            <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-3 text-sm text-amber-100">
-              <div className="flex items-start gap-2">
-                <Database className="w-4 h-4 mt-0.5" />
-                <div>
-                  <p className="font-bold mb-1">Synchronisation requise</p>
-                  <p className="text-xs opacity-90">
-                    Aucun code livreur enregistré. Un administrateur doit synchroniser les codes dans Paramètres.
-                  </p>
-                </div>
-              </div>
             </div>
           )}
 
