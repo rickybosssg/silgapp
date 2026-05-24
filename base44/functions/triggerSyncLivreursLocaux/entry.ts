@@ -2,13 +2,20 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 /**
  * Synchronise les codes livreurs - appelé depuis le frontend admin
- * Fait directement le travail au lieu de re-appeler syncLivreursLocaux (évite le problème d'auth en cascade)
+ * Utilise asServiceRole pour éviter les problèmes d'auth en cascade
  */
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
 
-    const user = await base44.auth.me();
+    // Vérifier l'auth admin - si non connecté, on retourne 403
+    let user = null;
+    try {
+      user = await base44.auth.me();
+    } catch {
+      // non authentifié
+    }
+
     if (!user || user.role !== 'admin') {
       return Response.json({ success: false, error: 'Accès réservé aux administrateurs' }, { status: 403 });
     }
