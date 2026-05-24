@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { LogOut, Wifi, WifiOff } from "lucide-react";
+import { LogOut, Wifi, WifiOff, MapPin, MapPinOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function getGreeting(prenom) {
@@ -30,7 +30,7 @@ function useOnlineStatus() {
   return online;
 }
 
-export default function LivreurHeader({ livreur, isEnLigne, onToggleLigne, onLogout }) {
+export default function LivreurHeader({ livreur, isEnLigne, onToggleLigne, onLogout, gpsActif, onActiverGps }) {
   const time = useClock();
   const online = useOnlineStatus();
   const prenom = livreur.prenom || livreur.nom.split(" ")[0];
@@ -98,18 +98,36 @@ export default function LivreurHeader({ livreur, isEnLigne, onToggleLigne, onLog
             )}
           </div>
 
-          {/* Toggle En ligne */}
-          <button
-            onClick={() => onToggleLigne(!isEnLigne)}
-            className={cn(
-              "flex-shrink-0 px-4 py-2 rounded-2xl font-bold text-sm transition-all duration-300 shadow-lg",
-              isEnLigne
-                ? "bg-green-500 hover:bg-green-600 text-white shadow-green-500/30"
-                : "bg-white/10 hover:bg-white/20 text-white/70 border border-white/20"
-            )}
-          >
-            {isEnLigne ? "EN LIGNE" : "HORS LIGNE"}
-          </button>
+          {/* Actions GPS + Ligne */}
+          <div className="flex flex-col gap-2 flex-shrink-0">
+            {/* Bouton En ligne / Hors ligne */}
+            <button
+              onClick={() => onToggleLigne(!isEnLigne)}
+              className={cn(
+                "px-4 py-2 rounded-2xl font-bold text-sm transition-all duration-300 shadow-lg",
+                isEnLigne
+                  ? "bg-red-500 hover:bg-red-600 text-white shadow-red-500/30"
+                  : "bg-green-500 hover:bg-green-600 text-white shadow-green-500/30"
+              )}
+            >
+              {isEnLigne ? "Hors ligne" : "En ligne"}
+            </button>
+            {/* Bouton GPS */}
+            <button
+              onClick={onActiverGps}
+              className={cn(
+                "px-3 py-1.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-1.5 justify-center",
+                gpsActif
+                  ? "bg-white/10 text-green-300 border border-green-400/40"
+                  : "bg-white/10 text-white/50 border border-white/20 hover:bg-white/20"
+              )}
+            >
+              {gpsActif
+                ? <><MapPin className="w-3 h-3" /> GPS actif</>
+                : <><MapPinOff className="w-3 h-3" /> Activer GPS</>
+              }
+            </button>
+          </div>
         </div>
       </div>
     </div>

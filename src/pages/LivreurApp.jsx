@@ -198,9 +198,32 @@ export default function LivreurApp() {
     toggleDispoMutation.mutate(enLigne ? "disponible" : "hors_ligne");
   };
 
-  // GPS tracking
+  // GPS state
+  const [gpsActif, setGpsActif] = useState(false);
+  const [gpsError, setGpsError] = useState(false);
+
+  const demanderGPS = () => {
+    if (!navigator.geolocation) {
+      setGpsError(true);
+      toast.error("GPS non disponible sur cet appareil");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      () => { setGpsActif(true); setGpsError(false); },
+      () => { setGpsActif(false); setGpsError(true); },
+      { enableHighAccuracy: true }
+    );
+  };
+
+  // Demander GPS automatiquement à l'ouverture
   useEffect(() => {
-    if (!livreurProfil || livreurProfil.statut === "hors_ligne") return;
+    if (!livreurProfil) return;
+    demanderGPS();
+  }, [!!livreurProfil]);
+
+  // GPS tracking - uniquement si en ligne et GPS actif
+  useEffect(() => {
+    if (!livreurProfil || livreurProfil.statut === "hors_ligne" || !gpsActif) return;
     const updatePos = () => {
       navigator.geolocation?.getCurrentPosition(
         (pos) => {
@@ -215,14 +238,14 @@ export default function LivreurApp() {
             base44.entities.Livreur.update(livreurProfil.id, positionData);
           }
         },
-        () => {},
+        () => { setGpsActif(false); },
         { enableHighAccuracy: true }
       );
     };
     updatePos();
     const interval = setInterval(updatePos, 30000);
     return () => clearInterval(interval);
-  }, [livreurProfil?.id, livreurProfil?.statut, isNativeLivreur]);
+  }, [livreurProfil?.id, livreurProfil?.statut, gpsActif, isNativeLivreur]);
 
   // ---- LOADING ----
   if (isLoadingAuth || isLoadingLivreurProfil) {
@@ -312,7 +335,18 @@ export default function LivreurApp() {
           isEnLigne={isEnLigne}
           onToggleLigne={handleToggleLigne}
           onLogout={logout}
+          gpsActif={gpsActif}
+          onActiverGps={demanderGPS}
         />
+        {/* Avertissement GPS */}
+        {!gpsActif && isEnLigne && (
+          <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-center gap-3">
+            <span className="text-xl">📍</span>
+            <p className="text-sm text-amber-700 font-medium leading-tight">
+              Activez votre GPS pour être visible sur la carte
+            </p>
+          </div>
+        )}
 
         {/* Stats du jour */}
         <LivreurStatsBanner mesCourses={mesCourses} totalEncaisse={totalEncaisse} />
