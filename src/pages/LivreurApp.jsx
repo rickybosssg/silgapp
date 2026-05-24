@@ -12,6 +12,7 @@ import {
   updateNativeLivreur,
   updateNativeLivreurCourse,
 } from "@/lib/nativeLivreurApi";
+import { invokeDirectly } from "@/lib/directFunctionCall";
 
 import LivreurHeader from "@/components/livreur/LivreurHeader";
 import LivreurStatsBanner from "@/components/livreur/LivreurStatsBanner";
@@ -128,7 +129,7 @@ export default function LivreurApp() {
   }, [mesCourses]);
 
   const updateLivreurBackend = (id, data) =>
-    base44.functions.invoke('updateLivreur', { id, data });
+    invokeDirectly('updateLivreur', { id, data });
 
   const toggleDispoMutation = useMutation({
     mutationFn: (newStatut) => (
