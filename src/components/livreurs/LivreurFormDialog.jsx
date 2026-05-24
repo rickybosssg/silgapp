@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { KeyRound, User, Upload, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { isIdentificationCodeAlreadyUsed } from "@/lib/codeIdentificationAuth";
 
 const emptyForm = {
   prenom: "",
@@ -63,10 +62,22 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
 
   const mutation = useMutation({
     mutationFn: async (data) => {
+      const codeIdentification = data.code_identification.trim().toUpperCase();
+      
+      // Vérifier l'unicité du code (sauf en mode édition)
+      if (!isEdit) {
+        const livreurs = await base44.entities.Livreur.list();
+        const codeExists = livreurs.some(l => l.code_identification === codeIdentification);
+        if (codeExists) {
+          const error = new Error("Ce code d'identification est deja utilise");
+          throw error;
+        }
+      }
+      
       if (isEdit) {
-        return base44.entities.Livreur.update(livreur.id, data);
+        return base44.entities.Livreur.update(livreur.id, { ...data, code_identification: codeIdentification });
       } else {
-        return base44.entities.Livreur.create({ ...data, validation: "valide", statut: "hors_ligne", actif: true });
+        return base44.entities.Livreur.create({ ...data, code_identification: codeIdentification, validation: "valide", statut: "hors_ligne", actif: true });
       }
     },
     onSuccess: () => {
@@ -88,7 +99,7 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
     setUploadingPhoto(false);
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     
     // Validation stricte
@@ -102,20 +113,7 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
       return;
     }
 
-    const codeIdentification = form.code_identification.trim().toUpperCase();
-    
-    try {
-      const codeExists = await isIdentificationCodeAlreadyUsed(codeIdentification, livreur?.id);
-      
-      if (codeExists) {
-        toast.error("Ce code d'identification est deja utilise");
-        return;
-      }
-      
-      mutation.mutate({ ...form, code_identification: codeIdentification });
-    } catch (error) {
-      toast.error(`Erreur: ${error.message || "Impossible de verifier le code"}`);
-    }
+    mutation.mutate(form);
   };
 
   return (
