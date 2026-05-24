@@ -75,7 +75,6 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
       onClose();
     },
     onError: (error) => {
-      console.error("LivreurFormDialog mutation error:", error);
       toast.error(error.message || "Erreur. Réessayez.");
     },
   });
@@ -91,7 +90,6 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("[LivreurFormDialog] handleSubmit called");
     
     // Validation stricte
     const errors = [];
@@ -100,27 +98,22 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
     if (!form.code_identification?.trim()) errors.push("Le code d'identification est obligatoire");
     
     if (errors.length > 0) {
-      console.log("[LivreurFormDialog] Validation errors:", errors);
       errors.forEach(err => toast.error(err));
       return;
     }
 
     const codeIdentification = form.code_identification.trim().toUpperCase();
-    console.log("[LivreurFormDialog] Code to check:", codeIdentification);
     
     try {
       const codeExists = await isIdentificationCodeAlreadyUsed(codeIdentification, livreur?.id);
-      console.log("[LivreurFormDialog] Code exists check result:", codeExists);
       
       if (codeExists) {
         toast.error("Ce code d'identification est deja utilise");
         return;
       }
       
-      console.log("[LivreurFormDialog] Calling mutation.mutate with:", { ...form, code_identification: codeIdentification });
       mutation.mutate({ ...form, code_identification: codeIdentification });
     } catch (error) {
-      console.error("[LivreurFormDialog] Code uniqueness check failed:", error);
       toast.error(`Erreur: ${error.message || "Impossible de verifier le code"}`);
     }
   };

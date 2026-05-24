@@ -185,6 +185,7 @@ export const isIdentificationCodeAlreadyUsed = async (code, ignoredLivreurId = n
   const normalizedCode = normalizeCode(code);
   if (!normalizedCode) return false;
 
-  const livreur = await findLivreurByIdentificationCode(normalizedCode);
+  const livreurs = await base44.entities.Livreur.list();
+  const livreur = livreurs.find(l => l.code_identification === normalizedCode);
   return !!livreur && livreur.id !== ignoredLivreurId;
 };
