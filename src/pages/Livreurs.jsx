@@ -200,7 +200,11 @@ export default function Livreurs() {
 
   const { data: livreurs = [], isLoading, error: livreursError } = useQuery({
     queryKey: ["livreurs"],
-    queryFn: () => base44.entities.Livreur.list("-created_date", 200),
+    queryFn: async () => {
+      const res = await base44.functions.invoke('getLivreurs', {});
+      if (!res.data?.success) throw new Error(res.data?.error || 'Erreur chargement livreurs');
+      return res.data.livreurs || [];
+    },
     initialData: [],
     refetchInterval: 30000,
     staleTime: 0,
@@ -208,14 +212,14 @@ export default function Livreurs() {
 
   const { data: courses = [] } = useQuery({
     queryKey: ["courses"],
-    queryFn: () => base44.entities.Course.list("-created_date", 200),
+    queryFn: () => base44.entities.Course.list("-created_date", 200).catch(() => []),
     initialData: [],
     refetchInterval: 30000,
   });
 
   const { data: alertes = [] } = useQuery({
     queryKey: ["batterie-alertes"],
-    queryFn: () => base44.entities.BatterieAlerte.list("-heure_signalement", 50),
+    queryFn: () => base44.entities.BatterieAlerte.list("-heure_signalement", 50).catch(() => []),
     initialData: [],
     refetchInterval: 10000,
   });
@@ -226,12 +230,12 @@ export default function Livreurs() {
   };
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Livreur.update(id, data),
+    mutationFn: ({ id, data }) => base44.functions.invoke('updateLivreur', { id, data }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["livreurs"] }),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Livreur.delete(id),
+    mutationFn: (id) => base44.functions.invoke('deleteLivreur', { id }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["livreurs"] }),
   });
 

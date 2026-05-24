@@ -63,21 +63,14 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
   const mutation = useMutation({
     mutationFn: async (data) => {
       const codeIdentification = data.code_identification.trim().toUpperCase();
-      
-      // Vérifier l'unicité du code (sauf en mode édition)
-      if (!isEdit) {
-        const livreurs = await base44.entities.Livreur.list();
-        const codeExists = livreurs.some(l => l.code_identification === codeIdentification);
-        if (codeExists) {
-          const error = new Error("Ce code d'identification est deja utilise");
-          throw error;
-        }
-      }
-      
       if (isEdit) {
-        return base44.entities.Livreur.update(livreur.id, { ...data, code_identification: codeIdentification });
+        const res = await base44.functions.invoke('updateLivreur', { id: livreur.id, data: { ...data, code_identification: codeIdentification } });
+        if (!res.data?.success) throw new Error(res.data?.error || 'Erreur mise à jour');
+        return res.data.livreur;
       } else {
-        return base44.entities.Livreur.create({ ...data, code_identification: codeIdentification, validation: "valide", statut: "hors_ligne", actif: true });
+        const res = await base44.functions.invoke('createLivreur', { data: { ...data, code_identification: codeIdentification } });
+        if (!res.data?.success) throw new Error(res.data?.error || 'Erreur création');
+        return res.data.livreur;
       }
     },
     onSuccess: () => {
