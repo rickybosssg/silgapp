@@ -33,12 +33,7 @@ export default function DiagnosticBase44() {
 
   const { data: livreurs, isLoading: isLoadingLivreurs, error: livreursError } = useQuery({
     queryKey: ['diagnostic-livreurs'],
-    queryFn: async () => {
-      console.log('[Diagnostic] Fetching livreurs...');
-      const data = await base44.asServiceRole.entities.Livreur.list('-created_date', 100);
-      console.log('[Diagnostic] Livreurs fetched:', data.length);
-      return data;
-    },
+    queryFn: () => base44.entities.Livreur.list('-created_date', 100),
   });
 
   const { data: userInfo, isLoading: isLoadingUser } = useQuery({
