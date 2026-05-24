@@ -2,6 +2,9 @@ import { base44 } from '@/api/base44Client';
 
 const LIVREURS_CACHE_KEY = 'silgapp_livreurs_cache';
 
+// ⚠️ IMPORTANT: syncLivreursLocaux ne peut être appelé que par un admin connecté.
+// Elle passe par la fonction backend qui utilise asServiceRole.
+
 const getPreferences = async () => {
   if (!isCapacitorAvailable()) {
     throw new Error('Capacitor not available');
