@@ -1,7 +1,7 @@
-import { base44 } from '@/api/base44Client';
 import { Preferences } from '@capacitor/preferences';
 
 const LIVREURS_CACHE_KEY = 'silgapp_livreurs_cache';
+const SYNC_META_KEY = 'silgapp_livreurs_sync_meta';
 
 export const isCapacitorAvailable = () => {
   try {
@@ -13,10 +13,68 @@ export const isCapacitorAvailable = () => {
 };
 
 /**
+ * Stocke la liste des livreurs localement (Capacitor ou localStorage)
+ */
+const storeLivreursLocaux = async (livreurs) => {
+  const synced_at = new Date().toISOString();
+  const cacheData = JSON.stringify({ livreurs, synced_at, count: livreurs.length });
+  const metaData = JSON.stringify({ synced_at, count: livreurs.length });
+
+  if (isCapacitorAvailable()) {
+    await Preferences.set({ key: LIVREURS_CACHE_KEY, value: cacheData });
+    await Preferences.set({ key: SYNC_META_KEY, value: metaData });
+  } else {
+    localStorage.setItem(LIVREURS_CACHE_KEY, cacheData);
+    localStorage.setItem(SYNC_META_KEY, metaData);
+  }
+};
+
+/**
+ * Stocke les livreurs depuis les données brutes du backend (utilisé par LivreursCacheSync)
+ * Retourne la meta { synced_at, count }
+ */
+export const storeLivreursLocauxFromData = async (data) => {
+  const livreurs = data.livreurs || [];
+  const synced_at = data.synced_at || new Date().toISOString();
+  const count = data.count || livreurs.length;
+
+  const cacheData = JSON.stringify({ livreurs, synced_at, count });
+  const metaData = JSON.stringify({ synced_at, count });
+
+  if (isCapacitorAvailable()) {
+    await Preferences.set({ key: LIVREURS_CACHE_KEY, value: cacheData });
+    await Preferences.set({ key: SYNC_META_KEY, value: metaData });
+  } else {
+    localStorage.setItem(LIVREURS_CACHE_KEY, cacheData);
+    localStorage.setItem(SYNC_META_KEY, metaData);
+  }
+
+  return { synced_at, count };
+};
+
+/**
+ * Lit la meta de synchronisation (date + count)
+ */
+export const getSyncMeta = async () => {
+  try {
+    let raw = null;
+    if (isCapacitorAvailable()) {
+      const { value } = await Preferences.get({ key: SYNC_META_KEY });
+      raw = value;
+    } else {
+      raw = localStorage.getItem(SYNC_META_KEY);
+    }
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
  * Synchronise la liste complète des livreurs actifs depuis la base de données
- * et la stocke localement dans Capacitor Preferences
  */
 export const syncLivreursLocaux = async () => {
+  const { base44 } = await import('@/api/base44Client');
   const allLivreurs = await base44.entities.Livreur.list('-created_date', 1000);
 
   const activeLivreurs = allLivreurs
@@ -36,19 +94,6 @@ export const syncLivreursLocaux = async () => {
   await storeLivreursLocaux(activeLivreurs);
 
   return { success: true, count: activeLivreurs.length, synced_at: new Date().toISOString() };
-};
-
-/**
- * Stocke la liste des livreurs localement
- */
-const storeLivreursLocaux = async (livreurs) => {
-  const cacheData = JSON.stringify({ livreurs, synced_at: new Date().toISOString(), count: livreurs.length });
-
-  if (isCapacitorAvailable()) {
-    await Preferences.set({ key: LIVREURS_CACHE_KEY, value: cacheData });
-  } else {
-    localStorage.setItem(LIVREURS_CACHE_KEY, cacheData);
-  }
 };
 
 /**

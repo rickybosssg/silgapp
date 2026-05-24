@@ -5,43 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Database, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-
-const SYNC_META_KEY = 'silgapp_livreurs_sync_meta';
-const LIVREURS_CACHE_KEY = 'silgapp_livreurs_cache';
-
-function getSyncMeta() {
-  try {
-    const raw = localStorage.getItem(SYNC_META_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveSyncResult(data) {
-  // Sauvegarder la liste des livreurs dans le cache
-  const cacheData = JSON.stringify({
-    livreurs: data.livreurs || [],
-    synced_at: data.synced_at || new Date().toISOString(),
-    count: data.count || 0
-  });
-  localStorage.setItem(LIVREURS_CACHE_KEY, cacheData);
-
-  // Sauvegarder la méta (date + count) pour l'affichage
-  const meta = {
-    synced_at: data.synced_at || new Date().toISOString(),
-    count: data.count || 0
-  };
-  localStorage.setItem(SYNC_META_KEY, JSON.stringify(meta));
-  return meta;
-}
+import { storeLivreursLocauxFromData, getSyncMeta } from '@/lib/livreursLocaux';
 
 export default function LivreursCacheSync() {
   const [syncMeta, setSyncMeta] = useState(() => getSyncMeta());
 
-  // Relire depuis localStorage au montage (persistance entre pages)
   useEffect(() => {
-    setSyncMeta(getSyncMeta());
+    getSyncMeta().then(setSyncMeta);
   }, []);
 
   const syncMutation = useMutation({
@@ -52,8 +22,8 @@ export default function LivreursCacheSync() {
       }
       return result.data;
     },
-    onSuccess: (data) => {
-      const meta = saveSyncResult(data);
+    onSuccess: async (data) => {
+      const meta = await storeLivreursLocauxFromData(data);
       setSyncMeta(meta);
       toast.success(`${data.count} codes livreurs synchronisés`);
     },
