@@ -1,5 +1,4 @@
 import { base44 } from '@/api/base44Client';
-import { isNativeLivreurRuntime, verifyNativeLivreurCode } from '@/lib/nativeLivreurApi';
 import { saveSessionNative, getSessionNative, removeSessionNative, isCapacitorAvailable } from '@/lib/capacitorStorage';
 import { verifyCodeLocalement } from '@/lib/livreursLocaux';
 
@@ -39,162 +38,126 @@ const saveSession = async (livreur) => {
     email: getLivreurNotificationEmail(livreur),
     created_at: new Date().toISOString(),
   };
-  
-  const isNative = isCapacitorAvailable();
-  
-  if (isNative) {
+
+  if (isCapacitorAvailable()) {
     await saveSessionNative(sessionData);
   } else {
     localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
   }
 };
 
-const findLivreurByPredicate = async (predicate) => {
-  const livreurs = await base44.entities.Livreur.list('-created_date', 500);
-  return livreurs.find(predicate) || null;
+/**
+ * Cherche un livreur par code via la fonction backend sécurisée.
+ * Ne jamais appeler base44.entities ou asServiceRole directement ici.
+ */
+const findLivreurViaBackend = async (code) => {
+  const response = await base44.functions.invoke('findLivreurByCode', { code });
+  const data = response?.data;
+  if (data?.success === true && data?.livreur) {
+    return data.livreur;
+  }
+  return null;
+};
+
+/**
+ * Cherche un livreur par son ID via la fonction backend sécurisée.
+ */
+const findLivreurByIdViaBackend = async (livreurId) => {
+  const response = await base44.functions.invoke('findLivreurByCode', { livreur_id: livreurId });
+  const data = response?.data;
+  if (data?.success === true && data?.livreur) {
+    return data.livreur;
+  }
+  return null;
 };
 
 export const findLivreurByIdentificationCode = async (code) => {
   const normalizedCode = normalizeCode(code);
-  if (!normalizedCode) {
-    return null;
-  }
+  if (!normalizedCode) return null;
 
-  // ÉTAPE 1: Vérification LOCALE (cache APK) — rapide si disponible
+  // ÉTAPE 1: Cache local APK (rapide, hors-ligne)
   const livreurLocal = await verifyCodeLocalement(normalizedCode);
   if (livreurLocal) {
     return livreurLocal;
   }
 
-  // ÉTAPE 2: Base de données Base44 directement (source unique de vérité)
-  // Ceci fonctionne dans l'APK ET dans le preview — même base de données
-  try {
-    const livreurs = await base44.entities.Livreur.list('-created_date', 1000);
-    const match = livreurs.find(l =>
-      l.code_identification &&
-      l.code_identification.trim().toUpperCase() === normalizedCode
-    );
-    if (match) {
-      return match;
-    }
-  } catch (error) {
-    // fallback backend function si l'accès direct échoue
-  }
-
-  // ÉTAPE 3: Backend function (dernier recours)
-  try {
-    const response = await base44.functions.invoke('findLivreurByCode', { code: normalizedCode });
-    if (response?.data?.success === true && response?.data?.livreur) {
-      return response.data.livreur;
-    }
-    if (response?.success === true && response?.livreur) {
-      return response.livreur;
-    }
-  } catch (error) {
-    // silencieux
-  }
-
-  return null;
+  // ÉTAPE 2: Backend sécurisé (asServiceRole côté serveur uniquement)
+  return findLivreurViaBackend(normalizedCode);
 };
 
 export const signInWithIdentificationCode = async (code) => {
-  try {
-    const livreur = await findLivreurByIdentificationCode(code);
-    
-    if (!livreur) {
-      const error = new Error("Code d'identification incorrect.");
-      error.code = 'invalid_identification_code';
-      throw error;
-    }
-    
-    if (livreur.validation !== 'valide') {
-      const error = new Error("Compte livreur non valide. Attendez la validation de l'administrateur.");
-      error.code = 'invalid_livreur_validation';
-      throw error;
-    }
+  const livreur = await findLivreurByIdentificationCode(code);
 
-    if (livreur.actif === false) {
-      const error = new Error("Compte livreur desactive. Contactez l'administrateur.");
-      error.code = 'disabled_livreur';
-      throw error;
-    }
-
-    await saveSession(livreur);
-    
-    const user = toCodeUser(livreur);
-    return user;
-  } catch (error) {
+  if (!livreur) {
+    const error = new Error("Code d'identification incorrect.");
+    error.code = 'invalid_identification_code';
     throw error;
   }
+
+  if (livreur.validation !== 'valide') {
+    const error = new Error("Compte livreur non valide. Attendez la validation de l'administrateur.");
+    error.code = 'invalid_livreur_validation';
+    throw error;
+  }
+
+  if (livreur.actif === false) {
+    const error = new Error("Compte livreur desactive. Contactez l'administrateur.");
+    error.code = 'disabled_livreur';
+    throw error;
+  }
+
+  await saveSession(livreur);
+  return toCodeUser(livreur);
 };
 
 export const getStoredIdentificationSession = async () => {
-  const isNative = isCapacitorAvailable();
-  
   let session = null;
-  
-  if (isNative) {
+
+  if (isCapacitorAvailable()) {
     try {
       session = await getSessionNative();
-    } catch (error) {
+    } catch {
       return null;
     }
   } else {
     try {
-      const rawSession = localStorage.getItem(SESSION_KEY);
-      if (rawSession) {
-        session = JSON.parse(rawSession);
-      }
-    } catch (error) {
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (raw) session = JSON.parse(raw);
+    } catch {
       return null;
     }
   }
-  
-  if (!session) {
+
+  if (!session?.livreur_id) {
+    await clearIdentificationSession();
     return null;
   }
 
   try {
-    if (!session?.livreur_id) {
-      clearIdentificationSession();
+    // Récupérer le livreur via backend (pas d'accès direct aux entités)
+    const livreur = await findLivreurByIdViaBackend(session.livreur_id);
+    if (!livreur) {
+      await clearIdentificationSession();
       return null;
     }
 
-    const livreur = await findLivreurByPredicate((item) => item.id === session.livreur_id);
-    if (!livreur) {
-      clearIdentificationSession();
-      return null;
-    }
-    
     if (livreur.actif === false) {
-      clearIdentificationSession();
+      await clearIdentificationSession();
       return null;
     }
 
     await saveSession(livreur);
-    const user = toCodeUser(livreur);
-    return user;
-  } catch (error) {
-    clearIdentificationSession();
+    return toCodeUser(livreur);
+  } catch {
+    await clearIdentificationSession();
     return null;
   }
 };
 
 export const clearIdentificationSession = async () => {
-  const isNative = isCapacitorAvailable();
-  
-  if (isNative) {
+  if (isCapacitorAvailable()) {
     await removeSessionNative();
   } else {
     localStorage.removeItem(SESSION_KEY);
   }
-};
-
-export const isIdentificationCodeAlreadyUsed = async (code, ignoredLivreurId = null) => {
-  const normalizedCode = normalizeCode(code);
-  if (!normalizedCode) return false;
-
-  const livreurs = await base44.entities.Livreur.list();
-  const livreur = livreurs.find(l => l.code_identification === normalizedCode);
-  return !!livreur && livreur.id !== ignoredLivreurId;
 };
