@@ -31,13 +31,6 @@ export default function DiagnosticBase44() {
     });
   }, []);
 
-  const { data: livreurs, isLoading: isLoadingLivreurs, error: livreursError } = useQuery({
-    queryKey: ['diagnostic-livreurs'],
-    queryFn: () => base44.entities.Livreur.list('-created_date', 100),
-    enabled: !!userInfo,
-    retry: false,
-  });
-
   const { data: userInfo, isLoading: isLoadingUser } = useQuery({
     queryKey: ['diagnostic-user'],
     queryFn: async () => {
@@ -48,6 +41,13 @@ export default function DiagnosticBase44() {
         return null;
       }
     },
+  });
+
+  const { data: livreurs, isLoading: isLoadingLivreurs, error: livreursError } = useQuery({
+    queryKey: ['diagnostic-livreurs'],
+    queryFn: () => base44.entities.Livreur.list('-created_date', 100),
+    enabled: !!userInfo,
+    retry: false,
   });
 
   const configInfo = {
