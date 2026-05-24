@@ -44,20 +44,15 @@ export default function LivreurApp() {
     return () => clearTimeout(timer);
   }, []);
   
-  // Mettre à jour l'étape de chargement
+  // Mettre à jour l'étape de chargement (livreurProfil déclaré plus bas — on utilisera un state séparé)
   useEffect(() => {
     if (isAuthenticated) {
       setLoadingStep('session_restored');
-      console.log('[LivreurApp] Step: session restored', { user: user?.email, role: user?.role, livreur_id: user?.livreur_id });
-    }
-    if (livreurProfil) {
-      setLoadingStep('livreur_found');
-      console.log('[LivreurApp] Step: livreur found', { id: livreurProfil.id, nom: livreurProfil.nom });
     }
     if (!isLoadingAuth && !loadingTimeout) {
       setLoadingStep('ready');
     }
-  }, [isAuthenticated, livreurProfil, isLoadingAuth, loadingTimeout]);
+  }, [isAuthenticated, isLoadingAuth, loadingTimeout]);
 
   // Rediriger les admins
   useEffect(() => {
@@ -134,6 +129,12 @@ export default function LivreurApp() {
       console.log('[LivreurApp] useQuery SUCCESS:', data ? { id: data.id, nom: data.nom } : 'null');
     },
   });
+
+  useEffect(() => {
+    if (livreurProfil) {
+      setLoadingStep('livreur_found');
+    }
+  }, [livreurProfil]);
 
   useEffect(() => {
     if (isNativeLivreur && nativeState?.livreur) {
