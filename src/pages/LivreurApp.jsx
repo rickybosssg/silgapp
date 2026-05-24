@@ -27,32 +27,7 @@ export default function LivreurApp() {
   const navigate = useNavigate();
   const { user, isAuthenticated, isLoadingAuth, logout } = useSilgappAuth();
   const [activeTab, setActiveTab] = useState("courses");
-  const [loadingTimeout, setLoadingTimeout] = useState(false);
-  const [loadingStep, setLoadingStep] = useState("initial");
   const isNativeLivreur = isNativeLivreurRuntime();
-
-  // Timeout de chargement - afficher l'erreur après 3 secondes
-  useEffect(() => {
-    console.log('[LivreurApp] Loading timeout started');
-    setLoadingStep('auth_check');
-    
-    const timer = setTimeout(() => {
-      console.log('[LivreurApp] LOADING TIMEOUT - Step:', loadingStep);
-      setLoadingTimeout(true);
-    }, 3000);
-    
-    return () => clearTimeout(timer);
-  }, []);
-  
-  // Mettre à jour l'étape de chargement (livreurProfil déclaré plus bas — on utilisera un state séparé)
-  useEffect(() => {
-    if (isAuthenticated) {
-      setLoadingStep('session_restored');
-    }
-    if (!isLoadingAuth && !loadingTimeout) {
-      setLoadingStep('ready');
-    }
-  }, [isAuthenticated, isLoadingAuth, loadingTimeout]);
 
   // Rediriger les admins
   useEffect(() => {
@@ -72,69 +47,24 @@ export default function LivreurApp() {
   const { data: livreurProfil, error: livreurProfilError, isLoading: isLoadingLivreurProfil } = useQuery({
     queryKey: ["livreur-profil", user?.livreur_id || user?.email, isNativeLivreur],
     queryFn: async () => {
-      console.log('[LivreurApp] Fetching livreur profil...');
-      console.log('[LivreurApp] Query params:', { user_email: user?.email, livreur_id: user?.livreur_id, isNativeLivreur });
-      
-      try {
-        if (isNativeLivreur) {
-          console.log('[LivreurApp] Using native path');
-          const result = [nativeState?.livreur || user?.livreur].filter(Boolean);
-          console.log('[LivreurApp] Native result:', result);
-          return result;
-        }
-        
-        if (user?.livreur) {
-          console.log('[LivreurApp] Using user.livreur from session');
-          return [user.livreur];
-        }
-        
-        if (!user?.email) {
-          console.warn('[LivreurApp] No user email');
-          return [];
-        }
-        
-        console.log('[LivreurApp] Calling base44.entities.Livreur.filter...');
-        const direct = await base44.entities.Livreur.filter({ user_email: user.email });
-        console.log('[LivreurApp] Direct filter result:', direct);
-        
-        if (direct?.[0]) {
-          console.log('[LivreurApp] Direct match found:', direct[0].nom);
-          return direct;
-        }
-        
-        console.log('[LivreurApp] Fallback: listing all livreurs...');
-        const allLivreurs = await base44.entities.Livreur.list("-created_date", 500);
-        console.log('[LivreurApp] Total livreurs:', allLivreurs.length);
-        
-        const filtered = allLivreurs.filter((livreur) => (livreur.user_email || '').trim().toLowerCase() === user.email.trim().toLowerCase());
-        console.log('[LivreurApp] Filtered result:', filtered.length, 'matches');
-        
-        return filtered;
-      } catch (error) {
-        console.error('[LivreurApp] Livreur profil fetch FAILED:', error);
-        throw error;
+      // Priorité 1 : données natives (APK)
+      if (isNativeLivreur) {
+        const result = [nativeState?.livreur || user?.livreur].filter(Boolean);
+        return result;
       }
+      // Priorité 2 : profil dans la session livreur (connexion par code)
+      if (user?.livreur) {
+        return [user.livreur];
+      }
+      // Priorité 3 : recherche via backend pour les admins/comptes Base44
+      if (!user?.email) return [];
+      const direct = await base44.entities.Livreur.filter({ user_email: user.email });
+      return direct || [];
     },
     enabled: !!user,
     refetchInterval: 10000,
-    select: (data) => {
-      console.log('[LivreurApp] Select called with data:', data?.length);
-      return data[0] || null;
-    },
-    onError: (error) => {
-      console.error('[LivreurApp] useQuery ERROR:', error);
-      console.error('[LivreurApp] Error details:', { message: error?.message, stack: error?.stack });
-    },
-    onSuccess: (data) => {
-      console.log('[LivreurApp] useQuery SUCCESS:', data ? { id: data.id, nom: data.nom } : 'null');
-    },
+    select: (data) => data?.[0] || null,
   });
-
-  useEffect(() => {
-    if (livreurProfil) {
-      setLoadingStep('livreur_found');
-    }
-  }, [livreurProfil]);
 
   useEffect(() => {
     if (isNativeLivreur && nativeState?.livreur) {
@@ -295,83 +225,24 @@ export default function LivreurApp() {
   }, [livreurProfil?.id, livreurProfil?.statut, isNativeLivreur]);
 
   // ---- LOADING ----
-  if (isLoadingAuth || loadingTimeout) {
+  if (isLoadingAuth || isLoadingLivreurProfil) {
     return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center bg-gray-900 p-6">
-        <div className="text-center space-y-4 max-w-md">
-          <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center mx-auto">
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
             <Truck className="w-8 h-8 text-primary animate-pulse" />
           </div>
-          
-          <div className="space-y-2">
-            <h2 className="text-white font-bold">SILGAPP 2 - Chargement</h2>
-            
-            {/* Logs de chargement */}
-            <div className="bg-gray-800 rounded-lg p-3 text-left text-xs font-mono space-y-1">
-              <div className={loadingStep !== 'initial' ? 'text-green-400' : 'text-gray-500'}>
-                {loadingStep !== 'initial' ? '✅' : '⏳'} 1. Session authentifiée
-              </div>
-              <div className="text-gray-500">
-                Email: {user?.email || 'N/A'}
-              </div>
-              <div className="text-gray-500">
-                Role: {user?.role || 'N/A'}
-              </div>
-              <div className="text-gray-500">
-                Livreur ID: {user?.livreur_id || 'N/A'}
-              </div>
-              
-              <div className={loadingStep !== 'session_restored' ? 'text-green-400' : 'text-gray-500'}>
-                {loadingStep !== 'session_restored' ? '✅' : '⏳'} 2. Session restaurée
-              </div>
-              
-              <div className={loadingStep !== 'livreur_found' ? 'text-green-400' : loadingTimeout ? 'text-red-400' : 'text-gray-500'}>
-                {loadingStep !== 'livreur_found' ? '✅' : loadingTimeout ? '❌' : '⏳'} 3. Profil livreur chargé
-              </div>
-              
-              {loadingTimeout && (
-                <div className="text-red-400 mt-2 pt-2 border-t border-red-800">
-                  ⚠️ TIMEOUT APRÈS 3 SECONDES
-                  <div className="text-red-500 text-xs mt-1">
-                    Étape bloquée: <span className="font-bold">{loadingStep}</span>
-                  </div>
-                  <div className="text-red-500 text-xs mt-1">
-                    isAuthenticated: <span className="font-bold">{isAuthenticated ? 'true' : 'false'}</span>
-                  </div>
-                  <div className="text-red-500 text-xs mt-1">
-                    livreurProfil: <span className="font-bold">{livreurProfil ? 'chargé' : 'undefined/null'}</span>
-                  </div>
-                  <div className="text-red-500 text-xs mt-1">
-                    isLoadingAuth: <span className="font-bold">{isLoadingAuth ? 'true' : 'false'}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <p className="text-white/50 text-xs mt-2">
-              {loadingTimeout 
-                ? "Le chargement prend trop de temps. Vérifiez les logs ci-dessus."
-                : "Chargement en cours..."}
-            </p>
-          </div>
+          <p className="text-sm text-muted-foreground">Chargement...</p>
         </div>
       </div>
     );
   }
 
-  // ---- NON CONNECTE : gere par App.jsx (Silgapp2Login) ----
-  if (!isAuthenticated) {
-    console.log('[LivreurApp] Not authenticated, returning null');
-    return null;
-  }
-
-  console.log('[LivreurApp] Authenticated, checking livreurProfil:', livreurProfil);
-  console.log('[LivreurApp] livreurProfilError:', livreurProfilError);
-  console.log('[LivreurApp] isLoadingLivreurProfil:', isLoadingLivreurProfil);
+  // ---- NON CONNECTE ----
+  if (!isAuthenticated) return null;
 
   // ---- ERREUR DE CHARGEMENT ----
   if (livreurProfilError) {
-    console.error('[LivreurApp] LIVREUR PROFIL ERROR:', livreurProfilError);
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-5 p-8 text-center">
         <div className="w-20 h-20 rounded-3xl bg-red-50 flex items-center justify-center text-4xl shadow">⚠️</div>
@@ -380,23 +251,16 @@ export default function LivreurApp() {
           <p className="text-gray-500 text-sm mt-1 max-w-md leading-relaxed">
             Impossible de charger votre profil livreur.
           </p>
-          <div className="bg-red-100 rounded-lg p-3 mt-3 text-left text-xs text-red-700 font-mono">
-            {livreurProfilError?.message || 'Erreur inconnue'}
-          </div>
         </div>
-        <button
-          className="px-6 py-3 rounded-2xl border border-gray-200 text-gray-600 text-sm font-semibold"
-          onClick={() => logout()}
-        >
+        <button className="px-6 py-3 rounded-2xl border border-gray-200 text-gray-600 text-sm font-semibold" onClick={() => logout()}>
           Se déconnecter
         </button>
       </div>
     );
   }
 
-  // ---- PAS DE PROFIL LIVREUR ----
-  if (livreurProfil === null) {
-    console.warn('[LivreurApp] Livreur profil is NULL - no match found');
+  // ---- PAS DE PROFIL LIVREUR (seulement si la query est terminée) ----
+  if (!isLoadingLivreurProfil && livreurProfil === null) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-5 p-8 text-center">
         <div className="w-20 h-20 rounded-3xl bg-red-50 flex items-center justify-center text-4xl shadow">🚫</div>
@@ -406,20 +270,15 @@ export default function LivreurApp() {
             Votre compte n'est pas autorisé par Silga Livraison. Contactez un administrateur.
           </p>
         </div>
-        <button
-          className="px-6 py-3 rounded-2xl border border-gray-200 text-gray-600 text-sm font-semibold"
-          onClick={() => logout()}
-        >
+        <button className="px-6 py-3 rounded-2xl border border-gray-200 text-gray-600 text-sm font-semibold" onClick={() => logout()}>
           Se déconnecter
         </button>
       </div>
     );
   }
 
-  if (!livreurProfil) {
-    console.warn('[LivreurApp] Livreur profil is UNDEFINED - returning null (should not happen)');
-    return null;
-  }
+  // En cours de chargement du profil (après auth OK)
+  if (!livreurProfil) return null;
 
   const isEnLigne = livreurProfil.statut !== "hors_ligne";
 

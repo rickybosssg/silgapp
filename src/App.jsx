@@ -67,7 +67,7 @@ const AuthenticatedApp = () => {
     return <Silgapp2Login />;
   }
 
-  if (isAuthenticated && !isAdmin && resolvedLivreurMatch === null) {
+  if (isAuthenticated && !isAdmin && !isLoadingLivreur && resolvedLivreurMatch === null) {
     return <UnauthorizedLivreur user={user} logout={logout} />;
   }
 
