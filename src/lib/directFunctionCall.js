@@ -1,25 +1,17 @@
 /**
- * Appelle une fonction backend directement via fetch,
- * en injectant le token de session disponible (preview ou APK).
+ * Appelle une fonction backend directement via fetch.
+ * Utilise l'URL publique /functions/ qui n'exige pas de token Base44.
+ * Compatible avec les livreurs connectés par code (pas de session Base44).
  */
-import { appParams } from '@/lib/app-params';
+import { APP_PUBLIC_URL } from '@/lib/app-params';
 
 export const invokeDirectly = async (functionName, payload = {}) => {
-  const { appId, token, appBaseUrl } = appParams;
-
-  // Construire l'URL : URL relative en preview/web, URL absolue en APK Capacitor
-  const isCapacitor = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-  const base = isCapacitor ? (appBaseUrl || '') : '';
-  const url = `${base}/api/apps/${appId}/functions/${functionName}`;
-
-  const headers = { 'Content-Type': 'application/json' };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
+  const baseUrl = APP_PUBLIC_URL.replace(/\/$/, '');
+  const url = `${baseUrl}/functions/${functionName}`;
 
   const res = await fetch(url, {
     method: 'POST',
-    headers,
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
 

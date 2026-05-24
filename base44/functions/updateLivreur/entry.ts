@@ -5,7 +5,6 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const { id, data } = await req.json();
     if (!id) return Response.json({ success: false, error: 'id requis' }, { status: 400 });
-    // asServiceRole permet la mise à jour sans session utilisateur
     const updated = await base44.asServiceRole.entities.Livreur.update(id, data);
     return Response.json({ success: true, livreur: updated });
   } catch (error) {
