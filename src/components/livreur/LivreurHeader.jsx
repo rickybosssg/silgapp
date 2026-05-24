@@ -101,10 +101,10 @@ export default function LivreurHeader({ livreur, isEnLigne, onToggleLigne, onLog
             {/* Bouton En ligne / Hors ligne */}
             <button
               type="button"
-              onClick={() => onToggleLigne(!isEnLigne)}
+              onClick={onToggleLigne}
               style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
               className={cn(
-                "px-4 py-2 rounded-2xl font-bold text-sm shadow-lg active:scale-95",
+                "px-4 py-2 rounded-2xl font-bold text-sm shadow-lg active:scale-95 transition-opacity",
                 isEnLigne
                   ? "bg-red-500 text-white"
                   : "bg-green-500 text-white"
@@ -116,12 +116,14 @@ export default function LivreurHeader({ livreur, isEnLigne, onToggleLigne, onLog
             <button
               type="button"
               onClick={onActiverGps}
+              disabled={!navigator.geolocation}
               style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
               className={cn(
-                "px-3 py-1.5 rounded-xl font-semibold text-xs flex items-center gap-1.5 justify-center border",
+                "px-3 py-1.5 rounded-xl font-semibold text-xs flex items-center gap-1.5 justify-center border transition-opacity",
                 gpsActif
                   ? "bg-white/10 text-green-300 border-green-400/40"
-                  : "bg-white/10 text-white/50 border-white/20"
+                  : "bg-white/10 text-white/50 border-white/20",
+                !navigator.geolocation && "opacity-50 cursor-not-allowed"
               )}
             >
               {gpsActif

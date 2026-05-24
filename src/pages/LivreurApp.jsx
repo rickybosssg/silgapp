@@ -137,12 +137,14 @@ export default function LivreurApp() {
         ? updateNativeLivreur(livreurProfil.id, { statut: newStatut })
         : updateLivreurBackend(livreurProfil.id, { statut: newStatut })
     ),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('[toggleDispoMutation] onSuccess:', data);
       queryClient.invalidateQueries({ queryKey: ["native-livreur-state"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
       toast.success("Statut mis à jour ✓");
     },
     onError: (err) => {
+      console.error('[toggleDispoMutation] onError:', err);
       toast.error("Erreur statut : " + (err?.message || "inconnue"));
     },
   });
@@ -202,9 +204,9 @@ export default function LivreurApp() {
     toast("Course annulée par le client");
   };
 
-  const handleToggleLigne = (enLigne) => {
-    const newStatut = enLigne ? "disponible" : "hors_ligne";
-    toast(enLigne ? "Passage en ligne…" : "Passage hors ligne…");
+  const handleToggleLigne = () => {
+    const newStatut = isEnLigne ? "hors_ligne" : "disponible";
+    toast(newStatut === "disponible" ? "Passage en ligne…" : "Passage hors ligne…");
     toggleDispoMutation.mutate(newStatut);
   };
 
