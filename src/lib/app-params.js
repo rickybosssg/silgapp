@@ -47,12 +47,12 @@ const getAppParamValue = (paramName, { defaultValue = undefined, removeFromUrl =
 }
 
 // Détecte Capacitor (APK Android/iOS) pour adapter les URLs
+// IMPORTANT: ne pas se baser sur localhost — le preview web tourne aussi sur localhost
 const detectCapacitor = () => {
 	try {
 		if (typeof window === 'undefined') return false;
+		// Seul indicateur fiable : Capacitor.isNativePlatform()
 		if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) return true;
-		// Capacitor sert le WebView sur localhost
-		if (window.location.hostname === 'localhost') return true;
 		return false;
 	} catch (e) {
 		return false;

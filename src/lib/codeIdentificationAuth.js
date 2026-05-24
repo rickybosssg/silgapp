@@ -60,29 +60,38 @@ export const findLivreurByIdentificationCode = async (code) => {
     return null;
   }
 
-  // ÉTAPE 1: Vérification LOCALE (priorité - comme admin)
+  // ÉTAPE 1: Vérification LOCALE (cache APK) — rapide si disponible
   const livreurLocal = await verifyCodeLocalement(normalizedCode);
-  
   if (livreurLocal) {
     return livreurLocal;
   }
 
-  // ÉTAPE 2: Backend (fallback)
+  // ÉTAPE 2: Base de données Base44 directement (source unique de vérité)
+  // Ceci fonctionne dans l'APK ET dans le preview — même base de données
   try {
-    if (isNativeLivreurRuntime()) {
-      const livreur = await verifyNativeLivreurCode(normalizedCode);
-      if (livreur) {
-        return livreur;
-      }
+    const livreurs = await base44.entities.Livreur.list('-created_date', 1000);
+    const match = livreurs.find(l =>
+      l.code_identification &&
+      l.code_identification.trim().toUpperCase() === normalizedCode
+    );
+    if (match) {
+      return match;
     }
+  } catch (error) {
+    // fallback backend function si l'accès direct échoue
+  }
 
+  // ÉTAPE 3: Backend function (dernier recours)
+  try {
     const response = await base44.functions.invoke('findLivreurByCode', { code: normalizedCode });
-    
+    if (response?.data?.success === true && response?.data?.livreur) {
+      return response.data.livreur;
+    }
     if (response?.success === true && response?.livreur) {
       return response.livreur;
     }
   } catch (error) {
-    console.error('[CodeIdentificationAuth] Backend lookup failed:', error?.message);
+    // silencieux
   }
 
   return null;

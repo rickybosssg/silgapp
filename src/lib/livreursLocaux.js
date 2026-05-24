@@ -13,8 +13,8 @@ const getPreferences = async () => {
 export const isCapacitorAvailable = () => {
   try {
     if (typeof window === 'undefined') return false;
-    const win = window;
-    return !!(win.Capacitor && win.Capacitor.isNativePlatform());
+    // Seul indicateur fiable — isNativePlatform() retourne true uniquement dans l'APK réel
+    return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
   } catch {
     return false;
   }
