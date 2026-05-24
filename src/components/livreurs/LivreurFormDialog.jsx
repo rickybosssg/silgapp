@@ -62,16 +62,22 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
   };
 
   const mutation = useMutation({
-    mutationFn: (data) =>
-      isEdit
-        ? base44.entities.Livreur.update(livreur.id, data)
-        : base44.entities.Livreur.create({ ...data, validation: "valide", statut: "hors_ligne" }),
+    mutationFn: async (data) => {
+      if (isEdit) {
+        return base44.entities.Livreur.update(livreur.id, data);
+      } else {
+        return base44.entities.Livreur.create({ ...data, validation: "valide", statut: "hors_ligne", actif: true });
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["livreurs"] });
       toast.success(isEdit ? "Livreur mis à jour ✅" : "Livreur créé ✅");
       onClose();
     },
-    onError: () => toast.error("Erreur. Réessayez."),
+    onError: (error) => {
+      console.error("LivreurFormDialog mutation error:", error);
+      toast.error(error.message || "Erreur. Réessayez.");
+    },
   });
 
   const handlePhoto = async (e) => {
@@ -85,27 +91,37 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.nom || !form.telephone) {
-      toast.error("Nom et téléphone sont obligatoires");
+    console.log("[LivreurFormDialog] handleSubmit called");
+    
+    // Validation stricte
+    const errors = [];
+    if (!form.nom?.trim()) errors.push("Le nom est obligatoire");
+    if (!form.telephone?.trim()) errors.push("Le téléphone est obligatoire");
+    if (!form.code_identification?.trim()) errors.push("Le code d'identification est obligatoire");
+    
+    if (errors.length > 0) {
+      console.log("[LivreurFormDialog] Validation errors:", errors);
+      errors.forEach(err => toast.error(err));
       return;
     }
 
     const codeIdentification = form.code_identification.trim().toUpperCase();
-    if (!codeIdentification) {
-      toast.error("Code d'identification obligatoire");
-      return;
-    }
-
+    console.log("[LivreurFormDialog] Code to check:", codeIdentification);
+    
     try {
       const codeExists = await isIdentificationCodeAlreadyUsed(codeIdentification, livreur?.id);
+      console.log("[LivreurFormDialog] Code exists check result:", codeExists);
+      
       if (codeExists) {
         toast.error("Ce code d'identification est deja utilise");
         return;
       }
+      
+      console.log("[LivreurFormDialog] Calling mutation.mutate with:", { ...form, code_identification: codeIdentification });
       mutation.mutate({ ...form, code_identification: codeIdentification });
     } catch (error) {
       console.error("[LivreurFormDialog] Code uniqueness check failed:", error);
-      toast.error("Impossible de verifier le code. Reessayez.");
+      toast.error(`Erreur: ${error.message || "Impossible de verifier le code"}`);
     }
   };
 

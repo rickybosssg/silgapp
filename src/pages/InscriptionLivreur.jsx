@@ -23,19 +23,13 @@ export default function InscriptionLivreur() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const createMutation = useMutation({
-    mutationFn: async (data) => {
-      console.log("START_CREATE_LIVREUR", data);
-      const result = await base44.entities.Livreur.create({ ...data, validation: "en_attente", statut: "hors_ligne" });
-      console.log("CREATE_LIVREUR_RESPONSE", result);
-      return result;
-    },
+    mutationFn: (data) => base44.entities.Livreur.create({ ...data, validation: "en_attente", statut: "hors_ligne", actif: true }),
     onSuccess: () => {
-      console.log("CREATE_LIVREUR_SUCCESS");
+      toast.success("Candidature envoyée avec succès !");
       setDone(true);
     },
     onError: (error) => {
-      console.log("CREATE_LIVREUR_ERROR", error);
-      toast.error(`Erreur: ${error.message || "Erreur lors de l'inscription"}`);
+      toast.error(error.message || "Erreur lors de l'inscription. Réessayez.");
     },
   });
 
@@ -43,39 +37,32 @@ export default function InscriptionLivreur() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingPhoto(true);
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    setForm(p => ({ ...p, photo_url: file_url }));
-    setUploadingPhoto(false);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      setForm(p => ({ ...p, photo_url: file_url }));
+    } catch (err) {
+      toast.error("Erreur lors de l'envoi de la photo");
+    } finally {
+      setUploadingPhoto(false);
+    }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log("CLICK_CREATE_LIVREUR");
     
-    // Validation des champs obligatoires
-    if (!form.prenom || !form.nom || !form.telephone) {
-      console.log("VALIDATION_ERROR: Champs manquants", { prenom: form.prenom, nom: form.nom, telephone: form.telephone });
-      if (!form.prenom) toast.error("Le prénom est obligatoire");
-      if (!form.nom) toast.error("Le nom est obligatoire");
-      if (!form.telephone) toast.error("Le téléphone est obligatoire");
+    // Validation stricte des champs obligatoires
+    const errors = [];
+    if (!form.prenom.trim()) errors.push("Le prénom est obligatoire");
+    if (!form.nom.trim()) errors.push("Le nom est obligatoire");
+    if (!form.telephone.trim()) errors.push("Le téléphone est obligatoire");
+    if (!form.quartier.trim()) errors.push("Le quartier est obligatoire");
+    
+    if (errors.length > 0) {
+      errors.forEach(err => toast.error(err));
       return;
     }
     
-    // Validation assouplie du téléphone (accepte les numéros courts pour test)
-    const phoneClean = form.telephone.replace(/\s/g, "");
-    if (phoneClean.length < 4) {
-      console.log("VALIDATION_ERROR: Téléphone incomplet", phoneClean);
-      toast.error("Téléphone incomplet (minimum 4 chiffres)");
-      return;
-    }
-    
-    if (!form.quartier) {
-      console.log("VALIDATION_ERROR: Quartier manquant");
-      toast.error("Le quartier est obligatoire");
-      return;
-    }
-    
-    console.log("FORM_VALIDATED", form);
+    // Création du livreur
     createMutation.mutate(form);
   };
 
@@ -143,15 +130,12 @@ export default function InscriptionLivreur() {
                   <Phone className="w-3 h-3" /> Téléphone *
                 </Label>
                 <Input
-                  placeholder="Ex: 77 66 ou +226 70 00 00 00"
+                  placeholder="+226 70 00 00 00"
                   value={form.telephone}
                   onChange={(e) => setForm(p => ({ ...p, telephone: e.target.value }))}
                   required
                   type="tel"
                 />
-                <p className="text-[10px] text-muted-foreground">
-                  Format: 77 66 (test) ou +226 70 00 00 00
-                </p>
               </div>
             </CardContent>
           </Card>
@@ -208,7 +192,6 @@ export default function InscriptionLivreur() {
             type="submit"
             className="w-full h-12 text-base font-bold bg-primary gap-2"
             disabled={createMutation.isPending || uploadingPhoto}
-            onClick={() => console.log("BUTTON_CLICKED", { isPending: createMutation.isPending, uploadingPhoto })}
           >
             <Truck className="w-5 h-5" />
             {createMutation.isPending ? "Envoi en cours..." : "Envoyer ma candidature"}
