@@ -310,8 +310,8 @@ export default function Livreurs() {
             </span>
           )}
           {livreursError && (
-            <span className="text-xs text-destructive bg-destructive/10 px-2 py-0.5 rounded-full">
-              Erreur chargement
+            <span className="text-xs text-destructive bg-destructive/10 px-2 py-0.5 rounded-full" title={livreursError?.message}>
+              ⚠️ {livreursError?.message || 'Erreur chargement'}
             </span>
           )}
         </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -6,37 +6,73 @@ import { Database, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
+const SYNC_META_KEY = 'silgapp_livreurs_sync_meta';
+const LIVREURS_CACHE_KEY = 'silgapp_livreurs_cache';
+
+function getSyncMeta() {
+  try {
+    const raw = localStorage.getItem(SYNC_META_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveSyncResult(data) {
+  // Sauvegarder la liste des livreurs dans le cache
+  const cacheData = JSON.stringify({
+    livreurs: data.livreurs || [],
+    synced_at: data.synced_at || new Date().toISOString(),
+    count: data.count || 0
+  });
+  localStorage.setItem(LIVREURS_CACHE_KEY, cacheData);
+
+  // Sauvegarder la méta (date + count) pour l'affichage
+  const meta = {
+    synced_at: data.synced_at || new Date().toISOString(),
+    count: data.count || 0
+  };
+  localStorage.setItem(SYNC_META_KEY, JSON.stringify(meta));
+  return meta;
+}
+
 export default function LivreursCacheSync() {
-  const [lastSync, setLastSync] = useState(null);
+  const [syncMeta, setSyncMeta] = useState(() => getSyncMeta());
+
+  // Relire depuis localStorage au montage (persistance entre pages)
+  useEffect(() => {
+    setSyncMeta(getSyncMeta());
+  }, []);
 
   const syncMutation = useMutation({
     mutationFn: async () => {
-      console.log('[LivreursCacheSync] Starting sync...');
-      try {
-        const result = await base44.functions.invoke('triggerSyncLivreursLocaux', {});
-        console.log('[LivreursCacheSync] Result:', result);
-        
-        if (!result.data?.success) {
-          console.error('[LivreursCacheSync] Sync failed:', result.data?.error);
-          throw new Error(result.data?.error || 'Échec de la synchronisation');
-        }
-        
-        return result.data;
-      } catch (error) {
-        console.error('[LivreursCacheSync] Error:', error.message);
-        throw error;
+      const result = await base44.functions.invoke('triggerSyncLivreursLocaux', {});
+      if (!result.data?.success) {
+        throw new Error(result.data?.error || 'Échec de la synchronisation');
       }
+      return result.data;
     },
     onSuccess: (data) => {
-      console.log('[LivreursCacheSync] Success:', data.count, 'livreurs');
-      setLastSync(new Date());
+      const meta = saveSyncResult(data);
+      setSyncMeta(meta);
       toast.success(`${data.count} codes livreurs synchronisés`);
     },
     onError: (error) => {
-      console.error('[LivreursCacheSync] onError:', error.message);
       toast.error(error.message);
     },
   });
+
+  const formatDate = (iso) => {
+    if (!iso) return '';
+    try {
+      return new Date(iso).toLocaleString('fr-FR', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+    } catch {
+      return iso;
+    }
+  };
 
   return (
     <Card>
@@ -58,10 +94,10 @@ export default function LivreursCacheSync() {
                   <RefreshCw className="w-4 h-4 animate-spin" />
                   Synchronisation en cours...
                 </span>
-              ) : lastSync ? (
+              ) : syncMeta?.synced_at ? (
                 <span className="flex items-center gap-2 text-green-600">
                   <CheckCircle2 className="w-4 h-4" />
-                  Dernière sync: {lastSync.toLocaleTimeString('fr-FR')}
+                  Dernière sync : {formatDate(syncMeta.synced_at)} ({syncMeta.count} livreurs)
                 </span>
               ) : (
                 <span className="flex items-center gap-2 text-amber-600">
@@ -71,29 +107,23 @@ export default function LivreursCacheSync() {
               )}
             </p>
           </div>
-          
+
           <Button
             onClick={() => syncMutation.mutate()}
             disabled={syncMutation.isPending}
-            variant={lastSync ? 'outline' : 'default'}
+            variant={syncMeta ? 'outline' : 'default'}
           >
             {syncMutation.isPending ? (
-              <>
-                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                Synchronisation...
-              </>
+              <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Synchronisation...</>
             ) : (
-              <>
-                <Database className="w-4 h-4 mr-2" />
-                Synchroniser
-              </>
+              <><Database className="w-4 h-4 mr-2" />Synchroniser</>
             )}
           </Button>
         </div>
 
         {syncMutation.isSuccess && (
           <div className="text-xs text-muted-foreground bg-green-50 p-3 rounded-lg border border-green-200">
-            ✅ Synchronisation réussie! Les livreurs peuvent maintenant se connecter avec leur code d'identification.
+            ✅ Synchronisation réussie ! Les livreurs peuvent maintenant se connecter avec leur code d'identification.
           </div>
         )}
 
