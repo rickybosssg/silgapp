@@ -2,69 +2,91 @@ import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
-  Package, TrendingUp, Menu, X, LogOut 
+  Package, TrendingUp, Menu, X, LogOut
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useSilgappAuth } from "@/lib/silgappAuth";
-
 const navItems = [
-  { path: "/", label: "Tableau de bord", icon: LayoutDashboard },
-  { path: "/nouvelle-course", label: "Nouvelle course", icon: Plus },
+  { path: "/", label: "Dashboard", icon: LayoutDashboard },
+  { path: "/nouvelle-course", label: "Course", icon: Plus },
   { path: "/carte", label: "Carte", icon: MapPin },
   { path: "/courses", label: "Courses", icon: Package },
   { path: "/livreurs", label: "Livreurs", icon: Truck },
-  { path: "/rapport", label: "Rapport", icon: BarChart3 },
-  { path: "/recapitulatif", label: "Récap", icon: TrendingUp },
+];
+
+const allNavItems = [
+  { path: "/", label: "Tableau de bord", icon: LayoutDashboard },
+  { path: "/nouvelle-course", label: "Nouvelle course", icon: Plus },
+  { path: "/carte", label: "Carte en direct", icon: MapPin },
+  { path: "/courses", label: "Toutes les courses", icon: Package },
+  { path: "/livreurs", label: "Livreurs", icon: Truck },
+  { path: "/rapport", label: "Rapport du jour", icon: BarChart3 },
+  { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp },
   { path: "/notifications", label: "Notifications", icon: Bell },
 ];
 
 export default function MobileNav({ notificationCount = 0 }) {
   const location = useLocation();
-  const { logout } = useSilgappAuth();
+  const { logout, user } = useSilgappAuth();
   const [showMenu, setShowMenu] = useState(false);
 
   return (
     <>
-      {/* Header mobile */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-card border-b border-border z-40 flex items-center justify-between px-4">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <Truck className="w-4 h-4 text-primary-foreground" />
+      {/* ===== MOBILE HEADER ===== */}
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-card border-b border-border z-40 flex items-center justify-between px-4 shadow-sm">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-sm">
+            <span className="text-primary-foreground font-black text-sm">S</span>
           </div>
           <div>
-            <h1 className="font-bold text-sm text-foreground">Silga</h1>
-            <p className="text-[9px] text-muted-foreground">Livraison</p>
+            <h1 className="font-extrabold text-sm text-foreground leading-tight">SILGAPP 2</h1>
+            <p className="text-[9px] text-muted-foreground leading-tight">Silga Livraison</p>
           </div>
         </div>
-        
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setShowMenu(!showMenu)}
-          className="text-muted-foreground"
-        >
-          {showMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </Button>
+
+        <div className="flex items-center gap-2">
+          {notificationCount > 0 && (
+            <Link to="/notifications" className="relative">
+              <Bell className="w-5 h-5 text-muted-foreground" />
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center">
+                {notificationCount > 9 ? '9+' : notificationCount}
+              </span>
+            </Link>
+          )}
+          <Button variant="ghost" size="icon" onClick={() => setShowMenu(true)} className="text-muted-foreground">
+            <Menu className="w-5 h-5" />
+          </Button>
+        </div>
       </header>
 
-      {/* Menu hamburger overlay */}
+      {/* ===== MOBILE SLIDE-IN MENU ===== */}
       {showMenu && (
-        <div className="lg:hidden fixed inset-0 bg-black/50 z-50" onClick={() => setShowMenu(false)}>
-          <div 
-            className="absolute right-0 top-0 bottom-0 w-64 bg-card border-l border-border p-4 overflow-y-auto"
+        <div className="lg:hidden fixed inset-0 z-50" onClick={() => setShowMenu(false)}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div
+            className="absolute right-0 top-0 bottom-0 w-72 bg-card flex flex-col shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="font-bold text-foreground">Menu</h2>
+            {/* Menu header */}
+            <div className="h-14 flex items-center justify-between px-4 border-b border-border flex-shrink-0">
+              <div>
+                {user && (
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{user.full_name || user.email}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
+                  </div>
+                )}
+              </div>
               <Button variant="ghost" size="icon" onClick={() => setShowMenu(false)}>
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </Button>
             </div>
-            
-            <nav className="space-y-1">
-              {navItems.map((item) => {
+
+            {/* Nav items */}
+            <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
+              {allNavItems.map((item) => {
                 const isActive = location.pathname === item.path;
                 const Icon = item.icon;
                 return (
@@ -73,16 +95,16 @@ export default function MobileNav({ notificationCount = 0 }) {
                     to={item.path}
                     onClick={() => setShowMenu(false)}
                     className={cn(
-                      "flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all",
-                      isActive 
-                        ? "bg-primary text-primary-foreground" 
-                        : "text-muted-foreground hover:bg-muted"
+                      "flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all",
+                      isActive
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     )}
                   >
-                    <Icon className="w-4 h-4" />
-                    <span>{item.label}</span>
+                    <Icon className="w-4 h-4 flex-shrink-0" />
+                    <span className="flex-1">{item.label}</span>
                     {item.path === "/notifications" && notificationCount > 0 && (
-                      <Badge className="ml-auto bg-destructive text-destructive-foreground text-xs">
+                      <Badge className="bg-destructive text-destructive-foreground text-xs">
                         {notificationCount}
                       </Badge>
                     )}
@@ -91,14 +113,12 @@ export default function MobileNav({ notificationCount = 0 }) {
               })}
             </nav>
 
-            <div className="absolute bottom-4 left-4 right-4">
+            {/* Logout */}
+            <div className="border-t border-border p-3 flex-shrink-0">
               <Button
                 variant="outline"
                 className="w-full text-destructive border-destructive/30 hover:bg-destructive/10"
-                onClick={() => {
-                  logout();
-                  setShowMenu(false);
-                }}
+                onClick={() => { logout(); setShowMenu(false); }}
               >
                 <LogOut className="w-4 h-4 mr-2" />
                 Déconnexion
@@ -108,10 +128,10 @@ export default function MobileNav({ notificationCount = 0 }) {
         </div>
       )}
 
-      {/* Navigation barre du bas */}
+      {/* ===== MOBILE BOTTOM TAB BAR ===== */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40 safe-area-bottom">
-        <div className="flex items-center justify-around py-2">
-          {navItems.slice(0, 5).map((item) => {
+        <div className="flex items-stretch justify-around">
+          {navItems.map((item) => {
             const isActive = location.pathname === item.path;
             const Icon = item.icon;
             return (
@@ -119,122 +139,44 @@ export default function MobileNav({ notificationCount = 0 }) {
                 key={item.path}
                 to={item.path}
                 className={cn(
-                  "flex flex-col items-center justify-center p-2 rounded-lg transition-all",
-                  isActive 
-                    ? "text-primary" 
-                    : "text-muted-foreground"
+                  "flex flex-col items-center justify-center py-2 px-1 flex-1 transition-all min-h-[56px]",
+                  isActive ? "text-primary" : "text-muted-foreground"
                 )}
               >
-                <Icon className="w-5 h-5" />
-                <span className="text-[10px] font-medium mt-0.5 truncate max-w-[60px]">
-                  {item.label.split(' ')[0]}
+                <div className={cn(
+                  "w-10 h-6 flex items-center justify-center rounded-full transition-all",
+                  isActive && "bg-primary/10"
+                )}>
+                  <Icon className="w-5 h-5" />
+                </div>
+                <span className={cn(
+                  "text-[10px] font-medium mt-0.5",
+                  isActive ? "text-primary" : "text-muted-foreground"
+                )}>
+                  {item.label}
                 </span>
               </Link>
             );
           })}
-          
-          {/* More menu */}
-          <div className="relative">
-            <Link
-              to="/notifications"
-              className={cn(
-                "flex flex-col items-center justify-center p-2 rounded-lg transition-all",
-                location.pathname === "/notifications" || location.pathname === "/rapport" || location.pathname === "/recapitulatif"
-                  ? "text-primary" 
-                  : "text-muted-foreground"
+
+          {/* Menu button */}
+          <button
+            onClick={() => setShowMenu(true)}
+            className="flex flex-col items-center justify-center py-2 px-1 flex-1 text-muted-foreground min-h-[56px]"
+          >
+            <div className="w-10 h-6 flex items-center justify-center rounded-full relative">
+              <Menu className="w-5 h-5" />
+              {notificationCount > 0 && (
+                <span className="absolute -top-1 right-0 w-3.5 h-3.5 rounded-full bg-destructive text-destructive-foreground text-[8px] font-bold flex items-center justify-center">
+                  {notificationCount > 9 ? '9+' : notificationCount}
+                </span>
               )}
-            >
-              <div className="relative">
-                <Bell className="w-5 h-5" />
-                {notificationCount > 0 && (
-                  <Badge className="absolute -top-1 -right-1 h-4 w-4 rounded-full p-0 flex items-center justify-center bg-destructive text-[8px]">
-                    {notificationCount}
-                  </Badge>
-                )}
-              </div>
-              <span className="text-[10px] font-medium mt-0.5">Plus</span>
-            </Link>
-          </div>
+            </div>
+            <span className="text-[10px] font-medium mt-0.5">Plus</span>
+          </button>
         </div>
       </nav>
 
-      {/* Desktop sidebar (hidden on mobile) */}
-      <div className="hidden lg:block">
-        <DesktopSidebar notificationCount={notificationCount} />
-      </div>
     </>
-  );
-}
-
-// Desktop Sidebar (same as original)
-function DesktopSidebar({ notificationCount = 0 }) {
-  const [collapsed, setCollapsed] = useState(false);
-  const location = useLocation();
-  const { logout } = useSilgappAuth();
-
-  return (
-    <aside className={cn(
-      "h-screen bg-card border-r border-border flex flex-col transition-all duration-300 sticky top-0",
-      collapsed ? "w-16" : "w-64"
-    )}>
-      <div className="h-16 flex items-center px-4 border-b border-border gap-3">
-        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
-          <Truck className="w-4 h-4 text-primary-foreground" />
-        </div>
-        {!collapsed && (
-          <div className="overflow-hidden">
-            <h1 className="font-bold text-sm leading-tight text-foreground">Silga</h1>
-            <p className="text-[10px] text-muted-foreground leading-tight">Livraison</p>
-          </div>
-        )}
-      </div>
-
-      <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
-          const isActive = location.pathname === item.path;
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
-                isActive 
-                  ? "bg-primary text-primary-foreground shadow-sm" 
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              <Icon className="w-4 h-4 flex-shrink-0" />
-              {!collapsed && (
-                <span className="truncate">{item.label}</span>
-              )}
-              {!collapsed && item.path === "/notifications" && notificationCount > 0 && (
-                <Badge className="ml-auto bg-destructive text-destructive-foreground text-[10px] h-5 min-w-5 flex items-center justify-center">
-                  {notificationCount}
-                </Badge>
-              )}
-            </Link>
-          );
-        })}
-      </nav>
-
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="h-12 flex items-center justify-center border-t border-border text-muted-foreground hover:text-foreground transition-colors"
-      >
-        {collapsed ? <Menu className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-      </button>
-
-      <button
-        onClick={logout}
-        className={cn(
-          "h-12 flex items-center gap-3 px-4 text-sm font-medium transition-colors border-t border-border",
-          "text-destructive hover:bg-destructive/10"
-        )}
-      >
-        <LogOut className="w-4 h-4 flex-shrink-0" />
-        {!collapsed && <span>Déconnexion</span>}
-      </button>
-    </aside>
   );
 }

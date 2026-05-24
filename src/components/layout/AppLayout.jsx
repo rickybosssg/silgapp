@@ -2,6 +2,7 @@ import React from "react";
 import { Outlet } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import Sidebar from "./Sidebar";
 import MobileNav from "./MobileNav";
 
 export default function AppLayout() {
@@ -14,17 +15,21 @@ export default function AppLayout() {
 
   return (
     <div className="min-h-screen bg-background">
-      <MobileNav notificationCount={notifications.length} />
-      <main className="lg:ml-0 pt-14 lg:pt-0 pb-16 lg:pb-0">
-        <div className="lg:flex">
-          <div className="hidden lg:block">
-            {/* Desktop sidebar rendered by MobileNav */}
-          </div>
-          <div className="flex-1">
-            <Outlet />
-          </div>
-        </div>
-      </main>
+      {/* Desktop layout */}
+      <div className="hidden lg:flex min-h-screen">
+        <Sidebar notificationCount={notifications.length} />
+        <main className="flex-1 min-h-screen overflow-x-hidden bg-background">
+          <Outlet />
+        </main>
+      </div>
+
+      {/* Mobile layout */}
+      <div className="lg:hidden">
+        <MobileNav notificationCount={notifications.length} />
+        <main className="pt-14 pb-16 min-h-screen">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }
