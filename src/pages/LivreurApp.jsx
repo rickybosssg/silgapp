@@ -127,11 +127,14 @@ export default function LivreurApp() {
       .reduce((sum, c) => sum + (c.prix_reel || 0), 0);
   }, [mesCourses]);
 
+  const updateLivreurBackend = (id, data) =>
+    base44.functions.invoke('updateLivreur', { id, data });
+
   const toggleDispoMutation = useMutation({
     mutationFn: (newStatut) => (
       isNativeLivreur
         ? updateNativeLivreur(livreurProfil.id, { statut: newStatut })
-        : base44.entities.Livreur.update(livreurProfil.id, { statut: newStatut })
+        : updateLivreurBackend(livreurProfil.id, { statut: newStatut })
     ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["native-livreur-state"] });
@@ -157,7 +160,7 @@ export default function LivreurApp() {
     if (isNativeLivreur) {
       updateNativeLivreur(livreurProfil.id, { statut: "en_course" });
     } else {
-      base44.entities.Livreur.update(livreurProfil.id, { statut: "en_course" });
+      updateLivreurBackend(livreurProfil.id, { statut: "en_course" });
     }
     toast.success("Course acceptée ! 🚀");
   };
@@ -177,7 +180,7 @@ export default function LivreurApp() {
     if (isNativeLivreur) {
       updateNativeLivreur(livreurProfil.id, { statut: "disponible" });
     } else {
-      base44.entities.Livreur.update(livreurProfil.id, { statut: "disponible" });
+      updateLivreurBackend(livreurProfil.id, { statut: "disponible" });
     }
     queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
     toast.success(`Livraison terminée ! 🎉 ${prixReel.toLocaleString()} FCFA encaissés`);
@@ -188,7 +191,7 @@ export default function LivreurApp() {
     if (isNativeLivreur) {
       updateNativeLivreur(livreurProfil.id, { statut: "disponible" });
     } else {
-      base44.entities.Livreur.update(livreurProfil.id, { statut: "disponible" });
+      updateLivreurBackend(livreurProfil.id, { statut: "disponible" });
     }
     queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
     toast("Course annulée par le client");
@@ -235,7 +238,7 @@ export default function LivreurApp() {
           if (isNativeLivreur) {
             updateNativeLivreur(livreurProfil.id, positionData);
           } else {
-            base44.entities.Livreur.update(livreurProfil.id, positionData);
+            updateLivreurBackend(livreurProfil.id, positionData);
           }
         },
         () => { setGpsActif(false); },
