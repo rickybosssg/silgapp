@@ -40,12 +40,8 @@ export default function LivreurHeader({ livreur, isEnLigne, onToggleLigne, onLog
   const dateStr = time.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
 
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white shadow-2xl">
-      {/* Decorative circles */}
-      <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-primary/20 blur-2xl" />
-      <div className="absolute -bottom-6 -left-6 w-24 h-24 rounded-full bg-primary/10 blur-xl" />
-
-      <div className="relative p-5">
+    <div className="rounded-3xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white shadow-2xl">
+      <div className="p-5">
         {/* Top row: time + status icons */}
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -58,8 +54,10 @@ export default function LivreurHeader({ livreur, isEnLigne, onToggleLigne, onLog
               : <WifiOff className="w-4 h-4 text-red-400" />
             }
             <button
+              type="button"
               onClick={onLogout}
-              className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
+              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+              className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center active:bg-white/30"
             >
               <LogOut className="w-3.5 h-3.5 text-white/70" />
             </button>
@@ -99,27 +97,31 @@ export default function LivreurHeader({ livreur, isEnLigne, onToggleLigne, onLog
           </div>
 
           {/* Actions GPS + Ligne */}
-          <div className="flex flex-col gap-2 flex-shrink-0">
+          <div className="flex flex-col gap-2 flex-shrink-0" style={{ position: 'relative', zIndex: 10 }}>
             {/* Bouton En ligne / Hors ligne */}
             <button
+              type="button"
               onClick={() => onToggleLigne(!isEnLigne)}
+              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
               className={cn(
-                "px-4 py-2 rounded-2xl font-bold text-sm transition-all duration-300 shadow-lg",
+                "px-4 py-2 rounded-2xl font-bold text-sm shadow-lg active:scale-95",
                 isEnLigne
-                  ? "bg-red-500 hover:bg-red-600 text-white shadow-red-500/30"
-                  : "bg-green-500 hover:bg-green-600 text-white shadow-green-500/30"
+                  ? "bg-red-500 text-white"
+                  : "bg-green-500 text-white"
               )}
             >
               {isEnLigne ? "Hors ligne" : "En ligne"}
             </button>
             {/* Bouton GPS */}
             <button
+              type="button"
               onClick={onActiverGps}
+              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
               className={cn(
-                "px-3 py-1.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-1.5 justify-center",
+                "px-3 py-1.5 rounded-xl font-semibold text-xs flex items-center gap-1.5 justify-center border",
                 gpsActif
-                  ? "bg-white/10 text-green-300 border border-green-400/40"
-                  : "bg-white/10 text-white/50 border border-white/20 hover:bg-white/20"
+                  ? "bg-white/10 text-green-300 border-green-400/40"
+                  : "bg-white/10 text-white/50 border-white/20"
               )}
             >
               {gpsActif
