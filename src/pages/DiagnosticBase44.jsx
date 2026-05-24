@@ -45,8 +45,8 @@ export default function DiagnosticBase44() {
 
   const { data: livreurs, isLoading: isLoadingLivreurs, error: livreursError } = useQuery({
     queryKey: ['diagnostic-livreurs'],
-    queryFn: () => base44.entities.Livreur.list('-created_date', 100),
-    enabled: !!userInfo,
+    queryFn: () => base44.functions.invoke('syncLivreursLocaux', {}).then(r => r?.data?.livreurs || []),
+    enabled: !isLoadingUser && !!userInfo,
     retry: false,
   });
 
@@ -146,7 +146,12 @@ export default function DiagnosticBase44() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {isLoadingLivreurs ? (
+            {!userInfo && !isLoadingUser ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <XCircle className="w-4 h-4 text-destructive" />
+                <span className="text-sm">Connectez-vous en tant qu'admin pour voir les données livreurs.</span>
+              </div>
+            ) : isLoadingLivreurs ? (
               <p className="text-muted-foreground">Chargement des livreurs...</p>
             ) : livreursError ? (
               <Alert variant="destructive">
