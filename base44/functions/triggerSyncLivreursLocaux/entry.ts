@@ -1,43 +1,46 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 /**
- * Wrapper pour appeler syncLivreursLocaux depuis le frontend
- * Cette fonction vérifie l'authentification et délègue à la fonction principale
+ * Synchronise les codes livreurs - appelé depuis le frontend admin
+ * Fait directement le travail au lieu de re-appeler syncLivreursLocaux (évite le problème d'auth en cascade)
  */
 Deno.serve(async (req) => {
   try {
-    console.log('[triggerSyncLivreursLocaux] ========== TRIGGER START ==========');
-    
     const base44 = createClientFromRequest(req);
-    
-    // Vérifier l'authentification
+
     const user = await base44.auth.me();
-    console.log('[triggerSyncLivreursLocaux] User:', user?.full_name, 'Role:', user?.role);
-    
     if (!user || user.role !== 'admin') {
-      console.error('[triggerSyncLivreursLocaux] ❌ Not admin or not logged in');
-      return Response.json({ 
-        success: false, 
-        error: 'Accès réservé aux administrateurs' 
-      }, { status: 403 });
+      return Response.json({ success: false, error: 'Accès réservé aux administrateurs' }, { status: 403 });
     }
-    
-    // Appeler la fonction principale via le SDK service role
-    console.log('[triggerSyncLivreursLocaux] Calling syncLivreursLocaux...');
-    const result = await base44.asServiceRole.functions.invoke('syncLivreursLocaux', {});
-    
-    console.log('[triggerSyncLivreursLocaux] Result:', result);
-    console.log('[triggerSyncLivreursLocaux] ========== TRIGGER SUCCESS ==========');
-    
-    return Response.json(result);
+
+    // Récupérer TOUS les livreurs avec service role
+    const allLivreurs = await base44.asServiceRole.entities.Livreur.list('-created_date', 1000);
+
+    // Filtrer actifs + validés + avec code
+    const activeLivreurs = allLivreurs
+      .filter(l => l.actif === true && l.validation === 'valide' && !!l.code_identification)
+      .map(l => ({
+        livreur_id: l.id,
+        nom: String(l.nom || ''),
+        prenom: String(l.prenom || ''),
+        telephone: String(l.telephone || ''),
+        code_identification: String(l.code_identification || '').toUpperCase().trim(),
+        quartier: l.quartier || '',
+        vehicule: l.vehicule || 'moto',
+        user_email: l.user_email || '',
+        validation: l.validation,
+        actif: l.actif
+      }));
+
+    return Response.json({
+      success: true,
+      count: activeLivreurs.length,
+      livreurs: activeLivreurs,
+      synced_at: new Date().toISOString(),
+      synced_by: user.full_name
+    });
   } catch (error) {
-    console.error('[triggerSyncLivreursLocaux] ❌ ERROR:', error.message);
-    console.error('[triggerSyncLivreursLocaux] Stack:', error.stack);
-    
-    return Response.json({ 
-      success: false, 
-      error: error.message,
-      details: 'Erreur lors de la synchronisation'
-    }, { status: 500 });
+    console.error('[triggerSyncLivreursLocaux] ERROR:', error.message);
+    return Response.json({ success: false, error: error.message }, { status: 500 });
   }
 });

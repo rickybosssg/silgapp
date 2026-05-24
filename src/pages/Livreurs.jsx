@@ -198,10 +198,12 @@ export default function Livreurs() {
   const [showForm, setShowForm] = useState(false);
   const [editingLivreur, setEditingLivreur] = useState(null);
 
-  const { data: livreurs = [], isLoading } = useQuery({
+  const { data: livreurs = [], isLoading, error: livreursError } = useQuery({
     queryKey: ["livreurs"],
     queryFn: () => base44.entities.Livreur.list("-created_date", 200),
     initialData: [],
+    refetchInterval: 30000,
+    staleTime: 0,
   });
 
   const { data: courses = [] } = useQuery({
@@ -282,15 +284,17 @@ export default function Livreurs() {
     onError: () => toast.error("Erreur lors de la génération des codes"),
   });
 
-  const enAttente = livreurs.filter(l => l.validation === "en_attente" || !l.validation);
+  const enAttente = livreurs.filter(l => l.validation === "en_attente");
   const valides = livreurs.filter(l => l.validation === "valide");
   const refuses = livreurs.filter(l => l.validation === "refuse");
+  // Livreurs sans validation définie (données incomplètes) - on les traite comme en_attente pour ne pas les perdre
+  const sansValidation = livreurs.filter(l => !l.validation);
 
   const disponibles = valides.filter(l => l.statut === "disponible");
   const enCourse = valides.filter(l => l.statut === "en_course");
   const horsLigne = valides.filter(l => l.statut === "hors_ligne" || !l.statut);
 
-  const currentList = tab === "en_attente" ? enAttente : tab === "refuse" ? refuses : [];
+  const currentList = tab === "en_attente" ? [...enAttente, ...sansValidation] : tab === "refuse" ? refuses : [];
 
   const inscriptionLink = `${window.location.origin}/inscription-livreur`;
 
@@ -300,6 +304,16 @@ export default function Livreurs() {
         <div className="flex items-center gap-2">
           <Truck className="w-5 h-5 lg:w-6 lg:h-6 text-primary" />
           <h1 className="text-xl lg:text-2xl font-bold">Livreurs</h1>
+          {!isLoading && (
+            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+              {livreurs.length} total
+            </span>
+          )}
+          {livreursError && (
+            <span className="text-xs text-destructive bg-destructive/10 px-2 py-0.5 rounded-full">
+              Erreur chargement
+            </span>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
@@ -336,9 +350,9 @@ export default function Livreurs() {
           <TabsTrigger value="en_attente" className="gap-1.5">
             <Clock className="w-3.5 h-3.5" />
             En attente
-            {enAttente.length > 0 && (
+            {(enAttente.length + sansValidation.length) > 0 && (
               <Badge className="ml-1 bg-amber-500 text-white text-[10px] h-4 min-w-4 flex items-center justify-center">
-                {enAttente.length}
+                {enAttente.length + sansValidation.length}
               </Badge>
             )}
           </TabsTrigger>
