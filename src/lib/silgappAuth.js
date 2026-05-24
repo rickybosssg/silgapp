@@ -5,7 +5,7 @@ import {
   signInWithIdentificationCode as signInWithStoredIdentificationCode,
 } from '@/lib/codeIdentificationAuth';
 import { clearAllSessions } from '@/lib/capacitorStorage';
-import { verifyCodeLocalement, syncLivreursLocaux, getLivreursLocaux, isCacheValide } from '@/lib/livreursLocaux';
+import { syncLivreursLocaux, getLivreursLocaux, isCacheValide } from '@/lib/livreursLocaux';
 
 const AuthContext = createContext(null);
 
@@ -157,59 +157,17 @@ export const SilgappAuthProvider = ({ children }) => {
   };
 
   const signInWithIdentificationCode = async (code) => {
-    console.log('[SilgappAuth] ========== SIGN IN FLOW START ==========');
-    console.log('[SilgappAuth] START_LOGIN: Code reçu:', code);
     setIsLoadingAuth(true);
     try {
       localStorage.removeItem(ADMIN_SESSION_KEY);
-      console.log('[SilgappAuth] Admin session cleared');
-      
-      // ÉTAPE 1: Vérification LOCALE (comme admin)
-      console.log('[SilgappAuth] ÉTAPE 1: Vérification LOCALE du code...');
-      const livreurLocal = await verifyCodeLocalement(code);
-      
-      if (livreurLocal) {
-        console.log('[SilgappAuth] ✅ MATCH LOCAL TROUVÉ:', livreurLocal.nom, livreurLocal.prenom);
-        console.log('[SilgappAuth] Livreur ID:', livreurLocal.id);
-        
-        // Créer l'utilisateur directement depuis le cache local
-        const codeUser = {
-          id: `livreur:${livreurLocal.id}`,
-          role: 'livreur',
-          full_name: `${livreurLocal.prenom} ${livreurLocal.nom}`.trim(),
-          name: `${livreurLocal.prenom} ${livreurLocal.nom}`.trim(),
-          email: livreurLocal.user_email || `livreur-${livreurLocal.id}@silgapp2.local`,
-          livreur_id: livreurLocal.id,
-          code_identification: livreurLocal.code_identification,
-          auth_provider: 'code_identification_local',
-          livreur: livreurLocal
-        };
-        
-        console.log('[SilgappAuth] ✅ User object created from LOCAL cache');
-        applyUser(codeUser);
-        console.log('[SilgappAuth] ========== SIGN IN FLOW COMPLETE (LOCAL) ==========');
-        return codeUser;
-      }
-      
-      // ÉTAPE 2: Si cache vide, essayer de synchroniser
-      console.log('[SilgappAuth] ❌ Pas de match local');
-      const livreurs = await getLivreursLocaux();
-      
-      if (!livreurs || livreurs.length === 0) {
-        console.warn('[SilgappAuth] ⚠️ Cache local VIDE');
-        const error = new Error("Aucun code livreur enregistré. Synchronisation nécessaire.");
-        error.code = 'livreurs_cache_empty';
-        throw error;
-      }
-      
-      // ÉTAPE 3: Code incorrect
-      console.log('[SilgappAuth] ❌ Code incorrect dans le cache');
-      const error = new Error("Code d'identification incorrect.");
-      error.code = 'invalid_identification_code';
-      throw error;
+      // Déléguer entièrement à codeIdentificationAuth qui cherche :
+      // 1. Cache local APK (rapide)
+      // 2. Base Base44 directement (source unique de vérité)
+      // 3. Backend function (dernier recours)
+      const codeUser = await signInWithStoredIdentificationCode(code);
+      applyUser(codeUser);
+      return codeUser;
     } catch (error) {
-      console.error('[SilgappAuth] ❌ SIGN IN FAILED:', error.message);
-      console.error('[SilgappAuth] Stack:', error.stack);
       throw error;
     } finally {
       setIsLoadingAuth(false);
