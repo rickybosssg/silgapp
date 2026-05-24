@@ -139,6 +139,10 @@ export default function LivreurApp() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["native-livreur-state"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
+      toast.success("Statut mis à jour ✓");
+    },
+    onError: (err) => {
+      toast.error("Erreur statut : " + (err?.message || "inconnue"));
     },
   });
 
@@ -198,7 +202,9 @@ export default function LivreurApp() {
   };
 
   const handleToggleLigne = (enLigne) => {
-    toggleDispoMutation.mutate(enLigne ? "disponible" : "hors_ligne");
+    const newStatut = enLigne ? "disponible" : "hors_ligne";
+    toast(enLigne ? "Passage en ligne…" : "Passage hors ligne…");
+    toggleDispoMutation.mutate(newStatut);
   };
 
   // GPS state
@@ -206,15 +212,24 @@ export default function LivreurApp() {
   const [gpsError, setGpsError] = useState(false);
 
   const demanderGPS = () => {
+    toast("GPS demandé…");
     if (!navigator.geolocation) {
       setGpsError(true);
       toast.error("GPS non disponible sur cet appareil");
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      () => { setGpsActif(true); setGpsError(false); },
-      () => { setGpsActif(false); setGpsError(true); },
-      { enableHighAccuracy: true }
+      (pos) => {
+        setGpsActif(true);
+        setGpsError(false);
+        toast.success("GPS activé !");
+      },
+      (err) => {
+        setGpsActif(false);
+        setGpsError(true);
+        toast.error("GPS refusé ou indisponible");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
