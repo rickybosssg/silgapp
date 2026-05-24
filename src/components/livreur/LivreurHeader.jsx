@@ -1,13 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { LogOut, Wifi, WifiOff, MapPin, MapPinOff } from "lucide-react";
+import { LogOut, Wifi, WifiOff, MapPin, MapPinOff, Power } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-function getGreeting(prenom) {
-  const h = new Date().getHours();
-  if (h < 12) return `Bonjour ${prenom} 👋`;
-  if (h < 18) return `Bonne journée ${prenom} 🚚`;
-  return `Bonsoir ${prenom} 🌙`;
-}
 
 function useClock() {
   const [time, setTime] = useState(new Date());
@@ -25,24 +18,35 @@ function useOnlineStatus() {
     const off = () => setOnline(false);
     window.addEventListener("online", on);
     window.addEventListener("offline", off);
-    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+    return () => {
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+    };
   }, []);
   return online;
 }
 
-export default function LivreurHeader({ livreur, isEnLigne, onToggleLigne, onLogout, gpsActif, onActiverGps }) {
+export default function LivreurHeader({
+  livreur,
+  isEnLigne,
+  isUpdatingStatut,
+  gpsActif,
+  onToggleLigne,
+  onActiverGps,
+  onLogout,
+}) {
   const time = useClock();
   const online = useOnlineStatus();
+
   const prenom = livreur.prenom || livreur.nom.split(" ")[0];
   const nomComplet = livreur.prenom ? `${livreur.prenom} ${livreur.nom}` : livreur.nom;
-
   const heureStr = time.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
   const dateStr = time.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
 
   return (
-    <div className="rounded-3xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white shadow-2xl">
+    <div className="rounded-3xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white shadow-2xl overflow-hidden">
       <div className="p-5">
-        {/* Top row: time + status icons */}
+        {/* Top row */}
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-2xl font-bold tracking-tight">{heureStr}</p>
@@ -56,7 +60,6 @@ export default function LivreurHeader({ livreur, isEnLigne, onToggleLigne, onLog
             <button
               type="button"
               onClick={onLogout}
-              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
               className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center active:bg-white/30"
             >
               <LogOut className="w-3.5 h-3.5 text-white/70" />
@@ -66,64 +69,63 @@ export default function LivreurHeader({ livreur, isEnLigne, onToggleLigne, onLog
 
         {/* Profile row */}
         <div className="flex items-center gap-4">
+          {/* Avatar */}
           <div className="relative flex-shrink-0">
             {livreur.photo_url ? (
               <img
                 src={livreur.photo_url}
                 alt={nomComplet}
-                className="w-16 h-16 rounded-2xl object-cover border-2 border-white/20 shadow-lg"
+                className="w-14 h-14 rounded-2xl object-cover border-2 border-white/20"
               />
             ) : (
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg border-2 border-white/10">
-                <span className="text-white font-bold text-xl">
-                  {prenom.charAt(0).toUpperCase()}
-                </span>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center border-2 border-white/10">
+                <span className="text-white font-bold text-xl">{prenom.charAt(0).toUpperCase()}</span>
               </div>
             )}
-            {/* Online dot */}
             <div className={cn(
-              "absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-gray-900",
+              "absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-gray-900",
               isEnLigne ? "bg-green-400" : "bg-gray-500"
             )} />
           </div>
 
+          {/* Info */}
           <div className="flex-1 min-w-0">
-            <p className="text-sm text-white/60 font-medium">{getGreeting(prenom)}</p>
-            <p className="text-lg font-bold truncate">{nomComplet}</p>
+            <p className="text-xs text-white/50">
+              {new Date().getHours() < 12 ? "Bonjour" : new Date().getHours() < 18 ? "Bonne journée" : "Bonsoir"} 👋
+            </p>
+            <p className="text-base font-bold truncate">{nomComplet}</p>
             <p className="text-xs text-white/40">{livreur.telephone}</p>
-            {livreur.code_identification && (
-              <p className="text-xs text-white/40">Code: {livreur.code_identification}</p>
-            )}
           </div>
 
-          {/* Actions GPS + Ligne */}
-          <div className="flex flex-col gap-2 flex-shrink-0" style={{ position: 'relative', zIndex: 10 }}>
-            {/* Bouton En ligne / Hors ligne */}
+          {/* Boutons action */}
+          <div className="flex flex-col gap-2 flex-shrink-0">
+            {/* Bouton statut */}
             <button
               type="button"
               onClick={onToggleLigne}
-              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+              disabled={isUpdatingStatut}
               className={cn(
-                "px-4 py-2 rounded-2xl font-bold text-sm shadow-lg active:scale-95 transition-opacity",
+                "flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs shadow-md transition-all",
+                "active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed",
                 isEnLigne
-                  ? "bg-red-500 text-white"
-                  : "bg-green-500 text-white"
+                  ? "bg-red-500 hover:bg-red-600 text-white"
+                  : "bg-green-500 hover:bg-green-600 text-white"
               )}
             >
-              {isEnLigne ? "Hors ligne" : "En ligne"}
+              <Power className="w-3.5 h-3.5" />
+              {isUpdatingStatut ? "..." : isEnLigne ? "Passer hors ligne" : "Passer en ligne"}
             </button>
+
             {/* Bouton GPS */}
             <button
               type="button"
               onClick={onActiverGps}
-              disabled={!navigator.geolocation}
-              style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
               className={cn(
-                "px-3 py-1.5 rounded-xl font-semibold text-xs flex items-center gap-1.5 justify-center border transition-opacity",
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all",
+                "active:scale-95",
                 gpsActif
-                  ? "bg-white/10 text-green-300 border-green-400/40"
-                  : "bg-white/10 text-white/50 border-white/20",
-                !navigator.geolocation && "opacity-50 cursor-not-allowed"
+                  ? "bg-green-500/20 text-green-300 border-green-400/40"
+                  : "bg-white/10 text-white/60 border-white/20 hover:bg-white/20"
               )}
             >
               {gpsActif
