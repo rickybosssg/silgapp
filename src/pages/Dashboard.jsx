@@ -108,34 +108,34 @@ export default function Dashboard() {
   }, [todayCourses, statusFilter]);
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="px-4 py-4 lg:p-6 space-y-4 lg:space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Tableau de bord</h1>
-          <p className="text-sm text-muted-foreground">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex-1">
+          <h1 className="text-xl lg:text-2xl font-bold text-foreground">Tableau de bord</h1>
+          <p className="text-xs lg:text-sm text-muted-foreground">
             {format(new Date(), "EEEE d MMMM yyyy", { locale: fr })}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Link to="/diagnostic-base44">
-            <Button variant="outline" size="sm" className="gap-1.5">
-              <AlertTriangle className="w-4 h-4" /> Diagnostic Base44
+        <div className="flex flex-wrap gap-2">
+          <Link to="/nouvelle-course" className="flex-1 sm:flex-none">
+            <Button size="sm" className="w-full sm:w-auto gap-1.5 bg-primary">
+              <Plus className="w-4 h-4" /> 
+              <span className="hidden sm:inline">Nouvelle course</span>
+              <span className="sm:hidden">Course</span>
             </Button>
           </Link>
-          <Link to="/test-code-livreur">
-            <Button variant="outline" size="sm" className="gap-1.5">
-              <Truck className="w-4 h-4" /> Test Code Livreur
+          <Link to="/carte" className="flex-1 sm:flex-none">
+            <Button variant="outline" size="sm" className="w-full sm:w-auto gap-1.5">
+              <MapPin className="w-4 h-4" /> 
+              <span className="hidden sm:inline">Carte</span>
             </Button>
           </Link>
-          <Link to="/carte">
-            <Button variant="outline" size="sm" className="gap-1.5">
-              <MapPin className="w-4 h-4" /> Carte
-            </Button>
-          </Link>
-          <Link to="/nouvelle-course">
-            <Button size="sm" className="gap-1.5 bg-primary">
-              <Plus className="w-4 h-4" /> Nouvelle course
+          <Link to="/diagnostic-base44" className="flex-1 sm:flex-none">
+            <Button variant="outline" size="sm" className="w-full sm:w-auto gap-1.5">
+              <AlertTriangle className="w-4 h-4" /> 
+              <span className="hidden sm:inline">Diagnostic</span>
+              <span className="sm:hidden">Diag</span>
             </Button>
           </Link>
         </div>
@@ -160,19 +160,19 @@ export default function Dashboard() {
 
       {/* Courses list */}
       <Card className="p-0 overflow-hidden">
-        <div className="px-5 pt-5 pb-3 flex items-center justify-between border-b">
+        <div className="px-4 lg:px-5 pt-4 lg:pt-5 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b">
           <h2 className="font-semibold text-base">Courses du jour</h2>
           <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-            <TabsList className="h-8">
+            <TabsList className="h-8 overflow-x-auto">
               {statusFilters.map(f => (
-                <TabsTrigger key={f.value} value={f.value} className="text-xs h-7 px-3">
+                <TabsTrigger key={f.value} value={f.value} className="text-xs h-7 px-3 whitespace-nowrap">
                   {f.label}
                 </TabsTrigger>
               ))}
             </TabsList>
           </Tabs>
         </div>
-        <div className="p-4 space-y-2 max-h-[600px] overflow-y-auto">
+        <div className="p-3 lg:p-4 space-y-2 max-h-[50vh] lg:max-h-[600px] overflow-y-auto">
           {isLoading && (
             <div className="text-center py-12 text-muted-foreground text-sm">Chargement...</div>
           )}

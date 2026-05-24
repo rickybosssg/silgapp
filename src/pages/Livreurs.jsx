@@ -38,62 +38,62 @@ function LivreurCard({ livreur, courses, onValider, onRefuser, onToggleStatut, o
     : "bg-white";
 
   return (
-    <Card className={cn("p-4 space-y-3 border-2", bgColor)}>
+    <Card className={cn("p-3 lg:p-4 space-y-3 border-2", bgColor)}>
       <div className="flex items-start gap-3">
         {livreur.photo_url ? (
-          <img src={livreur.photo_url} alt={nomComplet} className="w-12 h-12 rounded-full object-cover flex-shrink-0 border-2 border-white shadow" />
+          <img src={livreur.photo_url} alt={nomComplet} className="w-10 h-10 lg:w-12 lg:h-12 rounded-full object-cover flex-shrink-0 border-2 border-white shadow" />
         ) : (
-          <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-            <Truck className="w-6 h-6 text-muted-foreground" />
+          <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+            <Truck className="w-5 h-5 lg:w-6 lg:h-6 text-muted-foreground" />
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <p className="font-semibold">{nomComplet}</p>
+          <p className="font-semibold text-sm lg:text-base">{nomComplet}</p>
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Phone className="w-3 h-3" />
-            <span>{livreur.telephone}</span>
+            <span className="truncate">{livreur.telephone}</span>
           </div>
           {livreur.quartier && (
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <MapPin className="w-3 h-3" />
-              <span>{livreur.quartier}</span>
+              <span className="truncate">{livreur.quartier}</span>
             </div>
           )}
         </div>
-        <div className="flex flex-col items-end gap-1">
+        <div className="flex flex-col items-end gap-1 flex-shrink-0">
           {livreur.validation === "valide" && (
             <div className="flex flex-col items-end gap-1">
               {hasAlerteBatterie(livreur.id) && (
-                <Badge className="bg-orange-500 text-white text-[10px] gap-1 animate-pulse">
-                  <BatteryWarning className="w-3 h-3" /> Batterie faible
+                <Badge className="bg-orange-500 text-white text-[9px] lg:text-[10px] gap-1 animate-pulse">
+                  <BatteryWarning className="w-2.5 h-2.5 lg:w-3 lg:h-3" /> <span className="hidden lg:inline">Batterie faible</span><span className="lg:hidden">Batt.</span>
                 </Badge>
               )}
-              <Badge variant="outline" className={cn("text-[10px]",
+              <Badge variant="outline" className={cn("text-[9px] lg:text-[10px]",
                 isDisponible && "bg-green-100 text-green-700 border-green-200",
                 isEnCourse && "bg-red-100 text-red-700 border-red-200",
                 livreur.statut === "hors_ligne" && "bg-slate-100 text-slate-500 border-slate-200"
               )}>
-                {isDisponible ? "Disponible" : isEnCourse ? "En course" : "Hors ligne"}
+                {isDisponible ? "Dispo" : isEnCourse ? "Course" : "Hors ligne"}
               </Badge>
             </div>
           )}
           {livreur.validation === "en_attente" && (
-            <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200">En attente</Badge>
+            <Badge variant="outline" className="text-[9px] lg:text-[10px] bg-amber-50 text-amber-700 border-amber-200">En attente</Badge>
           )}
           {livreur.validation === "refuse" && (
-            <Badge variant="outline" className="text-[10px] bg-red-50 text-red-600 border-red-200">Refusé</Badge>
+            <Badge variant="outline" className="text-[9px] lg:text-[10px] bg-red-50 text-red-600 border-red-200">Refusé</Badge>
           )}
-          <span className="text-[10px] text-muted-foreground">{livreur.vehicule || "moto"}</span>
+          <span className="text-[9px] lg:text-[10px] text-muted-foreground">{livreur.vehicule || "moto"}</span>
         </div>
       </div>
 
       {/* Actions validation */}
       {livreur.validation === "en_attente" && (
-        <div className="flex gap-2">
-          <Button size="sm" className="flex-1 h-8 bg-accent text-accent-foreground gap-1 text-xs" onClick={() => onValider(livreur)} disabled={isPending}>
+        <div className="flex gap-2 flex-wrap">
+          <Button size="sm" className="flex-1 min-w-[100px] h-8 bg-accent text-accent-foreground gap-1 text-xs" onClick={() => onValider(livreur)} disabled={isPending}>
             <Check className="w-3.5 h-3.5" /> Valider
           </Button>
-          <Button size="sm" variant="destructive" className="flex-1 h-8 gap-1 text-xs" onClick={() => onRefuser(livreur)} disabled={isPending}>
+          <Button size="sm" variant="destructive" className="flex-1 min-w-[100px] h-8 gap-1 text-xs" onClick={() => onRefuser(livreur)} disabled={isPending}>
             <X className="w-3.5 h-3.5" /> Refuser
           </Button>
           <Button size="sm" variant="ghost" className="h-8 px-2 text-xs gap-1 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => onSupprimer(livreur)} disabled={isPending}>
@@ -104,64 +104,68 @@ function LivreurCard({ livreur, courses, onValider, onRefuser, onToggleStatut, o
 
       {/* Suppression pour livreurs refusés */}
       {livreur.validation === "refuse" && (
-        <Button size="sm" variant="ghost" className="w-full h-7 text-xs gap-1 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => onSupprimer(livreur)} disabled={isPending}>
+        <Button size="sm" variant="ghost" className="w-full h-8 text-xs gap-1 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => onSupprimer(livreur)} disabled={isPending}>
           <Trash2 className="w-3 h-3" /> Supprimer définitivement
         </Button>
       )}
 
-      {/* Actions statut livreur validé */}
+      {/* Actions statut livreur validé - empiler sur mobile */}
       {livreur.validation === "valide" && (
-        <div className="flex gap-2 flex-wrap">
-          {livreur.statut !== "disponible" && (
-            <Button size="sm" variant="outline" className="flex-1 text-xs h-7" onClick={() => onToggleStatut(livreur, "disponible")} disabled={isPending}>
-              Marquer disponible
+        <div className="flex flex-col sm:flex-row gap-2 flex-wrap">
+          <div className="flex flex-wrap gap-2 flex-1">
+            {livreur.statut !== "disponible" && (
+              <Button size="sm" variant="outline" className="flex-1 min-w-[120px] text-xs h-8" onClick={() => onToggleStatut(livreur, "disponible")} disabled={isPending}>
+                Marquer disponible
+              </Button>
+            )}
+            {livreur.statut !== "hors_ligne" && (
+              <Button size="sm" variant="outline" className="flex-1 min-w-[120px] text-xs h-8" onClick={() => onToggleStatut(livreur, "hors_ligne")} disabled={isPending}>
+                Hors ligne
+              </Button>
+            )}
+            <Button size="sm" variant="outline" className="flex-1 min-w-[100px] h-8 text-xs gap-1" onClick={() => onEdit(livreur)} disabled={isPending}>
+              <Pencil className="w-3 h-3" /> Modifier
             </Button>
-          )}
-          {livreur.statut !== "hors_ligne" && (
-            <Button size="sm" variant="outline" className="flex-1 text-xs h-7" onClick={() => onToggleStatut(livreur, "hors_ligne")} disabled={isPending}>
-              Hors ligne
+          </div>
+          <div className="flex flex-wrap gap-2 flex-1">
+            <Button
+              size="sm"
+              variant={livreur.actif === false ? "outline" : "destructive"}
+              className="flex-1 min-w-[120px] h-8 text-xs gap-1"
+              onClick={() => onToggleStatut(livreur, null, livreur.actif !== false)}
+              disabled={isPending}
+            >
+              <UserX className="w-3 h-3" />
+              {livreur.actif === false ? "Réactiver" : "Désactiver"}
             </Button>
-          )}
-          <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1" onClick={() => onEdit(livreur)} disabled={isPending}>
-            <Pencil className="w-3 h-3" /> Modifier
-          </Button>
-          <Button
-            size="sm"
-            variant={livreur.actif === false ? "outline" : "destructive"}
-            className="h-7 px-2 text-xs gap-1"
-            onClick={() => onToggleStatut(livreur, null, livreur.actif !== false)}
-            disabled={isPending}
-          >
-            <UserX className="w-3 h-3" />
-            {livreur.actif === false ? "Réactiver" : "Désactiver"}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 px-2 text-xs gap-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => onSupprimer(livreur)}
-            disabled={isPending}
-          >
-            <Trash2 className="w-3 h-3" /> Supprimer
-          </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="flex-1 min-w-[100px] h-8 text-xs gap-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => onSupprimer(livreur)}
+              disabled={isPending}
+            >
+              <Trash2 className="w-3 h-3" /> Supprimer
+            </Button>
+          </div>
         </div>
       )}
 
       {/* Montant dû à Silga */}
       {livreur.validation === "valide" && (
         <div className={cn(
-          "rounded-lg p-3 space-y-1",
+          "rounded-lg p-3 space-y-2",
           isPaye ? "bg-green-50 border border-green-200" : "bg-blue-50 border border-blue-200"
         )}>
-          <div className="flex items-center justify-between text-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
             <span className="text-muted-foreground">{nbCourses} course{nbCourses > 1 ? "s" : ""} livrée{nbCourses > 1 ? "s" : ""} aujourd'hui</span>
             {isPaye ? (
-              <Badge className="bg-green-500 text-white text-[10px]">✅ Payé</Badge>
+              <Badge className="bg-green-500 text-white text-[10px] self-start">✅ Payé</Badge>
             ) : totalDu > 0 ? (
-              <Badge className="bg-amber-500 text-white text-[10px]">Non payé</Badge>
+              <Badge className="bg-amber-500 text-white text-[10px] self-start">Non payé</Badge>
             ) : null}
           </div>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <span className={cn("font-bold text-sm", isPaye ? "text-green-700" : "text-blue-700")}>
               Doit à Silga : {totalDu.toLocaleString()} FCFA
             </span>
@@ -174,11 +178,11 @@ function LivreurCard({ livreur, courses, onValider, onRefuser, onToggleStatut, o
           {!isPaye && totalDu > 0 && (
             <Button
               size="sm"
-              className="w-full h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white gap-1 mt-1"
+              className="w-full h-9 text-xs bg-blue-600 hover:bg-blue-700 text-white gap-1 mt-1"
               onClick={() => onValiderPaiement(livreur, totalDu)}
               disabled={isPending}
             >
-              <Banknote className="w-3.5 h-3.5" /> Valider paiement
+              <Banknote className="w-3.5 h-3.5" /> Valider paiement ({totalDu.toLocaleString()} FCFA)
             </Button>
           )}
         </div>
@@ -291,31 +295,31 @@ export default function Livreurs() {
   const inscriptionLink = `${window.location.origin}/inscription-livreur`;
 
   return (
-    <div className="p-6 space-y-4 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="px-4 py-4 lg:p-6 space-y-4 max-w-4xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Truck className="w-6 h-6 text-primary" />
-          <h1 className="text-2xl font-bold">Livreurs</h1>
+          <Truck className="w-5 h-5 lg:w-6 lg:h-6 text-primary" />
+          <h1 className="text-xl lg:text-2xl font-bold">Livreurs</h1>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex flex-wrap gap-2">
           <Button
-            variant="outline" size="sm" className="gap-1.5 text-xs"
+            variant="outline" size="sm" className="gap-1.5 text-xs flex-1 sm:flex-none"
             onClick={() => { navigator.clipboard.writeText(inscriptionLink); toast.success("Lien copié !"); }}
           >
-            <Copy className="w-3.5 h-3.5" /> Copier lien inscription
+            <Copy className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Copier lien</span><span className="sm:hidden">Lien</span>
           </Button>
           <Button
-            variant="outline" size="sm" className="gap-1.5 text-xs"
+            variant="outline" size="sm" className="gap-1.5 text-xs flex-1 sm:flex-none"
             onClick={() => genererCodesMutation.mutate()}
             disabled={genererCodesMutation.isPending}
           >
-            <KeyRound className="w-3.5 h-3.5" /> {genererCodesMutation.isPending ? "Génération..." : "Générer codes"}
+            <KeyRound className="w-3.5 h-3.5" /> <span className="hidden sm:inline">{genererCodesMutation.isPending ? "Génération..." : "Générer codes"}</span><span className="sm:hidden">{genererCodesMutation.isPending ? "..." : "Codes"}</span>
           </Button>
           <Button
-            size="sm" className="gap-1.5 text-xs bg-primary"
+            size="sm" className="gap-1.5 text-xs bg-primary flex-1 sm:flex-none"
             onClick={() => { setEditingLivreur(null); setShowForm(true); }}
           >
-            <Plus className="w-3.5 h-3.5" /> Ajouter un livreur
+            <Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Ajouter</span><span className="sm:hidden">+</span>
           </Button>
         </div>
       </div>
@@ -349,10 +353,10 @@ export default function Livreurs() {
         </TabsList>
       </Tabs>
 
-      {/* Vue 3 colonnes pour les livreurs validés */}
+      {/* Vue 3 colonnes pour les livreurs validés - passe en 1 colonne sur mobile */}
       {tab === "valide" && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Colonne Disponibles */}
+        <div className="grid grid-cols-1 gap-4">
+          {/* Section Disponibles */}
           <div className="space-y-3">
             <div className="flex items-center gap-2 pb-1 border-b-2 border-green-400">
               <span className="w-3 h-3 rounded-full bg-green-400 inline-block" />
@@ -370,7 +374,7 @@ export default function Livreurs() {
             ))}
           </div>
 
-          {/* Colonne En course */}
+          {/* Section En course */}
           <div className="space-y-3">
             <div className="flex items-center gap-2 pb-1 border-b-2 border-red-400">
               <span className="w-3 h-3 rounded-full bg-red-400 inline-block" />
@@ -387,7 +391,7 @@ export default function Livreurs() {
             ))}
           </div>
 
-          {/* Colonne Hors ligne */}
+          {/* Section Hors ligne */}
           <div className="space-y-3">
             <div className="flex items-center gap-2 pb-1 border-b-2 border-slate-300">
               <span className="w-3 h-3 rounded-full bg-slate-300 inline-block" />
@@ -406,12 +410,12 @@ export default function Livreurs() {
         </div>
       )}
 
-      {/* Vue liste pour en attente et refusés */}
+      {/* Vue liste pour en attente et refusés - 1 colonne sur mobile */}
       {tab !== "valide" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {isLoading && <p className="col-span-2 text-center text-muted-foreground text-sm py-12">Chargement...</p>}
+        <div className="grid grid-cols-1 gap-3">
+          {isLoading && <p className="text-center text-muted-foreground text-sm py-12">Chargement...</p>}
           {!isLoading && currentList.length === 0 && (
-            <p className="col-span-2 text-center text-muted-foreground text-sm py-12">
+            <p className="text-center text-muted-foreground text-sm py-12">
               {tab === "en_attente" && "Aucune candidature en attente"}
               {tab === "refuse" && "Aucun livreur refusé"}
             </p>
