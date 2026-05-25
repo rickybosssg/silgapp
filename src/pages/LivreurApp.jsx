@@ -3,6 +3,22 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Truck } from "lucide-react";
 import { toast } from "sonner";
+
+/**
+ * Calcule la distance entre 2 points GPS (formule Haversine)
+ */
+function calculerDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Rayon terre en km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
 import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
 import LivreurHeader from "@/components/livreur/LivreurHeader";
 import LivreurStatsBanner from "@/components/livreur/LivreurStatsBanner";
@@ -180,12 +196,73 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
   };
 
   const handleColisRecupere = (course) => {
-    updateCourseMutation.mutate({ id: course.id, data: { statut: "colis_recupere", heure_recuperation: new Date().toISOString() } });
-    toast.success("Colis récupéré ! 📦");
+    if (!navigator.geolocation) {
+      toast.error("GPS non disponible");
+      updateCourseMutation.mutate({ id: course.id, data: { statut: "colis_recupere", heure_recuperation: new Date().toISOString(), colis_recupere_at: new Date().toISOString() } });
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        updateCourseMutation.mutate({
+          id: course.id,
+          data: {
+            statut: "colis_recupere",
+            heure_recuperation: new Date().toISOString(),
+            colis_recupere_at: new Date().toISOString(),
+            latitude_depart_livraison: pos.coords.latitude,
+            longitude_depart_livraison: pos.coords.longitude,
+          },
+        });
+        toast.success("Colis récupéré ! 📦 Position GPS enregistrée");
+      },
+      (err) => {
+        console.error("Erreur GPS:", err);
+        updateCourseMutation.mutate({
+          id: course.id,
+          data: {
+            statut: "colis_recupere",
+            heure_recuperation: new Date().toISOString(),
+            colis_recupere_at: new Date().toISOString(),
+          },
+        });
+        toast.warning("Colis récupéré (GPS non disponible)");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   };
 
-  const handleColisLivre = (course, prixReel) => {
-    updateCourseMutation.mutate({ id: course.id, data: { statut: "livree", heure_livraison: new Date().toISOString(), prix_reel: prixReel } });
+  const handleColisLivre = (course, prixReel, gpsArrivee) => {
+    if (!navigator.geolocation || !gpsArrivee) {
+      updateCourseMutation.mutate({
+        id: course.id,
+        data: {
+          statut: "livree",
+          heure_livraison: new Date().toISOString(),
+          colis_livre_at: new Date().toISOString(),
+          prix_reel: prixReel,
+        },
+      });
+    } else {
+      // Calcul distance et durée
+      const gpsDepart = { lat: course.latitude_depart_livraison, lng: course.longitude_depart_livraison };
+      const distance = gpsDepart.lat ? calculerDistance(gpsDepart.lat, gpsDepart.lng, gpsArrivee.lat, gpsArrivee.lng) : null;
+      const duree = course.colis_recupere_at ? Math.round((new Date().getTime() - new Date(course.colis_recupere_at).getTime()) / 60000) : null;
+
+      updateCourseMutation.mutate({
+        id: course.id,
+        data: {
+          statut: "livree",
+          heure_livraison: new Date().toISOString(),
+          colis_livre_at: new Date().toISOString(),
+          latitude_arrivee_livraison: gpsArrivee.lat,
+          longitude_arrivee_livraison: gpsArrivee.lng,
+          distance_km: distance,
+          duree_livraison_minutes: duree,
+          gps_distance_type: distance ? "estimee" : null,
+          prix_reel: prixReel,
+        },
+      });
+    }
     saveLivreur(livreurProfil.id, { statut: "disponible" }).then(() =>
       queryClient.invalidateQueries({ queryKey: ["livreur-profil"] })
     );

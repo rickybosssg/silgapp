@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { MapPin, Phone, Navigation, Package, Check, X, AlertTriangle, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
+import LivraisonResume from "./LivraisonResume";
 
 const STEPS = [
   { key: "acceptee", label: "Acceptée", icon: "✅" },
@@ -51,9 +52,22 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const [showPrixModal, setShowPrixModal] = useState(false);
   const [remarque, setRemarque] = useState("");
   const [showRemarque, setShowRemarque] = useState(false);
+  const [showResume, setShowResume] = useState(false);
+  const [gpsDepart, setGpsDepart] = useState(null);
+  const [gpsArrivee, setGpsArrivee] = useState(null);
+  const [gpsWatchId, setGpsWatchId] = useState(null);
 
   const colisRecupere = course.statut === "colis_recupere" || course.statut === "en_livraison";
   const colisLivre = course.statut === "livree";
+
+  // Nettoyer le GPS watch quand le composant se démonte
+  useEffect(() => {
+    return () => {
+      if (gpsWatchId && navigator.geolocation) {
+        navigator.geolocation.clearWatch(gpsWatchId);
+      }
+    };
+  }, [gpsWatchId]);
 
   const handleConfirmerLivraison = () => {
     const montant = parseFloat(prixReel);
@@ -61,9 +75,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       toast.error("Entrez le montant reçu du client");
       return;
     }
-    onColisLivre(course, montant);
+    onColisLivre(course, montant, gpsArrivee);
     setShowPrixModal(false);
     setPrixReel("");
+    setGpsArrivee(null);
   };
 
   const handleRemarque = () => {
@@ -76,6 +91,23 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
   return (
     <>
+      {/* Modal résumé livraison */}
+      {showResume && (
+        <LivraisonResume
+          course={course}
+          gpsDepart={gpsDepart || { lat: course.latitude_depart_livraison, lng: course.longitude_depart_livraison }}
+          gpsArrivee={gpsArrivee}
+          onContinuer={() => {
+            setShowResume(false);
+            setShowPrixModal(true);
+          }}
+          onCancel={() => {
+            setShowResume(false);
+            setGpsArrivee(null);
+          }}
+        />
+      )}
+
       {/* Modal montant */}
       {showPrixModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -238,15 +270,33 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   <ChevronRight className="w-5 h-5" />
                 </button>
               ) : (
-                <button
-                  className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                  onClick={() => setShowPrixModal(true)}
-                  disabled={isPending}
-                >
-                  <Check className="w-6 h-6" />
-                  Colis livré ✅
-                  <ChevronRight className="w-5 h-5" />
-                </button>
+                <>
+                  <button
+                    className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                    onClick={() => {
+                      if (!navigator.geolocation) {
+                        toast.error("GPS non disponible");
+                        return;
+                      }
+                      navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                          setGpsArrivee({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                          setShowResume(true);
+                        },
+                        (err) => {
+                          console.error("Erreur GPS:", err);
+                          setShowPrixModal(true);
+                        },
+                        { enableHighAccuracy: true, timeout: 10000 }
+                      );
+                    }}
+                    disabled={isPending}
+                  >
+                    <Check className="w-6 h-6" />
+                    Colis livré ✅
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </>
               )}
 
               <button

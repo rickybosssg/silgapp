@@ -131,6 +131,48 @@
       "type": "string",
       "format": "date-time",
       "description": "Heure de livraison effective"
+    },
+    "latitude_depart_livraison": {
+      "type": "number",
+      "description": "Latitude au moment de 'Colis r\u00e9cup\u00e9r\u00e9'"
+    },
+    "longitude_depart_livraison": {
+      "type": "number",
+      "description": "Longitude au moment de 'Colis r\u00e9cup\u00e9r\u00e9'"
+    },
+    "latitude_arrivee_livraison": {
+      "type": "number",
+      "description": "Latitude au moment de 'Colis livr\u00e9'"
+    },
+    "longitude_arrivee_livraison": {
+      "type": "number",
+      "description": "Longitude au moment de 'Colis livr\u00e9'"
+    },
+    "colis_recupere_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp exact de la r\u00e9cup\u00e9ration"
+    },
+    "colis_livre_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp exact de la livraison"
+    },
+    "distance_km": {
+      "type": "number",
+      "description": "Distance parcourue en km (r\u00e9elle ou estim\u00e9e)"
+    },
+    "duree_livraison_minutes": {
+      "type": "number",
+      "description": "Dur\u00e9e de livraison en minutes"
+    },
+    "gps_distance_type": {
+      "type": "string",
+      "enum": [
+        "reelle",
+        "estimee"
+      ],
+      "description": "Type de distance : r\u00e9elle (GPS continu) ou estim\u00e9e (entre 2 points)"
     }
   },
   "required": [
