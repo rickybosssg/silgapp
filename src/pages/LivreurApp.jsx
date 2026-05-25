@@ -208,6 +208,8 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
         dispatch_mode: "manuel"
       } 
     });
+    // Invalider les queries immédiatement pour que la course réapparaisse dans "Courses à dispatcher"
+    queryClient.invalidateQueries({ queryKey: ["courses"] });
     toast("Course renvoyée à l'admin");
   };
 
