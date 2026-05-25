@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { KeyRound, User, Upload, RefreshCw } from "lucide-react";
+import { User, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 const emptyForm = {
@@ -15,18 +15,12 @@ const emptyForm = {
   nom: "",
   telephone: "",
   user_email: "",
-  code_identification: "",
   quartier: "",
   vehicule: "moto",
   photo_url: "",
   actif: true,
 };
 
-const generateCode = (nom, telephone) => {
-  const nomPart = nom.substring(0, 3).toUpperCase();
-  const telPart = telephone.replace(/\D/g, "").slice(-3);
-  return `LVR-${nomPart}${telPart}`;
-};
 
 export default function LivreurFormDialog({ open, onClose, livreur }) {
   const queryClient = useQueryClient();
@@ -41,7 +35,6 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
         nom: livreur.nom || "",
         telephone: livreur.telephone || "",
         user_email: livreur.user_email || "",
-        code_identification: livreur.code_identification || "",
         quartier: livreur.quartier || "",
         vehicule: livreur.vehicule || "moto",
         photo_url: livreur.photo_url || "",
@@ -52,25 +45,14 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
     }
   }, [livreur, open]);
 
-  const autoGenerateCode = () => {
-    if (form.nom && form.telephone) {
-      const newCode = generateCode(form.nom, form.telephone);
-      setForm((p) => ({ ...p, code_identification: newCode }));
-      toast.success("Code généré automatiquement");
-    } else {
-      toast.error("Veuillez remplir le nom et le téléphone d'abord");
-    }
-  };
-
   const mutation = useMutation({
     mutationFn: async (data) => {
-      const codeIdentification = data.code_identification.trim().toUpperCase();
       if (isEdit) {
-        const res = await base44.functions.invoke('updateLivreur', { id: livreur.id, data: { ...data, code_identification: codeIdentification } });
+        const res = await base44.functions.invoke('updateLivreur', { id: livreur.id, data });
         if (!res.data?.success) throw new Error(res.data?.error || 'Erreur mise à jour');
         return res.data.livreur;
       } else {
-        const res = await base44.functions.invoke('createLivreur', { data: { ...data, code_identification: codeIdentification } });
+        const res = await base44.functions.invoke('createLivreur', { data });
         if (!res.data?.success) throw new Error(res.data?.error || 'Erreur création');
         return res.data.livreur;
       }
@@ -102,7 +84,6 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
     if (!form.nom?.trim()) errors.push("Le nom est obligatoire");
     if (!form.telephone?.trim()) errors.push("Le téléphone est obligatoire");
     if (!form.user_email?.trim()) errors.push("L'email du compte livreur est obligatoire");
-    if (!form.code_identification?.trim()) errors.push("Le code d'identification est obligatoire");
     
     if (errors.length > 0) {
       errors.forEach(err => toast.error(err));
@@ -163,33 +144,6 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
               required
               type="tel"
             />
-          </div>
-
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Code d'identification *</Label>
-              {!isEdit && (
-                <button
-                  type="button"
-                  onClick={autoGenerateCode}
-                  className="text-[10px] text-primary hover:underline flex items-center gap-1"
-                >
-                  <RefreshCw className="w-3 h-3" />
-                  Générer auto.
-                </button>
-              )}
-            </div>
-            <div className="relative">
-              <KeyRound className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Ex: LVR-001"
-                value={form.code_identification}
-                onChange={(e) => setForm((p) => ({ ...p, code_identification: e.target.value.toUpperCase() }))}
-                className="pl-9 uppercase"
-                required
-              />
-            </div>
-            <p className="text-[10px] text-muted-foreground">Code unique utilise par le livreur pour se connecter dans l'APK</p>
           </div>
 
           <div className="space-y-1.5">
