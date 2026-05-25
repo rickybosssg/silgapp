@@ -4,12 +4,14 @@ import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Phone, Navigation, Package, CheckCircle2, Clock, User } from "lucide-react";
+import { MapPin, Phone, Navigation, Package, CheckCircle2, Clock, User, Star } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 
 export default function ClientSuiviCourse() {
   const [maCourse, setMaCourse] = useState(null);
+  const [showRating, setShowRating] = useState(false);
 
   // Récupérer la course en cours (dernière course créée)
   const { data: courses = [] } = useQuery({
@@ -24,6 +26,12 @@ export default function ClientSuiviCourse() {
       setMaCourse(courses[0]);
     }
   }, [courses]);
+
+  const handleRated = () => {
+    setShowRating(false);
+    // Rafraîchir les données
+    window.location.reload();
+  };
 
   if (!maCourse) {
     return (
@@ -201,23 +209,89 @@ export default function ClientSuiviCourse() {
 
         {/* Info tarification */}
         {maCourse.statut === "livree" && maCourse.prix_final && (
-          <Card className="p-4 bg-green-50 border-green-200">
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
-              <h3 className="font-bold text-green-900">Course terminée</h3>
-            </div>
-            <div className="space-y-1 text-sm text-green-800">
-              {maCourse.distance_reelle_km && (
-                <p>Distance parcourue : {maCourse.distance_reelle_km.toFixed(1)} km</p>
-              )}
-              <p>Montant total : {maCourse.prix_final.toLocaleString()} FCFA</p>
-              {maCourse.commission_silga && (
-                <p className="text-xs text-green-600">
-                  Commission Silga (30%) : {maCourse.commission_silga.toLocaleString()} FCFA
-                </p>
-              )}
-            </div>
-          </Card>
+          <>
+            <Card className="p-4 bg-green-50 border-green-200">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                <h3 className="font-bold text-green-900">Course terminée</h3>
+              </div>
+              <div className="space-y-1 text-sm text-green-800">
+                {maCourse.distance_reelle_km && (
+                  <p>Distance parcourue : {maCourse.distance_reelle_km.toFixed(1)} km</p>
+                )}
+                <p>Montant total : {maCourse.prix_final.toLocaleString()} FCFA</p>
+                {maCourse.commission_silga && (
+                  <p className="text-xs text-green-600">
+                    Commission Silga (30%) : {maCourse.commission_silga.toLocaleString()} FCFA
+                  </p>
+                )}
+              </div>
+            </Card>
+
+            {/* Bouton de notation */}
+            {!maCourse.note_livreur && (
+              <Card className="p-4 border-l-4 border-l-yellow-400 bg-gradient-to-r from-yellow-50 to-orange-50">
+                <div className="flex items-start gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-xl bg-yellow-100 flex items-center justify-center flex-shrink-0">
+                    <Star className="w-5 h-5 text-yellow-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-yellow-900">Comment s'est passée la livraison ?</p>
+                    <p className="text-xs text-yellow-700 mt-1">
+                      Aidez-nous à améliorer nos services en évaluant {maCourse.livreur_nom}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold"
+                  onClick={() => setShowRating(true)}
+                >
+                  <Star className="w-4 h-4 mr-2 fill-white" />
+                  Évaluer le livreur
+                </Button>
+              </Card>
+            )}
+
+            {/* Déjà noté */}
+            {maCourse.note_livreur && (
+              <Card className="p-4 border-l-4 border-l-green-500 bg-gradient-to-r from-green-50 to-emerald-50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
+                    <CheckCircle2 className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-green-900">Merci pour votre évaluation !</p>
+                    <div className="flex items-center gap-1 mt-1">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`w-4 h-4 ${
+                            i < maCourse.note_livreur
+                              ? "fill-yellow-400 text-yellow-400"
+                              : "fill-gray-200 text-gray-300"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    {maCourse.commentaire_livreur && (
+                      <p className="text-xs text-green-700 mt-2 italic">
+                        "{maCourse.commentaire_livreur}"
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            )}
+          </>
+        )}
+
+        {/* Dialog de notation */}
+        {showRating && (
+          <LivreurRatingDialog
+            course={maCourse}
+            onClose={() => setShowRating(false)}
+            onRated={handleRated}
+          />
         )}
       </div>
     </div>

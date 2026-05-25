@@ -147,6 +147,21 @@
       ],
       "default": "non_paye",
       "description": "Statut du paiement du livreur \u00e0 Silga"
+    },
+    "note_livreur": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "Note donn\u00e9e par le client (1 \u00e0 5 \u00e9toiles)"
+    },
+    "commentaire_livreur": {
+      "type": "string",
+      "description": "Commentaire laiss\u00e9 par le client"
+    },
+    "note_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date et heure de la notation"
     }
   },
   "required": [
