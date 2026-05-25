@@ -491,7 +491,13 @@ export default function StepField({
         ) : (
           <Button
             type="submit"
-            disabled={isLoading || (!formData.destination_inconnue && !formData.livraisonGPS)}
+            disabled={
+              isLoading || 
+              !formData.adresse_depart || 
+              !(formData.type_course === "expedier" ? formData.destinataire_telephone : formData.expediteur_telephone) || 
+              !formData.type_colis
+            }
+            onClick={() => console.log("submit clicked")}
             className="flex-1 h-12 bg-gradient-to-r from-primary to-red-600"
           >
             {isLoading ? (
