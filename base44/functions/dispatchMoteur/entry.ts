@@ -43,27 +43,31 @@ function classerLivreurs(livreurs, quartierDepart, quartierArriveeNom, quartiers
     let motif = [];
     let distDepart = null;
 
+    // PRIORITÉ 1 : Proximité géographique (quand le quartier est renseigné)
     if (qDepart) {
       distDepart = haversine(l.latitude, l.longitude, qDepart.latitude_centre, qDepart.longitude_centre);
-      score -= distDepart;
-      motif.push(`${distDepart.toFixed(1)} km du quartier`);
+      // Score basé sur la distance : plus c'est proche, plus le score est élevé
+      // -10 points par km (forte pénalisation de la distance)
+      score -= distDepart * 10;
+      motif.push(`${distDepart.toFixed(1)} km`);
     }
 
+    // PRIORITÉ 2 : Statut du livreur
     if (l.statut === "disponible") {
-      score += 5;
+      score += 3; // Bonus pour disponible
       motif.push("disponible");
     } else if (l.statut === "en_course") {
       if (qDepart && qArrivee) {
-        const distLivreurArrivee = haversine(l.latitude, l.longitude, qDepart.latitude_centre, qDepart.longitude_centre);
-        if (distLivreurArrivee < 3) {
-          score += 2;
-          motif.push("course à proximité");
+        const distLivreurDepart = haversine(l.latitude, l.longitude, qDepart.latitude_centre, qDepart.longitude_centre);
+        if (distLivreurDepart < 3) {
+          score += 1; // Petit bonus si déjà proche
+          motif.push("en course à proximité");
         } else {
-          score -= 3;
+          score -= 2; // Pénalité si en course et loin
           motif.push("en course");
         }
       } else {
-        score -= 3;
+        score -= 2;
         motif.push("en course");
       }
     }
@@ -71,6 +75,7 @@ function classerLivreurs(livreurs, quartierDepart, quartierArriveeNom, quartiers
     candidats.push({ livreur: l, score, motif: motif.join(", "), distDepart });
   }
 
+  // Tri par score décroissant (meilleur en premier)
   return candidats.sort((a, b) => b.score - a.score);
 }
 
