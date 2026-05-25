@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import { appParams, APP_PUBLIC_URL } from "@/lib/app-params";
 import { Truck } from "lucide-react";
 
 /**
@@ -63,6 +64,24 @@ export default function AuthGate({ children, onLivreur }) {
   }
 
   if (state === "unauthenticated") {
+    if (appParams.isCapacitor) {
+      // Sur Android APK, on ouvre le login dans l'In-App Browser
+      // pour que le token de retour soit capturé par l'app
+      import("@capacitor/browser").then(({ Browser }) => {
+        const loginUrl = `${APP_PUBLIC_URL}?login=1&next=${encodeURIComponent(APP_PUBLIC_URL)}`;
+        Browser.open({ url: loginUrl, windowName: "_self" });
+      });
+      return (
+        <div className="fixed inset-0 flex items-center justify-center bg-background">
+          <div className="text-center space-y-4">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+              <Truck className="w-8 h-8 text-primary animate-pulse" />
+            </div>
+            <p className="text-sm text-muted-foreground">Redirection vers la connexion...</p>
+          </div>
+        </div>
+      );
+    }
     base44.auth.redirectToLogin();
     return null;
   }

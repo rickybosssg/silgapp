@@ -67,6 +67,20 @@ const getAppParams = () => {
 
 	const isCapacitor = detectCapacitor();
 
+	// Sur Capacitor, capturer le token depuis l'URL si présent (retour du login OAuth)
+	// Le SDK Base44 renvoie le token via ?access_token=... après authentification
+	if (isCapacitor && typeof window !== 'undefined') {
+		const urlParams = new URLSearchParams(window.location.search);
+		const tokenFromUrl = urlParams.get('access_token');
+		if (tokenFromUrl && isValidValue(tokenFromUrl)) {
+			storage.setItem('base44_access_token', tokenFromUrl);
+			// Nettoyer l'URL
+			urlParams.delete('access_token');
+			const newUrl = `${window.location.pathname}${urlParams.toString() ? `?${urlParams.toString()}` : ''}`;
+			window.history.replaceState({}, document.title, newUrl);
+		}
+	}
+
 	// Dans Capacitor, ne jamais utiliser localhost comme fromUrl — utiliser l'URL publique de l'app
 	const safeHref = isCapacitor
 		? (typeof window !== 'undefined' ? window.location.href : APP_PUBLIC_URL)
