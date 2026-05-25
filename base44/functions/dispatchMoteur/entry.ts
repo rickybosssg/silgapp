@@ -92,6 +92,7 @@ Deno.serve(async (req) => {
       await base44.asServiceRole.entities.Course.update(course.id, {
         dispatch_mode: "automatique",
         dispatch_status: "recherche_livreur",
+        heure_acceptation: new Date().toISOString(), // Initialiser le timer
       });
 
       const candidats = classerLivreurs(livreurs, course.adresse_depart, course.adresse_arrivee, quartiers);
@@ -110,6 +111,7 @@ Deno.serve(async (req) => {
         dispatch_status: "propose",
         livreur_id: meilleur.livreur.id,
         livreur_nom: nomLivreur,
+        heure_acceptation: new Date().toISOString(), // Initialiser le timer de 60s
       });
 
       // Mettre à jour la config dispatch globale pour le monitoring
@@ -132,82 +134,101 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Action : tick — gérer les timeouts des courses en dispatch automatique
+    // Action : tick — gérer les timeouts des courses en dispatch (manuel ET auto)
     if (action === "tick") {
-      const configs = await base44.asServiceRole.entities.DispatchConfig.list();
-      const config = configs[0];
-
-      if (!config || !config.course_en_dispatch_id || !config.livreur_sollicite_id || !config.heure_sollicitation) {
-        return Response.json({ message: "Aucun dispatch en cours" });
-      }
-
-      const elapsed = (Date.now() - new Date(config.heure_sollicitation).getTime()) / 1000;
-      const courseList = await base44.asServiceRole.entities.Course.filter({ id: config.course_en_dispatch_id });
-      const course = courseList[0];
-
-      if (!course) {
-        await base44.asServiceRole.entities.DispatchConfig.update(config.id, {
-          course_en_dispatch_id: "", livreur_sollicite_id: "", livreur_sollicite_nom: "", heure_sollicitation: null,
-        });
-        return Response.json({ message: "Course introuvable, config réinitialisée" });
-      }
-
-      // Course acceptée ou terminée → libérer le dispatch
-      if (!["nouvelle", "en_attente_livreur"].includes(course.statut)) {
-        await base44.asServiceRole.entities.Course.update(course.id, { dispatch_status: "accepte" });
-        await base44.asServiceRole.entities.DispatchConfig.update(config.id, {
-          course_en_dispatch_id: "", livreur_sollicite_id: "", livreur_sollicite_nom: "", heure_sollicitation: null,
-        });
-        return Response.json({ message: "Course acceptée, dispatch libéré" });
-      }
-
-      // Pas encore écoulé → attendre
-      if (elapsed < (config.timeout_secondes || 60)) {
-        return Response.json({
-          message: "Dispatch en cours",
-          course_id: config.course_en_dispatch_id,
-          livreur_id: config.livreur_sollicite_id,
-          temps_restant: Math.round((config.timeout_secondes || 60) - elapsed),
-        });
-      }
-
-      // Timeout → essayer le livreur suivant
-      const [quartiers, livreurs] = await Promise.all([
-        base44.asServiceRole.entities.QuartierOuaga.list(),
-        base44.asServiceRole.entities.Livreur.list(),
+      const [configs, coursesEnAttente] = await Promise.all([
+        base44.asServiceRole.entities.DispatchConfig.list(),
+        base44.asServiceRole.entities.Course.filter({ statut: "en_attente_livreur" }),
       ]);
+      const config = configs[0];
+      const now = Date.now();
 
-      const candidats = classerLivreurs(livreurs, course.adresse_depart, course.adresse_arrivee, quartiers);
-      const idxActuel = candidats.findIndex(c => c.livreur.id === config.livreur_sollicite_id);
-      const suivant = candidats[idxActuel + 1];
+      // Traiter toutes les courses en attente (pas seulement celle dans config)
+      for (const course of coursesEnAttente) {
+        // Ignorer les courses sans heure de sollicitation
+        const heureSollicitation = course.dispatch_status === "propose" && config?.course_en_dispatch_id === course.id
+          ? config.heure_sollicitation
+          : course.heure_acceptation; // Pour mode manuel, on utilise heure_acceptation comme heure de début
 
-      if (suivant) {
-        const nomSuivant = `${suivant.livreur.prenom || ""} ${suivant.livreur.nom}`.trim();
-        await base44.asServiceRole.entities.DispatchConfig.update(config.id, {
-          livreur_sollicite_id: suivant.livreur.id,
-          livreur_sollicite_nom: nomSuivant,
-          heure_sollicitation: new Date().toISOString(),
-        });
-        await base44.asServiceRole.entities.Course.update(course.id, {
-          statut: "en_attente_livreur",
-          dispatch_status: "propose",
-          livreur_id: suivant.livreur.id,
-          livreur_nom: nomSuivant,
-        });
-        return Response.json({ message: "Timeout, passage au livreur suivant", livreur: nomSuivant });
-      } else {
-        // Plus de candidats → expirée
-        await base44.asServiceRole.entities.Course.update(course.id, {
-          statut: "nouvelle",
-          dispatch_status: "expire",
-          livreur_id: "",
-          livreur_nom: "",
-        });
-        await base44.asServiceRole.entities.DispatchConfig.update(config.id, {
-          course_en_dispatch_id: "", livreur_sollicite_id: "", livreur_sollicite_nom: "", heure_sollicitation: null,
-        });
-        return Response.json({ message: "Aucun livreur disponible, course expirée" });
+        if (!heureSollicitation) continue;
+
+        const elapsed = (now - new Date(heureSollicitation).getTime()) / 1000;
+        const timeout = 60; // 60 secondes pour tous
+
+        // Course acceptée ou terminée → passer à la suivante
+        if (!["nouvelle", "en_attente_livreur"].includes(course.statut)) {
+          continue;
+        }
+
+        // Pas encore écoulé → attendre
+        if (elapsed < timeout) {
+          continue;
+        }
+
+        // TIMEOUT → action selon le mode
+        if (course.dispatch_mode === "automatique") {
+          // Mode auto : chercher le livreur suivant
+          const [quartiers, livreurs] = await Promise.all([
+            base44.asServiceRole.entities.QuartierOuaga.list(),
+            base44.asServiceRole.entities.Livreur.list(),
+          ]);
+
+          const candidats = classerLivreurs(livreurs, course.adresse_depart, course.adresse_arrivee, quartiers);
+          const idxActuel = candidats.findIndex(c => c.livreur.id === course.livreur_id);
+          const suivant = candidats[idxActuel + 1];
+
+          if (suivant) {
+            const nomSuivant = `${suivant.livreur.prenom || ""} ${suivant.livreur.nom}`.trim();
+            await base44.asServiceRole.entities.Course.update(course.id, {
+              statut: "en_attente_livreur",
+              dispatch_status: "propose",
+              livreur_id: suivant.livreur.id,
+              livreur_nom: nomSuivant,
+              heure_acceptation: new Date().toISOString(), // Reset le timer
+            });
+
+            // Mettre à jour config si c'est la course suivie
+            if (config && config.course_en_dispatch_id === course.id) {
+              await base44.asServiceRole.entities.DispatchConfig.update(config.id, {
+                livreur_sollicite_id: suivant.livreur.id,
+                livreur_sollicite_nom: nomSuivant,
+                heure_sollicitation: new Date().toISOString(),
+              });
+            }
+          } else {
+            // Plus de candidats → expirée
+            await base44.asServiceRole.entities.Course.update(course.id, {
+              statut: "nouvelle",
+              dispatch_status: "expire",
+              livreur_id: "",
+              livreur_nom: "",
+              heure_acceptation: null,
+            });
+            if (config && config.course_en_dispatch_id === course.id) {
+              await base44.asServiceRole.entities.DispatchConfig.update(config.id, {
+                course_en_dispatch_id: "", livreur_sollicite_id: "", livreur_sollicite_nom: "", heure_sollicitation: null,
+              });
+            }
+          }
+        } else {
+          // Mode manuel : retour à "en_attente_admin"
+          await base44.asServiceRole.entities.Course.update(course.id, {
+            statut: "nouvelle",
+            dispatch_status: "en_attente_admin",
+            livreur_id: "",
+            livreur_nom: "",
+            heure_acceptation: null,
+          });
+          // Libérer config si nécessaire
+          if (config && config.course_en_dispatch_id === course.id) {
+            await base44.asServiceRole.entities.DispatchConfig.update(config.id, {
+              course_en_dispatch_id: "", livreur_sollicite_id: "", livreur_sollicite_nom: "", heure_sollicitation: null,
+            });
+          }
+        }
       }
+
+      return Response.json({ message: "Tick terminé", courses_traitees: coursesEnAttente.length });
     }
 
     return Response.json({ message: "Action inconnue" }, { status: 400 });

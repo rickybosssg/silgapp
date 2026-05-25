@@ -39,6 +39,7 @@ export default function AssignLivreurDialog({ course, open, onClose }) {
         statut: "en_attente_livreur",
         dispatch_mode: "manuel",
         dispatch_status: "assigne_manuel",
+        heure_acceptation: new Date().toISOString(), // Initialiser le timer de 60s
       });
 
       const notificationEmail = livreur.user_email;

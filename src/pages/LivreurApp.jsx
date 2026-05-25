@@ -185,7 +185,15 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
   });
 
   const handleAccepter = (course) => {
-    updateCourseMutation.mutate({ id: course.id, data: { statut: "acceptee", heure_acceptation: new Date().toISOString() } });
+    // Enregistrer l'heure de début de sollicitation pour le timer
+    updateCourseMutation.mutate({ 
+      id: course.id, 
+      data: { 
+        statut: "acceptee", 
+        heure_acceptation: new Date().toISOString(),
+        dispatch_status: "accepte"
+      } 
+    });
     saveLivreur(livreurProfil.id, { statut: "en_course" }).then(() =>
       queryClient.invalidateQueries({ queryKey: ["livreur-profil"] })
     );
@@ -206,7 +214,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
         livreur_nom: "",
         remarque_livreur: remarque,
         dispatch_status: "en_attente_admin",
-        dispatch_mode: "manuel"
+        // Garder le mode de dispatch original (manuel ou auto)
       };
       
       console.log("📝 Update data:", updateData);
