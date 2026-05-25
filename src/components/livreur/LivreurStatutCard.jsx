@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 import BatterieFaibleButton from "./BatterieFaibleButton";
 
-export default function LivreurStatutCard({ statut, livreur }) {
+export default function LivreurStatutCard({ statut, livreur, isExterne = false }) {
   const isDisponible = statut === "disponible";
   const isEnCourse = statut === "en_course";
   const isHorsLigne = statut === "hors_ligne";
@@ -55,8 +55,8 @@ export default function LivreurStatutCard({ statut, livreur }) {
         </div>
       </div>
 
-      {/* Bouton batterie faible */}
-      {(isDisponible || isEnCourse) && livreur && (
+      {/* Bouton batterie faible - uniquement pour livreurs internes */}
+      {!isExterne && (isDisponible || isEnCourse) && livreur && (
         <BatterieFaibleButton livreur={livreur} />
       )}
     </div>
