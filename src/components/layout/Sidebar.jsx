@@ -43,12 +43,14 @@ export default function Sidebar({ notificationCount = 0 }) {
         "h-16 flex items-center border-b border-border flex-shrink-0 overflow-hidden",
         collapsed ? "px-4 justify-center" : "px-5 gap-3"
       )}>
-        <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
-          <span className="text-primary-foreground font-black text-base">S</span>
-        </div>
+        <img 
+          src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/2c20ad136_SILGAPPLOGO2.jpg"
+          alt="SILGAPP ET"
+          className="w-9 h-9 rounded-lg flex-shrink-0"
+        />
         {!collapsed && (
           <div>
-            <h1 className="font-extrabold text-sm text-foreground tracking-wide">SILGAPP 2</h1>
+            <h1 className="font-extrabold text-sm text-foreground tracking-wide">SILGAPP ET</h1>
             <p className="text-[10px] text-muted-foreground">Silga Livraison</p>
           </div>
         )}
