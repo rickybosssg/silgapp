@@ -197,20 +197,32 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
       ? `Livreur occupé : ${raison === "en_course" ? "déjà en cours de livraison" : "indisponible"}`
       : "Course refusée";
     
+    console.log("🔴 REFUS:", course.id, "Raison:", raison);
+    
     try {
-      await base44.entities.Course.update(course.id, { 
+      const updateData = { 
         statut: "nouvelle", 
         livreur_id: "", 
         livreur_nom: "",
         remarque_livreur: remarque,
         dispatch_status: "en_attente_admin",
         dispatch_mode: "manuel"
-      });
+      };
+      
+      console.log("📝 Update data:", updateData);
+      
+      await base44.entities.Course.update(course.id, updateData);
+      
+      console.log("✅ Course mise à jour, invalidation...");
+      
       // Invalider TOUTES les queries courses immédiatement
       await queryClient.invalidateQueries({ queryKey: ["courses"] });
       await queryClient.invalidateQueries({ queryKey: ["mes-courses"] });
+      
+      console.log("✅ Invalidation terminée");
       toast("Course renvoyée à l'admin");
     } catch (err) {
+      console.error("❌ Erreur refus:", err);
       toast.error("Erreur : " + err.message);
     }
   };
