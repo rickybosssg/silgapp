@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
-  { path: "/nouvelle-course", label: "Course", icon: Plus },
   { path: "/carte", label: "Carte", icon: MapPin },
   { path: "/courses", label: "Courses", icon: Package },
   { path: "/livreurs", label: "Livreurs", icon: Truck },
