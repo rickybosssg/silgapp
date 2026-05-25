@@ -53,9 +53,29 @@ export default function PinVerification({ onVerify, onCancel, networkName }) {
       setPin(newPin);
       setError("");
       
+      // Validation automatique après 6 chiffres
       if (newPin.length === 6) {
         setTimeout(() => {
-          handleSubmit(new Event("submit"));
+          // Vérification directe
+          if (newPin.length === 6) {
+            if (newPin === PIN_CODE) {
+              toast.success("Accès autorisé");
+              onVerify();
+            } else {
+              const newAttempts = attempts + 1;
+              setAttempts(newAttempts);
+              
+              if (newAttempts >= 5) {
+                setError("Trop de tentatives. Veuillez réessayer plus tard.");
+                toast.error("Trop de tentatives échouées");
+              } else {
+                setError(`Code incorrect. ${5 - newAttempts} tentatives restantes.`);
+                toast.error("Code incorrect");
+              }
+              
+              setPin("");
+            }
+          }
         }, 100);
       }
     }
