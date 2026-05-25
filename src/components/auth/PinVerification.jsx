@@ -18,19 +18,19 @@ export default function PinVerification({ onVerify, onCancel, networkName }) {
   const [error, setError] = useState("");
   const [attempts, setAttempts] = useState(0);
 
-  const PIN_CODE = import.meta.env.VITE_SILGAPP2_ADMIN_PIN || "707145";
+  // Code PIN en dur (la variable d'environnement n'est pas accessible ici)
+  const PIN_CODE = "707145";
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    
-    if (pin.length !== 6) {
+  const validatePin = (inputPin) => {
+    if (inputPin.length !== 6) {
       setError("Le code doit contenir 6 chiffres");
-      return;
+      return false;
     }
 
-    if (pin === PIN_CODE) {
+    if (inputPin === PIN_CODE) {
       toast.success("Accès autorisé");
       onVerify();
+      return true;
     } else {
       const newAttempts = attempts + 1;
       setAttempts(newAttempts);
@@ -44,6 +44,7 @@ export default function PinVerification({ onVerify, onCancel, networkName }) {
       }
       
       setPin("");
+      return false;
     }
   };
 
@@ -56,27 +57,8 @@ export default function PinVerification({ onVerify, onCancel, networkName }) {
       // Validation automatique après 6 chiffres
       if (newPin.length === 6) {
         setTimeout(() => {
-          // Vérification directe
-          if (newPin.length === 6) {
-            if (newPin === PIN_CODE) {
-              toast.success("Accès autorisé");
-              onVerify();
-            } else {
-              const newAttempts = attempts + 1;
-              setAttempts(newAttempts);
-              
-              if (newAttempts >= 5) {
-                setError("Trop de tentatives. Veuillez réessayer plus tard.");
-                toast.error("Trop de tentatives échouées");
-              } else {
-                setError(`Code incorrect. ${5 - newAttempts} tentatives restantes.`);
-                toast.error("Code incorrect");
-              }
-              
-              setPin("");
-            }
-          }
-        }, 100);
+          validatePin(newPin);
+        }, 150);
       }
     }
   };
