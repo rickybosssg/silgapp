@@ -63,6 +63,11 @@
       "type": "string",
       "description": "Adresse ou quartier de livraison"
     },
+    "destination_inconnue": {
+      "type": "boolean",
+      "default": false,
+      "description": "La destination finale n'est pas connue au moment de la commande"
+    },
     "gps_depart_lat": {
       "type": "number",
       "description": "Latitude du point de d\u00e9part"
@@ -270,7 +275,6 @@
   "required": [
     "client_telephone",
     "type_course",
-    "adresse_depart",
-    "adresse_arrivee"
+    "adresse_depart"
   ]
 }

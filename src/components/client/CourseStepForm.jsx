@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -15,7 +16,8 @@ import {
   FileText,
   CheckCircle,
   Smartphone,
-  Truck
+  Truck,
+  AlertCircle
 } from "lucide-react";
 
 export default function StepField({ 
@@ -126,6 +128,8 @@ export default function StepField({
         );
 
       case 2: // Lieu de livraison
+        const destinationInconnue = formData.destination_inconnue || false;
+        
         return (
           <div className="space-y-4">
             <div className="text-center mb-6">
@@ -136,26 +140,66 @@ export default function StepField({
               <p className="text-sm text-muted-foreground mt-1">Adresse ou quartier d'arrivée</p>
             </div>
             
-            <div>
-              <Label>Adresse de livraison *</Label>
-              <Input
-                value={formData.adresse_arrivee}
-                onChange={(e) => setFormData({ ...formData, adresse_arrivee: e.target.value })}
-                placeholder="Quartier, rue, point de repère..."
-                className="h-12"
-                autoFocus
+            {/* Checkbox Destination inconnue */}
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-blue-50 border border-blue-200">
+              <Checkbox
+                id="destination_inconnue"
+                checked={destinationInconnue}
+                onCheckedChange={(checked) => {
+                  setFormData({ 
+                    ...formData, 
+                    destination_inconnue: checked,
+                    adresse_arrivee: checked ? "" : formData.adresse_arrivee,
+                    gps_arrivee_lat: checked ? null : formData.gps_arrivee_lat,
+                    gps_arrivee_lng: checked ? null : formData.gps_arrivee_lng,
+                    livraisonGPS: checked ? false : formData.livraisonGPS
+                  });
+                }}
+                className="border-blue-400 data-[state=checked]:bg-blue-600"
               />
+              <Label htmlFor="destination_inconnue" className="text-sm font-medium text-blue-900 cursor-pointer flex-1">
+                Destination inconnue pour le moment
+              </Label>
             </div>
 
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={formData.onGetGPSArrivee}
-            >
-              <Navigation className="w-4 h-4 mr-2" />
-              {formData.livraisonGPS ? "✓ Position GPS enregistrée" : "Utiliser ma position actuelle"}
-            </Button>
+            {!destinationInconnue && (
+              <>
+                <div>
+                  <Label>Adresse de livraison *</Label>
+                  <Input
+                    value={formData.adresse_arrivee}
+                    onChange={(e) => setFormData({ ...formData, adresse_arrivee: e.target.value })}
+                    placeholder="Quartier, rue, point de repère..."
+                    className="h-12"
+                    autoFocus
+                  />
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={formData.onGetGPSArrivee}
+                >
+                  <Navigation className="w-4 h-4 mr-2" />
+                  {formData.livraisonGPS ? "✓ Position GPS enregistrée" : "Utiliser ma position actuelle"}
+                </Button>
+              </>
+            )}
+
+            {destinationInconnue && (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
+                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-amber-900">
+                    Le destinataire pourra envoyer sa position plus tard.
+                  </p>
+                  <p className="text-xs text-amber-700 mt-1">
+                    Un lien de suivi sera envoyé au destinataire pour partager sa position après la récupération du colis.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         );
 
@@ -313,7 +357,11 @@ export default function StepField({
                 </div>
                 <div className="flex-1">
                   <p className="text-xs text-muted-foreground uppercase font-semibold">Livraison</p>
-                  <p className="font-medium text-foreground">{formData.adresse_arrivee}</p>
+                  <p className="font-medium text-foreground">
+                    {formData.destination_inconnue 
+                      ? "📍 Destination à définir" 
+                      : formData.adresse_arrivee}
+                  </p>
                 </div>
               </div>
 
@@ -416,7 +464,7 @@ export default function StepField({
             disabled={
               (step === 0 && !formData.type_course) ||
               (step === 1 && !formData.adresse_depart) ||
-              (step === 2 && !formData.adresse_arrivee) ||
+              (step === 2 && !formData.destination_inconnue && !formData.adresse_arrivee) ||
               (step === 3 && !(formData.type_course === "expedier" ? formData.destinataire_telephone : formData.expediteur_telephone)) ||
               (step === 4 && !formData.type_colis)
             }
