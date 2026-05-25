@@ -1,5 +1,4 @@
-import { Preferences } from '@capacitor/preferences';
-
+// Stockage session — utilise localStorage (compatible APK Base44 natif)
 const SESSION_KEY = 'silgapp_code_identification_session';
 
 export const isCapacitorAvailable = () => {
@@ -12,20 +11,17 @@ export const isCapacitorAvailable = () => {
 };
 
 export const saveSessionNative = async (sessionData) => {
-  if (!isCapacitorAvailable()) return false;
   try {
-    await Preferences.set({ key: SESSION_KEY, value: JSON.stringify(sessionData) });
+    localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
     return true;
-  } catch (error) {
-    console.error('[CapacitorStorage] saveSession failed:', error.message);
+  } catch {
     return false;
   }
 };
 
 export const getSessionNative = async () => {
-  if (!isCapacitorAvailable()) return null;
   try {
-    const { value } = await Preferences.get({ key: SESSION_KEY });
+    const value = localStorage.getItem(SESSION_KEY);
     if (!value) return null;
     return JSON.parse(value);
   } catch {
@@ -34,19 +30,13 @@ export const getSessionNative = async () => {
 };
 
 export const removeSessionNative = async () => {
-  if (!isCapacitorAvailable()) return;
   try {
-    await Preferences.remove({ key: SESSION_KEY });
-  } catch (error) {
-    console.error('[CapacitorStorage] removeSession failed:', error.message);
-  }
+    localStorage.removeItem(SESSION_KEY);
+  } catch {}
 };
 
 export const clearAllSessions = async () => {
-  if (!isCapacitorAvailable()) return;
   try {
-    await Preferences.clear();
-  } catch (error) {
-    console.error('[CapacitorStorage] clearAll failed:', error.message);
-  }
+    localStorage.removeItem(SESSION_KEY);
+  } catch {}
 };
