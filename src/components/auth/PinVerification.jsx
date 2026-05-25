@@ -18,7 +18,7 @@ export default function PinVerification({ onVerify, onCancel, networkName }) {
   const [error, setError] = useState("");
   const [attempts, setAttempts] = useState(0);
 
-  const PIN_CODE = import.meta.env.VITE_SILGAPP2_ADMIN_PIN || "123456";
+  const PIN_CODE = import.meta.env.VITE_SILGAPP2_ADMIN_PIN || "707145";
 
   const handleSubmit = (e) => {
     e.preventDefault();
