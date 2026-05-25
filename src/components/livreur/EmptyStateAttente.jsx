@@ -8,15 +8,15 @@ export default function EmptyStateAttente() {
         <div className="relative w-24 h-24 mx-auto">
           <div className="absolute inset-0 rounded-full bg-green-100 animate-ping opacity-40" />
           <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg shadow-green-200">
-            <span className="text-4xl">🚴</span>
+            <span className="text-4xl">📡</span>
           </div>
         </div>
 
         <div className="space-y-1.5">
-          <p className="text-xl font-bold text-gray-800">Prêt pour une nouvelle course</p>
+          <p className="text-xl font-bold text-gray-800">En veille active</p>
           <p className="text-sm text-gray-500 leading-relaxed">
-            Restez connecté !<br />
-            Une course vous sera assignée très bientôt 🚀
+            Les courses proches apparaîtront ici<br />
+            Actualisation automatique 🚀
           </p>
         </div>
 

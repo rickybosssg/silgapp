@@ -123,6 +123,15 @@ export default function CourseExterneFormSync() {
           console.error("Erreur notification:", err);
         }
       }
+      // Lancer le dispatch automatique
+      try {
+        await base44.functions.invoke("dispatchExterneAuto", {
+          action: "lancer_recherche_auto",
+          course_id: course.id
+        });
+      } catch (err) {
+        console.error("Erreur dispatch:", err);
+      }
       return course;
     },
     onSuccess: (response) => {
