@@ -109,6 +109,16 @@
     "code_identification": {
       "type": "string",
       "description": "Code d'identification unique pour la connexion"
+    },
+    "app_active": {
+      "type": "boolean",
+      "default": false,
+      "description": "Livreur actuellement actif dans l'application SILGAPP"
+    },
+    "last_seen_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Derni\u00e8re activit\u00e9 dans l'application (heartbeat)"
     }
   },
   "required": [

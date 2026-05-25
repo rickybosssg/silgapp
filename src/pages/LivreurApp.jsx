@@ -45,6 +45,45 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
     return () => unsub?.();
   }, [livreurProfil?.id, livreurProfil?.user_email]);
 
+  // ── Heartbeat app_active ──────────────────────────────────────────────────
+  // Marque le livreur comme actif dans l'app et met à jour last_seen_at
+  useEffect(() => {
+    if (!initialProfil?.id) return;
+    const id = initialProfil.id;
+
+    const pingActif = () =>
+      saveLivreur(id, { app_active: true, last_seen_at: new Date().toISOString() }).catch(() => null);
+
+    const pingInactif = () =>
+      saveLivreur(id, { app_active: false }).catch(() => null);
+
+    // Ping immédiat à l'ouverture
+    pingActif();
+
+    // Heartbeat toutes les 60 secondes
+    const interval = setInterval(pingActif, 60 * 1000);
+
+    // Inactif quand l'onglet/app passe en arrière-plan
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        pingInactif();
+      } else {
+        pingActif();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // Inactif à la fermeture de la fenêtre (best-effort)
+    window.addEventListener('beforeunload', pingInactif);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('beforeunload', pingInactif);
+      pingInactif();
+    };
+  }, [initialProfil?.id]);
+
   // Courses
   const { data: mesCourses = [] } = useQuery({
     queryKey: ["mes-courses", livreurProfil?.id],
@@ -162,6 +201,10 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
   };
 
   const handleLogout = () => {
+    // Marquer inactif avant déconnexion
+    if (livreurProfil?.id) {
+      saveLivreur(livreurProfil.id, { app_active: false }).catch(() => null);
+    }
     ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
       try { localStorage.removeItem(k); } catch(_) {}
     });
