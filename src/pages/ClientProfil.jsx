@@ -5,8 +5,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { User, Save, ArrowLeft } from "lucide-react";
+import { User, Save, ArrowLeft, Phone } from "lucide-react";
 import { toast } from "sonner";
+
+// Formater le numéro de téléphone Burkina Faso
+const formatPhone = (value) => {
+  // Garder uniquement les chiffres
+  const digits = value.replace(/\D/g, '').slice(0, 8);
+  
+  // Formater avec espaces
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)} ${digits.slice(2)}`;
+  if (digits.length <= 6) return `${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4)}`;
+  return `${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4, 6)} ${digits.slice(6)}`;
+};
+
+// Nettoyer le numéro pour la base de données (sans espaces)
+const cleanPhone = (value) => value.replace(/\D/g, '');
 
 export default function ClientProfil({ onComplete, existingProfil }) {
   const navigate = useNavigate();
@@ -16,16 +31,48 @@ export default function ClientProfil({ onComplete, existingProfil }) {
     prenom: "",
     telephone: "",
   });
+  const [phoneError, setPhoneError] = useState("");
 
   useEffect(() => {
     if (existingProfil) {
+      const phoneFormatted = formatPhone(existingProfil.telephone || "");
       setFormData({
         nom: existingProfil.nom || "",
         prenom: existingProfil.prenom || "",
-        telephone: existingProfil.telephone || "",
+        telephone: phoneFormatted,
       });
     }
   }, [existingProfil]);
+
+  const validatePhone = (phone) => {
+    const digits = cleanPhone(phone);
+    if (digits.length !== 8) {
+      setPhoneError("Le numéro doit contenir 8 chiffres");
+      return false;
+    }
+    if (!/^[67]/.test(digits)) {
+      setPhoneError("Le numéro doit commencer par 6 ou 7");
+      return false;
+    }
+    setPhoneError("");
+    return true;
+  };
+
+  const handlePhoneChange = (e) => {
+    const value = e.target.value;
+    // Autoriser uniquement les chiffres et espaces
+    if (value && !/[\d\s]/.test(value)) return;
+    
+    const formatted = formatPhone(value);
+    setFormData({ ...formData, telephone: formatted });
+    
+    // Validation en temps réel
+    if (formatted.length > 0) {
+      validatePhone(formatted);
+    } else {
+      setPhoneError("");
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -35,24 +82,31 @@ export default function ClientProfil({ onComplete, existingProfil }) {
       return;
     }
 
+    // Validation finale du téléphone
+    if (!validatePhone(formData.telephone)) {
+      toast.error("Numéro de téléphone invalide");
+      return;
+    }
+
     setLoading(true);
 
     try {
       const user = await base44.auth.me();
+      const phoneClean = cleanPhone(formData.telephone);
       
       // Mettre à jour ou créer le profil client
       if (existingProfil) {
         await base44.entities.ClientExterne.update(existingProfil.id, {
           nom: formData.nom,
           prenom: formData.prenom,
-          telephone: formData.telephone,
+          telephone: phoneClean,
         });
         toast.success("Profil mis à jour !");
       } else {
         await base44.entities.ClientExterne.create({
           nom: formData.nom,
           prenom: formData.prenom,
-          telephone: formData.telephone,
+          telephone: phoneClean,
           email: user.email,
           user_email: user.email,
           actif: true,
@@ -60,7 +114,10 @@ export default function ClientProfil({ onComplete, existingProfil }) {
         toast.success("Profil créé !");
       }
       
-      onComplete?.();
+      // Retour au tableau de bord
+      setTimeout(() => {
+        navigate("/");
+      }, 500);
     } catch (err) {
       console.error("Erreur sauvegarde profil:", err);
       toast.error("Erreur lors de la sauvegarde");
@@ -122,14 +179,28 @@ export default function ClientProfil({ onComplete, existingProfil }) {
 
             <div className="space-y-2">
               <Label htmlFor="telephone">Numéro de téléphone</Label>
-              <Input
-                id="telephone"
-                placeholder="Ex: +226 70 00 00 00"
-                type="tel"
-                value={formData.telephone}
-                onChange={(e) => setFormData({ ...formData, telephone: e.target.value })}
-                disabled={loading}
-              />
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="telephone"
+                  placeholder="66 66 66 66"
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={formData.telephone}
+                  onChange={handlePhoneChange}
+                  disabled={loading}
+                  className={`pl-10 ${phoneError ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                />
+              </div>
+              {phoneError && (
+                <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                  <span>⚠️</span> {phoneError}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Format: 66 66 66 66 (8 chiffres)
+              </p>
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
