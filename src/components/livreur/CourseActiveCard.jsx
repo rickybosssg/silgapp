@@ -47,7 +47,7 @@ function ProgressBar({ statut }) {
   );
 }
 
-export default function CourseActiveCard({ course, onColisRecupere, onColisLivre, onClientAnnule, isPending }) {
+export default function CourseActiveCard({ course, onColisRecupere, onColisLivre, onClientAnnule, isPending, isExterne = false }) {
   const [prixReel, setPrixReel] = useState("");
   const [showPrixModal, setShowPrixModal] = useState(false);
   const [remarque, setRemarque] = useState("");
@@ -243,11 +243,31 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           </div>
 
           {/* Prix */}
-          {course.prix && (
-            <div className="flex items-center justify-between px-1">
-              <span className="text-gray-500 text-sm">Prix estimé</span>
-              <span className="text-xl font-black text-gray-900">{course.prix.toLocaleString()} <span className="text-sm font-semibold text-gray-400">FCFA</span></span>
-            </div>
+          {isExterne ? (
+            course.prix_estimate && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-blue-700 font-semibold">Prix estimé</span>
+                  <span className="text-lg font-black text-blue-900">~{course.prix_estimate.toLocaleString()} F</span>
+                </div>
+                <p className="text-[10px] text-blue-600">
+                  Prix final calculé à la livraison (100 F/km réel)
+                </p>
+                <div className="mt-2 pt-2 border-t border-blue-200 flex items-center justify-between text-xs">
+                  <span className="text-blue-700">Votre gain (70%)</span>
+                  <span className="font-bold text-green-700">
+                    {Math.round(course.prix_estimate * 0.7).toLocaleString()} F
+                  </span>
+                </div>
+              </div>
+            )
+          ) : (
+            course.prix && (
+              <div className="flex items-center justify-between px-1">
+                <span className="text-gray-500 text-sm">Prix estimé</span>
+                <span className="text-xl font-black text-gray-900">{course.prix.toLocaleString()} <span className="text-sm font-semibold text-gray-400">FCFA</span></span>
+              </div>
+            )
           )}
 
           {course.notes && (
@@ -335,10 +355,23 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             <div className="text-center py-4 bg-green-50 rounded-2xl border border-green-200">
               <p className="text-2xl mb-1">🎉</p>
               <p className="font-black text-green-700 text-base">Course terminée !</p>
-              {course.prix_reel && (
-                <p className="text-green-600 text-sm font-semibold mt-0.5">
-                  {course.prix_reel.toLocaleString()} FCFA encaissés
-                </p>
+              {isExterne ? (
+                course.montant_livreur && (
+                  <>
+                    <p className="text-green-600 text-sm font-semibold mt-0.5">
+                      +{course.montant_livreur.toLocaleString()} F gagnés
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Commission Silga: {course.commission_silga?.toLocaleString() || Math.round(course.prix_final * 0.3).toLocaleString()} F (30%)
+                    </p>
+                  </>
+                )
+              ) : (
+                course.prix_reel && (
+                  <p className="text-green-600 text-sm font-semibold mt-0.5">
+                    {course.prix_reel.toLocaleString()} FCFA encaissés
+                  </p>
+                )
               )}
             </div>
           )}

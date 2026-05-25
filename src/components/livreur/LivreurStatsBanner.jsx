@@ -1,7 +1,7 @@
 import React from "react";
-import { TrendingUp, Package, CheckCircle } from "lucide-react";
+import { TrendingUp, Package, CheckCircle, AlertCircle } from "lucide-react";
 
-export default function LivreurStatsBanner({ mesCourses, totalEncaisse }) {
+export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantDüSilga, isExterne = false }) {
   const today = new Date().toDateString();
   const coursesAujourdHui = mesCourses.filter(c =>
     new Date(c.created_date || c.updated_date).toDateString() === today
@@ -30,15 +30,21 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse }) {
         <p className="text-[10px] text-gray-400 font-medium">Livrées</p>
       </div>
 
-      {/* Total FCFA */}
+      {/* Total FCFA - ou Commission pour externe */}
       <div className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 text-center">
         <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center mx-auto mb-1.5">
-          <TrendingUp className="w-4 h-4 text-amber-500" />
+          {isExterne ? (
+            <AlertCircle className="w-4 h-4 text-amber-500" />
+          ) : (
+            <TrendingUp className="w-4 h-4 text-amber-500" />
+          )}
         </div>
         <p className="text-base font-bold text-gray-900 leading-tight">
-          {totalEncaisse > 0 ? `${(totalEncaisse / 1000).toFixed(1)}k` : "0"}
+          {isExterne && montantDüSilga ? `${(montantDüSilga / 1000).toFixed(1)}k` : (totalEncaisse > 0 ? `${(totalEncaisse / 1000).toFixed(1)}k` : "0")}
         </p>
-        <p className="text-[10px] text-gray-400 font-medium">FCFA</p>
+        <p className="text-[10px] text-gray-400 font-medium">
+          {isExterne ? "Dû Silga" : "FCFA"}
+        </p>
       </div>
     </div>
   );

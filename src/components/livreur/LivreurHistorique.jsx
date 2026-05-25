@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle2, XCircle, Clock, MapPin, Banknote, Calendar } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, MapPin, Banknote, Calendar, AlertCircle } from "lucide-react";
 import { format, subDays, startOfWeek, startOfMonth, isWithinInterval } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,7 @@ const periodFilters = [
   { value: "month", label: "Ce mois" },
 ];
 
-export default function LivreurHistorique({ mesCourses, livreurProfil }) {
+export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne = false }) {
   const [period, setPeriod] = useState("today");
 
   // Déterminer la période
@@ -52,8 +52,10 @@ export default function LivreurHistorique({ mesCourses, livreurProfil }) {
   );
   
   const livreesToday = coursesToday.filter(c => c.statut === "livree");
-  const totalEncaisseToday = livreesToday.reduce((sum, c) => sum + (c.prix_reel || 0), 0);
-  const montantDuToday = totalEncaisseToday;
+  const totalEncaisseToday = livreesToday.reduce((sum, c) => sum + (isExterne ? (c.montant_livreur || 0) : (c.prix_reel || 0)), 0);
+  const montantDuToday = isExterne 
+    ? livreesToday.reduce((sum, c) => sum + (c.commission_silga || Math.round((c.prix_final || c.prix_estimate || 0) * 0.3)), 0)
+    : totalEncaisseToday;
   const isPaye = livreurProfil?.statut_paiement === "paye";
 
   return (
@@ -164,11 +166,26 @@ export default function LivreurHistorique({ mesCourses, livreurProfil }) {
                       <span className="truncate">{course.adresse_arrivee}</span>
                     </div>
 
-                    {course.prix_reel && course.statut === "livree" && (
-                      <div className="flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 rounded px-2 py-1 w-fit">
-                        <Banknote className="w-3 h-3" />
-                        {course.prix_reel.toLocaleString()} FCFA encaissés
-                      </div>
+                    {course.statut === "livree" && (
+                      isExterne ? (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-50 rounded px-2 py-1 w-fit">
+                            <Banknote className="w-3 h-3" />
+                            +{course.montant_livreur?.toLocaleString() || 0} F gagnés
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground bg-gray-50 rounded px-2 py-1 w-fit">
+                            <AlertCircle className="w-3 h-3" />
+                            Commission: {course.commission_silga?.toLocaleString() || 0} F (30%)
+                          </div>
+                        </div>
+                      ) : (
+                        course.prix_reel && (
+                          <div className="flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 rounded px-2 py-1 w-fit">
+                            <Banknote className="w-3 h-3" />
+                            {course.prix_reel.toLocaleString()} FCFA encaissés
+                          </div>
+                        )
+                      )
                     )}
                   </div>
                 </div>
