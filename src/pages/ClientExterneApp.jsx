@@ -3,26 +3,67 @@ import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { MapPin, AlertCircle, Navigation, Loader2 } from "lucide-react";
+import { MapPin, AlertCircle, Navigation, Loader2, User } from "lucide-react";
+import ClientProfil from "./ClientProfil";
 
 export default function ClientExterneApp() {
   const navigate = useNavigate();
   const [gpsActive, setGpsActive] = useState(false);
   const [gpsRequired, setGpsRequired] = useState(true);
+  const [profilRequired, setProfilRequired] = useState(false);
+  const [profilComplet, setProfilComplet] = useState(false);
   const [position, setPosition] = useState(null);
+  const [clientProfil, setClientProfil] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Vérifier si GPS déjà activé
-    const saved = localStorage.getItem("client_gps_active");
-    if (saved === "true") {
-      setGpsActive(true);
-      setGpsRequired(false);
-      setLoading(false);
-    } else {
+    checkStatus();
+  }, []);
+
+  const checkStatus = async () => {
+    try {
+      // 1. Vérifier GPS
+      const savedGps = localStorage.getItem("client_gps_active");
+      if (savedGps === "true") {
+        setGpsActive(true);
+        setGpsRequired(false);
+      } else {
+        setLoading(false);
+        return;
+      }
+
+      // 2. Vérifier profil client
+      const user = await base44.auth.me();
+      const clients = await base44.entities.ClientExterne.filter({
+        user_email: user.email
+      });
+
+      if (clients && clients.length > 0) {
+        const profil = clients[0];
+        setClientProfil(profil);
+        
+        // Vérifier si profil complet
+        if (profil.nom && profil.prenom && profil.telephone) {
+          setProfilComplet(true);
+        } else {
+          setProfilRequired(true);
+        }
+      } else {
+        // Aucun profil → création nécessaire
+        setProfilRequired(true);
+      }
+    } catch (err) {
+      console.error("Erreur vérification statut:", err);
+    } finally {
       setLoading(false);
     }
-  }, []);
+  };
+
+  const handleProfilComplete = () => {
+    setProfilRequired(false);
+    setProfilComplet(true);
+    checkStatus(); // Recharger pour avoir le profil à jour
+  };
 
   const handleActiverGPS = () => {
     if (!navigator.geolocation) {
@@ -91,6 +132,11 @@ export default function ClientExterneApp() {
     );
   }
 
+  // Écran profil incomplet
+  if (profilRequired && !profilComplet) {
+    return <ClientProfil existingProfil={clientProfil} onComplete={handleProfilComplete} />;
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-lg mx-auto space-y-4">
@@ -101,9 +147,20 @@ export default function ClientExterneApp() {
               <h1 className="text-xl font-bold text-foreground">Silga Externe</h1>
               <p className="text-xs text-muted-foreground">Créer une course</p>
             </div>
-            <div className="flex items-center gap-2 text-xs text-green-600 bg-green-50 px-3 py-1.5 rounded-full">
-              <Navigation className="w-3 h-3" />
-              <span>GPS actif</span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-xs"
+                onClick={() => navigate("/client/profil")}
+              >
+                <User className="w-3 h-3" />
+                <span className="hidden sm:inline">Mon profil</span>
+              </Button>
+              <div className="flex items-center gap-2 text-xs text-green-600 bg-green-50 px-3 py-1.5 rounded-full">
+                <Navigation className="w-3 h-3" />
+                <span>GPS actif</span>
+              </div>
             </div>
           </div>
         </div>
@@ -112,7 +169,7 @@ export default function ClientExterneApp() {
         <div className="grid grid-cols-2 gap-3">
           <Card 
             className="p-6 cursor-pointer hover:shadow-md transition-shadow border-2 hover:border-primary"
-            onClick={() => navigate("/client/course/expedier", { state: { position } })}
+            onClick={() => navigate("/client/course/expedier", { state: { position, clientProfil } })}
           >
             <div className="text-center space-y-3">
               <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
@@ -129,7 +186,7 @@ export default function ClientExterneApp() {
 
           <Card 
             className="p-6 cursor-pointer hover:shadow-md transition-shadow border-2 hover:border-accent"
-            onClick={() => navigate("/client/course/recevoir", { state: { position } })}
+            onClick={() => navigate("/client/course/recevoir", { state: { position, clientProfil } })}
           >
             <div className="text-center space-y-3">
               <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto">

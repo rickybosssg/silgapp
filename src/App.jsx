@@ -28,6 +28,7 @@ const LivreurApp = lazy(() => import('./pages/LivreurApp.jsx'));
 const ClientExterneApp = lazy(() => import('./pages/ClientExterneApp.jsx'));
 const CourseExterneForm = lazy(() => import('./pages/CourseExterneForm.jsx'));
 const ClientSuiviCourse = lazy(() => import('./pages/ClientSuiviCourse.jsx'));
+const ClientProfilPage = lazy(() => import('./pages/ClientProfilPage.jsx'));
 const DashboardAdminExterne = lazy(() => import('./pages/DashboardAdminExterne.jsx'));
 
 const LoadingScreen = () => (
@@ -137,6 +138,7 @@ function AppRouter() {
             <Route path="/client/course/expedier" element={<CourseExterneForm />} />
             <Route path="/client/course/recevoir" element={<CourseExterneForm />} />
             <Route path="/client/suivi" element={<ClientSuiviCourse />} />
+            <Route path="/client/profil" element={<ClientProfilPage />} />
             <Route path="*" element={<ClientExterneApp />} />
           </Routes>
         </Suspense>

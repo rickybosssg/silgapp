@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useMutation } from "@tanstack/react-query";
@@ -16,6 +16,7 @@ export default function CourseExterneForm() {
   const navigate = useNavigate();
   const typeCourse = location.pathname.includes("expedier") ? "expedier" : "recevoir";
   const position = location.state?.position || JSON.parse(localStorage.getItem("client_gps_position") || "null");
+  const clientProfil = location.state?.clientProfil;
 
   const [formData, setFormData] = useState({
     client_nom: "",
@@ -32,6 +33,17 @@ export default function CourseExterneForm() {
 
   const [recuperationGPS, setRecuperationGPS] = useState(false);
   const [livraisonGPS, setLivraisonGPS] = useState(false);
+
+  // Pré-remplir nom et téléphone depuis le profil client
+  useEffect(() => {
+    if (clientProfil) {
+      setFormData((prev) => ({
+        ...prev,
+        client_nom: clientProfil.nom || "",
+        client_telephone: clientProfil.telephone || "",
+      }));
+    }
+  }, [clientProfil]);
 
   const handleGetGPSDepart = () => {
     if (!navigator.geolocation) {
