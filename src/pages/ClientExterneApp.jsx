@@ -7,11 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { 
   MapPin, Navigation, Phone, MessageCircle, User, Package, 
   Clock, History, HelpCircle, ChevronRight, TrendingUp, 
-  Shield, Zap, Star, Loader2, AlertCircle
+  Shield, Zap, Star, Loader2, AlertCircle, Sparkles
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import ClientProfil from "./ClientProfil";
+import VenusChat from "@/components/client/VenusChat";
 
 export default function ClientExterneApp() {
   const navigate = useNavigate();
@@ -25,6 +26,7 @@ export default function ClientExterneApp() {
   const [livreursProches, setLivreursProches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
+  const [showVenusChat, setShowVenusChat] = useState(false);
   const mapRef = useRef(null);
 
   useEffect(() => {
@@ -510,6 +512,14 @@ export default function ClientExterneApp() {
                 <User className="w-5 h-5 text-orange-600" />
                 <span className="text-[10px] font-medium">Profil</span>
               </Button>
+              <Button 
+                variant="ghost" 
+                className="h-auto py-3 flex flex-col gap-1.5 hover:bg-pink-50"
+                onClick={() => setShowVenusChat(true)}
+              >
+                <Sparkles className="w-5 h-5 text-pink-600" />
+                <span className="text-[10px] font-medium">VENUS</span>
+              </Button>
             </div>
           </Card>
 
@@ -574,6 +584,9 @@ export default function ClientExterneApp() {
 
         </div>
       </div>
+
+      {/* Chat VENUS */}
+      {showVenusChat && <VenusChat onClose={() => setShowVenusChat(false)} />}
     </div>
   );
 }
