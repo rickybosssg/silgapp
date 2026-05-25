@@ -55,7 +55,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       saveLivreur(id, { app_active: false }).catch(() => null);
 
     pingActif();
-    const interval = setInterval(pingActif, 60 * 1000);
+    const interval = setInterval(pingActif, 10 * 1000); // Ping toutes les 10s au lieu de 60s
     const handleVisibility = () => {
       if (document.visibilityState === 'hidden') pingInactif();
       else pingActif();
