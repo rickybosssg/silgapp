@@ -4,28 +4,28 @@ import { Truck } from "lucide-react";
 
 /**
  * AuthGate — routage post-connexion Base44
- * - admin → children (dashboard admin)
- * - livreur valide → onLivreur(profil)
- * - sinon → "Compte non autorisé"
+ * - admin → children (dashboard admin avec choix Interne/Externe)
+ * - livreur interne → onLivreur(profil)
+ * - livreur externe → onLivreur(profil + component Externe)
+ * - inconnu → client (onClient() + dashboard client)
  *
  * Fix APK Android :
  * - Le token est capturé dans index.html (script synchrone) avant tout module ES
  * - base44Client lit localStorage au moment de createClient()
  * - detectedToken permet de savoir si un token a été trouvé
  */
-export default function AuthGate({ children, onLivreur }) {
+export default function AuthGate({ children, onLivreur, onClient }) {
   const [state, setState] = useState("loading");
+  const [userType, setUserType] = useState(null);
 
   useEffect(() => {
     let mounted = true;
 
     async function check() {
       // Si le SDK n'a pas de token mais localStorage en a un → reload propre
-      // (cas rare : module chargé avant le script inline d'index.html)
       if (!detectedToken) {
         const storedToken = localStorage.getItem('base44_access_token') || localStorage.getItem('access_token');
         if (storedToken && storedToken.length > 10) {
-          // Recharger pour que base44Client soit recréé avec le token
           window.location.reload();
           return;
         }
@@ -47,11 +47,13 @@ export default function AuthGate({ children, onLivreur }) {
         return;
       }
 
+      // 1. Admin → dashboard admin
       if (user.role === "admin") {
         setState("admin");
         return;
       }
 
+      // 2. Livreur interne ou externe
       const livreurs = await base44.entities.Livreur.filter({
         user_email: user.email,
         actif: true,
@@ -61,21 +63,46 @@ export default function AuthGate({ children, onLivreur }) {
 
       if (livreurs && livreurs.length > 0) {
         const livreur = livreurs[0];
-        // Router selon type_livreur
         if (livreur.type_livreur === "externe") {
-          // Import dynamique pour éviter chargement inutile
+          // Livreur externe → charger component externe
           import("@/pages/LivreurExterneApp.jsx").then(module => {
             const LivreurExterneApp = module.default;
             onLivreur?.({ ...livreur, component: LivreurExterneApp });
           });
         } else {
+          // Livreur interne
           onLivreur?.(livreur);
         }
         setState("livreur");
         return;
       }
 
-      setState("unauthorized");
+      // 3. Inconnu → Client automatique
+      // Vérifier si profil client existe, sinon le créer
+      const clients = await base44.entities.ClientExterne.filter({
+        user_email: user.email
+      });
+      
+      if (!mounted) return;
+
+      if (!clients || clients.length === 0) {
+        // Créer profil client automatiquement
+        try {
+          await base44.entities.ClientExterne.create({
+            nom: user.full_name || user.email.split('@')[0],
+            telephone: "",
+            email: user.email,
+            user_email: user.email,
+            actif: true
+          });
+        } catch (err) {
+          console.error("Erreur création profil client:", err);
+        }
+      }
+
+      // Router vers dashboard client
+      onClient?.();
+      setState("client");
     }
 
     check();
@@ -100,40 +127,11 @@ export default function AuthGate({ children, onLivreur }) {
     return null;
   }
 
-  if (state === "unauthorized") {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-background p-6">
-        <div className="text-center space-y-4 max-w-sm">
-          <div className="w-16 h-16 rounded-2xl bg-red-100 flex items-center justify-center mx-auto text-3xl">
-            🚫
-          </div>
-          <div>
-            <p className="text-lg font-bold text-foreground">Compte non autorisé</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Votre compte n'est pas associé à un profil livreur valide ni à un accès admin.
-              Contactez l'administrateur Silga Livraison.
-            </p>
-          </div>
-          <button
-            onClick={() => {
-            ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
-              try { localStorage.removeItem(k); } catch(_) {}
-            });
-            base44.auth.logout();
-            setTimeout(() => window.location.reload(), 300);
-          }}
-            className="px-6 py-2 rounded-xl bg-primary text-white text-sm font-semibold"
-          >
-            Se déconnecter
-          </button>
-        </div>
-      </div>
-    );
-  }
-
+  // Admin → afficher children (SelectionReseau)
   if (state === "admin") {
     return <>{children}</>;
   }
 
+  // Livreur ou Client → rendu géré par App.jsx via onLivreur/onClient
   return null;
 }

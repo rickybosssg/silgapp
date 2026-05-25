@@ -48,6 +48,20 @@ const InscriptionLivreur = () => null;
 
 function AdminRoutes() {
   const [reseau, setReseau] = useState(null);
+  const [isClient, setIsClient] = useState(false);
+
+  // Client → dashboard client direct
+  if (isClient) {
+    return (
+      <Routes>
+        <Route path="/" element={<ClientExterneApp />} />
+        <Route path="/client/course/expedier" element={<CourseExterneForm />} />
+        <Route path="/client/course/recevoir" element={<CourseExterneForm />} />
+        <Route path="/client/suivi" element={<ClientSuiviCourse />} />
+        <Route path="*" element={<ClientExterneApp />} />
+      </Routes>
+    );
+  }
 
   if (!reseau) {
     return (
@@ -57,9 +71,6 @@ function AdminRoutes() {
       </Routes>
     );
   }
-
-  // Wrapper component pour passer le reseau aux pages
-  const PageWithReseau = ({ children, reseau }) => children;
 
   return (
     <Routes>
@@ -87,11 +98,6 @@ function AdminRoutes() {
           </>
         )}
         <Route path="/notifications" element={<Notifications />} />
-        {/* Routes Silga Externe */}
-        <Route path="/client" element={<ClientExterneApp />} />
-        <Route path="/client/course/expedier" element={<CourseExterneForm />} />
-        <Route path="/client/course/recevoir" element={<CourseExterneForm />} />
-        <Route path="/client/suivi" element={<ClientSuiviCourse />} />
         <Route path="/admin/externe" element={<DashboardAdminExterne />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
@@ -101,14 +107,16 @@ function AdminRoutes() {
 
 function AppRouter() {
   const [livreurProfil, setLivreurProfil] = useState(null);
+  const [isClient, setIsClient] = useState(false);
 
   // Si un profil livreur a été détecté, afficher directement l'app appropriée
   if (livreurProfil) {
     // Livreur externe ?
     if (livreurProfil.type_livreur === "externe") {
+      const LivreurExterneApp = livreurProfil.component || LivreurApp;
       return (
         <Suspense fallback={<LoadingScreen />}>
-          <LivreurApp livreurProfil={livreurProfil} />
+          <LivreurExterneApp livreurProfil={livreurProfil} />
         </Suspense>
       );
     }
@@ -127,8 +135,11 @@ function AppRouter() {
           <Route
             path="*"
             element={
-              <AuthGate onLivreur={setLivreurProfil}>
-                <AdminRoutes />
+              <AuthGate 
+                onLivreur={setLivreurProfil}
+                onClient={() => setIsClient(true)}
+              >
+                <AdminRoutes isClient={isClient} />
               </AuthGate>
             }
           />
