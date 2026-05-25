@@ -77,7 +77,11 @@ Deno.serve(async (req) => {
     // Envoi via Twilio WhatsApp API
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
     const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-    const fromNumber = Deno.env.get('TWILIO_WHATSAPP_FROM');
+    const fromRaw = Deno.env.get('TWILIO_WHATSAPP_FROM') || '';
+    // S'assurer que le from a le préfixe whatsapp:
+    const fromNumber = fromRaw.startsWith('whatsapp:') ? fromRaw : `whatsapp:${fromRaw}`;
+
+    console.log(`[WhatsApp] SID prefix: ${accountSid?.slice(0,8)}... | from: ${fromNumber} | to: ${whatsappTo}`);
 
     const message = `🚨 SILGAPP\nVous avez des notifications en attente.\nOuvrez l'application SILGAPP pour consulter.`;
 
@@ -109,12 +113,22 @@ Deno.serve(async (req) => {
       });
       return Response.json({ success: true, twilio_sid: twilioData.sid, to: whatsappTo });
     } else {
-      // Échec Twilio
+      // Échec Twilio — log complet pour diagnostic
+      const erreurDetail = `[${twilioData.code || twilioResp.status}] ${twilioData.message || ''} | status: ${twilioData.status} | more_info: ${twilioData.more_info || ''} | raw: ${JSON.stringify(twilioData)}`;
+      console.error('[WhatsApp] Twilio error:', erreurDetail);
       await base44.asServiceRole.entities.WhatsAppAlerte.update(alerte.id, {
         statut: 'failed',
-        erreur: twilioData.message || JSON.stringify(twilioData)
+        erreur: erreurDetail.slice(0, 500)
       });
-      return Response.json({ success: false, error: twilioData.message }, { status: 200 });
+      return Response.json({ 
+        success: false, 
+        twilio_status: twilioResp.status,
+        twilio_code: twilioData.code,
+        twilio_message: twilioData.message,
+        twilio_more_info: twilioData.more_info,
+        to: whatsappTo,
+        from: fromNumber
+      }, { status: 200 });
     }
 
   } catch (error) {
