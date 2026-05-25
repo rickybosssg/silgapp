@@ -203,7 +203,9 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
         statut: "nouvelle", 
         livreur_id: "", 
         livreur_nom: "",
-        remarque_livreur: remarque 
+        remarque_livreur: remarque,
+        dispatch_status: "en_attente_admin",
+        dispatch_mode: "manuel"
       } 
     });
     toast("Course renvoyée à l'admin");
