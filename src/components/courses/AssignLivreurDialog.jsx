@@ -10,7 +10,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { notifyNouvelleCourse } from "@/lib/notificationsHelpers";
-import { getLivreurNotificationEmail } from "@/lib/codeIdentificationAuth";
 
 function getDistance(lat1, lng1, lat2, lng2) {
   if (!lat1 || !lng1 || !lat2 || !lng2) return null;
@@ -40,7 +39,7 @@ export default function AssignLivreurDialog({ course, open, onClose }) {
         statut: "en_attente_livreur",
       });
 
-      const notificationEmail = getLivreurNotificationEmail(livreur);
+      const notificationEmail = livreur.user_email;
       if (notificationEmail) {
         await notifyNouvelleCourse(notificationEmail, {
           ...course,

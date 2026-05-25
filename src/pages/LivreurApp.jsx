@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { useNavigate } from "react-router-dom";
-import { Truck } from "lucide-react";
+import { Truck, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
-import { useSilgappAuth } from "@/lib/silgappAuth";
 import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
 import LivreurHeader from "@/components/livreur/LivreurHeader";
 import LivreurStatsBanner from "@/components/livreur/LivreurStatsBanner";
@@ -15,63 +13,41 @@ import CourseActiveCard from "@/components/livreur/CourseActiveCard";
 import LivreurHistorique from "@/components/livreur/LivreurHistorique";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// Sauvegarde livreur via le SDK base44 (inclut le token d'app automatiquement)
 const saveLivreur = (id, data) => base44.functions.invoke('updateLivreur', { id, data });
 
 export default function LivreurApp() {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  const { user, isAuthenticated, isLoadingAuth, logout } = useSilgappAuth();
   const [activeTab, setActiveTab] = useState("courses");
-
-  // ---- GPS local state ----
+  const [selectedLivreurId, setSelectedLivreurId] = useState(() => localStorage.getItem("livreur_selected_id") || "");
   const [gpsActif, setGpsActif] = useState(false);
 
-  // Rediriger les admins
-  useEffect(() => {
-    if (!isLoadingAuth && isAuthenticated && user?.role === "admin") {
-      navigate("/", { replace: true });
-    }
-  }, [isLoadingAuth, isAuthenticated, user, navigate]);
-
-  // ---- Chargement du profil livreur ----
-  const { data: livreurProfil, error: livreurProfilError, isLoading: isLoadingLivreurProfil } = useQuery({
-    queryKey: ["livreur-profil", user?.livreur_id || user?.email],
-    queryFn: async () => {
-      // Connexion par code : profil dans la session
-      if (user?.livreur) return [user.livreur];
-      // Connexion Base44 standard : recherche par email
-      if (user?.email) {
-        const result = await base44.entities.Livreur.filter({ user_email: user.email });
-        return result || [];
-      }
-      return [];
-    },
-    enabled: !!user,
-    refetchInterval: 10000,
-    select: (data) => data?.[0] || null,
+  // ---- Chargement de tous les livreurs actifs ----
+  const { data: tousLivreurs = [], isLoading: isLoadingLivreurs } = useQuery({
+    queryKey: ["livreurs-actifs"],
+    queryFn: () => base44.entities.Livreur.filter({ actif: true, validation: "valide" }),
+    initialData: [],
   });
 
-  // Déconnecter si compte désactivé
-  useEffect(() => {
-    if (livreurProfil?.actif === false) {
-      toast.error("Votre compte a été désactivé.");
-      logout();
-    }
-  }, [livreurProfil?.actif]);
+  const livreurProfil = useMemo(
+    () => tousLivreurs.find(l => l.id === selectedLivreurId) || null,
+    [tousLivreurs, selectedLivreurId]
+  );
+
+  const handleSelectLivreur = (id) => {
+    setSelectedLivreurId(id);
+    localStorage.setItem("livreur_selected_id", id);
+  };
 
   // Notifications push
   useEffect(() => {
-    if (!livreurProfil?.id) return;
-    const email = user?.email || livreurProfil?.user_email;
-    registerPushToken(livreurProfil.id, user).catch(() => null);
-    if (!email) return;
+    if (!livreurProfil?.id || !livreurProfil?.user_email) return;
+    registerPushToken(livreurProfil.id, { email: livreurProfil.user_email }).catch(() => null);
     const unsub = subscribeToNotifications(
       (n) => toast.info(`${n.titre}: ${n.message}`),
-      email
+      livreurProfil.user_email
     );
     return () => unsub?.();
-  }, [livreurProfil?.id, user?.email, livreurProfil?.user_email]);
+  }, [livreurProfil?.id, livreurProfil?.user_email]);
 
   // ---- Courses ----
   const { data: mesCourses = [] } = useQuery({
@@ -96,20 +72,17 @@ export default function LivreurApp() {
   const statutMutation = useMutation({
     mutationFn: (newStatut) => saveLivreur(livreurProfil.id, { statut: newStatut }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
+      queryClient.invalidateQueries({ queryKey: ["livreurs-actifs"] });
       toast.success("Statut mis à jour");
     },
     onError: (err) => toast.error("Erreur : " + (err?.message || "inconnue")),
   });
 
-  // ---- Handler toggle en ligne / hors ligne ----
   const handleToggleLigne = () => {
     const estHorsLigne = livreurProfil.statut === "hors_ligne";
-    const newStatut = estHorsLigne ? "disponible" : "hors_ligne";
-    statutMutation.mutate(newStatut);
+    statutMutation.mutate(estHorsLigne ? "disponible" : "hors_ligne");
   };
 
-  // ---- Handler GPS ----
   const handleActiverGPS = () => {
     if (!navigator.geolocation) {
       toast.error("GPS non disponible sur cet appareil");
@@ -117,39 +90,31 @@ export default function LivreurApp() {
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const { latitude, longitude } = pos.coords;
         setGpsActif(true);
         saveLivreur(livreurProfil.id, {
-          latitude,
-          longitude,
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
           derniere_position_date: new Date().toISOString(),
         }).then(() => {
-          queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
+          queryClient.invalidateQueries({ queryKey: ["livreurs-actifs"] });
           toast.success("GPS activé – position enregistrée");
-        }).catch(() => {
-          toast.error("Position GPS non enregistrée");
-        });
+        }).catch(() => toast.error("Position GPS non enregistrée"));
       },
-      () => {
-        setGpsActif(false);
-        toast.error("Permission GPS refusée");
-      },
+      () => { setGpsActif(false); toast.error("Permission GPS refusée"); },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
-  // GPS tracking périodique si en ligne et GPS actif
+  // GPS tracking périodique
   useEffect(() => {
     if (!livreurProfil?.id || livreurProfil.statut === "hors_ligne" || !gpsActif) return;
     const interval = setInterval(() => {
       navigator.geolocation?.getCurrentPosition(
-        (pos) => {
-          saveLivreur(livreurProfil.id, {
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-            derniere_position_date: new Date().toISOString(),
-          }).catch(() => null);
-        },
+        (pos) => saveLivreur(livreurProfil.id, {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          derniere_position_date: new Date().toISOString(),
+        }).catch(() => null),
         () => setGpsActif(false),
         { enableHighAccuracy: true }
       );
@@ -169,7 +134,7 @@ export default function LivreurApp() {
   const handleAccepter = (course) => {
     updateCourseMutation.mutate({ id: course.id, data: { statut: "acceptee", heure_acceptation: new Date().toISOString() } });
     saveLivreur(livreurProfil.id, { statut: "en_course" }).then(() =>
-      queryClient.invalidateQueries({ queryKey: ["livreur-profil"] })
+      queryClient.invalidateQueries({ queryKey: ["livreurs-actifs"] })
     );
     toast.success("Course acceptée ! 🚀");
   };
@@ -187,7 +152,7 @@ export default function LivreurApp() {
   const handleColisLivre = (course, prixReel) => {
     updateCourseMutation.mutate({ id: course.id, data: { statut: "livree", heure_livraison: new Date().toISOString(), prix_reel: prixReel } });
     saveLivreur(livreurProfil.id, { statut: "disponible" }).then(() =>
-      queryClient.invalidateQueries({ queryKey: ["livreur-profil"] })
+      queryClient.invalidateQueries({ queryKey: ["livreurs-actifs"] })
     );
     toast.success(`Livraison terminée ! 🎉 ${prixReel.toLocaleString()} FCFA encaissés`);
   };
@@ -195,13 +160,13 @@ export default function LivreurApp() {
   const handleClientAnnule = (course) => {
     updateCourseMutation.mutate({ id: course.id, data: { statut: "annulee", remarque_livreur: "Annulé par le client" } });
     saveLivreur(livreurProfil.id, { statut: "disponible" }).then(() =>
-      queryClient.invalidateQueries({ queryKey: ["livreur-profil"] })
+      queryClient.invalidateQueries({ queryKey: ["livreurs-actifs"] })
     );
     toast("Course annulée par le client");
   };
 
   // ---- LOADING ----
-  if (isLoadingAuth || isLoadingLivreurProfil) {
+  if (isLoadingLivreurs) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
@@ -214,34 +179,46 @@ export default function LivreurApp() {
     );
   }
 
-  if (!isAuthenticated) return null;
-
-  if (livreurProfilError) {
+  // ---- SÉLECTEUR DE LIVREUR ----
+  if (!livreurProfil) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-5 p-8 text-center">
-        <div className="w-20 h-20 rounded-3xl bg-red-50 flex items-center justify-center text-4xl shadow">⚠️</div>
-        <h1 className="text-xl font-black text-gray-900">Erreur de chargement</h1>
-        <button className="px-6 py-3 rounded-2xl border border-gray-200 text-gray-600 text-sm font-semibold" onClick={logout}>
-          Se déconnecter
-        </button>
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6 gap-6">
+        <div className="w-20 h-20 rounded-3xl bg-primary/10 flex items-center justify-center">
+          <Truck className="w-10 h-10 text-primary" />
+        </div>
+        <div className="text-center">
+          <h1 className="text-2xl font-black text-gray-900">SILGAPP 2</h1>
+          <p className="text-gray-500 text-sm mt-1">Sélectionnez votre profil livreur</p>
+        </div>
+        <div className="w-full max-w-sm space-y-2">
+          {tousLivreurs.length === 0 ? (
+            <p className="text-center text-gray-400 text-sm">Aucun livreur disponible</p>
+          ) : (
+            tousLivreurs.map(l => (
+              <button
+                key={l.id}
+                onClick={() => handleSelectLivreur(l.id)}
+                className="w-full flex items-center gap-4 p-4 bg-white rounded-2xl border border-gray-200 hover:border-primary hover:shadow-md transition-all text-left"
+              >
+                {l.photo_url ? (
+                  <img src={l.photo_url} alt={l.nom} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-primary font-bold text-lg">{(l.prenom || l.nom).charAt(0).toUpperCase()}</span>
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-gray-900">{l.prenom ? `${l.prenom} ${l.nom}` : l.nom}</p>
+                  <p className="text-xs text-gray-400">{l.telephone}</p>
+                </div>
+                <ChevronDown className="w-4 h-4 text-gray-300 -rotate-90 flex-shrink-0" />
+              </button>
+            ))
+          )}
+        </div>
       </div>
     );
   }
-
-  if (!isLoadingLivreurProfil && livreurProfil === null) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-5 p-8 text-center">
-        <div className="w-20 h-20 rounded-3xl bg-red-50 flex items-center justify-center text-4xl shadow">🚫</div>
-        <h1 className="text-xl font-black text-gray-900">Accès non autorisé</h1>
-        <p className="text-gray-500 text-sm max-w-xs">Votre compte n'est pas autorisé par Silga Livraison.</p>
-        <button className="px-6 py-3 rounded-2xl border border-gray-200 text-gray-600 text-sm font-semibold" onClick={logout}>
-          Se déconnecter
-        </button>
-      </div>
-    );
-  }
-
-  if (!livreurProfil) return null;
 
   const isEnLigne = livreurProfil.statut !== "hors_ligne";
   const livreurVisible = isEnLigne && gpsActif && livreurProfil.latitude && livreurProfil.longitude;
@@ -274,10 +251,9 @@ export default function LivreurApp() {
               gpsActif={gpsActif}
               onToggleLigne={handleToggleLigne}
               onActiverGps={handleActiverGPS}
-              onLogout={logout}
+              onLogout={() => { handleSelectLivreur(""); }}
             />
 
-            {/* Avertissement GPS */}
             {isEnLigne && !livreurVisible && (
               <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-center gap-3">
                 <span className="text-xl">📍</span>

@@ -19,9 +19,8 @@ import AssignLivreurDialog from "../components/courses/AssignLivreurDialog";
 import DispatchModeSelector from "../components/dispatch/DispatchModeSelector";
 import DispatchMonitor from "../components/dispatch/DispatchMonitor";
 import BatterieAlertesPanel from "../components/admin/BatterieAlertesPanel";
-import LivreursCacheSync from "../components/admin/LivreursCacheSync";
-import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
-import { useSilgappAuth } from "@/lib/silgappAuth";
+
+
 
 const statusFilters = [
   { value: "toutes", label: "Toutes" },
@@ -35,38 +34,6 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState("toutes");
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [assignCourse, setAssignCourse] = useState(null);
-  const { user: currentUser } = useSilgappAuth();
-
-  useEffect(() => {
-    let unsubscribe = null;
-    let cancelled = false;
-
-    const setupNotifications = async () => {
-      if (cancelled) return;
-      if (!currentUser?.email) return;
-      
-      // Enregistrer le token push pour admin
-      const token = await registerPushToken(null, currentUser);
-      if (token) {
-        console.log('Token push admin enregistré:', token);
-      }
-
-      // S'abonner aux notifications
-      unsubscribe = subscribeToNotifications(
-        (notification) => {
-          toast.info(`${notification.titre}: ${notification.message}`);
-        },
-        currentUser.email
-      );
-    };
-
-    setupNotifications().catch(() => {});
-
-    return () => {
-      cancelled = true;
-      if (unsubscribe) unsubscribe();
-    };
-  }, [currentUser]);
 
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ["courses"],
@@ -144,8 +111,8 @@ export default function Dashboard() {
       {/* Dispatch Mode Selector */}
       <DispatchModeSelector />
       <DispatchMonitor />
-      <BatterieAlertesPanel currentUser={currentUser} />
-      <LivreursCacheSync />
+      <BatterieAlertesPanel currentUser={null} />
+
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">

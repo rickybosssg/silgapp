@@ -2,11 +2,11 @@ import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
-  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut
+  Package, TrendingUp, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { useSilgappAuth } from "@/lib/silgappAuth";
+
 
 export const navItems = [
   { path: "/", label: "Tableau de bord", icon: LayoutDashboard },
@@ -22,7 +22,7 @@ export const navItems = [
 export default function Sidebar({ notificationCount = 0 }) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
-  const { logout, user } = useSilgappAuth();
+
 
   return (
     <aside className={cn(
@@ -83,36 +83,14 @@ export default function Sidebar({ notificationCount = 0 }) {
 
       {/* Footer */}
       <div className="border-t border-border flex-shrink-0">
-        {/* User info */}
-        {!collapsed && user && (
-          <div className="px-4 py-3 border-b border-border/50">
-            <p className="text-xs font-semibold text-foreground truncate">{user.full_name || user.email}</p>
-            <p className="text-[10px] text-muted-foreground capitalize">{user.role}</p>
-          </div>
-        )}
-
-        {/* Collapse toggle */}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="w-full h-10 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          title={collapsed ? "Étendre" : "Réduire"}
-        >
-          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-        </button>
-
-        {/* Logout */}
-        <button
-          onClick={logout}
-          className={cn(
-            "w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors border-t border-border",
-            "text-destructive hover:bg-destructive/10",
-            collapsed ? "justify-center" : ""
-          )}
-          title={collapsed ? "Déconnexion" : undefined}
-        >
-          <LogOut className="w-4 h-4 flex-shrink-0" />
-          {!collapsed && <span>Déconnexion</span>}
-        </button>
+      {/* Collapse toggle */}
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        className="w-full h-10 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        title={collapsed ? "Étendre" : "Réduire"}
+      >
+        {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+      </button>
       </div>
     </aside>
   );
