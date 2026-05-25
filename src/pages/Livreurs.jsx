@@ -5,12 +5,12 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Truck, Phone, MapPin, Check, X, Clock, UserCheck, Copy, Banknote, Plus, Pencil, UserX, Trash2, BatteryWarning, KeyRound } from "lucide-react";
+import { Truck, Phone, MapPin, Check, X, Clock, UserCheck, Copy, Banknote, Pencil, UserX, Trash2, BatteryWarning, KeyRound } from "lucide-react";
+import CreateLivreurDialog from "@/components/livreurs/CreateLivreurDialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import LivreurFormDialog from "@/components/livreurs/LivreurFormDialog";
 import { useSilgappAuth } from "@/lib/silgappAuth";
 
 function LivreurCard({ livreur, courses, onValider, onRefuser, onToggleStatut, onValiderPaiement, onEdit, onSupprimer, isPending, hasAlerteBatterie }) {
@@ -327,23 +327,12 @@ export default function Livreurs() {
         <div className="flex flex-wrap gap-2">
           <Button
             variant="outline" size="sm" className="gap-1.5 text-xs flex-1 sm:flex-none"
-            onClick={() => { navigator.clipboard.writeText(inscriptionLink); toast.success("Lien copié !"); }}
-          >
-            <Copy className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Copier lien</span><span className="sm:hidden">Lien</span>
-          </Button>
-          <Button
-            variant="outline" size="sm" className="gap-1.5 text-xs flex-1 sm:flex-none"
             onClick={() => genererCodesMutation.mutate()}
             disabled={genererCodesMutation.isPending}
           >
             <KeyRound className="w-3.5 h-3.5" /> <span className="hidden sm:inline">{genererCodesMutation.isPending ? "Génération..." : "Générer codes"}</span><span className="sm:hidden">{genererCodesMutation.isPending ? "..." : "Codes"}</span>
           </Button>
-          <Button
-            size="sm" className="gap-1.5 text-xs bg-primary flex-1 sm:flex-none"
-            onClick={() => { setEditingLivreur(null); setShowForm(true); }}
-          >
-            <Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Ajouter</span><span className="sm:hidden">+</span>
-          </Button>
+          <CreateLivreurDialog reseau="interne" />
         </div>
       </div>
 
@@ -488,11 +477,7 @@ export default function Livreurs() {
         </div>
       )}
 
-      <LivreurFormDialog
-        open={showForm}
-        onClose={() => { setShowForm(false); setEditingLivreur(null); }}
-        livreur={editingLivreur}
-      />
+
     </div>
   );
 }

@@ -24,7 +24,7 @@ const RapportJourExterne = lazy(() => import('./pages/RapportJourExterne'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 const RecapitulatifAdmin = lazy(() => import('./pages/RecapitulatifAdmin'));
 const LivreurApp = lazy(() => import('./pages/LivreurApp.jsx'));
-const InscriptionLivreur = lazy(() => import('./pages/InscriptionLivreur'));
+
 const ClientExterneApp = lazy(() => import('./pages/ClientExterneApp.jsx'));
 const CourseExterneForm = lazy(() => import('./pages/CourseExterneForm.jsx'));
 const ClientSuiviCourse = lazy(() => import('./pages/ClientSuiviCourse.jsx'));
@@ -44,13 +44,14 @@ const LoadingScreen = () => (
   </div>
 );
 
+const InscriptionLivreur = () => null;
+
 function AdminRoutes() {
   const [reseau, setReseau] = useState(null);
 
   if (!reseau) {
     return (
       <Routes>
-        <Route path="/inscription-livreur" element={<InscriptionLivreur />} />
         <Route path="/" element={<SelectionReseau onSelect={setReseau} />} />
         <Route path="*" element={<SelectionReseau onSelect={setReseau} />} />
       </Routes>
@@ -105,14 +106,10 @@ function AppRouter() {
   // Si un profil livreur a été détecté, afficher directement l'app appropriée
   if (livreurProfil) {
     // Livreur externe ?
-    if (livreurProfil.type_livreur === "externe" || livreurProfil.component) {
+    if (livreurProfil.type_livreur === "externe") {
       return (
         <Suspense fallback={<LoadingScreen />}>
-          {livreurProfil.component ? (
-            <livreurProfil.component livreurProfil={livreurProfil} />
-          ) : (
-            <LivreurApp livreurProfil={livreurProfil} />
-          )}
+          <LivreurApp livreurProfil={livreurProfil} />
         </Suspense>
       );
     }
@@ -127,9 +124,7 @@ function AppRouter() {
   return (
     <Router>
       <Suspense fallback={<LoadingScreen />}>
-        {/* La route inscription est publique */}
         <Routes>
-          <Route path="/inscription-livreur" element={<InscriptionLivreur />} />
           <Route
             path="*"
             element={

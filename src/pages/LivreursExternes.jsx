@@ -3,7 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Users, UserCheck, UserX, Phone, Mail } from "lucide-react";
+import { ArrowLeft, Users, UserCheck, UserX, Phone, Mail, Plus } from "lucide-react";
+import CreateLivreurDialog from "@/components/livreurs/CreateLivreurDialog";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -31,17 +32,20 @@ export default function LivreursExternes() {
 
   return (
     <div className="p-4 space-y-4 max-w-5xl mx-auto">
-      <div className="flex items-center gap-3 mb-4">
-        <Link to="/">
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <ArrowLeft className="w-4 h-4" />
-            Retour
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Livreurs Externes</h1>
-          <p className="text-sm text-muted-foreground">{stats.total} livreurs externes inscrits</p>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-3">
+          <Link to="/">
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <ArrowLeft className="w-4 h-4" />
+              Retour
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Livreurs Externes</h1>
+            <p className="text-sm text-muted-foreground">{stats.total} livreurs externes</p>
+          </div>
         </div>
+        <CreateLivreurDialog reseau="externe" />
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
