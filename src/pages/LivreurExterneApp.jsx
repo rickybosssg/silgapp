@@ -380,7 +380,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               montantDüSilga={montantDüSilga}
               isExterne={true}
             />
-            <LivreurStatutCard statut={livreurProfil.statut} livreur={livreurProfil} />
+            <LivreurStatutCard statut={livreurProfil.statut} livreur={livreurProfil} isExterne={true} />
 
             {coursesActives.length > 0 && (
               <div className="space-y-3">
