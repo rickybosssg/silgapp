@@ -2,6 +2,15 @@
   "name": "Course",
   "type": "object",
   "properties": {
+    "reseau": {
+      "type": "string",
+      "enum": [
+        "interne",
+        "externe"
+      ],
+      "default": "interne",
+      "description": "R\u00e9seau SILGAPP (interne ou externe)"
+    },
     "client_nom": {
       "type": "string",
       "description": "Nom du client"

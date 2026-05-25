@@ -2,6 +2,15 @@
   "name": "Livreur",
   "type": "object",
   "properties": {
+    "reseau": {
+      "type": "string",
+      "enum": [
+        "interne",
+        "externe"
+      ],
+      "default": "interne",
+      "description": "R\u00e9seau SILGAPP (interne ou externe)"
+    },
     "prenom": {
       "type": "string",
       "description": "Pr\u00e9nom du livreur"

@@ -6,14 +6,21 @@ import { queryClientInstance } from '@/lib/query-client';
 import { Truck } from 'lucide-react';
 import PageNotFound from './lib/PageNotFound';
 import AuthGate from './components/auth/AuthGate.jsx';
+import SelectionReseau from './pages/SelectionReseau.jsx';
 
 const AppLayout = lazy(() => import('./components/layout/AppLayout'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
+const DashboardExterne = lazy(() => import('./pages/DashboardExterne'));
 const NouvelleCourse = lazy(() => import('./pages/NouvelleCourse'));
+const NouvelleCourseExterne = lazy(() => import('./pages/NouvelleCourseExterne'));
 const CarteLivreurs = lazy(() => import('./pages/CarteLivreurs'));
+const CarteLivreursExterne = lazy(() => import('./pages/CarteLivreursExterne'));
 const ToutesCourses = lazy(() => import('./pages/ToutesCourses'));
+const ToutesCoursesExternes = lazy(() => import('./pages/ToutesCoursesExternes'));
 const Livreurs = lazy(() => import('./pages/Livreurs'));
+const LivreursExternes = lazy(() => import('./pages/LivreursExternes'));
 const RapportJour = lazy(() => import('./pages/RapportJour'));
+const RapportJourExterne = lazy(() => import('./pages/RapportJourExterne'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 const RecapitulatifAdmin = lazy(() => import('./pages/RecapitulatifAdmin'));
 const LivreurApp = lazy(() => import('./pages/LivreurApp.jsx'));
@@ -34,17 +41,46 @@ const LoadingScreen = () => (
 );
 
 function AdminRoutes() {
+  const [reseau, setReseau] = useState(null);
+
+  if (!reseau) {
+    return (
+      <Routes>
+        <Route path="/inscription-livreur" element={<InscriptionLivreur />} />
+        <Route path="/" element={<SelectionReseau onSelect={setReseau} />} />
+        <Route path="*" element={<SelectionReseau onSelect={setReseau} />} />
+      </Routes>
+    );
+  }
+
+  // Wrapper component pour passer le reseau aux pages
+  const PageWithReseau = ({ children, reseau }) => children;
+
   return (
     <Routes>
       <Route path="/inscription-livreur" element={<InscriptionLivreur />} />
-      <Route element={<AppLayout />}>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/nouvelle-course" element={<NouvelleCourse />} />
-        <Route path="/carte" element={<CarteLivreurs />} />
-        <Route path="/courses" element={<ToutesCourses />} />
-        <Route path="/livreurs" element={<Livreurs />} />
-        <Route path="/rapport" element={<RapportJour />} />
-        <Route path="/recapitulatif" element={<RecapitulatifAdmin />} />
+      <Route element={<AppLayout reseau={reseau} />}>
+        {reseau === "interne" ? (
+          <>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/nouvelle-course" element={<NouvelleCourse />} />
+            <Route path="/carte" element={<CarteLivreurs />} />
+            <Route path="/courses" element={<ToutesCourses />} />
+            <Route path="/livreurs" element={<Livreurs />} />
+            <Route path="/rapport" element={<RapportJour />} />
+            <Route path="/recapitulatif" element={<RecapitulatifAdmin />} />
+          </>
+        ) : (
+          <>
+            <Route path="/" element={<DashboardExterne />} />
+            <Route path="/nouvelle-course" element={<NouvelleCourseExterne />} />
+            <Route path="/carte" element={<CarteLivreursExterne />} />
+            <Route path="/courses" element={<ToutesCoursesExternes />} />
+            <Route path="/livreurs" element={<LivreursExternes />} />
+            <Route path="/rapport" element={<RapportJourExterne />} />
+            <Route path="/recapitulatif" element={<RecapitulatifAdmin reseau="externe" />} />
+          </>
+        )}
         <Route path="/notifications" element={<Notifications />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />

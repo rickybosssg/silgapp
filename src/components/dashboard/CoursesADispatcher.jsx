@@ -111,7 +111,7 @@ function CourseItem({ course, onAssign, onView }) {
   );
 }
 
-export default function CoursesADispatcher({ courses, onAssign, onView }) {
+export default function CoursesADispatcher({ courses, onAssign, onView, reseau = "interne" }) {
   return (
     <Card className="p-0 overflow-hidden">
       <div className="px-4 pt-4 pb-3 border-b flex items-center justify-between">

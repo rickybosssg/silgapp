@@ -5,9 +5,9 @@ import { Link } from "react-router-dom";
 import { Truck, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export default function LivreursEnLigne({ livreurs = [] }) {
+export default function LivreursEnLigne({ livreurs = [], reseau = "interne" }) {
   const enLigne = livreurs.filter(l =>
-    l.validation === "valide" && l.actif !== false && l.statut !== "hors_ligne"
+    l.validation === "valide" && l.actif !== false && l.statut !== "hors_ligne" && (l.reseau || "interne") === reseau
   );
 
   const disponibles = enLigne.filter(l => l.statut === "disponible");
