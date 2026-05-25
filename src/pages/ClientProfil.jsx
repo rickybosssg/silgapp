@@ -26,6 +26,7 @@ const handlePhoneFormatting = (raw) => {
 const cleanPhone = (value) => value.replace(/\D/g, '');
 
 export default function ClientProfil({ onComplete, existingProfil }) {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     nom: "",
@@ -101,10 +102,10 @@ export default function ClientProfil({ onComplete, existingProfil }) {
       
       toast.success("Profil enregistré avec succès");
       
-      // Appeler onComplete pour revenir au dashboard
-      if (onComplete) {
-        onComplete();
-      }
+      // Navigation IMMÉDIATE vers dashboard, peu importe onComplete
+      setTimeout(() => {
+        navigate("/");
+      }, 1000);
     } catch (err) {
       console.error("Erreur sauvegarde profil:", err);
       toast.error("Erreur lors de la sauvegarde");
@@ -121,7 +122,7 @@ export default function ClientProfil({ onComplete, existingProfil }) {
           <Button 
             variant="ghost" 
             size="icon" 
-            onClick={onComplete}
+            onClick={() => navigate("/")}
             type="button"
           >
             <ArrowLeft className="w-5 h-5" />

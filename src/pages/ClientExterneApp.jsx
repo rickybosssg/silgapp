@@ -55,7 +55,9 @@ export default function ClientExterneApp() {
         const profil = clients[0];
         setClientProfil(profil);
         
-        if (profil.nom && profil.prenom && profil.telephone) {
+        // Vérifier SI le profil est complet (nom, prénom ET téléphone avec 8+ chiffres)
+        const phoneDigits = (profil.telephone || "").replace(/\D/g, "");
+        if (profil.nom && profil.prenom && phoneDigits.length >= 8) {
           setProfilComplet(true);
         } else {
           setProfilRequired(true);
@@ -142,9 +144,11 @@ export default function ClientExterneApp() {
   };
 
   const handleProfilComplete = () => {
+    // Forcer le rafraîchissement du dashboard sans re-vérifier le profil
     setProfilRequired(false);
     setProfilComplet(true);
-    checkStatus();
+    // Recharger uniquement les données nécessaires (pas le profil)
+    loadLivreursProches(position);
   };
 
   const handleActiverGPS = () => {
