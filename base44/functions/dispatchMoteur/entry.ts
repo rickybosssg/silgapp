@@ -29,7 +29,10 @@ function classerLivreurs(livreurs, quartierDepart, quartierArriveeNom, quartiers
 
   for (const l of livreurs) {
     if (!l.actif || l.validation !== "valide") continue;
+    // Uniquement les livreurs en ligne (disponible ou en_course)
     if (l.statut === "hors_ligne") continue;
+    // Vérifier app_active pour s'assurer que le livreur est vraiment connecté à l'app
+    if (l.app_active !== true) continue;
     if (!l.latitude || !l.longitude) continue;
 
     const dernierePos = l.derniere_position_date ? new Date(l.derniere_position_date) : null;

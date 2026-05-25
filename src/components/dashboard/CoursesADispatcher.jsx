@@ -77,8 +77,7 @@ function CourseItem({ course, onAssign, onView }) {
           </Button>
           <Button
             size="sm"
-            variant="outline"
-            className="text-xs h-7 border-purple-300 text-purple-700 hover:bg-purple-50"
+            className="text-xs h-7 bg-blue-600 hover:bg-blue-700 text-white"
             onClick={() => onAssign(course)}
           >
             <UserCheck className="w-3 h-3 mr-1" />
