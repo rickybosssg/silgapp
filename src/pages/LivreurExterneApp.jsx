@@ -82,44 +82,28 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     refetchInterval: 5000,
   });
 
-  // Courses disponibles à prendre (sans livreur, proches)
+  // Courses disponibles à prendre (assignées à ce livreur)
   const { data: coursesDisponibles = [] } = useQuery({
     queryKey: ["courses-externes-disponibles", livreurProfil?.id, livreurProfil?.latitude, livreurProfil?.longitude],
     queryFn: async () => {
       if (!livreurProfil?.latitude || !livreurProfil?.longitude) return [];
-      // Récupérer toutes les courses sans livreur
+      // Récupérer les courses assignées à ce livreur (en attente d'acceptation)
       const courses = await base44.entities.CourseExterne.filter({
-        statut: "recherche_livreur",
-        livreur_id: ""
+        livreur_id: livreurProfil.id,
+        dispatch_status: "propose"
       }, "-created_date", 20);
       
-      // Filtrer celles qui sont proches (moins de 5km)
-      const R = 6371;
-      return courses.filter(c => {
-        if (!c.gps_depart_lat || !c.gps_depart_lng) return false;
-        const dLat = ((c.gps_depart_lat - livreurProfil.latitude) * Math.PI) / 180;
-        const dLon = ((c.gps_depart_lng - livreurProfil.longitude) * Math.PI) / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                  Math.cos((livreurProfil.latitude * Math.PI) / 180) *
-                  Math.cos((c.gps_depart_lat * Math.PI) / 180) *
-                  Math.sin(dLon/2) * Math.sin(dLon/2);
-        const c_dist = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        const distance = R * c_dist;
-        return distance <= 5; // 5km
-      });
+      return courses || [];
     },
     enabled: !!livreurProfil?.id && livreurProfil.statut === "disponible" && gpsActif,
     initialData: [],
-    refetchInterval: 3000, // Polling toutes les 3 secondes
+    refetchInterval: 2000, // Polling toutes les 2 secondes pour temps réel
   });
 
   const courseEnAttente = useMemo(() => {
-    // Priorité : course déjà assignée au livreur
-    const assigned = mesCourses.find(c => c.statut === "recherche_livreur" && c.livreur_id === livreurProfil.id);
-    if (assigned) return assigned;
-    // Sinon : première course disponible proche
+    // Course assignée en attente d'acceptation
     return coursesDisponibles[0] || null;
-  }, [mesCourses, coursesDisponibles, livreurProfil?.id]);
+  }, [coursesDisponibles]);
   
   const coursesActives = useMemo(() => mesCourses.filter(c => ["livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut)), [mesCourses]);
 
@@ -171,7 +155,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     );
   };
 
-  // GPS tracking périodique
+  // GPS tracking périodique (toutes les 15s si disponible)
   useEffect(() => {
     if (!livreurProfil?.id || livreurProfil.statut === "hors_ligne" || !gpsActif) return;
     const interval = setInterval(() => {
@@ -184,7 +168,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         () => setGpsActif(false),
         { enableHighAccuracy: true }
       );
-    }, 30000);
+    }, 15000);
     return () => clearInterval(interval);
   }, [livreurProfil?.id, livreurProfil?.statut, gpsActif]);
 
@@ -197,38 +181,18 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   });
 
   const handleAccepter = (course) => {
-    // Vérifier que la course est toujours disponible
-    if (course.livreur_id && course.livreur_id !== livreurProfil.id) {
-      toast.error("Course déjà prise par un autre livreur");
-      queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
-      return;
-    }
-    updateCourseMutation.mutate({ 
-      id: course.id, 
-      data: { 
-        statut: "livreur_en_route", 
-        heure_acceptation: new Date().toISOString(),
-        livreur_id: livreurProfil.id,
-        livreur_nom: `${livreurProfil.prenom || ''} ${livreurProfil.nom}`.trim(),
-      } 
-    });
+    // L'acceptation est maintenant gérée par le modal via dispatchExterneAuto
+    // Cette fonction est appelée après succès de l'acceptation
+    queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles", "mes-courses-externes"] });
     statutMutation.mutate("en_course");
     toast.success("Course acceptée ! 🚀");
   };
 
-  const handleRefuser = async (course) => {
-    try {
-      await base44.entities.CourseExterne.update(course.id, { 
-        statut: "recherche_livreur", 
-        livreur_id: "", 
-        livreur_nom: "",
-        remarque_livreur: "Course refusée par le livreur"
-      });
-      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes", "courses-externes-disponibles"] });
-      toast("Course refusée");
-    } catch (err) {
-      toast.error("Erreur : " + err.message);
-    }
+  const handleRefuser = async (course, raison) => {
+    // Le refus est maintenant géré par le modal via dispatchExterneAuto
+    // Cette fonction est appelée après succès du refus
+    queryClient.invalidateQueries({ queryKey: ["mes-courses-externes", "courses-externes-disponibles"] });
+    toast(`Course refusée (${raison || 'occupé'})`);
   };
 
   const handleColisRecupere = (course) => {
@@ -371,9 +335,13 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       {courseEnAttente && (
         <CourseEnAttenteModal
           course={courseEnAttente}
+          livreurId={livreurProfil.id}
           onAccepter={handleAccepter}
           onRefuser={handleRefuser}
           isPending={updateCourseMutation.isPending}
+          onExpire={() => {
+            queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles", "mes-courses-externes"] });
+          }}
         />
       )}
 

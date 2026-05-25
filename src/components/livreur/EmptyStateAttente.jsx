@@ -15,8 +15,8 @@ export default function EmptyStateAttente() {
         <div className="space-y-1.5">
           <p className="text-xl font-bold text-gray-800">En veille active</p>
           <p className="text-sm text-gray-500 leading-relaxed">
-            Les courses proches apparaîtront ici<br />
-            Actualisation automatique 🚀
+            Rayon : 3 → 5 → 8km<br />
+            Alertes sonores + vibrations 🚀
           </p>
         </div>
 
