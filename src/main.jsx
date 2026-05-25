@@ -3,22 +3,8 @@ import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import '@/index.css'
 
-// Capture immédiate du access_token dans l'URL AVANT tout le reste
-// Base44 renvoie ?access_token=xxx après login OAuth
-// Ce code s'exécute avant le SDK et avant app-params (évite le bug du singleton)
-;(function captureTokenFromUrl() {
-  try {
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('access_token');
-    if (token && token !== 'null' && token !== 'undefined' && token.length > 10) {
-      localStorage.setItem('base44_access_token', token);
-      // Nettoyer l'URL pour éviter re-capture
-      urlParams.delete('access_token');
-      const clean = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '') + window.location.hash;
-      window.history.replaceState({}, document.title, clean);
-    }
-  } catch(e) {}
-})();
+// Note: la capture du access_token depuis l'URL est faite dans index.html
+// (script inline synchrone, exécuté avant tout module ES)
 
 const notifyBase44Mounted = () => {
   if (window.self === window.top) return;

@@ -5,7 +5,33 @@
     <link rel="icon" type="image/svg+xml" href="https://base44.com/logo_v2.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="manifest" href="/manifest.json" />
-    <title>Base44 APP</title>
+    <title>SILGAPP 2</title>
+    <!-- 
+      CRITIQUE APK ANDROID : capture du token AVANT tout module ES
+      Les modules ES (main.jsx, base44Client.js) sont importés en parallèle par le navigateur.
+      Ce script inline s'exécute en premier, garantissant que localStorage a le token
+      avant que createClient() soit appelé.
+    -->
+    <script>
+      (function() {
+        try {
+          var search = window.location.search;
+          if (search && search.indexOf('access_token=') !== -1) {
+            var params = new URLSearchParams(search);
+            var token = params.get('access_token');
+            if (token && token.length > 10 && token !== 'null' && token !== 'undefined') {
+              // Stocker dans toutes les clés que le SDK Base44 pourrait lire
+              localStorage.setItem('base44_access_token', token);
+              localStorage.setItem('access_token', token);
+              // Nettoyer l'URL
+              params.delete('access_token');
+              var clean = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
+              window.history.replaceState({}, document.title, clean);
+            }
+          }
+        } catch(e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,69 +1,76 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { base44 } from "@/api/base44Client";
+import React, { useState, useEffect } from "react";
+import { base44, detectedToken } from "@/api/base44Client";
 import { Truck } from "lucide-react";
 
 /**
  * AuthGate — routage post-connexion Base44
- * - admin (role === 'admin') → children (dashboard admin)
- * - livreur (email trouvé dans Livreur.user_email) → onLivreur(livreurProfil)
+ * - admin → children (dashboard admin)
+ * - livreur valide → onLivreur(profil)
  * - sinon → "Compte non autorisé"
  *
- * Fix APK : après login, la page recharge avec ?access_token=xxx
- * On vérifie aussi localStorage directement pour ne pas manquer le token.
+ * Fix APK Android :
+ * - Le token est capturé dans index.html (script synchrone) avant tout module ES
+ * - base44Client lit localStorage au moment de createClient()
+ * - detectedToken permet de savoir si un token a été trouvé
  */
 export default function AuthGate({ children, onLivreur }) {
   const [state, setState] = useState("loading");
 
-  const check = useCallback(async () => {
-    // Vérifier d'abord si un token est présent dans localStorage
-    // (cas APK : page rechargée avec ?access_token capturé dans main.jsx)
-    const storedToken = localStorage.getItem('base44_access_token');
-    const hasToken = storedToken && storedToken !== 'null' && storedToken !== 'undefined' && storedToken.length > 10;
-
-    const isAuth = await base44.auth.isAuthenticated();
-
-    if (!isAuth && !hasToken) {
-      setState("unauthenticated");
-      return;
-    }
-
-    // Si pas auth selon SDK mais token présent → recharger la page
-    // pour que base44Client soit réinitialisé avec le nouveau token
-    if (!isAuth && hasToken) {
-      window.location.reload();
-      return;
-    }
-
-    const user = await base44.auth.me();
-    if (!user) {
-      setState("unauthenticated");
-      return;
-    }
-
-    if (user.role === "admin") {
-      setState("admin");
-      return;
-    }
-
-    // Livreur check
-    const livreurs = await base44.entities.Livreur.filter({
-      user_email: user.email,
-      actif: true,
-      validation: "valide"
-    });
-
-    if (livreurs && livreurs.length > 0) {
-      onLivreur?.(livreurs[0]);
-      setState("livreur");
-      return;
-    }
-
-    setState("unauthorized");
-  }, [onLivreur]);
-
   useEffect(() => {
+    let mounted = true;
+
+    async function check() {
+      // Si le SDK n'a pas de token mais localStorage en a un → reload propre
+      // (cas rare : module chargé avant le script inline d'index.html)
+      if (!detectedToken) {
+        const storedToken = localStorage.getItem('base44_access_token') || localStorage.getItem('access_token');
+        if (storedToken && storedToken.length > 10) {
+          // Recharger pour que base44Client soit recréé avec le token
+          window.location.reload();
+          return;
+        }
+      }
+
+      const isAuth = await base44.auth.isAuthenticated();
+      if (!mounted) return;
+
+      if (!isAuth) {
+        setState("unauthenticated");
+        return;
+      }
+
+      const user = await base44.auth.me();
+      if (!mounted) return;
+
+      if (!user) {
+        setState("unauthenticated");
+        return;
+      }
+
+      if (user.role === "admin") {
+        setState("admin");
+        return;
+      }
+
+      const livreurs = await base44.entities.Livreur.filter({
+        user_email: user.email,
+        actif: true,
+        validation: "valide"
+      });
+      if (!mounted) return;
+
+      if (livreurs && livreurs.length > 0) {
+        onLivreur?.(livreurs[0]);
+        setState("livreur");
+        return;
+      }
+
+      setState("unauthorized");
+    }
+
     check();
-  }, [check]);
+    return () => { mounted = false; };
+  }, []);
 
   if (state === "loading") {
     return (
@@ -112,6 +119,5 @@ export default function AuthGate({ children, onLivreur }) {
     return <>{children}</>;
   }
 
-  // livreur → rendu géré par App.jsx via onLivreur callback
   return null;
 }
