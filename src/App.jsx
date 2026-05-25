@@ -49,9 +49,7 @@ const LoadingScreen = () => (
 
 const InscriptionLivreur = () => null;
 
-function AdminRoutes({ isClient }) {
-  const [reseau, setReseau] = useState(null);
-
+function AdminRoutes({ isClient, reseau, setReseau }) {
   // Client → dashboard client direct
   if (isClient) {
     return (
@@ -107,9 +105,29 @@ function AdminRoutes({ isClient }) {
   );
 }
 
+function App() {
+  const [livreurProfil, setLivreurProfil] = useState(null);
+  const [isClient, setIsClient] = useState(false);
+  const [reseau, setReseau] = useState(null);
+
+  return (
+    <QueryClientProvider client={queryClientInstance}>
+      <AppRouter 
+        livreurProfil={livreurProfil}
+        setLivreurProfil={setLivreurProfil}
+        isClient={isClient}
+        setIsClient={setIsClient}
+        reseau={reseau}
+        setReseau={setReseau}
+      />
+    </QueryClientProvider>
+  );
+}
+
 function AppRouter() {
   const [livreurProfil, setLivreurProfil] = useState(null);
   const [isClient, setIsClient] = useState(false);
+  const [reseau, setReseau] = useState(null);
 
   // Si un profil livreur a été détecté, afficher directement l'app appropriée
   if (livreurProfil) {
@@ -162,7 +180,7 @@ function AppRouter() {
                 onLivreur={setLivreurProfil}
                 onClient={() => setIsClient(true)}
               >
-                <SelectionReseau />
+                <SelectionReseau onSelect={setReseau} />
               </AuthGate>
             }
           />
@@ -173,12 +191,6 @@ function AppRouter() {
   );
 }
 
-function App() {
-  return (
-    <QueryClientProvider client={queryClientInstance}>
-      <AppRouter />
-    </QueryClientProvider>
-  );
-}
+
 
 export default App;
