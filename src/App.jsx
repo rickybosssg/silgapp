@@ -29,7 +29,6 @@ const ClientExterneApp = lazy(() => import('./pages/ClientExterneApp.jsx'));
 const CourseExterneForm = lazy(() => import('./pages/CourseExterneForm.jsx'));
 const CourseExterneFormSync = lazy(() => import('./pages/CourseExterneFormSync.jsx'));
 const ClientSuiviCourse = lazy(() => import('./pages/ClientSuiviCourse.jsx'));
-const ClientProfilPage = lazy(() => import('./pages/ClientProfilPage.jsx'));
 const DashboardAdminExterne = lazy(() => import('./pages/DashboardAdminExterne.jsx'));
 const PublicSuiviCourse = lazy(() => import('./pages/PublicSuiviCourse.jsx'));
 
@@ -83,7 +82,6 @@ function App() {
             <Route path="/client/course/expedier" element={<CourseExterneFormSync />} />
             <Route path="/client/course/recevoir" element={<CourseExterneFormSync />} />
             <Route path="/client/suivi" element={<ClientSuiviCourse />} />
-            <Route path="/client/profil" element={<ClientProfilPage />} />
             <Route path="/suivi-public/:token" element={<PublicSuiviCourse />} />
             <Route path="*" element={<ClientExterneApp />} />
           </Routes>

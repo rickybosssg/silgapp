@@ -11,17 +11,16 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import ClientProfil from "./ClientProfil";
 import VenusChat from "@/components/client/VenusChat";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import ModernMap from "@/components/client/ModernMap";
+import ProfilModal from "@/components/client/ProfilModal";
 
 export default function ClientExterneApp() {
   const navigate = useNavigate();
   const [gpsActive, setGpsActive] = useState(false);
   const [gpsRequired, setGpsRequired] = useState(true);
-  const [profilRequired, setProfilRequired] = useState(false);
-  const [profilComplet, setProfilComplet] = useState(false);
+  const [showProfilModal, setShowProfilModal] = useState(false);
   const [position, setPosition] = useState(null);
   const [clientProfil, setClientProfil] = useState(null);
   const [courseActive, setCourseActive] = useState(null);
@@ -57,13 +56,11 @@ export default function ClientExterneApp() {
         
         // Vérifier SI le profil est complet (nom, prénom ET téléphone avec 8+ chiffres)
         const phoneDigits = (profil.telephone || "").replace(/\D/g, "");
-        if (profil.nom && profil.prenom && phoneDigits.length >= 8) {
-          setProfilComplet(true);
-        } else {
-          setProfilRequired(true);
+        if (!profil.nom || !profil.prenom || phoneDigits.length < 8) {
+          setShowProfilModal(true);
         }
       } else {
-        setProfilRequired(true);
+        setShowProfilModal(true);
       }
 
       // 3. Vérifier course active (créée par le client)
@@ -143,11 +140,28 @@ export default function ClientExterneApp() {
     return R * c;
   };
 
-  const handleProfilComplete = () => {
-    // Forcer le rafraîchissement du dashboard sans re-vérifier le profil
-    setProfilRequired(false);
-    setProfilComplet(true);
-    // Recharger uniquement les données nécessaires (pas le profil)
+  const checkProfilComplet = async () => {
+    try {
+      const user = await base44.auth.me();
+      const clients = await base44.entities.ClientExterne.filter({ user_email: user.email });
+
+      if (clients && clients.length > 0) {
+        const profil = clients[0];
+        setClientProfil(profil);
+        
+        const phoneDigits = (profil.telephone || "").replace(/\D/g, "");
+        if (!profil.nom || !profil.prenom || phoneDigits.length < 8) {
+          setShowProfilModal(true);
+        }
+      }
+    } catch (err) {
+      console.error("Erreur vérification profil:", err);
+    }
+  };
+
+  const handleProfilComplete = async () => {
+    // Recharger le profil et les données
+    await checkProfilComplet();
     loadLivreursProches(position);
   };
 
@@ -216,9 +230,7 @@ export default function ClientExterneApp() {
     );
   }
 
-  if (profilRequired && !profilComplet) {
-    return <ClientProfil existingProfil={clientProfil} onComplete={handleProfilComplete} />;
-  }
+
 
   const prenom = clientProfil?.prenom || clientProfil?.nom?.split(" ")[0] || "Client";
   const quartier = "Ouagadougou"; // Pourrait être amélioré avec reverse geocoding
@@ -314,7 +326,7 @@ export default function ClientExterneApp() {
                 variant="ghost"
                 size="icon"
                 className="bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-xl"
-                onClick={() => navigate("/client/profil")}
+                onClick={() => setShowProfilModal(true)}
               >
                 <User className="w-5 h-5" />
               </Button>
@@ -429,10 +441,10 @@ export default function ClientExterneApp() {
               <Button 
                 variant="ghost" 
                 className="h-auto py-3 flex flex-col gap-1.5 hover:bg-orange-50"
-                onClick={() => navigate("/client/profil")}
+                onClick={() => setShowProfilModal(true)}
               >
                 <User className="w-5 h-5 text-orange-600" />
-                <span className="text-[10px] font-medium">Profil</span>
+                <span className="text-[10px] font-medium">Mes infos</span>
               </Button>
 
             </div>
@@ -497,6 +509,14 @@ export default function ClientExterneApp() {
 
       {/* Bouton flottant VENUS */}
       <VenusFloatingButton />
+
+      {/* Modale profil simple */}
+      <ProfilModal
+        open={showProfilModal}
+        onClose={() => setShowProfilModal(false)}
+        existingProfil={clientProfil}
+        onSuccess={handleProfilComplete}
+      />
     </div>
   );
 }
