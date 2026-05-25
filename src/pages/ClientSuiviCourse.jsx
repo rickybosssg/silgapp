@@ -4,15 +4,17 @@ import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Phone, Navigation, Package, CheckCircle2, Clock, User, Star, QrCode } from "lucide-react";
+import { MapPin, Phone, Navigation, Package, CheckCircle2, Clock, User, Star, QrCode, XCircle } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import QRCodeDisplay from "@/components/client/QRCodeDisplay";
+import AnnulerCourseDialog from "@/components/client/AnnulerCourseDialog";
 
 export default function ClientSuiviCourse() {
   const [maCourse, setMaCourse] = useState(null);
   const [showRating, setShowRating] = useState(false);
+  const [showAnnulerDialog, setShowAnnulerDialog] = useState(false);
 
   // Récupérer la course en cours (dernière course créée)
   const { data: courses = [] } = useQuery({
@@ -101,6 +103,18 @@ export default function ClientSuiviCourse() {
               }`}
             />
           </div>
+
+          {/* Bouton Annuler - seulement si course pas terminée */}
+          {!["livree", "annulee"].includes(maCourse.statut) && (
+            <Button
+              variant="outline"
+              className="w-full mt-4 border-red-300 text-red-600 hover:bg-red-50"
+              onClick={() => setShowAnnulerDialog(true)}
+            >
+              <XCircle className="w-4 h-4 mr-2" />
+              Annuler la course
+            </Button>
+          )}
         </Card>
 
         {/* Infos livreur */}
@@ -309,6 +323,16 @@ export default function ClientSuiviCourse() {
             onRated={handleRated}
           />
         )}
+
+        {/* Dialog annulation */}
+        <AnnulerCourseDialog
+          course={maCourse}
+          open={showAnnulerDialog}
+          onClose={() => setShowAnnulerDialog(false)}
+          onSuccess={() => {
+            window.location.href = "/client";
+          }}
+        />
       </div>
     </div>
   );

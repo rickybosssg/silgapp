@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { 
   Truck, 
   MapPin, 
@@ -9,10 +10,13 @@ import {
   Smartphone,
   CheckCircle2,
   Loader2,
-  Navigation
+  Navigation,
+  XCircle
 } from "lucide-react";
+import AnnulerCourseDialog from "./AnnulerCourseDialog";
 
 export default function LivreurRechercheAnimation({ course }) {
+  const [showAnnulerDialog, setShowAnnulerDialog] = useState(false);
   const [currentMessage, setCurrentMessage] = useState(0);
   const [livreursContactes, setLivreursContactes] = useState(0);
 
@@ -201,23 +205,35 @@ export default function LivreurRechercheAnimation({ course }) {
           </div>
         </Card>
 
-        {/* Statut */}
-        <Card className="p-4 bg-green-50 border-green-200">
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
-                <CheckCircle2 className="w-6 h-6 text-white" />
+        {/* Statut et actions */}
+        <div className="space-y-4">
+          <Card className="p-4 bg-green-50 border-green-200">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
+                  <CheckCircle2 className="w-6 h-6 text-white" />
+                </div>
+                <div className="absolute inset-0 bg-green-500 rounded-full animate-ping opacity-75" />
               </div>
-              <div className="absolute inset-0 bg-green-500 rounded-full animate-ping opacity-75" />
+              <div>
+                <p className="font-bold text-green-900">Course créée avec succès</p>
+                <p className="text-xs text-green-700">
+                  Un livreur va bientôt accepter votre course
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="font-bold text-green-900">Course créée avec succès</p>
-              <p className="text-xs text-green-700">
-                Un livreur va bientôt accepter votre course
-              </p>
-            </div>
-          </div>
-        </Card>
+          </Card>
+
+          {/* Bouton Annuler */}
+          <Button
+            variant="outline"
+            className="w-full border-red-300 text-red-600 hover:bg-red-50"
+            onClick={() => setShowAnnulerDialog(true)}
+          >
+            <XCircle className="w-4 h-4 mr-2" />
+            Annuler la course
+          </Button>
+        </div>
 
         {/* Instruction */}
         <div className="text-center">
@@ -228,6 +244,16 @@ export default function LivreurRechercheAnimation({ course }) {
             Vous serez redirigé vers le suivi quand un livreur acceptera
           </p>
         </div>
+
+        {/* Dialog annulation */}
+        <AnnulerCourseDialog
+          course={course}
+          open={showAnnulerDialog}
+          onClose={() => setShowAnnulerDialog(false)}
+          onSuccess={() => {
+            window.location.href = "/client";
+          }}
+        />
 
       </div>
     </div>

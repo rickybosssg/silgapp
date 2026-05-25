@@ -47,21 +47,22 @@ export default function ClientExterneApp() {
         return;
       }
 
-      // 2. Vérifier profil client
+      // 2. Vérifier profil client - création auto si inexistant
       const user = await base44.auth.me();
       const clients = await base44.entities.ClientExterne.filter({ user_email: user.email });
 
       if (clients && clients.length > 0) {
         const profil = clients[0];
         setClientProfil(profil);
-        
-        // Vérifier SI le profil est complet (nom, prénom ET téléphone avec 8+ chiffres)
-        const phoneDigits = (profil.telephone || "").replace(/\D/g, "");
-        if (!profil.nom || !profil.prenom || phoneDigits.length < 8) {
-          setShowProfilModal(true);
-        }
       } else {
-        setShowProfilModal(true);
+        // Création automatique d'un profil minimal
+        const newProfil = await base44.entities.ClientExterne.create({
+          nom: "Client",
+          prenom: "Silga",
+          telephone: "+226" + (user.email?.split('@')[0] || "00000000"),
+          user_email: user.email
+        });
+        setClientProfil(newProfil);
       }
 
       // 3. Vérifier course active (créée par le client)
@@ -141,30 +142,9 @@ export default function ClientExterneApp() {
     return R * c;
   };
 
-  const checkProfilComplet = async () => {
-    try {
-      const user = await base44.auth.me();
-      const clients = await base44.entities.ClientExterne.filter({ user_email: user.email });
 
-      if (clients && clients.length > 0) {
-        const profil = clients[0];
-        setClientProfil(profil);
-        
-        const phoneDigits = (profil.telephone || "").replace(/\D/g, "");
-        if (!profil.nom || !profil.prenom || phoneDigits.length < 8) {
-          setShowProfilModal(true);
-        }
-      }
-    } catch (err) {
-      console.error("Erreur vérification profil:", err);
-    }
-  };
 
-  const handleProfilComplete = async () => {
-    // Recharger le profil et les données
-    await checkProfilComplet();
-    loadLivreursProches(position);
-  };
+
 
   const handleActiverGPS = () => {
     if (!navigator.geolocation) {
@@ -508,14 +488,6 @@ export default function ClientExterneApp() {
 
       {/* Bouton flottant VENUS */}
       <VenusFloatingButton />
-
-      {/* Modale profil simple */}
-      <ProfilModal
-        open={showProfilModal}
-        onClose={() => setShowProfilModal(false)}
-        existingProfil={clientProfil}
-        onSuccess={handleProfilComplete}
-      />
     </div>
   );
 }
