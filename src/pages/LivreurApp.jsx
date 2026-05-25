@@ -6,8 +6,6 @@ import { Truck } from "lucide-react";
 import { toast } from "sonner";
 import { useSilgappAuth } from "@/lib/silgappAuth";
 import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
-import { invokeDirectly } from "@/lib/directFunctionCall";
-
 import LivreurHeader from "@/components/livreur/LivreurHeader";
 import LivreurStatsBanner from "@/components/livreur/LivreurStatsBanner";
 import LivreurStatutCard from "@/components/livreur/LivreurStatutCard";
@@ -17,8 +15,8 @@ import CourseActiveCard from "@/components/livreur/CourseActiveCard";
 import LivreurHistorique from "@/components/livreur/LivreurHistorique";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// Sauvegarde livreur via la fonction backend publique (pas de token requis)
-const saveLivreur = (id, data) => invokeDirectly('updateLivreur', { id, data });
+// Sauvegarde livreur via le SDK base44 (inclut le token d'app automatiquement)
+const saveLivreur = (id, data) => base44.functions.invoke('updateLivreur', { id, data });
 
 export default function LivreurApp() {
   const queryClient = useQueryClient();
