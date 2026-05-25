@@ -101,8 +101,8 @@ export default function AuthGate({ children, onLivreur, onClient }) {
       }
 
       // Router vers dashboard client
-      onClient?.();
       setState("client");
+      onClient?.();
     }
 
     check();
@@ -132,6 +132,11 @@ export default function AuthGate({ children, onLivreur, onClient }) {
     return <>{children}</>;
   }
 
-  // Livreur ou Client → rendu géré par App.jsx via onLivreur/onClient
+  // Client → afficher children avec isClient=true
+  if (state === "client") {
+    return <>{children}</>;
+  }
+
+  // Livreur → rendu géré par App.jsx via onLivreur
   return null;
 }

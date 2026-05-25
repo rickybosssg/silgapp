@@ -46,9 +46,8 @@ const LoadingScreen = () => (
 
 const InscriptionLivreur = () => null;
 
-function AdminRoutes() {
+function AdminRoutes({ isClient }) {
   const [reseau, setReseau] = useState(null);
-  const [isClient, setIsClient] = useState(false);
 
   // Client → dashboard client direct
   if (isClient) {
@@ -128,6 +127,25 @@ function AppRouter() {
     );
   }
 
+  // Client → afficher directement le dashboard client
+  if (isClient) {
+    return (
+      <Router>
+        <Suspense fallback={<LoadingScreen />}>
+          <Routes>
+            <Route path="/" element={<ClientExterneApp />} />
+            <Route path="/client/course/expedier" element={<CourseExterneForm />} />
+            <Route path="/client/course/recevoir" element={<CourseExterneForm />} />
+            <Route path="/client/suivi" element={<ClientSuiviCourse />} />
+            <Route path="*" element={<ClientExterneApp />} />
+          </Routes>
+        </Suspense>
+        <Toaster />
+      </Router>
+    );
+  }
+
+  // Admin → afficher SelectionReseau
   return (
     <Router>
       <Suspense fallback={<LoadingScreen />}>
@@ -139,7 +157,7 @@ function AppRouter() {
                 onLivreur={setLivreurProfil}
                 onClient={() => setIsClient(true)}
               >
-                <AdminRoutes isClient={isClient} />
+                <SelectionReseau />
               </AuthGate>
             }
           />
