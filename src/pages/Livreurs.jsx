@@ -298,6 +298,8 @@ export default function Livreurs() {
   const enCourse = valides.filter(l => l.statut === "en_course");
   const horsLigne = valides.filter(l => l.statut === "hors_ligne" || !l.statut);
 
+  const [statutFilter, setStatutFilter] = useState(null); // null = tous, "disponible", "en_course", "hors_ligne"
+
   const currentList = tab === "en_attente" ? [...enAttente, ...sansValidation] : tab === "refuse" ? refuses : [];
 
   const inscriptionLink = `${window.location.origin}/inscription-livreur`;
@@ -342,14 +344,43 @@ export default function Livreurs() {
         </div>
       </div>
 
-      {/* Légende couleurs */}
-      <div className="flex gap-3 text-xs text-muted-foreground flex-wrap">
-        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-green-400 inline-block" /> Disponible</span>
-        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-red-400 inline-block" /> En course</span>
-        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-slate-300 inline-block" /> Hors ligne</span>
+      {/* Filtres rapides statut — cliquables */}
+      <div className="flex gap-2 flex-wrap">
+        <button
+          onClick={() => { setTab("valide"); setStatutFilter(null); }}
+          className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all",
+            tab === "valide" && statutFilter === null ? "bg-foreground text-background border-foreground" : "bg-background text-muted-foreground border-border hover:border-foreground hover:text-foreground"
+          )}
+        >
+          Tous ({valides.length})
+        </button>
+        <button
+          onClick={() => { setTab("valide"); setStatutFilter("disponible"); }}
+          className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all",
+            tab === "valide" && statutFilter === "disponible" ? "bg-green-500 text-white border-green-500" : "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+          )}
+        >
+          <span className="w-2 h-2 rounded-full bg-green-400 inline-block" /> Disponibles ({disponibles.length})
+        </button>
+        <button
+          onClick={() => { setTab("valide"); setStatutFilter("en_course"); }}
+          className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all",
+            tab === "valide" && statutFilter === "en_course" ? "bg-red-500 text-white border-red-500" : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+          )}
+        >
+          <span className="w-2 h-2 rounded-full bg-red-400 inline-block" /> En course ({enCourse.length})
+        </button>
+        <button
+          onClick={() => { setTab("valide"); setStatutFilter("hors_ligne"); }}
+          className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all",
+            tab === "valide" && statutFilter === "hors_ligne" ? "bg-slate-500 text-white border-slate-500" : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+          )}
+        >
+          <span className="w-2 h-2 rounded-full bg-slate-400 inline-block" /> Hors ligne ({horsLigne.length})
+        </button>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab}>
+      <Tabs value={tab} onValueChange={(v) => { setTab(v); setStatutFilter(null); }}>
         <TabsList>
           <TabsTrigger value="en_attente" className="gap-1.5">
             <Clock className="w-3.5 h-3.5" />
@@ -375,6 +406,7 @@ export default function Livreurs() {
       {tab === "valide" && (
         <div className="grid grid-cols-1 gap-4">
           {/* Section Disponibles */}
+          {(statutFilter === null || statutFilter === "disponible") && (
           <div className="space-y-3">
             <div className="flex items-center gap-2 pb-1 border-b-2 border-green-400">
               <span className="w-3 h-3 rounded-full bg-green-400 inline-block" />
@@ -391,8 +423,10 @@ export default function Livreurs() {
                 hasAlerteBatterie={hasAlerteBatterie} />
             ))}
           </div>
+          )}
 
           {/* Section En course */}
+          {(statutFilter === null || statutFilter === "en_course") && (
           <div className="space-y-3">
             <div className="flex items-center gap-2 pb-1 border-b-2 border-red-400">
               <span className="w-3 h-3 rounded-full bg-red-400 inline-block" />
@@ -408,8 +442,10 @@ export default function Livreurs() {
                 hasAlerteBatterie={hasAlerteBatterie} />
             ))}
           </div>
+          )}
 
           {/* Section Hors ligne */}
+          {(statutFilter === null || statutFilter === "hors_ligne") && (
           <div className="space-y-3">
             <div className="flex items-center gap-2 pb-1 border-b-2 border-slate-300">
               <span className="w-3 h-3 rounded-full bg-slate-300 inline-block" />
@@ -425,6 +461,7 @@ export default function Livreurs() {
                 hasAlerteBatterie={hasAlerteBatterie} />
             ))}
           </div>
+          )}
         </div>
       )}
 
