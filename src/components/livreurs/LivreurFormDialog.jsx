@@ -14,6 +14,7 @@ const emptyForm = {
   prenom: "",
   nom: "",
   telephone: "",
+  user_email: "",
   code_identification: "",
   quartier: "",
   vehicule: "moto",
@@ -39,6 +40,7 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
         prenom: livreur.prenom || "",
         nom: livreur.nom || "",
         telephone: livreur.telephone || "",
+        user_email: livreur.user_email || "",
         code_identification: livreur.code_identification || "",
         quartier: livreur.quartier || "",
         vehicule: livreur.vehicule || "moto",
@@ -99,6 +101,7 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
     const errors = [];
     if (!form.nom?.trim()) errors.push("Le nom est obligatoire");
     if (!form.telephone?.trim()) errors.push("Le téléphone est obligatoire");
+    if (!form.user_email?.trim()) errors.push("L'email du compte livreur est obligatoire");
     if (!form.code_identification?.trim()) errors.push("Le code d'identification est obligatoire");
     
     if (errors.length > 0) {
@@ -125,6 +128,17 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
               <Label className="text-xs">Nom *</Label>
               <Input placeholder="Nom" value={form.nom} onChange={(e) => setForm((p) => ({ ...p, nom: e.target.value }))} required />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Email du compte livreur *</Label>
+            <Input
+              type="email"
+              placeholder="livreur@gmail.com"
+              value={form.user_email}
+              onChange={(e) => setForm((p) => ({ ...p, user_email: e.target.value.trim().toLowerCase() }))}
+            />
+            <p className="text-[10px] text-muted-foreground">Cet email est utilisé pour identifier le livreur lors de la connexion</p>
           </div>
 
           <div className="space-y-1.5">
