@@ -13,6 +13,7 @@ import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 import StatCard from "../components/dashboard/StatCard";
+import LivreursEnLigne from "../components/dashboard/LivreursEnLigne";
 import CourseListItem from "../components/courses/CourseListItem";
 import CourseDetailDialog from "../components/courses/CourseDetailDialog";
 import AssignLivreurDialog from "../components/courses/AssignLivreurDialog";
@@ -46,6 +47,7 @@ export default function Dashboard() {
     queryKey: ["livreurs"],
     queryFn: () => base44.entities.Livreur.list(),
     initialData: [],
+    refetchInterval: 15000,
   });
 
   const todayCourses = useMemo(
@@ -118,6 +120,9 @@ export default function Dashboard() {
         <StatCard title="CA du jour" value={`${stats.ca.toLocaleString()}`} icon={TrendingUp} iconBg="bg-indigo-500" trendLabel="FCFA" />
         <StatCard title="Livreurs dispo" value={stats.dispoLivreurs} icon={Truck} iconBg="bg-accent" />
       </div>
+
+      {/* Livreurs en ligne */}
+      <LivreursEnLigne livreurs={livreurs} />
 
       {/* Courses list */}
       <Card className="p-0 overflow-hidden">
