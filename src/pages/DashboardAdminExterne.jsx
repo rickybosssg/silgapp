@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, Package, DollarSign, TrendingUp, ArrowLeft, MapPin, Truck, AlertCircle } from "lucide-react";
+import { Users, Package, DollarSign, TrendingUp, ArrowLeft, Truck, AlertCircle, Eye, MapPin } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -100,7 +100,7 @@ export default function DashboardAdminExterne() {
       )}
 
       {/* Actions rapides */}
-      <div className="grid sm:grid-cols-3 gap-3">
+      <div className="grid sm:grid-cols-2 gap-3">
         <Link to="/admin/externe/livreurs" className="flex-1">
           <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer">
             <div className="flex items-center gap-3">
@@ -110,20 +110,6 @@ export default function DashboardAdminExterne() {
               <div>
                 <p className="font-semibold text-foreground">Gérer les livreurs</p>
                 <p className="text-xs text-muted-foreground">Validations, blocages</p>
-              </div>
-            </div>
-          </Card>
-        </Link>
-
-        <Link to="/admin/externe/courses" className="flex-1">
-          <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Package className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="font-semibold text-foreground">Courses</p>
-                <p className="text-xs text-muted-foreground">Historique complet</p>
               </div>
             </div>
           </Card>
@@ -144,38 +130,59 @@ export default function DashboardAdminExterne() {
         </Link>
       </div>
 
-      {/* Dernières courses */}
+      {/* Courses en traitement - défilement automatique */}
       <Card className="p-4">
-        <h3 className="font-bold text-foreground mb-3">Dernières courses</h3>
-        <div className="space-y-2">
-          {courses.slice(0, 5).map(course => (
-            <div key={course.id} className="flex items-center justify-between p-3 border rounded-lg">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">{course.client_nom || "Client"}</span>
-                  <Badge variant={course.statut === "livree" ? "default" : "secondary"} className="text-xs">
-                    {course.statut}
-                  </Badge>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {course.adresse_depart} → {course.adresse_arrivee}
-                </p>
-                <p className="text-[10px] text-muted-foreground">
-                  {format(new Date(course.created_date), "dd/MM HH:mm", { locale: fr })}
-                </p>
-              </div>
-              <div className="text-right">
-                {course.prix_final ? (
-                  <p className="font-bold text-sm text-green-600">{course.prix_final.toLocaleString()} F</p>
-                ) : course.prix_estimate ? (
-                  <p className="text-xs text-muted-foreground">~{course.prix_estimate.toLocaleString()} F</p>
-                ) : null}
-                {course.livreur_nom && (
-                  <p className="text-xs text-muted-foreground">{course.livreur_nom}</p>
-                )}
-              </div>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Eye className="w-4 h-4 text-primary" />
+            <h3 className="font-bold text-foreground">Courses en temps réel</h3>
+          </div>
+          <Badge variant="outline" className="text-xs">
+            {courses.filter(c => ["livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut)).length} en cours
+          </Badge>
+        </div>
+        <div className="space-y-2 max-h-[400px] overflow-y-auto">
+          {courses.filter(c => c.statut !== "nouvelle").length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">
+              Aucune course en cours
             </div>
-          ))}
+          ) : (
+            courses
+              .filter(c => c.statut !== "nouvelle")
+              .sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
+              .map(course => (
+                <div key={course.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-semibold text-sm">{course.client_nom || "Client"}</span>
+                      <Badge variant={course.statut === "livree" ? "default" : course.statut === "annulee" ? "destructive" : "secondary"} className="text-xs">
+                        {course.statut === "colis_recupere" ? "📦 Récupéré" : course.statut === "en_livraison" ? "🚀 Livraison" : course.statut === "livree" ? "✅ Livrée" : course.statut === "annulee" ? "Annulée" : "En attente"}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      <MapPin className="w-3 h-3 inline mr-1" />
+                      {course.adresse_depart} → {course.adresse_arrivee}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      {course.livreur_nom && `👤 ${course.livreur_nom} • `}
+                      {format(new Date(course.created_date), "dd/MM HH:mm", { locale: fr })}
+                    </p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    {course.prix_final ? (
+                      <p className="font-bold text-sm text-green-600">{course.prix_final.toLocaleString()} F</p>
+                    ) : course.prix_estimate ? (
+                      <p className="text-xs text-muted-foreground">~{course.prix_estimate.toLocaleString()} F</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">En calcul</p>
+                    )}
+                    {course.distance_reelle_km && (
+                      <p className="text-[10px] text-muted-foreground">{course.distance_reelle_km.toFixed(1)} km</p>
+                    )}
+                  </div>
+                </div>
+              ))
+          )}
         </div>
       </Card>
     </div>
