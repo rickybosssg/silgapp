@@ -86,13 +86,17 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const { data: coursesDisponibles = [] } = useQuery({
     queryKey: ["courses-externes-disponibles", livreurProfil?.id, livreurProfil?.latitude, livreurProfil?.longitude],
     queryFn: async () => {
-      if (!livreurProfil?.latitude || !livreurProfil?.longitude) return [];
+      if (!livreurProfil?.latitude || !livreurProfil?.longitude) {
+        console.log('[LIVREUR] ⚠️ GPS non actif, query désactivée');
+        return [];
+      }
       // Récupérer les courses assignées à ce livreur (en attente d'acceptation)
       const courses = await base44.entities.CourseExterne.filter({
         livreur_id: livreurProfil.id,
         dispatch_status: "propose"
       }, "-created_date", 20);
       
+      console.log('[LIVREUR] 📦 Courses disponibles:', courses?.length || 0, courses?.map(c => ({ id: c.id, dispatch_status: c.dispatch_status })));
       return courses || [];
     },
     enabled: !!livreurProfil?.id && livreurProfil.statut === "disponible" && gpsActif,
@@ -100,9 +104,28 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     refetchInterval: 2000, // Polling toutes les 2 secondes pour temps réel
   });
 
+  // Debug: logs état query
+  useEffect(() => {
+    console.log('[LIVREUR] 📊 État query coursesDisponibles:', {
+      enabled: !!livreurProfil?.id && livreurProfil.statut === "disponible" && gpsActif,
+      livreur_id: livreurProfil?.id,
+      statut: livreurProfil?.statut,
+      gpsActif: gpsActif,
+      courses_count: coursesDisponibles?.length,
+      first_course: coursesDisponibles?.[0]?.id
+    });
+  }, [livreurProfil?.statut, gpsActif, coursesDisponibles?.length]);
+
   const courseEnAttente = useMemo(() => {
     // Course assignée en attente d'acceptation
-    return coursesDisponibles[0] || null;
+    const course = coursesDisponibles[0] || null;
+    console.log('[LIVREUR] 🎯 courseEnAttente:', course ? {
+      id: course.id,
+      dispatch_status: course.dispatch_status,
+      livreur_id: course.livreur_id,
+      statut: course.statut
+    } : null);
+    return course;
   }, [coursesDisponibles]);
   
   const coursesActives = useMemo(() => mesCourses.filter(c => ["livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut)), [mesCourses]);

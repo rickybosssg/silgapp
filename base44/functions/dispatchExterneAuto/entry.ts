@@ -28,7 +28,10 @@ async function trouverLivreursProches(base44, course, rayonKm) {
     app_active: true,
   });
 
+  console.log('[DISPATCH] 👥 Livreurs externes trouvés:', livreurs?.length || 0);
+
   if (!livreurs || livreurs.length === 0) {
+    console.warn('[DISPATCH] ❌ Aucun livreur externe en base');
     return [];
   }
 
@@ -37,13 +40,30 @@ async function trouverLivreursProches(base44, course, rayonKm) {
     new Date(l.derniere_position_date).getTime() > Date.now() - 300000
   );
 
+  console.log('[DISPATCH] 📍 Livreurs avec GPS valide:', livreursGPS.length);
+  console.log('[DISPATCH] 📍 GPS coords:', livreursGPS.map(l => ({ 
+    nom: l.nom, 
+    lat: l.latitude, 
+    lng: l.longitude, 
+    last_seen: l.derniere_position_date 
+  })));
+
   const livreursProches = livreursGPS.filter(l => {
+    // Vérifier que GPS client est valide
+    if (!course.gps_depart_lat || !course.gps_depart_lng) {
+      console.error('[DISPATCH] ❌ GPS client invalide:', { lat: course.gps_depart_lat, lng: course.gps_depart_lng });
+      return false;
+    }
+    
     const dist = calculerDistance(
       course.gps_depart_lat, course.gps_depart_lng,
       l.latitude, l.longitude
     );
+    console.log(`[DISPATCH] 📏 Distance livreur ${l.nom}: ${dist.toFixed(2)}km (rayon: ${rayonKm}km)`);
     return dist <= rayonKm;
   });
+
+  console.log('[DISPATCH] ✅ Livreurs proches trouvés:', livreursProches.length);
 
   return livreursProches.sort((a, b) => {
     const distA = calculerDistance(
@@ -66,32 +86,42 @@ Deno.serve(async (req) => {
 
     // 1. Lancer la recherche automatique avec rayon progressif
     if (action === 'lancer_recherche_auto') {
-      console.log(`[DISPATCH] Démarrage dispatch pour course ${course_id}`);
+      console.log(`[DISPATCH] 🚀 Démarrage dispatch pour course ${course_id}`);
       
       const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
       if (!course) {
-        console.error('[DISPATCH] Course introuvable');
+        console.error('[DISPATCH] ❌ Course introuvable');
         return Response.json({ error: 'Course introuvable' }, { status: 404 });
       }
 
+      console.log('[DISPATCH] 📦 Course data:', {
+        id: course.id,
+        statut: course.statut,
+        gps_depart: { lat: course.gps_depart_lat, lng: course.gps_depart_lng },
+        adresse_depart: course.adresse_depart,
+        adresse_arrivee: course.adresse_arrivee
+      });
+
       if (course.statut !== 'recherche_livreur') {
-        console.log(`[DISPATCH] Course déjà en traitement (statut: ${course.statut})`);
+        console.log(`[DISPATCH] ⚠️ Course déjà en traitement (statut: ${course.statut})`);
         return Response.json({ error: 'Course déjà en cours de traitement' }, { status: 400 });
       }
 
       // Recherche progressive : 3km → 5km → 8km
       let livreursTries = [];
       for (const rayon of [3, 5, 8]) {
-        console.log(`[DISPATCH] Recherche dans rayon ${rayon}km`);
+        console.log(`[DISPATCH] 🔍 Recherche dans rayon ${rayon}km...`);
         livreursTries = await trouverLivreursProches(base44, course, rayon);
         if (livreursTries.length > 0) {
-          console.log(`[DISPATCH] ${livreursTries.length} livreurs trouvés dans rayon ${rayon}km`);
+          console.log(`[DISPATCH] ✅ ${livreursTries.length} livreurs trouvés dans rayon ${rayon}km`);
           break;
+        } else {
+          console.log(`[DISPATCH] ⚠️ Aucun livreur dans rayon ${rayon}km, expansion...`);
         }
       }
 
       if (livreursTries.length === 0) {
-        console.warn('[DISPATCH] Aucun livreur trouvé');
+        console.error('[DISPATCH] ❌ Aucun livreur trouvé après 3km, 5km, 8km');
         return Response.json({ 
           success: false, 
           message: 'Aucun livreur disponible dans un rayon de 8km' 
@@ -119,10 +149,13 @@ Deno.serve(async (req) => {
         timeout_expires_at: new Date(Date.now() + 60000).toISOString(), // 60s
       };
 
+      console.log('[DISPATCH] 📝 Mise à jour course:', courseUpdate);
       await base44.asServiceRole.entities.CourseExterne.update(course_id, courseUpdate);
+      console.log('[DISPATCH] ✅ Course mise à jour avec succès');
 
       // Notification push au livreur
       try {
+        console.log('[DISPATCH] 📱 Envoi notification push à:', livreurProche.user_email);
         await base44.functions.invoke('envoiNotificationPush', {
           email: livreurProche.user_email,
           titre: '🚨 Nouvelle course disponible !',
@@ -130,11 +163,12 @@ Deno.serve(async (req) => {
           type: 'nouvelle_course',
           course_id: course_id,
         });
+        console.log('[DISPATCH] ✅ Notification push envoyée');
       } catch (err) {
-        console.error('[DISPATCH] Erreur notification push:', err);
+        console.error('[DISPATCH] ❌ Erreur notification push:', err.message);
       }
 
-      console.log(`[DISPATCH] Course proposée au livreur ${livreurProche.id}`);
+      console.log(`[DISPATCH] ✅ Course proposée au livreur ${livreurProche.id} (${livreurProche.nom})`);
 
       return Response.json({
         success: true,
