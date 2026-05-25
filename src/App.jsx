@@ -49,81 +49,6 @@ const LoadingScreen = () => (
 
 const InscriptionLivreur = () => null;
 
-function AdminRoutes({ isClient, reseau, setReseau }) {
-  // Client → dashboard client direct
-  if (isClient) {
-    return (
-      <Routes>
-        <Route path="/" element={<ClientExterneApp />} />
-        <Route path="/client/course/expedier" element={<CourseExterneForm />} />
-        <Route path="/client/course/recevoir" element={<CourseExterneForm />} />
-        <Route path="/client/suivi" element={<ClientSuiviCourse />} />
-        <Route path="*" element={<ClientExterneApp />} />
-      </Routes>
-    );
-  }
-
-  if (!reseau) {
-    return (
-      <Routes>
-        <Route path="/" element={<SelectionReseau onSelect={setReseau} />} />
-        <Route path="*" element={<SelectionReseau onSelect={setReseau} />} />
-      </Routes>
-    );
-  }
-
-  return (
-    <Routes>
-      <Route path="/inscription-livreur" element={<InscriptionLivreur />} />
-      <Route element={<AppLayout reseau={reseau} />}>
-        {reseau === "interne" ? (
-          <>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/admin/externe" element={<DashboardAdminExterne />} />
-            <Route path="/nouvelle-course" element={<NouvelleCourse />} />
-            <Route path="/carte" element={<CarteLivreurs />} />
-            <Route path="/courses" element={<ToutesCourses />} />
-            <Route path="/livreurs" element={<Livreurs />} />
-            <Route path="/rapport" element={<RapportJour />} />
-            <Route path="/recapitulatif" element={<RecapitulatifAdmin />} />
-          </>
-        ) : (
-          <>
-            <Route path="/" element={<DashboardExterne />} />
-            <Route path="/carte" element={<CarteLivreursExterne />} />
-            <Route path="/courses" element={<ToutesCoursesExternes />} />
-            <Route path="/livreurs" element={<LivreursExternes />} />
-            <Route path="/rapport" element={<RapportJourExterne />} />
-            <Route path="/recapitulatif" element={<RecapitulatifAdmin reseau="externe" />} />
-          </>
-        )}
-        <Route path="/notifications" element={<Notifications />} />
-        <Route path="/admin/externe" element={<DashboardAdminExterne />} />
-      </Route>
-      <Route path="*" element={<PageNotFound />} />
-    </Routes>
-  );
-}
-
-function App() {
-  const [livreurProfil, setLivreurProfil] = useState(null);
-  const [isClient, setIsClient] = useState(false);
-  const [reseau, setReseau] = useState(null);
-
-  return (
-    <QueryClientProvider client={queryClientInstance}>
-      <AppRouter 
-        livreurProfil={livreurProfil}
-        setLivreurProfil={setLivreurProfil}
-        isClient={isClient}
-        setIsClient={setIsClient}
-        reseau={reseau}
-        setReseau={setReseau}
-      />
-    </QueryClientProvider>
-  );
-}
-
 function AppRouter() {
   const [livreurProfil, setLivreurProfil] = useState(null);
   const [isClient, setIsClient] = useState(false);
@@ -168,22 +93,62 @@ function AppRouter() {
     );
   }
 
-  // Admin → afficher SelectionReseau
+  // Admin → afficher SelectionReseau ou le dashboard selon le réseau sélectionné
+  if (!reseau) {
+    return (
+      <Router>
+        <Suspense fallback={<LoadingScreen />}>
+          <Routes>
+            <Route
+              path="*"
+              element={
+                <AuthGate 
+                  onLivreur={setLivreurProfil}
+                  onClient={() => setIsClient(true)}
+                >
+                  <SelectionReseau onSelect={setReseau} />
+                </AuthGate>
+              }
+            />
+          </Routes>
+        </Suspense>
+        <Toaster />
+      </Router>
+    );
+  }
+
+  // Réseau sélectionné → afficher le dashboard approprié
   return (
     <Router>
       <Suspense fallback={<LoadingScreen />}>
         <Routes>
-          <Route
-            path="*"
-            element={
-              <AuthGate 
-                onLivreur={setLivreurProfil}
-                onClient={() => setIsClient(true)}
-              >
-                <SelectionReseau onSelect={setReseau} />
-              </AuthGate>
-            }
-          />
+          <Route path="/inscription-livreur" element={<InscriptionLivreur />} />
+          <Route element={<AppLayout reseau={reseau} />}>
+            {reseau === "interne" ? (
+              <>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/admin/externe" element={<DashboardAdminExterne />} />
+                <Route path="/nouvelle-course" element={<NouvelleCourse />} />
+                <Route path="/carte" element={<CarteLivreurs />} />
+                <Route path="/courses" element={<ToutesCourses />} />
+                <Route path="/livreurs" element={<Livreurs />} />
+                <Route path="/rapport" element={<RapportJour />} />
+                <Route path="/recapitulatif" element={<RecapitulatifAdmin />} />
+              </>
+            ) : (
+              <>
+                <Route path="/" element={<DashboardExterne />} />
+                <Route path="/carte" element={<CarteLivreursExterne />} />
+                <Route path="/courses" element={<ToutesCoursesExternes />} />
+                <Route path="/livreurs" element={<LivreursExternes />} />
+                <Route path="/rapport" element={<RapportJourExterne />} />
+                <Route path="/recapitulatif" element={<RecapitulatifAdmin reseau="externe" />} />
+              </>
+            )}
+            <Route path="/notifications" element={<Notifications />} />
+            <Route path="/admin/externe" element={<DashboardAdminExterne />} />
+          </Route>
+          <Route path="*" element={<PageNotFound />} />
         </Routes>
       </Suspense>
       <Toaster />
@@ -193,4 +158,6 @@ function AppRouter() {
 
 
 
-export default App;
+
+
+export default AppRouter;
