@@ -254,7 +254,7 @@ export default function ClientSuiviCourse() {
                   <div className="flex-1">
                     <p className="font-bold text-yellow-900">Comment s'est passée la livraison ?</p>
                     <p className="text-xs text-yellow-700 mt-1">
-                      Aidez-nous à améliorer nos services en évaluant {maCourse.livreur_nom}
+                      Aidez-nous à améliorer nos services en évaluant {maCourse.livreur_nom || "le livreur"}
                     </p>
                   </div>
                 </div>

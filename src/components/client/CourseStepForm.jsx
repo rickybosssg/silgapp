@@ -223,17 +223,18 @@ export default function StepField({
             </div>
             
             <div>
-              <Label>Nom complet *</Label>
+              <Label>Nom complet</Label>
               <Input
                 value={formData.type_course === "expedier" ? formData.destinataire_nom : formData.expediteur_nom}
                 onChange={(e) => setFormData({ 
                   ...formData, 
                   [formData.type_course === "expedier" ? "destinataire_nom" : "expediteur_nom"]: e.target.value 
                 })}
-                placeholder="Nom et prénom"
+                placeholder="Nom et prénom (optionnel)"
                 className="h-12"
                 autoFocus
               />
+              <p className="text-xs text-muted-foreground mt-1">Optionnel</p>
             </div>
 
             <div>
@@ -366,17 +367,17 @@ export default function StepField({
               </div>
 
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                  <User className="w-4 h-4 text-blue-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs text-muted-foreground uppercase font-semibold">Contact</p>
-                  <p className="font-medium text-foreground">
-                    {formData.type_course === "expedier" 
-                      ? `${formData.destinataire_nom} - ${formData.destinataire_telephone}`
-                      : `${formData.expediteur_nom} - ${formData.expediteur_telephone}`}
-                  </p>
-                </div>
+               <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                 <User className="w-4 h-4 text-blue-600" />
+               </div>
+               <div className="flex-1">
+                 <p className="text-xs text-muted-foreground uppercase font-semibold">Contact</p>
+                 <p className="font-medium text-foreground">
+                   {formData.type_course === "expedier" 
+                     ? `${formData.destinataire_nom || "Destinataire"} - ${formData.destinataire_telephone}`
+                     : `${formData.expediteur_nom || "Expéditeur"} - ${formData.expediteur_telephone}`}
+                 </p>
+               </div>
               </div>
 
               <div className="flex items-start gap-3">
@@ -468,6 +469,7 @@ export default function StepField({
               (step === 3 && !(formData.type_course === "expedier" ? formData.destinataire_telephone : formData.expediteur_telephone)) ||
               (step === 4 && !formData.type_colis)
             }
+            className="flex-1 h-12 bg-primary"
             className="flex-1 h-12 bg-primary"
           >
             Continuer
