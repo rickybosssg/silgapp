@@ -3,12 +3,11 @@ import { appParams, APP_PUBLIC_URL } from '@/lib/app-params';
 
 const { appId, token, functionsVersion, appBaseUrl, isCapacitor } = appParams;
 
-// Dans Capacitor (APK), les URLs relatives ne fonctionnent pas.
-// Les fonctions Base44 doivent etre appelees via le sous-domaine public de l'app,
-// pas via app.base44.com, sinon Base44 refuse l'appel.
+// En mode Capacitor avec server.url, la WebView tourne sur le domaine public.
+// Le SDK doit pointer vers ce même domaine pour les appels API/auth.
+// En web normal (preview/prod), serverUrl vide = même origine.
 const serverUrl = isCapacitor ? APP_PUBLIC_URL : '';
 
-// Garantir que appBaseUrl n'est jamais null/undefined
 const safeAppBaseUrl = (appBaseUrl && appBaseUrl !== 'null' && appBaseUrl !== 'undefined')
   ? appBaseUrl
   : APP_PUBLIC_URL;
