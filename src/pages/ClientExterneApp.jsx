@@ -14,6 +14,7 @@ import { fr } from "date-fns/locale";
 import ClientProfil from "./ClientProfil";
 import VenusChat from "@/components/client/VenusChat";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
+import ModernMap from "@/components/client/ModernMap";
 
 export default function ClientExterneApp() {
   const navigate = useNavigate();
@@ -27,7 +28,6 @@ export default function ClientExterneApp() {
   const [livreursProches, setLivreursProches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
-  const mapRef = useRef(null);
 
   useEffect(() => {
     checkStatus();
@@ -178,68 +178,6 @@ export default function ClientExterneApp() {
     );
   };
 
-  // Initialiser la carte Leaflet
-  useEffect(() => {
-    if (!gpsActive || !position || !mapRef.current || courseActive) return;
-
-    // Injecter Leaflet CSS & JS si pas déjà fait
-    if (!window.L) {
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-      document.head.appendChild(link);
-
-      const script = document.createElement("script");
-      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-      script.onload = () => initMap();
-      document.head.appendChild(script);
-    } else {
-      initMap();
-    }
-
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.innerHTML = "";
-      }
-    };
-  }, [gpsActive, position, courseActive]);
-
-  const initMap = () => {
-    if (!window.L || !mapRef.current) return;
-
-    const map = window.L.map(mapRef.current, {
-      zoomControl: false,
-      attributionControl: false,
-    }).setView([position.latitude, position.longitude], 13);
-
-    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-    }).addTo(map);
-
-    // Marqueur position client
-    const clientIcon = window.L.divIcon({
-      html: `<div style="background: #dc2626; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>`,
-      className: "",
-      iconSize: [16, 16],
-    });
-
-    window.L.marker([position.latitude, position.longitude], { icon: clientIcon }).addTo(map);
-
-    // Marqueurs livreurs
-    livreursProches.forEach((livreur, idx) => {
-      const livreurIcon = window.L.divIcon({
-        html: `<div style="background: #16a34a; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"></div>`,
-        className: "",
-        iconSize: [12, 12],
-      });
-
-      window.L.marker([livreur.latitude, livreur.longitude], { icon: livreurIcon }).addTo(map);
-    });
-
-    // Retirer zoom control
-    map.zoomControl.setPosition("bottomright");
-  };
-
   if (loading) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-primary/5 to-red-50">
@@ -383,34 +321,14 @@ export default function ClientExterneApp() {
             </div>
           </div>
 
-          {/* Carte GPS */}
-          {!courseActive && (
-            <Card className="overflow-hidden border-0 shadow-lg">
-              <div className="relative">
-                <div 
-                  ref={mapRef} 
-                  className="w-full h-48 bg-gradient-to-br from-blue-50 to-blue-100"
-                  style={{ minHeight: "192px" }}
-                />
-                <div className="absolute bottom-3 left-3 right-3 bg-white/95 backdrop-blur-sm rounded-xl p-3 shadow-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <MapPin className="w-4 h-4 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-foreground">Votre position</p>
-                        <p className="text-[10px] text-muted-foreground">Localisation en temps réel</p>
-                      </div>
-                    </div>
-                    {livreursProches.length > 0 && (
-                      <Badge className="bg-green-100 text-green-700 border-green-200">
-                        {livreursProches.length} livr{livreursProches.length === 1 ? "eur" : "eurs"} à proximité
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              </div>
+          {/* Carte moderne style Uber/Glovo */}
+          {!courseActive && gpsActive && position && (
+            <Card className="overflow-hidden border-0 shadow-xl">
+              <ModernMap 
+                position={position}
+                livreursProches={livreursProches}
+                courseActive={courseActive}
+              />
             </Card>
           )}
 
