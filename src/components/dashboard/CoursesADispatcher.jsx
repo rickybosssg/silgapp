@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Phone, Clock, User, ArrowRight, Zap, UserCheck } from "lucide-react";
+import { MapPin, Phone, Clock, User, ArrowRight, Zap, UserCheck, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { base44 } from "@/api/base44Client";
@@ -11,6 +11,15 @@ import UrgenceBadge from "@/components/courses/UrgenceBadge";
 
 function CourseItem({ course, onAssign, onView }) {
   const queryClient = useQueryClient();
+
+  const deleteMutation = useMutation({
+    mutationFn: () => base44.entities.Course.delete(course.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      toast.success("Course supprimée");
+    },
+    onError: (e) => toast.error("Erreur : " + e.message),
+  });
 
   const lancerAutoMutation = useMutation({
     mutationFn: () => base44.functions.invoke("dispatchMoteur", { action: "lancer_auto", course_id: course.id }),
@@ -83,6 +92,19 @@ function CourseItem({ course, onAssign, onView }) {
           >
             <Zap className="w-3 h-3 mr-1" />
             {lancerAutoMutation.isPending ? "..." : "Auto"}
+          </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            className="text-xs h-7"
+            onClick={() => {
+              if (confirm("Supprimer cette course ?")) {
+                deleteMutation.mutate();
+              }
+            }}
+            disabled={deleteMutation.isPending}
+          >
+            <Trash2 className="w-3 h-3" />
           </Button>
         </div>
       </div>
