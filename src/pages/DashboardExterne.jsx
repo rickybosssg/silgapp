@@ -3,23 +3,22 @@ import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Plus, MapPin, Package, Truck, Clock, CheckCircle2, XCircle, AlertTriangle, TrendingUp, ArrowLeft } from "lucide-react";
+import { Plus, MapPin, Package, Truck, Clock, CheckCircle2, XCircle, TrendingUp, ArrowLeft } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
 import StatCard from "@/components/dashboard/StatCard";
 import LivreursEnLigne from "@/components/dashboard/LivreursEnLigne";
-import CoursesADispatcher from "@/components/dashboard/CoursesADispatcher";
+
 import CoursesEnTraitement from "@/components/dashboard/CoursesEnTraitement";
 import CoursesTerminees from "@/components/dashboard/CoursesTerminees";
 import CourseDetailDialog from "@/components/courses/CourseDetailDialog";
-import AssignLivreurDialog from "@/components/courses/AssignLivreurDialog";
+
 import DispatchMonitor from "@/components/dispatch/DispatchMonitor";
 import BatterieAlertesPanel from "@/components/admin/BatterieAlertesPanel";
 import { Card } from "@/components/ui/card";
 
 export default function DashboardExterne() {
   const [selectedCourse, setSelectedCourse] = useState(null);
-  const [assignCourse, setAssignCourse] = useState(null);
 
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ["courses-externes"],
@@ -40,20 +39,8 @@ export default function DashboardExterne() {
     [courses]
   );
 
-  const coursesADispatcher = useMemo(
-    () => todayCourses.filter(c =>
-      c.statut === "nouvelle" &&
-      (!c.dispatch_status || c.dispatch_status === "en_attente_admin" || c.dispatch_status === "expire")
-    ),
-    [todayCourses]
-  );
-
   const coursesEnTraitement = useMemo(
-    () => todayCourses.filter(c =>
-      !["livree", "annulee"].includes(c.statut) &&
-      (c.statut !== "nouvelle" || (c.dispatch_status && !["en_attente_admin", "expire"].includes(c.dispatch_status))) &&
-      !(c.statut === "nouvelle" && (!c.dispatch_status || c.dispatch_status === "en_attente_admin" || c.dispatch_status === "expire"))
-    ),
+    () => todayCourses.filter(c => !["livree", "annulee"].includes(c.statut)),
     [todayCourses]
   );
 
@@ -67,11 +54,10 @@ export default function DashboardExterne() {
     const livrees = coursesTerminees.filter(c => c.statut === "livree").length;
     const annulees = coursesTerminees.filter(c => c.statut === "annulee").length;
     const enCours = coursesEnTraitement.length;
-    const aDispatcher = coursesADispatcher.length;
     const ca = coursesTerminees.filter(c => c.statut === "livree").reduce((s, c) => s + (c.prix_reel || c.prix || 0), 0);
     const dispoLivreurs = livreurs.filter(l => l.statut === "disponible" && l.validation === "valide" && l.actif !== false).length;
-    return { total, livrees, annulees, enCours, aDispatcher, ca, dispoLivreurs };
-  }, [todayCourses, coursesADispatcher, coursesEnTraitement, coursesTerminees, livreurs]);
+    return { total, livrees, annulees, enCours, ca, dispoLivreurs };
+  }, [todayCourses, coursesEnTraitement, coursesTerminees, livreurs]);
 
   return (
     <div className="px-4 py-4 lg:p-6 space-y-4 lg:space-y-5 max-w-7xl mx-auto">
@@ -91,21 +77,12 @@ export default function DashboardExterne() {
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link to="/nouvelle-course" className="flex-1 sm:flex-none">
-            <Button size="sm" className="w-full sm:w-auto gap-1.5 bg-accent">
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Nouvelle course</span>
-              <span className="sm:hidden">Course</span>
-            </Button>
-          </Link>
-          <Link to="/carte" className="flex-1 sm:flex-none">
-            <Button variant="outline" size="sm" className="w-full sm:w-auto gap-1.5">
-              <MapPin className="w-4 h-4" />
-              <span className="hidden sm:inline">Carte</span>
-            </Button>
-          </Link>
-        </div>
+        <Link to="/carte" className="flex-1 sm:flex-none">
+          <Button variant="outline" size="sm" className="w-full sm:w-auto gap-1.5">
+            <MapPin className="w-4 h-4" />
+            <span className="hidden sm:inline">Carte</span>
+          </Button>
+        </Link>
       </div>
 
       {/* Alertes batterie + dispatch monitor */}
@@ -113,9 +90,8 @@ export default function DashboardExterne() {
       <DispatchMonitor />
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <StatCard title="Total" value={stats.total} icon={Package} iconBg="bg-accent" />
-        <StatCard title="À dispatcher" value={stats.aDispatcher} icon={AlertTriangle} iconBg="bg-orange-500" />
         <StatCard title="En traitement" value={stats.enCours} icon={Clock} iconBg="bg-blue-500" />
         <StatCard title="Livrées" value={stats.livrees} icon={CheckCircle2} iconBg="bg-emerald-500" />
         <StatCard title="Annulées" value={stats.annulees} icon={XCircle} iconBg="bg-red-500" />
@@ -125,13 +101,6 @@ export default function DashboardExterne() {
 
       {/* Livreurs en ligne */}
       <LivreursEnLigne livreurs={livreurs} />
-
-      {/* Courses à dispatcher */}
-      <CoursesADispatcher
-        courses={coursesADispatcher}
-        onAssign={setAssignCourse}
-        onView={setSelectedCourse}
-      />
 
       {/* Courses en traitement */}
       <CoursesEnTraitement
@@ -151,12 +120,7 @@ export default function DashboardExterne() {
         open={!!selectedCourse}
         onClose={() => setSelectedCourse(null)}
       />
-      <AssignLivreurDialog
-        course={assignCourse}
-        open={!!assignCourse}
-        onClose={() => setAssignCourse(null)}
-        reseau="externe"
-      />
+
     </div>
   );
 }
