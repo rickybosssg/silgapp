@@ -517,59 +517,54 @@ export default function ClientExterneApp() {
           </Card>
 
           {/* Estimation dynamique */}
-          <Card className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200">
+          <Card className="p-5 bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200 shadow-md">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0 shadow-sm">
                 <TrendingUp className="w-5 h-5 text-indigo-600" />
               </div>
               <div className="flex-1">
                 <p className="text-sm font-bold text-indigo-900">Tarification transparente</p>
-                <p className="text-xs text-indigo-700 mt-1">
-                  100 F/km • Prix calculé automatiquement selon la distance réelle
+                <p className="text-xs text-indigo-700 mt-1.5 leading-relaxed">
+                  100 F/km — Prix calculé automatiquement selon la distance réellement parcourue.
                 </p>
-                <div className="mt-2 flex items-center gap-2 text-xs">
-                  <Badge className="bg-white/80 text-indigo-700">Petit colis: ~500F</Badge>
-                  <Badge className="bg-white/80 text-indigo-700">Moyen: ~1000F</Badge>
-                  <Badge className="bg-white/80 text-indigo-700">Gros: ~1500F+</Badge>
-                </div>
               </div>
             </div>
           </Card>
 
-          {/* Pourquoi Silga */}
-          <Card className="p-5 bg-gradient-to-br from-white to-gray-50">
+          {/* Avantages Silga */}
+          <Card className="p-5 bg-gradient-to-br from-white to-gray-50 shadow-md">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Star className="w-4 h-4 text-primary" />
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-red-600 flex items-center justify-center shadow-sm">
+                <Star className="w-4 h-4 text-white" />
               </div>
-              <p className="font-bold text-foreground">Pourquoi Silga Externe ?</p>
+              <p className="font-bold text-foreground text-base">Facilitez-vous la vie avec SILGAPP</p>
             </div>
             <div className="space-y-3">
-              <div className="flex items-start gap-3">
-                <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Zap className="w-3 h-3 text-green-600" />
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-gradient-to-r from-green-50 to-white border border-green-100">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <Zap className="w-3.5 h-3.5 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-foreground">Livraison rapide</p>
-                  <p className="text-xs text-muted-foreground">Livreurs disponibles 24/7 près de chez vous</p>
+                  <p className="text-sm font-bold text-foreground">Livraison rapide</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Livreurs disponibles 24/7 près de chez vous</p>
                 </div>
               </div>
-              <div className="flex items-start gap-3">
-                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Shield className="w-3 h-3 text-blue-600" />
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-gradient-to-r from-blue-50 to-white border border-blue-100">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <Shield className="w-3.5 h-3.5 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-foreground">Service sécurisé</p>
-                  <p className="text-xs text-muted-foreground">Livreurs vérifiés et suivis en temps réel</p>
+                  <p className="text-sm font-bold text-foreground">Service sécurisé</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Livreurs vérifiés et suivis en temps réel</p>
                 </div>
               </div>
-              <div className="flex items-start gap-3">
-                <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <HelpCircle className="w-3 h-3 text-purple-600" />
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-gradient-to-r from-purple-50 to-white border border-purple-100">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <HelpCircle className="w-3.5 h-3.5 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-foreground">Support réactif</p>
-                  <p className="text-xs text-muted-foreground">Assistance disponible à tout moment</p>
+                  <p className="text-sm font-bold text-foreground">Support réactif</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Assistance disponible à tout moment</p>
                 </div>
               </div>
             </div>
