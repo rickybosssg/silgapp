@@ -12,7 +12,7 @@ const AppLayout = lazy(() => import('./components/layout/AppLayout'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const DashboardExterne = lazy(() => import('./pages/DashboardExterne'));
 const NouvelleCourse = lazy(() => import('./pages/NouvelleCourse'));
-const NouvelleCourseExterne = lazy(() => import('./pages/NouvelleCourseExterne'));
+
 const CarteLivreurs = lazy(() => import('./pages/CarteLivreurs'));
 const CarteLivreursExterne = lazy(() => import('./pages/CarteLivreursExterne'));
 const ToutesCourses = lazy(() => import('./pages/ToutesCourses'));
@@ -79,7 +79,6 @@ function AdminRoutes() {
         ) : (
           <>
             <Route path="/" element={<DashboardExterne />} />
-            <Route path="/nouvelle-course" element={<NouvelleCourseExterne />} />
             <Route path="/carte" element={<CarteLivreursExterne />} />
             <Route path="/courses" element={<ToutesCoursesExternes />} />
             <Route path="/livreurs" element={<LivreursExternes />} />
