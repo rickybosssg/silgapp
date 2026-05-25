@@ -16,6 +16,7 @@ import CourseDetailDialog from "@/components/courses/CourseDetailDialog";
 import DispatchMonitor from "@/components/dispatch/DispatchMonitor";
 import BatterieAlertesPanel from "@/components/admin/BatterieAlertesPanel";
 import { Card } from "@/components/ui/card";
+import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 
 export default function DashboardExterne() {
   const [selectedCourse, setSelectedCourse] = useState(null);
@@ -121,6 +122,8 @@ export default function DashboardExterne() {
         onClose={() => setSelectedCourse(null)}
       />
 
+      {/* Bouton flottant VENUS */}
+      <VenusFloatingButton />
     </div>
   );
 }

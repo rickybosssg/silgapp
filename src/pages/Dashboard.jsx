@@ -15,6 +15,7 @@ import CourseDetailDialog from "@/components/courses/CourseDetailDialog";
 import AssignLivreurDialog from "@/components/courses/AssignLivreurDialog";
 import DispatchMonitor from "@/components/dispatch/DispatchMonitor";
 import BatterieAlertesPanel from "@/components/admin/BatterieAlertesPanel";
+import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 
 export default function Dashboard() {
   const [selectedCourse, setSelectedCourse] = useState(null);
@@ -157,6 +158,9 @@ export default function Dashboard() {
         open={!!assignCourse}
         onClose={() => setAssignCourse(null)}
       />
+
+      {/* Bouton flottant VENUS */}
+      <VenusFloatingButton />
     </div>
   );
 }
