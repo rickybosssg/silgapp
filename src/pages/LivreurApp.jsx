@@ -190,9 +190,21 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
     toast.success("Course acceptée ! 🚀");
   };
 
-  const handleRefuser = (course) => {
-    updateCourseMutation.mutate({ id: course.id, data: { statut: "nouvelle", livreur_id: "", livreur_nom: "" } });
-    toast("Course refusée");
+  const handleRefuser = (course, raison) => {
+    const remarque = raison 
+      ? `Livreur occupé : ${raison === "en_course" ? "déjà en cours de livraison" : "indisponible"}`
+      : "Course refusée";
+    
+    updateCourseMutation.mutate({ 
+      id: course.id, 
+      data: { 
+        statut: "nouvelle", 
+        livreur_id: "", 
+        livreur_nom: "",
+        remarque_livreur: remarque 
+      } 
+    });
+    toast("Course renvoyée à l'admin");
   };
 
   const handleColisRecupere = (course) => {

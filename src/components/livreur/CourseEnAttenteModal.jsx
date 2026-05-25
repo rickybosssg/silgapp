@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from "react";
-import { MapPin, Phone, Navigation, Check, X, Package } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { MapPin, Phone, Navigation, Check, X, Package, Clock, Truck } from "lucide-react";
 
 function useVibration(active) {
   const intervalRef = useRef(null);
@@ -50,13 +50,21 @@ const typeColisLabel = {
 };
 
 export default function CourseEnAttenteModal({ course, onAccepter, onRefuser, isPending }) {
+  // onRefuser peut maintenant recevoir 2 params : (course, raison)
   useVibration(true);
+  const [showRaison, setShowRaison] = useState(false);
+  const [raison, setRaison] = useState("");
 
   useEffect(() => {
     playNotificationSound();
     const t = setInterval(playNotificationSound, 5000);
     return () => clearInterval(t);
   }, []);
+
+  const handleOccupé = () => {
+    if (!raison) return;
+    onRefuser(course, raison);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-3"
@@ -176,24 +184,72 @@ export default function CourseEnAttenteModal({ course, onAccepter, onRefuser, is
           )}
 
           {/* Boutons */}
-          <div className="grid grid-cols-2 gap-3 pt-1">
-            <button
-              className="h-16 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 disabled:opacity-50"
-              onClick={() => onAccepter(course)}
-              disabled={isPending}
-            >
-              <Check className="w-6 h-6" />
-              <span className="text-xs font-bold">Oui, je prends !</span>
-            </button>
-            <button
-              className="h-16 rounded-2xl bg-gray-100 text-gray-700 font-black text-base border border-gray-200 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 disabled:opacity-50"
-              onClick={() => onRefuser(course)}
-              disabled={isPending}
-            >
-              <X className="w-6 h-6 text-gray-500" />
-              <span className="text-xs font-bold text-gray-500">Non, occupé</span>
-            </button>
-          </div>
+          {!showRaison ? (
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <button
+                className="h-16 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 disabled:opacity-50"
+                onClick={() => onAccepter(course)}
+                disabled={isPending}
+              >
+                <Check className="w-6 h-6" />
+                <span className="text-xs font-bold">Oui, je prends !</span>
+              </button>
+              <button
+                className="h-16 rounded-2xl bg-gray-100 text-gray-700 font-black text-base border border-gray-200 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 disabled:opacity-50"
+                onClick={() => setShowRaison(true)}
+                disabled={isPending}
+              >
+                <X className="w-6 h-6 text-gray-500" />
+                <span className="text-xs font-bold text-gray-500">Non, occupé</span>
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3 pt-1">
+              <p className="text-sm font-bold text-gray-700 text-center">Pourquoi êtes-vous occupé ?</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  className={`h-14 rounded-2xl border-2 font-semibold text-sm transition-all ${
+                    raison === "en_course"
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                  }`}
+                  onClick={() => setRaison("en_course")}
+                >
+                  <Truck className="w-4 h-4 mx-auto mb-0.5" />
+                  En cours
+                </button>
+                <button
+                  className={`h-14 rounded-2xl border-2 font-semibold text-sm transition-all ${
+                    raison === "indisponible"
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                  }`}
+                  onClick={() => setRaison("indisponible")}
+                >
+                  <Clock className="w-4 h-4 mx-auto mb-0.5" />
+                  Indisponible
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button
+                  className="h-12 rounded-2xl border border-gray-200 text-gray-600 font-semibold text-sm"
+                  onClick={() => {
+                    setShowRaison(false);
+                    setRaison("");
+                  }}
+                >
+                  Annuler
+                </button>
+                <button
+                  className="h-12 rounded-2xl bg-gray-800 text-white font-bold text-sm disabled:opacity-50"
+                  onClick={handleOccupé}
+                  disabled={!raison || isPending}
+                >
+                  Envoyer
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
