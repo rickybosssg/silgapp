@@ -105,7 +105,13 @@ export default function AuthGate({ children, onLivreur }) {
             </p>
           </div>
           <button
-            onClick={() => base44.auth.logout()}
+            onClick={() => {
+            ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
+              try { localStorage.removeItem(k); } catch(_) {}
+            });
+            base44.auth.logout();
+            setTimeout(() => window.location.reload(), 300);
+          }}
             className="px-6 py-2 rounded-xl bg-primary text-white text-sm font-semibold"
           >
             Se déconnecter

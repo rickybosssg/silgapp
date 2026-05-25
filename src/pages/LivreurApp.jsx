@@ -162,7 +162,11 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
   };
 
   const handleLogout = () => {
+    ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
+      try { localStorage.removeItem(k); } catch(_) {}
+    });
     base44.auth.logout();
+    setTimeout(() => window.location.reload(), 300);
   };
 
   if (!livreurProfil) {

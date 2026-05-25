@@ -6,6 +6,14 @@ import {
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
+
+const doLogout = () => {
+  ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
+    try { localStorage.removeItem(k); } catch(_) {}
+  });
+  base44.auth.logout();
+  setTimeout(() => window.location.reload(), 300);
+};
 import { Badge } from "@/components/ui/badge";
 
 
@@ -86,7 +94,7 @@ export default function Sidebar({ notificationCount = 0 }) {
       <div className="border-t border-border flex-shrink-0">
         {/* Déconnexion */}
         <button
-          onClick={() => base44.auth.logout()}
+          onClick={doLogout}
           className={cn(
             "w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors",
             collapsed ? "justify-center" : ""

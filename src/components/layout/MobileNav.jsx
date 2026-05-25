@@ -31,7 +31,13 @@ export default function MobileNav({ notificationCount = 0 }) {
   const location = useLocation();
   const [user, setUser] = useState(null);
   useEffect(() => { base44.auth.me().then(setUser).catch(() => null); }, []);
-  const logout = () => base44.auth.logout();
+  const logout = () => {
+    ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
+      try { localStorage.removeItem(k); } catch(_) {}
+    });
+    base44.auth.logout();
+    setTimeout(() => window.location.reload(), 300);
+  };
   const [showMenu, setShowMenu] = useState(false);
 
   return (
