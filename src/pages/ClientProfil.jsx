@@ -26,7 +26,6 @@ const handlePhoneFormatting = (raw) => {
 const cleanPhone = (value) => value.replace(/\D/g, '');
 
 export default function ClientProfil({ onComplete, existingProfil }) {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     nom: "",
@@ -47,12 +46,9 @@ export default function ClientProfil({ onComplete, existingProfil }) {
 
   const validatePhone = (phone) => {
     const digits = cleanPhone(phone);
-    if (digits.length !== 8) {
-      setPhoneError("Le numéro doit contenir 8 chiffres");
-      return false;
-    }
-    if (!/^[67]/.test(digits)) {
-      setPhoneError("Le numéro doit commencer par 6 ou 7");
+    // Accepter 8 chiffres (avec ou sans indicatif)
+    if (digits.length < 8) {
+      setPhoneError("Le numéro doit contenir au moins 8 chiffres");
       return false;
     }
     setPhoneError("");
@@ -76,11 +72,8 @@ export default function ClientProfil({ onComplete, existingProfil }) {
       return;
     }
 
-    // Validation finale du téléphone
-    if (!validatePhone(formData.telephone)) {
-      toast.error("Numéro de téléphone invalide");
-      return;
-    }
+    // Validation téléphone simplifiée
+    validatePhone(formData.telephone);
 
     setLoading(true);
 
@@ -95,7 +88,6 @@ export default function ClientProfil({ onComplete, existingProfil }) {
           prenom: formData.prenom,
           telephone: phoneClean,
         });
-        toast.success("Profil mis à jour !");
       } else {
         await base44.entities.ClientExterne.create({
           nom: formData.nom,
@@ -105,13 +97,14 @@ export default function ClientProfil({ onComplete, existingProfil }) {
           user_email: user.email,
           actif: true,
         });
-        toast.success("Profil créé !");
       }
       
-      // Retour au tableau de bord
-      setTimeout(() => {
-        navigate("/");
-      }, 500);
+      toast.success("Profil enregistré avec succès");
+      
+      // Appeler onComplete pour revenir au dashboard
+      if (onComplete) {
+        onComplete();
+      }
     } catch (err) {
       console.error("Erreur sauvegarde profil:", err);
       toast.error("Erreur lors de la sauvegarde");
@@ -123,9 +116,14 @@ export default function ClientProfil({ onComplete, existingProfil }) {
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-md mx-auto space-y-4">
-        {/* Header */}
+        {/* Header avec bouton retour */}
         <div className="flex items-center gap-3 mb-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={onComplete}
+            type="button"
+          >
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
@@ -189,7 +187,11 @@ export default function ClientProfil({ onComplete, existingProfil }) {
               )}
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={loading || !formData.nom || !formData.prenom || !formData.telephone}
+            >
               <Save className="w-4 h-4 mr-2" />
               {loading ? "Enregistrement..." : "Enregistrer"}
             </Button>
