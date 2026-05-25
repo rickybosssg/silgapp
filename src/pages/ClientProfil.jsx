@@ -60,21 +60,13 @@ export default function ClientProfil({ onComplete, existingProfil }) {
 
   const handlePhoneChange = (e) => {
     const value = e.target.value;
-    // Autoriser uniquement les chiffres et espaces
-    if (value && !/[\d\s]/.test(value)) return;
-    
-    const formatted = formatPhone(value);
+    // Supprimer tout ce qui n'est pas chiffre (espaces automatiquement gérés par formatPhone)
+    const digitsOnly = value.replace(/\D/g, '');
+    const formatted = formatPhone(digitsOnly);
     setFormData({ ...formData, telephone: formatted });
     
-    // Validation en temps réel (nettoie les espaces avant validation)
-    const digits = cleanPhone(formatted);
-    if (digits.length > 0 && digits.length < 8) {
-      setPhoneError(""); // Pas d'erreur pendant la saisie
-    } else if (digits.length === 8) {
-      validatePhone(formatted);
-    } else {
-      setPhoneError("");
-    }
+    // Pas de validation en temps réel - seulement au moment de l'enregistrement
+    setPhoneError("");
   };
 
   const handleSubmit = async (e) => {
