@@ -1,0 +1,447 @@
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card } from "@/components/ui/card";
+import { 
+  ArrowLeft, 
+  ArrowRight, 
+  MapPin, 
+  Navigation, 
+  Package, 
+  User, 
+  FileText,
+  CheckCircle,
+  Smartphone,
+  Truck
+} from "lucide-react";
+
+export default function StepField({ 
+  step, 
+  totalSteps, 
+  formData, 
+  setFormData, 
+  onNext, 
+  onBack, 
+  isLoading 
+}) {
+  // Calcul de la progression
+  const progress = ((step + 1) / totalSteps) * 100;
+
+  const renderStep = () => {
+    switch (step) {
+      case 0: // Type de demande
+        return (
+          <div className="space-y-4">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                <Truck className="w-8 h-8 text-primary" />
+              </div>
+              <h2 className="text-xl font-bold text-foreground">Que souhaitez-vous faire ?</h2>
+              <p className="text-sm text-muted-foreground mt-1">Sélectionnez le type de course</p>
+            </div>
+            
+            <div className="grid gap-3">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, type_course: "expedier" })}
+                className={`p-5 rounded-2xl border-2 transition-all text-left ${
+                  formData.type_course === "expedier"
+                    ? "border-primary bg-primary/5"
+                    : "border-gray-200 hover:border-primary/50"
+                }`}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                    formData.type_course === "expedier" ? "bg-primary text-white" : "bg-gray-100"
+                  }`}>
+                    <Package className="w-5 h-5" />
+                  </div>
+                  <span className="font-bold text-foreground">Expédier un colis</span>
+                </div>
+                <p className="text-xs text-muted-foreground ml-13">
+                  Vous envoyez un colis à quelqu'un
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, type_course: "recevoir" })}
+                className={`p-5 rounded-2xl border-2 transition-all text-left ${
+                  formData.type_course === "recevoir"
+                    ? "border-accent bg-accent/5"
+                    : "border-gray-200 hover:border-accent/50"
+                }`}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                    formData.type_course === "recevoir" ? "bg-accent text-white" : "bg-gray-100"
+                  }`}>
+                    <Smartphone className="w-5 h-5" />
+                  </div>
+                  <span className="font-bold text-foreground">Recevoir un colis</span>
+                </div>
+                <p className="text-xs text-muted-foreground ml-13">
+                  On vous envoie un colis
+                </p>
+              </button>
+            </div>
+          </div>
+        );
+
+      case 1: // Lieu de récupération
+        return (
+          <div className="space-y-4">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                <MapPin className="w-8 h-8 text-primary" />
+              </div>
+              <h2 className="text-xl font-bold text-foreground">Où récupérer le colis ?</h2>
+              <p className="text-sm text-muted-foreground mt-1">Adresse ou quartier de départ</p>
+            </div>
+            
+            <div>
+              <Label>Adresse de récupération *</Label>
+              <Input
+                value={formData.adresse_depart}
+                onChange={(e) => setFormData({ ...formData, adresse_depart: e.target.value })}
+                placeholder="Quartier, rue, point de repère..."
+                className="h-12"
+                autoFocus
+              />
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={formData.onGetGPSDepart}
+            >
+              <Navigation className="w-4 h-4 mr-2" />
+              {formData.recuperationGPS ? "✓ Position GPS enregistrée" : "Utiliser ma position actuelle"}
+            </Button>
+          </div>
+        );
+
+      case 2: // Lieu de livraison
+        return (
+          <div className="space-y-4">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-3">
+                <MapPin className="w-8 h-8 text-accent" />
+              </div>
+              <h2 className="text-xl font-bold text-foreground">Où livrer le colis ?</h2>
+              <p className="text-sm text-muted-foreground mt-1">Adresse ou quartier d'arrivée</p>
+            </div>
+            
+            <div>
+              <Label>Adresse de livraison *</Label>
+              <Input
+                value={formData.adresse_arrivee}
+                onChange={(e) => setFormData({ ...formData, adresse_arrivee: e.target.value })}
+                placeholder="Quartier, rue, point de repère..."
+                className="h-12"
+                autoFocus
+              />
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={formData.onGetGPSArrivee}
+            >
+              <Navigation className="w-4 h-4 mr-2" />
+              {formData.livraisonGPS ? "✓ Position GPS enregistrée" : "Utiliser ma position actuelle"}
+            </Button>
+          </div>
+        );
+
+      case 3: // Contact de l'autre personne
+        return (
+          <div className="space-y-4">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 rounded-2xl bg-blue-100 flex items-center justify-center mx-auto mb-3">
+                <User className="w-8 h-8 text-blue-600" />
+              </div>
+              <h2 className="text-xl font-bold text-foreground">
+                {formData.type_course === "expedier" 
+                  ? "Qui reçoit le colis ?" 
+                  : "Qui envoie le colis ?"}
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {formData.type_course === "expedier" 
+                  ? "Informations du destinataire" 
+                  : "Informations de l'expéditeur"}
+              </p>
+            </div>
+            
+            <div>
+              <Label>Nom complet *</Label>
+              <Input
+                value={formData.type_course === "expedier" ? formData.destinataire_nom : formData.expediteur_nom}
+                onChange={(e) => setFormData({ 
+                  ...formData, 
+                  [formData.type_course === "expedier" ? "destinataire_nom" : "expediteur_nom"]: e.target.value 
+                })}
+                placeholder="Nom et prénom"
+                className="h-12"
+                autoFocus
+              />
+            </div>
+
+            <div>
+              <Label>Téléphone *</Label>
+              <Input
+                type="tel"
+                value={formData.type_course === "expedier" ? formData.destinataire_telephone : formData.expediteur_telephone}
+                onChange={(e) => setFormData({ 
+                  ...formData, 
+                  [formData.type_course === "expedier" ? "destinataire_telephone" : "expediteur_telephone"]: e.target.value 
+                })}
+                placeholder="+226 XX XX XX XX"
+                className="h-12"
+              />
+            </div>
+          </div>
+        );
+
+      case 4: // Type de colis
+        return (
+          <div className="space-y-4">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 rounded-2xl bg-purple-100 flex items-center justify-center mx-auto mb-3">
+                <Package className="w-8 h-8 text-purple-600" />
+              </div>
+              <h2 className="text-xl font-bold text-foreground">Quel type de colis ?</h2>
+              <p className="text-sm text-muted-foreground mt-1">Sélectionnez la catégorie</p>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { value: "petit_colis", label: "Petit colis", icon: "📦" },
+                { value: "moyen_colis", label: "Moyen colis", icon: "📦" },
+                { value: "gros_colis", label: "Gros colis", icon: "📦" },
+                { value: "document", label: "Document", icon: "📄" },
+                { value: "nourriture", label: "Nourriture", icon: "🍔" },
+                { value: "autre", label: "Autre", icon: "🎁" },
+              ].map((type) => (
+                <button
+                  key={type.value}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, type_colis: type.value })}
+                  className={`p-4 rounded-xl border-2 transition-all ${
+                    formData.type_colis === type.value
+                      ? "border-primary bg-primary/5"
+                      : "border-gray-200 hover:border-primary/50"
+                  }`}
+                >
+                  <div className="text-2xl mb-2">{type.icon}</div>
+                  <div className="text-sm font-medium text-foreground">{type.label}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 5: // Notes
+        return (
+          <div className="space-y-4">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 rounded-2xl bg-orange-100 flex items-center justify-center mx-auto mb-3">
+                <FileText className="w-8 h-8 text-orange-600" />
+              </div>
+              <h2 className="text-xl font-bold text-foreground">Instructions particulières ?</h2>
+              <p className="text-sm text-muted-foreground mt-1">Informations pour le livreur</p>
+            </div>
+            
+            <div>
+              <Textarea
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Point de repère, instructions, étage, code porte..."
+                rows={5}
+                className="resize-none"
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                Facultatif - Ajoutez des détails pour faciliter la livraison
+              </p>
+            </div>
+          </div>
+        );
+
+      case 6: // Résumé
+        return (
+          <div className="space-y-4">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 rounded-2xl bg-green-100 flex items-center justify-center mx-auto mb-3">
+                <CheckCircle className="w-8 h-8 text-green-600" />
+              </div>
+              <h2 className="text-xl font-bold text-foreground">Vérifiez les informations</h2>
+              <p className="text-sm text-muted-foreground mt-1">Récapitulatif de votre course</p>
+            </div>
+            
+            <Card className="p-4 space-y-3 bg-gradient-to-br from-white to-gray-50">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Truck className="w-4 h-4 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground uppercase font-semibold">Type</p>
+                  <p className="font-semibold text-foreground capitalize">
+                    {formData.type_course === "expedier" ? "Expédition" : "Réception"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-4 h-4 text-red-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground uppercase font-semibold">Récupération</p>
+                  <p className="font-medium text-foreground">{formData.adresse_depart}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-4 h-4 text-green-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground uppercase font-semibold">Livraison</p>
+                  <p className="font-medium text-foreground">{formData.adresse_arrivee}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                  <User className="w-4 h-4 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground uppercase font-semibold">Contact</p>
+                  <p className="font-medium text-foreground">
+                    {formData.type_course === "expedier" 
+                      ? `${formData.destinataire_nom} - ${formData.destinataire_telephone}`
+                      : `${formData.expediteur_nom} - ${formData.expediteur_telephone}`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+                  <Package className="w-4 h-4 text-purple-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground uppercase font-semibold">Colis</p>
+                  <p className="font-medium text-foreground capitalize">
+                    {formData.type_colis?.replace("_", " ")}
+                  </p>
+                </div>
+              </div>
+
+              {formData.notes && (
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
+                    <FileText className="w-4 h-4 text-orange-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs text-muted-foreground uppercase font-semibold">Notes</p>
+                    <p className="font-medium text-foreground text-sm">{formData.notes}</p>
+                  </div>
+                </div>
+              )}
+            </Card>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="w-full">
+      {/* Barre de progression */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-semibold text-muted-foreground">
+            Étape {step + 1} sur {totalSteps}
+          </span>
+          <span className="text-xs font-semibold text-primary">{Math.round(progress)}%</span>
+        </div>
+        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-gradient-to-r from-primary to-red-600 transition-all duration-300"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Contenu de l'étape */}
+      <div className="mb-6">
+        {renderStep()}
+      </div>
+
+      {/* Boutons de navigation */}
+      <div className="flex gap-3">
+        {step > 0 ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onBack}
+            className="flex-1 h-12"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Retour
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => window.history.back()}
+            className="flex-1 h-12"
+          >
+            Annuler
+          </Button>
+        )}
+        
+        {step < totalSteps - 1 ? (
+          <Button
+            type="button"
+            onClick={onNext}
+            disabled={
+              (step === 0 && !formData.type_course) ||
+              (step === 1 && !formData.adresse_depart) ||
+              (step === 2 && !formData.adresse_arrivee) ||
+              (step === 3 && !(formData.type_course === "expedier" ? formData.destinataire_telephone : formData.expediteur_telephone)) ||
+              (step === 4 && !formData.type_colis)
+            }
+            className="flex-1 h-12 bg-primary"
+          >
+            Continuer
+            <ArrowRight className="w-4 h-4 ml-2" />
+          </Button>
+        ) : (
+          <Button
+            type="submit"
+            disabled={isLoading || !formData.recuperationGPS || !formData.livraisonGPS}
+            className="flex-1 h-12 bg-gradient-to-r from-primary to-red-600"
+          >
+            {isLoading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                Création...
+              </>
+            ) : (
+              "Confirmer la course"
+            )}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
