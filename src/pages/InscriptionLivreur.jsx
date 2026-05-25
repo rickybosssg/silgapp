@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Truck, User, Phone, MapPin, Camera, CheckCircle2, Upload } from "lucide-react";
+import { Truck, User, Phone, MapPin, Camera, CheckCircle2, Upload, Building } from "lucide-react";
 import { toast } from "sonner";
 
 const defaultForm = {
@@ -15,6 +15,7 @@ const defaultForm = {
   quartier: "",
   photo_url: "",
   vehicule: "moto",
+  type_livreur: "externe",
 };
 
 export default function InscriptionLivreur() {
@@ -158,6 +159,46 @@ export default function InscriptionLivreur() {
                 />
               </div>
 
+            </CardContent>
+          </Card>
+
+          {/* Type de livreur */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Building className="w-4 h-4 text-primary" /> Type de livreur
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-2">
+                <Label className="text-xs">Je souhaite être :</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    className={`p-3 rounded-lg border-2 text-sm font-semibold transition-all ${
+                      form.type_livreur === "interne"
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-border text-muted-foreground hover:bg-muted"
+                    }`}
+                    onClick={() => setForm(p => ({ ...p, type_livreur: "interne" }))}
+                  >
+                    🏢 Livreur Interne
+                    <p className="text-xs font-normal text-muted-foreground mt-1">Silga officiel</p>
+                  </button>
+                  <button
+                    type="button"
+                    className={`p-3 rounded-lg border-2 text-sm font-semibold transition-all ${
+                      form.type_livreur === "externe"
+                        ? "border-accent bg-accent/5 text-accent"
+                        : "border-border text-muted-foreground hover:bg-muted"
+                    }`}
+                    onClick={() => setForm(p => ({ ...p, type_livreur: "externe" }))}
+                  >
+                    🤝 Livreur Externe
+                    <p className="text-xs font-normal text-muted-foreground mt-1">Partenaire libre</p>
+                  </button>
+                </div>
+              </div>
             </CardContent>
           </Card>
 

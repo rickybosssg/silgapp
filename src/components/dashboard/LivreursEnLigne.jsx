@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 export default function LivreursEnLigne({ livreurs = [], reseau = "interne" }) {
   const enLigne = livreurs.filter(l =>
-    l.validation === "valide" && l.actif !== false && l.statut !== "hors_ligne" && (l.reseau || "interne") === reseau
+    l.validation === "valide" && l.actif !== false && l.statut !== "hors_ligne" && (l.reseau || "interne") === reseau && (l.type_livreur || "interne") === "interne"
   );
 
   const disponibles = enLigne.filter(l => l.statut === "disponible");

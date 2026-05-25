@@ -30,7 +30,7 @@ export default function DashboardExterne() {
 
   const { data: livreurs = [] } = useQuery({
     queryKey: ["livreurs-externes"],
-    queryFn: () => base44.entities.Livreur.filter({ reseau: "externe" }),
+    queryFn: () => base44.entities.Livreur.filter({ reseau: "externe", type_livreur: "externe" }),
     initialData: [],
     refetchInterval: 15000,
   });

@@ -112,6 +112,8 @@ function CourseItem({ course, onAssign, onView }) {
 }
 
 export default function CoursesADispatcher({ courses, onAssign, onView, reseau = "interne" }) {
+  // Filtrer par type_livreur pour séparation stricte
+  const coursesFiltrees = courses.filter(c => !c.type_livreur || c.type_livreur === reseau);
   return (
     <Card className="p-0 overflow-hidden">
       <div className="px-4 pt-4 pb-3 border-b flex items-center justify-between">
@@ -125,12 +127,12 @@ export default function CoursesADispatcher({ courses, onAssign, onView, reseau =
         <p className="text-xs text-muted-foreground">Assignez manuellement ou envoyez en auto</p>
       </div>
       <div className="p-3 space-y-2 max-h-[400px] overflow-y-auto">
-        {courses.length === 0 ? (
+        {coursesFiltrees.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground text-sm">
             ✅ Aucune course en attente de dispatch
           </div>
         ) : (
-          courses.map(c => (
+          coursesFiltrees.map(c => (
             <CourseItem key={c.id} course={c} onAssign={onAssign} onView={onView} />
           ))
         )}

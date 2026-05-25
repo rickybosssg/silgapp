@@ -28,6 +28,7 @@ Deno.serve(async (req) => {
           quartier: livreur.quartier,
           telephone: livreur.telephone,
           vehicule: livreur.vehicule,
+          type_livreur: livreur.type_livreur,
         }
       });
     }
@@ -62,6 +63,7 @@ Deno.serve(async (req) => {
         quartier: livreur.quartier,
         telephone: livreur.telephone,
         vehicule: livreur.vehicule,
+        type_livreur: livreur.type_livreur,
       }
     });
 

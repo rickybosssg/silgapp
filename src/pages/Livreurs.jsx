@@ -288,11 +288,14 @@ export default function Livreurs() {
     onError: () => toast.error("Erreur lors de la génération des codes"),
   });
 
-  const enAttente = livreurs.filter(l => l.validation === "en_attente");
-  const valides = livreurs.filter(l => l.validation === "valide");
-  const refuses = livreurs.filter(l => l.validation === "refuse");
-  // Livreurs sans validation définie (données incomplètes) - on les traite comme en_attente pour ne pas les perdre
-  const sansValidation = livreurs.filter(l => !l.validation);
+  // Séparer par type_livreur
+  const internes = livreurs.filter(l => l.type_livreur === "interne");
+  const externes = livreurs.filter(l => l.type_livreur === "externe");
+  
+  const enAttente = internes.filter(l => l.validation === "en_attente");
+  const valides = internes.filter(l => l.validation === "valide");
+  const refuses = internes.filter(l => l.validation === "refuse");
+  const sansValidation = internes.filter(l => !l.validation);
 
   const disponibles = valides.filter(l => l.statut === "disponible");
   const enCourse = valides.filter(l => l.statut === "en_course");
@@ -309,7 +312,7 @@ export default function Livreurs() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Truck className="w-5 h-5 lg:w-6 lg:h-6 text-primary" />
-          <h1 className="text-xl lg:text-2xl font-bold">Livreurs</h1>
+          <h1 className="text-xl lg:text-2xl font-bold">Livreurs Internes</h1>
           {!isLoading && (
             <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
               {livreurs.length} total

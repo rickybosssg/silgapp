@@ -22,14 +22,14 @@ export default function Dashboard() {
 
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ["courses"],
-    queryFn: () => base44.entities.Course.list("-created_date", 300),
+    queryFn: () => base44.entities.Course.filter({ reseau: "interne" }, "-created_date", 300),
     initialData: [],
     refetchInterval: 10000,
   });
 
   const { data: livreurs = [] } = useQuery({
     queryKey: ["livreurs"],
-    queryFn: () => base44.entities.Livreur.list(),
+    queryFn: () => base44.entities.Livreur.filter({ type_livreur: "interne" }),
     initialData: [],
     refetchInterval: 15000,
   });

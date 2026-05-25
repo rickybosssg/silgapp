@@ -101,10 +101,13 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
     };
   }, [initialProfil?.id]);
 
-  // Courses
+  // Courses - filtrer par type_livreur pour séparation stricte
   const { data: mesCourses = [] } = useQuery({
     queryKey: ["mes-courses", livreurProfil?.id],
-    queryFn: () => base44.entities.Course.filter({ livreur_id: livreurProfil.id }, "-created_date", 50),
+    queryFn: () => base44.entities.Course.filter({ 
+      livreur_id: livreurProfil.id,
+      reseau: livreurProfil.type_livreur || "interne" 
+    }, "-created_date", 50),
     enabled: !!livreurProfil?.id,
     initialData: [],
     refetchInterval: 5000,

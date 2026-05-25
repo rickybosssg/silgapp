@@ -91,8 +91,9 @@ Deno.serve(async (req) => {
 
     if (action === 'getState') {
       const livreur = await requireLivreur();
+      // Filtrer les courses par reseau = type_livreur pour séparation stricte
       const courses = await base44.asServiceRole.entities.Course.filter(
-        { livreur_id: livreur.id },
+        { livreur_id: livreur.id, reseau: livreur.type_livreur || "interne" },
         '-created_date',
         50,
       );
