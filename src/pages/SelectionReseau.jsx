@@ -43,9 +43,11 @@ export default function SelectionReseau({ onSelect }) {
     <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-accent/10 flex items-center justify-center p-4">
       <div className="max-w-2xl w-full space-y-8">
         <div className="text-center space-y-4">
-          <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
-            <Truck className="w-10 h-10 text-primary" />
-          </div>
+          <img 
+            src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/4ec3bea34_generated_image.png" 
+            alt="Logo SILGAPP" 
+            className="w-32 h-32 object-contain mx-auto"
+          />
           <div>
             <h1 className="text-3xl font-bold text-foreground">SILGAPP</h1>
             <p className="text-muted-foreground mt-1">Sélectionnez votre espace de travail</p>

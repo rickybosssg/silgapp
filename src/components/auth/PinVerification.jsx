@@ -73,9 +73,11 @@ export default function PinVerification({ onVerify, onCancel, networkName }) {
       <div className="max-w-md w-full space-y-6">
         {/* Header */}
         <div className="text-center space-y-4">
-          <div className="w-20 h-20 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto">
-            <Shield className="w-10 h-10 text-accent" />
-          </div>
+          <img 
+            src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/4ec3bea34_generated_image.png" 
+            alt="Logo SILGAPP" 
+            className="w-32 h-32 object-contain mx-auto"
+          />
           <div>
             <h1 className="text-2xl font-bold text-foreground">Silga Externe</h1>
             <p className="text-muted-foreground mt-1">Accès sécurisé</p>
