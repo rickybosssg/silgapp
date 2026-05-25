@@ -517,7 +517,7 @@ export default function ClientExterneApp() {
                 className="h-auto py-3 flex flex-col gap-1.5 hover:bg-pink-50"
                 onClick={() => setShowVenusChat(true)}
               >
-                <Sparkles className="w-5 h-5 text-pink-600" />
+                <img src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/17cf522aa_file_0000000034b871f7bf133c0de0c9eb62.png" alt="VENUS" className="w-5 h-5 rounded-full object-cover" />
                 <span className="text-[10px] font-medium">VENUS</span>
               </Button>
             </div>

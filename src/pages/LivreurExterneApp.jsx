@@ -6,15 +6,17 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Truck, Navigation, MapPin, Phone, Package, DollarSign, Clock, LogOut, AlertCircle, CheckCircle2, QrCode, Hash } from "lucide-react";
+import { Truck, Navigation, MapPin, Phone, Package, DollarSign, Clock, LogOut, AlertCircle, CheckCircle2, QrCode, Hash, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import VenusChat from "@/components/client/VenusChat";
 
 export default function LivreurExterneApp({ livreurProfil }) {
   const queryClient = useQueryClient();
   const [gpsActif, setGpsActif] = useState(false);
   const [statut, setStatut] = useState(livreurProfil?.statut || "hors_ligne");
+  const [showVenusChat, setShowVenusChat] = useState(false);
 
   // Récupérer le profil livreur en temps réel
   const { data: livreur } = useQuery({
@@ -256,6 +258,15 @@ export default function LivreurExterneApp({ livreurProfil }) {
               <p className="text-xs text-muted-foreground">Livreur Externe</p>
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1 hover:bg-pink-50"
+                onClick={() => setShowVenusChat(true)}
+              >
+                <img src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/17cf522aa_file_0000000034b871f7bf133c0de0c9eb62.png" alt="VENUS" className="w-5 h-5 rounded-full object-cover" />
+                <span className="text-xs font-medium">VENUS</span>
+              </Button>
               <Badge variant={isEnLigne ? "default" : "secondary"}>
                 {isEnLigne ? "En ligne" : "Hors ligne"}
               </Badge>
@@ -500,6 +511,9 @@ export default function LivreurExterneApp({ livreurProfil }) {
           </div>
         )}
       </div>
+
+      {/* Chat VENUS */}
+      {showVenusChat && <VenusChat onClose={() => setShowVenusChat(false)} />}
     </div>
   );
 }
