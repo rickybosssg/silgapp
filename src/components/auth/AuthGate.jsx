@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 import { Truck } from "lucide-react";
 
@@ -7,47 +7,63 @@ import { Truck } from "lucide-react";
  * - admin (role === 'admin') → children (dashboard admin)
  * - livreur (email trouvé dans Livreur.user_email) → onLivreur(livreurProfil)
  * - sinon → "Compte non autorisé"
+ *
+ * Fix APK : après login, la page recharge avec ?access_token=xxx
+ * On vérifie aussi localStorage directement pour ne pas manquer le token.
  */
 export default function AuthGate({ children, onLivreur }) {
-  const [state, setState] = useState("loading"); // loading | admin | livreur | unauthorized | unauthenticated
-  const [livreurProfil, setLivreurProfil] = useState(null);
+  const [state, setState] = useState("loading");
+
+  const check = useCallback(async () => {
+    // Vérifier d'abord si un token est présent dans localStorage
+    // (cas APK : page rechargée avec ?access_token capturé dans main.jsx)
+    const storedToken = localStorage.getItem('base44_access_token');
+    const hasToken = storedToken && storedToken !== 'null' && storedToken !== 'undefined' && storedToken.length > 10;
+
+    const isAuth = await base44.auth.isAuthenticated();
+
+    if (!isAuth && !hasToken) {
+      setState("unauthenticated");
+      return;
+    }
+
+    // Si pas auth selon SDK mais token présent → recharger la page
+    // pour que base44Client soit réinitialisé avec le nouveau token
+    if (!isAuth && hasToken) {
+      window.location.reload();
+      return;
+    }
+
+    const user = await base44.auth.me();
+    if (!user) {
+      setState("unauthenticated");
+      return;
+    }
+
+    if (user.role === "admin") {
+      setState("admin");
+      return;
+    }
+
+    // Livreur check
+    const livreurs = await base44.entities.Livreur.filter({
+      user_email: user.email,
+      actif: true,
+      validation: "valide"
+    });
+
+    if (livreurs && livreurs.length > 0) {
+      onLivreur?.(livreurs[0]);
+      setState("livreur");
+      return;
+    }
+
+    setState("unauthorized");
+  }, [onLivreur]);
 
   useEffect(() => {
-    let mounted = true;
-    async function check() {
-      const isAuth = await base44.auth.isAuthenticated();
-      if (!isAuth) {
-        if (mounted) setState("unauthenticated");
-        return;
-      }
-      const user = await base44.auth.me();
-      if (!user) {
-        if (mounted) setState("unauthenticated");
-        return;
-      }
-
-      // Admin check
-      if (user.role === "admin") {
-        if (mounted) setState("admin");
-        return;
-      }
-
-      // Livreur check — cherche l'email dans les profils livreurs
-      const livreurs = await base44.entities.Livreur.filter({ user_email: user.email, actif: true, validation: "valide" });
-      if (livreurs && livreurs.length > 0) {
-        if (mounted) {
-          setLivreurProfil(livreurs[0]);
-          setState("livreur");
-          onLivreur?.(livreurs[0]);
-        }
-        return;
-      }
-
-      if (mounted) setState("unauthorized");
-    }
     check();
-    return () => { mounted = false; };
-  }, []);
+  }, [check]);
 
   if (state === "loading") {
     return (

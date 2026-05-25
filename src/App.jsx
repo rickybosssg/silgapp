@@ -5,7 +5,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { queryClientInstance } from '@/lib/query-client';
 import { Truck } from 'lucide-react';
 import PageNotFound from './lib/PageNotFound';
-import AuthGate from './components/auth/AuthGate';
+import AuthGate from './components/auth/AuthGate.jsx';
 
 const AppLayout = lazy(() => import('./components/layout/AppLayout'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
