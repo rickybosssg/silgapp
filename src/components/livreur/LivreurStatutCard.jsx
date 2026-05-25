@@ -57,7 +57,9 @@ export default function LivreurStatutCard({ statut, livreur, isExterne = false }
 
       {/* Bouton batterie faible - uniquement pour livreurs internes */}
       {!isExterne && (isDisponible || isEnCourse) && livreur && (
-        <BatterieFaibleButton livreur={livreur} />
+        <div className="pt-1">
+          <BatterieFaibleButton livreur={livreur} />
+        </div>
       )}
     </div>
   );
