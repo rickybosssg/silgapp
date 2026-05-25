@@ -1,10 +1,11 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { Toaster } from '@/components/ui/toaster';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { queryClientInstance } from '@/lib/query-client';
 import { Truck } from 'lucide-react';
 import PageNotFound from './lib/PageNotFound';
+import AuthGate from './components/auth/AuthGate';
 
 const AppLayout = lazy(() => import('./components/layout/AppLayout'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -32,29 +33,62 @@ const LoadingScreen = () => (
   </div>
 );
 
+function AdminRoutes() {
+  return (
+    <Routes>
+      <Route path="/inscription-livreur" element={<InscriptionLivreur />} />
+      <Route element={<AppLayout />}>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/nouvelle-course" element={<NouvelleCourse />} />
+        <Route path="/carte" element={<CarteLivreurs />} />
+        <Route path="/courses" element={<ToutesCourses />} />
+        <Route path="/livreurs" element={<Livreurs />} />
+        <Route path="/rapport" element={<RapportJour />} />
+        <Route path="/recapitulatif" element={<RecapitulatifAdmin />} />
+        <Route path="/notifications" element={<Notifications />} />
+      </Route>
+      <Route path="*" element={<PageNotFound />} />
+    </Routes>
+  );
+}
+
+function AppRouter() {
+  const [livreurProfil, setLivreurProfil] = useState(null);
+
+  // Si un profil livreur a été détecté, afficher directement LivreurApp
+  if (livreurProfil) {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <LivreurApp livreurProfil={livreurProfil} />
+      </Suspense>
+    );
+  }
+
+  return (
+    <Router>
+      <Suspense fallback={<LoadingScreen />}>
+        {/* La route inscription est publique */}
+        <Routes>
+          <Route path="/inscription-livreur" element={<InscriptionLivreur />} />
+          <Route
+            path="*"
+            element={
+              <AuthGate onLivreur={setLivreurProfil}>
+                <AdminRoutes />
+              </AuthGate>
+            }
+          />
+        </Routes>
+      </Suspense>
+      <Toaster />
+    </Router>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClientInstance}>
-      <Router>
-        <Suspense fallback={<LoadingScreen />}>
-          <Routes>
-            <Route path="/inscription-livreur" element={<InscriptionLivreur />} />
-            <Route path="/livreur" element={<LivreurApp />} />
-            <Route element={<AppLayout />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/nouvelle-course" element={<NouvelleCourse />} />
-              <Route path="/carte" element={<CarteLivreurs />} />
-              <Route path="/courses" element={<ToutesCourses />} />
-              <Route path="/livreurs" element={<Livreurs />} />
-              <Route path="/rapport" element={<RapportJour />} />
-              <Route path="/recapitulatif" element={<RecapitulatifAdmin />} />
-              <Route path="/notifications" element={<Notifications />} />
-            </Route>
-            <Route path="*" element={<PageNotFound />} />
-          </Routes>
-        </Suspense>
-        <Toaster />
-      </Router>
+      <AppRouter />
     </QueryClientProvider>
   );
 }

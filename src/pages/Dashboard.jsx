@@ -98,13 +98,7 @@ export default function Dashboard() {
               <span className="hidden sm:inline">Carte</span>
             </Button>
           </Link>
-          <Link to="/diagnostic-base44" className="flex-1 sm:flex-none">
-            <Button variant="outline" size="sm" className="w-full sm:w-auto gap-1.5">
-              <AlertTriangle className="w-4 h-4" /> 
-              <span className="hidden sm:inline">Diagnostic</span>
-              <span className="sm:hidden">Diag</span>
-            </Button>
-          </Link>
+
         </div>
       </div>
 
