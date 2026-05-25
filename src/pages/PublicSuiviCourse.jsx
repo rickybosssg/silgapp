@@ -14,10 +14,12 @@ import {
   Navigation,
   Download,
   Star,
-  Truck
+  Truck,
+  QrCode
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import QRCodeDisplay from "@/components/client/QRCodeDisplay";
 
 export default function PublicSuiviCourse({ token }) {
   const [course, setCourse] = useState(null);
@@ -261,6 +263,34 @@ export default function PublicSuiviCourse({ token }) {
               Position du livreur
             </h2>
             <div id="public-map" className="h-64 rounded-xl overflow-hidden" />
+          </Card>
+        )}
+
+        {/* QR Code de livraison - pour destinataire sans app */}
+        {course.livreur_id && 
+         course.type_course === "expedier" && 
+         !course.recipient_has_app && 
+         ["livreur_en_route", "colis_recupere", "en_livraison"].includes(course.statut) && (
+          <Card className="p-6 border-2 border-dashed border-primary/30 bg-blue-50">
+            <div className="flex items-center gap-2 mb-4">
+              <QrCode className="w-6 h-6 text-primary" />
+              <h2 className="font-bold text-lg text-primary">Code de réception</h2>
+            </div>
+            
+            <p className="text-sm text-muted-foreground mb-4">
+              Montrez ce QR code au livreur quand il arrivera pour confirmer la réception du colis
+            </p>
+            
+            <QRCodeDisplay course={course} type="delivery" />
+            
+            <div className="mt-4 bg-white rounded-lg p-3 border border-blue-200">
+              <p className="text-xs text-blue-800 font-semibold">
+                💡 Information
+              </p>
+              <p className="text-xs text-blue-700 mt-1">
+                Le livreur scannera ce code ou utilisera le code à 4 chiffres pour confirmer la livraison
+              </p>
+            </div>
           </Card>
         )}
 

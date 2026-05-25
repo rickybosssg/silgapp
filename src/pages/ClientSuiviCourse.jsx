@@ -4,10 +4,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Phone, Navigation, Package, CheckCircle2, Clock, User, Star } from "lucide-react";
+import { MapPin, Phone, Navigation, Package, CheckCircle2, Clock, User, Star, QrCode } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
+import QRCodeDisplay from "@/components/client/QRCodeDisplay";
 
 export default function ClientSuiviCourse() {
   const [maCourse, setMaCourse] = useState(null);
@@ -166,6 +167,21 @@ export default function ClientSuiviCourse() {
             </div>
           </div>
         </Card>
+
+        {/* QR Codes pour validation */}
+        {maCourse.livreur_id && ["livreur_en_route", "colis_recupere", "en_livraison"].includes(maCourse.statut) && (
+          <div className="space-y-4">
+            {/* QR Code de récupération - visible si colis pas encore récupéré */}
+            {maCourse.statut === "livreur_en_route" && (
+              <QRCodeDisplay course={maCourse} type="pickup" />
+            )}
+
+            {/* QR Code de livraison - visible si colis récupéré mais pas livré */}
+            {["colis_recupere", "en_livraison"].includes(maCourse.statut) && (
+              <QRCodeDisplay course={maCourse} type="delivery" />
+            )}
+          </div>
+        )}
 
         {/* Détails course */}
         <Card className="p-4">
