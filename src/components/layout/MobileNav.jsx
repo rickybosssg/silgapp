@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
@@ -7,7 +7,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useSilgappAuth } from "@/lib/silgappAuth";
+import { base44 } from "@/api/base44Client";
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
   { path: "/nouvelle-course", label: "Course", icon: Plus },
@@ -29,7 +29,9 @@ const allNavItems = [
 
 export default function MobileNav({ notificationCount = 0 }) {
   const location = useLocation();
-  const { logout, user } = useSilgappAuth();
+  const [user, setUser] = useState(null);
+  useEffect(() => { base44.auth.me().then(setUser).catch(() => null); }, []);
+  const logout = () => base44.auth.logout();
   const [showMenu, setShowMenu] = useState(false);
 
   return (
