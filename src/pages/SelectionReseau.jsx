@@ -3,14 +3,41 @@ import { base44 } from "@/api/base44Client";
 import { Truck, Building, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import PinVerification from "@/components/auth/PinVerification";
 
 export default function SelectionReseau({ onSelect }) {
   const [loading, setLoading] = useState(false);
+  const [showPinVerification, setShowPinVerification] = useState(false);
 
   const handleSelect = (reseau) => {
-    setLoading(true);
-    onSelect(reseau);
+    if (reseau === "externe") {
+      setShowPinVerification(true);
+    } else {
+      setLoading(true);
+      onSelect(reseau);
+    }
   };
+
+  const handlePinVerified = () => {
+    setLoading(true);
+    setShowPinVerification(false);
+    onSelect("externe");
+  };
+
+  const handlePinCancel = () => {
+    setShowPinVerification(false);
+    setLoading(false);
+  };
+
+  if (showPinVerification) {
+    return (
+      <PinVerification
+        onVerify={handlePinVerified}
+        onCancel={handlePinCancel}
+        networkName="externe"
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-accent/10 flex items-center justify-center p-4">
