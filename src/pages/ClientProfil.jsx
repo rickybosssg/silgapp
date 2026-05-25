@@ -8,19 +8,21 @@ import { Card } from "@/components/ui/card";
 import { User, Save, ArrowLeft, Phone } from "lucide-react";
 import { toast } from "sonner";
 
-// Formater le numéro de téléphone Burkina Faso
-const formatPhone = (value) => {
-  // Garder uniquement les chiffres
-  const digits = value.replace(/\D/g, '').slice(0, 8);
-  
-  // Formater avec espaces
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 4) return `${digits.slice(0, 2)} ${digits.slice(2)}`;
-  if (digits.length <= 6) return `${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4)}`;
-  return `${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4, 6)} ${digits.slice(6)}`;
+// Même logique que les livreurs - formatage automatique tous les 2 chiffres
+const handlePhoneFormatting = (raw) => {
+  let formatted = raw;
+  if (raw.startsWith("+226")) {
+    const local = raw.slice(4).replace(/(\d{2})(?=\d)/g, "$1 ").trim();
+    formatted = "+226 " + local;
+  } else if (raw.startsWith("+")) {
+    formatted = raw;
+  } else {
+    formatted = raw.replace(/(\d{2})(?=\d)/g, "$1 ").trim();
+  }
+  return formatted;
 };
 
-// Nettoyer le numéro pour la base de données (sans espaces)
+// Nettoyer le numéro pour la base de données (sans espaces, seulement chiffres)
 const cleanPhone = (value) => value.replace(/\D/g, '');
 
 export default function ClientProfil({ onComplete, existingProfil }) {
@@ -35,11 +37,10 @@ export default function ClientProfil({ onComplete, existingProfil }) {
 
   useEffect(() => {
     if (existingProfil) {
-      const phoneFormatted = formatPhone(existingProfil.telephone || "");
       setFormData({
         nom: existingProfil.nom || "",
         prenom: existingProfil.prenom || "",
-        telephone: phoneFormatted,
+        telephone: existingProfil.telephone || "",
       });
     }
   }, [existingProfil]);
@@ -60,12 +61,10 @@ export default function ClientProfil({ onComplete, existingProfil }) {
 
   const handlePhoneChange = (e) => {
     const value = e.target.value;
-    // Supprimer tout ce qui n'est pas chiffre (espaces automatiquement gérés par formatPhone)
-    const digitsOnly = value.replace(/\D/g, '');
-    const formatted = formatPhone(digitsOnly);
+    // Garder uniquement + et chiffres, puis formater
+    const raw = value.replace(/[^\d+]/g, "");
+    const formatted = handlePhoneFormatting(raw);
     setFormData({ ...formData, telephone: formatted });
-    
-    // Pas de validation en temps réel - seulement au moment de l'enregistrement
     setPhoneError("");
   };
 
@@ -174,20 +173,15 @@ export default function ClientProfil({ onComplete, existingProfil }) {
 
             <div className="space-y-2">
               <Label htmlFor="telephone">Numéro de téléphone</Label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="telephone"
-                  placeholder="66 66 66 66"
-                  type="tel"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={formData.telephone}
-                  onChange={handlePhoneChange}
-                  disabled={loading}
-                  className={`pl-10 ${phoneError ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
-                />
-              </div>
+              <Input
+                id="telephone"
+                placeholder="+226 70 00 00 00"
+                value={formData.telephone}
+                onChange={handlePhoneChange}
+                disabled={loading}
+                type="tel"
+                required
+              />
               {phoneError && (
                 <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
                   <span>⚠️</span> {phoneError}
