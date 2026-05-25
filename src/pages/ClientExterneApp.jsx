@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { 
   MapPin, Navigation, Phone, MessageCircle, User, Package, 
   Clock, History, HelpCircle, ChevronRight, TrendingUp, 
-  Shield, Zap, Star, Loader2, AlertCircle, Sparkles
+  Shield, Zap, Star, Loader2, AlertCircle, Sparkles, ArrowLeft
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -27,6 +27,7 @@ export default function ClientExterneApp() {
   const [livreursProches, setLivreursProches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
+  const [showMap, setShowMap] = useState(false);
 
   useEffect(() => {
     checkStatus();
@@ -333,49 +334,9 @@ export default function ClientExterneApp() {
             </div>
           </div>
 
-          {/* Carte moderne style Uber/Glovo */}
-          {!courseActive && gpsActive && position && (
-            <Card className="overflow-hidden border-0 shadow-xl">
-              <ModernMap 
-                position={position}
-                livreursProches={livreursProches}
-                courseActive={courseActive}
-              />
-            </Card>
-          )}
 
-          {/* Livreurs disponibles */}
-          {!courseActive && livreursProches.length > 0 && (
-            <Card className="p-4 border-l-4 border-l-green-500">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
-                  <User className="w-4 h-4 text-green-600" />
-                </div>
-                <div>
-                  <p className="font-semibold text-foreground">Livreurs disponibles</p>
-                  <p className="text-xs text-muted-foreground">Près de votre position</p>
-                </div>
-              </div>
-              <div className="flex gap-2 overflow-x-auto pb-2">
-                {livreursProches.map((livreur) => (
-                  <div key={livreur.id} className="flex-shrink-0 w-20 text-center">
-                    {livreur.photo_url ? (
-                      <img src={livreur.photo_url} alt={livreur.nom} className="w-14 h-14 rounded-full object-cover mx-auto mb-1 border-2 border-green-500" />
-                    ) : (
-                      <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-1">
-                        <User className="w-6 h-6 text-green-600" />
-                      </div>
-                    )}
-                    <p className="text-xs font-medium truncate">{livreur.nom?.split(" ")[0]}</p>
-                    <div className="flex items-center justify-center gap-0.5 text-[10px] text-green-600">
-                      <Star className="w-2.5 h-2.5 fill-green-600" />
-                      <span>4.8</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
+
+
 
           {/* Actions principales */}
           <div className="grid grid-cols-2 gap-3">
@@ -409,6 +370,22 @@ export default function ClientExterneApp() {
               </div>
             </Card>
           </div>
+
+          {/* Bouton Voir la carte - uniquement si course active */}
+          {courseActive && gpsActive && position && (
+            <Card className="p-4 cursor-pointer hover:shadow-lg transition-all" onClick={() => setShowMap(true)}>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <MapPin className="w-5 h-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-foreground">Voir le livreur en temps réel</p>
+                  <p className="text-xs text-muted-foreground">Carte interactive style Uber/Glovo</p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-muted-foreground" />
+              </div>
+            </Card>
+          )}
 
           {/* Raccourcis */}
           <Card className="p-4">
@@ -506,6 +483,28 @@ export default function ClientExterneApp() {
 
         </div>
       </div>
+
+      {/* Modale carte temps réel - uniquement si course active */}
+      {showMap && courseActive && gpsActive && position && (
+        <div className="fixed inset-0 z-50 bg-background">
+          <div className="flex items-center justify-between p-4 border-b bg-card">
+            <h2 className="text-lg font-bold text-foreground">Suivi en temps réel</h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowMap(false)}
+              className="h-10 w-10"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+          </div>
+          <ModernMap 
+            position={position}
+            livreursProches={livreursProches}
+            courseActive={courseActive}
+          />
+        </div>
+      )}
 
       {/* Bouton flottant VENUS */}
       <VenusFloatingButton />
