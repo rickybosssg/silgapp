@@ -17,11 +17,10 @@ export default function DispatchMonitor() {
   });
 
   const config = configs[0];
-  const isAuto = config?.mode === "automatique";
 
   // Timer compte à rebours
   useEffect(() => {
-    if (!config?.heure_sollicitation || !isAuto) {
+    if (!config?.heure_sollicitation || !config?.course_en_dispatch_id) {
       setTempsRestant(null);
       return;
     }
@@ -31,7 +30,7 @@ export default function DispatchMonitor() {
       setTempsRestant(Math.round(restant));
     }, 1000);
     return () => clearInterval(interval);
-  }, [config?.heure_sollicitation, isAuto, config?.timeout_secondes]);
+  }, [config?.heure_sollicitation, config?.course_en_dispatch_id, config?.timeout_secondes]);
 
   const tickMutation = useMutation({
     mutationFn: () => base44.functions.invoke("dispatchMoteur", { action: "tick" }),
@@ -39,16 +38,17 @@ export default function DispatchMonitor() {
     onError: (e) => toast.error("Erreur moteur: " + e.message),
   });
 
-  // Tick automatique toutes les 8s si mode auto
+  const hasActiveCourse = !!config?.course_en_dispatch_id;
+
+  // Tick automatique toutes les 8s si une course est en dispatch automatique
   useEffect(() => {
-    if (!isAuto) return;
-    // Tick immédiat au démarrage
+    if (!hasActiveCourse) return;
     tickMutation.mutate();
     const interval = setInterval(() => tickMutation.mutate(), 8000);
     return () => clearInterval(interval);
-  }, [isAuto]);
+  }, [hasActiveCourse]);
 
-  if (!isAuto) return null;
+  if (!config?.course_en_dispatch_id) return null;
 
   return (
     <div className="bg-pink-50 border border-pink-200 rounded-2xl p-4 space-y-3">

@@ -79,6 +79,28 @@
       "default": "nouvelle",
       "description": "Statut de la course"
     },
+    "dispatch_mode": {
+      "type": "string",
+      "enum": [
+        "manuel",
+        "automatique"
+      ],
+      "default": "manuel",
+      "description": "Mode de dispatch choisi par l'admin"
+    },
+    "dispatch_status": {
+      "type": "string",
+      "enum": [
+        "en_attente_admin",
+        "recherche_livreur",
+        "propose",
+        "accepte",
+        "expire",
+        "assigne_manuel"
+      ],
+      "default": "en_attente_admin",
+      "description": "Statut d\u00e9taill\u00e9 du dispatch"
+    },
     "livreur_id": {
       "type": "string",
       "description": "ID du livreur assign\u00e9"

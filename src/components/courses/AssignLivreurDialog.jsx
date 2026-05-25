@@ -37,6 +37,8 @@ export default function AssignLivreurDialog({ course, open, onClose }) {
         livreur_id: livreur.id,
         livreur_nom: livreur.nom,
         statut: "en_attente_livreur",
+        dispatch_mode: "manuel",
+        dispatch_status: "assigne_manuel",
       });
 
       const notificationEmail = livreur.user_email;

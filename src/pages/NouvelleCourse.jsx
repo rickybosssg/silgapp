@@ -27,6 +27,8 @@ const defaultForm = {
   urgence: "normale",
   notes: "",
   statut: "nouvelle",
+  dispatch_mode: "manuel",
+  dispatch_status: "en_attente_admin",
 };
 
 const typeColis = [
