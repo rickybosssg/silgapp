@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Truck, Phone, MapPin, Check, X, Clock, UserCheck, Copy, Banknote, Pencil, UserX, Trash2, BatteryWarning, KeyRound } from "lucide-react";
 import CreateLivreurDialog from "@/components/livreurs/CreateLivreurDialog";
+import LivreurFormDialog from "@/components/livreurs/LivreurFormDialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -477,7 +478,12 @@ export default function Livreurs() {
         </div>
       )}
 
-
+      {/* Dialog modification livreur */}
+      <LivreurFormDialog
+        open={showForm}
+        onClose={() => { setShowForm(false); setEditingLivreur(null); }}
+        livreur={editingLivreur}
+      />
     </div>
   );
 }
