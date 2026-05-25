@@ -85,13 +85,8 @@ function MapView({ livreurs, coursesActives, onSelectLivreur }) {
         html: `
           <div style="position:relative;width:44px;height:44px;">
             ${isActive ? `<div style="position:absolute;inset:0;border-radius:50%;background:${color};opacity:0.25;animation:ping 1.5s cubic-bezier(0,0,0.2,1) infinite;"></div>` : ""}
-            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:36px;height:36px;border-radius:50%;background:#0f172a;border:3px solid ${color};box-shadow:0 0 0 1px rgba(0,0,0,0.3),0 4px 16px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="1" y="3" width="15" height="13"></rect>
-                <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
-                <circle cx="5.5" cy="18.5" r="2.5"></circle>
-                <circle cx="18.5" cy="18.5" r="2.5"></circle>
-              </svg>
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:36px;height:36px;border-radius:50%;background:#0f172a;border:3px solid ${color};box-shadow:0 0 0 1px rgba(0,0,0,0.3),0 4px 16px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1;">
+              🛵
             </div>
           </div>`,
         iconSize: [44, 44],
@@ -225,8 +220,8 @@ export default function CarteLivreurs() {
                   {livreur.photo_url ? (
                     <img src={livreur.photo_url} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
                   ) : (
-                    <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0">
-                      <Truck className="w-4 h-4 text-slate-400" />
+                    <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0 text-lg">
+                      🛵
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
