@@ -102,6 +102,33 @@
       "default": "moto",
       "description": "Type de v\u00e9hicule"
     },
+    "type_vehicule": {
+      "type": "string",
+      "enum": [
+        "moto",
+        "velo",
+        "voiture",
+        "a_pied"
+      ],
+      "default": "moto",
+      "description": "Type de v\u00e9hicule"
+    },
+    "numero_plaque": {
+      "type": "string",
+      "description": "Num\u00e9ro de plaque de la moto"
+    },
+    "photo_cnib_recto_url": {
+      "type": "string",
+      "description": "Photo CNIB recto"
+    },
+    "photo_cnib_verso_url": {
+      "type": "string",
+      "description": "Photo CNIB verso"
+    },
+    "photo_moto_url": {
+      "type": "string",
+      "description": "Photo de la moto"
+    },
     "statut_paiement": {
       "type": "string",
       "enum": [
@@ -137,6 +164,11 @@
       "type": "string",
       "format": "date-time",
       "description": "Derni\u00e8re activit\u00e9 dans l'application (heartbeat)"
+    },
+    "montant_du_silga": {
+      "type": "number",
+      "default": 0,
+      "description": "Montant total d\u00fb \u00e0 Silga (commission 30% cumul\u00e9e)"
     }
   },
   "required": [

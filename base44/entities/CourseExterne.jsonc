@@ -1,0 +1,158 @@
+{
+  "name": "CourseExterne",
+  "type": "object",
+  "properties": {
+    "client_nom": {
+      "type": "string",
+      "description": "Nom du client"
+    },
+    "client_telephone": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone du client"
+    },
+    "type_course": {
+      "type": "string",
+      "enum": [
+        "expedier",
+        "recevoir"
+      ],
+      "description": "Type de course : exp\u00e9dier ou recevoir un colis"
+    },
+    "adresse_depart": {
+      "type": "string",
+      "description": "Adresse ou quartier de r\u00e9cup\u00e9ration"
+    },
+    "adresse_arrivee": {
+      "type": "string",
+      "description": "Adresse ou quartier de livraison"
+    },
+    "gps_depart_lat": {
+      "type": "number",
+      "description": "Latitude du point de d\u00e9part"
+    },
+    "gps_depart_lng": {
+      "type": "number",
+      "description": "Longitude du point de d\u00e9part"
+    },
+    "gps_arrivee_lat": {
+      "type": "number",
+      "description": "Latitude du point d'arriv\u00e9e"
+    },
+    "gps_arrivee_lng": {
+      "type": "number",
+      "description": "Longitude du point d'arriv\u00e9e"
+    },
+    "type_colis": {
+      "type": "string",
+      "enum": [
+        "petit_colis",
+        "moyen_colis",
+        "gros_colis",
+        "document",
+        "nourriture",
+        "autre"
+      ],
+      "description": "Type de colis"
+    },
+    "prix_estimate": {
+      "type": "number",
+      "description": "Prix estim\u00e9 (\u00e0 titre indicatif)"
+    },
+    "prix_final": {
+      "type": "number",
+      "description": "Prix final calcul\u00e9 apr\u00e8s livraison (distance r\u00e9elle \u00d7 100F)"
+    },
+    "distance_reelle_km": {
+      "type": "number",
+      "description": "Distance r\u00e9ellement parcourue en km (GPS entre r\u00e9cup\u00e9ration et livraison)"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "nouvelle",
+        "recherche_livreur",
+        "livreur_en_route",
+        "colis_recupere",
+        "en_livraison",
+        "livree",
+        "annulee"
+      ],
+      "default": "nouvelle",
+      "description": "Statut de la course"
+    },
+    "livreur_id": {
+      "type": "string",
+      "description": "ID du livreur assign\u00e9"
+    },
+    "livreur_nom": {
+      "type": "string",
+      "description": "Nom du livreur assign\u00e9"
+    },
+    "livreur_photo_url": {
+      "type": "string",
+      "description": "Photo du livreur"
+    },
+    "livreur_telephone": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone du livreur"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notes suppl\u00e9mentaires"
+    },
+    "heure_acceptation": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure d'acceptation par le livreur"
+    },
+    "heure_recuperation": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure de r\u00e9cup\u00e9ration du colis"
+    },
+    "heure_livraison": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure de livraison effective"
+    },
+    "latitude_recuperation": {
+      "type": "number",
+      "description": "Latitude au moment de 'Colis r\u00e9cup\u00e9r\u00e9'"
+    },
+    "longitude_recuperation": {
+      "type": "number",
+      "description": "Longitude au moment de 'Colis r\u00e9cup\u00e9r\u00e9'"
+    },
+    "latitude_livraison": {
+      "type": "number",
+      "description": "Latitude au moment de 'Colis livr\u00e9'"
+    },
+    "longitude_livraison": {
+      "type": "number",
+      "description": "Longitude au moment de 'Colis livr\u00e9'"
+    },
+    "commission_silga": {
+      "type": "number",
+      "description": "Commission Silga (30% du prix final)"
+    },
+    "montant_livreur": {
+      "type": "number",
+      "description": "Montant net pour le livreur (70% du prix final)"
+    },
+    "statut_paiement_livreur": {
+      "type": "string",
+      "enum": [
+        "non_paye",
+        "paye"
+      ],
+      "default": "non_paye",
+      "description": "Statut du paiement du livreur \u00e0 Silga"
+    }
+  },
+  "required": [
+    "client_telephone",
+    "type_course",
+    "adresse_depart",
+    "adresse_arrivee"
+  ]
+}

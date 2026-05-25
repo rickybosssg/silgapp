@@ -60,7 +60,17 @@ export default function AuthGate({ children, onLivreur }) {
       if (!mounted) return;
 
       if (livreurs && livreurs.length > 0) {
-        onLivreur?.(livreurs[0]);
+        const livreur = livreurs[0];
+        // Router selon type_livreur
+        if (livreur.type_livreur === "externe") {
+          // Import dynamique pour éviter chargement inutile
+          import("@/pages/LivreurExterneApp.jsx").then(module => {
+            const LivreurExterneApp = module.default;
+            onLivreur?.({ ...livreur, component: LivreurExterneApp });
+          });
+        } else {
+          onLivreur?.(livreur);
+        }
         setState("livreur");
         return;
       }

@@ -16,6 +16,11 @@ const defaultForm = {
   photo_url: "",
   vehicule: "moto",
   type_livreur: "externe",
+  type_vehicule: "moto",
+  numero_plaque: "",
+  photo_cnib_recto_url: "",
+  photo_cnib_verso_url: "",
+  photo_moto_url: "",
 };
 
 export default function InscriptionLivreur() {
@@ -34,15 +39,15 @@ export default function InscriptionLivreur() {
     },
   });
 
-  const handlePhoto = async (e) => {
+  const handlePhoto = async (e, fieldName) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingPhoto(true);
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      setForm(p => ({ ...p, photo_url: file_url }));
+      setForm(p => ({ ...p, [fieldName]: file_url }));
     } catch (err) {
-      toast.error("Erreur lors de l'envoi de la photo");
+      toast.error("Erreur lors de l'envoi du document");
     } finally {
       setUploadingPhoto(false);
     }
@@ -163,46 +168,36 @@ export default function InscriptionLivreur() {
           </Card>
 
           {/* Type de livreur */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Building className="w-4 h-4 text-primary" /> Type de livreur
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="space-y-2">
-                <Label className="text-xs">Je souhaite être :</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    className={`p-3 rounded-lg border-2 text-sm font-semibold transition-all ${
-                      form.type_livreur === "interne"
-                        ? "border-primary bg-primary/5 text-primary"
-                        : "border-border text-muted-foreground hover:bg-muted"
-                    }`}
-                    onClick={() => setForm(p => ({ ...p, type_livreur: "interne" }))}
-                  >
-                    🏢 Livreur Interne
-                    <p className="text-xs font-normal text-muted-foreground mt-1">Silga officiel</p>
-                  </button>
-                  <button
-                    type="button"
-                    className={`p-3 rounded-lg border-2 text-sm font-semibold transition-all ${
-                      form.type_livreur === "externe"
-                        ? "border-accent bg-accent/5 text-accent"
-                        : "border-border text-muted-foreground hover:bg-muted"
-                    }`}
-                    onClick={() => setForm(p => ({ ...p, type_livreur: "externe" }))}
-                  >
-                    🤝 Livreur Externe
-                    <p className="text-xs font-normal text-muted-foreground mt-1">Partenaire libre</p>
-                  </button>
+          {form.type_livreur === "externe" && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Building className="w-4 h-4 text-primary" /> Documents requis (Externe)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Pour les livreurs externes, veuillez fournir les documents suivants :
+                </p>
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold">✓</div>
+                    <span>Photo CNIB (recto/verso)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold">✓</div>
+                    <span>Photo de la moto</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold">✓</div>
+                    <span>Numéro de plaque (optionnel)</span>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
-          {/* Photo */}
+          {/* Photo profil */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -219,15 +214,74 @@ export default function InscriptionLivreur() {
                   </div>
                 )}
                 <label className="cursor-pointer">
-                  <input type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhoto(e, "photo_url")} />
                   <div className="flex items-center gap-2 text-sm border border-border rounded-lg px-3 py-2 hover:bg-muted transition-colors">
                     <Upload className="w-4 h-4" />
-                    {uploadingPhoto ? "Envoi..." : form.photo_url ? "Changer" : "Ajouter une photo"}
+                    {uploadingPhoto ? "Envoi..." : form.photo_url ? "Changer" : "Ajouter"}
                   </div>
                 </label>
               </div>
             </CardContent>
           </Card>
+
+          {/* Documents pour externes */}
+          {form.type_livreur === "externe" && (
+            <>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold">CNIB (Recto)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <label className="cursor-pointer">
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhoto(e, "photo_cnib_recto_url")} />
+                    <div className="flex items-center gap-2 text-sm border border-border rounded-lg px-3 py-2 hover:bg-muted transition-colors">
+                      <Upload className="w-4 h-4" />
+                      {form.photo_cnib_recto_url ? "✓ Photo ajoutée" : "Télécharger recto CNIB"}
+                    </div>
+                  </label>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold">CNIB (Verso)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <label className="cursor-pointer">
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhoto(e, "photo_cnib_verso_url")} />
+                    <div className="flex items-center gap-2 text-sm border border-border rounded-lg px-3 py-2 hover:bg-muted transition-colors">
+                      <Upload className="w-4 h-4" />
+                      {form.photo_cnib_verso_url ? "✓ Photo ajoutée" : "Télécharger verso CNIB"}
+                    </div>
+                  </label>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold">Photo de la moto</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <label className="cursor-pointer">
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhoto(e, "photo_moto_url")} />
+                    <div className="flex items-center gap-2 text-sm border border-border rounded-lg px-3 py-2 hover:bg-muted transition-colors">
+                      <Upload className="w-4 h-4" />
+                      {form.photo_moto_url ? "✓ Photo ajoutée" : "Télécharger photo moto"}
+                    </div>
+                  </label>
+                </CardContent>
+              </Card>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">Numéro de plaque (optionnel)</Label>
+                <Input
+                  placeholder="Ex: AA 123 BB"
+                  value={form.numero_plaque}
+                  onChange={(e) => setForm(p => ({ ...p, numero_plaque: e.target.value }))}
+                />
+              </div>
+            </>
+          )}
 
           <Button
             type="submit"

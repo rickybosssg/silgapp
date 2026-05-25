@@ -25,6 +25,10 @@ const Notifications = lazy(() => import('./pages/Notifications'));
 const RecapitulatifAdmin = lazy(() => import('./pages/RecapitulatifAdmin'));
 const LivreurApp = lazy(() => import('./pages/LivreurApp.jsx'));
 const InscriptionLivreur = lazy(() => import('./pages/InscriptionLivreur'));
+const ClientExterneApp = lazy(() => import('./pages/ClientExterneApp.jsx'));
+const CourseExterneForm = lazy(() => import('./pages/CourseExterneForm.jsx'));
+const ClientSuiviCourse = lazy(() => import('./pages/ClientSuiviCourse.jsx'));
+const DashboardAdminExterne = lazy(() => import('./pages/DashboardAdminExterne.jsx'));
 
 const LoadingScreen = () => (
   <div className="fixed inset-0 flex items-center justify-center bg-background">
@@ -63,6 +67,7 @@ function AdminRoutes() {
         {reseau === "interne" ? (
           <>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/admin/externe" element={<DashboardAdminExterne />} />
             <Route path="/nouvelle-course" element={<NouvelleCourse />} />
             <Route path="/carte" element={<CarteLivreurs />} />
             <Route path="/courses" element={<ToutesCourses />} />
@@ -82,6 +87,12 @@ function AdminRoutes() {
           </>
         )}
         <Route path="/notifications" element={<Notifications />} />
+        {/* Routes Silga Externe */}
+        <Route path="/client" element={<ClientExterneApp />} />
+        <Route path="/client/course/expedier" element={<CourseExterneForm />} />
+        <Route path="/client/course/recevoir" element={<CourseExterneForm />} />
+        <Route path="/client/suivi" element={<ClientSuiviCourse />} />
+        <Route path="/admin/externe" element={<DashboardAdminExterne />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
@@ -91,8 +102,21 @@ function AdminRoutes() {
 function AppRouter() {
   const [livreurProfil, setLivreurProfil] = useState(null);
 
-  // Si un profil livreur a été détecté, afficher directement LivreurApp
+  // Si un profil livreur a été détecté, afficher directement l'app appropriée
   if (livreurProfil) {
+    // Livreur externe ?
+    if (livreurProfil.type_livreur === "externe" || livreurProfil.component) {
+      return (
+        <Suspense fallback={<LoadingScreen />}>
+          {livreurProfil.component ? (
+            <livreurProfil.component livreurProfil={livreurProfil} />
+          ) : (
+            <LivreurApp livreurProfil={livreurProfil} />
+          )}
+        </Suspense>
+      );
+    }
+    // Livreur interne
     return (
       <Suspense fallback={<LoadingScreen />}>
         <LivreurApp livreurProfil={livreurProfil} />

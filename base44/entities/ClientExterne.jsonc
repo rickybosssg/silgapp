@@ -1,0 +1,43 @@
+{
+  "name": "ClientExterne",
+  "type": "object",
+  "properties": {
+    "nom": {
+      "type": "string",
+      "description": "Nom complet du client"
+    },
+    "telephone": {
+      "type": "string",
+      "description": "Num\u00e9ro de t\u00e9l\u00e9phone"
+    },
+    "email": {
+      "type": "string",
+      "description": "Adresse email"
+    },
+    "quartier": {
+      "type": "string",
+      "description": "Quartier de r\u00e9sidence"
+    },
+    "latitude": {
+      "type": "number",
+      "description": "Latitude actuelle"
+    },
+    "longitude": {
+      "type": "number",
+      "description": "Longitude actuelle"
+    },
+    "actif": {
+      "type": "boolean",
+      "default": true,
+      "description": "Compte actif ou bloqu\u00e9"
+    },
+    "user_email": {
+      "type": "string",
+      "description": "Email du compte utilisateur li\u00e9"
+    }
+  },
+  "required": [
+    "nom",
+    "telephone"
+  ]
+}
