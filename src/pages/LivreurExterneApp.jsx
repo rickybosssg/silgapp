@@ -4,7 +4,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Truck, Navigation, MapPin, Phone, Package, DollarSign, Clock, LogOut, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Truck, Navigation, MapPin, Phone, Package, DollarSign, Clock, LogOut, AlertCircle, CheckCircle2, QrCode, Hash } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -114,52 +116,113 @@ export default function LivreurExterneApp({ livreurProfil }) {
     toast("Course refusée");
   };
 
+  // États pour validation QR/manual
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [validationType, setValidationType] = useState(null); // 'pickup' ou 'delivery'
+  const [validationMode, setValidationMode] = useState('qr'); // 'qr' ou 'manual'
+  const [manualCode, setManualCode] = useState('');
+  const [scanning, setScanning] = useState(false);
+
   const handleColisRecupere = (course) => {
-    if (!navigator.geolocation) {
-      toast.error("GPS non disponible");
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        updateCourseMutation.mutate({
-          id: course.id,
-          data: {
-            statut: "en_livraison",
-            heure_recuperation: new Date().toISOString(),
-            latitude_recuperation: pos.coords.latitude,
-            longitude_recuperation: pos.coords.longitude,
-          },
-        });
-        toast.success("Colis récupéré ! En route vers la livraison");
-      },
-      () => toast.error("GPS non disponible")
-    );
+    setValidationType('pickup');
+    setValidationMode('qr');
+    setManualCode('');
+    setShowValidationModal(true);
   };
 
   const handleColisLivre = (course) => {
-    if (!navigator.geolocation) {
-      toast.error("GPS non disponible");
+    setValidationType('delivery');
+    setValidationMode('qr');
+    setManualCode('');
+    setShowValidationModal(true);
+  };
+
+  const handleGetGPS = () => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("GPS non disponible"));
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+        () => reject(new Error("GPS non disponible"))
+      );
+    });
+  };
+
+  const handleValidateQR = async () => {
+    if (!courseEnCours) return;
+
+    try {
+      const gps = await handleGetGPS();
+      
+      const action = validationType === 'pickup' ? 'validate_pickup_qr' : 'validate_delivery_qr';
+      
+      const result = await base44.functions.invoke("validateQRCode", {
+        course_id: courseEnCours.id,
+        action,
+        qr_token: manualCode, // Le token QR scanné
+        livreur_id: livreur.id,
+        latitude: gps.latitude,
+        longitude: gps.longitude,
+      });
+
+      if (result.success) {
+        toast.success(result.message);
+        setShowValidationModal(false);
+        
+        if (validationType === 'delivery') {
+          setStatut("disponible");
+          statutMutation.mutate("disponible");
+        }
+        
+        queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      }
+    } catch (err) {
+      toast.error(err.message || "Erreur de validation");
+    }
+  };
+
+  const handleValidateManual = async () => {
+    if (!courseEnCours || manualCode.length !== 4) {
+      toast.error("Code à 4 chiffres requis");
       return;
     }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        updateCourseMutation.mutate({
-          id: course.id,
-          data: {
-            statut: "livree",
-            heure_livraison: new Date().toISOString(),
-            latitude_livraison: pos.coords.latitude,
-            longitude_livraison: pos.coords.longitude,
-          },
-        });
-        // Appel fonction pour calcul prix final
-        base44.functions.invoke("calculPrixCourseExterne", { course_id: course.id });
-        setStatut("disponible");
-        statutMutation.mutate("disponible");
-        toast.success("Course livrée ! Prix calculé automatiquement");
-      },
-      () => toast.error("GPS non disponible")
-    );
+
+    try {
+      const gps = await handleGetGPS();
+      
+      const action = validationType === 'pickup' ? 'validate_pickup_manual' : 'validate_delivery_manual';
+      
+      const result = await base44.functions.invoke("validateQRCode", {
+        course_id: courseEnCours.id,
+        action,
+        code_4_digits: manualCode,
+        livreur_id: livreur.id,
+        latitude: gps.latitude,
+        longitude: gps.longitude,
+      });
+
+      if (result.success) {
+        toast.success(result.message);
+        setShowValidationModal(false);
+        
+        if (validationType === 'delivery') {
+          setStatut("disponible");
+          statutMutation.mutate("disponible");
+        }
+        
+        queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      }
+    } catch (err) {
+      toast.error(err.message || "Erreur de validation");
+    }
+  };
+
+  const handleSimulateScan = () => {
+    // Simulation : le livreur entre manuellement le code QR token
+    toast.info("Pour tester, utilisez le mode 'Code manuel' et entrez le code à 4 chiffres affiché chez le client");
+    setValidationMode('manual');
   };
 
   const handleLogout = () => {
@@ -284,8 +347,8 @@ export default function LivreurExterneApp({ livreurProfil }) {
                     className="flex-1 bg-primary"
                     onClick={() => handleColisRecupere(courseEnCours)}
                   >
-                    <Package className="w-3 h-3 mr-2" />
-                    Colis récupéré
+                    <QrCode className="w-3 h-3 mr-2" />
+                    Scanner / Valider
                   </Button>
                 )}
                 {courseEnCours.statut === "en_livraison" && (
@@ -293,8 +356,8 @@ export default function LivreurExterneApp({ livreurProfil }) {
                     className="flex-1 bg-green-600 hover:bg-green-700"
                     onClick={() => handleColisLivre(courseEnCours)}
                   >
-                    <CheckCircle2 className="w-3 h-3 mr-2" />
-                    Colis livré
+                    <QrCode className="w-3 h-3 mr-2" />
+                    Scanner / Valider
                   </Button>
                 )}
               </div>
@@ -334,6 +397,108 @@ export default function LivreurExterneApp({ livreurProfil }) {
             ))}
           </div>
         </Card>
+
+        {/* Modal de validation QR/Code */}
+        {showValidationModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <Card className="w-full max-w-md p-6 bg-white">
+              <div className="flex items-center gap-2 mb-4">
+                {validationMode === 'qr' ? (
+                  <>
+                    <QrCode className="w-6 h-6 text-primary" />
+                    <h3 className="font-bold text-lg">
+                      {validationType === 'pickup' ? 'Scanner code récupération' : 'Scanner code livraison'}
+                    </h3>
+                  </>
+                ) : (
+                  <>
+                    <Hash className="w-6 h-6 text-primary" />
+                    <h3 className="font-bold text-lg">
+                      {validationType === 'pickup' ? 'Code récupération' : 'Code livraison'}
+                    </h3>
+                  </>
+                )}
+              </div>
+
+              {validationMode === 'qr' ? (
+                <div className="space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-sm text-blue-900 font-semibold mb-2">
+                      Mode scan QR code
+                    </p>
+                    <p className="text-xs text-blue-700">
+                      Demandez au client de vous montrer son QR code. 
+                      Si la caméra ne fonctionne pas, utilisez le code manuel.
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button 
+                      className="flex-1" 
+                      onClick={handleSimulateScan}
+                    >
+                      <QrCode className="w-4 h-4 mr-2" />
+                      Scanner QR
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setValidationMode('manual')}
+                    >
+                      Code manuel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-sm font-semibold">
+                      Code à 4 chiffres
+                    </Label>
+                    <Input
+                      type="text"
+                      maxLength={4}
+                      value={manualCode}
+                      onChange={(e) => setManualCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      placeholder="0000"
+                      className="text-2xl text-center tracking-widest h-16"
+                      autoFocus
+                    />
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Demandez au client le code affiché sur son écran
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button 
+                      className="flex-1" 
+                      onClick={handleValidateManual}
+                      disabled={manualCode.length !== 4}
+                    >
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                      Valider
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setValidationMode('qr')}
+                    >
+                      Retour QR
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-4 pt-4 border-t">
+                <Button 
+                  variant="ghost" 
+                  className="w-full" 
+                  onClick={() => setShowValidationModal(false)}
+                >
+                  Annuler
+                </Button>
+              </div>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );

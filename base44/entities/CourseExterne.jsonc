@@ -221,6 +221,50 @@
       "type": "number",
       "default": 0,
       "description": "Nombre de fois o\u00f9 le lien a \u00e9t\u00e9 ouvert"
+    },
+    "pickup_qr_token": {
+      "type": "string",
+      "description": "Token unique pour QR code de r\u00e9cup\u00e9ration"
+    },
+    "pickup_code_4_digits": {
+      "type": "string",
+      "description": "Code \u00e0 4 chiffres pour validation manuelle de r\u00e9cup\u00e9ration"
+    },
+    "delivery_qr_token": {
+      "type": "string",
+      "description": "Token unique pour QR code de livraison"
+    },
+    "delivery_code_4_digits": {
+      "type": "string",
+      "description": "Code \u00e0 4 chiffres pour validation manuelle de livraison"
+    },
+    "pickup_confirmed_by": {
+      "type": "string",
+      "enum": [
+        "qr",
+        "manual_code",
+        "admin"
+      ],
+      "description": "M\u00e9thode de confirmation de r\u00e9cup\u00e9ration"
+    },
+    "delivery_confirmed_by": {
+      "type": "string",
+      "enum": [
+        "qr",
+        "manual_code",
+        "admin"
+      ],
+      "description": "M\u00e9thode de confirmation de livraison"
+    },
+    "pickup_confirmed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date et heure de confirmation de r\u00e9cup\u00e9ration"
+    },
+    "delivery_confirmed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date et heure de confirmation de livraison"
     }
   },
   "required": [
