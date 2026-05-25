@@ -27,9 +27,11 @@ const LivreurApp = lazy(() => import('./pages/LivreurApp.jsx'));
 
 const ClientExterneApp = lazy(() => import('./pages/ClientExterneApp.jsx'));
 const CourseExterneForm = lazy(() => import('./pages/CourseExterneForm.jsx'));
+const CourseExterneFormSync = lazy(() => import('./pages/CourseExterneFormSync.jsx'));
 const ClientSuiviCourse = lazy(() => import('./pages/ClientSuiviCourse.jsx'));
 const ClientProfilPage = lazy(() => import('./pages/ClientProfilPage.jsx'));
 const DashboardAdminExterne = lazy(() => import('./pages/DashboardAdminExterne.jsx'));
+const PublicSuiviCourse = lazy(() => import('./pages/PublicSuiviCourse.jsx'));
 
 const LoadingScreen = () => (
   <div className="fixed inset-0 flex items-center justify-center bg-background">
@@ -135,10 +137,11 @@ function AppRouter() {
         <Suspense fallback={<LoadingScreen />}>
           <Routes>
             <Route path="/" element={<ClientExterneApp />} />
-            <Route path="/client/course/expedier" element={<CourseExterneForm />} />
-            <Route path="/client/course/recevoir" element={<CourseExterneForm />} />
+            <Route path="/client/course/expedier" element={<CourseExterneFormSync />} />
+            <Route path="/client/course/recevoir" element={<CourseExterneFormSync />} />
             <Route path="/client/suivi" element={<ClientSuiviCourse />} />
             <Route path="/client/profil" element={<ClientProfilPage />} />
+            <Route path="/suivi-public/:token" element={<PublicSuiviCourse />} />
             <Route path="*" element={<ClientExterneApp />} />
           </Routes>
         </Suspense>

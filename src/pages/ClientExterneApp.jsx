@@ -24,6 +24,7 @@ export default function ClientExterneApp() {
   const [courseActive, setCourseActive] = useState(null);
   const [livreursProches, setLivreursProches] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState([]);
   const mapRef = useRef(null);
 
   useEffect(() => {
@@ -61,18 +62,39 @@ export default function ClientExterneApp() {
         setProfilRequired(true);
       }
 
-      // 3. Vérifier course active
-      const courses = await base44.entities.CourseExterne.filter({ 
+      // 3. Vérifier course active (créée par le client)
+      const coursesClient = await base44.entities.CourseExterne.filter({ 
         user_email: user.email 
       });
-      const activeCourse = courses?.find(c => 
+      const activeCourseClient = coursesClient?.find(c => 
         !["livree", "annulee"].includes(c.statut)
       );
-      if (activeCourse) {
-        setCourseActive(activeCourse);
+      
+      // 4. Vérifier courses où le client est destinataire (synchronisation)
+      const coursesDestinataire = await base44.entities.CourseExterne.filter({
+        destinataire_client_id: clients[0]?.id
+      });
+      const activeCourseDestinataire = coursesDestinataire?.find(c => 
+        !["livree", "annulee"].includes(c.statut) && c.type_course === "expedier"
+      );
+      
+      // Priorité : course active du client, sinon course en tant que destinataire
+      if (activeCourseClient) {
+        setCourseActive(activeCourseClient);
+      } else if (activeCourseDestinataire) {
+        setCourseActive(activeCourseDestinataire);
       }
 
-      // 4. Charger livreurs disponibles
+      // 5. Charger notifications non lues
+      const userNotifications = await base44.entities.Notification.filter({
+        destinataire_email: user.email,
+        lue: false
+      });
+      if (userNotifications && userNotifications.length > 0) {
+        setNotifications(userNotifications);
+      }
+
+      // 6. Charger livreurs disponibles
       await loadLivreursProches(savedPos || JSON.parse(localStorage.getItem("client_gps_position") || "null"));
 
     } catch (err) {
@@ -298,6 +320,35 @@ export default function ClientExterneApp() {
       <div className={`px-4 py-4 ${courseActive ? "mt-32" : ""}`}>
         <div className="max-w-lg mx-auto space-y-4">
           
+          {/* Notifications */}
+          {notifications.length > 0 && (
+            <div className="mb-4 space-y-2">
+              {notifications.map((notif) => (
+                <Card key={notif.id} className="p-4 border-l-4 border-l-yellow-400 bg-gradient-to-r from-yellow-50 to-orange-50">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-yellow-100 flex items-center justify-center flex-shrink-0">
+                      <Package className="w-5 h-5 text-yellow-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-bold text-yellow-900">{notif.titre}</p>
+                      <p className="text-sm text-yellow-700 mt-1">{notif.message}</p>
+                      {notif.course_id && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-2 border-yellow-300 text-yellow-800 hover:bg-yellow-100"
+                          onClick={() => navigate("/client/suivi")}
+                        >
+                          Voir la course
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+
           {/* Header moderne */}
           <div className="bg-gradient-to-r from-primary to-red-600 rounded-3xl p-5 shadow-lg shadow-red-200">
             <div className="flex items-center justify-between mb-3">

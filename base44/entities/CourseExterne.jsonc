@@ -18,6 +18,43 @@
       ],
       "description": "Type de course : exp\u00e9dier ou recevoir un colis"
     },
+    "expediteur_nom": {
+      "type": "string",
+      "description": "Nom de l'exp\u00e9diteur"
+    },
+    "expediteur_telephone": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone de l'exp\u00e9diteur"
+    },
+    "expediteur_phone_normalized": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone normalis\u00e9 (sans espaces, avec indicatif)"
+    },
+    "expediteur_client_id": {
+      "type": "string",
+      "description": "ID du client SILGAPP si l'exp\u00e9diteur existe"
+    },
+    "destinataire_nom": {
+      "type": "string",
+      "description": "Nom du destinataire"
+    },
+    "destinataire_telephone": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone du destinataire"
+    },
+    "destinataire_phone_normalized": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone normalis\u00e9 (sans espaces, avec indicatif)"
+    },
+    "destinataire_client_id": {
+      "type": "string",
+      "description": "ID du client SILGAPP si le destinataire existe"
+    },
+    "recipient_has_app": {
+      "type": "boolean",
+      "default": false,
+      "description": "Le destinataire a l'application SILGAPP"
+    },
     "adresse_depart": {
       "type": "string",
       "description": "Adresse ou quartier de r\u00e9cup\u00e9ration"
@@ -96,6 +133,10 @@
       "type": "string",
       "description": "T\u00e9l\u00e9phone du livreur"
     },
+    "livreur_vehicule": {
+      "type": "string",
+      "description": "Type de v\u00e9hicule du livreur"
+    },
     "notes": {
       "type": "string",
       "description": "Notes suppl\u00e9mentaires"
@@ -162,6 +203,24 @@
       "type": "string",
       "format": "date-time",
       "description": "Date et heure de la notation"
+    },
+    "tracking_token": {
+      "type": "string",
+      "description": "Token unique pour le lien de suivi public"
+    },
+    "tracking_link": {
+      "type": "string",
+      "description": "Lien public de suivi de la course"
+    },
+    "tracking_shared_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de partage du lien de suivi"
+    },
+    "tracking_opened_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de fois o\u00f9 le lien a \u00e9t\u00e9 ouvert"
     }
   },
   "required": [
