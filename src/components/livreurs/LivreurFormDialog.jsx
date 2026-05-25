@@ -19,6 +19,8 @@ const emptyForm = {
   vehicule: "moto",
   photo_url: "",
   actif: true,
+  type_livreur: "interne",
+  reseau: "interne",
 };
 
 
@@ -39,6 +41,8 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
         vehicule: livreur.vehicule || "moto",
         photo_url: livreur.photo_url || "",
         actif: livreur.actif !== false,
+        type_livreur: livreur.type_livreur || "interne",
+        reseau: livreur.reseau || "interne",
       });
     } else {
       setForm(emptyForm);
@@ -149,6 +153,34 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
           <div className="space-y-1.5">
             <Label className="text-xs">Quartier</Label>
             <Input placeholder="Ex: Ouaga 2000" value={form.quartier} onChange={(e) => setForm((p) => ({ ...p, quartier: e.target.value }))} />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Type de livreur *</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                className={`p-3 rounded-lg border-2 text-sm font-semibold transition-all ${
+                  form.type_livreur === "interne"
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border text-muted-foreground hover:bg-muted"
+                }`}
+                onClick={() => setForm((p) => ({ ...p, type_livreur: "interne", reseau: "interne" }))}
+              >
+                🏢 Interne
+              </button>
+              <button
+                type="button"
+                className={`p-3 rounded-lg border-2 text-sm font-semibold transition-all ${
+                  form.type_livreur === "externe"
+                    ? "border-accent bg-accent/5 text-accent"
+                    : "border-border text-muted-foreground hover:bg-muted"
+                }`}
+                onClick={() => setForm((p) => ({ ...p, type_livreur: "externe", reseau: "externe" }))}
+              >
+                🤝 Externe
+              </button>
+            </div>
           </div>
 
           <div className="space-y-1.5">
