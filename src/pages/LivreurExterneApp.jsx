@@ -74,12 +74,20 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // Mes courses externes (déjà assignées)
   const { data: mesCourses = [] } = useQuery({
     queryKey: ["mes-courses-externes", livreurProfil?.id],
-    queryFn: () => base44.entities.CourseExterne.filter({ 
-      livreur_id: livreurProfil.id 
-    }, "-created_date", 50),
+    queryFn: async () => {
+      const courses = await base44.entities.CourseExterne.filter({ 
+        livreur_id: livreurProfil.id 
+      }, "-created_date", 50);
+      console.log('[LIVREUR EXTERNE] 📦 mesCourses query:', {
+        livreur_id: livreurProfil.id,
+        count: courses?.length || 0,
+        courses: courses?.map(c => ({ id: c.id, statut: c.statut, dispatch_status: c.dispatch_status }))
+      });
+      return courses || [];
+    },
     enabled: !!livreurProfil?.id,
     initialData: [],
-    refetchInterval: 5000,
+    refetchInterval: 2000, // Réduit à 2s pour temps réel
   });
 
   // Course en attente - même logique que livreur interne
