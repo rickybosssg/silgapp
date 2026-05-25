@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import ClientProfil from "./ClientProfil";
 import VenusChat from "@/components/client/VenusChat";
+import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 
 export default function ClientExterneApp() {
   const navigate = useNavigate();
@@ -26,7 +27,6 @@ export default function ClientExterneApp() {
   const [livreursProches, setLivreursProches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
-  const [showVenusChat, setShowVenusChat] = useState(false);
   const mapRef = useRef(null);
 
   useEffect(() => {
@@ -512,14 +512,7 @@ export default function ClientExterneApp() {
                 <User className="w-5 h-5 text-orange-600" />
                 <span className="text-[10px] font-medium">Profil</span>
               </Button>
-              <Button 
-                variant="ghost" 
-                className="h-auto py-3 flex flex-col gap-1.5 hover:bg-pink-50"
-                onClick={() => setShowVenusChat(true)}
-              >
-                <img src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/17cf522aa_file_0000000034b871f7bf133c0de0c9eb62.png" alt="VENUS" className="w-5 h-5 rounded-full object-cover" />
-                <span className="text-[10px] font-medium">VENUS</span>
-              </Button>
+
             </div>
           </Card>
 
@@ -585,8 +578,8 @@ export default function ClientExterneApp() {
         </div>
       </div>
 
-      {/* Chat VENUS */}
-      {showVenusChat && <VenusChat onClose={() => setShowVenusChat(false)} />}
+      {/* Bouton flottant VENUS */}
+      <VenusFloatingButton />
     </div>
   );
 }
