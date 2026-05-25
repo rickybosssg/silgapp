@@ -20,37 +20,58 @@ export default function CourseExterneFormSync() {
   const [courseCreated, setCourseCreated] = useState(false);
   const [createdCourse, setCreatedCourse] = useState(null);
 
-  const [formData, setFormData] = useState({
-    type_course: typeCourse,
-    client_nom: "",
-    client_telephone: "",
-    expediteur_nom: "",
-    expediteur_telephone: "",
-    destinataire_nom: "",
-    destinataire_telephone: "",
-    type_colis: "petit_colis",
-    adresse_depart: "",
-    adresse_arrivee: "",
-    destination_inconnue: false,
-    notes: "",
-    gps_depart_lat: position?.latitude || null,
-    gps_depart_lng: position?.longitude || null,
-    gps_arrivee_lat: null,
-    gps_arrivee_lng: null,
-    recuperationGPS: false,
-    livraisonGPS: false,
-  });
+  // Récupérer le brouillon sauvegardé
+  const getDraftFromStorage = () => {
+    try {
+      const saved = localStorage.getItem("silgapp_course_draft");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Vérifier que le type de course correspond
+        if (parsed.type_course === typeCourse) {
+          return parsed;
+        }
+      }
+    } catch (err) {
+      console.error("Erreur lecture brouillon:", err);
+    }
+    return null;
+  };
 
-  // Pré-remplir nom et téléphone depuis le profil client
+  const draft = getDraftFromStorage();
+
+  const [formData, setFormData] = useState(
+    draft || {
+      type_course: typeCourse,
+      client_nom: clientProfil?.nom || "",
+      client_telephone: clientProfil?.telephone || "",
+      expediteur_nom: "",
+      expediteur_telephone: "",
+      destinataire_nom: "",
+      destinataire_telephone: "",
+      type_colis: "petit_colis",
+      adresse_depart: "",
+      adresse_arrivee: "",
+      destination_inconnue: false,
+      notes: "",
+      gps_depart_lat: position?.latitude || null,
+      gps_depart_lng: position?.longitude || null,
+      gps_arrivee_lat: null,
+      gps_arrivee_lng: null,
+      recuperationGPS: false,
+      livraisonGPS: false,
+    }
+  );
+
+  // Pré-remplir nom et téléphone depuis le profil client (seulement si pas de brouillon)
   useEffect(() => {
-    if (clientProfil) {
+    if (clientProfil && !draft) {
       setFormData((prev) => ({
         ...prev,
         client_nom: clientProfil.nom || "",
         client_telephone: clientProfil.telephone || "",
       }));
     }
-  }, [clientProfil]);
+  }, [clientProfil, draft]);
 
   const handleGetGPSDepart = () => {
     if (!navigator.geolocation) {
@@ -108,6 +129,8 @@ export default function CourseExterneFormSync() {
       toast.success("Course créée ! Recherche d'un livreur en cours...");
       setCreatedCourse(response);
       setCourseCreated(true);
+      // Supprimer le brouillon après création réussie
+      localStorage.removeItem("silgapp_course_draft");
     },
     onError: (err) => toast.error("Erreur : " + err.message),
   });
@@ -234,6 +257,10 @@ export default function CourseExterneFormSync() {
               onNext={handleNext}
               onBack={handleBack}
               isLoading={createMutation.isPending}
+              onAnnuler={() => {
+                localStorage.removeItem("silgapp_course_draft");
+                navigate("/client");
+              }}
             />
           </form>
         </Card>

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +20,8 @@ import {
   AlertCircle
 } from "lucide-react";
 
+const STORAGE_KEY = "silgapp_course_draft";
+
 export default function StepField({ 
   step, 
   totalSteps, 
@@ -31,6 +33,15 @@ export default function StepField({
 }) {
   // Calcul de la progression
   const progress = ((step + 1) / totalSteps) * 100;
+
+  // Sauvegarder automatiquement dans localStorage à chaque changement
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
+    } catch (err) {
+      console.error("Erreur sauvegarde brouillon:", err);
+    }
+  }, [formData]);
 
   const renderStep = () => {
     switch (step) {
@@ -451,7 +462,10 @@ export default function StepField({
           <Button
             type="button"
             variant="outline"
-            onClick={() => window.history.back()}
+            onClick={() => {
+              localStorage.removeItem("silgapp_course_draft");
+              window.history.back();
+            }}
             className="flex-1 h-12"
           >
             Annuler
@@ -470,7 +484,6 @@ export default function StepField({
               (step === 4 && !formData.type_colis)
             }
             className="flex-1 h-12 bg-primary"
-            className="flex-1 h-12 bg-primary"
           >
             Continuer
             <ArrowRight className="w-4 h-4 ml-2" />
@@ -478,7 +491,7 @@ export default function StepField({
         ) : (
           <Button
             type="submit"
-            disabled={isLoading || !formData.recuperationGPS || !formData.livraisonGPS}
+            disabled={isLoading || (!formData.destination_inconnue && !formData.livraisonGPS)}
             className="flex-1 h-12 bg-gradient-to-r from-primary to-red-600"
           >
             {isLoading ? (
