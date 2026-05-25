@@ -49,7 +49,7 @@ const LoadingScreen = () => (
 
 const InscriptionLivreur = () => null;
 
-function AppRouter() {
+function App() {
   const [livreurProfil, setLivreurProfil] = useState(null);
   const [isClient, setIsClient] = useState(false);
   const [reseau, setReseau] = useState(null);
@@ -160,4 +160,12 @@ function AppRouter() {
 
 
 
-export default AppRouter;
+function AppWithProviders() {
+  return (
+    <QueryClientProvider client={queryClientInstance}>
+      <App />
+    </QueryClientProvider>
+  );
+}
+
+export default AppWithProviders;
