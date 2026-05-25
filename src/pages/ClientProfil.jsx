@@ -66,8 +66,11 @@ export default function ClientProfil({ onComplete, existingProfil }) {
     const formatted = formatPhone(value);
     setFormData({ ...formData, telephone: formatted });
     
-    // Validation en temps réel
-    if (formatted.length > 0) {
+    // Validation en temps réel (nettoie les espaces avant validation)
+    const digits = cleanPhone(formatted);
+    if (digits.length > 0 && digits.length < 8) {
+      setPhoneError(""); // Pas d'erreur pendant la saisie
+    } else if (digits.length === 8) {
       validatePhone(formatted);
     } else {
       setPhoneError("");
@@ -198,9 +201,6 @@ export default function ClientProfil({ onComplete, existingProfil }) {
                   <span>⚠️</span> {phoneError}
                 </p>
               )}
-              <p className="text-xs text-muted-foreground">
-                Format: 66 66 66 66 (8 chiffres)
-              </p>
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
