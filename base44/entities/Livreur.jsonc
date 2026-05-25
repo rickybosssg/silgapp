@@ -11,6 +11,15 @@
       "default": "interne",
       "description": "R\u00e9seau SILGAPP (interne ou externe)"
     },
+    "type_livreur": {
+      "type": "string",
+      "enum": [
+        "interne",
+        "externe"
+      ],
+      "default": "interne",
+      "description": "Type de livreur (interne ou externe)"
+    },
     "prenom": {
       "type": "string",
       "description": "Pr\u00e9nom du livreur"
@@ -132,6 +141,7 @@
   },
   "required": [
     "nom",
-    "telephone"
+    "telephone",
+    "type_livreur"
   ]
 }
