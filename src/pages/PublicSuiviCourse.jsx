@@ -21,8 +21,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import QRCodeDisplay from "@/components/client/QRCodeDisplay";
 
-// Lien APK configurable — changer ici pour mettre à jour le lien de téléchargement
-const APK_DOWNLOAD_URL = "https://drive.google.com/drive/folders/silgapp-apk";
+const APK_DOWNLOAD_URL = "/telecharger-app";
 
 export default function PublicSuiviCourse({ token }) {
   const [course, setCourse] = useState(null);
@@ -368,12 +367,7 @@ export default function PublicSuiviCourse({ token }) {
                       <Star className="w-4 h-4 mr-2 fill-white" />
                       Noter
                     </Button>
-                    <a
-                      href={APK_DOWNLOAD_URL}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1"
-                    >
+                    <a href={APK_DOWNLOAD_URL} className="flex-1">
                       <Button variant="outline" className="w-full border-green-600 text-green-700 hover:bg-green-50">
                         <Download className="w-4 h-4 mr-2" />
                         Télécharger SILGAPP

@@ -1,11 +1,12 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, Package, DollarSign, TrendingUp, ArrowLeft, Truck, AlertCircle, Eye, MapPin, CreditCard } from "lucide-react";
+import { Users, Package, DollarSign, TrendingUp, ArrowLeft, Truck, AlertCircle, Eye, MapPin, CreditCard, Download, Save, ExternalLink } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -23,6 +24,36 @@ export default function DashboardAdminExterne() {
     initialData: [],
     refetchInterval: 15000,
   });
+
+  const [apkUrl, setApkUrl] = useState("");
+  const [apkSaving, setApkSaving] = useState(false);
+  const [apkConfigId, setApkConfigId] = useState(null);
+
+  useEffect(() => {
+    base44.entities.AppConfig.filter({ cle: "GOOGLE_DRIVE_APK_URL" }).then((configs) => {
+      if (configs?.[0]) {
+        setApkUrl(configs[0].valeur || "");
+        setApkConfigId(configs[0].id);
+      }
+    }).catch(() => null);
+  }, []);
+
+  const handleSaveApkUrl = async () => {
+    setApkSaving(true);
+    try {
+      if (apkConfigId) {
+        await base44.entities.AppConfig.update(apkConfigId, { valeur: apkUrl });
+      } else {
+        await base44.entities.AppConfig.create({
+          cle: "GOOGLE_DRIVE_APK_URL",
+          valeur: apkUrl,
+          description: "Lien Google Drive vers le fichier APK SILGAPP Externe"
+        });
+      }
+    } finally {
+      setApkSaving(false);
+    }
+  };
 
   const { data: clients = [] } = useQuery({
     queryKey: ["clients-externes"],
@@ -129,6 +160,38 @@ export default function DashboardAdminExterne() {
           </Card>
         </Link>
       </div>
+
+      {/* Config APK */}
+      <Card className="p-4 border-red-200 bg-red-50">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Download className="w-4 h-4 text-primary" />
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900">Lien de téléchargement APK</p>
+            <p className="text-xs text-gray-500">Mis à jour automatiquement sur la page /telecharger-app</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Input
+            value={apkUrl}
+            onChange={(e) => setApkUrl(e.target.value)}
+            placeholder="https://drive.google.com/file/d/..."
+            className="flex-1 bg-white text-sm"
+          />
+          <Button size="sm" onClick={handleSaveApkUrl} disabled={apkSaving} className="flex-shrink-0">
+            <Save className="w-4 h-4 mr-1" />
+            {apkSaving ? "..." : "Sauver"}
+          </Button>
+          {apkUrl && (
+            <a href="/telecharger-app" target="_blank" rel="noreferrer">
+              <Button size="sm" variant="outline" className="flex-shrink-0">
+                <ExternalLink className="w-4 h-4" />
+              </Button>
+            </a>
+          )}
+        </div>
+      </Card>
 
       {/* Courses en traitement - défilement automatique */}
       <Card className="p-4">

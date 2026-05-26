@@ -5,15 +5,14 @@ import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Phone, Package, CheckCircle2, Clock, User, Star, XCircle, ArrowLeft, Share2 } from "lucide-react";
+import { MapPin, Phone, Package, CheckCircle2, Clock, User, Star, XCircle, ArrowLeft, Share2, Download } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import QRCodeDisplay from "@/components/client/QRCodeDisplay";
 import AnnulerCourseDialog from "@/components/client/AnnulerCourseDialog";
 
-// Lien APK configurable
-const APK_URL = "https://drive.google.com/drive/folders/silgapp-apk";
+const APK_URL = "/telecharger-app";
 
 function buildWhatsAppMessage(course, clientProfil) {
   const trackingUrl = `${window.location.origin}/suivi-public/${course.tracking_token || course.id}`;
@@ -348,6 +347,27 @@ export default function ClientSuiviCourse() {
             onClose={() => setShowRating(false)}
             onRated={handleRated}
           />
+        )}
+
+        {/* Bandeau téléchargement — après livraison pour le destinataire */}
+        {maCourse.statut === "livree" && maCourse.type_course === "recevoir" && (
+          <Card className="p-4 bg-gradient-to-r from-red-50 to-orange-50 border-red-200">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Download className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-gray-800">Suivez vos prochaines livraisons</p>
+                <p className="text-xs text-gray-500">Téléchargez SILGAPP pour commander et suivre en direct</p>
+              </div>
+            </div>
+            <a href={APK_URL} className="block mt-3">
+              <Button className="w-full bg-primary hover:bg-primary/90 font-semibold text-sm rounded-xl">
+                <Download className="w-4 h-4 mr-2" />
+                Télécharger SILGAPP
+              </Button>
+            </a>
+          </Card>
         )}
 
         <AnnulerCourseDialog

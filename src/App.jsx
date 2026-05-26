@@ -32,6 +32,7 @@ const ClientSuiviCourse = lazy(() => import('./pages/ClientSuiviCourse.jsx'));
 const DashboardAdminExterne = lazy(() => import('./pages/DashboardAdminExterne.jsx'));
 const DusLivreursExternes = lazy(() => import('./pages/DusLivreursExternes.jsx'));
 const PublicSuiviCourse = lazy(() => import('./pages/PublicSuiviCourse.jsx'));
+const TelechargerApp = lazy(() => import('./pages/TelechargerApp.jsx'));
 
 const LoadingScreen = () => (
   <div className="fixed inset-0 flex items-center justify-center bg-background">
@@ -84,6 +85,7 @@ function App() {
             <Route path="/client/course/recevoir" element={<CourseExterneFormSync />} />
             <Route path="/client/suivi" element={<ClientSuiviCourse />} />
             <Route path="/suivi-public/:token" element={<PublicSuiviCourse />} />
+            <Route path="/telecharger-app" element={<TelechargerApp />} />
             <Route path="*" element={<ClientExterneApp />} />
           </Routes>
         </Suspense>
