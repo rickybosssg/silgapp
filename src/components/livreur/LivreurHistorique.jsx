@@ -37,19 +37,22 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
     }
   }, [period]);
 
-  // Filtrer les courses par période
+  // Filtrer les courses par période — utiliser heure_livraison pour les livrées, created_date sinon
   const filteredCourses = useMemo(() => {
     return mesCourses.filter(c => {
-      const courseDate = new Date(c.created_date);
-      return isWithinInterval(courseDate, { start: dateRange.start, end: dateRange.end });
+      const refDate = new Date(c.heure_livraison || c.updated_date || c.created_date);
+      const start = new Date(dateRange.start); start.setHours(0,0,0,0);
+      const end = new Date(dateRange.end); end.setHours(23,59,59,999);
+      return refDate >= start && refDate <= end;
     });
   }, [mesCourses, dateRange]);
 
   // Récapitulatif du jour (toujours aujourd'hui, peu importe le filtre)
   const today = new Date().toDateString();
-  const coursesToday = mesCourses.filter(c => 
-    new Date(c.created_date).toDateString() === today
-  );
+  const coursesToday = mesCourses.filter(c => {
+    const refDate = new Date(c.heure_livraison || c.updated_date || c.created_date);
+    return refDate.toDateString() === today;
+  });
   
   const livreesToday = coursesToday.filter(c => c.statut === "livree");
   const totalEncaisseToday = livreesToday.reduce((sum, c) => sum + (isExterne ? (c.montant_livreur || 0) : (c.prix_reel || 0)), 0);

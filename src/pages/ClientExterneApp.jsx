@@ -329,7 +329,11 @@ export default function ClientExterneApp() {
               <Button 
                 variant="ghost" 
                 className="h-auto py-3 flex flex-col gap-1.5 hover:bg-green-50"
-                onClick={() => window.open("https://wa.me/22667572857?text=" + encodeURIComponent("Bonjour SILGAPP 👋\nJ'ai besoin d'aide concernant ma course."), "_blank")}
+                onClick={() => {
+                  const msg = encodeURIComponent("Bonjour SILGAPP 👋\nJ'ai besoin d'aide concernant ma course.");
+                  window.location.href = `whatsapp://send?phone=22667572857&text=${msg}`;
+                  setTimeout(() => window.open(`https://wa.me/22667572857?text=${msg}`, "_blank"), 1500);
+                }}
               >
                 <MessageCircle className="w-5 h-5 text-green-600" />
                 <span className="text-[10px] font-medium">Support</span>

@@ -231,10 +231,21 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   };
 
   const handleColisLivre = (course, gpsArrivee) => {
+    // Si le backend QR a déjà mis statut=livree + prix calculé, on invalide juste le cache
+    // et on remet le livreur disponible (le backend a déjà mis statut=disponible)
+    if (course.statut === "livree" && course.prix_final) {
+      // Déjà traité par validateQRCode côté backend — forcer le refresh
+      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+      statutMutation.mutate("disponible");
+      toast.success("Livraison confirmée ! 🎉");
+      return;
+    }
+
+    // Cas sans QR (bouton manuel) : calculer le prix localement
     const baseData = { statut: "livree", heure_livraison: new Date().toISOString() };
 
     if (gpsArrivee && course.latitude_recuperation && course.longitude_recuperation) {
-      // Haversine pour prix exact
       const distance = calculerDistance(
         course.latitude_recuperation, course.longitude_recuperation,
         gpsArrivee.lat, gpsArrivee.lng
