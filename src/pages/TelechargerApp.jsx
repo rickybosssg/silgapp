@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Download, Truck, Package, Shield, Zap } from "lucide-react";
 
-const DEFAULT_APK_URL = "https://drive.google.com/drive/folders/silgapp-apk";
+const DEFAULT_APK_URL = "https://drive.google.com/uc?export=download&id=1zCeyzyAMP1CkTimaPMk-mJW560ZQWhmd";
 
 export default function TelechargerApp() {
   const [apkUrl, setApkUrl] = useState(DEFAULT_APK_URL);
