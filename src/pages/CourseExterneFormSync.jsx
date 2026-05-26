@@ -4,10 +4,23 @@ import { base44 } from "@/api/base44Client";
 import { useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import CourseStepForm from "@/components/client/CourseStepForm";
 import LivreurRechercheAnimation from "@/components/client/LivreurRechercheAnimation";
+
+// Haversine
+function calculerDistance(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lng2 - lng1) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+const STORAGE_KEY = "silgapp_course_draft";
+const STEP_KEY = "silgapp_course_step";
 
 export default function CourseExterneFormSync() {
   const location = useLocation();
@@ -16,20 +29,19 @@ export default function CourseExterneFormSync() {
   const position = location.state?.position || JSON.parse(localStorage.getItem("client_gps_position") || "null");
   const clientProfil = location.state?.clientProfil;
 
-  const [currentStep, setCurrentStep] = useState(0);
+  // Restaurer l'étape depuis localStorage si disponible
+  const savedStep = parseInt(localStorage.getItem(STEP_KEY) || "0", 10);
+  const [currentStep, setCurrentStep] = useState(isNaN(savedStep) ? 0 : savedStep);
   const [courseCreated, setCourseCreated] = useState(false);
   const [createdCourse, setCreatedCourse] = useState(null);
 
-  // Récupérer le brouillon sauvegardé
+  // Lire brouillon (données pures, sans fonctions)
   const getDraftFromStorage = () => {
     try {
-      const saved = localStorage.getItem("silgapp_course_draft");
+      const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Vérifier que le type de course correspond
-        if (parsed.type_course === typeCourse) {
-          return parsed;
-        }
+        if (parsed.type_course === typeCourse) return parsed;
       }
     } catch (err) {
       console.error("Erreur lecture brouillon:", err);
@@ -62,7 +74,7 @@ export default function CourseExterneFormSync() {
     }
   );
 
-  // Pré-remplir nom et téléphone depuis le profil client (seulement si pas de brouillon)
+  // Pré-remplir depuis profil si pas de brouillon
   useEffect(() => {
     if (clientProfil && !draft) {
       setFormData((prev) => ({
@@ -71,44 +83,45 @@ export default function CourseExterneFormSync() {
         client_telephone: clientProfil.telephone || "",
       }));
     }
-  }, [clientProfil, draft]);
+  }, [clientProfil]);
 
-  const handleGetGPSDepart = () => {
-    if (!navigator.geolocation) {
-      toast.error("GPS non disponible");
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setFormData((prev) => ({
-          ...prev,
-          gps_depart_lat: pos.coords.latitude,
-          gps_depart_lng: pos.coords.longitude,
-          recuperationGPS: true,
-        }));
-        toast.success("Position GPS de récupération enregistrée");
-      },
-      () => toast.error("Impossible d'obtenir la position GPS")
-    );
-  };
+  // Sauvegarder l'étape dans localStorage
+  useEffect(() => {
+    localStorage.setItem(STEP_KEY, String(currentStep));
+  }, [currentStep]);
 
-  const handleGetGPSArrivee = () => {
-    if (!navigator.geolocation) {
-      toast.error("GPS non disponible");
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setFormData((prev) => ({
-          ...prev,
-          gps_arrivee_lat: pos.coords.latitude,
-          gps_arrivee_lng: pos.coords.longitude,
-          livraisonGPS: true,
-        }));
-        toast.success("Position GPS de livraison enregistrée");
-      },
-      () => toast.error("Impossible d'obtenir la position GPS")
-    );
+  // Handlers GPS — fonctions séparées de formData
+  const gpsHandlers = {
+    onGetGPSDepart: () => {
+      if (!navigator.geolocation) { toast.error("GPS non disponible"); return; }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setFormData((prev) => ({
+            ...prev,
+            gps_depart_lat: pos.coords.latitude,
+            gps_depart_lng: pos.coords.longitude,
+            recuperationGPS: true,
+          }));
+          toast.success("Position GPS de récupération enregistrée");
+        },
+        () => toast.error("Impossible d'obtenir la position GPS")
+      );
+    },
+    onGetGPSArrivee: () => {
+      if (!navigator.geolocation) { toast.error("GPS non disponible"); return; }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setFormData((prev) => ({
+            ...prev,
+            gps_arrivee_lat: pos.coords.latitude,
+            gps_arrivee_lng: pos.coords.longitude,
+            livraisonGPS: true,
+          }));
+          toast.success("Position GPS de livraison enregistrée");
+        },
+        () => toast.error("Impossible d'obtenir la position GPS")
+      );
+    },
   };
 
   const createMutation = useMutation({
@@ -116,14 +129,11 @@ export default function CourseExterneFormSync() {
       const course = await base44.entities.CourseExterne.create(data);
       if (data.destinataire_client_id || data.expediteur_client_id) {
         try {
-          await base44.functions.invoke("notifyClientSync", {
-            course_id: course.id
-          });
+          await base44.functions.invoke("notifyClientSync", { course_id: course.id });
         } catch (err) {
           console.error("Erreur notification:", err);
         }
       }
-      // Lancer le dispatch automatique
       try {
         await base44.functions.invoke("dispatchExterneAuto", {
           action: "lancer_recherche_auto",
@@ -138,54 +148,51 @@ export default function CourseExterneFormSync() {
       toast.success("Course créée ! Recherche d'un livreur en cours...");
       setCreatedCourse(response);
       setCourseCreated(true);
-      // Supprimer le brouillon après création réussie
-      localStorage.removeItem("silgapp_course_draft");
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STEP_KEY);
     },
     onError: (err) => toast.error("Erreur : " + err.message),
   });
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
+
     let expediteurNom, expediteurTel, expediteurClientId, expediteurPhoneNormalized;
     let destinataireNom, destinataireTel, destinataireClientId, destinatairePhoneNormalized;
-    let recipientHasApp = false;
 
     if (formData.type_course === "expedier") {
       expediteurNom = formData.client_nom;
       expediteurTel = formData.client_telephone;
       expediteurClientId = clientProfil?.id || null;
       expediteurPhoneNormalized = formData.client_telephone.replace(/\D/g, "").replace(/^226/, "");
-      
       destinataireNom = formData.destinataire_nom;
       destinataireTel = formData.destinataire_telephone;
       destinataireClientId = null;
       destinatairePhoneNormalized = formData.destinataire_telephone.replace(/\D/g, "").replace(/^226/, "");
-      recipientHasApp = false;
     } else {
       destinataireNom = formData.client_nom;
       destinataireTel = formData.client_telephone;
       destinataireClientId = clientProfil?.id || null;
       destinatairePhoneNormalized = formData.client_telephone.replace(/\D/g, "").replace(/^226/, "");
-      
       expediteurNom = formData.expediteur_nom;
       expediteurTel = formData.expediteur_telephone;
       expediteurClientId = null;
       expediteurPhoneNormalized = formData.expediteur_telephone.replace(/\D/g, "").replace(/^226/, "");
-      recipientHasApp = false;
     }
 
-    const R = 6371;
-    const dLat = ((formData.gps_arrivee_lat - formData.gps_depart_lat) * Math.PI) / 180;
-    const dLon = ((formData.gps_arrivee_lng - formData.gps_depart_lng) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((formData.gps_depart_lat * Math.PI) / 180) *
-      Math.cos((formData.gps_arrivee_lat * Math.PI) / 180) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distanceEstimee = R * c;
-    const prixEstime = Math.round(distanceEstimee * 100);
+    // Calcul prix — sécurisé : uniquement si les 4 coordonnées GPS sont valides
+    let prixEstime = 0;
+    if (
+      !formData.destination_inconnue &&
+      formData.gps_depart_lat && formData.gps_depart_lng &&
+      formData.gps_arrivee_lat && formData.gps_arrivee_lng
+    ) {
+      const distance = calculerDistance(
+        formData.gps_depart_lat, formData.gps_depart_lng,
+        formData.gps_arrivee_lat, formData.gps_arrivee_lng
+      );
+      prixEstime = Math.round(distance * 100);
+    }
 
     createMutation.mutate({
       client_nom: formData.client_nom,
@@ -199,7 +206,7 @@ export default function CourseExterneFormSync() {
       destinataire_telephone: destinataireTel,
       destinataire_phone_normalized: destinatairePhoneNormalized,
       destinataire_client_id: destinataireClientId,
-      recipient_has_app: recipientHasApp,
+      recipient_has_app: false,
       adresse_depart: formData.adresse_depart,
       adresse_arrivee: formData.destination_inconnue ? "Destination à définir" : formData.adresse_arrivee,
       type_colis: formData.type_colis,
@@ -209,20 +216,20 @@ export default function CourseExterneFormSync() {
       gps_arrivee_lat: formData.destination_inconnue ? null : formData.gps_arrivee_lat,
       gps_arrivee_lng: formData.destination_inconnue ? null : formData.gps_arrivee_lng,
       destination_inconnue: formData.destination_inconnue || false,
-      prix_estimate: formData.destination_inconnue ? 0 : prixEstime,
+      prix_estimate: prixEstime,
       statut: "recherche_livreur",
     });
   };
 
-  const handleNext = () => {
-    setCurrentStep((prev) => prev + 1);
+  const handleNext = () => setCurrentStep((prev) => prev + 1);
+  const handleBack = () => setCurrentStep((prev) => prev - 1);
+
+  const handleAnnuler = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STEP_KEY);
+    navigate("/client");
   };
 
-  const handleBack = () => {
-    setCurrentStep((prev) => prev - 1);
-  };
-
-  // Afficher l'animation de recherche
   if (courseCreated && createdCourse) {
     return <LivreurRechercheAnimation course={createdCourse} />;
   }
@@ -232,23 +239,15 @@ export default function CourseExterneFormSync() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white p-4">
       <div className="max-w-lg mx-auto">
-        {/* Header */}
         <div className="flex items-center gap-3 mb-4">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => navigate("/client")}
-            className="h-10 w-10 p-0"
-          >
+          <Button variant="outline" size="sm" onClick={handleAnnuler} className="h-10 w-10 p-0">
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <div>
             <h1 className="text-xl font-bold text-foreground">
               {formData.type_course === "expedier" ? "Expédier un colis" : "Recevoir un colis"}
             </h1>
-            <p className="text-xs text-muted-foreground">
-              Formulaire étape par étape
-            </p>
+            <p className="text-xs text-muted-foreground">Formulaire étape par étape</p>
           </div>
         </div>
 
@@ -257,19 +256,13 @@ export default function CourseExterneFormSync() {
             <CourseStepForm
               step={currentStep}
               totalSteps={totalSteps}
-              formData={{
-                ...formData,
-                onGetGPSDepart: handleGetGPSDepart,
-                onGetGPSArrivee: handleGetGPSArrivee,
-              }}
+              formData={formData}
+              gpsHandlers={gpsHandlers}
               setFormData={setFormData}
               onNext={handleNext}
               onBack={handleBack}
+              onAnnuler={handleAnnuler}
               isLoading={createMutation.isPending}
-              onAnnuler={() => {
-                localStorage.removeItem("silgapp_course_draft");
-                navigate("/client");
-              }}
             />
           </form>
         </Card>

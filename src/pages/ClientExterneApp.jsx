@@ -1,20 +1,27 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 import { 
   MapPin, Navigation, Phone, MessageCircle, User, Package, 
-  Clock, History, HelpCircle, ChevronRight, TrendingUp, 
-  Shield, Zap, Star, Loader2, AlertCircle, Sparkles, ArrowLeft
+  Clock, HelpCircle, ChevronRight, TrendingUp, 
+  Shield, Zap, Star, Loader2, ArrowLeft
 } from "lucide-react";
-import { format } from "date-fns";
-import { fr } from "date-fns/locale";
-import VenusChat from "@/components/client/VenusChat";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import ModernMap from "@/components/client/ModernMap";
 import ProfilModal from "@/components/client/ProfilModal";
+
+function haversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a = Math.sin(dLat/2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon/2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 export default function ClientExterneApp() {
   const navigate = useNavigate();
@@ -51,35 +58,41 @@ export default function ClientExterneApp() {
       const user = await base44.auth.me();
       const clients = await base44.entities.ClientExterne.filter({ user_email: user.email });
 
+      let profil;
       if (clients && clients.length > 0) {
-        const profil = clients[0];
+        profil = clients[0];
         setClientProfil(profil);
       } else {
         // Création automatique d'un profil minimal
         const newProfil = await base44.entities.ClientExterne.create({
           nom: "Client",
-          prenom: "Silga",
           telephone: "+226" + (user.email?.split('@')[0] || "00000000"),
           user_email: user.email
         });
+        profil = newProfil;
         setClientProfil(newProfil);
+        // Inviter à compléter le profil
+        setShowProfilModal(true);
       }
 
-      // 3. Vérifier course active (créée par le client)
+      // 3. Vérifier course active (créée par le client) — filtrée par user_email
       const coursesClient = await base44.entities.CourseExterne.filter({ 
-        user_email: user.email 
+        created_by_id: user.id
       });
       const activeCourseClient = coursesClient?.find(c => 
         !["livree", "annulee"].includes(c.statut)
       );
       
-      // 4. Vérifier courses où le client est destinataire (synchronisation)
-      const coursesDestinataire = await base44.entities.CourseExterne.filter({
-        destinataire_client_id: clients[0]?.id
-      });
-      const activeCourseDestinataire = coursesDestinataire?.find(c => 
-        !["livree", "annulee"].includes(c.statut) && c.type_course === "expedier"
-      );
+      // 4. Vérifier courses où le client est destinataire — utiliser profil correct
+      let activeCourseDestinataire = null;
+      if (profil?.id) {
+        const coursesDestinataire = await base44.entities.CourseExterne.filter({
+          destinataire_client_id: profil.id
+        });
+        activeCourseDestinataire = coursesDestinataire?.find(c => 
+          !["livree", "annulee"].includes(c.statut) && c.type_course === "expedier"
+        ) || null;
+      }
       
       // Priorité : course active du client, sinon course en tant que destinataire
       if (activeCourseClient) {
@@ -98,7 +111,7 @@ export default function ClientExterneApp() {
       }
 
       // 6. Charger livreurs disponibles
-      await loadLivreursProches(savedPos || JSON.parse(localStorage.getItem("client_gps_position") || "null"));
+      await loadLivreursProches(savedPos);
 
     } catch (err) {
       console.error("Erreur vérification statut:", err);
@@ -110,54 +123,30 @@ export default function ClientExterneApp() {
   const loadLivreursProches = async (pos) => {
     try {
       if (!pos) return;
-      
       const livreurs = await base44.entities.Livreur.filter({
         type_livreur: "externe",
         statut: "disponible",
         actif: true,
         validation: "valide"
       });
-
-      // Filtrer livreurs proches (dans un rayon de 5km)
       const proches = livreurs.filter(l => {
         if (!l.latitude || !l.longitude) return false;
-        const distance = haversineDistance(pos.latitude, pos.longitude, l.latitude, l.longitude);
-        return distance <= 5; // 5km
+        return haversineDistance(pos.latitude, pos.longitude, l.latitude, l.longitude) <= 5;
       }).slice(0, 5);
-
       setLivreursProches(proches);
     } catch (err) {
       console.error("Erreur chargement livreurs:", err);
     }
   };
 
-  const haversineDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  };
-
-
-
-
-
   const handleActiverGPS = () => {
     if (!navigator.geolocation) {
-      alert("GPS non disponible sur cet appareil");
+      toast.error("GPS non disponible sur cet appareil");
       return;
     }
-
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const posData = {
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-        };
+        const posData = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
         setPosition(posData);
         setGpsActive(true);
         setGpsRequired(false);
@@ -165,10 +154,7 @@ export default function ClientExterneApp() {
         localStorage.setItem("client_gps_position", JSON.stringify(posData));
         loadLivreursProches(posData);
       },
-      (err) => {
-        console.error("Erreur GPS:", err);
-        alert("Permission GPS refusée – obligatoire pour créer une course");
-      },
+      () => toast.error("Permission GPS refusée – obligatoire pour créer une course"),
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
@@ -177,10 +163,7 @@ export default function ClientExterneApp() {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-primary/5 to-red-50">
         <div className="text-center space-y-4">
-          <div className="relative">
-            <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto" />
-            <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full"></div>
-          </div>
+          <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto" />
           <p className="text-sm font-medium text-muted-foreground">Chargement...</p>
         </div>
       </div>
@@ -211,10 +194,7 @@ export default function ClientExterneApp() {
     );
   }
 
-
-
   const prenom = clientProfil?.prenom || clientProfil?.nom?.split(" ")[0] || "Client";
-  const quartier = "Ouagadougou"; // Pourrait être amélioré avec reverse geocoding
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -256,7 +236,7 @@ export default function ClientExterneApp() {
 
       <div className={`px-4 py-4 ${courseActive ? "mt-32" : ""}`}>
         <div className="max-w-lg mx-auto space-y-4">
-          
+
           {/* Notifications */}
           {notifications.length > 0 && (
             <div className="mb-4 space-y-2">
@@ -286,7 +266,7 @@ export default function ClientExterneApp() {
             </div>
           )}
 
-          {/* Header moderne */}
+          {/* Header */}
           <div className="bg-gradient-to-r from-primary to-red-600 rounded-3xl p-5 shadow-lg shadow-red-200">
             <div className="flex items-center justify-between mb-3">
               <div>
@@ -295,7 +275,7 @@ export default function ClientExterneApp() {
                 <div className="flex items-center gap-2 mt-2">
                   <div className="flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full">
                     <MapPin className="w-3 h-3 text-white" />
-                    <span className="text-xs text-white font-medium">{quartier}</span>
+                    <span className="text-xs text-white font-medium">Ouagadougou</span>
                   </div>
                   <div className="flex items-center gap-1.5 bg-green-500/90 px-2.5 py-1 rounded-full">
                     <Navigation className="w-3 h-3 text-white" />
@@ -313,10 +293,6 @@ export default function ClientExterneApp() {
               </Button>
             </div>
           </div>
-
-
-
-
 
           {/* Actions principales */}
           <div className="grid grid-cols-2 gap-3">
@@ -351,7 +327,7 @@ export default function ClientExterneApp() {
             </Card>
           </div>
 
-          {/* Bouton Voir la carte - uniquement si course active */}
+          {/* Bouton carte — uniquement si course active */}
           {courseActive && gpsActive && position && (
             <Card className="p-4 cursor-pointer hover:shadow-lg transition-all" onClick={() => setShowMap(true)}>
               <div className="flex items-center gap-3">
@@ -390,7 +366,7 @@ export default function ClientExterneApp() {
               <Button 
                 variant="ghost" 
                 className="h-auto py-3 flex flex-col gap-1.5 hover:bg-green-50"
-                onClick={() => window.open("https://wa.me/22600000000", "_blank")}
+                onClick={() => window.open("https://wa.me/22670000000", "_blank")}
               >
                 <MessageCircle className="w-5 h-5 text-green-600" />
                 <span className="text-[10px] font-medium">Support</span>
@@ -403,11 +379,10 @@ export default function ClientExterneApp() {
                 <User className="w-5 h-5 text-orange-600" />
                 <span className="text-[10px] font-medium">Mes infos</span>
               </Button>
-
             </div>
           </Card>
 
-          {/* Estimation dynamique */}
+          {/* Tarification */}
           <Card className="p-5 bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200 shadow-md">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0 shadow-sm">
@@ -422,7 +397,7 @@ export default function ClientExterneApp() {
             </div>
           </Card>
 
-          {/* Avantages Silga */}
+          {/* Avantages */}
           <Card className="p-5 bg-gradient-to-br from-white to-gray-50 shadow-md">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-red-600 flex items-center justify-center shadow-sm">
@@ -431,50 +406,32 @@ export default function ClientExterneApp() {
               <p className="font-bold text-foreground text-base">Facilitez-vous la vie avec SILGAPP</p>
             </div>
             <div className="space-y-3">
-              <div className="flex items-start gap-3 p-3 rounded-xl bg-gradient-to-r from-green-50 to-white border border-green-100">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center flex-shrink-0 shadow-sm">
-                  <Zap className="w-3.5 h-3.5 text-white" />
+              {[
+                { color: "green", icon: <Zap className="w-3.5 h-3.5 text-white" />, title: "Livraison rapide", desc: "Livreurs disponibles 24/7 près de chez vous" },
+                { color: "blue", icon: <Shield className="w-3.5 h-3.5 text-white" />, title: "Service sécurisé", desc: "Livreurs vérifiés et suivis en temps réel" },
+                { color: "purple", icon: <HelpCircle className="w-3.5 h-3.5 text-white" />, title: "Support réactif", desc: "Assistance disponible à tout moment" },
+              ].map((item, i) => (
+                <div key={i} className={`flex items-start gap-3 p-3 rounded-xl bg-gradient-to-r from-${item.color}-50 to-white border border-${item.color}-100`}>
+                  <div className={`w-7 h-7 rounded-lg bg-gradient-to-br from-${item.color}-500 to-${item.color}-600 flex items-center justify-center flex-shrink-0 shadow-sm`}>
+                    {item.icon}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-foreground">{item.title}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-bold text-foreground">Livraison rapide</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Livreurs disponibles 24/7 près de chez vous</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 rounded-xl bg-gradient-to-r from-blue-50 to-white border border-blue-100">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0 shadow-sm">
-                  <Shield className="w-3.5 h-3.5 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-foreground">Service sécurisé</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Livreurs vérifiés et suivis en temps réel</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 rounded-xl bg-gradient-to-r from-purple-50 to-white border border-purple-100">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-sm">
-                  <HelpCircle className="w-3.5 h-3.5 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-foreground">Support réactif</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Assistance disponible à tout moment</p>
-                </div>
-              </div>
+              ))}
             </div>
           </Card>
-
         </div>
       </div>
 
-      {/* Modale carte temps réel - uniquement si course active */}
+      {/* Modale carte temps réel */}
       {showMap && courseActive && gpsActive && position && (
         <div className="fixed inset-0 z-50 bg-background">
           <div className="flex items-center justify-between p-4 border-b bg-card">
             <h2 className="text-lg font-bold text-foreground">Suivi en temps réel</h2>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowMap(false)}
-              className="h-10 w-10"
-            >
+            <Button variant="ghost" size="icon" onClick={() => setShowMap(false)} className="h-10 w-10">
               <ArrowLeft className="w-5 h-5" />
             </Button>
           </div>
@@ -486,7 +443,18 @@ export default function ClientExterneApp() {
         </div>
       )}
 
-      {/* Bouton flottant VENUS */}
+      {/* Profil modal */}
+      {showProfilModal && (
+        <ProfilModal
+          clientProfil={clientProfil}
+          onClose={() => setShowProfilModal(false)}
+          onSave={(updatedProfil) => {
+            setClientProfil(updatedProfil);
+            setShowProfilModal(false);
+          }}
+        />
+      )}
+
       <VenusFloatingButton />
     </div>
   );
