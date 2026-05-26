@@ -32,7 +32,7 @@ export default function ClientExterneApp() {
   const [showProfilModal, setShowProfilModal] = useState(false);
   const [position, setPosition] = useState(null);
   const [clientProfil, setClientProfil] = useState(null);
-  const [courseActive, setCourseActive] = useState(null);
+  const [coursesActives, setCoursesActives] = useState([]);
   const [livreursProches, setLivreursProches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
@@ -76,16 +76,20 @@ export default function ClientExterneApp() {
     try {
       const user = await base44.auth.me();
       const coursesClient = await base44.entities.CourseExterne.filter({ created_by_id: user.id });
-      const activeCourseClient = coursesClient?.find(c => !["livree", "annulee"].includes(c.statut));
-      
-      let activeCourseDestinataire = null;
+      const actives = (coursesClient || []).filter(c => !["livree", "annulee"].includes(c.statut));
+
+      let activesDestinataire = [];
       if (profil?.id) {
         const coursesDestinataire = await base44.entities.CourseExterne.filter({ destinataire_client_id: profil.id });
-        activeCourseDestinataire = coursesDestinataire?.find(c =>
+        activesDestinataire = (coursesDestinataire || []).filter(c =>
           !["livree", "annulee"].includes(c.statut) && c.type_course === "expedier"
-        ) || null;
+        );
       }
-      setCourseActive(activeCourseClient || activeCourseDestinataire || null);
+
+      // Fusionner sans doublons par id
+      const toutes = [...actives];
+      activesDestinataire.forEach(c => { if (!toutes.find(x => x.id === c.id)) toutes.push(c); });
+      setCoursesActives(toutes);
 
       const userNotifications = await base44.entities.Notification.filter({ destinataire_email: user.email, lue: false });
       if (userNotifications?.length > 0) setNotifications(userNotifications);
@@ -154,43 +158,45 @@ export default function ClientExterneApp() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      {/* Course active - Floating card */}
-      {courseActive && (
-        <div className="fixed top-4 left-4 right-4 z-50 animate-in slide-in-from-top duration-300">
-          <Card className="border-l-4 border-l-primary shadow-lg cursor-pointer" onClick={() => navigate("/client/suivi")}>
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <Badge className="bg-primary/10 text-primary">
-                    {courseActive.statut === "recherche_livreur" ? "🔍 Recherche" : 
-                     courseActive.statut === "livreur_en_route" ? "🚀 En route" :
-                     courseActive.statut === "colis_recupere" ? "📦 Récupéré" : "🚚 Livraison"}
-                  </Badge>
-                </div>
-                <ChevronRight className="w-5 h-5 text-muted-foreground" />
-              </div>
-              <div className="flex items-center gap-3">
-                {courseActive.livreur_photo_url ? (
-                  <img src={courseActive.livreur_photo_url} alt={courseActive.livreur_nom} className="w-10 h-10 rounded-full object-cover border-2 border-primary" />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <User className="w-5 h-5 text-primary" />
+      {/* Courses actives - Floating cards */}
+      {coursesActives.length > 0 && (
+        <div className="fixed top-4 left-4 right-4 z-50 space-y-2 animate-in slide-in-from-top duration-300">
+          {coursesActives.map((course) => (
+            <Card key={course.id} className="border-l-4 border-l-primary shadow-lg cursor-pointer" onClick={() => navigate("/client/suivi", { state: { course_id: course.id } })}>
+              <div className="p-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <Badge className="bg-primary/10 text-primary text-xs">
+                      {course.statut === "recherche_livreur" ? "🔍 Recherche" :
+                       course.statut === "livreur_en_route" ? "🚀 En route" :
+                       course.statut === "colis_recupere" ? "📦 Récupéré" : "🚚 Livraison"}
+                    </Badge>
                   </div>
-                )}
-                <div className="flex-1">
-                  <p className="font-semibold text-sm">{courseActive.livreur_nom || "Livreur en route"}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {courseActive.adresse_depart} → {courseActive.adresse_arrivee}
-                  </p>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                </div>
+                <div className="flex items-center gap-2">
+                  {course.livreur_photo_url ? (
+                    <img src={course.livreur_photo_url} alt={course.livreur_nom} className="w-8 h-8 rounded-full object-cover border-2 border-primary" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <User className="w-4 h-4 text-primary" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-xs">{course.livreur_nom || "Recherche livreur..."}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {course.adresse_depart} → {course.adresse_arrivee}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          </Card>
+            </Card>
+          ))}
         </div>
       )}
 
-      <div className={`px-4 py-4 ${courseActive ? "mt-32" : ""}`}>
+      <div className={`px-4 py-4 ${coursesActives.length > 0 ? `mt-${Math.min(8 + coursesActives.length * 24, 56)}` : ""}`} style={coursesActives.length > 0 ? { marginTop: `${coursesActives.length * 90 + 8}px` } : {}}>
         <div className="max-w-lg mx-auto space-y-4">
 
           {/* Notifications */}
@@ -283,8 +289,8 @@ export default function ClientExterneApp() {
             </Card>
           </div>
 
-          {/* Bouton carte — uniquement si course active */}
-          {courseActive && position && (
+          {/* Bouton carte — uniquement si course active avec livreur localisable */}
+          {coursesActives.some(c => ["livreur_en_route","colis_recupere","en_livraison"].includes(c.statut)) && position && (
             <Card className="p-4 cursor-pointer hover:shadow-lg transition-all" onClick={() => setShowMap(true)}>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -385,22 +391,26 @@ export default function ClientExterneApp() {
         </div>
       </div>
 
-      {/* Modale carte temps réel */}
-      {showMap && courseActive && position && (
-        <div className="fixed inset-0 z-50 bg-background">
-          <div className="flex items-center justify-between p-4 border-b bg-card">
-            <h2 className="text-lg font-bold text-foreground">Suivi en temps réel</h2>
-            <Button variant="ghost" size="icon" onClick={() => setShowMap(false)} className="h-10 w-10">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
+      {/* Modale carte temps réel — utilise la première course avec livreur actif */}
+      {showMap && position && (() => {
+        const courseMap = coursesActives.find(c => ["livreur_en_route","colis_recupere","en_livraison"].includes(c.statut)) || coursesActives[0];
+        if (!courseMap) return null;
+        return (
+          <div className="fixed inset-0 z-50 bg-background">
+            <div className="flex items-center justify-between p-4 border-b bg-card">
+              <h2 className="text-lg font-bold text-foreground">Suivi en temps réel</h2>
+              <Button variant="ghost" size="icon" onClick={() => setShowMap(false)} className="h-10 w-10">
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+            </div>
+            <ModernMap
+              position={position}
+              livreursProches={livreursProches}
+              courseActive={courseMap}
+            />
           </div>
-          <ModernMap 
-            position={position}
-            livreursProches={livreursProches}
-            courseActive={courseActive}
-          />
-        </div>
-      )}
+        );
+      })()}
 
       {/* Profil modal */}
       {showProfilModal && (

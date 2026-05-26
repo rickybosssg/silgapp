@@ -38,11 +38,21 @@ async function trouverLivreursCandidats(base44, course, rayonKm, exclusions = []
 
   if (!livreurs || livreurs.length === 0) return [];
 
+  // Charger toutes les courses actives pour exclure les livreurs déjà en course
+  const coursesActives = await base44.asServiceRole.entities.CourseExterne.filter({});
+  const livreurIdsEnCourse = new Set(
+    coursesActives
+      .filter(c => ['livreur_en_route', 'colis_recupere', 'en_livraison'].includes(c.statut) && c.livreur_id)
+      .map(c => c.livreur_id)
+  );
+  console.log(`[DISPATCH] 🚫 Livreurs déjà en course exclus: ${livreurIdsEnCourse.size}`);
+
   // GPS valide = mis à jour dans les 5 dernières minutes
   const livreursGPS = livreurs.filter(l =>
     l.latitude && l.longitude && l.derniere_position_date &&
     new Date(l.derniere_position_date).getTime() > Date.now() - 300000 &&
-    !exclusions.includes(l.id)
+    !exclusions.includes(l.id) &&
+    !livreurIdsEnCourse.has(l.id)  // Exclure les livreurs déjà en course active
   );
 
   if (!course.gps_depart_lat || !course.gps_depart_lng) {
@@ -239,6 +249,7 @@ Deno.serve(async (req) => {
         delivery_code_4_digits: deliveryPIN,
       });
 
+      // Mettre le livreur en_course ET disponible=false (statut suffit pour l'exclusion dispatch)
       await base44.asServiceRole.entities.Livreur.update(livreur_id, { statut: 'en_course' });
 
       console.log(`[DISPATCH] 🎉 Course ${course_id} acceptée par ${livreur_id}`);
