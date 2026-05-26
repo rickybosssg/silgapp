@@ -310,7 +310,7 @@ export default function CourseEnAttenteModal({
             </div>
             <div className="flex gap-2">
               <a
-                href={`https://wa.me/226${course.client_telephone?.replace(/[^0-9]/g, "")}?text=${encodeURIComponent("Bonjour, je suis votre livreur SILGAPP. Je vous contacte pour votre course.")}`}
+                href={`https://wa.me/${course.client_telephone?.replace(/[^0-9]/g, "").replace(/^0+/, "")}`}
                 target="_blank" rel="noreferrer"
               >
                 <button className="w-11 h-11 rounded-2xl bg-green-50 border border-green-200 flex items-center justify-center">

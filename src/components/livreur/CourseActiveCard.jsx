@@ -72,12 +72,17 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   }, [gpsWatchId]);
 
   const handleConfirmerLivraison = () => {
-    const montant = parseFloat(prixReel);
-    if (!prixReel || isNaN(montant) || montant <= 0) {
-      toast.error("Entrez le montant reçu du client");
-      return;
+    if (isExterne) {
+      // Externe : le prix est calculé depuis le GPS, pas saisi manuellement
+      onColisLivre(course, gpsArrivee);
+    } else {
+      const montant = parseFloat(prixReel);
+      if (!prixReel || isNaN(montant) || montant <= 0) {
+        toast.error("Entrez le montant reçu du client");
+        return;
+      }
+      onColisLivre(course, montant, gpsArrivee);
     }
-    onColisLivre(course, montant, gpsArrivee);
     setShowPrixModal(false);
     setPrixReel("");
     setGpsArrivee(null);
@@ -85,7 +90,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
   const handleRemarque = () => {
     if (!remarque.trim()) return;
-    base44.entities.Course.update(course.id, { remarque_livreur: remarque });
+    // Utilise CourseExterne pour le réseau externe, Course pour l'interne
+    const entity = isExterne ? base44.entities.CourseExterne : base44.entities.Course;
+    entity.update(course.id, { remarque_livreur: remarque });
     setRemarque("");
     setShowRemarque(false);
     toast.success("Remarque enregistrée");
@@ -144,8 +151,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
         />
       )}
 
-      {/* Modal montant */}
-      {showPrixModal && (
+      {/* Modal montant — uniquement pour l'interne (externe calcule via GPS) */}
+      {showPrixModal && !isExterne && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
         >
@@ -182,6 +189,22 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               >
                 Confirmer ✅
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Externe : confirmation automatique sans saisie de montant */}
+      {showPrixModal && isExterne && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
+        >
+          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl space-y-5 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center mx-auto text-3xl">🎉</div>
+            <p className="text-xl font-black text-gray-900">Confirmer la livraison ?</p>
+            <p className="text-sm text-gray-500">Le prix final sera calculé automatiquement selon la distance GPS réelle.</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button className="h-12 rounded-2xl border border-gray-200 text-gray-600 font-bold text-sm" onClick={() => setShowPrixModal(false)}>Annuler</button>
+              <button className="h-12 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-sm shadow-lg shadow-red-200 disabled:opacity-50" onClick={handleConfirmerLivraison} disabled={isPending}>Livré ✅</button>
             </div>
           </div>
         </div>
@@ -376,13 +399,16 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 )
               )}
 
-              <button
-                className="w-full h-11 rounded-2xl border border-red-200 text-red-500 font-semibold text-sm flex items-center justify-center gap-2 active:bg-red-50 transition-colors disabled:opacity-50"
-                onClick={() => onClientAnnule(course)}
-                disabled={isPending}
-              >
-                <X className="w-4 h-4" /> Le client a annulé
-              </button>
+              {/* Bouton annulation client — uniquement pour l'interne */}
+              {!isExterne && (
+                <button
+                  className="w-full h-11 rounded-2xl border border-red-200 text-red-500 font-semibold text-sm flex items-center justify-center gap-2 active:bg-red-50 transition-colors disabled:opacity-50"
+                  onClick={() => onClientAnnule?.(course)}
+                  disabled={isPending}
+                >
+                  <X className="w-4 h-4" /> Le client a annulé
+                </button>
+              )}
 
               {!showRemarque ? (
                 <button
@@ -419,7 +445,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                       +{course.montant_livreur.toLocaleString()} F gagnés
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Commission Silga: {course.commission_silga?.toLocaleString() || Math.round(course.prix_final * 0.3).toLocaleString()} F (30%)
+                      Commission Silga: {(course.commission_silga ?? (course.prix_final ? Math.round(course.prix_final * 0.3) : 0)).toLocaleString()} F (30%)
                     </p>
                   </>
                 )

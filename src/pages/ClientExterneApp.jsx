@@ -42,6 +42,20 @@ export default function ClientExterneApp() {
     loadProfil();
   }, []);
 
+  // Auto-complétion onboarding si GPS + profil déjà ok (retour sur l'app)
+  useEffect(() => {
+    if (onboardingDone || !clientProfil) return;
+    const gpsOk = localStorage.getItem("client_gps_active") === "true";
+    const profilComplet = !!(clientProfil.nom && clientProfil.prenom && clientProfil.telephone &&
+      clientProfil.telephone.replace(/\D/g, "").length >= 8);
+    if (gpsOk && profilComplet) {
+      const savedPos = JSON.parse(localStorage.getItem("client_gps_position") || "null");
+      setOnboardingDone(true);
+      setPosition(savedPos);
+      checkStatus(savedPos, clientProfil);
+    }
+  }, [clientProfil, onboardingDone]);
+
   const loadProfil = async () => {
     try {
       const user = await base44.auth.me();
@@ -145,14 +159,11 @@ export default function ClientExterneApp() {
         />
       );
     }
-    // Profil déjà complet → passer directement
-    if (!onboardingDone) {
-      const savedPos = JSON.parse(localStorage.getItem("client_gps_position") || "null");
-      setOnboardingDone(true);
-      setPosition(savedPos);
-      checkStatus(savedPos, clientProfil);
-    }
+    // Profil déjà complet → passer via useEffect, pas pendant le rendu
   }
+
+  // useEffect déclenché si profil complet mais onboarding pas encore marqué done
+  // (cas connexion ultérieure avec GPS et profil déjà renseignés)
 
   const prenom = clientProfil?.prenom || clientProfil?.nom?.split(" ")[0] || "Client";
 

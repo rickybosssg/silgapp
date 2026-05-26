@@ -27,6 +27,7 @@ export default function ClientSuiviCourse() {
   const [userId, setUserId] = useState(null);
   const [showRating, setShowRating] = useState(false);
   const [showAnnulerDialog, setShowAnnulerDialog] = useState(false);
+  const [selectedCourseId, setSelectedCourseId] = useState(null);
 
   // Récupérer l'ID user pour filtrer correctement
   useEffect(() => {
@@ -46,8 +47,11 @@ export default function ClientSuiviCourse() {
     refetchInterval: 5000,
   });
 
-  // Course la plus récente non terminée, sinon la dernière
-  const maCourse = courses.find(c => !["livree", "annulee"].includes(c.statut)) || courses[0] || null;
+  // Toutes les courses actives
+  const coursesActives = courses.filter(c => !["livree", "annulee"].includes(c.statut));
+  // Course sélectionnée : celle choisie ou la première active ou la dernière
+  const maCourse = (selectedCourseId ? courses.find(c => c.id === selectedCourseId) : null)
+    || coursesActives[0] || courses[0] || null;
 
   const handleRated = () => {
     setShowRating(false);
@@ -74,7 +78,7 @@ export default function ClientSuiviCourse() {
           <p className="text-sm text-muted-foreground mb-4">
             Vous n'avez pas de course active pour le moment
           </p>
-          <Button onClick={() => navigate("/client")} variant="outline" className="w-full">
+          <Button onClick={() => navigate("/")} variant="outline" className="w-full">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Retour au dashboard
           </Button>
@@ -108,10 +112,43 @@ export default function ClientSuiviCourse() {
       <div className="max-w-lg mx-auto space-y-4">
 
         {/* Bouton retour */}
-        <Button variant="ghost" size="sm" onClick={() => navigate("/client")} className="gap-2">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="gap-2">
           <ArrowLeft className="w-4 h-4" />
           Retour au dashboard
         </Button>
+
+        {/* Sélecteur de course si plusieurs actives */}
+        {coursesActives.length > 1 && (
+          <Card className="p-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+              {coursesActives.length} courses actives — sélectionnez
+            </p>
+            <div className="space-y-2">
+              {coursesActives.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setSelectedCourseId(c.id)}
+                  className={`w-full text-left p-3 rounded-xl border-2 transition-all ${
+                    maCourse?.id === c.id ? "border-primary bg-primary/5" : "border-gray-200 hover:border-primary/30"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-foreground truncate max-w-[200px]">
+                      {c.adresse_depart} → {c.adresse_arrivee}
+                    </span>
+                    <Badge className={`text-xs ml-2 flex-shrink-0 ${
+                      c.statut === "recherche_livreur" ? "bg-orange-100 text-orange-700" :
+                      c.statut === "livreur_en_route" ? "bg-blue-100 text-blue-700" :
+                      "bg-purple-100 text-purple-700"
+                    }`}>
+                      {c.statut === "recherche_livreur" ? "🔍" : c.statut === "livreur_en_route" ? "🚀" : "📦"}
+                    </Badge>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </Card>
+        )}
 
         {/* Statut course */}
         <Card className="p-4">
