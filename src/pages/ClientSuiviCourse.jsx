@@ -253,8 +253,8 @@ export default function ClientSuiviCourse() {
                 <h3 className="font-bold text-green-900">Course terminée</h3>
               </div>
               <div className="space-y-1 text-sm text-green-800">
-                {maCourse.distance_reelle_km && (
-                  <p>Distance parcourue : {maCourse.distance_reelle_km.toFixed(1)} km</p>
+                {maCourse.distance_reelle_km != null && (
+                  <p>Distance parcourue : {Number(maCourse.distance_reelle_km || 0).toFixed(1)} km</p>
                 )}
                 <p>Montant total : {maCourse.prix_final.toLocaleString()} FCFA</p>
                 {maCourse.commission_silga && (

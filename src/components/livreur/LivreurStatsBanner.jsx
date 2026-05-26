@@ -40,7 +40,7 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
           )}
         </div>
         <p className="text-base font-bold text-gray-900 leading-tight">
-          {isExterne && montantDüSilga ? `${(montantDüSilga / 1000).toFixed(1)}k` : (totalEncaisse > 0 ? `${(totalEncaisse / 1000).toFixed(1)}k` : "0")}
+          {isExterne && montantDüSilga ? `${(Number(montantDüSilga || 0) / 1000).toFixed(1)}k` : (totalEncaisse > 0 ? `${(Number(totalEncaisse || 0) / 1000).toFixed(1)}k` : "0")}
         </p>
         <p className="text-[10px] text-gray-400 font-medium">
           {isExterne ? "Dû Silga" : "FCFA"}

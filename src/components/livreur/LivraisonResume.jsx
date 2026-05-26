@@ -82,7 +82,7 @@ export default function LivraisonResume({
               <p className="text-xs font-bold text-blue-600 uppercase">Distance</p>
             </div>
             <p className="text-2xl font-black text-blue-700">
-              {distance ? distance.toFixed(2) : "--"} <span className="text-sm font-semibold">km</span>
+              {distance != null ? Number(distance).toFixed(2) : "--"} <span className="text-sm font-semibold">km</span>
             </p>
             <p className="text-[10px] text-blue-400 mt-1 uppercase font-bold">
               {typeDistance === "reelle" ? "GPS réel" : "Estimée"}
@@ -107,7 +107,7 @@ export default function LivraisonResume({
             <div className="flex-1">
               <p className="text-[10px] text-gray-400 font-semibold uppercase">Départ</p>
               <p className="text-xs font-medium text-gray-700">
-                {gpsDepart.lat.toFixed(6)}, {gpsDepart.lng.toFixed(6)}
+                {(gpsDepart.lat ?? 0).toFixed(6)}, {(gpsDepart.lng ?? 0).toFixed(6)}
               </p>
               {course.colis_recupere_at && (
                 <p className="text-[10px] text-gray-400 mt-0.5">
@@ -121,7 +121,7 @@ export default function LivraisonResume({
             <div className="flex-1">
               <p className="text-[10px] text-gray-400 font-semibold uppercase">Arrivée</p>
               <p className="text-xs font-medium text-gray-700">
-                {gpsArrivee.lat.toFixed(6)}, {gpsArrivee.lng.toFixed(6)}
+                {(gpsArrivee.lat ?? 0).toFixed(6)}, {(gpsArrivee.lng ?? 0).toFixed(6)}
               </p>
               {course.colis_livre_at && (
                 <p className="text-[10px] text-gray-400 mt-0.5">

@@ -253,7 +253,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         course.latitude_recuperation, course.longitude_recuperation,
         gpsArrivee.lat, gpsArrivee.lng
       );
-      const prixFinal = Math.round(distance * 100);
+      const distanceVal = Number(distance || 0);
+      const prixFinal = Math.round(distanceVal * 100);
       const commissionSilga = Math.round(prixFinal * 0.3);
       const montantLivreur = prixFinal - commissionSilga;
 
@@ -263,7 +264,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           ...baseData,
           latitude_livraison: gpsArrivee.lat,
           longitude_livraison: gpsArrivee.lng,
-          distance_reelle_km: distance,
+          distance_reelle_km: distanceVal,
           prix_final: prixFinal,
           commission_silga: commissionSilga,
           montant_livreur: montantLivreur,

@@ -68,6 +68,7 @@ async function assignerCourse(base44, courseId, course, livreur) {
   const distance = (course.gps_depart_lat && livreur.latitude)
     ? calculerDistance(course.gps_depart_lat, course.gps_depart_lng, livreur.latitude, livreur.longitude)
     : 0;
+  const distanceSafe = Number(distance || 0);
 
   await base44.asServiceRole.entities.CourseExterne.update(courseId, {
     livreur_id: livreur.id,
@@ -86,7 +87,7 @@ async function assignerCourse(base44, courseId, course, livreur) {
       await base44.functions.invoke('envoiNotificationPush', {
         email: livreur.user_email,
         titre: '🚨 Nouvelle course disponible !',
-        message: `Course à ${distance.toFixed(1)}km - ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`,
+        message: `Course à ${distanceSafe.toFixed(1)}km - ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`,
         type: 'nouvelle_course',
         course_id: courseId,
       });
@@ -95,7 +96,7 @@ async function assignerCourse(base44, courseId, course, livreur) {
     }
   }
 
-  return { livreur, distance };
+  return { livreur, distance: distanceSafe };
 }
 
 Deno.serve(async (req) => {
@@ -129,12 +130,12 @@ Deno.serve(async (req) => {
         return Response.json({ success: false, message: 'Aucun livreur disponible dans un rayon de 8km' });
       }
 
-      const { livreur, distance } = await assignerCourse(base44, course_id, course, livreursTries[0]);
+      const { livreur, distance: distanceSafe } = await assignerCourse(base44, course_id, course, livreursTries[0]);
 
       return Response.json({
         success: true,
-        livreur: { id: livreur.id, nom: `${livreur.prenom || ''} ${livreur.nom}`.trim(), distance_km: distance.toFixed(1) },
-        message: `Livreur trouvé à ${distance.toFixed(1)} km`,
+        livreur: { id: livreur.id, nom: `${livreur.prenom || ''} ${livreur.nom}`.trim(), distance_km: distanceSafe.toFixed(1) },
+        message: `Livreur trouvé à ${distanceSafe.toFixed(1)} km`,
         expires_in: 60,
       });
     }
