@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import { Check } from "lucide-react";
-import PhotoPicker from "./PhotoPicker";
 
 // ─── Helpers téléphone ────────────────────────────────────────────────────────
 export function normaliserTelephone(tel) {
@@ -126,12 +125,7 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
     telephone: livreurProfil?.telephone ? livreurProfil.telephone.replace(/\D/g, "").slice(-8) : "",
     quartier: livreurProfil?.quartier || "",
     vehicule: livreurProfil?.vehicule || livreurProfil?.type_vehicule || "moto",
-    numero_plaque: livreurProfil?.numero_plaque || "",
   });
-  const [photoLivreur, setPhotoLivreur] = useState(livreurProfil?.photo_url || null);
-  const [photoMoto, setPhotoMoto] = useState(livreurProfil?.photo_moto_url || null);
-  const [cnibRecto, setCnibRecto] = useState(livreurProfil?.photo_cnib_recto_url || null);
-  const [cnibVerso, setCnibVerso] = useState(livreurProfil?.photo_cnib_verso_url || null);
   const [saving, setSaving] = useState(false);
 
   const setF = (key, val) => setForm(f => ({ ...f, [key]: val }));
@@ -155,15 +149,10 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
       quartier: form.quartier.trim(),
       vehicule: form.vehicule,
       type_vehicule: form.vehicule,
-      numero_plaque: form.numero_plaque.trim(),
       latitude: gpsData?.lat || null,
       longitude: gpsData?.lng || null,
       derniere_position_date: gpsData ? new Date().toISOString() : null,
     };
-    if (photoLivreur) data.photo_url = photoLivreur;
-    if (photoMoto) data.photo_moto_url = photoMoto;
-    if (cnibRecto) data.photo_cnib_recto_url = cnibRecto;
-    if (cnibVerso) data.photo_cnib_verso_url = cnibVerso;
 
     try {
       await base44.functions.invoke('updateLivreur', { id: livreurProfil.id, data });
@@ -194,7 +183,6 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
           { key: "nom", label: "Nom *", placeholder: "Ex: Ouédraogo" },
           { key: "prenom", label: "Prénom *", placeholder: "Ex: Ibrahim" },
           { key: "quartier", label: "Quartier de résidence *", placeholder: "Ex: Wemtenga" },
-          { key: "numero_plaque", label: "N° de plaque (optionnel)", placeholder: "Ex: 12AB3456" },
         ].map(({ key, label, placeholder }) => (
           <div key={key}>
             <label className="block text-xs font-semibold text-gray-400 mb-1 uppercase tracking-wide">{label}</label>
@@ -248,15 +236,6 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
               </button>
             ))}
           </div>
-        </div>
-
-        {/* Photos */}
-        <div className="space-y-3">
-          <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide">Photos (optionnelles mais recommandées)</label>
-          <PhotoPicker label="📸 Photo de vous" value={photoLivreur} onChange={setPhotoLivreur} darkMode />
-          <PhotoPicker label="🚗 Photo du moyen de déplacement" value={photoMoto} onChange={setPhotoMoto} darkMode />
-          <PhotoPicker label="🪪 CNIB Recto" value={cnibRecto} onChange={setCnibRecto} darkMode />
-          <PhotoPicker label="🪪 CNIB Verso" value={cnibVerso} onChange={setCnibVerso} darkMode />
         </div>
 
         {/* Bouton sauvegarder */}
