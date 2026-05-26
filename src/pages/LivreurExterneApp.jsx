@@ -101,6 +101,24 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     } : null);
     return course;
   }, [mesCourses]);
+
+  // DEBUG MODE - affichage visible des données
+  const [showDebug, setShowDebug] = useState(false);
+  const debugData = {
+    totalCourses: mesCourses?.length || 0,
+    courseEnAttente: courseEnAttente ? {
+      id: courseEnAttente.id,
+      statut: courseEnAttente.statut,
+      dispatch_status: courseEnAttente.dispatch_status,
+      livreur_id: courseEnAttente.livreur_id,
+      client_nom: courseEnAttente.client_nom,
+      adresse_depart: courseEnAttente.adresse_depart,
+    } : null,
+    modalOpen: !!courseEnAttente,
+    livreurStatut: livreurProfil?.statut,
+    gpsActif,
+    isEnLigne,
+  };
   
   const coursesActives = useMemo(() => mesCourses.filter(c => ["livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut)), [mesCourses]);
 
@@ -329,7 +347,14 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   // Modal AVANT le return pour être au-dessus de tout
   if (courseEnAttente) {
-    console.log('[LIVREUR EXTERNE] 🚨 AFFICHAGE MODAL:', courseEnAttente.id);
+    console.log('[LIVREUR EXTERNE] 🚨 AFFICHAGE MODAL:', {
+      id: courseEnAttente.id,
+      statut: courseEnAttente.statut,
+      dispatch_status: courseEnAttente.dispatch_status,
+      client: courseEnAttente.client_nom,
+      depart: courseEnAttente.adresse_depart,
+      arrivee: courseEnAttente.adresse_arrivee,
+    });
     return (
       <>
         <CourseEnAttenteModal
@@ -342,6 +367,27 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles", "mes-courses-externes"] });
           }}
         />
+        {/* DEBUG OVERLAY - bouton pour afficher/masquer */}
+        <button
+          onClick={() => setShowDebug(!showDebug)}
+          className="fixed bottom-4 right-4 z-[100] w-10 h-10 rounded-full bg-red-600 text-white font-bold text-xs shadow-lg"
+        >
+          🐛
+        </button>
+        {showDebug && (
+          <div className="fixed top-0 left-0 z-[99] bg-black/90 text-green-400 p-4 text-xs font-mono max-h-screen overflow-auto w-full max-w-sm">
+            <div className="flex justify-between items-center mb-2">
+              <strong className="text-white text-sm">🔍 DEBUG MODE</strong>
+              <button onClick={() => setShowDebug(false)} className="text-white text-xs">✕</button>
+            </div>
+            <pre>{JSON.stringify(debugData, null, 2)}</pre>
+            <div className="mt-2 text-white">
+              <p>✅ Modal devrait être affiché</p>
+              <p>📦 Courses totales: {debugData.totalCourses}</p>
+              <p>🚨 Course en attente: {debugData.courseEnAttente ? 'OUI' : 'NON'}</p>
+            </div>
+          </div>
+        )}
       </>
     );
   }
@@ -359,6 +405,38 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
         {activeTab === "courses" && (
           <div className="space-y-4">
+            {/* DEBUG BUTTON - visible même sans modal */}
+            <button
+              onClick={() => setShowDebug(!showDebug)}
+              className="fixed bottom-4 right-4 z-50 w-10 h-10 rounded-full bg-red-600 text-white font-bold text-xs shadow-lg"
+            >
+              🐛
+            </button>
+            {showDebug && (
+              <div className="fixed top-0 left-0 z-50 bg-black/90 text-green-400 p-4 text-xs font-mono max-h-screen overflow-auto w-full max-w-sm">
+                <div className="flex justify-between items-center mb-2">
+                  <strong className="text-white text-sm">🔍 DEBUG MODE</strong>
+                  <button onClick={() => setShowDebug(false)} className="text-white text-xs">✕</button>
+                </div>
+                <pre>{JSON.stringify(debugData, null, 2)}</pre>
+                <div className="mt-2 text-white space-y-1">
+                  <p>📦 Courses totales: {debugData.totalCourses}</p>
+                  <p>🚨 Course en attente: {debugData.courseEnAttente ? 'OUI (' + debugData.courseEnAttente.id + ')' : 'NON'}</p>
+                  <p>📍 GPS actif: {debugData.gpsActif ? 'OUI' : 'NON'}</p>
+                  <p>✅ En ligne: {debugData.isEnLigne ? 'OUI' : 'NON'}</p>
+                  <p>👤 Statut: {debugData.livreurStatut}</p>
+                  {debugData.courseEnAttente && (
+                    <>
+                      <hr className="border-gray-700 my-2" />
+                      <p className="text-yellow-400">🎯 MODAL DEVRAIT ÊTRE AFFICHÉ</p>
+                      <p>Client: {debugData.courseEnAttente.client_nom}</p>
+                      <p>Départ: {debugData.courseEnAttente.adresse_depart}</p>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
             <LivreurHeader
               livreur={livreurProfil}
               isEnLigne={isEnLigne}
