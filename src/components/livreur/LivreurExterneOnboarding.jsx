@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
-import { Camera, Upload, Check } from "lucide-react";
+import { Check } from "lucide-react";
+import PhotoPicker from "./PhotoPicker";
 
 // ─── Helpers téléphone ────────────────────────────────────────────────────────
 export function normaliserTelephone(tel) {
@@ -131,7 +132,6 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
   const [photoMoto, setPhotoMoto] = useState(livreurProfil?.photo_moto_url || null);
   const [cnibRecto, setCnibRecto] = useState(livreurProfil?.photo_cnib_recto_url || null);
   const [cnibVerso, setCnibVerso] = useState(livreurProfil?.photo_cnib_verso_url || null);
-  const [uploading, setUploading] = useState({});
   const [saving, setSaving] = useState(false);
 
   const setF = (key, val) => setForm(f => ({ ...f, [key]: val }));
@@ -139,20 +139,6 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
   const handleTelephone = (e) => {
     const raw = e.target.value.replace(/\D/g, "").slice(0, 8);
     setF("telephone", raw);
-  };
-
-  const handlePhoto = async (field, setFn, e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(u => ({ ...u, [field]: true }));
-    try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      setFn(file_url);
-    } catch {
-      toast.error("Erreur upload photo");
-    } finally {
-      setUploading(u => ({ ...u, [field]: false }));
-    }
   };
 
   const telValide = form.telephone.length === 8;
@@ -267,38 +253,10 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
         {/* Photos */}
         <div className="space-y-3">
           <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide">Photos (optionnelles mais recommandées)</label>
-          {[
-            { key: "photo", label: "📸 Photo de vous", state: photoLivreur, setFn: setPhotoLivreur },
-            { key: "moto", label: "🏍️ Photo du véhicule", state: photoMoto, setFn: setPhotoMoto },
-            { key: "cnib_recto", label: "🪪 CNIB Recto", state: cnibRecto, setFn: setCnibRecto },
-            { key: "cnib_verso", label: "🪪 CNIB Verso", state: cnibVerso, setFn: setCnibVerso },
-          ].map(({ key, label, state, setFn }) => (
-            <div key={key}>
-              <label className="block text-xs text-gray-400 mb-1">{label}</label>
-              {state ? (
-                <div className="flex items-center gap-2">
-                  <img src={state} alt="" className="w-14 h-14 rounded-xl object-cover border border-zinc-700" />
-                  <label className="text-xs text-red-400 cursor-pointer underline">
-                    Changer
-                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => handlePhoto(key, setFn, e)} />
-                  </label>
-                </div>
-              ) : (
-                <div className="flex gap-2">
-                  <label className="flex-1 h-11 rounded-xl bg-zinc-900 border border-dashed border-zinc-600 flex items-center justify-center gap-2 text-xs text-gray-400 cursor-pointer">
-                    <Camera className="w-4 h-4" />
-                    {uploading[key] ? "Upload..." : "Appareil photo"}
-                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => handlePhoto(key, setFn, e)} disabled={uploading[key]} />
-                  </label>
-                  <label className="flex-1 h-11 rounded-xl bg-zinc-900 border border-dashed border-zinc-600 flex items-center justify-center gap-2 text-xs text-gray-400 cursor-pointer">
-                    <Upload className="w-4 h-4" />
-                    {uploading[key] ? "Upload..." : "Galerie"}
-                    <input type="file" accept="image/*" className="hidden" onChange={e => handlePhoto(key, setFn, e)} disabled={uploading[key]} />
-                  </label>
-                </div>
-              )}
-            </div>
-          ))}
+          <PhotoPicker label="📸 Photo de vous" value={photoLivreur} onChange={setPhotoLivreur} darkMode />
+          <PhotoPicker label="🚗 Photo du moyen de déplacement" value={photoMoto} onChange={setPhotoMoto} darkMode />
+          <PhotoPicker label="🪪 CNIB Recto" value={cnibRecto} onChange={setCnibRecto} darkMode />
+          <PhotoPicker label="🪪 CNIB Verso" value={cnibVerso} onChange={setCnibVerso} darkMode />
         </div>
 
         {/* Bouton sauvegarder */}
