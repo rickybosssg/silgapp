@@ -21,26 +21,32 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import QRCodeDisplay from "@/components/client/QRCodeDisplay";
 
+// Lien APK configurable — changer ici pour mettre à jour le lien de téléchargement
+const APK_DOWNLOAD_URL = "https://drive.google.com/drive/folders/silgapp-apk";
+
 export default function PublicSuiviCourse({ token }) {
   const [course, setCourse] = useState(null);
   const [mapLoaded, setMapLoaded] = useState(false);
 
-  // Récupérer la course par token
+  // Récupérer la course par token ou par ID direct
   useEffect(() => {
     async function fetchCourse() {
       try {
-        const courses = await base44.entities.CourseExterne.filter({
+        // Chercher par tracking_token d'abord, puis par id
+        let courses = await base44.entities.CourseExterne.filter({
           tracking_token: token
         });
         
+        // Fallback : chercher par ID
+        if (!courses || courses.length === 0) {
+          try {
+            const byId = await base44.entities.CourseExterne.get(token);
+            if (byId) courses = [byId];
+          } catch (_) {}
+        }
+
         if (courses && courses.length > 0) {
           setCourse(courses[0]);
-          
-          // Tracker l'ouverture
-          await base44.functions.invoke("clientSync", {
-            action: "track_open",
-            course_id: courses[0].id
-          });
         }
       } catch (err) {
         console.error("Erreur fetch course:", err);
@@ -266,31 +272,31 @@ export default function PublicSuiviCourse({ token }) {
           </Card>
         )}
 
-        {/* QR Code de livraison - pour destinataire sans app */}
-        {course.livreur_id && 
-         course.type_course === "expedier" && 
-         !course.recipient_has_app && 
-         ["livreur_en_route", "colis_recupere", "en_livraison"].includes(course.statut) && (
+        {/* QR Code de livraison - visible automatiquement pour le destinataire */}
+        {course.livreur_id && ["colis_recupere", "en_livraison"].includes(course.statut) && (
           <Card className="p-6 border-2 border-dashed border-primary/30 bg-blue-50">
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2 mb-3">
               <QrCode className="w-6 h-6 text-primary" />
-              <h2 className="font-bold text-lg text-primary">Code de réception</h2>
+              <h2 className="font-bold text-lg text-primary">Votre code de réception</h2>
             </div>
-            
             <p className="text-sm text-muted-foreground mb-4">
-              Montrez ce QR code au livreur quand il arrivera pour confirmer la réception du colis
+              Le livreur est en route. Présentez ce code ou QR code pour confirmer la réception.
             </p>
-            
             <QRCodeDisplay course={course} type="delivery" />
-            
-            <div className="mt-4 bg-white rounded-lg p-3 border border-blue-200">
-              <p className="text-xs text-blue-800 font-semibold">
-                💡 Information
-              </p>
-              <p className="text-xs text-blue-700 mt-1">
-                Le livreur scannera ce code ou utilisera le code à 4 chiffres pour confirmer la livraison
-              </p>
+          </Card>
+        )}
+
+        {/* QR Code de récupération - pour le statut livreur_en_route */}
+        {course.livreur_id && course.statut === "livreur_en_route" && (
+          <Card className="p-6 border-2 border-dashed border-amber-300 bg-amber-50">
+            <div className="flex items-center gap-2 mb-3">
+              <QrCode className="w-6 h-6 text-amber-600" />
+              <h2 className="font-bold text-lg text-amber-700">Code de récupération</h2>
             </div>
+            <p className="text-sm text-amber-700 mb-4">
+              Le livreur arrive bientôt. Présentez ce code pour confirmer la prise en charge.
+            </p>
+            <QRCodeDisplay course={course} type="pickup" />
           </Card>
         )}
 
@@ -363,14 +369,14 @@ export default function PublicSuiviCourse({ token }) {
                       Noter
                     </Button>
                     <a
-                      href="https://drive.google.com/drive/folders/your-apk-folder"
+                      href={APK_DOWNLOAD_URL}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-1"
                     >
                       <Button variant="outline" className="w-full border-green-600 text-green-700 hover:bg-green-50">
                         <Download className="w-4 h-4 mr-2" />
-                        Télécharger l'appli
+                        Télécharger SILGAPP
                       </Button>
                     </a>
                   </div>

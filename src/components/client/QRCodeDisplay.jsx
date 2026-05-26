@@ -1,169 +1,115 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Package, Truck, Copy, CheckCircle2 } from "lucide-react";
+import { Package, Truck, Copy, CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+/**
+ * Affiche automatiquement le QR code + code PIN de récupération ou livraison.
+ * Les codes sont générés côté backend à l'acceptation — plus de bouton manuel.
+ */
 export default function QRCodeDisplay({ course, type }) {
-  const [codesGenerated, setCodesGenerated] = React.useState(false);
-  const [pickupData, setPickupData] = React.useState(null);
-  const [deliveryData, setDeliveryData] = React.useState(null);
-
-  React.useEffect(() => {
-    if (course.pickup_qr_token && course.delivery_qr_token) {
-      setCodesGenerated(true);
-      setPickupData({
-        qr_token: course.pickup_qr_token,
-        code_4_digits: course.pickup_code_4_digits,
-      });
-      setDeliveryData({
-        qr_token: course.delivery_qr_token,
-        code_4_digits: course.delivery_code_4_digits,
-      });
-    }
-  }, [course]);
-
-  const handleGenerateCodes = async () => {
-    try {
-      const result = await base44.functions.invoke("validateQRCode", {
-        course_id: course.id,
-        action: "generate_codes",
-      });
-      
-      setCodesGenerated(true);
-      setPickupData({
-        qr_token: result.pickup_qr_token,
-        code_4_digits: result.pickup_code_4_digits,
-      });
-      setDeliveryData({
-        qr_token: result.delivery_qr_token,
-        code_4_digits: result.delivery_code_4_digits,
-      });
-      
-      toast.success("Codes QR générés avec succès");
-    } catch (err) {
-      toast.error("Erreur: " + err.message);
-    }
-  };
-
-  const handleCopyCode = (code, label) => {
-    navigator.clipboard.writeText(code);
-    toast.success(`${label} copié !`);
-  };
-
-  if (!codesGenerated) {
-    return (
-      <Card className="p-6 text-center">
-        <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-        <p className="text-sm text-muted-foreground mb-4">
-          Les codes QR seront générés quand la course sera acceptée par un livreur
-        </p>
-        <Button onClick={handleGenerateCodes} className="gap-2">
-          <Package className="w-4 h-4" />
-          Générer les codes maintenant
-        </Button>
-      </Card>
-    );
-  }
-
   const isPickup = type === "pickup";
-  const data = isPickup ? pickupData : deliveryData;
-  const isConfirmed = isPickup ? course.pickup_confirmed_at : course.delivery_confirmed_at;
+  const qrToken = isPickup ? course.pickup_qr_token : course.delivery_qr_token;
+  const code4 = isPickup ? course.pickup_code_4_digits : course.delivery_code_4_digits;
+  const confirmedAt = isPickup ? course.pickup_confirmed_at : course.delivery_confirmed_at;
+  const confirmedBy = isPickup ? course.pickup_confirmed_by : course.delivery_confirmed_by;
 
-  if (isConfirmed) {
+  // Déjà confirmé
+  if (confirmedAt) {
     return (
-      <Card className="p-6 bg-green-50 border-green-200">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
+      <Card className="p-5 bg-green-50 border-green-200">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
             <CheckCircle2 className="w-6 h-6 text-white" />
           </div>
           <div>
             <h3 className="font-bold text-green-900">
-              {isPickup ? "Récupération confirmée" : "Livraison confirmée"}
+              {isPickup ? "Récupération confirmée ✅" : "Livraison confirmée ✅"}
             </h3>
             <p className="text-sm text-green-700">
-              Confirmé par {course[isPickup ? 'pickup_confirmed_by' : 'delivery_confirmed_by'] === 'qr' ? 'QR code' : 'code manuel'}
+              Validé par {confirmedBy === "qr" ? "QR code" : "code manuel"}
             </p>
-            <p className="text-xs text-green-600 mt-1">
-              {new Date(isPickup ? course.pickup_confirmed_at : course.delivery_confirmed_at).toLocaleString('fr-FR')}
+            <p className="text-xs text-green-600 mt-0.5">
+              {new Date(confirmedAt).toLocaleString("fr-FR")}
             </p>
           </div>
         </div>
+      </Card>
+    );
+  }
+
+  // Codes pas encore générés (livreur pas encore assigné)
+  if (!qrToken || !code4) {
+    return (
+      <Card className="p-5 text-center bg-gray-50">
+        <Loader2 className="w-8 h-8 text-muted-foreground mx-auto mb-3 animate-spin" />
+        <p className="text-sm text-muted-foreground">
+          Le code sera généré automatiquement quand un livreur accepte la course
+        </p>
       </Card>
     );
   }
 
   return (
-    <Card className="p-6">
+    <Card className="p-5 border-2 border-dashed border-primary/30">
       <div className="flex items-center gap-2 mb-4">
         {isPickup ? (
           <>
             <Package className="w-5 h-5 text-primary" />
-            <h3 className="font-bold text-lg">Code de récupération</h3>
+            <h3 className="font-bold text-base">Code de récupération</h3>
           </>
         ) : (
           <>
             <Truck className="w-5 h-5 text-accent" />
-            <h3 className="font-bold text-lg">Code de livraison</h3>
+            <h3 className="font-bold text-base">Code de livraison</h3>
           </>
         )}
+        <Badge variant="outline" className="ml-auto text-xs text-green-700 border-green-300">Actif</Badge>
       </div>
 
+      <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
+        📲 Présentez ce QR code ou donnez le code à 4 chiffres au livreur pour confirmer{" "}
+        {isPickup ? "la récupération du colis" : "la livraison"}.
+      </p>
+
       {/* QR Code */}
-      <div className="bg-white p-4 rounded-lg border-2 border-dashed border-gray-300 mb-4">
-        <QRCodeSVG 
-          value={data.qr_token}
-          size={200}
+      <div className="bg-white p-4 rounded-2xl border-2 border-gray-100 mb-4 flex flex-col items-center">
+        <QRCodeSVG
+          value={qrToken}
+          size={180}
           level="H"
           includeMargin={true}
         />
-        <p className="text-xs text-center text-muted-foreground mt-2">
-          Présentez ce QR code au livreur pour {isPickup ? "récupérer le colis" : "confirmer la livraison"}
+        <p className="text-[10px] text-center text-muted-foreground mt-2">
+          Scannez avec l'app SILGAPP livreur
         </p>
       </div>
 
-      {/* Code manuel 4 chiffres */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <p className="text-xs font-semibold text-blue-900 mb-2">
-          Code de secours à 4 chiffres
+      {/* Code PIN */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+        <p className="text-xs font-bold text-blue-900 mb-2 uppercase tracking-wide">
+          Code de secours
         </p>
         <div className="flex items-center justify-between gap-3">
-          <div className="flex-1 text-center bg-white rounded-lg py-3 px-4 border-2 border-blue-300">
-            <span className="text-2xl font-bold text-blue-900 tracking-widest">
-              {data.code_4_digits}
-            </span>
+          <div className="flex-1 text-center bg-white rounded-xl py-3 px-4 border-2 border-blue-200">
+            <span className="text-3xl font-black text-blue-900 tracking-[0.4em]">{code4}</span>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleCopyCode(data.code_4_digits, "Code")}
+          <button
+            className="w-11 h-11 rounded-xl bg-blue-100 border border-blue-200 flex items-center justify-center"
+            onClick={() => {
+              navigator.clipboard.writeText(code4);
+              toast.success("Code copié !");
+            }}
           >
-            <Copy className="w-4 h-4" />
-          </Button>
+            <Copy className="w-4 h-4 text-blue-700" />
+          </button>
         </div>
         <p className="text-xs text-blue-700 mt-2">
           Si le scan QR ne fonctionne pas, donnez ce code au livreur
         </p>
       </div>
-
-      {isPickup && course.type_course === "recevoir" && (
-        <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
-          <p className="text-xs text-amber-800">
-            💡 Pour une réception : montrez ce code à l'expéditeur quand il viendra récupérer le colis
-          </p>
-        </div>
-      )}
-
-      {!isPickup && course.type_course === "expedier" && course.recipient_has_app === false && (
-        <div className="mt-4 bg-purple-50 border border-purple-200 rounded-lg p-3">
-          <p className="text-xs text-purple-800">
-            📱 Le destinataire n'a pas SILGAPP. Ce QR code sera visible sur le lien de suivi WhatsApp
-          </p>
-        </div>
-      )}
     </Card>
   );
 }

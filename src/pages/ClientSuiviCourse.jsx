@@ -5,12 +5,23 @@ import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Phone, Package, CheckCircle2, Clock, User, Star, XCircle, ArrowLeft } from "lucide-react";
+import { MapPin, Phone, Package, CheckCircle2, Clock, User, Star, XCircle, ArrowLeft, Share2 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import QRCodeDisplay from "@/components/client/QRCodeDisplay";
 import AnnulerCourseDialog from "@/components/client/AnnulerCourseDialog";
+
+// Lien APK configurable
+const APK_URL = "https://drive.google.com/drive/folders/silgapp-apk";
+
+function buildWhatsAppMessage(course, clientProfil) {
+  const trackingUrl = `${window.location.origin}/suivi-public/${course.tracking_token || course.id}`;
+  const expediteur = course.expediteur_nom || clientProfil?.nom || "Quelqu'un";
+  return encodeURIComponent(
+    `Bonjour 👋\n${expediteur} vous envoie un colis via SILGAPP.\n\nSuivez la livraison en direct ici :\n${trackingUrl}\n\nSi vous n'avez pas encore l'application, téléchargez SILGAPP ici :\n${APK_URL}`
+  );
+}
 
 export default function ClientSuiviCourse() {
   const navigate = useNavigate();
@@ -198,16 +209,41 @@ export default function ClientSuiviCourse() {
           </div>
         </Card>
 
-        {/* QR Codes */}
-        {maCourse.livreur_id && ["livreur_en_route", "colis_recupere", "en_livraison"].includes(maCourse.statut) && (
+        {/* QR Codes — affichage automatique dès que livreur assigné */}
+        {maCourse.livreur_id && !["livree", "annulee"].includes(maCourse.statut) && (
           <div className="space-y-4">
-            {maCourse.statut === "livreur_en_route" && (
+            {/* Pickup QR — visible jusqu'à récupération confirmée */}
+            {["livreur_en_route", "recherche_livreur"].includes(maCourse.statut) && (
               <QRCodeDisplay course={maCourse} type="pickup" />
             )}
+            {/* Delivery QR — visible dès colis récupéré */}
             {["colis_recupere", "en_livraison"].includes(maCourse.statut) && (
               <QRCodeDisplay course={maCourse} type="delivery" />
             )}
           </div>
+        )}
+
+        {/* Bouton partage WhatsApp destinataire — si expéditeur */}
+        {maCourse.type_course === "expedier" && maCourse.destinataire_telephone && !["livree", "annulee"].includes(maCourse.statut) && (
+          <Card className="p-4 bg-green-50 border-green-200">
+            <p className="text-sm font-bold text-green-900 mb-3 flex items-center gap-2">
+              <Share2 className="w-4 h-4" />
+              Informer le destinataire
+            </p>
+            <p className="text-xs text-green-700 mb-3">
+              Envoyez le lien de suivi à {maCourse.destinataire_nom || "votre destinataire"} pour qu'il puisse suivre la livraison.
+            </p>
+            <a
+              href={`https://wa.me/${maCourse.destinataire_telephone.replace(/\D/g, "")}?text=${buildWhatsAppMessage(maCourse, null)}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <Button className="w-full bg-green-600 hover:bg-green-700 gap-2">
+                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                Envoyer le lien WhatsApp au destinataire
+              </Button>
+            </a>
+          </Card>
         )}
 
         {/* Détails */}

@@ -1,5 +1,15 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
+/** Génère un token UUID simplifié */
+function generateToken() {
+  return crypto.randomUUID().replace(/-/g, '');
+}
+
+/** Génère un code PIN à 4 chiffres */
+function generatePIN() {
+  return String(Math.floor(1000 + Math.random() * 9000));
+}
+
 /**
  * Calcule la distance entre 2 points GPS (formule Haversine)
  */
@@ -160,6 +170,12 @@ Deno.serve(async (req) => {
       const livreur = await base44.asServiceRole.entities.Livreur.get(livreur_id);
       if (!livreur) return Response.json({ error: 'Livreur introuvable' }, { status: 404 });
 
+      // Générer QR tokens + PIN automatiquement à l'acceptation
+      const pickupToken = generateToken();
+      const deliveryToken = generateToken();
+      const pickupPIN = generatePIN();
+      const deliveryPIN = generatePIN();
+
       await base44.asServiceRole.entities.CourseExterne.update(course_id, {
         statut: 'livreur_en_route',
         dispatch_status: 'accepte',
@@ -168,6 +184,11 @@ Deno.serve(async (req) => {
         livreur_nom: `${livreur.prenom || ''} ${livreur.nom}`.trim(),
         livreur_photo_url: livreur.photo_url || '',
         livreur_telephone: livreur.telephone,
+        // QR codes générés automatiquement
+        pickup_qr_token: pickupToken,
+        pickup_code_4_digits: pickupPIN,
+        delivery_qr_token: deliveryToken,
+        delivery_code_4_digits: deliveryPIN,
       });
 
       await base44.asServiceRole.entities.Livreur.update(livreur_id, { statut: 'en_course' });

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { MapPin, Phone, Navigation, Package, Check, X, AlertTriangle, ChevronRight } from "lucide-react";
+import { MapPin, Phone, Navigation, Package, Check, X, AlertTriangle, ChevronRight, QrCode } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
 import LivraisonResume from "./LivraisonResume";
+import QRScannerModal from "./QRScannerModal";
 
 const STEPS = [
   { key: "acceptee", label: "Acceptée", icon: "✅" },
@@ -56,6 +57,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const [gpsDepart, setGpsDepart] = useState(null);
   const [gpsArrivee, setGpsArrivee] = useState(null);
   const [gpsWatchId, setGpsWatchId] = useState(null);
+  const [showQRScanner, setShowQRScanner] = useState(null); // "pickup" | "delivery" | null
 
   const colisRecupere = course.statut === "colis_recupere" || course.statut === "en_livraison";
   const colisLivre = course.statut === "livree";
@@ -89,8 +91,42 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     toast.success("Remarque enregistrée");
   };
 
+  // Handler succès scan QR pickup (externe)
+  const handleQRPickupSuccess = (courseData) => {
+    setShowQRScanner(null);
+    navigator.geolocation?.getCurrentPosition(
+      (pos) => onColisRecupere({ ...course, _gps: { lat: pos.coords.latitude, lng: pos.coords.longitude } }),
+      () => onColisRecupere(course),
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+    toast.success("Colis récupéré avec succès ! 📦");
+  };
+
+  // Handler succès scan QR delivery (externe)
+  const handleQRDeliverySuccess = () => {
+    setShowQRScanner(null);
+    navigator.geolocation?.getCurrentPosition(
+      (pos) => {
+        setGpsArrivee({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setShowResume(true);
+      },
+      () => setShowPrixModal(true),
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  };
+
   return (
     <>
+      {/* Modal scan QR (externe) */}
+      {showQRScanner && (
+        <QRScannerModal
+          course={course}
+          type={showQRScanner}
+          onSuccess={showQRScanner === "pickup" ? handleQRPickupSuccess : handleQRDeliverySuccess}
+          onClose={() => setShowQRScanner(null)}
+        />
+      )}
+
       {/* Modal résumé livraison */}
       {showResume && (
         <LivraisonResume
@@ -280,17 +316,41 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           {!colisLivre && (
             <div className="space-y-3 pt-1">
               {!colisRecupere ? (
-                <button
-                  className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                  onClick={() => onColisRecupere(course)}
-                  disabled={isPending}
-                >
-                  <Package className="w-6 h-6" />
-                  Colis récupéré
-                  <ChevronRight className="w-5 h-5" />
-                </button>
+                isExterne ? (
+                  /* ── EXTERNE : Scanner QR pour récupérer ── */
+                  <button
+                    className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                    onClick={() => setShowQRScanner("pickup")}
+                    disabled={isPending}
+                  >
+                    <QrCode className="w-6 h-6" />
+                    Scanner pour récupérer le colis
+                  </button>
+                ) : (
+                  /* ── INTERNE : bouton classique ── */
+                  <button
+                    className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                    onClick={() => onColisRecupere(course)}
+                    disabled={isPending}
+                  >
+                    <Package className="w-6 h-6" />
+                    Colis récupéré
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                )
               ) : (
-                <>
+                isExterne ? (
+                  /* ── EXTERNE : Scanner QR pour livrer ── */
+                  <button
+                    className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                    onClick={() => setShowQRScanner("delivery")}
+                    disabled={isPending}
+                  >
+                    <QrCode className="w-6 h-6" />
+                    Scanner pour livrer ✅
+                  </button>
+                ) : (
+                  /* ── INTERNE : bouton classique ── */
                   <button
                     className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                     onClick={() => {
@@ -303,10 +363,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                           setGpsArrivee({ lat: pos.coords.latitude, lng: pos.coords.longitude });
                           setShowResume(true);
                         },
-                        (err) => {
-                          console.error("Erreur GPS:", err);
-                          setShowPrixModal(true);
-                        },
+                        () => setShowPrixModal(true),
                         { enableHighAccuracy: true, timeout: 10000 }
                       );
                     }}
@@ -316,7 +373,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     Colis livré ✅
                     <ChevronRight className="w-5 h-5" />
                   </button>
-                </>
+                )
               )}
 
               <button
