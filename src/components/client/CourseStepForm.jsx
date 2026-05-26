@@ -102,7 +102,7 @@ export default function CourseStepForm({
             </div>
             <Button type="button" variant="outline" className="w-full" onClick={gpsHandlers?.onGetGPSDepart}>
               <Navigation className="w-4 h-4 mr-2" />
-              {formData.recuperationGPS ? "✓ Position GPS utilisée comme point de départ" : "Utiliser ma position actuelle"}
+              {formData.gps_depart_lat ? "✓ Position GPS utilisée comme point de départ" : "Utiliser ma position actuelle"}
             </Button>
           </div>
         );
