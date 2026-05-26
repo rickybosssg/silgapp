@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Truck } from "lucide-react";
@@ -32,7 +32,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [activeTab, setActiveTab] = useState("courses");
   const [gpsActif, setGpsActif] = useState(false);
   const [gpsRequis, setGpsRequis] = useState(true);
-  const [showDebug, setShowDebug] = useState(false);
+
 
   // ─── Profil livreur (rechargé toutes les 10s) ─────────────────────────────
   const { data: livreurProfil } = useQuery({
@@ -128,23 +128,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const isEnLigne = livreurProfil ? livreurProfil.statut !== "hors_ligne" : false;
   const livreurVisible = isEnLigne && gpsActif && livreurProfil?.latitude && livreurProfil?.longitude;
 
-  // ─── Debug data ───────────────────────────────────────────────────────────
-  const debugData = {
-    totalCourses: mesCourses.length,
-    courseEnAttente: courseEnAttente ? {
-      id: courseEnAttente.id,
-      statut: courseEnAttente.statut,
-      dispatch_status: courseEnAttente.dispatch_status,
-      livreur_id: courseEnAttente.livreur_id,
-      client_nom: courseEnAttente.client_nom,
-      adresse_depart: courseEnAttente.adresse_depart,
-      timeout_expires_at: courseEnAttente.timeout_expires_at,
-    } : null,
-    modalOpen: !!courseEnAttente,
-    livreurStatut: livreurProfil?.statut,
-    gpsActif,
-    isEnLigne,
-  };
+
 
   // ─── Statut livreur ───────────────────────────────────────────────────────
   const statutMutation = useMutation({
@@ -353,14 +337,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
           }}
         />
-        {/* Debug overlay */}
-        <button
-          onClick={() => setShowDebug(v => !v)}
-          className="fixed bottom-4 right-4 z-[200] w-10 h-10 rounded-full bg-red-600 text-white font-bold text-xs shadow-lg"
-        >
-          🐛
-        </button>
-        {showDebug && <DebugPanel data={debugData} onClose={() => setShowDebug(false)} />}
+
       </>
     );
   }
@@ -429,52 +406,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         )}
       </div>
 
-      {/* Debug bouton toujours visible */}
-      <button
-        onClick={() => setShowDebug(v => !v)}
-        className="fixed bottom-4 right-4 z-50 w-10 h-10 rounded-full bg-red-600 text-white font-bold text-xs shadow-lg"
-      >
-        🐛
-      </button>
-      {showDebug && <DebugPanel data={debugData} onClose={() => setShowDebug(false)} />}
-    </div>
-  );
-}
 
-// ─── Composant Debug Panel ────────────────────────────────────────────────────
-function DebugPanel({ data, onClose }) {
-  return (
-    <div className="fixed top-0 left-0 z-[150] bg-black/95 text-green-400 p-4 text-xs font-mono h-screen overflow-auto w-full max-w-xs">
-      <div className="flex justify-between items-center mb-3">
-        <strong className="text-white text-sm">🔍 DEBUG — LivreurExterne</strong>
-        <button onClick={onClose} className="text-white text-lg leading-none">✕</button>
-      </div>
-      <div className="space-y-1 text-white mb-3">
-        <p>📦 Courses totales: <span className="text-green-400">{data.totalCourses}</span></p>
-        <p>🚨 Modal ouvert: <span className={data.modalOpen ? "text-green-400" : "text-red-400"}>{data.modalOpen ? "OUI" : "NON"}</span></p>
-        <p>📍 GPS actif: <span className={data.gpsActif ? "text-green-400" : "text-red-400"}>{data.gpsActif ? "OUI" : "NON"}</span></p>
-        <p>✅ En ligne: <span className={data.isEnLigne ? "text-green-400" : "text-red-400"}>{data.isEnLigne ? "OUI" : "NON"}</span></p>
-        <p>👤 Statut: <span className="text-yellow-400">{data.livreurStatut}</span></p>
-      </div>
-      {data.courseEnAttente ? (
-        <div className="border border-green-700 rounded p-2 space-y-1">
-          <p className="text-yellow-400 font-bold">🎯 COURSE EN ATTENTE</p>
-          <p>ID: {data.courseEnAttente.id}</p>
-          <p>Statut: {data.courseEnAttente.statut}</p>
-          <p>Dispatch: {data.courseEnAttente.dispatch_status}</p>
-          <p>Client: {data.courseEnAttente.client_nom}</p>
-          <p>Départ: {data.courseEnAttente.adresse_depart}</p>
-          <p>Expire: {data.courseEnAttente.timeout_expires_at ? new Date(data.courseEnAttente.timeout_expires_at).toLocaleTimeString() : 'N/A'}</p>
-        </div>
-      ) : (
-        <div className="border border-gray-700 rounded p-2">
-          <p className="text-gray-400">Aucune course en attente</p>
-          <p className="text-gray-500 text-xs mt-1">Filtre: statut=recherche_livreur + dispatch_status=propose</p>
-        </div>
-      )}
-      <pre className="mt-3 text-green-300 text-[10px] whitespace-pre-wrap">
-        {JSON.stringify(data, null, 2)}
-      </pre>
     </div>
   );
 }

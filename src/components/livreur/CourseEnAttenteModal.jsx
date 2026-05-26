@@ -101,31 +101,34 @@ export default function CourseEnAttenteModal({
     return () => clearInterval(timer);
   }, []); // ← dépendances vides : un seul interval, jamais recréé
 
-  // Vérifier expiration backend — via SDK, pas fetch direct
+  // Vérifier si la course a été acceptée par un autre livreur (poll backend)
   const courseExpireeSentRef = useRef(false);
   useEffect(() => {
-    const checkExpiration = async () => {
+    const checkStatus = async () => {
       try {
         const data = await base44.functions.invoke('dispatchExterneAuto', {
           action: 'verifier_expiration',
           course_id: course.id,
         });
-
-        if (data?.data?.expired && !courseExpireeSentRef.current) {
-          courseExpireeSentRef.current = true;
-          setCourseExpiree(true);
-          onExpireRef.current?.();
-        }
-
-        if (data?.data?.livreur_id && data?.data?.livreur_id !== livreurId) {
+        const d = data?.data;
+        // Course acceptée par un autre
+        if (d?.livreur_id && d.livreur_id !== livreurId && d.dispatch_status === 'accepte') {
           setCourseDejaPrise(true);
         }
-      } catch (err) {
-        console.error('Erreur vérification expiration:', err);
-      }
+        // Expirée côté backend mais PAS encore côté timer local → déclencher une seule fois
+        if (d?.expired && !courseExpireeSentRef.current && !d?.livreur_id) {
+          courseExpireeSentRef.current = true;
+          setCourseExpiree(true);
+          // Déclencher redispatch
+          base44.functions.invoke('dispatchExterneAuto', {
+            action: 'verifier_expiration',
+            course_id: course.id,
+          }).catch(() => null);
+        }
+      } catch (_) {}
     };
 
-    const interval = setInterval(checkExpiration, 3000);
+    const interval = setInterval(checkStatus, 4000);
     return () => clearInterval(interval);
   }, [course.id, livreurId]);
 
