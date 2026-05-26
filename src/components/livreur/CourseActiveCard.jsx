@@ -7,6 +7,7 @@ import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
 import LivraisonResume from "./LivraisonResume";
 import QRScannerModal from "./QRScannerModal";
+import LivraisonRecapitulatif from "./LivraisonRecapitulatif";
 
 const STEPS = [
   { key: "acceptee", label: "Acceptée", icon: "✅" },
@@ -58,6 +59,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const [gpsArrivee, setGpsArrivee] = useState(null);
   const [gpsWatchId, setGpsWatchId] = useState(null);
   const [showQRScanner, setShowQRScanner] = useState(null); // "pickup" | "delivery" | null
+  const [showRecapitulatif, setShowRecapitulatif] = useState(false);
+  const [courseLivreeData, setCourseLivreeData] = useState(null);
 
   const colisRecupere = course.statut === "colis_recupere" || course.statut === "en_livraison";
   const colisLivre = course.statut === "livree";
@@ -109,25 +112,40 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     toast.success("Colis récupéré avec succès ! 📦");
   };
 
-  // Handler succès scan QR delivery (externe) — livraison confirmée directement par le backend
+  // Handler succès scan QR delivery (externe) — livraison confirmée par le backend
+  // → afficher le récapitulatif AVANT de fermer la course
   const handleQRDeliverySuccess = (courseData) => {
     setShowQRScanner(null);
-    // Le backend validateQRCode a déjà mis statut=livree, prix_final, commission, montant_livreur
-    // On appelle directement onColisLivre avec les données GPS courantes pour la mutation locale
+    // Récupérer le GPS pour le calcul si pas déjà fait
     navigator.geolocation?.getCurrentPosition(
       (pos) => {
         const gps = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setGpsArrivee(gps);
-        // Passer courseData du backend pour que onColisLivre puisse utiliser les valeurs déjà calculées
-        onColisLivre({ ...course, ...courseData }, gps);
       },
-      () => onColisLivre({ ...course, ...courseData }, null),
+      () => null,
       { enableHighAccuracy: true, timeout: 8000 }
     );
+    // Stocker les données de la course livrée pour le récapitulatif
+    setCourseLivreeData({ ...course, ...courseData });
+    setShowRecapitulatif(true);
+  };
+
+  const handleFermerCourse = () => {
+    setShowRecapitulatif(false);
+    onColisLivre({ ...course, ...(courseLivreeData || {}), statut: "livree" }, gpsArrivee);
+    setCourseLivreeData(null);
   };
 
   return (
     <>
+      {/* Récapitulatif post-livraison (externe) */}
+      {showRecapitulatif && courseLivreeData && (
+        <LivraisonRecapitulatif
+          course={courseLivreeData}
+          onClose={handleFermerCourse}
+        />
+      )}
+
       {/* Modal scan QR (externe) */}
       {showQRScanner && (
         <QRScannerModal

@@ -10,9 +10,10 @@ import { MapPin, Phone, Package, CheckCircle2, Clock, User, Star, XCircle, Arrow
 // Deep link WhatsApp natif avec fallback navigateur
 function openWhatsApp(phone, message = "") {
   const num = phone?.replace(/\D/g, "") || "";
-  const txt = message ? `&text=${message}` : "";
+  const encoded = message ? encodeURIComponent(message) : "";
+  const txt = encoded ? `&text=${encoded}` : "";
   const deepLink = `whatsapp://send?phone=${num}${txt}`;
-  const fallback = `https://wa.me/${num}${message ? `?text=${message}` : ""}`;
+  const fallback = `https://wa.me/${num}${encoded ? `?text=${encoded}` : ""}`;
   window.location.href = deepLink;
   setTimeout(() => { window.open(fallback, "_blank"); }, 1500);
 }
@@ -27,9 +28,8 @@ const APK_URL = "/telecharger-app";
 function buildWhatsAppMessage(course, clientProfil) {
   const trackingUrl = `${window.location.origin}/suivi-public/${course.tracking_token || course.id}`;
   const expediteur = course.expediteur_nom || clientProfil?.nom || "Quelqu'un";
-  return encodeURIComponent(
-    `Bonjour 👋\n${expediteur} vous envoie un colis via SILGAPP.\n\nSuivez la livraison en direct ici :\n${trackingUrl}\n\nSi vous n'avez pas encore l'application, téléchargez SILGAPP ici :\n${APK_URL}`
-  );
+  // Retourne le texte brut — openWhatsApp se charge de l'encodage
+  return `Bonjour 👋\n${expediteur} vous envoie un colis via SILGAPP.\n\nSuivez la livraison en direct ici :\n${trackingUrl}\n\nSi vous n'avez pas encore l'application, téléchargez SILGAPP ici :\n${APK_URL}`;
 }
 
 export default function ClientSuiviCourse() {

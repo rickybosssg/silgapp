@@ -26,12 +26,10 @@ export default function CourseStepForm({
 }) {
   const progress = ((step + 1) / totalSteps) * 100;
 
-  // Sauvegarder UNIQUEMENT les données (pas les fonctions) dans localStorage
+  // Sauvegarder les données du formulaire dans localStorage
   useEffect(() => {
     try {
-      // eslint-disable-next-line no-unused-vars
-      const { onGetGPSDepart: _a, onGetGPSArrivee: _b, ...dataOnly } = formData;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(dataOnly));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
     } catch (err) {
       console.error("Erreur sauvegarde brouillon:", err);
     }
@@ -88,22 +86,54 @@ export default function CourseStepForm({
                 <MapPin className="w-8 h-8 text-primary" />
               </div>
               <h2 className="text-xl font-bold text-foreground">Où récupérer le colis ?</h2>
-              <p className="text-sm text-muted-foreground mt-1">Adresse ou quartier de départ</p>
+              <p className="text-sm text-muted-foreground mt-1">Vous êtes au point de récupération</p>
             </div>
+
+            {/* Bouton GPS — validant (remplace la saisie texte) */}
+            {!formData.recuperationGPS ? (
+              <button
+                type="button"
+                onClick={gpsHandlers?.onGetGPSDepart}
+                className="w-full h-14 rounded-2xl bg-primary text-white font-bold flex items-center justify-center gap-3 shadow-lg shadow-primary/20 active:scale-[0.98] transition-all"
+              >
+                <Navigation className="w-5 h-5" />
+                Utiliser ma position actuelle
+              </button>
+            ) : (
+              <div className="flex items-center gap-3 p-4 rounded-2xl bg-green-50 border border-green-200">
+                <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-green-900">Position actuelle utilisée comme point de récupération</p>
+                  {formData.adresse_depart && (
+                    <p className="text-xs text-green-700 mt-0.5">{formData.adresse_depart}</p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, recuperationGPS: false, gps_depart_lat: null, gps_depart_lng: null })}
+                  className="text-green-600 text-xs underline"
+                >
+                  Changer
+                </button>
+              </div>
+            )}
+
+            {/* Séparateur */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-gray-200" />
+              <span className="text-xs text-muted-foreground">ou saisir manuellement</span>
+              <div className="flex-1 h-px bg-gray-200" />
+            </div>
+
             <div>
-              <Label>Adresse de récupération *</Label>
+              <Label>Adresse de récupération</Label>
               <Input
                 value={formData.adresse_depart}
                 onChange={(e) => setFormData({ ...formData, adresse_depart: e.target.value })}
                 placeholder="Quartier, rue, point de repère..."
                 className="h-12"
-                autoFocus
               />
             </div>
-            <Button type="button" variant="outline" className="w-full" onClick={gpsHandlers?.onGetGPSDepart}>
-              <Navigation className="w-4 h-4 mr-2" />
-              {formData.gps_depart_lat ? "✓ Position GPS utilisée comme point de départ" : "Utiliser ma position actuelle"}
-            </Button>
           </div>
         );
 
@@ -137,22 +167,19 @@ export default function CourseStepForm({
               </Label>
             </div>
             {!destinationInconnue && (
-              <>
-                <div>
-                  <Label>Adresse de livraison *</Label>
-                  <Input
-                    value={formData.adresse_arrivee}
-                    onChange={(e) => setFormData({ ...formData, adresse_arrivee: e.target.value })}
-                    placeholder="Quartier, rue, point de repère..."
-                    className="h-12"
-                    autoFocus
-                  />
-                </div>
-                <Button type="button" variant="outline" className="w-full" onClick={gpsHandlers?.onGetGPSArrivee}>
-                  <Navigation className="w-4 h-4 mr-2" />
-                  {formData.livraisonGPS ? "✓ Position GPS enregistrée" : "Utiliser ma position actuelle"}
-                </Button>
-              </>
+              <div>
+                <Label>Adresse de livraison *</Label>
+                <Input
+                  value={formData.adresse_arrivee}
+                  onChange={(e) => setFormData({ ...formData, adresse_arrivee: e.target.value })}
+                  placeholder="Quartier, rue, point de repère..."
+                  className="h-12"
+                  autoFocus
+                />
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  Indiquez le quartier, la rue ou un point de repère connu.
+                </p>
+              </div>
             )}
             {destinationInconnue && (
               <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
@@ -280,7 +307,7 @@ export default function CourseStepForm({
             <Card className="p-4 space-y-3 bg-gradient-to-br from-white to-gray-50">
               {[
                 { icon: <Truck className="w-4 h-4 text-primary" />, bg: "bg-primary/10", label: "Type", value: formData.type_course === "expedier" ? "Expédition" : "Réception" },
-                { icon: <MapPin className="w-4 h-4 text-red-600" />, bg: "bg-red-100", label: "Récupération", value: formData.adresse_depart },
+                { icon: <MapPin className="w-4 h-4 text-red-600" />, bg: "bg-red-100", label: "Récupération", value: formData.adresse_depart || (formData.recuperationGPS ? "📍 Position actuelle" : "") },
                 { icon: <MapPin className="w-4 h-4 text-green-600" />, bg: "bg-green-100", label: "Livraison", value: formData.destination_inconnue ? "📍 Destination à définir" : formData.adresse_arrivee },
                 { icon: <User className="w-4 h-4 text-blue-600" />, bg: "bg-blue-100", label: "Contact", value: formData.type_course === "expedier" ? `${formData.destinataire_nom || "Destinataire"} - ${formData.destinataire_telephone}` : `${formData.expediteur_nom || "Expéditeur"} - ${formData.expediteur_telephone}` },
                 { icon: <Package className="w-4 h-4 text-purple-600" />, bg: "bg-purple-100", label: "Colis", value: formData.type_colis?.replace(/_/g, " ") },
@@ -347,7 +374,7 @@ export default function CourseStepForm({
             onClick={onNext}
             disabled={
               (step === 0 && !formData.type_course) ||
-              (step === 1 && !formData.adresse_depart && !(formData.gps_depart_lat && formData.gps_depart_lng)) ||
+              (step === 1 && !formData.adresse_depart && !formData.recuperationGPS) ||
               (step === 2 && !formData.destination_inconnue && !formData.adresse_arrivee) ||
               (step === 3 && !(formData.type_course === "expedier" ? formData.destinataire_telephone : formData.expediteur_telephone)) ||
               (step === 4 && !formData.type_colis)
@@ -360,7 +387,7 @@ export default function CourseStepForm({
         ) : (
           <Button
             type="submit"
-            disabled={isLoading || !formData.adresse_depart || !(formData.type_course === "expedier" ? formData.destinataire_telephone : formData.expediteur_telephone) || !formData.type_colis}
+            disabled={isLoading || (!formData.adresse_depart && !formData.recuperationGPS) || !(formData.type_course === "expedier" ? formData.destinataire_telephone : formData.expediteur_telephone) || !formData.type_colis}
             className="flex-1 h-12 bg-gradient-to-r from-primary to-red-600"
           >
             {isLoading ? (

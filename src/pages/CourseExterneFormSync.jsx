@@ -95,33 +95,29 @@ export default function CourseExterneFormSync() {
     onGetGPSDepart: () => {
       if (!navigator.geolocation) { toast.error("GPS non disponible"); return; }
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
+        async (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          // Geocoding inverse pour auto-remplir l'adresse
+          let adresse = "";
+          try {
+            const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=fr`);
+            const geo = await resp.json();
+            adresse = geo?.address?.suburb || geo?.address?.neighbourhood || geo?.address?.quarter || geo?.address?.city_district || geo?.address?.village || "";
+          } catch (_) {}
           setFormData((prev) => ({
             ...prev,
-            gps_depart_lat: pos.coords.latitude,
-            gps_depart_lng: pos.coords.longitude,
+            gps_depart_lat: lat,
+            gps_depart_lng: lng,
             recuperationGPS: true,
+            adresse_depart: prev.adresse_depart || adresse,
           }));
-          toast.success("Position GPS de récupération enregistrée");
         },
         () => toast.error("Impossible d'obtenir la position GPS")
       );
     },
-    onGetGPSArrivee: () => {
-      if (!navigator.geolocation) { toast.error("GPS non disponible"); return; }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setFormData((prev) => ({
-            ...prev,
-            gps_arrivee_lat: pos.coords.latitude,
-            gps_arrivee_lng: pos.coords.longitude,
-            livraisonGPS: true,
-          }));
-          toast.success("Position GPS de livraison enregistrée");
-        },
-        () => toast.error("Impossible d'obtenir la position GPS")
-      );
-    },
+    // GPS livraison supprimé — le client n'est pas à la destination
+
   };
 
   const createMutation = useMutation({
@@ -207,7 +203,7 @@ export default function CourseExterneFormSync() {
       destinataire_phone_normalized: destinatairePhoneNormalized,
       destinataire_client_id: destinataireClientId,
       recipient_has_app: false,
-      adresse_depart: formData.adresse_depart,
+      adresse_depart: formData.adresse_depart || (formData.recuperationGPS ? "Position GPS" : ""),
       adresse_arrivee: formData.destination_inconnue ? "Destination à définir" : formData.adresse_arrivee,
       type_colis: formData.type_colis,
       notes: formData.notes,
