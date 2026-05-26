@@ -1,11 +1,21 @@
 import React from "react";
 
 const SUPPORT_NUMBER = "22667572857";
-const SUPPORT_MESSAGE = encodeURIComponent("Bonjour SILGAPP 👋\nJ'ai besoin d'aide concernant ma course.");
+const SUPPORT_MESSAGE = encodeURIComponent("Bonjour SILGAPP 👋 J'ai besoin d'aide concernant ma course.");
+const WA_DEEP_LINK = `whatsapp://send?phone=${SUPPORT_NUMBER}&text=${SUPPORT_MESSAGE}`;
+const WA_FALLBACK = `https://wa.me/${SUPPORT_NUMBER}?text=${SUPPORT_MESSAGE}`;
 
 export default function SupportWhatsApp({ compact = false }) {
   const handleClick = () => {
-    window.open(`https://wa.me/${SUPPORT_NUMBER}?text=${SUPPORT_MESSAGE}`, "_blank");
+    // Tenter le deep link natif d'abord
+    const start = Date.now();
+    window.location.href = WA_DEEP_LINK;
+    // Si WhatsApp n'est pas installé, le deep link échoue silencieusement → fallback après 1.5s
+    setTimeout(() => {
+      if (Date.now() - start < 2000) {
+        window.open(WA_FALLBACK, "_blank");
+      }
+    }, 1500);
   };
 
   if (compact) {
