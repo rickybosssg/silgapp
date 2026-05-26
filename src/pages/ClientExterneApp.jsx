@@ -28,9 +28,12 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
 
 export default function ClientExterneApp() {
   const navigate = useNavigate();
-  const [onboardingDone, setOnboardingDone] = useState(false);
+  // Déjà passé par l'onboarding si GPS actif en localStorage
+  const gpsDejaActif = (() => { try { return localStorage.getItem("client_gps_active") === "true"; } catch { return false; } })();
+  const [onboardingDone, setOnboardingDone] = useState(gpsDejaActif);
   const [showProfilModal, setShowProfilModal] = useState(false);
-  const [position, setPosition] = useState(null);
+  const savedGpsPos = (() => { try { return JSON.parse(localStorage.getItem("client_gps_position") || "null"); } catch { return null; } })();
+  const [position, setPosition] = useState(savedGpsPos);
   const [clientProfil, setClientProfil] = useState(null);
   const [coursesActives, setCoursesActives] = useState([]);
   const [livreursProches, setLivreursProches] = useState([]);
@@ -58,6 +61,11 @@ export default function ClientExterneApp() {
         });
       }
       setClientProfil(profil);
+      // Si onboarding déjà fait (GPS en localStorage), charger les courses directement
+      if (gpsDejaActif) {
+        const pos = (() => { try { return JSON.parse(localStorage.getItem("client_gps_position") || "null"); } catch { return null; } })();
+        checkStatus(pos, profil);
+      }
     } catch (err) {
       console.error("Erreur chargement profil:", err);
     } finally {
