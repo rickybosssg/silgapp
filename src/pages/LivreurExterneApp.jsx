@@ -13,6 +13,7 @@ import CourseEnAttenteModal from "@/components/livreur/CourseEnAttenteModal";
 import CourseActiveCard from "@/components/livreur/CourseActiveCard";
 import LivreurHistorique from "@/components/livreur/LivreurHistorique";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import LivreurExterneOnboarding from "@/components/livreur/LivreurExterneOnboarding";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -32,6 +33,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [activeTab, setActiveTab] = useState("courses");
   const [gpsActif, setGpsActif] = useState(false);
   const [gpsRequis, setGpsRequis] = useState(true);
+  const [onboardingTermine, setOnboardingTermine] = useState(false);
 
 
   // ─── Profil livreur (rechargé toutes les 10s) ─────────────────────────────
@@ -275,6 +277,27 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     setTimeout(() => window.location.reload(), 300);
   };
 
+  // ─── Onboarding externe obligatoire (GPS + profil) ───────────────────────
+  if (!onboardingTermine) {
+    return (
+      <LivreurExterneOnboarding
+        livreurProfil={livreurProfil || initialProfil}
+        onComplete={(gpsData) => {
+          setGpsActif(true);
+          setGpsRequis(false);
+          setOnboardingTermine(true);
+          if (gpsData && livreurProfil?.id) {
+            saveLivreur(livreurProfil.id || initialProfil?.id, {
+              latitude: gpsData.lat,
+              longitude: gpsData.lng,
+              derniere_position_date: new Date().toISOString(),
+            }).catch(() => null);
+          }
+        }}
+      />
+    );
+  }
+
   // ─── Guards de rendu ──────────────────────────────────────────────────────
   if (!livreurProfil) {
     return (
@@ -284,39 +307,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             <Truck className="w-8 h-8 text-primary animate-pulse" />
           </div>
           <p className="text-sm text-muted-foreground">Chargement du profil...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Écran GPS obligatoire
-  if (gpsRequis && !gpsActif) {
-    return (
-      <div className="fixed inset-0 bg-gradient-to-br from-accent/10 to-green-50 flex items-center justify-center p-6">
-        <div className="max-w-sm w-full bg-white rounded-3xl shadow-2xl p-6 space-y-6 text-center">
-          <div className="w-20 h-20 rounded-2xl bg-green-50 flex items-center justify-center mx-auto">
-            <span className="text-4xl">📍</span>
-          </div>
-          <div>
-            <p className="text-xl font-black text-gray-900 mb-2">GPS Obligatoire</p>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              Activez votre GPS pour accéder à votre tableau de bord et recevoir des courses.
-            </p>
-          </div>
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-            <p className="text-xs text-amber-700 font-semibold">
-              ⚠️ Sans GPS, vous ne pourrez pas recevoir de courses ni être visible sur la carte.
-            </p>
-          </div>
-          <button
-            className="w-full h-14 rounded-2xl bg-gradient-to-b from-accent to-green-600 text-white font-black text-base shadow-lg shadow-green-200 active:scale-95 transition-all"
-            onClick={handleActiverGPS}
-          >
-            Activer le GPS
-          </button>
-          <p className="text-xs text-gray-400">
-            Appuyez sur "Autoriser" lorsque votre appareil vous demande la permission
-          </p>
         </div>
       </div>
     );

@@ -9,6 +9,7 @@ import { Users, Package, DollarSign, TrendingUp, ArrowLeft, Truck, AlertCircle, 
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import ClientsExternesPanel from "@/components/admin/ClientsExternesPanel";
 
 export default function DashboardAdminExterne() {
   const { data: courses = [] } = useQuery({
@@ -247,6 +248,10 @@ export default function DashboardAdminExterne() {
               ))
           )}
         </div>
+      </Card>
+      {/* Section Clients inscrits */}
+      <Card className="p-4">
+        <ClientsExternesPanel />
       </Card>
     </div>
   );
