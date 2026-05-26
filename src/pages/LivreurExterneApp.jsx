@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Truck } from "lucide-react";
@@ -14,6 +14,17 @@ import CourseActiveCard from "@/components/livreur/CourseActiveCard";
 import LivreurHistorique from "@/components/livreur/LivreurHistorique";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+// Haversine — utilisée aussi pour le calcul de prix
+function calculerDistance(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 const saveLivreur = (id, data) => base44.functions.invoke('updateLivreur', { id, data });
 
 export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
@@ -21,8 +32,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [activeTab, setActiveTab] = useState("courses");
   const [gpsActif, setGpsActif] = useState(false);
   const [gpsRequis, setGpsRequis] = useState(true);
+  const [showDebug, setShowDebug] = useState(false);
 
-  // Recharger le profil livreur en temps réel
+  // ─── Profil livreur (rechargé toutes les 10s) ─────────────────────────────
   const { data: livreurProfil } = useQuery({
     queryKey: ["livreur-externe-profil", initialProfil?.id],
     queryFn: () => base44.entities.Livreur.filter({ id: initialProfil.id }),
@@ -32,30 +44,31 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     refetchInterval: 10000,
   });
 
-  // Notifications push
+  // ─── Notifications push — dépendances stables ─────────────────────────────
+  const livreurId = livreurProfil?.id;
+  const livreurEmail = livreurProfil?.user_email;
   useEffect(() => {
-    if (!livreurProfil?.id || !livreurProfil?.user_email) return;
-    registerPushToken(livreurProfil.id, { email: livreurProfil.user_email }).catch(() => null);
+    if (!livreurId || !livreurEmail) return;
+    registerPushToken(livreurId, { email: livreurEmail }).catch(() => null);
     const unsub = subscribeToNotifications(
       (n) => toast.info(`${n.titre}: ${n.message}`),
-      livreurProfil.user_email
+      livreurEmail
     );
     return () => unsub?.();
-  }, [livreurProfil?.id, livreurProfil?.user_email]);
+  }, [livreurId, livreurEmail]); // Stables : ne changent pas si profil rechargé avec mêmes valeurs
 
-  // Heartbeat app_active
+  // ─── Heartbeat app_active ─────────────────────────────────────────────────
   useEffect(() => {
     if (!initialProfil?.id) return;
     const id = initialProfil.id;
 
     const pingActif = () =>
       saveLivreur(id, { app_active: true, last_seen_at: new Date().toISOString() }).catch(() => null);
-
     const pingInactif = () =>
       saveLivreur(id, { app_active: false }).catch(() => null);
 
     pingActif();
-    const interval = setInterval(pingActif, 10 * 1000); // Ping toutes les 10s au lieu de 60s
+    const interval = setInterval(pingActif, 10000);
     const handleVisibility = () => {
       if (document.visibilityState === 'hidden') pingInactif();
       else pingActif();
@@ -71,41 +84,53 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     };
   }, [initialProfil?.id]);
 
-  // Mes courses externes (déjà assignées)
+  // ─── Mes courses (poll 2s) ─────────────────────────────────────────────────
   const { data: mesCourses = [] } = useQuery({
-    queryKey: ["mes-courses-externes", livreurProfil?.id],
+    queryKey: ["mes-courses-externes", livreurId],
     queryFn: async () => {
-      const courses = await base44.entities.CourseExterne.filter({ 
-        livreur_id: livreurProfil.id 
-      }, "-created_date", 50);
-      console.log('[LIVREUR EXTERNE] 📦 mesCourses query:', {
-        livreur_id: livreurProfil.id,
-        count: courses?.length || 0,
-        courses: courses?.map(c => ({ id: c.id, statut: c.statut, dispatch_status: c.dispatch_status }))
-      });
+      const courses = await base44.entities.CourseExterne.filter(
+        { livreur_id: livreurId },
+        "-created_date",
+        50
+      );
       return courses || [];
     },
-    enabled: !!livreurProfil?.id,
+    enabled: !!livreurId,
     initialData: [],
-    refetchInterval: 2000, // Réduit à 2s pour temps réel
+    refetchInterval: 2000,
   });
 
-  // Course en attente - même logique que livreur interne
+  // ─── Course en attente de réponse ─────────────────────────────────────────
   const courseEnAttente = useMemo(() => {
-    const course = mesCourses.find(c => c.statut === "recherche_livreur" && c.dispatch_status === "propose");
-    console.log('[LIVREUR EXTERNE] 🎯 courseEnAttente:', course ? {
-      id: course.id,
-      dispatch_status: course.dispatch_status,
-      statut: course.statut,
-      livreur_id: course.livreur_id
-    } : null);
-    return course;
+    return mesCourses.find(
+      c => c.statut === "recherche_livreur" && c.dispatch_status === "propose"
+    ) || null;
   }, [mesCourses]);
 
-  // DEBUG MODE - affichage visible des données
-  const [showDebug, setShowDebug] = useState(false);
+  // ─── Courses actives (en route / colis récupéré / en livraison) ───────────
+  const coursesActives = useMemo(
+    () => mesCourses.filter(c => ["livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut)),
+    [mesCourses]
+  );
+
+  // ─── Gains du jour ────────────────────────────────────────────────────────
+  const totalEncaisse = useMemo(() => {
+    const today = new Date().toDateString();
+    return mesCourses
+      .filter(c => c.statut === "livree" && c.montant_livreur &&
+        new Date(c.heure_livraison || c.updated_date).toDateString() === today)
+      .reduce((sum, c) => sum + (c.montant_livreur || 0), 0);
+  }, [mesCourses]);
+
+  const montantDüSilga = livreurProfil?.montant_du_silga || 0;
+
+  // ─── isEnLigne — défini ici, AVANT debugData ──────────────────────────────
+  const isEnLigne = livreurProfil ? livreurProfil.statut !== "hors_ligne" : false;
+  const livreurVisible = isEnLigne && gpsActif && livreurProfil?.latitude && livreurProfil?.longitude;
+
+  // ─── Debug data ───────────────────────────────────────────────────────────
   const debugData = {
-    totalCourses: mesCourses?.length || 0,
+    totalCourses: mesCourses.length,
     courseEnAttente: courseEnAttente ? {
       id: courseEnAttente.id,
       statut: courseEnAttente.statut,
@@ -113,26 +138,15 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       livreur_id: courseEnAttente.livreur_id,
       client_nom: courseEnAttente.client_nom,
       adresse_depart: courseEnAttente.adresse_depart,
+      timeout_expires_at: courseEnAttente.timeout_expires_at,
     } : null,
     modalOpen: !!courseEnAttente,
     livreurStatut: livreurProfil?.statut,
     gpsActif,
     isEnLigne,
   };
-  
-  const coursesActives = useMemo(() => mesCourses.filter(c => ["livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut)), [mesCourses]);
 
-  // Calcul des gains (70% du prix final)
-  const totalEncaisse = useMemo(() => {
-    const today = new Date().toDateString();
-    return mesCourses
-      .filter(c => c.statut === "livree" && c.montant_livreur && new Date(c.heure_livraison || c.updated_date).toDateString() === today)
-      .reduce((sum, c) => sum + (c.montant_livreur || 0), 0);
-  }, [mesCourses]);
-
-  const montantDüSilga = livreurProfil?.montant_du_silga || 0;
-
-  // Mutation statut livreur
+  // ─── Statut livreur ───────────────────────────────────────────────────────
   const statutMutation = useMutation({
     mutationFn: (newStatut) => saveLivreur(livreurProfil.id, { statut: newStatut }),
     onSuccess: () => {
@@ -147,6 +161,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     statutMutation.mutate(estHorsLigne ? "disponible" : "hors_ligne");
   };
 
+  // ─── GPS ──────────────────────────────────────────────────────────────────
   const handleActiverGPS = () => {
     if (!navigator.geolocation) {
       toast.error("GPS non disponible sur cet appareil");
@@ -165,17 +180,17 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           toast.success("GPS activé – vous pouvez accéder au tableau de bord");
         }).catch(() => toast.error("Position GPS non enregistrée"));
       },
-      () => { setGpsActif(false); toast.error("Permission GPS refusée – obligatoire pour utiliser l'app"); },
+      () => { setGpsActif(false); toast.error("Permission GPS refusée – obligatoire"); },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
-  // GPS tracking périodique (toutes les 15s si disponible)
+  // GPS tracking périodique (15s)
   useEffect(() => {
-    if (!livreurProfil?.id || livreurProfil.statut === "hors_ligne" || !gpsActif) return;
+    if (!livreurId || livreurProfil?.statut === "hors_ligne" || !gpsActif) return;
     const interval = setInterval(() => {
       navigator.geolocation?.getCurrentPosition(
-        (pos) => saveLivreur(livreurProfil.id, {
+        (pos) => saveLivreur(livreurId, {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
           derniere_position_date: new Date().toISOString(),
@@ -185,9 +200,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       );
     }, 15000);
     return () => clearInterval(interval);
-  }, [livreurProfil?.id, livreurProfil?.statut, gpsActif]);
+  }, [livreurId, livreurProfil?.statut, gpsActif]);
 
-  // Mutation courses
+  // ─── Mutations courses ────────────────────────────────────────────────────
   const updateCourseMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.CourseExterne.update(id, data),
     onSuccess: () => {
@@ -195,78 +210,57 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     },
   });
 
-  const handleAccepter = (course) => {
-    // L'acceptation est maintenant gérée par le modal via dispatchExterneAuto
-    // Cette fonction est appelée après succès de l'acceptation
-    queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles", "mes-courses-externes"] });
+  const handleAccepter = () => {
+    queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+    queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
     statutMutation.mutate("en_course");
     toast.success("Course acceptée ! 🚀");
   };
 
-  const handleRefuser = async (course, raison) => {
-    // Le refus est maintenant géré par le modal via dispatchExterneAuto
-    // Cette fonction est appelée après succès du refus
-    queryClient.invalidateQueries({ queryKey: ["mes-courses-externes", "courses-externes-disponibles"] });
-    toast(`Course refusée (${raison || 'occupé'})`);
+  const handleRefuser = () => {
+    queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+    queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
+    toast("Course refusée – recherche du prochain livreur...");
   };
 
   const handleColisRecupere = (course) => {
+    const doUpdate = (extraData = {}) => updateCourseMutation.mutate({
+      id: course.id,
+      data: { statut: "colis_recupere", heure_recuperation: new Date().toISOString(), ...extraData },
+    });
+
     if (!navigator.geolocation) {
-      toast.error("GPS non disponible");
-      updateCourseMutation.mutate({ id: course.id, data: { statut: "colis_recupere", heure_recuperation: new Date().toISOString() } });
+      doUpdate();
+      toast.warning("Colis récupéré (GPS non disponible)");
       return;
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        updateCourseMutation.mutate({
-          id: course.id,
-          data: {
-            statut: "colis_recupere",
-            heure_recuperation: new Date().toISOString(),
-            latitude_recuperation: pos.coords.latitude,
-            longitude_recuperation: pos.coords.longitude,
-          },
-        });
+        doUpdate({ latitude_recuperation: pos.coords.latitude, longitude_recuperation: pos.coords.longitude });
         toast.success("Colis récupéré ! 📦 Position GPS enregistrée");
       },
-      (err) => {
-        console.error("Erreur GPS:", err);
-        updateCourseMutation.mutate({
-          id: course.id,
-          data: {
-            statut: "colis_recupere",
-            heure_recuperation: new Date().toISOString(),
-          },
-        });
-        toast.warning("Colis récupéré (GPS non disponible)");
-      },
+      () => { doUpdate(); toast.warning("Colis récupéré (GPS non disponible)"); },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
   const handleColisLivre = (course, gpsArrivee) => {
-    if (!navigator.geolocation || !gpsArrivee) {
-      updateCourseMutation.mutate({
-        id: course.id,
-        data: {
-          statut: "livree",
-          heure_livraison: new Date().toISOString(),
-        },
-      });
-    } else {
-      const gpsDepart = { lat: course.latitude_recuperation, lng: course.longitude_recuperation };
-      const distance = gpsDepart.lat ? 
-        Math.sqrt(Math.pow(gpsArrivee.lat - gpsDepart.lat, 2) + Math.pow(gpsArrivee.lng - gpsDepart.lng, 2)) * 111 : 
-        null;
-      const prixFinal = distance ? Math.round(distance * 100) : course.prix_estimate || 0;
+    const baseData = { statut: "livree", heure_livraison: new Date().toISOString() };
+
+    if (gpsArrivee && course.latitude_recuperation && course.longitude_recuperation) {
+      // Haversine pour prix exact
+      const distance = calculerDistance(
+        course.latitude_recuperation, course.longitude_recuperation,
+        gpsArrivee.lat, gpsArrivee.lng
+      );
+      const prixFinal = Math.round(distance * 100);
       const commissionSilga = Math.round(prixFinal * 0.3);
       const montantLivreur = prixFinal - commissionSilga;
 
       updateCourseMutation.mutate({
         id: course.id,
         data: {
-          statut: "livree",
-          heure_livraison: new Date().toISOString(),
+          ...baseData,
           latitude_livraison: gpsArrivee.lat,
           longitude_livraison: gpsArrivee.lng,
           distance_reelle_km: distance,
@@ -275,14 +269,14 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           montant_livreur: montantLivreur,
         },
       });
-
-      // Mettre à jour le montant dû à Silga
       saveLivreur(livreurProfil.id, {
         montant_du_silga: (livreurProfil.montant_du_silga || 0) + commissionSilga
       });
+    } else {
+      updateCourseMutation.mutate({ id: course.id, data: baseData });
     }
     statutMutation.mutate("disponible");
-    toast.success(`Livraison terminée ! 🎉`);
+    toast.success("Livraison terminée ! 🎉");
   };
 
   const handleLogout = () => {
@@ -290,12 +284,13 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       saveLivreur(livreurProfil.id, { app_active: false }).catch(() => null);
     }
     ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
-      try { localStorage.removeItem(k); } catch(_) {}
+      try { localStorage.removeItem(k); } catch (_) {}
     });
     base44.auth.logout();
     setTimeout(() => window.location.reload(), 300);
   };
 
+  // ─── Guards de rendu ──────────────────────────────────────────────────────
   if (!livreurProfil) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">
@@ -342,19 +337,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     );
   }
 
-  const isEnLigne = livreurProfil.statut !== "hors_ligne";
-  const livreurVisible = isEnLigne && gpsActif && livreurProfil.latitude && livreurProfil.longitude;
-
-  // Modal AVANT le return pour être au-dessus de tout
+  // ─── Modal plein écran si course en attente ───────────────────────────────
   if (courseEnAttente) {
-    console.log('[LIVREUR EXTERNE] 🚨 AFFICHAGE MODAL:', {
-      id: courseEnAttente.id,
-      statut: courseEnAttente.statut,
-      dispatch_status: courseEnAttente.dispatch_status,
-      client: courseEnAttente.client_nom,
-      depart: courseEnAttente.adresse_depart,
-      arrivee: courseEnAttente.adresse_arrivee,
-    });
     return (
       <>
         <CourseEnAttenteModal
@@ -364,37 +348,25 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           onRefuser={handleRefuser}
           isPending={updateCourseMutation.isPending}
           onExpire={() => {
-            queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles", "mes-courses-externes"] });
+            queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+            queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
           }}
         />
-        {/* DEBUG OVERLAY - bouton pour afficher/masquer */}
+        {/* Debug overlay */}
         <button
-          onClick={() => setShowDebug(!showDebug)}
-          className="fixed bottom-4 right-4 z-[100] w-10 h-10 rounded-full bg-red-600 text-white font-bold text-xs shadow-lg"
+          onClick={() => setShowDebug(v => !v)}
+          className="fixed bottom-4 right-4 z-[200] w-10 h-10 rounded-full bg-red-600 text-white font-bold text-xs shadow-lg"
         >
           🐛
         </button>
-        {showDebug && (
-          <div className="fixed top-0 left-0 z-[99] bg-black/90 text-green-400 p-4 text-xs font-mono max-h-screen overflow-auto w-full max-w-sm">
-            <div className="flex justify-between items-center mb-2">
-              <strong className="text-white text-sm">🔍 DEBUG MODE</strong>
-              <button onClick={() => setShowDebug(false)} className="text-white text-xs">✕</button>
-            </div>
-            <pre>{JSON.stringify(debugData, null, 2)}</pre>
-            <div className="mt-2 text-white">
-              <p>✅ Modal devrait être affiché</p>
-              <p>📦 Courses totales: {debugData.totalCourses}</p>
-              <p>🚨 Course en attente: {debugData.courseEnAttente ? 'OUI' : 'NON'}</p>
-            </div>
-          </div>
-        )}
+        {showDebug && <DebugPanel data={debugData} onClose={() => setShowDebug(false)} />}
       </>
     );
   }
 
+  // ─── Dashboard principal ──────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50">
-
       <div className="max-w-lg mx-auto p-4 pb-12">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
           <TabsList className="w-full">
@@ -405,38 +377,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
         {activeTab === "courses" && (
           <div className="space-y-4">
-            {/* DEBUG BUTTON - visible même sans modal */}
-            <button
-              onClick={() => setShowDebug(!showDebug)}
-              className="fixed bottom-4 right-4 z-50 w-10 h-10 rounded-full bg-red-600 text-white font-bold text-xs shadow-lg"
-            >
-              🐛
-            </button>
-            {showDebug && (
-              <div className="fixed top-0 left-0 z-50 bg-black/90 text-green-400 p-4 text-xs font-mono max-h-screen overflow-auto w-full max-w-sm">
-                <div className="flex justify-between items-center mb-2">
-                  <strong className="text-white text-sm">🔍 DEBUG MODE</strong>
-                  <button onClick={() => setShowDebug(false)} className="text-white text-xs">✕</button>
-                </div>
-                <pre>{JSON.stringify(debugData, null, 2)}</pre>
-                <div className="mt-2 text-white space-y-1">
-                  <p>📦 Courses totales: {debugData.totalCourses}</p>
-                  <p>🚨 Course en attente: {debugData.courseEnAttente ? 'OUI (' + debugData.courseEnAttente.id + ')' : 'NON'}</p>
-                  <p>📍 GPS actif: {debugData.gpsActif ? 'OUI' : 'NON'}</p>
-                  <p>✅ En ligne: {debugData.isEnLigne ? 'OUI' : 'NON'}</p>
-                  <p>👤 Statut: {debugData.livreurStatut}</p>
-                  {debugData.courseEnAttente && (
-                    <>
-                      <hr className="border-gray-700 my-2" />
-                      <p className="text-yellow-400">🎯 MODAL DEVRAIT ÊTRE AFFICHÉ</p>
-                      <p>Client: {debugData.courseEnAttente.client_nom}</p>
-                      <p>Départ: {debugData.courseEnAttente.adresse_depart}</p>
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-
             <LivreurHeader
               livreur={livreurProfil}
               isEnLigne={isEnLigne}
@@ -456,8 +396,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               </div>
             )}
 
-            <LivreurStatsBanner 
-              mesCourses={mesCourses} 
+            <LivreurStatsBanner
+              mesCourses={mesCourses}
               totalEncaisse={totalEncaisse}
               montantDüSilga={montantDüSilga}
               isExterne={true}
@@ -487,6 +427,53 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           <LivreurHistorique mesCourses={mesCourses} livreurProfil={livreurProfil} isExterne={true} />
         )}
       </div>
+
+      {/* Debug bouton toujours visible */}
+      <button
+        onClick={() => setShowDebug(v => !v)}
+        className="fixed bottom-4 right-4 z-50 w-10 h-10 rounded-full bg-red-600 text-white font-bold text-xs shadow-lg"
+      >
+        🐛
+      </button>
+      {showDebug && <DebugPanel data={debugData} onClose={() => setShowDebug(false)} />}
+    </div>
+  );
+}
+
+// ─── Composant Debug Panel ────────────────────────────────────────────────────
+function DebugPanel({ data, onClose }) {
+  return (
+    <div className="fixed top-0 left-0 z-[150] bg-black/95 text-green-400 p-4 text-xs font-mono h-screen overflow-auto w-full max-w-xs">
+      <div className="flex justify-between items-center mb-3">
+        <strong className="text-white text-sm">🔍 DEBUG — LivreurExterne</strong>
+        <button onClick={onClose} className="text-white text-lg leading-none">✕</button>
+      </div>
+      <div className="space-y-1 text-white mb-3">
+        <p>📦 Courses totales: <span className="text-green-400">{data.totalCourses}</span></p>
+        <p>🚨 Modal ouvert: <span className={data.modalOpen ? "text-green-400" : "text-red-400"}>{data.modalOpen ? "OUI" : "NON"}</span></p>
+        <p>📍 GPS actif: <span className={data.gpsActif ? "text-green-400" : "text-red-400"}>{data.gpsActif ? "OUI" : "NON"}</span></p>
+        <p>✅ En ligne: <span className={data.isEnLigne ? "text-green-400" : "text-red-400"}>{data.isEnLigne ? "OUI" : "NON"}</span></p>
+        <p>👤 Statut: <span className="text-yellow-400">{data.livreurStatut}</span></p>
+      </div>
+      {data.courseEnAttente ? (
+        <div className="border border-green-700 rounded p-2 space-y-1">
+          <p className="text-yellow-400 font-bold">🎯 COURSE EN ATTENTE</p>
+          <p>ID: {data.courseEnAttente.id}</p>
+          <p>Statut: {data.courseEnAttente.statut}</p>
+          <p>Dispatch: {data.courseEnAttente.dispatch_status}</p>
+          <p>Client: {data.courseEnAttente.client_nom}</p>
+          <p>Départ: {data.courseEnAttente.adresse_depart}</p>
+          <p>Expire: {data.courseEnAttente.timeout_expires_at ? new Date(data.courseEnAttente.timeout_expires_at).toLocaleTimeString() : 'N/A'}</p>
+        </div>
+      ) : (
+        <div className="border border-gray-700 rounded p-2">
+          <p className="text-gray-400">Aucune course en attente</p>
+          <p className="text-gray-500 text-xs mt-1">Filtre: statut=recherche_livreur + dispatch_status=propose</p>
+        </div>
+      )}
+      <pre className="mt-3 text-green-300 text-[10px] whitespace-pre-wrap">
+        {JSON.stringify(data, null, 2)}
+      </pre>
     </div>
   );
 }

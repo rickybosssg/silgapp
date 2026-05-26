@@ -1,6 +1,8 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { MapPin, Phone, Navigation, Check, X, Package, Clock, Truck, AlertCircle, MessageCircle } from "lucide-react";
+import { base44 } from "@/api/base44Client";
 
+// Vibration continue pendant que le modal est ouvert
 function useVibration(active) {
   const intervalRef = useRef(null);
   useEffect(() => {
@@ -9,20 +11,29 @@ function useVibration(active) {
       intervalRef.current = setInterval(() => {
         navigator.vibrate([500, 150, 500, 150, 500]);
       }, 3000);
-    } else {
-      navigator.vibrate?.(0);
-      clearInterval(intervalRef.current);
     }
     return () => {
       navigator.vibrate?.(0);
-      clearInterval(intervalRef.current);
+      if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, [active]);
 }
 
+// AudioContext unique réutilisé pour éviter les leaks
+let sharedAudioCtx = null;
+function getAudioCtx() {
+  if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
+    sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (sharedAudioCtx.state === 'suspended') {
+    sharedAudioCtx.resume();
+  }
+  return sharedAudioCtx;
+}
+
 function playNotificationSound() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = getAudioCtx();
     const notes = [880, 1100, 880, 1100];
     notes.forEach((freq, i) => {
       const osc = ctx.createOscillator();
@@ -62,49 +73,51 @@ export default function CourseEnAttenteModal({
   const [tempsRestant, setTempsRestant] = useState(60);
   const [courseDejaPrise, setCourseDejaPrise] = useState(false);
   const [courseExpiree, setCourseExpiree] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Sonnerie répétée
+  // Sonnerie répétée — nettoyée au démontage
   useEffect(() => {
     playNotificationSound();
     const t = setInterval(playNotificationSound, 5000);
     return () => clearInterval(t);
   }, []);
 
-  // Timer 60 secondes
+  // Timer 60 secondes — un seul interval stable avec useRef
+  const onExpireRef = useRef(onExpire);
+  useEffect(() => { onExpireRef.current = onExpire; }, [onExpire]);
+
   useEffect(() => {
-    if (tempsRestant <= 0) {
-      setCourseExpiree(true);
-      onExpire?.();
-      return;
-    }
-
     const timer = setInterval(() => {
-      setTempsRestant(prev => prev - 1);
+      setTempsRestant(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setCourseExpiree(true);
+          onExpireRef.current?.();
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
-
     return () => clearInterval(timer);
-  }, [tempsRestant, onExpire]);
+  }, []); // ← dépendances vides : un seul interval, jamais recréé
 
-  // Vérifier expiration backend
+  // Vérifier expiration backend — via SDK, pas fetch direct
+  const courseExpireeSentRef = useRef(false);
   useEffect(() => {
     const checkExpiration = async () => {
       try {
-        const res = await fetch('/functions/dispatchExterneAuto', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'verifier_expiration',
-            course_id: course.id,
-          }),
+        const data = await base44.functions.invoke('dispatchExterneAuto', {
+          action: 'verifier_expiration',
+          course_id: course.id,
         });
-        const data = await res.json();
-        
-        if (data.expired && !courseExpiree) {
+
+        if (data?.data?.expired && !courseExpireeSentRef.current) {
+          courseExpireeSentRef.current = true;
           setCourseExpiree(true);
-          onExpire?.();
+          onExpireRef.current?.();
         }
-        
-        if (data.livreur_id && data.livreur_id !== livreurId) {
+
+        if (data?.data?.livreur_id && data?.data?.livreur_id !== livreurId) {
           setCourseDejaPrise(true);
         }
       } catch (err) {
@@ -112,71 +125,75 @@ export default function CourseEnAttenteModal({
       }
     };
 
-    const interval = setInterval(checkExpiration, 2000);
-    checkExpiration(); // Check immédiat
-    
+    const interval = setInterval(checkExpiration, 3000);
     return () => clearInterval(interval);
-  }, [course.id, livreurId, courseExpiree, onExpire]);
+  }, [course.id, livreurId]);
 
   const handleAccepter = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
-      const res = await fetch('/functions/dispatchExterneAuto', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'accepter_course',
-          course_id: course.id,
-          livreur_id: livreurId,
-        }),
+      const res = await base44.functions.invoke('dispatchExterneAuto', {
+        action: 'accepter_course',
+        course_id: course.id,
+        livreur_id: livreurId,
       });
-      const data = await res.json();
+      const data = res?.data;
 
-      if (data.already_taken) {
+      if (data?.already_taken) {
         setCourseDejaPrise(true);
         return;
       }
-
-      if (data.expired) {
+      if (data?.expired) {
         setCourseExpiree(true);
         return;
       }
-
-      if (data.success) {
+      if (data?.success) {
         onAccepter(course);
       } else {
-        alert(data.error || 'Erreur lors de l\'acceptation');
+        alert(data?.error || "Erreur lors de l'acceptation");
       }
     } catch (err) {
       console.error('Erreur acceptation:', err);
       alert('Erreur réseau');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleRefuser = async () => {
-    if (!raison && showRaison) return;
-    
+    if (!raison) return;
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
-      const res = await fetch('/functions/dispatchExterneAuto', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'refuser_course',
-          course_id: course.id,
-          livreur_id: livreurId,
-          raison: raison || 'Course refusée',
-        }),
+      const res = await base44.functions.invoke('dispatchExterneAuto', {
+        action: 'refuser_course',
+        course_id: course.id,
+        livreur_id: livreurId,
+        raison: raison,
       });
-      const data = await res.json();
-
-      if (data.success) {
+      const data = res?.data;
+      if (data?.success) {
         onRefuser(course, raison);
       }
     } catch (err) {
       console.error('Erreur refuser:', err);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // Affichage état course déjà prise
+  // Fermeture auto après 3s sur les écrans terminaux
+  useEffect(() => {
+    if (courseDejaPrise || courseExpiree) {
+      const t = setTimeout(() => {
+        onExpireRef.current?.();
+      }, 3000);
+      return () => clearTimeout(t);
+    }
+  }, [courseDejaPrise, courseExpiree]);
+
+  // Écran "Course déjà prise"
   if (courseDejaPrise) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-3"
@@ -185,7 +202,7 @@ export default function CourseEnAttenteModal({
         <div className="w-full max-w-sm bg-white rounded-3xl overflow-hidden shadow-2xl">
           <div className="bg-gradient-to-r from-gray-400 to-gray-600 px-5 pt-5 pb-4">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-2xl">
+              <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center">
                 <AlertCircle className="w-8 h-8 text-white" />
               </div>
               <div>
@@ -194,17 +211,18 @@ export default function CourseEnAttenteModal({
               </div>
             </div>
           </div>
-          <div className="p-5">
-            <p className="text-sm text-gray-600 text-center mb-4">
+          <div className="p-5 text-center space-y-4">
+            <p className="text-sm text-gray-600">
               Cette course n'est plus disponible. De nouvelles courses arriveront bientôt !
             </p>
+            <p className="text-xs text-gray-400">Fermeture automatique dans 3s...</p>
           </div>
         </div>
       </div>
     );
   }
 
-  // Affichage état course expirée
+  // Écran "Course expirée"
   if (courseExpiree) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-3"
@@ -213,7 +231,7 @@ export default function CourseEnAttenteModal({
         <div className="w-full max-w-sm bg-white rounded-3xl overflow-hidden shadow-2xl">
           <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-5 pt-5 pb-4">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-2xl">
+              <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center">
                 <Clock className="w-8 h-8 text-white" />
               </div>
               <div>
@@ -222,10 +240,11 @@ export default function CourseEnAttenteModal({
               </div>
             </div>
           </div>
-          <div className="p-5">
-            <p className="text-sm text-gray-600 text-center mb-4">
+          <div className="p-5 text-center space-y-4">
+            <p className="text-sm text-gray-600">
               Le temps d'acceptation est écoulé. La course a été proposée à un autre livreur.
             </p>
+            <p className="text-xs text-gray-400">Fermeture automatique dans 3s...</p>
           </div>
         </div>
       </div>
@@ -242,7 +261,7 @@ export default function CourseEnAttenteModal({
       </div>
 
       <div className="relative w-full max-w-sm bg-white rounded-3xl overflow-hidden shadow-2xl">
-        {/* Header rouge animé */}
+        {/* Header rouge */}
         <div className="bg-gradient-to-r from-primary to-red-600 px-5 pt-5 pb-4 relative overflow-hidden">
           <div className="absolute -top-4 -right-4 w-20 h-20 rounded-full bg-white/10" />
           <div className="flex items-center gap-3">
@@ -280,7 +299,7 @@ export default function CourseEnAttenteModal({
         </div>
 
         <div className="p-5 space-y-4">
-          {/* Client */}
+          {/* Client + contacts */}
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Client</p>
@@ -344,11 +363,11 @@ export default function CourseEnAttenteModal({
             </div>
           </div>
 
-          {/* Infos cours */}
+          {/* Infos course */}
           <div className="flex items-center justify-between">
             <div>
-              {course.prix ? (
-                <p className="text-2xl font-black text-gray-900">{course.prix.toLocaleString()} <span className="text-base font-semibold text-gray-400">FCFA</span></p>
+              {course.prix_estimate ? (
+                <p className="text-2xl font-black text-gray-900">{course.prix_estimate.toLocaleString()} <span className="text-base font-semibold text-gray-400">FCFA</span></p>
               ) : null}
               {course.type_colis && (
                 <div className="flex items-center gap-1 mt-0.5">
@@ -357,12 +376,6 @@ export default function CourseEnAttenteModal({
                 </div>
               )}
             </div>
-            {course.urgence === "tres_urgente" && (
-              <span className="bg-red-100 text-red-700 text-xs font-black px-3 py-1.5 rounded-xl">⚡ TRÈS URGENT</span>
-            )}
-            {course.urgence === "urgente" && (
-              <span className="bg-amber-100 text-amber-700 text-xs font-black px-3 py-1.5 rounded-xl">⚡ URGENT</span>
-            )}
           </div>
 
           {course.notes && (
@@ -375,7 +388,7 @@ export default function CourseEnAttenteModal({
               <button
                 className="h-16 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 disabled:opacity-50"
                 onClick={handleAccepter}
-                disabled={isPending}
+                disabled={isPending || isSubmitting}
               >
                 <Check className="w-6 h-6" />
                 <span className="text-xs font-bold">Oui, je prends !</span>
@@ -383,7 +396,7 @@ export default function CourseEnAttenteModal({
               <button
                 className="h-16 rounded-2xl bg-gray-100 text-gray-700 font-black text-base border border-gray-200 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 disabled:opacity-50"
                 onClick={() => setShowRaison(true)}
-                disabled={isPending}
+                disabled={isPending || isSubmitting}
               >
                 <X className="w-6 h-6 text-gray-500" />
                 <span className="text-xs font-bold text-gray-500">Non, occupé</span>
@@ -412,24 +425,21 @@ export default function CourseEnAttenteModal({
                   }`}
                   onClick={() => setRaison("indisponible")}
                 >
-                  <Clock className="w-4 h-4 mx-auto mb-0.5-auto mb-0.5" />
+                  <Clock className="w-4 h-4 mx-auto mb-0.5" />
                   Indisponible
                 </button>
               </div>
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <button
                   className="h-12 rounded-2xl border border-gray-200 text-gray-600 font-semibold text-sm"
-                  onClick={() => {
-                    setShowRaison(false);
-                    setRaison("");
-                  }}
+                  onClick={() => { setShowRaison(false); setRaison(""); }}
                 >
                   Annuler
                 </button>
                 <button
                   className="h-12 rounded-2xl bg-gray-800 text-white font-bold text-sm disabled:opacity-50"
                   onClick={handleRefuser}
-                  disabled={!raison || isPending}
+                  disabled={!raison || isPending || isSubmitting}
                 >
                   Envoyer
                 </button>
