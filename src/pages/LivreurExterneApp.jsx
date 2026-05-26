@@ -327,9 +327,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const isEnLigne = livreurProfil.statut !== "hors_ligne";
   const livreurVisible = isEnLigne && gpsActif && livreurProfil.latitude && livreurProfil.longitude;
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {courseEnAttente && (
+  // Modal AVANT le return pour être au-dessus de tout
+  if (courseEnAttente) {
+    console.log('[LIVREUR EXTERNE] 🚨 AFFICHAGE MODAL:', courseEnAttente.id);
+    return (
+      <>
         <CourseEnAttenteModal
           course={courseEnAttente}
           livreurId={livreurProfil.id}
@@ -340,7 +342,12 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles", "mes-courses-externes"] });
           }}
         />
-      )}
+      </>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
 
       <div className="max-w-lg mx-auto p-4 pb-12">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
