@@ -102,7 +102,7 @@ export default function CourseStepForm({
             </div>
             <Button type="button" variant="outline" className="w-full" onClick={gpsHandlers?.onGetGPSDepart}>
               <Navigation className="w-4 h-4 mr-2" />
-              {formData.recuperationGPS ? "✓ Position GPS enregistrée" : "Utiliser ma position actuelle"}
+              {formData.recuperationGPS ? "✓ Position GPS utilisée comme point de départ" : "Utiliser ma position actuelle"}
             </Button>
           </div>
         );
@@ -347,7 +347,7 @@ export default function CourseStepForm({
             onClick={onNext}
             disabled={
               (step === 0 && !formData.type_course) ||
-              (step === 1 && !formData.adresse_depart) ||
+              (step === 1 && !formData.adresse_depart && !(formData.gps_depart_lat && formData.gps_depart_lng)) ||
               (step === 2 && !formData.destination_inconnue && !formData.adresse_arrivee) ||
               (step === 3 && !(formData.type_course === "expedier" ? formData.destinataire_telephone : formData.expediteur_telephone)) ||
               (step === 4 && !formData.type_colis)
