@@ -30,6 +30,7 @@ const CourseExterneForm = lazy(() => import('./pages/CourseExterneForm.jsx'));
 const CourseExterneFormSync = lazy(() => import('./pages/CourseExterneFormSync.jsx'));
 const ClientSuiviCourse = lazy(() => import('./pages/ClientSuiviCourse.jsx'));
 const DashboardAdminExterne = lazy(() => import('./pages/DashboardAdminExterne.jsx'));
+const DusLivreursExternes = lazy(() => import('./pages/DusLivreursExternes.jsx'));
 const PublicSuiviCourse = lazy(() => import('./pages/PublicSuiviCourse.jsx'));
 
 const LoadingScreen = () => (
@@ -145,6 +146,7 @@ function App() {
             )}
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/admin/externe" element={<DashboardAdminExterne />} />
+            <Route path="/admin/externe/dus-livreurs" element={<DusLivreursExternes />} />
           </Route>
           <Route path="*" element={<PageNotFound />} />
         </Routes>

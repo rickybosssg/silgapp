@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, Package, DollarSign, TrendingUp, ArrowLeft, Truck, AlertCircle, Eye, MapPin } from "lucide-react";
+import { Users, Package, DollarSign, TrendingUp, ArrowLeft, Truck, AlertCircle, Eye, MapPin, CreditCard } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -115,15 +115,15 @@ export default function DashboardAdminExterne() {
           </Card>
         </Link>
 
-        <Link to="/admin/externe/paiements" className="flex-1">
-          <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer">
+        <Link to="/admin/externe/dus-livreurs" className="flex-1">
+          <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer border-orange-200 bg-orange-50">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-green/10 flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-green-600" />
+              <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
+                <CreditCard className="w-5 h-5 text-orange-600" />
               </div>
               <div>
-                <p className="font-semibold text-foreground">Paiements</p>
-                <p className="text-xs text-muted-foreground">Montants dus à Silga</p>
+                <p className="font-semibold text-foreground">Dus livreurs</p>
+                <p className="text-xs text-muted-foreground">Récapitulatif commissions 30%</p>
               </div>
             </div>
           </Card>

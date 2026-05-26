@@ -10,9 +10,12 @@ import {
   Clock, HelpCircle, ChevronRight, TrendingUp, 
   Shield, Zap, Star, Loader2, ArrowLeft
 } from "lucide-react";
+// Note: MapPin, Navigation conservés pour usage dans le header
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import ModernMap from "@/components/client/ModernMap";
 import ProfilModal from "@/components/client/ProfilModal";
+import SupportWhatsApp from "@/components/client/SupportWhatsApp";
+import ClientOnboarding from "@/components/client/ClientOnboarding";
 
 function haversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -25,8 +28,7 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
 
 export default function ClientExterneApp() {
   const navigate = useNavigate();
-  const [gpsActive, setGpsActive] = useState(false);
-  const [gpsRequired, setGpsRequired] = useState(true);
+  const [onboardingDone, setOnboardingDone] = useState(false);
   const [showProfilModal, setShowProfilModal] = useState(false);
   const [position, setPosition] = useState(null);
   const [clientProfil, setClientProfil] = useState(null);
@@ -37,86 +39,60 @@ export default function ClientExterneApp() {
   const [showMap, setShowMap] = useState(false);
 
   useEffect(() => {
-    checkStatus();
+    loadProfil();
   }, []);
 
-  const checkStatus = async () => {
+  const loadProfil = async () => {
     try {
-      // 1. Vérifier GPS
-      const savedGps = localStorage.getItem("client_gps_active");
-      const savedPos = JSON.parse(localStorage.getItem("client_gps_position") || "null");
-      if (savedGps === "true") {
-        setGpsActive(true);
-        setGpsRequired(false);
-        if (savedPos) setPosition(savedPos);
-      } else {
-        setLoading(false);
-        return;
-      }
-
-      // 2. Vérifier profil client - création auto si inexistant
       const user = await base44.auth.me();
       const clients = await base44.entities.ClientExterne.filter({ user_email: user.email });
-
       let profil;
       if (clients && clients.length > 0) {
         profil = clients[0];
-        setClientProfil(profil);
       } else {
-        // Création automatique d'un profil minimal
-        const newProfil = await base44.entities.ClientExterne.create({
-          nom: "Client",
-          telephone: "+226" + (user.email?.split('@')[0] || "00000000"),
-          user_email: user.email
+        profil = await base44.entities.ClientExterne.create({
+          nom: user.full_name || user.email.split('@')[0],
+          telephone: "",
+          user_email: user.email,
+          actif: true
         });
-        profil = newProfil;
-        setClientProfil(newProfil);
-        // Inviter à compléter le profil
-        setShowProfilModal(true);
       }
+      setClientProfil(profil);
+    } catch (err) {
+      console.error("Erreur chargement profil:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      // 3. Vérifier course active (créée par le client) — filtrée par user_email
-      const coursesClient = await base44.entities.CourseExterne.filter({ 
-        created_by_id: user.id
-      });
-      const activeCourseClient = coursesClient?.find(c => 
-        !["livree", "annulee"].includes(c.statut)
-      );
+  const handleOnboardingComplete = async ({ gps, profil }) => {
+    setPosition(gps);
+    setClientProfil(profil);
+    setOnboardingDone(true);
+    await checkStatus(gps, profil);
+  };
+
+  const checkStatus = async (pos, profil) => {
+    try {
+      const user = await base44.auth.me();
+      const coursesClient = await base44.entities.CourseExterne.filter({ created_by_id: user.id });
+      const activeCourseClient = coursesClient?.find(c => !["livree", "annulee"].includes(c.statut));
       
-      // 4. Vérifier courses où le client est destinataire — utiliser profil correct
       let activeCourseDestinataire = null;
       if (profil?.id) {
-        const coursesDestinataire = await base44.entities.CourseExterne.filter({
-          destinataire_client_id: profil.id
-        });
-        activeCourseDestinataire = coursesDestinataire?.find(c => 
+        const coursesDestinataire = await base44.entities.CourseExterne.filter({ destinataire_client_id: profil.id });
+        activeCourseDestinataire = coursesDestinataire?.find(c =>
           !["livree", "annulee"].includes(c.statut) && c.type_course === "expedier"
         ) || null;
       }
-      
-      // Priorité : course active du client, sinon course en tant que destinataire
-      if (activeCourseClient) {
-        setCourseActive(activeCourseClient);
-      } else if (activeCourseDestinataire) {
-        setCourseActive(activeCourseDestinataire);
-      }
+      setCourseActive(activeCourseClient || activeCourseDestinataire || null);
 
-      // 5. Charger notifications non lues
-      const userNotifications = await base44.entities.Notification.filter({
-        destinataire_email: user.email,
-        lue: false
-      });
-      if (userNotifications && userNotifications.length > 0) {
-        setNotifications(userNotifications);
-      }
+      const userNotifications = await base44.entities.Notification.filter({ destinataire_email: user.email, lue: false });
+      if (userNotifications?.length > 0) setNotifications(userNotifications);
 
-      // 6. Charger livreurs disponibles
-      await loadLivreursProches(savedPos);
-
+      await loadLivreursProches(pos);
     } catch (err) {
       console.error("Erreur vérification statut:", err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -139,27 +115,9 @@ export default function ClientExterneApp() {
     }
   };
 
-  const handleActiverGPS = () => {
-    if (!navigator.geolocation) {
-      toast.error("GPS non disponible sur cet appareil");
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const posData = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-        setPosition(posData);
-        setGpsActive(true);
-        setGpsRequired(false);
-        localStorage.setItem("client_gps_active", "true");
-        localStorage.setItem("client_gps_position", JSON.stringify(posData));
-        loadLivreursProches(posData);
-      },
-      () => toast.error("Permission GPS refusée – obligatoire pour créer une course"),
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  };
 
-  if (loading) {
+
+  if (loading || !clientProfil) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-primary/5 to-red-50">
         <div className="text-center space-y-4">
@@ -170,28 +128,26 @@ export default function ClientExterneApp() {
     );
   }
 
-  if (gpsRequired && !gpsActive) {
-    return (
-      <div className="fixed inset-0 bg-gradient-to-br from-primary/10 to-red-50 flex items-center justify-center p-6">
-        <div className="max-w-sm w-full bg-white rounded-3xl shadow-2xl p-6 space-y-6 text-center">
-          <div className="w-20 h-20 rounded-2xl bg-red-50 flex items-center justify-center mx-auto">
-            <MapPin className="w-10 h-10 text-primary" />
-          </div>
-          <div>
-            <p className="text-xl font-black text-gray-900 mb-2">GPS Obligatoire</p>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              Pour créer une course et être localisé, l'activation du GPS est requise.
-            </p>
-          </div>
-          <button
-            className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-95 transition-all"
-            onClick={handleActiverGPS}
-          >
-            Activer le GPS
-          </button>
-        </div>
-      </div>
-    );
+  // Onboarding obligatoire (GPS + profil) avant d'accéder au dashboard
+  if (!onboardingDone) {
+    const gpsOk = localStorage.getItem("client_gps_active") === "true";
+    const profilComplet = !!(clientProfil?.nom && clientProfil?.prenom && clientProfil?.telephone &&
+      clientProfil.telephone.replace(/\D/g, "").length >= 8);
+    if (!gpsOk || !profilComplet) {
+      return (
+        <ClientOnboarding
+          clientProfil={clientProfil}
+          onComplete={handleOnboardingComplete}
+        />
+      );
+    }
+    // Profil déjà complet → passer directement
+    if (!onboardingDone) {
+      const savedPos = JSON.parse(localStorage.getItem("client_gps_position") || "null");
+      setOnboardingDone(true);
+      setPosition(savedPos);
+      checkStatus(savedPos, clientProfil);
+    }
   }
 
   const prenom = clientProfil?.prenom || clientProfil?.nom?.split(" ")[0] || "Client";
@@ -328,7 +284,7 @@ export default function ClientExterneApp() {
           </div>
 
           {/* Bouton carte — uniquement si course active */}
-          {courseActive && gpsActive && position && (
+          {courseActive && position && (
             <Card className="p-4 cursor-pointer hover:shadow-lg transition-all" onClick={() => setShowMap(true)}>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -366,7 +322,7 @@ export default function ClientExterneApp() {
               <Button 
                 variant="ghost" 
                 className="h-auto py-3 flex flex-col gap-1.5 hover:bg-green-50"
-                onClick={() => window.open("https://wa.me/22670000000", "_blank")}
+                onClick={() => window.open("https://wa.me/22667572857?text=" + encodeURIComponent("Bonjour SILGAPP 👋\nJ'ai besoin d'aide concernant ma course."), "_blank")}
               >
                 <MessageCircle className="w-5 h-5 text-green-600" />
                 <span className="text-[10px] font-medium">Support</span>
@@ -381,6 +337,9 @@ export default function ClientExterneApp() {
               </Button>
             </div>
           </Card>
+
+          {/* Support WhatsApp */}
+          <SupportWhatsApp />
 
           {/* Tarification */}
           <Card className="p-5 bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200 shadow-md">
@@ -427,7 +386,7 @@ export default function ClientExterneApp() {
       </div>
 
       {/* Modale carte temps réel */}
-      {showMap && courseActive && gpsActive && position && (
+      {showMap && courseActive && position && (
         <div className="fixed inset-0 z-50 bg-background">
           <div className="flex items-center justify-between p-4 border-b bg-card">
             <h2 className="text-lg font-bold text-foreground">Suivi en temps réel</h2>
