@@ -13,7 +13,8 @@ import CourseEnAttenteModal from "@/components/livreur/CourseEnAttenteModal";
 import CourseActiveCard from "@/components/livreur/CourseActiveCard";
 import LivreurHistorique from "@/components/livreur/LivreurHistorique";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import LivreurExterneOnboarding from "@/components/livreur/LivreurExterneOnboarding";
+import LivreurExterneOnboarding, { profilLivreurComplet, normaliserTelephone, formaterTelephone } from "@/components/livreur/LivreurExterneOnboarding";
+import LivreurMesInfosModal from "@/components/livreur/LivreurMesInfosModal";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -32,8 +33,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("courses");
   const [gpsActif, setGpsActif] = useState(false);
-  const [gpsRequis, setGpsRequis] = useState(true);
   const [onboardingTermine, setOnboardingTermine] = useState(false);
+  const [showMesInfos, setShowMesInfos] = useState(false);
 
 
   // ─── Profil livreur (rechargé toutes les 10s) ─────────────────────────────
@@ -156,14 +157,13 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setGpsActif(true);
-        setGpsRequis(false);
         saveLivreur(livreurProfil.id, {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
           derniere_position_date: new Date().toISOString(),
         }).then(() => {
           queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
-          toast.success("GPS activé – vous pouvez accéder au tableau de bord");
+          toast.success("GPS activé");
         }).catch(() => toast.error("Position GPS non enregistrée"));
       },
       () => { setGpsActif(false); toast.error("Permission GPS refusée – obligatoire"); },
@@ -282,17 +282,18 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     return (
       <LivreurExterneOnboarding
         livreurProfil={livreurProfil || initialProfil}
-        onComplete={(gpsData) => {
+        onComplete={(gpsData, updatedProfil) => {
           setGpsActif(true);
-          setGpsRequis(false);
           setOnboardingTermine(true);
-          if (gpsData && livreurProfil?.id) {
-            saveLivreur(livreurProfil.id || initialProfil?.id, {
+          const lid = (livreurProfil || initialProfil)?.id;
+          if (gpsData && lid) {
+            saveLivreur(lid, {
               latitude: gpsData.lat,
               longitude: gpsData.lng,
               derniere_position_date: new Date().toISOString(),
             }).catch(() => null);
           }
+          queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
         }}
       />
     );
@@ -340,6 +341,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           <TabsList className="w-full">
             <TabsTrigger value="courses" className="flex-1 text-xs">Courses</TabsTrigger>
             <TabsTrigger value="historique" className="flex-1 text-xs">Historique</TabsTrigger>
+            <TabsTrigger value="infos" className="flex-1 text-xs">Mes infos</TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -394,9 +396,17 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         {activeTab === "historique" && (
           <LivreurHistorique mesCourses={mesCourses} livreurProfil={livreurProfil} isExterne={true} />
         )}
+
+        {activeTab === "infos" && livreurProfil && (
+          <LivreurMesInfosModal
+            livreurProfil={livreurProfil}
+            onSave={(updated) => {
+              queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+              toast.success("Profil mis à jour ✓");
+            }}
+          />
+        )}
       </div>
-
-
     </div>
   );
 }

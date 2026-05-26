@@ -1,25 +1,31 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
-import { MapPin, User, Phone, Check, Loader2 } from "lucide-react";
+import { MapPin, User, Check, Loader2 } from "lucide-react";
 
-// Normalise un numéro de téléphone au format +226XXXXXXXX
+// ─── Helpers téléphone ────────────────────────────────────────────────────────
 export function normaliserTelephone(raw) {
   if (!raw) return "";
   const digits = raw.replace(/\D/g, "");
   if (digits.startsWith("226") && digits.length === 11) return "+" + digits;
-  if (digits.startsWith("0226") && digits.length === 12) return "+" + digits.slice(1);
   if (digits.length === 8) return "+226" + digits;
-  return "+" + digits;
+  if (digits.length > 8) return "+" + digits.slice(-11);
+  return "";
 }
 
-// Formater visuellement : XX XX XX XX
 function formaterAffichage(raw) {
-  const digits = raw.replace(/\D/g, "").slice(0, 8);
+  const digits = (raw || "").replace(/\D/g, "").slice(0, 8);
   return digits.replace(/(\d{2})(?=\d)/g, "$1 ").trim();
 }
 
-// ─── Étape 1 : GPS ────────────────────────────────────────────────────────────
+// ─── Vérification profil complet ──────────────────────────────────────────────
+export function profilClientComplet(p) {
+  if (!p) return false;
+  const tel = (p.telephone || "").replace(/\D/g, "");
+  return !!(p.nom && p.nom.trim() && p.prenom && p.prenom.trim() && tel.length >= 8);
+}
+
+// ─── GPS ──────────────────────────────────────────────────────────────────────
 function EtapeGPS({ onSuccess }) {
   const [loading, setLoading] = useState(false);
 
@@ -32,8 +38,8 @@ function EtapeGPS({ onSuccess }) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const posData = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-        localStorage.setItem("client_gps_active", "true");
-        localStorage.setItem("client_gps_position", JSON.stringify(posData));
+        try { localStorage.setItem("client_gps_active", "true"); } catch (_) {}
+        try { localStorage.setItem("client_gps_position", JSON.stringify(posData)); } catch (_) {}
         setLoading(false);
         onSuccess(posData);
       },
@@ -70,20 +76,18 @@ function EtapeGPS({ onSuccess }) {
           {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <MapPin className="w-5 h-5" />}
           {loading ? "Activation..." : "Activer le GPS"}
         </button>
-        <p className="text-xs text-gray-400">
-          Appuyez sur "Autoriser" lorsque votre appareil vous demande la permission
-        </p>
+        <p className="text-xs text-gray-400">Appuyez sur "Autoriser" lorsque votre appareil vous demande</p>
       </div>
     </div>
   );
 }
 
-// ─── Étape 2 : Profil ─────────────────────────────────────────────────────────
+// ─── Profil ────────────────────────────────────────────────────────────────────
 function EtapeProfil({ clientProfil, onSuccess }) {
   const [nom, setNom] = useState(clientProfil?.nom || "");
   const [prenom, setPrenom] = useState(clientProfil?.prenom || "");
   const [telAffiche, setTelAffiche] = useState(
-    clientProfil?.telephone ? formaterAffichage(clientProfil.telephone.replace(/^\+226/, "")) : ""
+    clientProfil?.telephone ? formaterAffichage(clientProfil.telephone) : ""
   );
   const [loading, setLoading] = useState(false);
 
@@ -92,24 +96,39 @@ function EtapeProfil({ clientProfil, onSuccess }) {
     setTelAffiche(formaterAffichage(raw));
   };
 
-  const handleSave = async () => {
-    const telDigits = telAffiche.replace(/\D/g, "");
-    if (!nom.trim()) { toast.error("Veuillez entrer votre nom"); return; }
-    if (!prenom.trim()) { toast.error("Veuillez entrer votre prénom"); return; }
-    if (telDigits.length !== 8) { toast.error("Numéro de téléphone invalide (8 chiffres requis)"); return; }
+  const telDigits = telAffiche.replace(/\D/g, "");
+  const telValide = telDigits.length === 8;
+  const peutSauvegarder = nom.trim() && prenom.trim() && telValide;
 
+  const handleSave = async () => {
+    if (!peutSauvegarder) return;
     const telNormalise = normaliserTelephone(telDigits);
     setLoading(true);
     try {
-      const updated = await base44.entities.ClientExterne.update(clientProfil.id, {
-        nom: nom.trim(),
-        prenom: prenom.trim(),
-        telephone: telNormalise,
-      });
+      // Utiliser update ou create selon que le profil existe
+      let updated;
+      if (clientProfil?.id) {
+        updated = await base44.entities.ClientExterne.update(clientProfil.id, {
+          nom: nom.trim(),
+          prenom: prenom.trim(),
+          telephone: telNormalise,
+        });
+      } else {
+        const user = await base44.auth.me();
+        updated = await base44.entities.ClientExterne.create({
+          nom: nom.trim(),
+          prenom: prenom.trim(),
+          telephone: telNormalise,
+          user_email: user?.email || "",
+          actif: true,
+        });
+      }
+      // Marquer en localStorage aussi
+      try { localStorage.setItem("client_profil_complet", "true"); } catch (_) {}
       toast.success("Profil complété !");
-      onSuccess(updated);
-    } catch (err) {
-      toast.error("Erreur lors de la sauvegarde");
+      onSuccess(updated || { ...(clientProfil || {}), nom: nom.trim(), prenom: prenom.trim(), telephone: telNormalise });
+    } catch {
+      toast.error("Erreur lors de la sauvegarde – réessayez");
     } finally {
       setLoading(false);
     }
@@ -123,16 +142,13 @@ function EtapeProfil({ clientProfil, onSuccess }) {
             <User className="w-8 h-8 text-primary" />
           </div>
           <p className="text-xl font-black text-gray-900">Complétez vos informations</p>
-          <p className="text-xs text-gray-500">
-            Ces informations permettent de synchroniser vos courses automatiquement.
-          </p>
+          <p className="text-xs text-gray-500">Ces informations permettent de synchroniser vos courses.</p>
         </div>
 
         <div className="space-y-3">
           <div>
             <label className="text-xs font-bold text-gray-700 mb-1 block">Nom *</label>
             <input
-              type="text"
               value={nom}
               onChange={e => setNom(e.target.value)}
               placeholder="Votre nom de famille"
@@ -142,7 +158,6 @@ function EtapeProfil({ clientProfil, onSuccess }) {
           <div>
             <label className="text-xs font-bold text-gray-700 mb-1 block">Prénom *</label>
             <input
-              type="text"
               value={prenom}
               onChange={e => setPrenom(e.target.value)}
               placeholder="Votre prénom"
@@ -150,27 +165,31 @@ function EtapeProfil({ clientProfil, onSuccess }) {
             />
           </div>
           <div>
-            <label className="text-xs font-bold text-gray-700 mb-1 block">Numéro de téléphone *</label>
-            <div className="flex items-center gap-2">
+            <label className="text-xs font-bold text-gray-700 mb-1 block">Téléphone * (8 chiffres)</label>
+            <div className="flex gap-2">
               <div className="h-12 rounded-xl border border-gray-200 bg-gray-50 px-3 flex items-center text-sm font-semibold text-gray-600 flex-shrink-0">
                 +226
               </div>
               <input
-                type="tel"
+                inputMode="numeric"
                 value={telAffiche}
                 onChange={handleTelChange}
                 placeholder="70 71 45 00"
-                className="flex-1 h-12 rounded-xl border border-gray-200 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary tracking-widest"
+                className="flex-1 h-12 rounded-xl border border-gray-200 px-4 text-sm tracking-widest font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
             </div>
-            <p className="text-[10px] text-gray-400 mt-1">Format : 70 71 45 00 (8 chiffres)</p>
+            {telAffiche.length > 0 && (
+              <p className={`text-xs mt-1 flex items-center gap-1 ${telValide ? "text-green-600" : "text-red-400"}`}>
+                {telValide ? <><Check className="w-3 h-3" /> {normaliserTelephone(telDigits)}</> : `${telDigits.length}/8 chiffres`}
+              </p>
+            )}
           </div>
         </div>
 
         <button
           onClick={handleSave}
-          disabled={loading}
-          className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-95 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+          disabled={loading || !peutSauvegarder}
+          className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
           {loading ? "Sauvegarde..." : "Valider et continuer"}
@@ -180,41 +199,47 @@ function EtapeProfil({ clientProfil, onSuccess }) {
   );
 }
 
-// ─── Orchestrateur onboarding ─────────────────────────────────────────────────
+// ─── Orchestrateur principal ──────────────────────────────────────────────────
 export default function ClientOnboarding({ clientProfil, onComplete }) {
-  const [step, setStep] = useState(null); // null = calcul en cours
+  // "gps" | "profil" | "done" | null (calcul en cours)
+  const [step, setStep] = useState(null);
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
 
-  // Calculer l'étape initiale
-  React.useEffect(() => {
-    const gpsOk = localStorage.getItem("client_gps_active") === "true";
-    const profilComplet = !!(clientProfil?.nom && clientProfil?.prenom && clientProfil?.telephone &&
-      clientProfil.telephone.replace(/\D/g, "").length >= 8);
+  useEffect(() => {
+    if (!clientProfil) return; // Attendre que le profil soit chargé
+    let gpsOk = false;
+    try { gpsOk = localStorage.getItem("client_gps_active") === "true"; } catch (_) {}
+    const complet = profilClientComplet(clientProfil);
 
     if (!gpsOk) {
       setStep("gps");
-    } else if (!profilComplet) {
+    } else if (!complet) {
       setStep("profil");
     } else {
+      // Profil complet + GPS déjà ok → terminer directement
+      let savedPos = null;
+      try { savedPos = JSON.parse(localStorage.getItem("client_gps_position") || "null"); } catch (_) {}
       setStep("done");
-      onComplete({ gps: JSON.parse(localStorage.getItem("client_gps_position") || "null"), profil: clientProfil });
+      // setTimeout 0 pour éviter l'appel pendant le rendu
+      setTimeout(() => onCompleteRef.current({ gps: savedPos, profil: clientProfil }), 0);
     }
-  }, []);
+  }, [clientProfil?.id]); // Dépend uniquement de l'ID pour éviter re-runs inutiles
 
-  if (step === null) return null;
-  if (step === "done") return null;
+  if (step === null || step === "done") return null;
 
   if (step === "gps") {
     return (
-      <EtapeGPS onSuccess={(posData) => {
-        const profilComplet = !!(clientProfil?.nom && clientProfil?.prenom && clientProfil?.telephone &&
-          clientProfil.telephone.replace(/\D/g, "").length >= 8);
-        if (profilComplet) {
-          setStep("done");
-          onComplete({ gps: posData, profil: clientProfil });
-        } else {
-          setStep("profil");
-        }
-      }} />
+      <EtapeGPS
+        onSuccess={(posData) => {
+          if (profilClientComplet(clientProfil)) {
+            setStep("done");
+            setTimeout(() => onCompleteRef.current({ gps: posData, profil: clientProfil }), 0);
+          } else {
+            setStep("profil");
+          }
+        }}
+      />
     );
   }
 
@@ -223,9 +248,10 @@ export default function ClientOnboarding({ clientProfil, onComplete }) {
       <EtapeProfil
         clientProfil={clientProfil}
         onSuccess={(updatedProfil) => {
+          let gpsPos = null;
+          try { gpsPos = JSON.parse(localStorage.getItem("client_gps_position") || "null"); } catch (_) {}
           setStep("done");
-          const gpsPos = JSON.parse(localStorage.getItem("client_gps_position") || "null");
-          onComplete({ gps: gpsPos, profil: updatedProfil });
+          setTimeout(() => onCompleteRef.current({ gps: gpsPos, profil: updatedProfil }), 0);
         }}
       />
     );

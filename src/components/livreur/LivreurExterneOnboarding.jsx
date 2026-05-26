@@ -1,36 +1,66 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import { Camera, Upload, Check } from "lucide-react";
 
-// ─── Téléphone helpers ────────────────────────────────────────────────────────
+// ─── Helpers téléphone ────────────────────────────────────────────────────────
 export function normaliserTelephone(tel) {
   if (!tel) return "";
-  let t = tel.replace(/[\s\-().]/g, "");
-  if (t.startsWith("+226")) return t;
-  if (t.startsWith("226") && t.length >= 11) return "+" + t;
-  if (t.length === 8) return "+226" + t;
-  return t;
+  const digits = tel.replace(/\D/g, "");
+  if (digits.startsWith("226") && digits.length === 11) return "+" + digits;
+  if (digits.length === 8) return "+226" + digits;
+  if (digits.length > 8) return "+" + digits.slice(-11);
+  return "";
 }
 
 export function formaterTelephone(tel) {
   if (!tel) return "";
-  let digits = tel.replace(/\D/g, "").slice(-8);
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 4) return digits.slice(0, 2) + " " + digits.slice(2);
-  if (digits.length <= 6) return digits.slice(0, 2) + " " + digits.slice(2, 4) + " " + digits.slice(4);
-  return digits.slice(0, 2) + " " + digits.slice(2, 4) + " " + digits.slice(4, 6) + " " + digits.slice(6, 8);
+  const digits = tel.replace(/\D/g, "").slice(-8);
+  return digits.replace(/(\d{2})(?=\d)/g, "$1 ").trim();
 }
 
-// ─── Upload photo helper ──────────────────────────────────────────────────────
-async function uploadPhoto(file) {
-  const { file_url } = await base44.integrations.Core.UploadFile({ file });
-  return file_url;
+// ─── Vérification profil livreur complet ─────────────────────────────────────
+export function profilLivreurComplet(p) {
+  if (!p) return false;
+  const tel = (p.telephone || "").replace(/\D/g, "");
+  return !!(
+    p.nom && p.nom.trim() &&
+    p.prenom && p.prenom.trim() &&
+    tel.length >= 8 &&
+    p.quartier && p.quartier.trim() &&
+    (p.vehicule || p.type_vehicule)
+  );
 }
 
-// ─── Écran GPS ─────────────────────────────────────────────────────────────────
-function EcranGPS({ onGpsOk }) {
+// ─── Clé localStorage GPS livreur ────────────────────────────────────────────
+const GPS_KEY = (id) => `livreur_gps_active_${id}`;
+const GPS_POS_KEY = (id) => `livreur_gps_pos_${id}`;
+
+// ─── Écran GPS ────────────────────────────────────────────────────────────────
+function EcranGPS({ livreurId, onGpsOk }) {
   const [loading, setLoading] = useState(false);
+
+  // Si GPS déjà accordé (session précédente), proposer réutiliser
+  useEffect(() => {
+    try {
+      const deja = localStorage.getItem(GPS_KEY(livreurId)) === "true";
+      if (deja) {
+        const pos = JSON.parse(localStorage.getItem(GPS_POS_KEY(livreurId)) || "null");
+        if (pos) {
+          // Rafraîchir silencieusement la position mais ne pas bloquer
+          navigator.geolocation?.getCurrentPosition(
+            (p) => {
+              const gps = { lat: p.coords.latitude, lng: p.coords.longitude };
+              try { localStorage.setItem(GPS_POS_KEY(livreurId), JSON.stringify(gps)); } catch (_) {}
+              onGpsOk(gps);
+            },
+            () => onGpsOk(pos), // Utiliser la position sauvegardée
+            { enableHighAccuracy: true, timeout: 5000 }
+          );
+        }
+      }
+    } catch (_) {}
+  }, []);
 
   const handleActiver = () => {
     if (!navigator.geolocation) {
@@ -40,8 +70,11 @@ function EcranGPS({ onGpsOk }) {
     setLoading(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        const gps = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        try { localStorage.setItem(GPS_KEY(livreurId), "true"); } catch (_) {}
+        try { localStorage.setItem(GPS_POS_KEY(livreurId), JSON.stringify(gps)); } catch (_) {}
         setLoading(false);
-        onGpsOk({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        onGpsOk(gps);
       },
       () => {
         setLoading(false);
@@ -60,12 +93,12 @@ function EcranGPS({ onGpsOk }) {
         <div>
           <p className="text-2xl font-black text-white mb-2">GPS Obligatoire</p>
           <p className="text-sm text-gray-400 leading-relaxed">
-            Activez votre GPS pour recevoir des courses et être visible sur la carte SILGAPP Externe.
+            Activez votre GPS pour recevoir des courses et être visible sur la carte.
           </p>
         </div>
         <div className="bg-amber-950/50 border border-amber-700 rounded-2xl p-4">
           <p className="text-xs text-amber-400 leading-relaxed">
-            ⚠️ Sans GPS, vous ne pourrez pas recevoir de courses ni être localisé par les clients.
+            ⚠️ Sans GPS, vous ne pourrez pas recevoir de courses.
           </p>
         </div>
         <button
@@ -75,40 +108,37 @@ function EcranGPS({ onGpsOk }) {
         >
           {loading ? (
             <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Activation...</>
-          ) : (
-            "📍 Activer le GPS"
-          )}
+          ) : "📍 Activer le GPS"}
         </button>
-        <p className="text-xs text-gray-600">
-          Appuyez sur "Autoriser" lorsque l'appareil vous le demande
-        </p>
+        <p className="text-xs text-gray-600">Appuyez sur "Autoriser" lorsque l'appareil vous le demande</p>
       </div>
     </div>
   );
 }
 
-// ─── Formulaire profil ─────────────────────────────────────────────────────────
-function FormulaireProfilLivreur({ livreurId, gpsData, onTermine }) {
+// ─── Formulaire profil livreur ────────────────────────────────────────────────
+function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
+  // Pré-remplir avec les données existantes
   const [form, setForm] = useState({
-    nom: "",
-    prenom: "",
-    telephone: "",
-    quartier: "",
-    vehicule: "moto",
-    numero_plaque: "",
+    nom: livreurProfil?.nom || "",
+    prenom: livreurProfil?.prenom || "",
+    telephone: livreurProfil?.telephone ? livreurProfil.telephone.replace(/\D/g, "").slice(-8) : "",
+    quartier: livreurProfil?.quartier || "",
+    vehicule: livreurProfil?.vehicule || livreurProfil?.type_vehicule || "moto",
+    numero_plaque: livreurProfil?.numero_plaque || "",
   });
-  const [photoLivreur, setPhotoLivreur] = useState(null);
-  const [photoMoto, setPhotoMoto] = useState(null);
-  const [cnibRecto, setCnibRecto] = useState(null);
-  const [cnibVerso, setCnibVerso] = useState(null);
+  const [photoLivreur, setPhotoLivreur] = useState(livreurProfil?.photo_url || null);
+  const [photoMoto, setPhotoMoto] = useState(livreurProfil?.photo_moto_url || null);
+  const [cnibRecto, setCnibRecto] = useState(livreurProfil?.photo_cnib_recto_url || null);
+  const [cnibVerso, setCnibVerso] = useState(livreurProfil?.photo_cnib_verso_url || null);
   const [uploading, setUploading] = useState({});
   const [saving, setSaving] = useState(false);
 
-  const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
+  const setF = (key, val) => setForm(f => ({ ...f, [key]: val }));
 
   const handleTelephone = (e) => {
     const raw = e.target.value.replace(/\D/g, "").slice(0, 8);
-    set("telephone", raw);
+    setF("telephone", raw);
   };
 
   const handlePhoto = async (field, setFn, e) => {
@@ -116,8 +146,8 @@ function FormulaireProfilLivreur({ livreurId, gpsData, onTermine }) {
     if (!file) return;
     setUploading(u => ({ ...u, [field]: true }));
     try {
-      const url = await uploadPhoto(file);
-      setFn(url);
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      setFn(file_url);
     } catch {
       toast.error("Erreur upload photo");
     } finally {
@@ -125,10 +155,11 @@ function FormulaireProfilLivreur({ livreurId, gpsData, onTermine }) {
     }
   };
 
-  const peutSauvegarder = form.nom && form.prenom && form.telephone.length === 8 && form.quartier && form.vehicule;
+  const telValide = form.telephone.length === 8;
+  const peutSauvegarder = form.nom.trim() && form.prenom.trim() && telValide && form.quartier.trim() && form.vehicule;
 
   const handleSauvegarder = async () => {
-    if (!peutSauvegarder) return;
+    if (!peutSauvegarder || saving) return;
     setSaving(true);
     const telNormalise = normaliserTelephone(form.telephone);
     const data = {
@@ -149,11 +180,13 @@ function FormulaireProfilLivreur({ livreurId, gpsData, onTermine }) {
     if (cnibVerso) data.photo_cnib_verso_url = cnibVerso;
 
     try {
-      await base44.functions.invoke('updateLivreur', { id: livreurId, data });
+      await base44.functions.invoke('updateLivreur', { id: livreurProfil.id, data });
+      // Marquer en localStorage que le profil est complet
+      try { localStorage.setItem(`livreur_profil_complet_${livreurProfil.id}`, "true"); } catch (_) {}
       toast.success("Profil enregistré !");
-      onTermine();
+      onTermine({ ...livreurProfil, ...data });
     } catch {
-      toast.error("Erreur lors de la sauvegarde");
+      toast.error("Erreur lors de la sauvegarde – réessayez");
     } finally {
       setSaving(false);
     }
@@ -162,17 +195,15 @@ function FormulaireProfilLivreur({ livreurId, gpsData, onTermine }) {
   return (
     <div className="fixed inset-0 bg-black overflow-y-auto z-50">
       <div className="max-w-sm mx-auto px-5 py-8 space-y-5">
-
-        {/* Logo + titre */}
         <div className="text-center mb-2">
           <div className="w-16 h-16 rounded-2xl bg-red-600 flex items-center justify-center mx-auto mb-3">
             <span className="text-3xl">⚡</span>
           </div>
           <h1 className="text-2xl font-black text-white">Complétez votre profil</h1>
-          <p className="text-sm text-gray-400 mt-1">Ces informations sont indispensables pour recevoir des courses</p>
+          <p className="text-sm text-gray-400 mt-1">Indispensable pour recevoir des courses</p>
         </div>
 
-        {/* Champ texte helper */}
+        {/* Champs texte */}
         {[
           { key: "nom", label: "Nom *", placeholder: "Ex: Ouédraogo" },
           { key: "prenom", label: "Prénom *", placeholder: "Ex: Ibrahim" },
@@ -183,14 +214,14 @@ function FormulaireProfilLivreur({ livreurId, gpsData, onTermine }) {
             <label className="block text-xs font-semibold text-gray-400 mb-1 uppercase tracking-wide">{label}</label>
             <input
               value={form[key]}
-              onChange={e => set(key, e.target.value)}
+              onChange={e => setF(key, e.target.value)}
               placeholder={placeholder}
               className="w-full h-12 rounded-xl bg-zinc-900 border border-zinc-700 text-white px-4 text-sm focus:border-red-500 focus:outline-none"
             />
           </div>
         ))}
 
-        {/* Téléphone avec formatage automatique */}
+        {/* Téléphone */}
         <div>
           <label className="block text-xs font-semibold text-gray-400 mb-1 uppercase tracking-wide">Téléphone * (8 chiffres)</label>
           <div className="relative">
@@ -203,11 +234,10 @@ function FormulaireProfilLivreur({ livreurId, gpsData, onTermine }) {
               className="w-full h-12 rounded-xl bg-zinc-900 border border-zinc-700 text-white pl-16 pr-4 text-sm font-mono focus:border-red-500 focus:outline-none tracking-widest"
             />
           </div>
-          {form.telephone.length > 0 && form.telephone.length < 8 && (
-            <p className="text-xs text-red-400 mt-1">8 chiffres requis ({form.telephone.length}/8)</p>
-          )}
-          {form.telephone.length === 8 && (
-            <p className="text-xs text-green-400 mt-1 flex items-center gap-1"><Check className="w-3 h-3" /> {normaliserTelephone(form.telephone)}</p>
+          {form.telephone.length > 0 && (
+            <p className={`text-xs mt-1 flex items-center gap-1 ${telValide ? "text-green-400" : "text-red-400"}`}>
+              {telValide ? <><Check className="w-3 h-3" /> {normaliserTelephone(form.telephone)}</> : `${form.telephone.length}/8 chiffres`}
+            </p>
           )}
         </div>
 
@@ -223,7 +253,7 @@ function FormulaireProfilLivreur({ livreurId, gpsData, onTermine }) {
             ].map(({ val, label }) => (
               <button
                 key={val}
-                onClick={() => set("vehicule", val)}
+                onClick={() => setF("vehicule", val)}
                 className={`h-12 rounded-xl border-2 font-semibold text-sm transition-all ${
                   form.vehicule === val ? "border-red-600 bg-red-600/10 text-red-400" : "border-zinc-700 bg-zinc-900 text-gray-400"
                 }`}
@@ -237,39 +267,36 @@ function FormulaireProfilLivreur({ livreurId, gpsData, onTermine }) {
         {/* Photos */}
         <div className="space-y-3">
           <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide">Photos (optionnelles mais recommandées)</label>
-
           {[
-            { key: "photo", label: "📸 Photo de vous (face)", state: photoLivreur, setFn: setPhotoLivreur },
+            { key: "photo", label: "📸 Photo de vous", state: photoLivreur, setFn: setPhotoLivreur },
             { key: "moto", label: "🏍️ Photo du véhicule", state: photoMoto, setFn: setPhotoMoto },
             { key: "cnib_recto", label: "🪪 CNIB Recto", state: cnibRecto, setFn: setCnibRecto },
             { key: "cnib_verso", label: "🪪 CNIB Verso", state: cnibVerso, setFn: setCnibVerso },
           ].map(({ key, label, state, setFn }) => (
-            <div key={key} className="flex items-center gap-3">
-              <div className="flex-1">
-                <label className="block text-xs text-gray-400 mb-1">{label}</label>
-                {state ? (
-                  <div className="flex items-center gap-2">
-                    <img src={state} alt="" className="w-14 h-14 rounded-xl object-cover border border-zinc-700" />
-                    <label className="text-xs text-red-400 cursor-pointer underline">
-                      Changer
-                      <input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => handlePhoto(key, setFn, e)} />
-                    </label>
-                  </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <label className="flex-1 h-11 rounded-xl bg-zinc-900 border border-dashed border-zinc-600 flex items-center justify-center gap-2 text-xs text-gray-400 cursor-pointer active:bg-zinc-800">
-                      <Camera className="w-4 h-4" />
-                      {uploading[key] ? "Upload..." : "Appareil photo"}
-                      <input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => handlePhoto(key, setFn, e)} disabled={uploading[key]} />
-                    </label>
-                    <label className="flex-1 h-11 rounded-xl bg-zinc-900 border border-dashed border-zinc-600 flex items-center justify-center gap-2 text-xs text-gray-400 cursor-pointer active:bg-zinc-800">
-                      <Upload className="w-4 h-4" />
-                      {uploading[key] ? "Upload..." : "Galerie"}
-                      <input type="file" accept="image/*" className="hidden" onChange={e => handlePhoto(key, setFn, e)} disabled={uploading[key]} />
-                    </label>
-                  </div>
-                )}
-              </div>
+            <div key={key}>
+              <label className="block text-xs text-gray-400 mb-1">{label}</label>
+              {state ? (
+                <div className="flex items-center gap-2">
+                  <img src={state} alt="" className="w-14 h-14 rounded-xl object-cover border border-zinc-700" />
+                  <label className="text-xs text-red-400 cursor-pointer underline">
+                    Changer
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => handlePhoto(key, setFn, e)} />
+                  </label>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <label className="flex-1 h-11 rounded-xl bg-zinc-900 border border-dashed border-zinc-600 flex items-center justify-center gap-2 text-xs text-gray-400 cursor-pointer">
+                    <Camera className="w-4 h-4" />
+                    {uploading[key] ? "Upload..." : "Appareil photo"}
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => handlePhoto(key, setFn, e)} disabled={uploading[key]} />
+                  </label>
+                  <label className="flex-1 h-11 rounded-xl bg-zinc-900 border border-dashed border-zinc-600 flex items-center justify-center gap-2 text-xs text-gray-400 cursor-pointer">
+                    <Upload className="w-4 h-4" />
+                    {uploading[key] ? "Upload..." : "Galerie"}
+                    <input type="file" accept="image/*" className="hidden" onChange={e => handlePhoto(key, setFn, e)} disabled={uploading[key]} />
+                  </label>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -282,9 +309,7 @@ function FormulaireProfilLivreur({ livreurId, gpsData, onTermine }) {
         >
           {saving ? (
             <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Sauvegarde...</>
-          ) : (
-            <><Check className="w-5 h-5" /> Valider mon profil</>
-          )}
+          ) : <><Check className="w-5 h-5" /> Valider mon profil</>}
         </button>
         <p className="text-center text-xs text-gray-600 pb-8">
           Ces informations sont visibles par les clients lors de la livraison
@@ -296,39 +321,54 @@ function FormulaireProfilLivreur({ livreurId, gpsData, onTermine }) {
 
 // ─── Composant principal exporté ──────────────────────────────────────────────
 export default function LivreurExterneOnboarding({ livreurProfil, onComplete }) {
-  const [etape, setEtape] = useState("gps"); // "gps" | "profil"
+  // "loading" → "gps" → "profil" → "done"
+  const [etape, setEtape] = useState("loading");
   const [gpsData, setGpsData] = useState(null);
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
 
-  // Vérifier si le profil est déjà complet
-  const profilComplet = !!(
-    livreurProfil?.nom &&
-    livreurProfil?.prenom &&
-    livreurProfil?.telephone &&
-    livreurProfil?.quartier &&
-    livreurProfil?.vehicule
-  );
+  useEffect(() => {
+    if (!livreurProfil?.id) return;
 
-  if (profilComplet) {
-    // Juste besoin du GPS
-    if (etape === "gps") {
-      return (
-        <EcranGPS
-          onGpsOk={(gps) => {
-            setGpsData(gps);
-            onComplete(gps);
-          }}
-        />
-      );
+    const complet = profilLivreurComplet(livreurProfil);
+    let gpsDeja = false;
+    let posDejaData = null;
+    try {
+      gpsDeja = localStorage.getItem(GPS_KEY(livreurProfil.id)) === "true";
+      posDejaData = JSON.parse(localStorage.getItem(GPS_POS_KEY(livreurProfil.id)) || "null");
+    } catch (_) {}
+
+    if (gpsDeja && posDejaData && complet) {
+      // Tout ok : pas d'onboarding nécessaire
+      setEtape("done");
+      setTimeout(() => onCompleteRef.current(posDejaData), 0);
+    } else if (!gpsDeja) {
+      setEtape("gps");
+    } else if (!complet) {
+      // GPS ok mais profil incomplet
+      setGpsData(posDejaData);
+      setEtape("profil");
+    } else {
+      // GPS ok + profil ok
+      setEtape("done");
+      setTimeout(() => onCompleteRef.current(posDejaData), 0);
     }
-    return null;
-  }
+  }, [livreurProfil?.id]);
+
+  if (etape === "loading" || etape === "done") return null;
 
   if (etape === "gps") {
     return (
       <EcranGPS
+        livreurId={livreurProfil?.id}
         onGpsOk={(gps) => {
           setGpsData(gps);
-          setEtape("profil");
+          if (profilLivreurComplet(livreurProfil)) {
+            setEtape("done");
+            setTimeout(() => onCompleteRef.current(gps), 0);
+          } else {
+            setEtape("profil");
+          }
         }}
       />
     );
@@ -336,9 +376,12 @@ export default function LivreurExterneOnboarding({ livreurProfil, onComplete }) 
 
   return (
     <FormulaireProfilLivreur
-      livreurId={livreurProfil.id}
+      livreurProfil={livreurProfil}
       gpsData={gpsData}
-      onTermine={() => onComplete(gpsData)}
+      onTermine={(updatedProfil) => {
+        setEtape("done");
+        setTimeout(() => onCompleteRef.current(gpsData, updatedProfil), 0);
+      }}
     />
   );
 }

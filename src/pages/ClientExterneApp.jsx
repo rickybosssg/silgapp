@@ -15,7 +15,7 @@ import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import ModernMap from "@/components/client/ModernMap";
 import ProfilModal from "@/components/client/ProfilModal";
 import SupportWhatsApp from "@/components/client/SupportWhatsApp";
-import ClientOnboarding from "@/components/client/ClientOnboarding";
+import ClientOnboarding, { profilClientComplet } from "@/components/client/ClientOnboarding";
 
 function haversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -42,20 +42,6 @@ export default function ClientExterneApp() {
     loadProfil();
   }, []);
 
-  // Auto-complétion onboarding si GPS + profil déjà ok (retour sur l'app)
-  useEffect(() => {
-    if (onboardingDone || !clientProfil) return;
-    const gpsOk = localStorage.getItem("client_gps_active") === "true";
-    const profilComplet = !!(clientProfil.nom && clientProfil.prenom && clientProfil.telephone &&
-      clientProfil.telephone.replace(/\D/g, "").length >= 8);
-    if (gpsOk && profilComplet) {
-      const savedPos = JSON.parse(localStorage.getItem("client_gps_position") || "null");
-      setOnboardingDone(true);
-      setPosition(savedPos);
-      checkStatus(savedPos, clientProfil);
-    }
-  }, [clientProfil, onboardingDone]);
-
   const loadProfil = async () => {
     try {
       const user = await base44.auth.me();
@@ -79,11 +65,11 @@ export default function ClientExterneApp() {
     }
   };
 
-  const handleOnboardingComplete = async ({ gps, profil }) => {
+  const handleOnboardingComplete = ({ gps, profil }) => {
     setPosition(gps);
     setClientProfil(profil);
     setOnboardingDone(true);
-    await checkStatus(gps, profil);
+    checkStatus(gps, profil);
   };
 
   const checkStatus = async (pos, profil) => {
@@ -135,7 +121,8 @@ export default function ClientExterneApp() {
 
 
 
-  if (loading || !clientProfil) {
+  // Spinner uniquement si vraiment en chargement et pas encore de profil
+  if (loading) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-primary/5 to-red-50">
         <div className="text-center space-y-4">
@@ -146,26 +133,21 @@ export default function ClientExterneApp() {
     );
   }
 
-  // Onboarding obligatoire (GPS + profil) avant d'accéder au dashboard
+  // Onboarding : laisser ClientOnboarding décider (GPS + profil)
+  // ClientOnboarding attend clientProfil non-null pour calculer l'étape
   if (!onboardingDone) {
-    const gpsOk = localStorage.getItem("client_gps_active") === "true";
-    const profilComplet = !!(clientProfil?.nom && clientProfil?.prenom && clientProfil?.telephone &&
-      clientProfil.telephone.replace(/\D/g, "").length >= 8);
-    if (!gpsOk || !profilComplet) {
-      return (
-        <ClientOnboarding
-          clientProfil={clientProfil}
-          onComplete={handleOnboardingComplete}
-        />
-      );
-    }
-    // Profil déjà complet → passer via useEffect, pas pendant le rendu
+    return (
+      <ClientOnboarding
+        clientProfil={clientProfil}
+        onComplete={handleOnboardingComplete}
+      />
+    );
   }
 
-  // useEffect déclenché si profil complet mais onboarding pas encore marqué done
-  // (cas connexion ultérieure avec GPS et profil déjà renseignés)
+  // Dashboard : clientProfil garanti non-null ici
+  if (!clientProfil) return null;
 
-  const prenom = clientProfil?.prenom || clientProfil?.nom?.split(" ")[0] || "Client";
+  const prenom = (clientProfil?.prenom || (clientProfil?.nom || "").split(" ")[0] || "Client").trim() || "Client";
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -423,13 +405,13 @@ export default function ClientExterneApp() {
         );
       })()}
 
-      {/* Profil modal */}
-      {showProfilModal && (
+      {/* Profil modal — "Mes infos" */}
+      {showProfilModal && clientProfil && (
         <ProfilModal
           clientProfil={clientProfil}
           onClose={() => setShowProfilModal(false)}
           onSave={(updatedProfil) => {
-            setClientProfil(updatedProfil);
+            if (updatedProfil) setClientProfil(updatedProfil);
             setShowProfilModal(false);
           }}
         />
