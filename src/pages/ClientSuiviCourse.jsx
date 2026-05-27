@@ -562,56 +562,9 @@ export default function ClientSuiviCourse() {
                 </Card>
               )}
 
-              {/* 👍/👎 Feedback destinataire — résumé enrichi + réaction */}
+              {/* 👍/👎 Feedback destinataire */}
               {isDestinataire && (
                 <div className="space-y-3">
-                  {/* Résumé destinataire équivalent à celui de l'expéditeur */}
-                  <Card className="overflow-hidden border-2 border-green-300 shadow-lg">
-                    <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-4 py-3 text-center">
-                      <p className="text-white font-black text-base">✅ Votre colis est arrivé !</p>
-                      {maCourse.heure_livraison && (
-                        <p className="text-white/80 text-xs mt-0.5">
-                          Livré à {format(new Date(maCourse.heure_livraison), "HH:mm", { locale: fr })}
-                        </p>
-                      )}
-                    </div>
-                    {(() => {
-                      const distD = maCourse.distance_reelle_km
-                        || haversineKm(maCourse.latitude_recuperation, maCourse.longitude_recuperation, maCourse.latitude_livraison, maCourse.longitude_livraison)
-                        || null;
-                      const prixD = maCourse.prix_final > 0 ? maCourse.prix_final : (distD > 0 ? Math.round(distD * 100) : null);
-                      const dureeD = maCourse.heure_livraison && maCourse.heure_recuperation
-                        ? Math.round((new Date(maCourse.heure_livraison) - new Date(maCourse.heure_recuperation)) / 60000)
-                        : maCourse.heure_livraison && maCourse.heure_acceptation
-                          ? Math.round((new Date(maCourse.heure_livraison) - new Date(maCourse.heure_acceptation)) / 60000)
-                          : distD ? Math.round((distD / 25) * 60) : null;
-                      return (
-                        <div className="p-3 bg-green-50 grid grid-cols-3 gap-2">
-                          <div className="bg-white rounded-xl p-2.5 text-center shadow-sm">
-                            <Ruler className="w-3.5 h-3.5 mx-auto mb-1 text-blue-500" />
-                            <p className="text-xs font-black text-gray-900">
-                              {distD ? `${Number(distD).toFixed(1)} km` : "—"}
-                            </p>
-                            <p className="text-[9px] text-gray-400 uppercase">Distance</p>
-                          </div>
-                          <div className="bg-white rounded-xl p-2.5 text-center shadow-sm">
-                            <Clock className="w-3.5 h-3.5 mx-auto mb-1 text-purple-500" />
-                            <p className="text-xs font-black text-gray-900">
-                              {dureeD ? `${dureeD} min` : "—"}
-                            </p>
-                            <p className="text-[9px] text-gray-400 uppercase">Durée</p>
-                          </div>
-                          <div className="bg-white rounded-xl p-2.5 text-center shadow-sm">
-                            <Banknote className="w-3.5 h-3.5 mx-auto mb-1 text-green-600" />
-                            <p className="text-xs font-black text-green-700">
-                              {prixD > 0 ? `${prixD.toLocaleString()} F` : "—"}
-                            </p>
-                            <p className="text-[9px] text-gray-400 uppercase">Prix final</p>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </Card>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">👍/👎 Votre avis sur la livraison</p>
                   <DestinataireReactionButton course={maCourse} onDone={refetch} />
                 </div>
