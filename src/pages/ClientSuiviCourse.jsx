@@ -82,9 +82,12 @@ export default function ClientSuiviCourse() {
       );
       let byDest = [];
       if (clientProfilId) {
-        byDest = await base44.entities.CourseExterne.filter(
+        const allByDest = await base44.entities.CourseExterne.filter(
           { destinataire_client_id: clientProfilId }, "-created_date", 20
         );
+        // Exclure les courses créées par ce même utilisateur (déjà dans byCreator)
+        // et les courses "recevoir" où destinataire = créateur (incohérence de rôle)
+        byDest = (allByDest || []).filter(c => c.created_by_id !== userId);
       }
       // Fusionner sans doublons
       const map = new Map();

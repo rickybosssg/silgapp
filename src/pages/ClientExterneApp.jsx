@@ -101,7 +101,11 @@ export default function ClientExterneApp() {
       let activesDestinataire = [];
       if (profil?.id) {
         const coursesDestinataire = await base44.entities.CourseExterne.filter({ destinataire_client_id: profil.id }, "-created_date", 20);
-        activesDestinataire = (coursesDestinataire || []).filter(c => !["livree", "annulee"].includes(c.statut));
+        // Exclure : courses déjà dans byCreator (même userId) + courses "recevoir" dont le créateur est le destinataire lui-même (même compte)
+        activesDestinataire = (coursesDestinataire || []).filter(c =>
+          !["livree", "annulee"].includes(c.statut) &&
+          c.created_by_id !== user.id // ne pas dupliquer les courses que l'utilisateur a lui-même créées
+        );
       }
 
       // Fusionner sans doublons par id
