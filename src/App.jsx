@@ -119,7 +119,7 @@ function App() {
     );
   }
 
-  // Réseau sélectionné → afficher le dashboard approprié
+  // Réseau sélectionné → afficher le dashboard approprié + routes admin communes
   return (
     <Router>
       <Suspense fallback={<LoadingScreen />}>
@@ -135,6 +135,9 @@ function App() {
                 <Route path="/livreurs" element={<Livreurs />} />
                 <Route path="/rapport" element={<RapportJour />} />
                 <Route path="/recapitulatif" element={<RecapitulatifAdmin />} />
+                {/* Routes admin externe accessibles depuis interne */}
+                <Route path="/admin/externe" element={<DashboardAdminExterne />} />
+                <Route path="/admin/externe/dus-livreurs" element={<DusLivreursExternes />} />
               </>
             ) : (
               <>
@@ -148,8 +151,6 @@ function App() {
             )}
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/maintenance" element={<Maintenance />} />
-            <Route path="/admin/externe" element={<DashboardAdminExterne />} />
-            <Route path="/admin/externe/dus-livreurs" element={<DusLivreursExternes />} />
           </Route>
           <Route path="*" element={<PageNotFound />} />
         </Routes>
