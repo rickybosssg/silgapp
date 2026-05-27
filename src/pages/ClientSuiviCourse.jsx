@@ -303,8 +303,8 @@ export default function ClientSuiviCourse() {
         )}
 
         {/* ETA temps réel — destinataire : vers livraison uniquement (après récupération) */}
-        {/* Affiché si : livreur assigné + statut en_livraison + (destinataire OU non-principal) */}
-        {maCourse.statut === "en_livraison" && maCourse.livreur_id && maCourse.gps_arrivee_lat && maCourse.gps_arrivee_lng && (
+        {/* Affiché si : livreur assigné + statut colis_recupere/en_livraison + (destinataire OU non-principal) */}
+        {["colis_recupere", "en_livraison"].includes(maCourse.statut) && maCourse.livreur_id && maCourse.gps_arrivee_lat && maCourse.gps_arrivee_lng && (
           (() => {
             const livreurLat = maCourse._livreur?.latitude;
             const livreurLng = maCourse._livreur?.longitude;
