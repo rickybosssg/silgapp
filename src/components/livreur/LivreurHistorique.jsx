@@ -58,8 +58,14 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
   const totalEncaisseToday = isExterne
     ? livreesToday.reduce((sum, c) => sum + (c.prix_final || 0), 0)
     : livreesToday.reduce((sum, c) => sum + (c.prix_reel || 0), 0);
-  const gainLivreurToday = livreesToday.reduce((sum, c) => sum + (c.montant_livreur || Math.round((c.prix_final || 0) * 0.7)), 0);
-  const commissionToday = livreesToday.reduce((sum, c) => sum + (c.commission_silga || Math.round((c.prix_final || 0) * 0.3)), 0);
+  const gainLivreurToday = livreesToday.reduce((sum, c) => {
+    if (c.montant_livreur > 0) return sum + c.montant_livreur;
+    return sum + Math.round((c.prix_final || 0) * 0.7);
+  }, 0);
+  const commissionToday = livreesToday.reduce((sum, c) => {
+    if (c.commission_silga > 0) return sum + c.commission_silga;
+    return sum + Math.round((c.prix_final || 0) * 0.3);
+  }, 0);
   const montantDuSilga = livreurProfil?.montant_du_silga || 0;
   const isPaye = livreurProfil?.statut_paiement === "paye";
 
@@ -202,26 +208,31 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
                     {course.statut === "livree" && (
                       isExterne ? (
                         <div className="flex flex-wrap gap-1 mt-1">
-                          {course.distance_reelle_km != null && (
+                          {course.distance_reelle_km > 0 && (
                             <span className="text-xs text-blue-600 bg-blue-50 rounded px-2 py-0.5">
                               📏 {Number(course.distance_reelle_km).toFixed(1)} km
                             </span>
                           )}
-                          {course.prix_final ? (
+                          {course.heure_livraison && course.heure_acceptation && (
+                            <span className="text-xs text-purple-600 bg-purple-50 rounded px-2 py-0.5">
+                              ⏱ {Math.round((new Date(course.heure_livraison) - new Date(course.heure_acceptation)) / 60000)} min
+                            </span>
+                          )}
+                          {course.prix_final > 0 && (
                             <span className="text-xs font-semibold text-gray-700 bg-gray-50 rounded px-2 py-0.5">
                               💰 {course.prix_final.toLocaleString()} F total
                             </span>
-                          ) : null}
-                          {course.montant_livreur ? (
+                          )}
+                          {course.montant_livreur > 0 && (
                             <span className="text-xs font-bold text-green-700 bg-green-50 rounded px-2 py-0.5">
                               ✅ +{course.montant_livreur.toLocaleString()} F (70%)
                             </span>
-                          ) : null}
-                          {course.commission_silga ? (
+                          )}
+                          {course.commission_silga > 0 && (
                             <span className="text-xs text-orange-600 bg-orange-50 rounded px-2 py-0.5">
                               Dû Silga: {course.commission_silga.toLocaleString()} F (30%)
                             </span>
-                          ) : null}
+                          )}
                           {course.note_livreur > 0 && (
                             <span className="text-xs text-yellow-700 bg-yellow-50 rounded px-2 py-0.5 flex items-center gap-0.5">
                               {"⭐".repeat(course.note_livreur)}

@@ -321,7 +321,7 @@ export default function ClientSuiviCourse() {
                       ? `📍 GPS : ${Number(maCourse.latitude_livraison).toFixed(4)}, ${Number(maCourse.longitude_livraison).toFixed(4)}`
                       : maCourse.latitude_arrivee_livraison
                         ? `📍 GPS : ${Number(maCourse.latitude_arrivee_livraison).toFixed(4)}, ${Number(maCourse.longitude_arrivee_livraison).toFixed(4)}`
-                        : "Destination enregistrée à la livraison"
+                        : "Position du destinataire confirmée"
                   : maCourse.adresse_arrivee || "—"}
               </p>
             </div>
@@ -425,13 +425,25 @@ export default function ClientSuiviCourse() {
                 <span className="font-semibold text-green-600">{format(new Date(maCourse.heure_livraison), "HH:mm", { locale: fr })}</span>
               </div>
             )}
+            {maCourse.heure_livraison && maCourse.heure_acceptation && (
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">⏱ Durée totale</span>
+                <span className="font-semibold">{Math.round((new Date(maCourse.heure_livraison) - new Date(maCourse.heure_acceptation)) / 60000)} min</span>
+              </div>
+            )}
+            {maCourse.distance_reelle_km > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">📏 Distance réelle</span>
+                <span className="font-semibold">{Number(maCourse.distance_reelle_km).toFixed(1)} km</span>
+              </div>
+            )}
             {maCourse.prix_estimate && !maCourse.prix_final && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Prix estimé</span>
                 <span className="font-medium">{maCourse.prix_estimate.toLocaleString()} FCFA</span>
               </div>
             )}
-            {maCourse.prix_final ? (
+            {maCourse.prix_final > 0 ? (
               <div className="flex justify-between pt-2 border-t">
                 <span className="text-muted-foreground font-semibold">Prix final</span>
                 <span className="font-bold text-lg text-primary">{maCourse.prix_final.toLocaleString()} FCFA</span>
@@ -532,10 +544,46 @@ export default function ClientSuiviCourse() {
                 </Card>
               )}
 
-              {/* 👍/👎 Feedback destinataire — ne compte pas dans la note */}
+              {/* 👍/👎 Feedback destinataire — résumé enrichi + réaction */}
               {isDestinataire && (
-                <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">👍/👎 Retour destinataire · Ne compte pas dans la note</p>
+                <div className="space-y-3">
+                  {/* Résumé destinataire équivalent à celui de l'expéditeur */}
+                  <Card className="overflow-hidden border-2 border-green-300 shadow-lg">
+                    <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-4 py-3 text-center">
+                      <p className="text-white font-black text-base">✅ Votre colis est arrivé !</p>
+                      {maCourse.heure_livraison && (
+                        <p className="text-white/80 text-xs mt-0.5">
+                          Livré à {format(new Date(maCourse.heure_livraison), "HH:mm", { locale: fr })}
+                        </p>
+                      )}
+                    </div>
+                    <div className="p-3 bg-green-50 grid grid-cols-3 gap-2">
+                      <div className="bg-white rounded-xl p-2.5 text-center shadow-sm">
+                        <Ruler className="w-3.5 h-3.5 mx-auto mb-1 text-blue-500" />
+                        <p className="text-xs font-black text-gray-900">
+                          {maCourse.distance_reelle_km > 0 ? `${Number(maCourse.distance_reelle_km).toFixed(1)} km` : "—"}
+                        </p>
+                        <p className="text-[9px] text-gray-400 uppercase">Distance</p>
+                      </div>
+                      <div className="bg-white rounded-xl p-2.5 text-center shadow-sm">
+                        <Clock className="w-3.5 h-3.5 mx-auto mb-1 text-purple-500" />
+                        <p className="text-xs font-black text-gray-900">
+                          {maCourse.heure_livraison && maCourse.heure_acceptation
+                            ? `${Math.round((new Date(maCourse.heure_livraison) - new Date(maCourse.heure_acceptation)) / 60000)} min`
+                            : "—"}
+                        </p>
+                        <p className="text-[9px] text-gray-400 uppercase">Durée</p>
+                      </div>
+                      <div className="bg-white rounded-xl p-2.5 text-center shadow-sm">
+                        <Banknote className="w-3.5 h-3.5 mx-auto mb-1 text-green-600" />
+                        <p className="text-xs font-black text-green-700">
+                          {maCourse.prix_final > 0 ? `${maCourse.prix_final.toLocaleString()} F` : "—"}
+                        </p>
+                        <p className="text-[9px] text-gray-400 uppercase">Prix final</p>
+                      </div>
+                    </div>
+                  </Card>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">👍/👎 Votre avis sur la livraison</p>
                   <DestinataireReactionButton course={maCourse} onDone={refetch} />
                 </div>
               )}

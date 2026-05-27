@@ -15,7 +15,8 @@ import {
   Download,
   Star,
   Truck,
-  QrCode
+  QrCode,
+  Banknote
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -364,43 +365,65 @@ export default function PublicSuiviCourse({ token }) {
           </div>
         </Card>
 
-        {/* Message fin */}
+        {/* Message fin — résumé complet type Uber */}
         {isDelivered && (
-          <>
-            <Card className="p-6 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
-                  <CheckCircle2 className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h2 className="font-bold text-green-900 text-lg">Colis livré avec succès !</h2>
-                  <p className="text-sm text-green-700">
-                    Merci d'avoir utilisé SILGAPP
+          <Card className="overflow-hidden border-2 border-green-300 shadow-xl">
+            <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-6 py-6 text-center">
+              <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-3">
+                <CheckCircle2 className="w-9 h-9 text-white" />
+              </div>
+              <h2 className="font-black text-white text-xl">Livraison terminée ! 🎉</h2>
+              <p className="text-white/80 text-sm mt-1">Votre colis a bien été livré</p>
+            </div>
+            <div className="p-5 bg-green-50 space-y-3">
+              {/* Métriques */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+                  <Clock className="w-4 h-4 mx-auto mb-1 text-purple-500" />
+                  <p className="text-sm font-black text-gray-900">
+                    {course.heure_livraison
+                      ? format(new Date(course.heure_livraison), "HH:mm", { locale: fr })
+                      : "—"}
                   </p>
+                  <p className="text-[9px] text-gray-400 font-semibold uppercase">Heure</p>
+                </div>
+                <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+                  <Truck className="w-4 h-4 mx-auto mb-1 text-blue-500" />
+                  <p className="text-sm font-black text-gray-900">
+                    {course.distance_reelle_km > 0
+                      ? `${Number(course.distance_reelle_km).toFixed(1)} km`
+                      : "—"}
+                  </p>
+                  <p className="text-[9px] text-gray-400 font-semibold uppercase">Distance</p>
+                </div>
+                <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+                  <Star className="w-4 h-4 mx-auto mb-1 text-yellow-500" />
+                  <p className="text-sm font-black text-gray-900">
+                    {course.prix_final > 0 ? `${course.prix_final.toLocaleString()} F` : "—"}
+                  </p>
+                  <p className="text-[9px] text-gray-400 font-semibold uppercase">Prix final</p>
                 </div>
               </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <p className="font-semibold text-green-900 mb-2">
-                    Avez-vous aimé l'expérience SILGAPP ?
-                  </p>
-                  <div className="flex gap-2">
-                    <Button className="flex-1 bg-green-600 hover:bg-green-700">
-                      <Star className="w-4 h-4 mr-2 fill-white" />
-                      Noter
-                    </Button>
-                    <a href={APK_DOWNLOAD_URL} className="flex-1">
-                      <Button variant="outline" className="w-full border-green-600 text-green-700 hover:bg-green-50">
-                        <Download className="w-4 h-4 mr-2" />
-                        Télécharger SILGAPP
-                      </Button>
-                    </a>
-                  </div>
+              {/* Durée si disponible */}
+              {course.heure_livraison && course.heure_acceptation && (
+                <div className="bg-white rounded-xl p-3 flex items-center justify-between shadow-sm">
+                  <span className="text-sm text-gray-600">⏱ Durée totale de livraison</span>
+                  <span className="font-bold text-gray-900">
+                    {Math.round((new Date(course.heure_livraison) - new Date(course.heure_acceptation)) / 60000)} min
+                  </span>
                 </div>
-              </div>
-            </Card>
-          </>
+              )}
+              <p className="text-center text-xs text-green-700 font-medium pt-1">
+                Merci d'avoir utilisé SILGAPP 🙏
+              </p>
+              <a href={APK_DOWNLOAD_URL}>
+                <Button className="w-full bg-primary hover:bg-primary/90 font-semibold gap-2">
+                  <Download className="w-4 h-4" />
+                  Télécharger SILGAPP
+                </Button>
+              </a>
+            </div>
+          </Card>
         )}
       </div>
     </div>

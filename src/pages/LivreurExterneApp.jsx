@@ -130,16 +130,32 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     }
   }, [livreurProfil?.statut, coursesActives.length, livreurId]);
 
-  // ─── Gains du jour ────────────────────────────────────────────────────────
-  const totalEncaisse = useMemo(() => {
-    const today = new Date().toDateString();
-    return mesCourses
-      .filter(c => c.statut === "livree" && c.montant_livreur &&
-        new Date(c.heure_livraison || c.updated_date).toDateString() === today)
-      .reduce((sum, c) => sum + (c.montant_livreur || 0), 0);
+  // ─── Gains du jour — recalcul temps réel depuis les courses ──────────────
+  const livreesToday = useMemo(() => {
+    const todayStr = new Date().toDateString();
+    return mesCourses.filter(c =>
+      c.statut === "livree" &&
+      new Date(c.heure_livraison || c.updated_date).toDateString() === todayStr
+    );
   }, [mesCourses]);
 
-  const montantDüSilga = livreurProfil?.montant_du_silga || 0;
+  const totalEncaisse = useMemo(() =>
+    livreesToday.reduce((sum, c) => {
+      // Priorité : montant_livreur sauvegardé, sinon 70% du prix_final
+      if (c.montant_livreur > 0) return sum + c.montant_livreur;
+      return sum + Math.round((c.prix_final || 0) * 0.7);
+    }, 0),
+    [livreesToday]
+  );
+
+  // Montant dû à Silga recalculé en temps réel depuis les courses (plus fiable que le champ Livreur)
+  const montantDüSilga = useMemo(() =>
+    livreesToday.reduce((sum, c) => {
+      if (c.commission_silga > 0) return sum + c.commission_silga;
+      return sum + Math.round((c.prix_final || 0) * 0.3);
+    }, 0),
+    [livreesToday]
+  );
 
   // ─── isEnLigne — défini ici, AVANT debugData ──────────────────────────────
   const isEnLigne = livreurProfil ? livreurProfil.statut !== "hors_ligne" : false;

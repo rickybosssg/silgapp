@@ -10,10 +10,19 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
     new Date(c.created_date || c.updated_date).toDateString() === today
   ).length;
 
-  // Calculs financiers du jour pour livreur externe
-  const prixTotalToday = livreesToday.reduce((s, c) => s + (c.prix_final || 0), 0);
-  const commissionToday = livreesToday.reduce((s, c) => s + (c.commission_silga || Math.round((c.prix_final || 0) * 0.3)), 0);
-  const gainToday = livreesToday.reduce((s, c) => s + (c.montant_livreur || Math.round((c.prix_final || 0) * 0.7)), 0);
+  // Calculs financiers du jour — priorité aux champs sauvegardés, fallback calcul local
+  const prixTotalToday = livreesToday.reduce((s, c) => {
+    const prix = c.prix_final || 0;
+    return s + prix;
+  }, 0);
+  const commissionToday = livreesToday.reduce((s, c) => {
+    if (c.commission_silga > 0) return s + c.commission_silga;
+    return s + Math.round((c.prix_final || 0) * 0.3);
+  }, 0);
+  const gainToday = livreesToday.reduce((s, c) => {
+    if (c.montant_livreur > 0) return s + c.montant_livreur;
+    return s + Math.round((c.prix_final || 0) * 0.7);
+  }, 0);
 
   if (isExterne) {
     return (

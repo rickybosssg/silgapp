@@ -1,5 +1,5 @@
-import React from "react";
-import { CheckCircle2, MapPin, Banknote, Clock, TrendingUp } from "lucide-react";
+import React, { useEffect } from "react";
+import { CheckCircle2, MapPin, Banknote, Clock, TrendingUp, Star } from "lucide-react";
 
 /**
  * Écran récapitulatif après livraison confirmée (côté livreur externe).
@@ -8,8 +8,8 @@ import { CheckCircle2, MapPin, Banknote, Clock, TrendingUp } from "lucide-react"
 export default function LivraisonRecapitulatif({ course, onClose }) {
   const prixFinal = Number(course.prix_final || 0);
   const distance = Number(course.distance_reelle_km || 0);
-  const montantLivreur = Number(course.montant_livreur || (prixFinal * 0.7) || 0);
-  const commission = Number(course.commission_silga || (prixFinal * 0.3) || 0);
+  const montantLivreur = Number(course.montant_livreur > 0 ? course.montant_livreur : (prixFinal * 0.7));
+  const commission = Number(course.commission_silga > 0 ? course.commission_silga : (prixFinal * 0.3));
 
   // Calcul temps réel si heures disponibles
   let tempsMinutes = null;
@@ -89,12 +89,24 @@ export default function LivraisonRecapitulatif({ course, onClose }) {
             </div>
           )}
 
+          {/* Note reçue si disponible */}
+          {course.note_livreur > 0 && (
+            <div className="flex items-center gap-3 bg-yellow-50 rounded-2xl p-3 border border-yellow-200">
+              <div className="flex items-center gap-0.5">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className={`w-5 h-5 ${i < course.note_livreur ? "fill-yellow-400 text-yellow-400" : "fill-gray-200 text-gray-200"}`} />
+                ))}
+              </div>
+              <p className="text-sm font-bold text-yellow-800">Note reçue : {course.note_livreur}/5</p>
+            </div>
+          )}
+
           {/* Bouton principal */}
           <button
             className="w-full h-14 rounded-2xl bg-gradient-to-b from-green-600 to-emerald-700 text-white font-black text-base shadow-lg shadow-green-200 active:scale-[0.98] transition-all mt-2"
             onClick={onClose}
           >
-            ✅ Paiement reçu — Fermer la course
+            ✅ Paiement reçu — Retour disponible
           </button>
         </div>
       </div>
