@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import ClientsExternesPanel from "@/components/admin/ClientsExternesPanel";
+import HistoriqueDuJour from "@/components/admin/HistoriqueDuJour";
 
 export default function DashboardAdminExterne() {
   const { data: courses = [] } = useQuery({
@@ -67,16 +68,27 @@ export default function DashboardAdminExterne() {
     const today = new Date().toDateString();
     const coursesToday = courses.filter(c => new Date(c.created_date).toDateString() === today);
     const livrees = courses.filter(c => c.statut === "livree");
+    const annulees = courses.filter(c => c.statut === "annulee");
+    
+    // Correction logique : un livreur est "en ligne" si app_active=true ET (disponible OU en_course)
+    const livreursEnLigne = livreurs.filter(l => 
+      l.app_active === true && 
+      l.actif !== false && 
+      (l.statut === "disponible" || l.statut === "en_course")
+    ).length;
     
     return {
       coursesTotale: courses.length,
       coursesToday: coursesToday.length,
-      enCours: courses.filter(c => ["livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut)).length,
+      enTraitement: courses.filter(c => !["livree", "annulee"].includes(c.statut)).length,
       livrees: livrees.length,
+      annulees: annulees.length,
       caTotal: livrees.reduce((sum, c) => sum + (c.prix_final || 0), 0),
       commissionSilga: livrees.reduce((sum, c) => sum + (c.commission_silga || 0), 0),
       livreursTotal: livreurs.length,
-      livreursActifs: livreurs.filter(l => l.statut === "disponible" && l.actif).length,
+      livreursEnLigne,
+      livreursDisponibles: livreurs.filter(l => l.statut === "disponible" && l.actif !== false && l.app_active === true).length,
+      livreursEnCourse: livreurs.filter(l => l.statut === "en_course" && l.actif !== false).length,
       livreursEnAttente: livreurs.filter(l => l.validation === "en_attente").length,
       clientsTotal: clients.length,
     };
@@ -103,14 +115,16 @@ export default function DashboardAdminExterne() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard title="Courses totales" value={stats.coursesTotale} icon={Package} color="bg-primary" />
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <StatCard title="Total courses" value={stats.coursesTotale} icon={Package} color="bg-primary" />
         <StatCard title="Aujourd'hui" value={stats.coursesToday} icon={Package} color="bg-blue-500" />
-        <StatCard title="En cours" value={stats.enCours} icon={Truck} color="bg-orange-500" />
+        <StatCard title="En traitement" value={stats.enTraitement} icon={Truck} color="bg-orange-500" />
         <StatCard title="Livrées" value={stats.livrees} icon={TrendingUp} color="bg-green-500" />
+        <StatCard title="Annulées" value={stats.annulees} icon={AlertCircle} color="bg-red-400" />
         <StatCard title="CA total" value={`${stats.caTotal.toLocaleString()}`} icon={DollarSign} color="bg-indigo-500" suffix="F" />
         <StatCard title="Commission Silga" value={`${stats.commissionSilga.toLocaleString()}`} icon={DollarSign} color="bg-purple-500" suffix="F" />
-        <StatCard title="Livreurs" value={stats.livreursTotal} icon={Users} color="bg-accent" />
+        <StatCard title="Livreurs en ligne" value={stats.livreursEnLigne} icon={Users} color="bg-emerald-500" />
+        <StatCard title="Disponibles" value={stats.livreursDisponibles} icon={Users} color="bg-green-400" />
         <StatCard title="Clients" value={stats.clientsTotal} icon={Users} color="bg-pink-500" />
       </div>
 
@@ -202,17 +216,17 @@ export default function DashboardAdminExterne() {
             <h3 className="font-bold text-foreground">Courses en temps réel</h3>
           </div>
           <Badge variant="outline" className="text-xs">
-            {courses.filter(c => ["livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut)).length} en cours
+            {courses.filter(c => !["livree", "annulee"].includes(c.statut)).length} en cours
           </Badge>
         </div>
         <div className="space-y-2 max-h-[400px] overflow-y-auto">
-          {courses.filter(c => c.statut !== "nouvelle").length === 0 ? (
+          {courses.filter(c => !["livree", "annulee"].includes(c.statut)).length === 0 ? (
             <div className="text-center py-8 text-muted-foreground text-sm">
               Aucune course en cours
             </div>
           ) : (
             courses
-              .filter(c => c.statut !== "nouvelle")
+              .filter(c => !["livree", "annulee"].includes(c.statut))
               .sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
               .map(course => (
                 <div key={course.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -249,6 +263,10 @@ export default function DashboardAdminExterne() {
           )}
         </div>
       </Card>
+
+      {/* Historique du jour */}
+      <HistoriqueDuJour courses={courses} />
+
       {/* Section Clients inscrits */}
       <Card className="p-4">
         <ClientsExternesPanel />
@@ -257,12 +275,12 @@ export default function DashboardAdminExterne() {
   );
 }
 
-function StatCard({ title, value, icon: IconComp, color, suffix }) {
+function StatCard({ title, value, icon: Icon, color, suffix }) {
   return (
     <Card className={`p-4 ${color} text-white`}>
       <div className="flex items-center justify-between mb-2">
         <p className="text-xs opacity-90">{title}</p>
-        {IconComp && <IconComp className="w-4 h-4 opacity-80" />}
+        {Icon && <Icon className="w-4 h-4 opacity-80" />}
       </div>
       <p className="text-2xl font-bold">
         {value}

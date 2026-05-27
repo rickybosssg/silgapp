@@ -296,18 +296,20 @@ export default function LivreursExternes() {
 
   const stats = useMemo(() => ({
     total: livreurs.length,
-    disponible: livreurs.filter(l => l.statut === "disponible" && l.actif !== false).length,
-    enCourse: livreurs.filter(l => l.statut === "en_course").length,
-    horsLigne: livreurs.filter(l => l.statut === "hors_ligne").length,
+    enLigne: livreurs.filter(l => l.app_active === true && l.actif !== false && (l.statut === "disponible" || l.statut === "en_course")).length,
+    disponible: livreurs.filter(l => l.statut === "disponible" && l.actif !== false && l.app_active === true).length,
+    enCourse: livreurs.filter(l => l.statut === "en_course" && l.actif !== false).length,
+    horsLigne: livreurs.filter(l => l.statut === "hors_ligne" || l.app_active === false || l.actif === false).length,
     valide: livreurs.filter(l => l.validation === "valide").length,
     bloque: livreurs.filter(l => l.actif === false).length,
   }), [livreurs]);
 
   const livreursFiltres = useMemo(() => {
     if (filterStatut === "tous") return livreurs;
-    if (filterStatut === "disponible") return livreurs.filter(l => l.statut === "disponible" && l.actif !== false);
-    if (filterStatut === "en_course") return livreurs.filter(l => l.statut === "en_course");
-    if (filterStatut === "hors_ligne") return livreurs.filter(l => l.statut === "hors_ligne");
+    if (filterStatut === "en_ligne") return livreurs.filter(l => l.app_active === true && l.actif !== false && (l.statut === "disponible" || l.statut === "en_course"));
+    if (filterStatut === "disponible") return livreurs.filter(l => l.statut === "disponible" && l.actif !== false && l.app_active === true);
+    if (filterStatut === "en_course") return livreurs.filter(l => l.statut === "en_course" && l.actif !== false);
+    if (filterStatut === "hors_ligne") return livreurs.filter(l => l.statut === "hors_ligne" || l.app_active === false || l.actif === false);
     if (filterStatut === "bloque") return livreurs.filter(l => l.actif === false);
     if (filterStatut === "en_attente") return livreurs.filter(l => l.validation === "en_attente");
     return livreurs;
@@ -361,11 +363,12 @@ export default function LivreursExternes() {
 
   const FILTRES = [
     { id: "tous", label: `Tous (${stats.total})` },
+    { id: "en_ligne", label: `En ligne (${stats.enLigne})` },
     { id: "disponible", label: `Disponibles (${stats.disponible})` },
     { id: "en_course", label: `En course (${stats.enCourse})` },
     { id: "hors_ligne", label: `Hors ligne (${stats.horsLigne})` },
     { id: "bloque", label: `Bloqués (${stats.bloque})` },
-    { id: "en_attente", label: `En attente validation` },
+    { id: "en_attente", label: `En attente` },
   ];
 
   return (
@@ -411,14 +414,13 @@ export default function LivreursExternes() {
       </div>
 
       {/* Statistiques */}
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
         {[
           { label: "Total", value: stats.total, color: "bg-primary text-white" },
-          { label: "Validés", value: stats.valide, color: "bg-emerald-500 text-white" },
+          { label: "En ligne", value: stats.enLigne, color: "bg-emerald-500 text-white" },
           { label: "Disponibles", value: stats.disponible, color: "bg-green-500 text-white" },
           { label: "En course", value: stats.enCourse, color: "bg-blue-500 text-white" },
           { label: "Hors ligne", value: stats.horsLigne, color: "bg-gray-400 text-white" },
-          { label: "Bloqués", value: stats.bloque, color: "bg-red-500 text-white" },
         ].map(s => (
           <Card key={s.label} className={`p-3 text-center ${s.color}`}>
             <p className="text-xl font-bold">{s.value}</p>
