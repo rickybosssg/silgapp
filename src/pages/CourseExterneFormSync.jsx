@@ -217,7 +217,7 @@ export default function CourseExterneFormSync() {
     onError: (err) => toast.error("Erreur : " + err.message),
   });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     let expediteurNom, expediteurTel, expediteurClientId, expediteurPhoneNormalized;
@@ -266,6 +266,25 @@ export default function CourseExterneFormSync() {
     const gpsArriveLat = isRecevoir ? formData.gps_arrivee_lat : (formData.destination_inconnue ? null : formData.gps_arrivee_lat);
     const gpsArriveLng = isRecevoir ? formData.gps_arrivee_lng : (formData.destination_inconnue ? null : formData.gps_arrivee_lng);
     const destInconnue = isRecevoir ? false : (formData.destination_inconnue || false);
+
+    // Validation backend des rôles avant création
+    try {
+      const validationRes = await base44.functions.invoke('validateCourseRoles', {
+        type_course: formData.type_course,
+        expediteur_client_id: expediteurClientId,
+        destinataire_client_id: destinataireClientId,
+        created_by_id: user?.id
+      });
+      
+      if (!validationRes.data.valid) {
+        toast.error(validationRes.data.errors?.[0] || "Incohérence détectée dans les rôles");
+        return;
+      }
+    } catch (err) {
+      console.error("Erreur validation:", err);
+      toast.error("Erreur de validation des rôles");
+      return;
+    }
 
     createMutation.mutate({
       client_nom: formData.client_nom,

@@ -114,8 +114,15 @@ export default function ClientExterneApp() {
       const toutes = [...map.values()];
       setCoursesActives(toutes);
 
+      // Nettoyer les notifications obsolètes (courses supprimées ou terminées)
       const userNotifications = await base44.entities.Notification.filter({ destinataire_email: user.email, lue: false });
-      if (userNotifications?.length > 0) setNotifications(userNotifications);
+      if (userNotifications && userNotifications.length > 0) {
+        const validCourseIds = new Map(toutes.map(c => [c.id, true]));
+        const notificationsValides = userNotifications.filter(n => 
+          !n.course_id || validCourseIds.has(n.course_id)
+        );
+        setNotifications(notificationsValides);
+      }
 
       await loadLivreursProches(pos);
     } catch (err) {
