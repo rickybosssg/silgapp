@@ -104,10 +104,11 @@ export default function ClientSuiviCourse() {
           const l = livreurMap[c.livreur_id];
           return {
             ...c,
-            livreur_photo_url: c.livreur_photo_url || l.photo_url || null,
+            // Bug #9 : priorité à la photo de l'entité Livreur (source de vérité admin)
+            livreur_photo_url: l.photo_url || c.livreur_photo_url || null,
             livreur_note_moyenne: l.note_moyenne || 0,
             livreur_nombre_avis: l.nombre_avis || 0,
-            livreur_vehicule: c.livreur_vehicule || l.vehicule || l.type_vehicule || null,
+            livreur_vehicule: l.vehicule || l.type_vehicule || c.livreur_vehicule || null,
             _livreur: l,
           };
         });
@@ -179,15 +180,16 @@ export default function ClientSuiviCourse() {
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-lg mx-auto space-y-4">
 
-        {/* Bouton retour — UX mobile premium */}
-        <button
-          onClick={() => navigate("/")}
-          className="flex items-center gap-3 w-full bg-white border border-gray-200 shadow-sm rounded-2xl px-4 h-12 text-sm font-semibold text-gray-700 active:scale-[0.98] transition-all"
-          style={{ paddingTop: "env(safe-area-inset-top)" }}
-        >
-          <ArrowLeft className="w-5 h-5 text-gray-500 flex-shrink-0" />
-          <span>Retour au dashboard</span>
-        </button>
+        {/* Bouton retour — sticky, gros, accessible au pouce */}
+        <div className="sticky top-0 z-20 pt-2 pb-1">
+          <button
+            onClick={() => navigate("/")}
+            className="flex items-center gap-3 w-full bg-white border border-gray-200 shadow-md rounded-2xl px-5 h-14 text-base font-bold text-gray-800 active:scale-[0.98] transition-all"
+          >
+            <ArrowLeft className="w-6 h-6 text-primary flex-shrink-0" />
+            <span>← Retour au dashboard</span>
+          </button>
+        </div>
 
         {/* Sélecteur de course si plusieurs actives */}
         {coursesActives.length > 1 && (
@@ -307,15 +309,25 @@ export default function ClientSuiviCourse() {
             </div>
             <div className="flex-1">
               <p className="text-xs text-muted-foreground uppercase font-semibold">Livraison</p>
-              <p className="text-sm font-bold text-foreground">{maCourse.adresse_arrivee}</p>
+              {/* Bug #1 — si destination_inconnue et livraison faite, afficher adresse réelle ou coordonnées */}
+              <p className="text-sm font-bold text-foreground">
+                {maCourse.statut === "livree" && maCourse.destination_inconnue
+                  ? maCourse.adresse_arrivee && maCourse.adresse_arrivee !== "Destination à définir"
+                    ? maCourse.adresse_arrivee
+                    : maCourse.latitude_livraison
+                      ? `📍 GPS : ${Number(maCourse.latitude_livraison).toFixed(4)}, ${Number(maCourse.longitude_livraison).toFixed(4)}`
+                      : maCourse.latitude_arrivee_livraison
+                        ? `📍 GPS : ${Number(maCourse.latitude_arrivee_livraison).toFixed(4)}, ${Number(maCourse.longitude_arrivee_livraison).toFixed(4)}`
+                        : "Destination enregistrée à la livraison"
+                  : maCourse.adresse_arrivee || "—"}
+              </p>
             </div>
           </div>
 
-          {/* Estimation distance / temps / prix — calculée si GPS disponible */}
+          {/* Estimation distance / temps / prix */}
           {(() => {
-            const distEst = maCourse.prix_final
-              ? maCourse.distance_reelle_km
-              : haversineKm(maCourse.gps_depart_lat, maCourse.gps_depart_lng, maCourse.gps_arrivee_lat, maCourse.gps_arrivee_lng);
+            const distEst = maCourse.distance_reelle_km
+              || haversineKm(maCourse.gps_depart_lat, maCourse.gps_depart_lng, maCourse.gps_arrivee_lat, maCourse.gps_arrivee_lng);
             const prix = maCourse.prix_final || (distEst ? Math.round(distEst * 100) : maCourse.prix_estimate || null);
             const temps = distEst ? Math.round((distEst / 25) * 60) : null;
             const isFinal = !!maCourse.prix_final;
@@ -325,7 +337,7 @@ export default function ClientSuiviCourse() {
                 {distEst && (
                   <div className={`rounded-xl p-2.5 text-center ${isFinal ? "bg-blue-50" : "bg-gray-50"}`}>
                     <Ruler className="w-3.5 h-3.5 mx-auto mb-1 text-blue-500" />
-                    <p className="text-xs font-black text-gray-800">{distEst.toFixed(1)} km</p>
+                    <p className="text-xs font-black text-gray-800">{Number(distEst).toFixed(1)} km</p>
                     <p className="text-[9px] text-gray-400">{isFinal ? "Réelle" : "Estimée"}</p>
                   </div>
                 )}
@@ -382,29 +394,38 @@ export default function ClientSuiviCourse() {
           </Card>
         )}
 
-        {/* Détails */}
+        {/* Timeline / Détails — Bug #4 : heure récupération manquante */}
         <Card className="p-4">
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Type de colis</span>
-              <span className="font-medium">{maCourse.type_colis}</span>
-            </div>
-            {maCourse.prix_estimate ? (
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Historique</p>
+          <div className="space-y-2.5 text-sm">
+            {maCourse.type_colis && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Prix estimé</span>
-                <span className="font-medium">{maCourse.prix_estimate.toLocaleString()} FCFA</span>
+                <span className="text-muted-foreground">Type de colis</span>
+                <span className="font-medium capitalize">{maCourse.type_colis?.replace(/_/g, " ")}</span>
               </div>
-            ) : null}
+            )}
             {maCourse.heure_acceptation && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Acceptée à</span>
-                <span className="font-medium">{format(new Date(maCourse.heure_acceptation), "HH:mm", { locale: fr })}</span>
+              <div className="flex justify-between items-center">
+                <span className="flex items-center gap-1.5 text-muted-foreground"><span className="text-green-500">✅</span> Acceptée à</span>
+                <span className="font-semibold">{format(new Date(maCourse.heure_acceptation), "HH:mm", { locale: fr })}</span>
+              </div>
+            )}
+            {maCourse.heure_recuperation && (
+              <div className="flex justify-between items-center">
+                <span className="flex items-center gap-1.5 text-muted-foreground"><span className="text-blue-500">📦</span> Récupérée à</span>
+                <span className="font-semibold">{format(new Date(maCourse.heure_recuperation), "HH:mm", { locale: fr })}</span>
               </div>
             )}
             {maCourse.heure_livraison && (
+              <div className="flex justify-between items-center">
+                <span className="flex items-center gap-1.5 text-muted-foreground"><span className="text-green-600">🏁</span> Livrée à</span>
+                <span className="font-semibold text-green-600">{format(new Date(maCourse.heure_livraison), "HH:mm", { locale: fr })}</span>
+              </div>
+            )}
+            {maCourse.prix_estimate && !maCourse.prix_final && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Livré à</span>
-                <span className="font-medium text-green-600">{format(new Date(maCourse.heure_livraison), "HH:mm", { locale: fr })}</span>
+                <span className="text-muted-foreground">Prix estimé</span>
+                <span className="font-medium">{maCourse.prix_estimate.toLocaleString()} FCFA</span>
               </div>
             )}
             {maCourse.prix_final ? (
@@ -430,45 +451,58 @@ export default function ClientSuiviCourse() {
 
           return (
             <>
-              <Card className="p-4 bg-green-50 border-green-200">
-                <div className="flex items-center gap-2 mb-3">
-                  <CheckCircle2 className="w-5 h-5 text-green-600" />
-                  <h3 className="font-bold text-green-900">Course livrée ✅</h3>
+              {/* Résumé final livraison — bugs #3 #7 #8 */}
+              <Card className="overflow-hidden border-2 border-green-300 shadow-lg">
+                <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-4 py-3 flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-white" />
+                  <p className="text-white font-bold">Livraison terminée avec succès !</p>
                 </div>
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  {maCourse.distance_reelle_km != null && (
-                    <div className="bg-white rounded-xl p-2.5 text-center">
-                      <p className="text-[9px] text-gray-400 uppercase font-semibold">Distance</p>
-                      <p className="text-sm font-black text-gray-800">{Number(maCourse.distance_reelle_km).toFixed(1)} km</p>
-                    </div>
-                  )}
-                  {maCourse.heure_livraison && maCourse.heure_acceptation && (
-                    <div className="bg-white rounded-xl p-2.5 text-center">
-                      <p className="text-[9px] text-gray-400 uppercase font-semibold">Durée</p>
-                      <p className="text-sm font-black text-gray-800">
-                        {Math.round((new Date(maCourse.heure_livraison) - new Date(maCourse.heure_acceptation)) / 60000)} min
+                <div className="p-4 bg-green-50">
+                  {/* 3 métriques toujours visibles */}
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+                      <Ruler className="w-4 h-4 mx-auto mb-1 text-blue-500" />
+                      <p className="text-sm font-black text-gray-900">
+                        {maCourse.distance_reelle_km != null
+                          ? `${Number(maCourse.distance_reelle_km).toFixed(1)} km`
+                          : "—"}
                       </p>
+                      <p className="text-[9px] text-gray-400 font-semibold uppercase">Distance</p>
                     </div>
-                  )}
-                  {maCourse.prix_final ? (
-                    <div className="bg-white rounded-xl p-2.5 text-center">
-                      <p className="text-[9px] text-gray-400 uppercase font-semibold">Prix final</p>
-                      <p className="text-sm font-black text-green-700">{maCourse.prix_final.toLocaleString()} F</p>
+                    <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+                      <Clock className="w-4 h-4 mx-auto mb-1 text-purple-500" />
+                      <p className="text-sm font-black text-gray-900">
+                        {maCourse.heure_livraison && maCourse.heure_acceptation
+                          ? `${Math.round((new Date(maCourse.heure_livraison) - new Date(maCourse.heure_acceptation)) / 60000)} min`
+                          : "—"}
+                      </p>
+                      <p className="text-[9px] text-gray-400 font-semibold uppercase">Durée</p>
                     </div>
-                  ) : null}
+                    <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+                      <Banknote className="w-4 h-4 mx-auto mb-1 text-green-600" />
+                      <p className="text-sm font-black text-green-700">
+                        {maCourse.prix_final ? `${maCourse.prix_final.toLocaleString()} F` : "—"}
+                      </p>
+                      <p className="text-[9px] text-gray-400 font-semibold uppercase">Prix final</p>
+                    </div>
+                  </div>
+                  <p className="text-center text-xs text-green-700 font-medium">
+                    Merci d'avoir utilisé SILGAPP 🙏
+                  </p>
                 </div>
               </Card>
 
-              {/* Évaluation expéditeur — note officielle étoiles */}
+              {/* ⭐ Note officielle expéditeur */}
               {isExpediteur && !maCourse.note_livreur && (
                 <Card className="p-4 border-l-4 border-l-yellow-400 bg-gradient-to-r from-yellow-50 to-orange-50">
+                  <p className="text-[10px] font-bold text-yellow-600 uppercase tracking-widest mb-2">⭐ Note officielle · Expéditeur</p>
                   <div className="flex items-start gap-3 mb-3">
                     <div className="w-10 h-10 rounded-xl bg-yellow-100 flex items-center justify-center flex-shrink-0">
                       <Star className="w-5 h-5 text-yellow-600" />
                     </div>
                     <div className="flex-1">
                       <p className="font-bold text-yellow-900">Comment s'est passée votre livraison ?</p>
-                      <p className="text-xs text-yellow-700 mt-1">Évaluez {maCourse.livreur_nom || "le livreur"} en tant qu'expéditeur</p>
+                      <p className="text-xs text-yellow-700 mt-1">Votre note impacte la réputation de {maCourse.livreur_nom || "le livreur"}</p>
                     </div>
                   </div>
                   <Button
@@ -476,32 +510,31 @@ export default function ClientSuiviCourse() {
                     onClick={() => setShowRating(true)}
                   >
                     <Star className="w-4 h-4 mr-2 fill-white" />
-                    Évaluer le livreur
+                    Donner ma note officielle
                   </Button>
                 </Card>
               )}
 
               {isExpediteur && maCourse.note_livreur && (
-                <Card className="p-4 border-l-4 border-l-green-500 bg-gradient-to-r from-green-50 to-emerald-50">
+                <Card className="p-4 border-l-4 border-l-green-500 bg-green-50">
+                  <p className="text-[10px] font-bold text-green-600 uppercase tracking-widest mb-2">⭐ Note officielle · Expéditeur</p>
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
-                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                    <div className="flex items-center gap-1">
+                      {[...Array(5)].map((_, i) => (
+                        <Star key={i} className={`w-5 h-5 ${i < maCourse.note_livreur ? "fill-yellow-400 text-yellow-400" : "fill-gray-200 text-gray-300"}`} />
+                      ))}
                     </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-green-900">Merci pour votre évaluation !</p>
-                      <div className="flex items-center gap-1 mt-1">
-                        {[...Array(5)].map((_, i) => (
-                          <Star key={i} className={`w-4 h-4 ${i < maCourse.note_livreur ? "fill-yellow-400 text-yellow-400" : "fill-gray-200 text-gray-300"}`} />
-                        ))}
-                      </div>
-                    </div>
+                    <p className="text-sm font-bold text-green-900">{maCourse.note_livreur}/5 — Merci !</p>
                   </div>
                 </Card>
               )}
 
-              {/* Feedback destinataire — pouce simple */}
+              {/* 👍/👎 Feedback destinataire — ne compte pas dans la note */}
               {isDestinataire && (
-                <DestinataireReactionButton course={maCourse} onDone={refetch} />
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">👍/👎 Retour destinataire · Ne compte pas dans la note</p>
+                  <DestinataireReactionButton course={maCourse} onDone={refetch} />
+                </div>
               )}
             </>
           );
