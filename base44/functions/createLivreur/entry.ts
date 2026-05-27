@@ -2,17 +2,26 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 Deno.serve(async (req) => {
   try {
+    console.log("🔵 [createLivreur] Requête reçue");
     const base44 = createClientFromRequest(req);
     const { data } = await req.json();
-    if (!data) return Response.json({ success: false, error: 'data requis' }, { status: 400 });
+    console.log("📦 [createLivreur] Data:", data);
+    
+    if (!data) {
+      console.log("❌ [createLivreur] Data manquante");
+      return Response.json({ success: false, error: 'data requis' }, { status: 400 });
+    }
 
     // Vérifier unicité du code
     const codeIdentification = String(data.code_identification || '').toUpperCase().trim();
+    console.log("🔍 [createLivreur] Code à vérifier:", codeIdentification);
     const existing = await base44.asServiceRole.entities.Livreur.filter({ code_identification: codeIdentification });
     if (existing && existing.length > 0) {
+      console.log("⚠️ [createLivreur] Code déjà utilisé");
       return Response.json({ success: false, error: "Ce code d'identification est déjà utilisé" }, { status: 409 });
     }
 
+    console.log("✅ [createLivreur] Création du livreur...");
     const created = await base44.asServiceRole.entities.Livreur.create({
       ...data,
       code_identification: codeIdentification,
@@ -20,8 +29,10 @@ Deno.serve(async (req) => {
       statut: 'hors_ligne',
       actif: true,
     });
+    console.log("✅ [createLivreur] Livreur créé:", created.id);
     return Response.json({ success: true, livreur: created });
   } catch (error) {
+    console.error("❌ [createLivreur] Erreur:", error);
     return Response.json({ success: false, error: error.message }, { status: 500 });
   }
 });
