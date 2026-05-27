@@ -64,9 +64,16 @@ Deno.serve(async (req) => {
     if (course.type_course === "recevoir") {
       const expediteurClient = await resolveClient(course.expediteur_client_id, course.expediteur_telephone);
       if (expediteurClient && expediteurClient.user_email) {
+        // Lier automatiquement si pas encore lié
+        if (!course.expediteur_client_id) {
+          await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+            expediteur_client_id: expediteurClient.id,
+            expediteur_has_app: true,
+          });
+        }
         const notification = await base44.asServiceRole.entities.Notification.create({
-          titre: "🚚 Demande de récupération",
-          message: `${course.destinataire_nom || "Un client"} a demandé la récupération d'un colis chez vous.`,
+          titre: "📦 Colis à récupérer chez vous",
+          message: `${course.destinataire_nom || "Un client"} veut récupérer un colis chez vous. Un livreur viendra le chercher. ${course.adresse_depart ? "Récupération : " + course.adresse_depart : ""}`,
           type: "nouvelle_course",
           course_id: course.id,
           destinataire_email: expediteurClient.user_email,

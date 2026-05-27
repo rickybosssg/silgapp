@@ -69,9 +69,9 @@ export default function CourseExterneFormSync() {
     adresse_arrivee: "",
     destination_inconnue: false,
     notes: "",
-    // Pour "recevoir" : départ = inconnu (chez l'expéditeur), arrivée = position client
-    gps_depart_lat: typeCourse === "expedier" ? clientGpsLat : null,
-    gps_depart_lng: typeCourse === "expedier" ? clientGpsLng : null,
+    // Pour "recevoir" : départ = chez l'expéditeur (à saisir), arrivée = position client (auto)
+    gps_depart_lat: null,
+    gps_depart_lng: null,
     gps_arrivee_lat: typeCourse === "recevoir" ? clientGpsLat : null,
     gps_arrivee_lng: typeCourse === "recevoir" ? clientGpsLng : null,
     recuperationGPS: false,
@@ -87,10 +87,10 @@ export default function CourseExterneFormSync() {
         ...prev,
         client_nom: clientProfil.nom || "",
         client_telephone: clientProfil.telephone || "",
-        // Pour "recevoir" : arrivée auto = position client si dispo
+        // Pour "recevoir" : arrivée auto = position client si dispo (jamais inconnue)
         gps_arrivee_lat: prev.type_course === "recevoir" ? (clientGpsLat || prev.gps_arrivee_lat) : prev.gps_arrivee_lat,
         gps_arrivee_lng: prev.type_course === "recevoir" ? (clientGpsLng || prev.gps_arrivee_lng) : prev.gps_arrivee_lng,
-        adresse_arrivee: prev.type_course === "recevoir" && !prev.adresse_arrivee ? (clientAdresse || prev.adresse_arrivee) : prev.adresse_arrivee,
+        adresse_arrivee: prev.type_course === "recevoir" ? (clientAdresse || prev.adresse_arrivee || "Position GPS client") : prev.adresse_arrivee,
         livraisonGPS: prev.type_course === "recevoir" && !!clientGpsLat ? true : prev.livraisonGPS,
       }));
     }
@@ -173,14 +173,17 @@ export default function CourseExterneFormSync() {
       if (finalData.type_course === "recevoir" && !finalData.expediteur_client_id && finalData.expediteur_telephone) {
         try {
           const digits = finalData.expediteur_telephone.replace(/\D/g, "").slice(-8);
-          const found = await base44.entities.ClientExterne.filter({ telephone: digits })
-            || await base44.entities.ClientExterne.filter({ telephone: "+226" + digits });
+          // Essayer avec le numéro normalisé
+          const found = await base44.entities.ClientExterne.filter({ telephone: "+226" + digits });
           if (found?.length > 0) {
             finalData.expediteur_client_id = found[0].id;
+            // Marquer que cette personne a l'application pour synchronisation
+            finalData.expediteur_has_app = true;
           }
         } catch (_) {}
       }
       // Génération QR/codes dès la création
+      // Pour "recevoir" : pickup = chez l'expéditeur, delivery = chez le destinataire
       const pickupQrToken = crypto.randomUUID().replace(/-/g, "");
       const deliveryQrToken = crypto.randomUUID().replace(/-/g, "");
       const pickupCode4 = String(Math.floor(1000 + Math.random() * 9000));
@@ -189,6 +192,8 @@ export default function CourseExterneFormSync() {
       finalData.pickup_code_4_digits = pickupCode4;
       finalData.delivery_qr_token = deliveryQrToken;
       finalData.delivery_code_4_digits = deliveryCode4;
+      finalData.pickup_confirmed_at = null;
+      finalData.delivery_confirmed_at = null;
 
       const course = await base44.entities.CourseExterne.create(finalData);
       // Notifier toujours (la fonction vérifie en interne)
@@ -266,8 +271,12 @@ export default function CourseExterneFormSync() {
       ? (formData.adresse_arrivee || (formData.livraisonGPS ? "Position GPS client" : clientProfil?.quartier || "Chez le destinataire"))
       : (formData.destination_inconnue ? "Destination à définir" : formData.adresse_arrivee);
 
-    const gpsArriveLat = isRecevoir ? formData.gps_arrivee_lat : (formData.destination_inconnue ? null : formData.gps_arrivee_lat);
-    const gpsArriveLng = isRecevoir ? formData.gps_arrivee_lng : (formData.destination_inconnue ? null : formData.gps_arrivee_lng);
+    const gpsArriveLat = isRecevoir 
+      ? (formData.gps_arrivee_lat || clientGpsLat)  // Toujours GPS pour recevoir
+      : (formData.destination_inconnue ? null : formData.gps_arrivee_lat);
+    const gpsArriveLng = isRecevoir 
+      ? (formData.gps_arrivee_lng || clientGpsLng)  // Toujours GPS pour recevoir
+      : (formData.destination_inconnue ? null : formData.gps_arrivee_lng);
     const destInconnue = isRecevoir ? false : (formData.destination_inconnue || false);
 
     // Validation backend des rôles avant création
@@ -302,7 +311,8 @@ export default function CourseExterneFormSync() {
       destinataire_phone_normalized: destinatairePhoneNormalized,
       destinataire_client_id: destinataireClientId,
       recipient_has_app: false,
-      adresse_depart: formData.adresse_depart || (formData.recuperationGPS ? "Position GPS" : ""),
+      expediteur_has_app: false,
+      adresse_depart: formData.adresse_depart || (formData.recuperationGPS ? "Position GPS" : "À définir"),
       adresse_arrivee: adresseArrivee,
       type_colis: formData.type_colis,
       notes: formData.notes,
@@ -313,6 +323,7 @@ export default function CourseExterneFormSync() {
       destination_inconnue: destInconnue,
       prix_estimate: prixEstime,
       statut: "recherche_livreur",
+      dispatch_status: "en_attente",
     });
   };
 

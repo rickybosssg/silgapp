@@ -126,10 +126,28 @@ export default function CourseStepForm({
 
             {/* Pour "recevoir" : bannière info + saisie manuelle adresse expéditeur */}
             {isRecevoir && (
-              <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-50 border border-blue-200">
-                <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-blue-800">Indiquez l'adresse de <strong>la personne qui détient votre colis</strong>. Le livreur ira récupérer le colis là-bas.</p>
-              </div>
+              <>
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-50 border border-blue-200">
+                  <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-blue-800">Indiquez l'adresse de <strong>la personne qui détient votre colis</strong>.</p>
+                    <p className="text-xs text-blue-700 mt-1">Le livreur ira récupérer le colis à cette adresse.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={gpsHandlers?.onGetGPSDepart}
+                  className="w-full h-14 rounded-2xl bg-accent text-white font-bold flex items-center justify-center gap-3 shadow-lg shadow-accent/20 active:scale-[0.98] transition-all"
+                >
+                  <Navigation className="w-5 h-5" />
+                  Utiliser la position de l'expéditeur
+                </button>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px bg-gray-200" />
+                  <span className="text-xs text-muted-foreground">ou saisir manuellement</span>
+                  <div className="flex-1 h-px bg-gray-200" />
+                </div>
+              </>
             )}
 
             <div>
@@ -150,7 +168,7 @@ export default function CourseStepForm({
         const isRecevoir = formData.type_course === "recevoir";
         const destinationInconnue = formData.destination_inconnue || false;
 
-        // "Recevoir" : la destination = position du client lui-même
+        // "Recevoir" : la destination = position du client lui-même (automatique)
         if (isRecevoir) {
           return (
             <div className="space-y-4">
@@ -158,8 +176,8 @@ export default function CourseStepForm({
                 <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-3">
                   <MapPin className="w-8 h-8 text-accent" />
                 </div>
-                <h2 className="text-xl font-bold text-foreground">Où livrer chez vous ?</h2>
-                <p className="text-sm text-muted-foreground mt-1">Le livreur vous livrera à cette adresse</p>
+                <h2 className="text-xl font-bold text-foreground">📍 Votre position = lieu de livraison</h2>
+                <p className="text-sm text-muted-foreground mt-1">Le livreur vous livrera à votre position actuelle</p>
               </div>
 
               {/* GPS déjà disponible → affichage automatique */}
@@ -167,10 +185,11 @@ export default function CourseStepForm({
                 <div className="flex items-center gap-3 p-4 rounded-2xl bg-green-50 border border-green-200">
                   <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
                   <div className="flex-1">
-                    <p className="text-sm font-bold text-green-900">📍 Votre position GPS sera utilisée</p>
+                    <p className="text-sm font-bold text-green-900">✅ Position GPS enregistrée</p>
                     {formData.adresse_arrivee && <p className="text-xs text-green-700 mt-0.5">{formData.adresse_arrivee}</p>}
+                    <p className="text-xs text-green-600 mt-1">Coordonnées : {Number(formData.gps_arrivee_lat).toFixed(4)}, {Number(formData.gps_arrivee_lng).toFixed(4)}</p>
                   </div>
-                  <button type="button" onClick={() => setFormData({ ...formData, livraisonGPS: false, gps_arrivee_lat: null, gps_arrivee_lng: null })} className="text-green-600 text-xs underline">Changer</button>
+                  <button type="button" onClick={() => setFormData({ ...formData, livraisonGPS: false, gps_arrivee_lat: null, gps_arrivee_lng: null, adresse_arrivee: "" })} className="text-green-600 text-xs underline">Modifier</button>
                 </div>
               ) : (
                 <button
@@ -179,25 +198,37 @@ export default function CourseStepForm({
                   className="w-full h-14 rounded-2xl bg-accent text-white font-bold flex items-center justify-center gap-3 shadow-lg shadow-accent/20 active:scale-[0.98] transition-all"
                 >
                   <Navigation className="w-5 h-5" />
-                  Utiliser ma position GPS
+                  Enregistrer ma position GPS
                 </button>
               )}
 
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-gray-200" />
-                <span className="text-xs text-muted-foreground">ou saisir manuellement</span>
-                <div className="flex-1 h-px bg-gray-200" />
-              </div>
+              {!formData.livraisonGPS && (
+                <>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-px bg-gray-200" />
+                    <span className="text-xs text-muted-foreground">ou saisir manuellement</span>
+                    <div className="flex-1 h-px bg-gray-200" />
+                  </div>
 
-              <div>
-                <Label>Mon adresse de livraison</Label>
-                <Input
-                  value={formData.adresse_arrivee}
-                  onChange={(e) => setFormData({ ...formData, adresse_arrivee: e.target.value })}
-                  placeholder="Votre quartier, rue, point de repère..."
-                  className="h-12"
-                />
-                <p className="text-xs text-muted-foreground mt-1.5">Indiquez où vous voulez recevoir le colis.</p>
+                  <div>
+                    <Label>Mon adresse de livraison</Label>
+                    <Input
+                      value={formData.adresse_arrivee}
+                      onChange={(e) => setFormData({ ...formData, adresse_arrivee: e.target.value })}
+                      placeholder="Votre quartier, rue, point de repère..."
+                      className="h-12"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1.5">Indiquez où vous voulez recevoir le colis.</p>
+                  </div>
+                </>
+              )}
+
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-green-50 border border-green-200">
+                <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-green-900">Votre position GPS sera automatiquement utilisée comme destination.</p>
+                  <p className="text-xs text-green-700 mt-1">Le livreur vous localisera précisément pour la livraison.</p>
+                </div>
               </div>
             </div>
           );
@@ -265,12 +296,21 @@ export default function CourseStepForm({
                 <User className="w-8 h-8 text-blue-600" />
               </div>
               <h2 className="text-xl font-bold text-foreground">
-                {formData.type_course === "expedier" ? "Qui reçoit le colis ?" : "Qui envoie le colis ?"}
+                {formData.type_course === "expedier" ? "Qui reçoit le colis ?" : "Chez qui récupérer ?"}
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
-                {formData.type_course === "expedier" ? "Informations du destinataire" : "Informations de l'expéditeur"}
+                {formData.type_course === "expedier" ? "Informations du destinataire" : "Personne qui détient votre colis"}
               </p>
             </div>
+            {formData.type_course === "recevoir" && (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-50 border border-blue-200">
+                <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-blue-900">Entrez les coordonnées de la personne qui remettra le colis au livreur.</p>
+                  <p className="text-xs text-blue-700 mt-1">Si cette personne a SILGAPP, elle recevra une notification automatique.</p>
+                </div>
+              </div>
+            )}
             <div>
               <Label>Nom complet <span className="text-muted-foreground text-xs">(optionnel)</span></Label>
               <Input
@@ -279,7 +319,7 @@ export default function CourseStepForm({
                   ...formData, 
                   [formData.type_course === "expedier" ? "destinataire_nom" : "expediteur_nom"]: e.target.value 
                 })}
-                placeholder="Nom et prénom (optionnel)"
+                placeholder={formData.type_course === "expedier" ? "Nom du destinataire" : "Nom de la personne"}
                 className="h-12"
                 autoFocus
               />
@@ -296,6 +336,7 @@ export default function CourseStepForm({
                 placeholder="+226 XX XX XX XX"
                 className="h-12"
               />
+              <p className="text-xs text-muted-foreground mt-1.5">Format : +226 XX XX XX XX</p>
             </div>
           </div>
         );
@@ -373,6 +414,7 @@ export default function CourseStepForm({
                 { icon: <MapPin className="w-4 h-4 text-red-600" />, bg: "bg-red-100", label: "Récupération", value: formData.adresse_depart || (formData.recuperationGPS ? "📍 Position actuelle" : "") },
                 { icon: <MapPin className="w-4 h-4 text-green-600" />, bg: "bg-green-100", label: "Livraison", value: formData.destination_inconnue ? "📍 Destination à définir" : formData.adresse_arrivee },
                 { icon: <User className="w-4 h-4 text-blue-600" />, bg: "bg-blue-100", label: "Contact", value: formData.type_course === "expedier" ? `${formData.destinataire_nom || "Destinataire"} - ${formData.destinataire_telephone}` : `${formData.expediteur_nom || "Expéditeur"} - ${formData.expediteur_telephone}` },
+                { icon: <MapPin className="w-4 h-4 text-accent" />, bg: "bg-accent-100", label: "Votre position", value: formData.type_course === "recevoir" ? (formData.livraisonGPS ? "✅ GPS utilisé" : "📍 " + (formData.adresse_arrivee || "À définir")) : "—" },
                 { icon: <Package className="w-4 h-4 text-purple-600" />, bg: "bg-purple-100", label: "Colis", value: formData.type_colis?.replace(/_/g, " ") },
               ].map((row, i) => (
                 <div key={i} className="flex items-start gap-3">
