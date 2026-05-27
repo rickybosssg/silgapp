@@ -342,15 +342,19 @@ export default function ClientExterneApp() {
             </Card>
           </div>
 
-          {/* Bouton carte — uniquement si course active avec livreur localisable */}
-          {coursesActives.some(c => ["livreur_en_route","colis_recupere","en_livraison"].includes(c.statut)) && position && (
+          {/* Bouton carte — toujours visible si GPS actif */}
+          {position && (
             <Card className="p-4 cursor-pointer hover:shadow-lg transition-all" onClick={() => setShowMap(true)}>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                   <MapPin className="w-5 h-5 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <p className="font-semibold text-foreground">📍 Voir le livreur en temps réel</p>
+                  <p className="font-semibold text-foreground">
+                    {coursesActives.some(c => ["livreur_en_route","colis_recupere","en_livraison"].includes(c.statut))
+                      ? "📍 Voir le livreur en temps réel"
+                      : "🗺️ Voir la carte"}
+                  </p>
                 </div>
                 <ChevronRight className="w-5 h-5 text-muted-foreground" />
               </div>

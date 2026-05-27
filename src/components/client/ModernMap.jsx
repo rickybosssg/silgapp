@@ -37,7 +37,7 @@ export default function ModernMap({
       }
       markersRef.current = [];
     };
-  }, []);
+  }, [position?.latitude, position?.longitude]);
 
   // Mettre à jour la position du client
   useEffect(() => {
