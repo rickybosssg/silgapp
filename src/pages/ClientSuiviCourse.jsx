@@ -137,18 +137,14 @@ export default function ClientSuiviCourse() {
 
   if (!maCourse) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="p-8 text-center max-w-sm">
-          <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h2 className="text-lg font-bold text-foreground mb-2">Aucune course en cours</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            Vous n'avez pas de course active pour le moment
-          </p>
-          <Button onClick={() => navigate("/")} variant="outline" className="w-full">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Retour au dashboard
-          </Button>
-        </Card>
+      <div className="fixed inset-0 bg-white flex items-center justify-center">
+        <div
+          className="text-[22vw] leading-none select-none"
+          style={{ animation: "pulse 2s ease-in-out infinite" }}
+        >
+          😊
+        </div>
+        <style>{`@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}`}</style>
       </div>
     );
   }
@@ -177,11 +173,15 @@ export default function ClientSuiviCourse() {
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-lg mx-auto space-y-4">
 
-        {/* Bouton retour */}
-        <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="gap-2">
-          <ArrowLeft className="w-4 h-4" />
-          Retour au dashboard
-        </Button>
+        {/* Bouton retour — UX mobile premium */}
+        <button
+          onClick={() => navigate("/")}
+          className="flex items-center gap-3 w-full bg-white border border-gray-200 shadow-sm rounded-2xl px-4 h-12 text-sm font-semibold text-gray-700 active:scale-[0.98] transition-all"
+          style={{ paddingTop: "env(safe-area-inset-top)" }}
+        >
+          <ArrowLeft className="w-5 h-5 text-gray-500 flex-shrink-0" />
+          <span>Retour au dashboard</span>
+        </button>
 
         {/* Sélecteur de course si plusieurs actives */}
         {coursesActives.length > 1 && (

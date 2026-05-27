@@ -309,8 +309,7 @@ export default function ClientExterneApp() {
                   <MapPin className="w-5 h-5 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <p className="font-semibold text-foreground">Voir le livreur en temps réel</p>
-                  <p className="text-xs text-muted-foreground">Carte interactive style Uber/Glovo</p>
+                  <p className="font-semibold text-foreground">📍 Voir le livreur en temps réel</p>
                 </div>
                 <ChevronRight className="w-5 h-5 text-muted-foreground" />
               </div>
@@ -341,8 +340,11 @@ export default function ClientExterneApp() {
                 variant="ghost" 
                 className="h-auto py-3 flex flex-col gap-1.5 hover:bg-green-50"
                 onClick={() => {
-                  const msg = encodeURIComponent("Bonjour SILGAPP 👋\nJ'ai besoin d'aide concernant ma course.");
-                  window.open(`https://wa.me/22667572857?text=${msg}`, "_blank", "noopener,noreferrer");
+                  const msg = encodeURIComponent("Bonjour SILGAPP 👋\nJ'ai besoin d'aide sur SILGAPP.");
+                  const a = document.createElement("a");
+                  a.href = `whatsapp://send?phone=22667572857&text=${msg}`;
+                  a.click();
+                  setTimeout(() => { if (document.hasFocus()) window.open(`https://wa.me/22667572857?text=${msg}`, "_blank"); }, 500);
                 }}
               >
                 <MessageCircle className="w-5 h-5 text-green-600" />
