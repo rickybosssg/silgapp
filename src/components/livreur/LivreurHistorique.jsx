@@ -55,11 +55,12 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
   });
   
   const livreesToday = coursesToday.filter(c => c.statut === "livree");
-  // Côté livreur externe : afficher le prix total (pas la répartition interne)
-  const totalEncaisseToday = livreesToday.reduce((sum, c) => sum + (isExterne ? (c.prix_final || 0) : (c.prix_reel || 0)), 0);
-  const montantDuToday = isExterne
-    ? livreesToday.reduce((sum, c) => sum + (c.commission_silga || Math.round((c.prix_final || 0) * 0.3)), 0)
-    : totalEncaisseToday;
+  const totalEncaisseToday = isExterne
+    ? livreesToday.reduce((sum, c) => sum + (c.prix_final || 0), 0)
+    : livreesToday.reduce((sum, c) => sum + (c.prix_reel || 0), 0);
+  const gainLivreurToday = livreesToday.reduce((sum, c) => sum + (c.montant_livreur || Math.round((c.prix_final || 0) * 0.7)), 0);
+  const commissionToday = livreesToday.reduce((sum, c) => sum + (c.commission_silga || Math.round((c.prix_final || 0) * 0.3)), 0);
+  const montantDuSilga = livreurProfil?.montant_du_silga || 0;
   const isPaye = livreurProfil?.statut_paiement === "paye";
 
   return (
@@ -70,38 +71,64 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
           <Calendar className="w-4 h-4" />
           Récapitulatif aujourd'hui
         </h3>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white/70 rounded-lg p-3 border border-amber-200">
-            <div className="flex items-center gap-1 text-amber-700 font-semibold text-sm mb-1">
-              <CheckCircle2 className="w-4 h-4" />
-              {livreesToday.length} course{livreesToday.length > 1 ? "s" : ""}
-            </div>
-            <p className="text-xs text-amber-600">Livrées aujourd'hui</p>
-          </div>
-          <div className="bg-white/70 rounded-lg p-3 border border-amber-200">
-            <div className="flex items-center gap-1 text-amber-700 font-semibold text-sm mb-1">
-              <Banknote className="w-4 h-4" />
-              {totalEncaisseToday.toLocaleString()} FCFA
-            </div>
-            <p className="text-xs text-amber-600">Total encaissé</p>
-          </div>
-          {!isExterne && (
-            <div className="bg-white/70 rounded-lg p-3 border border-amber-200">
-              <div className="flex items-center gap-1 text-blue-700 font-semibold text-sm mb-1">
-                <Banknote className="w-4 h-4" />
-                {montantDuToday.toLocaleString()} FCFA
+        {isExterne ? (
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-white/70 rounded-lg p-3 border border-amber-200">
+                <div className="flex items-center gap-1 text-amber-700 font-semibold text-sm mb-1">
+                  <CheckCircle2 className="w-4 h-4" />
+                  {livreesToday.length} course{livreesToday.length > 1 ? "s" : ""}
+                </div>
+                <p className="text-xs text-amber-600">Livrées aujourd'hui</p>
               </div>
-              <p className="text-xs text-blue-600">Dû à Silga</p>
+              <div className="bg-white/70 rounded-lg p-3 border border-amber-200">
+                <div className="flex items-center gap-1 text-gray-700 font-semibold text-sm mb-1">
+                  <Banknote className="w-4 h-4" />
+                  {totalEncaisseToday.toLocaleString()} F
+                </div>
+                <p className="text-xs text-amber-600">Prix total courses</p>
+              </div>
             </div>
-          )}
-          <div className="bg-white/70 rounded-lg p-3 border border-amber-200">
-            <div className="flex items-center gap-1 text-green-700 font-semibold text-sm mb-1">
-              {isPaye ? <CheckCircle2 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
-              {isPaye ? "Payé" : "Non payé"}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-green-50 rounded-lg p-2 border border-green-200 text-center">
+                <p className="text-xs font-bold text-green-700">{gainLivreurToday.toLocaleString()} F</p>
+                <p className="text-[10px] text-green-600 mt-0.5">Votre gain (70%)</p>
+              </div>
+              <div className="bg-orange-50 rounded-lg p-2 border border-orange-200 text-center">
+                <p className="text-xs font-bold text-orange-700">{commissionToday.toLocaleString()} F</p>
+                <p className="text-[10px] text-orange-600 mt-0.5">Commission (30%)</p>
+              </div>
+              <div className="bg-red-50 rounded-lg p-2 border border-red-200 text-center">
+                <p className="text-xs font-bold text-red-700">{montantDuSilga.toLocaleString()} F</p>
+                <p className="text-[10px] text-red-600 mt-0.5">Dû à Silga</p>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">Statut paiement</p>
           </div>
-        </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white/70 rounded-lg p-3 border border-amber-200">
+              <div className="flex items-center gap-1 text-amber-700 font-semibold text-sm mb-1">
+                <CheckCircle2 className="w-4 h-4" />
+                {livreesToday.length} course{livreesToday.length > 1 ? "s" : ""}
+              </div>
+              <p className="text-xs text-amber-600">Livrées aujourd'hui</p>
+            </div>
+            <div className="bg-white/70 rounded-lg p-3 border border-amber-200">
+              <div className="flex items-center gap-1 text-amber-700 font-semibold text-sm mb-1">
+                <Banknote className="w-4 h-4" />
+                {totalEncaisseToday.toLocaleString()} FCFA
+              </div>
+              <p className="text-xs text-amber-600">Total encaissé</p>
+            </div>
+            <div className="bg-white/70 rounded-lg p-3 border border-amber-200">
+              <div className="flex items-center gap-1 text-green-700 font-semibold text-sm mb-1">
+                {isPaye ? <CheckCircle2 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                {isPaye ? "Payé" : "Non payé"}
+              </div>
+              <p className="text-xs text-muted-foreground">Statut paiement</p>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Filtres période */}
@@ -174,18 +201,26 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
 
                     {course.statut === "livree" && (
                       isExterne ? (
-                        <div className="space-y-1">
+                        <div className="flex flex-wrap gap-1 mt-1">
                           {course.distance_reelle_km != null && (
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground bg-blue-50 rounded px-2 py-1 w-fit">
-                              <MapPin className="w-3 h-3" />
-                              {Number(course.distance_reelle_km).toFixed(1)} km
-                            </div>
+                            <span className="text-xs text-blue-600 bg-blue-50 rounded px-2 py-0.5">
+                              📏 {Number(course.distance_reelle_km).toFixed(1)} km
+                            </span>
                           )}
                           {course.prix_final ? (
-                            <div className="flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-50 rounded px-2 py-1 w-fit">
-                              <Banknote className="w-3 h-3" />
-                              {course.prix_final.toLocaleString()} FCFA
-                            </div>
+                            <span className="text-xs font-semibold text-gray-700 bg-gray-50 rounded px-2 py-0.5">
+                              💰 {course.prix_final.toLocaleString()} F total
+                            </span>
+                          ) : null}
+                          {course.montant_livreur ? (
+                            <span className="text-xs font-bold text-green-700 bg-green-50 rounded px-2 py-0.5">
+                              ✅ +{course.montant_livreur.toLocaleString()} F (70%)
+                            </span>
+                          ) : null}
+                          {course.commission_silga ? (
+                            <span className="text-xs text-orange-600 bg-orange-50 rounded px-2 py-0.5">
+                              Dû Silga: {course.commission_silga.toLocaleString()} F (30%)
+                            </span>
                           ) : null}
                         </div>
                       ) : (

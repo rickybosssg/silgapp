@@ -116,6 +116,20 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     [mesCourses]
   );
 
+  // ─── Auto-resync statut : si en_course mais aucune course active, passer à disponible ──
+  useEffect(() => {
+    if (!livreurProfil || !livreurId || mesCourses.length === 0) return;
+    if (livreurProfil.statut === "en_course" && coursesActives.length === 0) {
+      // Attendre que les données soient stables (2 polls) avant de resync
+      const timer = setTimeout(() => {
+        saveLivreur(livreurId, { statut: "disponible" }).then(() => {
+          queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+        }).catch(() => null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [livreurProfil?.statut, coursesActives.length, livreurId]);
+
   // ─── Gains du jour ────────────────────────────────────────────────────────
   const totalEncaisse = useMemo(() => {
     const today = new Date().toDateString();
