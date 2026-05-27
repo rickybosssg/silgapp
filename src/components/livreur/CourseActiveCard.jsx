@@ -390,16 +390,18 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             </p>
           )}
 
-          {/* Navigation GPS — uniquement externe */}
-          {isExterne && !colisLivre && (
+          {/* Navigation GPS — affiché si coordonnées GPS disponibles */}
+          {!colisLivre && (
             !colisRecupere ? (
-              <NavigationGPS
-                phase="recuperation"
-                destLat={course.gps_depart_lat}
-                destLng={course.gps_depart_lng}
-                destLabel={course.adresse_depart}
-                destinataireTelephone={course.expediteur_telephone || course.client_telephone}
-              />
+              (course.gps_depart_lat && course.gps_depart_lng) && (
+                <NavigationGPS
+                  phase="recuperation"
+                  destLat={course.gps_depart_lat}
+                  destLng={course.gps_depart_lng}
+                  destLabel={course.adresse_depart}
+                  destinataireTelephone={course.expediteur_telephone || course.client_telephone}
+                />
+              )
             ) : (
               <NavigationGPS
                 phase="livraison"
