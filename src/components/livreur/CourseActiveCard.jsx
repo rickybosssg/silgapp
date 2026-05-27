@@ -66,6 +66,14 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const colisRecupere = course.statut === "colis_recupere" || course.statut === "en_livraison";
   const colisLivre = course.statut === "livree";
 
+  // Afficher automatiquement le récapitulatif si la course est passée à "livree" (sans QR)
+  useEffect(() => {
+    if (colisLivre && !showRecapitulatif && !courseLivreeData) {
+      setCourseLivreeData(course);
+      setShowRecapitulatif(true);
+    }
+  }, [colisLivre]);
+
   // Nettoyer le GPS watch quand le composant se démonte
   useEffect(() => {
     return () => {
