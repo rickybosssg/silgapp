@@ -176,13 +176,13 @@ export default function LivreurPhotoUploader({
         <img
           src={previewUrl}
           alt={nomComplet || "Photo livreur"}
-          className={`${sizeClass} rounded-full object-cover border-2 border-white shadow-md cursor-pointer`}
+          className={`${sizeClass} rounded-full object-cover border-2 border-white shadow-md ${canEdit ? 'cursor-pointer hover:shadow-lg transition-all' : ''}`}
           onError={() => setPreviewUrl(null)}
           onClick={canEdit ? () => fileInputRef.current?.click() : undefined}
         />
       ) : (
         <div
-          className={`${sizeClass} rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary border-2 border-white shadow-md ${canEdit ? 'cursor-pointer hover:bg-primary/30 transition-colors' : ''}`}
+          className={`${sizeClass} rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary border-2 border-white shadow-md ${canEdit ? 'cursor-pointer hover:bg-primary/30 hover:shadow-lg transition-all' : ''}`}
           onClick={canEdit ? () => fileInputRef.current?.click() : undefined}
           title={canEdit ? "Cliquez pour ajouter une photo" : ""}
         >
@@ -190,35 +190,22 @@ export default function LivreurPhotoUploader({
         </div>
       )}
 
-      {/* Boutons d'édition (seulement si canEdit) */}
+      {/* Overlay caméra - visible au hover/touch */}
       {canEdit && (
         <>
-          {/* Bouton caméra overlay - toujours visible sur mobile, hover sur desktop */}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 active:opacity-100 transition-opacity cursor-pointer"
-            title={uploading ? "Envoi en cours..." : "Modifier la photo"}
+            className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 hover:opacity-100 active:opacity-100 transition-opacity cursor-pointer"
+            title={uploading ? "Envoi en cours..." : "Changer la photo"}
           >
             {uploading ? (
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
-              <Camera className="w-5 h-5 text-white" />
+              <Camera className="w-6 h-6 text-white" />
             )}
           </button>
-
-          {/* Bouton supprimer (seulement si photo existe) */}
-          {previewUrl && (
-            <button
-              type="button"
-              onClick={handleRemovePhoto}
-              className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors shadow-sm"
-              title="Supprimer la photo"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          )}
 
           {/* Input file caché */}
           <input
