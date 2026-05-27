@@ -18,17 +18,24 @@ export default function HistoriqueDuJour({ courses }) {
     )
     .sort((a, b) => new Date(b.heure_livraison || b.updated_date) - new Date(a.heure_livraison || a.updated_date));
 
-  const totalCA = coursesHistorique
-    .filter(c => c.statut === "livree")
-    .reduce((sum, c) => sum + (c.prix_final || 0), 0);
+  const livrees = coursesHistorique.filter(c => c.statut === "livree");
 
-  const totalCommission = coursesHistorique
-    .filter(c => c.statut === "livree")
-    .reduce((sum, c) => sum + (c.commission_silga || 0), 0);
+  // Fonctions de fallback pour les calculs
+  const getDistance = (c) => c.distance_reelle_km
+    || (c.latitude_recuperation && c.longitude_recuperation && c.latitude_livraison && c.longitude_livraison
+      ? (() => {
+          const R = 6371, dLat = ((c.latitude_livraison - c.latitude_recuperation) * Math.PI) / 180;
+          const dLon = ((c.longitude_livraison - c.longitude_recuperation) * Math.PI) / 180;
+          const a = Math.sin(dLat/2)**2 + Math.cos(c.latitude_recuperation*Math.PI/180)*Math.cos(c.latitude_livraison*Math.PI/180)*Math.sin(dLon/2)**2;
+          return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        })()
+      : null) || 0;
+  const getPrix = (c) => c.prix_final || (getDistance(c) > 0 ? Math.round(getDistance(c) * 100) : 0);
+  const getCommission = (c) => c.commission_silga || (getPrix(c) > 0 ? Math.round(getPrix(c) * 0.3) : 0);
 
-  const totalDistance = coursesHistorique
-    .filter(c => c.statut === "livree")
-    .reduce((sum, c) => sum + (c.distance_reelle_km || 0), 0);
+  const totalCA = livrees.reduce((sum, c) => sum + getPrix(c), 0);
+  const totalCommission = livrees.reduce((sum, c) => sum + getCommission(c), 0);
+  const totalDistance = livrees.reduce((sum, c) => sum + getDistance(c), 0);
 
   if (coursesHistorique.length === 0) {
     return (
@@ -78,11 +85,30 @@ function StatBox({ label, value, color }) {
   );
 }
 
+function haversineKm(lat1, lon1, lat2, lon2) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
 function CourseHistoriqueRow({ course }) {
   const isLivree = course.statut === "livree";
-  const dureeMinutes = course.heure_livraison && course.heure_acceptation
-    ? Math.round((new Date(course.heure_livraison) - new Date(course.heure_acceptation)) / 60000)
-    : null;
+  // Durée : priorité récupération→livraison, sinon acceptation→livraison
+  const dureeMinutes = course.heure_livraison && course.heure_recuperation
+    ? Math.round((new Date(course.heure_livraison) - new Date(course.heure_recuperation)) / 60000)
+    : course.heure_livraison && course.heure_acceptation
+      ? Math.round((new Date(course.heure_livraison) - new Date(course.heure_acceptation)) / 60000)
+      : null;
+  // Distance avec fallback GPS
+  const distance = course.distance_reelle_km
+    || haversineKm(course.latitude_recuperation, course.longitude_recuperation, course.latitude_livraison, course.longitude_livraison)
+    || haversineKm(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng);
+  // Prix avec fallback distance
+  const prixFinal = course.prix_final || (distance ? Math.round(distance * 100) : null);
+  const commission = course.commission_silga || (prixFinal ? Math.round(prixFinal * 0.3) : null);
 
   return (
     <div className={`border rounded-xl p-3 ${isLivree ? "bg-green-50/50 border-green-200" : "bg-red-50/50 border-red-200"}`}>
@@ -147,17 +173,17 @@ function CourseHistoriqueRow({ course }) {
       {/* Métriques */}
       {isLivree && (
         <div className="grid grid-cols-4 gap-2 pt-2 border-t border-dashed border-green-200">
-          {course.distance_reelle_km && (
-            <Metric icon={Ruler} label="Distance" value={`${Number(course.distance_reelle_km).toFixed(1)} km`} />
+          {distance && (
+            <Metric icon={Ruler} label="Distance" value={`${Number(distance).toFixed(1)} km`} />
           )}
           {dureeMinutes && (
             <Metric icon={Clock} label="Durée" value={`${dureeMinutes} min`} />
           )}
-          {course.prix_final && (
-            <Metric icon={Banknote} label="Prix" value={`${course.prix_final.toLocaleString()} F`} />
+          {prixFinal && (
+            <Metric icon={Banknote} label="Prix" value={`${prixFinal.toLocaleString()} F`} />
           )}
-          {course.commission_silga && (
-            <Metric icon={Banknote} label="Commission" value={`${course.commission_silga.toLocaleString()} F`} color="text-orange-600" />
+          {commission && (
+            <Metric icon={Banknote} label="Commission" value={`${commission.toLocaleString()} F`} color="text-orange-600" />
           )}
         </div>
       )}

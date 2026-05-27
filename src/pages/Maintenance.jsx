@@ -192,6 +192,8 @@ function RapportDetail({ rapport }) {
 export default function Maintenance() {
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null);
+  const [retrocorr, setRetrocorr] = useState(false);
+  const [retrocorrResult, setRetrocorrResult] = useState(null);
   const queryClient = useQueryClient();
 
   const { data: rapports = [], isLoading } = useQuery({
@@ -315,6 +317,50 @@ export default function Maintenance() {
           </>
         )}
       </Button>
+
+      {/* Rétro-correction financière */}
+      <Card className="p-4 border-2 border-orange-200 bg-orange-50/30">
+        <div className="flex items-center gap-2 mb-2">
+          <Zap className="w-5 h-5 text-orange-600" />
+          <p className="font-bold text-orange-900 text-sm">Rétro-correction des prix manquants</p>
+        </div>
+        <p className="text-xs text-orange-700 mb-3">
+          Recalcule automatiquement <code>prix_final</code>, <code>distance_reelle_km</code>, <code>montant_livreur</code> et <code>commission_silga</code> pour toutes les courses livrées sans données financières.
+        </p>
+        <Button
+          variant="outline"
+          className="w-full border-orange-300 text-orange-700 hover:bg-orange-100 gap-2"
+          disabled={retrocorr}
+          onClick={async () => {
+            setRetrocorr(true);
+            setRetrocorrResult(null);
+            try {
+              const res = await base44.functions.invoke("retroCorrigerCourses", {});
+              setRetrocorrResult(res.data);
+            } catch (e) {
+              setRetrocorrResult({ success: false, error: e.message });
+            } finally {
+              setRetrocorr(false);
+            }
+          }}
+        >
+          {retrocorr ? <><RefreshCw className="w-4 h-4 animate-spin" /> Correction en cours...</> : <><Wrench className="w-4 h-4" /> Corriger les prix manquants</>}
+        </Button>
+        {retrocorrResult && (
+          <div className={`mt-3 p-3 rounded-xl text-xs ${retrocorrResult.success ? "bg-green-50 border border-green-200 text-green-800" : "bg-red-50 border border-red-200 text-red-700"}`}>
+            {retrocorrResult.success ? (
+              <>
+                <p className="font-bold mb-1">✅ {retrocorrResult.corrigees} course(s) corrigée(s) sur {retrocorrResult.sans_prix} sans prix</p>
+                {retrocorrResult.details?.map((d, i) => (
+                  <p key={i} className="text-[10px] text-green-700">#{d.id} · {d.distance} km · {d.prix} F · source: {d.source}</p>
+                ))}
+              </>
+            ) : (
+              <p>❌ {retrocorrResult.error}</p>
+            )}
+          </div>
+        )}
+      </Card>
 
       {/* Résultat du scan manuel */}
       {scanResult && (

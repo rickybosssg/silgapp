@@ -329,10 +329,18 @@ export default function ClientSuiviCourse() {
 
           {/* Estimation distance / temps / prix */}
           {(() => {
+            // Cascade de fallbacks pour la distance
             const distEst = maCourse.distance_reelle_km
+              || haversineKm(maCourse.latitude_recuperation, maCourse.longitude_recuperation, maCourse.latitude_livraison, maCourse.longitude_livraison)
               || haversineKm(maCourse.gps_depart_lat, maCourse.gps_depart_lng, maCourse.gps_arrivee_lat, maCourse.gps_arrivee_lng);
             const prix = maCourse.prix_final || (distEst ? Math.round(distEst * 100) : maCourse.prix_estimate || null);
-            const temps = distEst ? Math.round((distEst / 25) * 60) : null;
+            // Durée depuis heure_recuperation → heure_livraison (plus précis que acceptation → livraison)
+            const dureeMs = maCourse.heure_livraison && maCourse.heure_recuperation
+              ? new Date(maCourse.heure_livraison) - new Date(maCourse.heure_recuperation)
+              : maCourse.heure_livraison && maCourse.heure_acceptation
+                ? new Date(maCourse.heure_livraison) - new Date(maCourse.heure_acceptation)
+                : null;
+            const temps = dureeMs ? Math.round(dureeMs / 60000) : distEst ? Math.round((distEst / 25) * 60) : null;
             const isFinal = !!maCourse.prix_final;
             if (!distEst && !prix) return null;
             return (
@@ -473,34 +481,44 @@ export default function ClientSuiviCourse() {
                   <p className="text-white font-bold">Livraison terminée avec succès !</p>
                 </div>
                 <div className="p-4 bg-green-50">
-                  {/* 3 métriques toujours visibles */}
-                  <div className="grid grid-cols-3 gap-2 mb-3">
-                    <div className="bg-white rounded-xl p-3 text-center shadow-sm">
-                      <Ruler className="w-4 h-4 mx-auto mb-1 text-blue-500" />
-                      <p className="text-sm font-black text-gray-900">
-                        {maCourse.distance_reelle_km != null
-                          ? `${Number(maCourse.distance_reelle_km).toFixed(1)} km`
-                          : "—"}
-                      </p>
-                      <p className="text-[9px] text-gray-400 font-semibold uppercase">Distance</p>
-                    </div>
-                    <div className="bg-white rounded-xl p-3 text-center shadow-sm">
-                      <Clock className="w-4 h-4 mx-auto mb-1 text-purple-500" />
-                      <p className="text-sm font-black text-gray-900">
-                        {maCourse.heure_livraison && maCourse.heure_acceptation
-                          ? `${Math.round((new Date(maCourse.heure_livraison) - new Date(maCourse.heure_acceptation)) / 60000)} min`
-                          : "—"}
-                      </p>
-                      <p className="text-[9px] text-gray-400 font-semibold uppercase">Durée</p>
-                    </div>
-                    <div className="bg-white rounded-xl p-3 text-center shadow-sm">
-                      <Banknote className="w-4 h-4 mx-auto mb-1 text-green-600" />
-                      <p className="text-sm font-black text-green-700">
-                        {maCourse.prix_final ? `${maCourse.prix_final.toLocaleString()} F` : "—"}
-                      </p>
-                      <p className="text-[9px] text-gray-400 font-semibold uppercase">Prix final</p>
-                    </div>
-                  </div>
+                  {/* 3 métriques toujours visibles — avec fallbacks */}
+                  {(() => {
+                    const distFinal = maCourse.distance_reelle_km
+                      || haversineKm(maCourse.latitude_recuperation, maCourse.longitude_recuperation, maCourse.latitude_livraison, maCourse.longitude_livraison)
+                      || haversineKm(maCourse.gps_depart_lat, maCourse.gps_depart_lng, maCourse.gps_arrivee_lat, maCourse.gps_arrivee_lng);
+                    const prixFinal = maCourse.prix_final || (distFinal ? Math.round(distFinal * 100) : 0);
+                    const dureeMs = maCourse.heure_livraison && maCourse.heure_recuperation
+                      ? new Date(maCourse.heure_livraison) - new Date(maCourse.heure_recuperation)
+                      : maCourse.heure_livraison && maCourse.heure_acceptation
+                        ? new Date(maCourse.heure_livraison) - new Date(maCourse.heure_acceptation)
+                        : null;
+                    const dureeMin = dureeMs ? Math.round(dureeMs / 60000) : distFinal ? Math.round((distFinal / 25) * 60) : null;
+                    return (
+                      <div className="grid grid-cols-3 gap-2 mb-3">
+                        <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+                          <Ruler className="w-4 h-4 mx-auto mb-1 text-blue-500" />
+                          <p className="text-sm font-black text-gray-900">
+                            {distFinal ? `${Number(distFinal).toFixed(1)} km` : "—"}
+                          </p>
+                          <p className="text-[9px] text-gray-400 font-semibold uppercase">Distance</p>
+                        </div>
+                        <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+                          <Clock className="w-4 h-4 mx-auto mb-1 text-purple-500" />
+                          <p className="text-sm font-black text-gray-900">
+                            {dureeMin ? `${dureeMin} min` : "—"}
+                          </p>
+                          <p className="text-[9px] text-gray-400 font-semibold uppercase">Durée</p>
+                        </div>
+                        <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+                          <Banknote className="w-4 h-4 mx-auto mb-1 text-green-600" />
+                          <p className="text-sm font-black text-green-700">
+                            {prixFinal > 0 ? `${prixFinal.toLocaleString()} F` : "—"}
+                          </p>
+                          <p className="text-[9px] text-gray-400 font-semibold uppercase">Prix final</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <p className="text-center text-xs text-green-700 font-medium">
                     Merci d'avoir utilisé SILGAPP 🙏
                   </p>
@@ -557,31 +575,42 @@ export default function ClientSuiviCourse() {
                         </p>
                       )}
                     </div>
-                    <div className="p-3 bg-green-50 grid grid-cols-3 gap-2">
-                      <div className="bg-white rounded-xl p-2.5 text-center shadow-sm">
-                        <Ruler className="w-3.5 h-3.5 mx-auto mb-1 text-blue-500" />
-                        <p className="text-xs font-black text-gray-900">
-                          {maCourse.distance_reelle_km > 0 ? `${Number(maCourse.distance_reelle_km).toFixed(1)} km` : "—"}
-                        </p>
-                        <p className="text-[9px] text-gray-400 uppercase">Distance</p>
-                      </div>
-                      <div className="bg-white rounded-xl p-2.5 text-center shadow-sm">
-                        <Clock className="w-3.5 h-3.5 mx-auto mb-1 text-purple-500" />
-                        <p className="text-xs font-black text-gray-900">
-                          {maCourse.heure_livraison && maCourse.heure_acceptation
-                            ? `${Math.round((new Date(maCourse.heure_livraison) - new Date(maCourse.heure_acceptation)) / 60000)} min`
-                            : "—"}
-                        </p>
-                        <p className="text-[9px] text-gray-400 uppercase">Durée</p>
-                      </div>
-                      <div className="bg-white rounded-xl p-2.5 text-center shadow-sm">
-                        <Banknote className="w-3.5 h-3.5 mx-auto mb-1 text-green-600" />
-                        <p className="text-xs font-black text-green-700">
-                          {maCourse.prix_final > 0 ? `${maCourse.prix_final.toLocaleString()} F` : "—"}
-                        </p>
-                        <p className="text-[9px] text-gray-400 uppercase">Prix final</p>
-                      </div>
-                    </div>
+                    {(() => {
+                      const distD = maCourse.distance_reelle_km
+                        || haversineKm(maCourse.latitude_recuperation, maCourse.longitude_recuperation, maCourse.latitude_livraison, maCourse.longitude_livraison)
+                        || haversineKm(maCourse.gps_depart_lat, maCourse.gps_depart_lng, maCourse.gps_arrivee_lat, maCourse.gps_arrivee_lng);
+                      const prixD = maCourse.prix_final || (distD ? Math.round(distD * 100) : 0);
+                      const dureeD = maCourse.heure_livraison && maCourse.heure_recuperation
+                        ? Math.round((new Date(maCourse.heure_livraison) - new Date(maCourse.heure_recuperation)) / 60000)
+                        : maCourse.heure_livraison && maCourse.heure_acceptation
+                          ? Math.round((new Date(maCourse.heure_livraison) - new Date(maCourse.heure_acceptation)) / 60000)
+                          : distD ? Math.round((distD / 25) * 60) : null;
+                      return (
+                        <div className="p-3 bg-green-50 grid grid-cols-3 gap-2">
+                          <div className="bg-white rounded-xl p-2.5 text-center shadow-sm">
+                            <Ruler className="w-3.5 h-3.5 mx-auto mb-1 text-blue-500" />
+                            <p className="text-xs font-black text-gray-900">
+                              {distD ? `${Number(distD).toFixed(1)} km` : "—"}
+                            </p>
+                            <p className="text-[9px] text-gray-400 uppercase">Distance</p>
+                          </div>
+                          <div className="bg-white rounded-xl p-2.5 text-center shadow-sm">
+                            <Clock className="w-3.5 h-3.5 mx-auto mb-1 text-purple-500" />
+                            <p className="text-xs font-black text-gray-900">
+                              {dureeD ? `${dureeD} min` : "—"}
+                            </p>
+                            <p className="text-[9px] text-gray-400 uppercase">Durée</p>
+                          </div>
+                          <div className="bg-white rounded-xl p-2.5 text-center shadow-sm">
+                            <Banknote className="w-3.5 h-3.5 mx-auto mb-1 text-green-600" />
+                            <p className="text-xs font-black text-green-700">
+                              {prixD > 0 ? `${prixD.toLocaleString()} F` : "—"}
+                            </p>
+                            <p className="text-[9px] text-gray-400 uppercase">Prix final</p>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </Card>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">👍/👎 Votre avis sur la livraison</p>
                   <DestinataireReactionButton course={maCourse} onDone={refetch} />

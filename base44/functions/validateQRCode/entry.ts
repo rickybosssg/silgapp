@@ -152,19 +152,31 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Recharger la course complète pour renvoyer toutes les données persistées
+      const courseFinale = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+
       return Response.json({
         success: true,
         message: 'Livraison confirmée !',
-        prix_final: updateData.prix_final || null,
-        distance_km: updateData.distance_reelle_km || null,
-        montant_livreur: updateData.montant_livreur || null,
-        commission_silga: updateData.commission_silga || null,
+        prix_final: courseFinale.prix_final || null,
+        distance_km: courseFinale.distance_reelle_km || null,
+        montant_livreur: courseFinale.montant_livreur || null,
+        commission_silga: courseFinale.commission_silga || null,
         course: {
+          // Champs financiers
           statut: 'livree',
-          prix_final: updateData.prix_final || null,
-          distance_reelle_km: updateData.distance_reelle_km || null,
-          montant_livreur: updateData.montant_livreur || null,
-          commission_silga: updateData.commission_silga || null,
+          prix_final: courseFinale.prix_final || null,
+          distance_reelle_km: courseFinale.distance_reelle_km || null,
+          montant_livreur: courseFinale.montant_livreur || null,
+          commission_silga: courseFinale.commission_silga || null,
+          // Champs timestamps — nécessaires pour calcul durée dans LivraisonRecapitulatif
+          heure_livraison: courseFinale.heure_livraison || null,
+          heure_recuperation: courseFinale.heure_recuperation || null,
+          heure_acceptation: courseFinale.heure_acceptation || null,
+          colis_livre_at: courseFinale.colis_livre_at || null,
+          // Champs GPS livraison
+          latitude_livraison: courseFinale.latitude_livraison || null,
+          longitude_livraison: courseFinale.longitude_livraison || null,
         },
       });
     }
