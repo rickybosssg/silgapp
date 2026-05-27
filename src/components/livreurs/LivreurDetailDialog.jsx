@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Truck, Phone, MapPin, Calendar, Clock, CheckCircle2, XCircle, Banknote } from "lucide-react";
+import LivreurPhotoUploader from "@/components/livreur/LivreurPhotoUploader";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -60,13 +61,12 @@ export default function LivreurDetailDialog({ livreur, open, onClose }) {
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
-            {livreur.photo_url ? (
-              <img src={livreur.photo_url} alt={livreur.nom} className="w-10 h-10 rounded-full" />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                <Truck className="w-6 h-6 text-muted-foreground" />
-              </div>
-            )}
+            <LivreurPhotoUploader
+              photoUrl={livreur.photo_url}
+              nomComplet={`${livreur.prenom || ""} ${livreur.nom}`.trim()}
+              canEdit={false}
+              size="md"
+            />
             {livreur.prenom} {livreur.nom}
           </DialogTitle>
         </DialogHeader>

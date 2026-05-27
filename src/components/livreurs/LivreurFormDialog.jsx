@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { User, Upload } from "lucide-react";
+import LivreurPhotoUploader from "@/components/livreur/LivreurPhotoUploader";
 import { toast } from "sonner";
 
 const emptyForm = {
@@ -27,7 +27,6 @@ const emptyForm = {
 export default function LivreurFormDialog({ open, onClose, livreur }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(emptyForm);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const isEdit = !!livreur;
 
   useEffect(() => {
@@ -71,16 +70,7 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
     },
   });
 
-  const handlePhoto = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadingPhoto(true);
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    setForm((p) => ({ ...p, photo_url: file_url }));
-    setUploadingPhoto(false);
-  };
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     // Validation stricte
@@ -200,20 +190,16 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
           <div className="space-y-1.5">
             <Label className="text-xs">Photo</Label>
             <div className="flex items-center gap-3">
-              {form.photo_url ? (
-                <img src={form.photo_url} alt="Photo" className="w-12 h-12 rounded-full object-cover border-2 border-primary" />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                  <User className="w-6 h-6 text-muted-foreground" />
-                </div>
-              )}
-              <label className="cursor-pointer">
-                <input type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
-                <div className="flex items-center gap-2 text-xs border border-border rounded-lg px-3 py-2 hover:bg-muted transition-colors">
-                  <Upload className="w-3.5 h-3.5" />
-                  {uploadingPhoto ? "Envoi..." : form.photo_url ? "Changer" : "Ajouter"}
-                </div>
-              </label>
+              <LivreurPhotoUploader
+                photoUrl={form.photo_url}
+                nomComplet={`${form.prenom || ""} ${form.nom}`.trim()}
+                onPhotoChange={(newUrl) => setForm((p) => ({ ...p, photo_url: newUrl }))}
+                canEdit={true}
+                size="md"
+              />
+              <p className="text-xs text-muted-foreground">
+                Cliquez sur la photo pour la modifier
+              </p>
             </div>
           </div>
 
@@ -226,7 +212,7 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
 
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Annuler</Button>
-            <Button type="submit" className="flex-1 bg-primary" disabled={mutation.isPending || uploadingPhoto}>
+            <Button type="submit" className="flex-1 bg-primary" disabled={mutation.isPending}>
               {mutation.isPending ? "Enregistrement..." : isEdit ? "Mettre à jour" : "Créer le compte"}
             </Button>
           </div>

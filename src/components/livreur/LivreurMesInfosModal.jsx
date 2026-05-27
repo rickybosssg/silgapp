@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { Check, User } from "lucide-react";
 import { normaliserTelephone, formaterTelephone } from "./LivreurExterneOnboarding";
 import PhotoPicker from "./PhotoPicker";
+import LivreurPhotoUploader from "./LivreurPhotoUploader";
 import { base44 } from "@/api/base44Client";
 
 export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
@@ -41,14 +42,15 @@ export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
       vehicule: form.vehicule,
       type_vehicule: form.vehicule,
       numero_plaque: form.numero_plaque.trim(),
+      photo_url: photoLivreur || null,
     };
-    if (photoLivreur) data.photo_url = photoLivreur;
     if (photoMoto) data.photo_moto_url = photoMoto;
     if (cnibRecto) data.photo_cnib_recto_url = cnibRecto;
     if (cnibVerso) data.photo_cnib_verso_url = cnibVerso;
 
     try {
       await base44.functions.invoke('updateLivreur', { id: livreurProfil.id, data });
+      onSave?.({ photo_url: photoLivreur || null });
       onSave?.({ ...livreurProfil, ...data });
     } catch {
       toast.error("Erreur lors de la sauvegarde");
@@ -61,13 +63,14 @@ export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
     <div className="space-y-4 pb-10">
       {/* Entête */}
       <div className="flex items-center gap-3 mb-2">
-        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
-          {photoLivreur ? (
-            <img src={photoLivreur} alt="profil" className="w-12 h-12 rounded-2xl object-cover" />
-          ) : (
-            <User className="w-6 h-6 text-primary" />
-          )}
-        </div>
+        <LivreurPhotoUploader
+          photoUrl={photoLivreur}
+          nomComplet={`${livreurProfil?.prenom || ""} ${livreurProfil?.nom || ""}`.trim()}
+          livreurId={livreurProfil?.id}
+          onPhotoChange={setPhotoLivreur}
+          canEdit={true}
+          size="md"
+        />
         <div>
           <p className="font-bold text-gray-900">{livreurProfil?.prenom || ""} {livreurProfil?.nom || ""}</p>
           <p className="text-xs text-gray-500">Livreur SILGAPP Externe</p>
@@ -137,8 +140,7 @@ export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
 
       {/* Photos */}
       <div className="space-y-3">
-        <label className="block text-xs font-semibold text-gray-500">Photos</label>
-        <PhotoPicker label="📸 Photo de profil" value={photoLivreur} onChange={setPhotoLivreur} />
+        <label className="block text-xs font-semibold text-gray-500">Autres photos</label>
         <PhotoPicker label="🚗 Photo du moyen de déplacement" value={photoMoto} onChange={setPhotoMoto} />
         <PhotoPicker label="🪪 CNIB Recto" value={cnibRecto} onChange={setCnibRecto} />
         <PhotoPicker label="🪪 CNIB Verso" value={cnibVerso} onChange={setCnibVerso} />

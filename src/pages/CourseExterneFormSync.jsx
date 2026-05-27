@@ -220,6 +220,9 @@ export default function CourseExterneFormSync() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Récupérer l'utilisateur connecté
+    const user = await base44.auth.me();
+
     let expediteurNom, expediteurTel, expediteurClientId, expediteurPhoneNormalized;
     let destinataireNom, destinataireTel, destinataireClientId, destinatairePhoneNormalized;
 

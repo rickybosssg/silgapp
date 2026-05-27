@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import CreateLivreurDialog from "@/components/livreurs/CreateLivreurDialog";
 import NotationLivreurPanel from "@/components/admin/NotationLivreurPanel";
+import LivreurPhotoUploader from "@/components/livreur/LivreurPhotoUploader";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -45,6 +46,18 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
   const vb = validationBadge(livreur.validation);
   const isBloque = !livreur.actif;
 
+  // Mise à jour photo livreur
+  const handlePhotoChange = async (newPhotoUrl) => {
+    try {
+      await base44.entities.Livreur.update(livreur.id, { photo_url: newPhotoUrl });
+      // Refresh local state
+      livreur.photo_url = newPhotoUrl;
+    } catch (err) {
+      console.error("Erreur update photo:", err);
+      toast.error("Erreur lors de la mise à jour de la photo");
+    }
+  };
+
   const coursesLivrees = courses.filter(c => c.statut === "livree");
   const coursesActives = courses.filter(c => !["livree", "annulee"].includes(c.statut));
   const montantTotal = coursesLivrees.reduce((s, c) => s + (c.prix_final || 0), 0);
@@ -60,17 +73,14 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
         {/* Header */}
         <div className="bg-gradient-to-r from-primary/10 to-accent/10 p-5 flex items-start justify-between">
           <div className="flex items-center gap-3">
-            {livreur.photo_url ? (
-              <img
-                src={livreur.photo_url}
-                alt={nomComplet}
-                className="w-14 h-14 rounded-2xl object-cover border-2 border-white shadow-md"
-              />
-            ) : (
-              <div className="w-14 h-14 rounded-2xl bg-primary/20 flex items-center justify-center text-xl font-bold text-primary">
-                {nomComplet.charAt(0).toUpperCase()}
-              </div>
-            )}
+            <LivreurPhotoUploader
+              photoUrl={livreur.photo_url}
+              nomComplet={nomComplet}
+              livreurId={livreur.id}
+              onPhotoChange={handlePhotoChange}
+              canEdit={true}
+              size="lg"
+            />
             <div>
               <p className="font-bold text-lg text-foreground">{nomComplet}</p>
               <div className="flex gap-1.5 mt-1 flex-wrap items-center">
@@ -434,28 +444,29 @@ export default function LivreursExternes() {
 
       {/* Liste */}
       {livreursFiltres.length === 0 ? (
-        <Card className="p-10 text-center text-muted-foreground">
-          <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p className="font-semibold">Aucun livreur</p>
-          <p className="text-xs mt-1">Modifiez le filtre ou ajoutez un livreur.</p>
-        </Card>
+      <Card className="p-10 text-center text-muted-foreground">
+      <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
+      <p className="font-semibold">Aucun livreur</p>
+      <p className="text-xs mt-1">Modifiez le filtre ou ajoutez un livreur.</p>
+      </Card>
       ) : (
-        <div className="space-y-2">
-          {livreursFiltres.map(livreur => {
-            const nomComplet = `${livreur.prenom || ""} ${livreur.nom}`.trim();
-            const sb = statutBadge(livreur);
-            const vb = validationBadge(livreur.validation);
-            const isBloque = livreur.actif === false;
-            const montantDu = livreur.montant_du_silga || 0;
+      <div className="space-y-2">
+      {livreursFiltres.map(livreur => {
+        const nomComplet = `${livreur.prenom || ""} ${livreur.nom}`.trim();
+        const sb = statutBadge(livreur);
+        const vb = validationBadge(livreur.validation);
+        const isBloque = livreur.actif === false;
+        const montantDu = livreur.montant_du_silga || 0;
 
-            return (
-              <Card key={livreur.id} className={`p-4 transition-all ${isBloque ? "border-red-200 bg-red-50/30" : ""}`}>
-                <div className="flex items-start gap-3">
-                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-base font-bold flex-shrink-0 ${
-                    isBloque ? "bg-red-100 text-red-600" : "bg-primary/10 text-primary"
-                  }`}>
-                    {nomComplet.charAt(0).toUpperCase()}
-                  </div>
+        return (
+          <Card key={livreur.id} className={`p-4 transition-all ${isBloque ? "border-red-200 bg-red-50/30" : ""}`}>
+            <div className="flex items-start gap-3">
+              <LivreurPhotoUploader
+                photoUrl={livreur.photo_url}
+                nomComplet={nomComplet}
+                canEdit={false}
+                size="md"
+              />
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
