@@ -129,7 +129,6 @@ function App() {
             {reseau === "interne" ? (
               <>
                 <Route path="/" element={<Dashboard />} />
-                <Route path="/admin/externe" element={<DashboardAdminExterne />} />
                 <Route path="/nouvelle-course" element={<NouvelleCourse />} />
                 <Route path="/carte" element={<CarteLivreurs />} />
                 <Route path="/courses" element={<ToutesCourses />} />
