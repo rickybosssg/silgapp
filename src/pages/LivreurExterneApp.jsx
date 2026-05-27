@@ -261,9 +261,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   };
 
   const handleColisLivre = (course, gpsArrivee) => {
-    // Si le backend QR a déjà mis statut=livree + prix calculé, on invalide juste le cache
+    // Si le backend QR a déjà mis statut=livree + prix calculé, on affiche le récapitulatif
     if (course.statut === "livree") {
-      // Déjà traité par validateQRCode côté backend — forcer le refresh de tout
+      // Déjà traité par validateQRCode côté backend — le récapitulatif s'affiche via CourseActiveCard
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
       const gains = course.montant_livreur || 0;
