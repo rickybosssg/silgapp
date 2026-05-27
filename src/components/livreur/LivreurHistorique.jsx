@@ -55,9 +55,10 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
   });
   
   const livreesToday = coursesToday.filter(c => c.statut === "livree");
-  const totalEncaisseToday = livreesToday.reduce((sum, c) => sum + (isExterne ? (c.montant_livreur || 0) : (c.prix_reel || 0)), 0);
-  const montantDuToday = isExterne 
-    ? livreesToday.reduce((sum, c) => sum + (c.commission_silga || Math.round((c.prix_final || c.prix_estimate || 0) * 0.3)), 0)
+  // Côté livreur externe : afficher le prix total (pas la répartition interne)
+  const totalEncaisseToday = livreesToday.reduce((sum, c) => sum + (isExterne ? (c.prix_final || 0) : (c.prix_reel || 0)), 0);
+  const montantDuToday = isExterne
+    ? livreesToday.reduce((sum, c) => sum + (c.commission_silga || Math.round((c.prix_final || 0) * 0.3)), 0)
     : totalEncaisseToday;
   const isPaye = livreurProfil?.statut_paiement === "paye";
 
@@ -84,13 +85,15 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
             </div>
             <p className="text-xs text-amber-600">Total encaissé</p>
           </div>
-          <div className="bg-white/70 rounded-lg p-3 border border-amber-200">
-            <div className="flex items-center gap-1 text-blue-700 font-semibold text-sm mb-1">
-              <Banknote className="w-4 h-4" />
-              {montantDuToday.toLocaleString()} FCFA
+          {!isExterne && (
+            <div className="bg-white/70 rounded-lg p-3 border border-amber-200">
+              <div className="flex items-center gap-1 text-blue-700 font-semibold text-sm mb-1">
+                <Banknote className="w-4 h-4" />
+                {montantDuToday.toLocaleString()} FCFA
+              </div>
+              <p className="text-xs text-blue-600">Dû à Silga</p>
             </div>
-            <p className="text-xs text-blue-600">Dû à Silga</p>
-          </div>
+          )}
           <div className="bg-white/70 rounded-lg p-3 border border-amber-200">
             <div className="flex items-center gap-1 text-green-700 font-semibold text-sm mb-1">
               {isPaye ? <CheckCircle2 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
@@ -172,14 +175,18 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
                     {course.statut === "livree" && (
                       isExterne ? (
                         <div className="space-y-1">
-                          <div className="flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-50 rounded px-2 py-1 w-fit">
-                            <Banknote className="w-3 h-3" />
-                            +{course.montant_livreur?.toLocaleString() || 0} F gagnés
-                          </div>
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground bg-gray-50 rounded px-2 py-1 w-fit">
-                            <AlertCircle className="w-3 h-3" />
-                            Commission: {course.commission_silga?.toLocaleString() || 0} F (30%)
-                          </div>
+                          {course.distance_reelle_km != null && (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground bg-blue-50 rounded px-2 py-1 w-fit">
+                              <MapPin className="w-3 h-3" />
+                              {Number(course.distance_reelle_km).toFixed(1)} km
+                            </div>
+                          )}
+                          {course.prix_final ? (
+                            <div className="flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-50 rounded px-2 py-1 w-fit">
+                              <Banknote className="w-3 h-3" />
+                              {course.prix_final.toLocaleString()} FCFA
+                            </div>
+                          ) : null}
                         </div>
                       ) : (
                         course.prix_reel && (

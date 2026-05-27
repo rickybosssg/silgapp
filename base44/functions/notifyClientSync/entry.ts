@@ -19,40 +19,59 @@ Deno.serve(async (req) => {
 
     const notifications = [];
 
-    // 1. Notifier le destinataire s'il a l'application (course type "expedier")
-    if (course.type_course === "expedier" && course.destinataire_client_id) {
-      // Trouver le client destinataire
-      const destinataireClient = await base44.entities.ClientExterne.get(course.destinataire_client_id);
-      
+    // Helper : résoudre un client par id OU par téléphone normalisé
+    const resolveClient = async (clientId, telephone) => {
+      if (clientId) {
+        try { return await base44.entities.ClientExterne.get(clientId); } catch (_) {}
+      }
+      if (telephone) {
+        const tel = telephone.replace(/\D/g, "");
+        const telNorm = tel.startsWith("226") && tel.length === 11 ? "+" + tel : tel.length === 8 ? "+226" + tel : null;
+        if (telNorm) {
+          try {
+            const found = await base44.asServiceRole.entities.ClientExterne.filter({ telephone: telNorm });
+            if (found?.length > 0) return found[0];
+          } catch (_) {}
+        }
+      }
+      return null;
+    };
+
+    // 1. Notifier le destinataire (course type "expedier")
+    if (course.type_course === "expedier") {
+      const destinataireClient = await resolveClient(course.destinataire_client_id, course.destinataire_telephone);
       if (destinataireClient && destinataireClient.user_email) {
-        const notification = await base44.entities.Notification.create({
-          titre: "Colis en route",
-          message: `Vous allez bientôt recevoir un colis de ${course.expediteur_nom || "un expéditeur"}.`,
+        // Lier automatiquement si pas encore lié
+        if (!course.destinataire_client_id) {
+          await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+            destinataire_client_id: destinataireClient.id,
+            recipient_has_app: true,
+          });
+        }
+        const notification = await base44.asServiceRole.entities.Notification.create({
+          titre: "📦 Vous allez recevoir un colis",
+          message: `${course.expediteur_nom || "Un expéditeur"} vous envoie un colis${course.type_colis ? " (" + course.type_colis.replace(/_/g, " ") + ")" : ""}. ${course.adresse_depart ? "Récupération depuis : " + course.adresse_depart : ""}`,
           type: "nouvelle_course",
           course_id: course.id,
           destinataire_email: destinataireClient.user_email,
           lue: false
         });
-        
         notifications.push(notification);
       }
     }
 
     // 2. Notifier l'expéditeur s'il a l'application (course type "recevoir")
-    if (course.type_course === "recevoir" && course.expediteur_client_id) {
-      // Trouver le client expéditeur
-      const expediteurClient = await base44.entities.ClientExterne.get(course.expediteur_client_id);
-      
+    if (course.type_course === "recevoir") {
+      const expediteurClient = await resolveClient(course.expediteur_client_id, course.expediteur_telephone);
       if (expediteurClient && expediteurClient.user_email) {
-        const notification = await base44.entities.Notification.create({
-          titre: "Demande de récupération",
+        const notification = await base44.asServiceRole.entities.Notification.create({
+          titre: "🚚 Demande de récupération",
           message: `${course.destinataire_nom || "Un client"} a demandé la récupération d'un colis chez vous.`,
           type: "nouvelle_course",
           course_id: course.id,
           destinataire_email: expediteurClient.user_email,
           lue: false
         });
-        
         notifications.push(notification);
       }
     }

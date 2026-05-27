@@ -122,13 +122,34 @@ export default function CourseExterneFormSync() {
 
   const createMutation = useMutation({
     mutationFn: async (data) => {
-      const course = await base44.entities.CourseExterne.create(data);
-      if (data.destinataire_client_id || data.expediteur_client_id) {
+      // Lookup destinataire par téléphone normalisé si pas encore lié
+      let finalData = { ...data };
+      if (!finalData.destinataire_client_id && finalData.destinataire_telephone) {
         try {
-          await base44.functions.invoke("notifyClientSync", { course_id: course.id });
-        } catch (err) {
-          console.error("Erreur notification:", err);
-        }
+          const telNorm = "+226" + finalData.destinataire_telephone.replace(/\D/g, "").slice(-8);
+          const found = await base44.entities.ClientExterne.filter({ telephone: telNorm });
+          if (found?.length > 0) {
+            finalData.destinataire_client_id = found[0].id;
+            finalData.recipient_has_app = true;
+          }
+        } catch (_) {}
+      }
+      // Génération QR/codes dès la création
+      const pickupQrToken = crypto.randomUUID().replace(/-/g, "");
+      const deliveryQrToken = crypto.randomUUID().replace(/-/g, "");
+      const pickupCode4 = String(Math.floor(1000 + Math.random() * 9000));
+      const deliveryCode4 = String(Math.floor(1000 + Math.random() * 9000));
+      finalData.pickup_qr_token = pickupQrToken;
+      finalData.pickup_code_4_digits = pickupCode4;
+      finalData.delivery_qr_token = deliveryQrToken;
+      finalData.delivery_code_4_digits = deliveryCode4;
+
+      const course = await base44.entities.CourseExterne.create(finalData);
+      // Notifier toujours (la fonction vérifie en interne)
+      try {
+        await base44.functions.invoke("notifyClientSync", { course_id: course.id });
+      } catch (err) {
+        console.error("Erreur notification:", err);
       }
       try {
         await base44.functions.invoke("dispatchExterneAuto", {

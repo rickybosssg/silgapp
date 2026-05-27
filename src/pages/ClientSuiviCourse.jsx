@@ -44,14 +44,36 @@ export default function ClientSuiviCourse() {
     base44.auth.me().then(u => setUserId(u?.id)).catch(() => null);
   }, []);
 
-  // Charger uniquement les courses créées par l'utilisateur connecté
+  const [clientProfilId, setClientProfilId] = useState(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    base44.auth.me().then(async (user) => {
+      try {
+        const clients = await base44.entities.ClientExterne.filter({ user_email: user.email });
+        if (clients?.length > 0) setClientProfilId(clients[0].id);
+      } catch (_) {}
+    }).catch(() => null);
+  }, [userId]);
+
+  // Charger les courses créées par l'utilisateur + celles où il est destinataire
   const { data: courses = [], refetch } = useQuery({
-    queryKey: ["mes-courses-externes", userId],
-    queryFn: () => base44.entities.CourseExterne.filter(
-      { created_by_id: userId },
-      "-created_date",
-      20
-    ),
+    queryKey: ["mes-courses-externes", userId, clientProfilId],
+    queryFn: async () => {
+      const byCreator = await base44.entities.CourseExterne.filter(
+        { created_by_id: userId }, "-created_date", 20
+      );
+      let byDest = [];
+      if (clientProfilId) {
+        byDest = await base44.entities.CourseExterne.filter(
+          { destinataire_client_id: clientProfilId }, "-created_date", 20
+        );
+      }
+      // Fusionner sans doublons
+      const map = new Map();
+      [...(byCreator || []), ...(byDest || [])].forEach(c => map.set(c.id, c));
+      return [...map.values()].sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+    },
     enabled: !!userId,
     initialData: [],
     refetchInterval: 5000,
@@ -253,15 +275,15 @@ export default function ClientSuiviCourse() {
           </div>
         </Card>
 
-        {/* QR Codes — affichage automatique dès que livreur assigné */}
-        {maCourse.livreur_id && !["livree", "annulee"].includes(maCourse.statut) && (
+        {/* QR Codes — dès que les codes existent */}
+        {!["livree", "annulee"].includes(maCourse.statut) && (
           <div className="space-y-4">
-            {/* Pickup QR — visible jusqu'à récupération confirmée */}
-            {["livreur_en_route", "recherche_livreur"].includes(maCourse.statut) && (
+            {/* Pickup QR — visible avant récupération */}
+            {maCourse.pickup_qr_token && !maCourse.pickup_confirmed_at && (
               <QRCodeDisplay course={maCourse} type="pickup" />
             )}
-            {/* Delivery QR — visible dès colis récupéré */}
-            {["colis_recupere", "en_livraison"].includes(maCourse.statut) && (
+            {/* Delivery QR — visible après récupération ou dès que le code existe */}
+            {maCourse.delivery_qr_token && (maCourse.pickup_confirmed_at || ["colis_recupere", "en_livraison"].includes(maCourse.statut)) && !maCourse.delivery_confirmed_at && (
               <QRCodeDisplay course={maCourse} type="delivery" />
             )}
           </div>
@@ -322,23 +344,20 @@ export default function ClientSuiviCourse() {
         </Card>
 
         {/* Course terminée */}
-        {maCourse.statut === "livree" && maCourse.prix_final && (
+        {maCourse.statut === "livree" && (
           <>
             <Card className="p-4 bg-green-50 border-green-200">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-3">
                 <CheckCircle2 className="w-5 h-5 text-green-600" />
-                <h3 className="font-bold text-green-900">Course terminée</h3>
+                <h3 className="font-bold text-green-900">Course livrée</h3>
               </div>
-              <div className="space-y-1 text-sm text-green-800">
+              <div className="space-y-2 text-sm text-green-800">
                 {maCourse.distance_reelle_km != null && (
-                  <p>Distance parcourue : {Number(maCourse.distance_reelle_km || 0).toFixed(1)} km</p>
+                  <p>Distance parcourue : <span className="font-bold">{Number(maCourse.distance_reelle_km || 0).toFixed(1)} km</span></p>
                 )}
-                <p>Montant total : {maCourse.prix_final.toLocaleString()} FCFA</p>
-                {maCourse.commission_silga && (
-                  <p className="text-xs text-green-600">
-                    Commission Silga (30%) : {maCourse.commission_silga.toLocaleString()} FCFA
-                  </p>
-                )}
+                {maCourse.prix_final ? (
+                  <p className="text-base font-black text-green-900">Prix à payer : {maCourse.prix_final.toLocaleString()} FCFA</p>
+                ) : null}
               </div>
             </Card>
 

@@ -45,6 +45,15 @@ export default function ClientExterneApp() {
     loadProfil();
   }, []);
 
+  // Polling automatique des courses actives toutes les 5s
+  useEffect(() => {
+    if (!onboardingDone || !clientProfil) return;
+    const interval = setInterval(() => {
+      checkStatus(position, clientProfil);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [onboardingDone, clientProfil?.id, position]);
+
   const loadProfil = async () => {
     try {
       const user = await base44.auth.me();
@@ -74,6 +83,9 @@ export default function ClientExterneApp() {
   };
 
   const handleOnboardingComplete = ({ gps, profil }) => {
+    if (gps) {
+      try { localStorage.setItem("client_gps_position", JSON.stringify(gps)); } catch (_) {}
+    }
     setPosition(gps);
     setClientProfil(profil);
     setOnboardingDone(true);
@@ -83,20 +95,19 @@ export default function ClientExterneApp() {
   const checkStatus = async (pos, profil) => {
     try {
       const user = await base44.auth.me();
-      const coursesClient = await base44.entities.CourseExterne.filter({ created_by_id: user.id });
+      const coursesClient = await base44.entities.CourseExterne.filter({ created_by_id: user.id }, "-created_date", 20);
       const actives = (coursesClient || []).filter(c => !["livree", "annulee"].includes(c.statut));
 
       let activesDestinataire = [];
       if (profil?.id) {
-        const coursesDestinataire = await base44.entities.CourseExterne.filter({ destinataire_client_id: profil.id });
-        activesDestinataire = (coursesDestinataire || []).filter(c =>
-          !["livree", "annulee"].includes(c.statut) && c.type_course === "expedier"
-        );
+        const coursesDestinataire = await base44.entities.CourseExterne.filter({ destinataire_client_id: profil.id }, "-created_date", 20);
+        activesDestinataire = (coursesDestinataire || []).filter(c => !["livree", "annulee"].includes(c.statut));
       }
 
       // Fusionner sans doublons par id
-      const toutes = [...actives];
-      activesDestinataire.forEach(c => { if (!toutes.find(x => x.id === c.id)) toutes.push(c); });
+      const map = new Map();
+      [...actives, ...activesDestinataire].forEach(c => map.set(c.id, c));
+      const toutes = [...map.values()];
       setCoursesActives(toutes);
 
       const userNotifications = await base44.entities.Notification.filter({ destinataire_email: user.email, lue: false });

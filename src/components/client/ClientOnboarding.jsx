@@ -112,16 +112,33 @@ function EtapeProfil({ clientProfil, onSuccess }) {
           nom: nom.trim(),
           prenom: prenom.trim(),
           telephone: telNormalise,
+          actif: true,
         });
       } else {
         const user = await base44.auth.me();
-        updated = await base44.entities.ClientExterne.create({
-          nom: nom.trim(),
-          prenom: prenom.trim(),
-          telephone: telNormalise,
-          user_email: user?.email || "",
-          actif: true,
-        });
+        // Vérifier s'il n'existe pas déjà un profil avec ce téléphone
+        let existing = null;
+        try {
+          const found = await base44.entities.ClientExterne.filter({ telephone: telNormalise });
+          if (found?.length > 0) existing = found[0];
+        } catch (_) {}
+        if (existing) {
+          updated = await base44.entities.ClientExterne.update(existing.id, {
+            nom: nom.trim(),
+            prenom: prenom.trim(),
+            telephone: telNormalise,
+            user_email: user?.email || "",
+            actif: true,
+          });
+        } else {
+          updated = await base44.entities.ClientExterne.create({
+            nom: nom.trim(),
+            prenom: prenom.trim(),
+            telephone: telNormalise,
+            user_email: user?.email || "",
+            actif: true,
+          });
+        }
       }
       // Marquer en localStorage aussi
       try { localStorage.setItem("client_profil_complet", "true"); } catch (_) {}
