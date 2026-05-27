@@ -45,14 +45,44 @@ export default function ClientExterneApp() {
     loadProfil();
   }, []);
 
-  // Polling automatique des courses actives toutes les 5s
+  // Polling automatique des courses actives toutes les 5s + synchronisation GPS destinataire
   useEffect(() => {
-    if (!onboardingDone || !clientProfil) return;
+    if (!onboardingDone || !clientProfil || !position) return;
     const interval = setInterval(() => {
       checkStatus(position, clientProfil);
+      syncGpsDestinataire(position, clientProfil);
     }, 5000);
     return () => clearInterval(interval);
   }, [onboardingDone, clientProfil?.id, position]);
+
+  // Synchroniser le GPS du destinataire vers les courses où il est notifié
+  const syncGpsDestinataire = async (pos, profil) => {
+    try {
+      if (!pos?.latitude || !pos?.longitude || !profil?.id) return;
+      const user = await base44.auth.me();
+      // Trouver les courses où ce client est destinataire (recevoir) et qui sont en cours
+      const courses = await base44.entities.CourseExterne.filter({
+        destinataire_client_id: profil.id,
+        statut: ["nouvelle", "recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison"]
+      });
+      // Mettre à jour uniquement si GPS différent ou absent
+      for (const course of (courses || [])) {
+        const needsUpdate = 
+          !course.gps_arrivee_lat || 
+          !course.gps_arrivee_lng ||
+          Math.abs(course.gps_arrivee_lat - pos.latitude) > 0.001 ||
+          Math.abs(course.gps_arrivee_lng - pos.longitude) > 0.001;
+        if (needsUpdate) {
+          await base44.entities.CourseExterne.update(course.id, {
+            gps_arrivee_lat: pos.latitude,
+            gps_arrivee_lng: pos.longitude
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Erreur sync GPS destinataire:", err);
+    }
+  };
 
   const loadProfil = async () => {
     try {
