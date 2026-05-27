@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
-  Package, TrendingUp, Menu, X, LogOut
+  Package, TrendingUp, Menu, X, LogOut, Wallet
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,7 @@ const allNavItems = [
   { path: "/livreurs", label: "Livreurs", icon: Truck },
   { path: "/rapport", label: "Rapport du jour", icon: BarChart3 },
   { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp },
+  { path: "/admin/externe/dus-livreurs", label: "Comptabilité", icon: Wallet },
   { path: "/notifications", label: "Notifications", icon: Bell },
 ];
 

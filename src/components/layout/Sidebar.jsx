@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
-  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut
+  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,7 @@ export const navItems = [
   { path: "/livreurs", label: "Livreurs", icon: Truck },
   { path: "/rapport", label: "Rapport du jour", icon: BarChart3 },
   { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp },
+  { path: "/admin/externe/dus-livreurs", label: "Comptabilité", icon: Wallet },
   { path: "/notifications", label: "Notifications", icon: Bell },
 ];
 
