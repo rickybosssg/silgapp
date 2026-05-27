@@ -14,6 +14,7 @@ import {
   XCircle, Package, Banknote, Star, Clock, AlertTriangle, Plus
 } from "lucide-react";
 import CreateLivreurDialog from "@/components/livreurs/CreateLivreurDialog";
+import NotationLivreurPanel from "@/components/admin/NotationLivreurPanel";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -59,14 +60,28 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
         {/* Header */}
         <div className="bg-gradient-to-r from-primary/10 to-accent/10 p-5 flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-14 h-14 rounded-2xl bg-primary/20 flex items-center justify-center text-xl font-bold text-primary">
-              {nomComplet.charAt(0).toUpperCase()}
-            </div>
+            {livreur.photo_url ? (
+              <img
+                src={livreur.photo_url}
+                alt={nomComplet}
+                className="w-14 h-14 rounded-2xl object-cover border-2 border-white shadow-md"
+              />
+            ) : (
+              <div className="w-14 h-14 rounded-2xl bg-primary/20 flex items-center justify-center text-xl font-bold text-primary">
+                {nomComplet.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div>
               <p className="font-bold text-lg text-foreground">{nomComplet}</p>
-              <div className="flex gap-1.5 mt-1 flex-wrap">
+              <div className="flex gap-1.5 mt-1 flex-wrap items-center">
                 <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${sb.color}`}>{sb.label}</span>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${vb.color}`}>{vb.label}</span>
+                {livreur.note_moyenne > 0 && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 font-medium flex items-center gap-0.5">
+                    <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                    {livreur.note_moyenne.toFixed(1)}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -139,6 +154,14 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
                 {resteAPayerSilga.toLocaleString()} FCFA
               </span>
             </div>
+          </div>
+
+          {/* Notation */}
+          <div>
+            <p className="text-sm font-bold text-foreground mb-2 flex items-center gap-2">
+              <Star className="w-4 h-4 text-yellow-500" /> Réputation
+            </p>
+            <NotationLivreurPanel livreur={livreur} courses={courses} />
           </div>
 
           {/* Courses récentes */}
@@ -459,12 +482,20 @@ export default function LivreursExternes() {
                       )}
                     </div>
 
-                    {montantDu > 0 && (
-                      <div className="inline-flex items-center gap-1 text-[11px] text-orange-700 bg-orange-50 border border-orange-200 rounded-full px-2 py-0.5">
-                        <Banknote className="w-3 h-3" />
-                        Dû Silga: {montantDu.toLocaleString()} FCFA
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {montantDu > 0 && (
+                        <div className="inline-flex items-center gap-1 text-[11px] text-orange-700 bg-orange-50 border border-orange-200 rounded-full px-2 py-0.5">
+                          <Banknote className="w-3 h-3" />
+                          Dû Silga: {montantDu.toLocaleString()} FCFA
+                        </div>
+                      )}
+                      {livreur.note_moyenne > 0 && (
+                        <div className="inline-flex items-center gap-1 text-[11px] text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-full px-2 py-0.5">
+                          <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                          {livreur.note_moyenne.toFixed(1)} ({livreur.nombre_avis || 0} avis)
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Actions rapides */}

@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Phone, Package, CheckCircle2, Clock, User, Star, XCircle, ArrowLeft, Share2, Download } from "lucide-react";
+import LivreurAssigneCard from "@/components/client/LivreurAssigneCard";
 
 // Deep link WhatsApp natif avec fallback navigateur
 function openWhatsApp(phone, message = "") {
@@ -72,7 +73,29 @@ export default function ClientSuiviCourse() {
       // Fusionner sans doublons
       const map = new Map();
       [...(byCreator || []), ...(byDest || [])].forEach(c => map.set(c.id, c));
-      return [...map.values()].sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+      const courses = [...map.values()].sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+
+      // Enrichir avec note_moyenne + nombre_avis du livreur
+      const livreurIds = [...new Set(courses.filter(c => c.livreur_id).map(c => c.livreur_id))];
+      if (livreurIds.length > 0) {
+        const livreursData = await Promise.all(
+          livreurIds.map(id => base44.entities.Livreur.filter({ id }).then(r => r?.[0]).catch(() => null))
+        );
+        const livreurMap = {};
+        livreursData.forEach(l => { if (l) livreurMap[l.id] = l; });
+        return courses.map(c => {
+          if (!c.livreur_id || !livreurMap[c.livreur_id]) return c;
+          const l = livreurMap[c.livreur_id];
+          return {
+            ...c,
+            livreur_photo_url: c.livreur_photo_url || l.photo_url || null,
+            livreur_note_moyenne: l.note_moyenne || 0,
+            livreur_nombre_avis: l.nombre_avis || 0,
+            livreur_vehicule: c.livreur_vehicule || l.vehicule || l.type_vehicule || null,
+          };
+        });
+      }
+      return courses;
     },
     enabled: !!userId,
     initialData: [],
@@ -222,35 +245,9 @@ export default function ClientSuiviCourse() {
           )}
         </Card>
 
-        {/* Infos livreur */}
+        {/* Infos livreur — Card style Uber dès acceptation */}
         {maCourse.livreur_id && (
-          <Card className="p-4">
-            <div className="flex items-start gap-3">
-              {maCourse.livreur_photo_url ? (
-                <img src={maCourse.livreur_photo_url} alt={maCourse.livreur_nom} className="w-14 h-14 rounded-full object-cover border-2 border-primary" />
-              ) : (
-                <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
-                  <User className="w-7 h-7 text-primary" />
-                </div>
-              )}
-              <div className="flex-1">
-                <p className="font-bold text-foreground">{maCourse.livreur_nom}</p>
-                <p className="text-xs text-muted-foreground">{maCourse.livreur_telephone}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <a href={`tel:${maCourse.livreur_telephone}`} className="flex items-center gap-1 text-xs text-primary hover:underline">
-                    <Phone className="w-3 h-3" />
-                    Appeler
-                  </a>
-                  <button
-                    onClick={() => openWhatsApp(maCourse.livreur_telephone)}
-                    className="flex items-center gap-1 text-xs text-green-600 hover:underline"
-                  >
-                    WhatsApp
-                  </button>
-                </div>
-              </div>
-            </div>
-          </Card>
+          <LivreurAssigneCard course={maCourse} />
         )}
 
         {/* Trajet */}

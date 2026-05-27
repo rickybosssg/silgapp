@@ -163,6 +163,16 @@
       "type": "string",
       "description": "Type de v\u00e9hicule du livreur"
     },
+    "livreur_note_moyenne": {
+      "type": "number",
+      "default": 0,
+      "description": "Note moyenne du livreur au moment de l'acceptation"
+    },
+    "livreur_nombre_avis": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre d'avis du livreur au moment de l'acceptation"
+    },
     "notes": {
       "type": "string",
       "description": "Notes suppl\u00e9mentaires"
@@ -223,11 +233,11 @@
       "type": "number",
       "minimum": 1,
       "maximum": 5,
-      "description": "Note donn\u00e9e par le client (1 \u00e0 5 \u00e9toiles)"
+      "description": "Note officielle donn\u00e9e par l'exp\u00e9diteur (1 \u00e0 5 \u00e9toiles)"
     },
     "commentaire_livreur": {
       "type": "string",
-      "description": "Commentaire laiss\u00e9 par le client"
+      "description": "Commentaire laiss\u00e9 par l'exp\u00e9diteur"
     },
     "note_date": {
       "type": "string",

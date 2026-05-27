@@ -222,6 +222,11 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
                               Dû Silga: {course.commission_silga.toLocaleString()} F (30%)
                             </span>
                           ) : null}
+                          {course.note_livreur > 0 && (
+                            <span className="text-xs text-yellow-700 bg-yellow-50 rounded px-2 py-0.5 flex items-center gap-0.5">
+                              {"⭐".repeat(course.note_livreur)}
+                            </span>
+                          )}
                         </div>
                       ) : (
                         course.prix_reel && (

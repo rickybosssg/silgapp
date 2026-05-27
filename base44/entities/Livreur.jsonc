@@ -169,6 +169,16 @@
       "type": "number",
       "default": 0,
       "description": "Montant total d\u00fb \u00e0 Silga (commission 30% cumul\u00e9e)"
+    },
+    "note_moyenne": {
+      "type": "number",
+      "default": 0,
+      "description": "Note moyenne calcul\u00e9e automatiquement (1-5 \u00e9toiles)"
+    },
+    "nombre_avis": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre total d'\u00e9valuations re\u00e7ues"
     }
   },
   "required": [

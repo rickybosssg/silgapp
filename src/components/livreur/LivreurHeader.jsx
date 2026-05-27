@@ -94,6 +94,13 @@ export default function LivreurHeader({
               {new Date().getHours() < 12 ? "Bonjour" : new Date().getHours() < 18 ? "Bonne journée" : "Bonsoir"} 👋
             </p>
             <p className="text-base font-bold truncate">{prenom}</p>
+            {livreur.note_moyenne > 0 && (
+              <div className="flex items-center gap-1 mt-0.5">
+                <span className="text-yellow-300 text-xs">{"⭐"}</span>
+                <span className="text-xs text-white/70 font-semibold">{livreur.note_moyenne.toFixed(1)}</span>
+                <span className="text-xs text-white/40">({livreur.nombre_avis || 0} avis)</span>
+              </div>
+            )}
             <p className="text-xs text-white/40">{livreur.telephone}</p>
           </div>
 
