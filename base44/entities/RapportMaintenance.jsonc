@@ -1,0 +1,73 @@
+{
+  "name": "RapportMaintenance",
+  "type": "object",
+  "properties": {
+    "date_scan": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date et heure du scan"
+    },
+    "declenchement": {
+      "type": "string",
+      "enum": [
+        "automatique",
+        "manuel"
+      ],
+      "default": "automatique",
+      "description": "Mode de d\u00e9clenchement"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "en_cours",
+        "termine",
+        "erreur"
+      ],
+      "default": "en_cours",
+      "description": "Statut du rapport"
+    },
+    "bugs_trouves": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre total de probl\u00e8mes d\u00e9tect\u00e9s"
+    },
+    "corrections_appliquees": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de corrections automatiques r\u00e9ussies"
+    },
+    "elements_non_corriges": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre d'\u00e9l\u00e9ments n\u00e9cessitant intervention admin"
+    },
+    "erreurs_critiques": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre d'erreurs critiques d\u00e9tect\u00e9es"
+    },
+    "details_bugs": {
+      "type": "string",
+      "description": "JSON stringifi\u00e9 des bugs d\u00e9tect\u00e9s par cat\u00e9gorie"
+    },
+    "details_corrections": {
+      "type": "string",
+      "description": "JSON stringifi\u00e9 des corrections appliqu\u00e9es"
+    },
+    "actions_recommandees": {
+      "type": "string",
+      "description": "JSON stringifi\u00e9 des actions manuelles recommand\u00e9es \u00e0 l'admin"
+    },
+    "duree_secondes": {
+      "type": "number",
+      "description": "Dur\u00e9e du scan en secondes"
+    },
+    "resume": {
+      "type": "string",
+      "description": "R\u00e9sum\u00e9 texte du rapport"
+    }
+  },
+  "required": [
+    "date_scan"
+  ]
+}

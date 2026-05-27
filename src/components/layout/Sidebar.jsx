@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
-  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet
+  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,7 @@ export const navItems = [
   { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp },
   { path: "/admin/externe/dus-livreurs", label: "Comptabilité", icon: Wallet },
   { path: "/notifications", label: "Notifications", icon: Bell },
+  { path: "/maintenance", label: "Maintenance", icon: Shield },
 ];
 
 export default function Sidebar({ notificationCount = 0 }) {
