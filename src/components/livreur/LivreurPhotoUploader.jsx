@@ -171,17 +171,20 @@ export default function LivreurPhotoUploader({
 
   return (
     <div className="relative inline-group">
-      {/* Photo ou initiales */}
+      {/* Photo ou initiales - CLIQUABLE pour uploader */}
       {previewUrl ? (
         <img
           src={previewUrl}
           alt={nomComplet || "Photo livreur"}
-          className={`${sizeClass} rounded-full object-cover border-2 border-white shadow-md`}
+          className={`${sizeClass} rounded-full object-cover border-2 border-white shadow-md cursor-pointer`}
           onError={() => setPreviewUrl(null)}
+          onClick={canEdit ? () => fileInputRef.current?.click() : undefined}
         />
       ) : (
         <div
-          className={`${sizeClass} rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary border-2 border-white shadow-md`}
+          className={`${sizeClass} rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary border-2 border-white shadow-md ${canEdit ? 'cursor-pointer hover:bg-primary/30 transition-colors' : ''}`}
+          onClick={canEdit ? () => fileInputRef.current?.click() : undefined}
+          title={canEdit ? "Cliquez pour ajouter une photo" : ""}
         >
           {getInitials()}
         </div>
@@ -190,12 +193,12 @@ export default function LivreurPhotoUploader({
       {/* Boutons d'édition (seulement si canEdit) */}
       {canEdit && (
         <>
-          {/* Bouton caméra overlay - visible au hover */}
+          {/* Bouton caméra overlay - toujours visible sur mobile, hover sur desktop */}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity cursor-pointer"
+            className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 active:opacity-100 transition-opacity cursor-pointer"
             title={uploading ? "Envoi en cours..." : "Modifier la photo"}
           >
             {uploading ? (
