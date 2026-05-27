@@ -303,10 +303,15 @@ export default function ClientSuiviCourse() {
         )}
 
         {/* ETA temps réel — destinataire : vers livraison uniquement (après récupération) */}
-        {["colis_recupere", "en_livraison"].includes(maCourse.statut) && maCourse.livreur_id && !isClientPrincipalForETA(maCourse, userId, clientProfilId) && (
+        {/* Affiché si : livreur assigné + statut en_livraison + (destinataire OU non-principal) */}
+        {maCourse.statut === "en_livraison" && maCourse.livreur_id && maCourse.gps_arrivee_lat && maCourse.gps_arrivee_lng && (
           (() => {
             const livreurLat = maCourse._livreur?.latitude;
             const livreurLng = maCourse._livreur?.longitude;
+            // Afficher si c'est le destinataire (type_course=expedier) ou si non-principal
+            const isDestinataire = maCourse.type_course === "expedier" && maCourse.destinataire_client_id === clientProfilId;
+            const shouldShow = isDestinataire || !isClientPrincipalForETA(maCourse, userId, clientProfilId);
+            if (!shouldShow || !livreurLat || !livreurLng) return null;
             return (
               <ETADisplay
                 livreurLat={livreurLat}
