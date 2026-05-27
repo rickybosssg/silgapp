@@ -356,7 +356,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
           {/* Prix */}
           {isExterne ? (
-            course.prix_estimate && (
+            course.prix_estimate > 0 && (
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs text-blue-700 font-semibold">Prix estimé</span>
@@ -374,7 +374,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               </div>
             )
           ) : (
-            course.prix && (
+            course.prix > 0 && (
               <div className="flex items-center justify-between px-1">
                 <span className="text-gray-500 text-sm">Prix estimé</span>
                 <span className="text-xl font-black text-gray-900">{course.prix.toLocaleString()} <span className="text-sm font-semibold text-gray-400">FCFA</span></span>
@@ -512,10 +512,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           )}
 
           {colisLivre && (() => {
-            const dist = Number(course.distance_reelle_km || 0);
-            const prix = Number(course.prix_final || (dist > 0 ? Math.round(dist * 100) : 0));
-            const gain = Number(course.montant_livreur > 0 ? course.montant_livreur : Math.round(prix * 0.7));
-            const commission = Number(course.commission_silga > 0 ? course.commission_silga : Math.round(prix * 0.3));
+            const dist = Number(course.distance_reelle_km) > 0 ? Number(course.distance_reelle_km) : null;
+            const prix = Number(course.prix_final) > 0 ? Number(course.prix_final) : (dist ? Math.round(dist * 100) : null);
+            const gain = Number(course.montant_livreur) > 0 ? Number(course.montant_livreur) : (prix ? Math.round(prix * 0.7) : null);
+            const commission = Number(course.commission_silga) > 0 ? Number(course.commission_silga) : (prix ? Math.round(prix * 0.3) : null);
             return (
               <div className="py-4 bg-green-50 rounded-2xl border border-green-200 space-y-3 px-4">
                 <div className="text-center">
@@ -524,7 +524,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 </div>
                 {isExterne ? (
                   <div className="grid grid-cols-3 gap-2">
-                    {dist > 0 && (
+                    {dist !== null && (
                       <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
                         <p className="text-[10px] text-gray-400 font-semibold uppercase">Distance</p>
                         <p className="text-sm font-black text-gray-800">{dist.toFixed(1)} km</p>
@@ -533,13 +533,13 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
                       <p className="text-[10px] text-gray-400 font-semibold uppercase">Prix final</p>
                       <p className="text-sm font-black text-blue-700">
-                        {prix > 0 ? `${prix.toLocaleString()} F` : "—"}
+                        {prix !== null ? `${prix.toLocaleString()} F` : "—"}
                       </p>
                     </div>
                     <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
                       <p className="text-[10px] text-gray-400 font-semibold uppercase">Ton gain</p>
                       <p className="text-sm font-black text-green-700">
-                        {gain > 0 ? `+${gain.toLocaleString()} F` : "—"}
+                        {gain !== null ? `+${gain.toLocaleString()} F` : "—"}
                       </p>
                     </div>
                   </div>
@@ -550,7 +550,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     </p>
                   )
                 )}
-                {isExterne && commission > 0 && (
+                {isExterne && commission !== null && (
                   <p className="text-center text-xs text-gray-400">
                     Commission Silga : {commission.toLocaleString()} F (30%)
                   </p>
