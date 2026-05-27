@@ -1,21 +1,29 @@
-import React from "react";
+import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
-import { MapPin, Truck, AlertCircle } from "lucide-react";
+import { MapPin, Truck, AlertCircle, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import ModernMap from "@/components/client/ModernMap";
 
 export default function CarteLivreursExterne() {
+  const [showMap, setShowMap] = useState(false);
+  
   const { data: livreurs = [] } = useQuery({
     queryKey: ["livreurs-externes"],
-    queryFn: () => base44.entities.Livreur.filter({ reseau: "externe" }),
+    queryFn: () => base44.entities.Livreur.filter({ reseau: "externe", statut: ["disponible", "en_course"], app_active: true }),
     initialData: [],
     refetchInterval: 15000,
   });
 
   const enLigne = livreurs.filter(l => l.statut !== "hors_ligne" && l.app_active === true);
+  
+  // Position centrale (Ouagadougou) si pas de livreurs
+  const centerPosition = enLigne.length > 0 && enLigne[0].latitude && enLigne[0].longitude
+    ? { latitude: enLigne[0].latitude, longitude: enLigne[0].longitude }
+    : { latitude: 12.3714, longitude: -1.5197 }; // Ouagadougou
 
   return (
     <div className="p-4 space-y-4 max-w-4xl mx-auto">
@@ -32,9 +40,23 @@ export default function CarteLivreursExterne() {
         </div>
       </div>
 
+      {/* Bouton pour ouvrir la carte */}
+      <Card className="p-4 cursor-pointer hover:shadow-lg transition-all" onClick={() => setShowMap(true)}>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
+            <MapPin className="w-5 h-5 text-accent" />
+          </div>
+          <div className="flex-1">
+            <p className="font-semibold text-foreground">🗺️ Voir la carte interactive</p>
+            <p className="text-xs text-muted-foreground">{enLigne.length} livreurs en ligne</p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Liste des livreurs */}
       <Card className="p-6">
         <div className="flex items-center gap-3 mb-4">
-          <MapPin className="w-5 h-5 text-accent" />
+          <Truck className="w-5 h-5 text-accent" />
           <h2 className="font-semibold">Livreurs Externes Actifs</h2>
         </div>
 
@@ -63,13 +85,24 @@ export default function CarteLivreursExterne() {
         )}
       </Card>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-        <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-        <div>
-          <p className="text-sm font-semibold text-blue-900">Carte interactive à venir</p>
-          <p className="text-xs text-blue-700 mt-1">La carte Google Maps sera ajoutée prochainement pour voir la position en temps réel des livreurs externes.</p>
+      {/* Modale carte interactive */}
+      {showMap && (
+        <div className="fixed inset-0 z-50 bg-background">
+          <div className="flex items-center justify-between p-4 border-b bg-card">
+            <h2 className="text-lg font-bold text-foreground">Carte - Livreurs Externes</h2>
+            <Button variant="ghost" size="icon" onClick={() => setShowMap(false)} className="h-10 w-10">
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
+          <div className="h-[calc(100vh-80px)]">
+            <ModernMap
+              position={centerPosition}
+              livreursProches={enLigne}
+              courseActive={null}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
