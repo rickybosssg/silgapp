@@ -23,24 +23,26 @@ export default function Dashboard() {
 
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ["courses"],
-    queryFn: () => base44.entities.Course.filter({ reseau: "interne" }, "-created_date", 300),
+    queryFn: () => base44.entities.Course.filter({ reseau: "interne" }, "-created_date", 500),
     initialData: [],
-    refetchInterval: 10000,
+    refetchInterval: 5000,
   });
 
   const { data: livreurs = [] } = useQuery({
     queryKey: ["livreurs"],
     queryFn: () => base44.entities.Livreur.filter({ type_livreur: "interne" }),
     initialData: [],
-    refetchInterval: 15000,
+    refetchInterval: 5000,
   });
 
-  const todayCourses = useMemo(
-    () => courses.filter(c => isToday(new Date(c.created_date))),
-    [courses]
-  );
+  // Courses du jour = créées aujourd'hui OU encore actives (pas terminées)
+  const todayCourses = useMemo(() => {
+    return courses.filter(c =>
+      isToday(new Date(c.created_date)) || !["livree", "annulee"].includes(c.statut)
+    );
+  }, [courses]);
 
-  // Courses à dispatcher : statut "nouvelle" et pas encore assignées/lancées en auto
+  // Courses à dispatcher : statut "nouvelle" sans livreur assigné
   const coursesADispatcher = useMemo(
     () => todayCourses.filter(c =>
       c.statut === "nouvelle" &&
@@ -49,32 +51,46 @@ export default function Dashboard() {
     [todayCourses]
   );
 
-  // Courses en traitement : assignées (manuellement ou auto) et pas encore terminées
+  // Courses en traitement : tout ce qui est actif (pas nouvelle sans livreur, pas terminé)
   const coursesEnTraitement = useMemo(
     () => todayCourses.filter(c =>
       !["livree", "annulee"].includes(c.statut) &&
-      (c.statut !== "nouvelle" || (c.dispatch_status && !["en_attente_admin", "expire"].includes(c.dispatch_status))) &&
-      !(c.statut === "nouvelle" && (!c.dispatch_status || c.dispatch_status === "en_attente_admin" || c.dispatch_status === "expire"))
+      !(c.statut === "nouvelle" && (!c.dispatch_status || ["en_attente_admin", "expire"].includes(c.dispatch_status)))
     ),
     [todayCourses]
   );
 
-  // Courses terminées
+  // Courses terminées aujourd'hui
   const coursesTerminees = useMemo(
-    () => todayCourses.filter(c => ["livree", "annulee"].includes(c.statut)),
-    [todayCourses]
+    () => courses.filter(c =>
+      ["livree", "annulee"].includes(c.statut) &&
+      isToday(new Date(c.heure_livraison || c.updated_date || c.created_date))
+    ),
+    [courses]
+  );
+
+  // Livreurs en ligne = disponible ou en_course, validés et actifs
+  const livreursEnLigne = useMemo(
+    () => livreurs.filter(l =>
+      l.statut !== "hors_ligne" &&
+      l.validation === "valide" &&
+      l.actif !== false
+    ),
+    [livreurs]
   );
 
   const stats = useMemo(() => {
-    const total = todayCourses.length;
-    const livrees = coursesTerminees.filter(c => c.statut === "livree").length;
-    const annulees = coursesTerminees.filter(c => c.statut === "annulee").length;
+    const todayAll = courses.filter(c => isToday(new Date(c.created_date)));
+    const total = todayAll.length;
+    const livrees = courses.filter(c => c.statut === "livree" && isToday(new Date(c.heure_livraison || c.updated_date || c.created_date))).length;
+    const annulees = todayAll.filter(c => c.statut === "annulee").length;
     const enCours = coursesEnTraitement.length;
     const aDispatcher = coursesADispatcher.length;
-    const ca = coursesTerminees.filter(c => c.statut === "livree").reduce((s, c) => s + (c.prix_reel || c.prix || 0), 0);
-    const dispoLivreurs = livreurs.filter(l => l.statut === "disponible" && l.validation === "valide" && l.actif !== false).length;
+    const ca = courses.filter(c => c.statut === "livree" && isToday(new Date(c.heure_livraison || c.updated_date || c.created_date)))
+      .reduce((s, c) => s + (c.prix_reel || c.prix || 0), 0);
+    const dispoLivreurs = livreursEnLigne.filter(l => l.statut === "disponible").length;
     return { total, livrees, annulees, enCours, aDispatcher, ca, dispoLivreurs };
-  }, [todayCourses, coursesADispatcher, coursesEnTraitement, coursesTerminees, livreurs]);
+  }, [courses, coursesADispatcher, coursesEnTraitement, livreursEnLigne]);
 
   return (
     <div className="px-4 py-4 lg:p-6 space-y-4 lg:space-y-5 max-w-7xl mx-auto">
@@ -126,7 +142,7 @@ export default function Dashboard() {
       </div>
 
       {/* Livreurs en ligne */}
-      <LivreursEnLigne livreurs={livreurs} />
+      <LivreursEnLigne livreurs={livreursEnLigne} />
 
       {/* Courses à dispatcher */}
       <CoursesADispatcher

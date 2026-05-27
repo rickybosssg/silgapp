@@ -25,11 +25,11 @@ function CourseItem({ course, onView }) {
         </div>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
-        {course.prix_reel && (
-          <span className="text-xs font-bold text-green-700">{course.prix_reel.toLocaleString()} F</span>
+        {(course.prix_reel || course.prix) > 0 && (
+          <span className="text-xs font-bold text-green-700">{(course.prix_reel || course.prix).toLocaleString()} F</span>
         )}
         <span className="text-[10px] text-muted-foreground">
-          {format(new Date(course.created_date), "HH:mm")}
+          {format(new Date(course.heure_livraison || course.updated_date || course.created_date), "HH:mm")}
         </span>
         <Button size="sm" variant="ghost" className="text-xs h-6 px-2" onClick={() => onView(course)}>
           ↗

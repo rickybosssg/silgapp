@@ -5,7 +5,6 @@ import { MapPin, Phone, Clock, User, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import CourseStatusBadge from "@/components/courses/CourseStatusBadge";
-import DispatchStatusBadge from "@/components/courses/DispatchStatusBadge";
 import UrgenceBadge from "@/components/courses/UrgenceBadge";
 
 const STATUT_LABELS = {
@@ -38,11 +37,15 @@ function CourseItem({ course, onView }) {
 
           <div className="flex items-center gap-2 flex-wrap">
             <CourseStatusBadge statut={course.statut} />
-            <DispatchStatusBadge status={course.dispatch_status || "en_attente_admin"} />
             {course.livreur_nom && (
-              <span className="text-xs text-muted-foreground">→ {course.livreur_nom}</span>
+              <span className="text-xs font-medium text-foreground">🚴 {course.livreur_nom}</span>
             )}
-            <span className="text-[10px] text-muted-foreground flex items-center gap-1 ml-auto">
+            {(course.prix_reel || course.prix) > 0 && (
+              <span className="text-xs font-bold text-green-700 ml-auto">
+                {(course.prix_reel || course.prix).toLocaleString()} F
+              </span>
+            )}
+            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
               <Clock className="w-3 h-3" />
               {format(new Date(course.created_date), "HH:mm", { locale: fr })}
             </span>
@@ -72,8 +75,10 @@ export default function CoursesEnTraitement({ courses, onView }) {
       </div>
       <div className="p-3 space-y-2 max-h-[400px] overflow-y-auto">
         {courses.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground text-sm">
-            Aucune course en traitement
+          <div className="text-center py-8 space-y-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-blue-300 mx-auto" />
+            <p className="text-muted-foreground text-sm">Aucune course en traitement</p>
+            <p className="text-xs text-muted-foreground">Les courses assignées apparaîtront ici</p>
           </div>
         ) : (
           courses.map(c => (
