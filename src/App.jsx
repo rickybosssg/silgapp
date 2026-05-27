@@ -34,6 +34,7 @@ const DusLivreursExternes = lazy(() => import('./pages/DusLivreursExternes.jsx')
 const PublicSuiviCourse = lazy(() => import('./pages/PublicSuiviCourse.jsx'));
 const TelechargerApp = lazy(() => import('./pages/TelechargerApp.jsx'));
 const Maintenance = lazy(() => import('./pages/Maintenance.jsx'));
+const TestBoutEnBout = lazy(() => import('./pages/TestBoutEnBout.jsx'));
 
 const LoadingScreen = () => (
   <div className="fixed inset-0 flex items-center justify-center bg-background">
@@ -151,6 +152,7 @@ function App() {
             )}
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/maintenance" element={<Maintenance />} />
+            <Route path="/test-bout-en-bout" element={<TestBoutEnBout />} />
           </Route>
           <Route path="*" element={<PageNotFound />} />
         </Routes>
