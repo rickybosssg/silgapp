@@ -45,6 +45,7 @@ export default function TestTerrainComplet() {
   };
 
   const startTest = async () => {
+    console.log("🚀 [TEST] Démarrage du test terrain");
     setTestState("running");
     setLogs([]);
     setScreenshots([]);
@@ -58,10 +59,13 @@ export default function TestTerrainComplet() {
       // ─── ÉTAPE 1 : VÉRIFICATION PRÉALABLE ──────────────────────────────────
       setCurrentStep(1);
       addLog("ÉTAPE 1", "Vérification préalable des entités");
+      console.log("[TEST] Étape 1 - Vérification entités");
       
       const users = await base44.entities.User.list();
       const livreurs = await base44.entities.Livreur.filter({ type_livreur: "externe", app_active: true });
       const clients = await base44.entities.ClientExterne.filter({ actif: true });
+      
+      console.log("[TEST] Entités trouvées:", { users: users.length, livreurs: livreurs.length, clients: clients.length });
       
       if (users.length < 2) {
         throw new Error("❌ Il faut au moins 2 utilisateurs pour le test");
@@ -80,6 +84,7 @@ export default function TestTerrainComplet() {
       setCurrentStep(2);
       addLog("ÉTAPE 2", "Création course par expéditeur");
       const t0 = Date.now();
+      console.log("[TEST] Étape 2 - Création course");
       
       const course = await base44.entities.CourseExterne.create({
         client_nom: "Test Expéditeur",
@@ -104,6 +109,7 @@ export default function TestTerrainComplet() {
       });
       
       const t1 = Date.now();
+      console.log("[TEST] Course créée:", course.id);
       addLog("ÉTAPE 2", "✅ Course créée", { id: course.id, temps: t1 - t0 }, "success");
       setTestData(prev => ({ ...prev, course, timings: { ...prev.timings, creation: t1 - t0 } }));
       
@@ -111,6 +117,7 @@ export default function TestTerrainComplet() {
       setCurrentStep(3);
       addLog("ÉTAPE 3", "Dispatch automatique");
       const t2 = Date.now();
+      console.log("[TEST] Étape 3 - Dispatch auto");
       
       const dispatchRes = await base44.functions.invoke("dispatchExterneAuto", {
         action: "lancer_recherche_auto",
@@ -118,16 +125,20 @@ export default function TestTerrainComplet() {
       });
       
       const t3 = Date.now();
+      console.log("[TEST] Dispatch lancé:", dispatchRes);
       addLog("ÉTAPE 3", "✅ Dispatch lancé", { temps: t3 - t2, result: dispatchRes }, "success");
       setTestData(prev => ({ ...prev, timings: { ...prev.timings, dispatch: t3 - t2 } }));
       
       // Attendre acceptation (simulée)
+      setCurrentStep(4);
       addLog("ÉTAPE 4", "Attente acceptation livreur (60s max)");
+      console.log("[TEST] Étape 4 - Attente acceptation");
       await waitForLivreurAcceptation(course.id, 60000);
       
       // ─── ÉTAPE 5 : VÉRIFICATION SYNCHRONISATION ───────────────────────────
       setCurrentStep(5);
       addLog("ÉTAPE 5", "Vérification synchronisation temps réel");
+      console.log("[TEST] Étape 5 - Vérification synchro");
       
       const courseMaj = await base44.entities.CourseExterne.get(course.id);
       if (!courseMaj.livreur_id) {
@@ -156,6 +167,7 @@ export default function TestTerrainComplet() {
       // ─── ÉTAPE 10-20 : VÉRIFICATIONS FINALES ─────────────────────────────
       setCurrentStep(10);
       addLog("ÉTAPE 10", "Vérification données finales");
+      console.log("[TEST] Étape 10 - Vérifications finales");
       
       const courseFinale = await base44.entities.CourseExterne.get(course.id);
       const checks = {
@@ -170,6 +182,7 @@ export default function TestTerrainComplet() {
         heureLivr: courseFinale.heure_livraison,
       };
       
+      console.log("[TEST] Vérifications finales:", checks);
       const allPassed = Object.values(checks).every(v => v);
       
       if (allPassed) {
@@ -185,7 +198,8 @@ export default function TestTerrainComplet() {
       setCurrentStep(20);
       
     } catch (error) {
-      addLog("ERROR", "❌ Erreur critique", { error: error.message }, "error");
+      console.error("❌ [TEST] Erreur critique:", error);
+      addLog("ERROR", "❌ Erreur critique", { error: error.message, stack: error.stack }, "error");
       setTestData(prev => ({ ...prev, errors: [...prev.errors, error.message] }));
       setTestState("failed");
     }

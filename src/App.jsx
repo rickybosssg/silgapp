@@ -104,6 +104,12 @@ function App() {
       <Router>
         <Suspense fallback={<LoadingScreen />}>
           <Routes>
+            {/* Routes de test accessibles sans sélection de réseau */}
+            <Route path="/test-terrain" element={<TestTerrainComplet />} />
+            <Route path="/test-diagnostics" element={<TestDiagnosticsComplet />} />
+            <Route path="/test-bout-en-bout" element={<TestBoutEnBout />} />
+            <Route path="/maintenance" element={<Maintenance />} />
+            
             <Route
               path="*"
               element={
@@ -153,10 +159,6 @@ function App() {
               </>
             )}
             <Route path="/notifications" element={<Notifications />} />
-            <Route path="/maintenance" element={<Maintenance />} />
-            <Route path="/test-bout-en-bout" element={<TestBoutEnBout />} />
-            <Route path="/test-diagnostics" element={<TestDiagnosticsComplet />} />
-            <Route path="/test-terrain" element={<TestTerrainComplet />} />
           </Route>
           <Route path="*" element={<PageNotFound />} />
         </Routes>
