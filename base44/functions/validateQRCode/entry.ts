@@ -98,11 +98,12 @@ Deno.serve(async (req) => {
         colis_livre_at: now,
       };
 
-      // Calcul prix final — utiliser GPS récupération (latitude_recuperation) OU depart estimé
+      // Calcul prix final — cascade de fallbacks GPS
       const latRecup = course.latitude_recuperation || course.gps_depart_lat;
       const lngRecup = course.longitude_recuperation || course.gps_depart_lng;
-      const latLivr = latitude || course.gps_arrivee_lat;
-      const lngLivr = longitude || course.gps_arrivee_lng;
+      // Priorité : GPS livreur au moment livraison, puis GPS fixe arrivée, puis GPS destinataire
+      const latLivr = latitude || course.gps_arrivee_lat || course.latitude_arrivee_livraison;
+      const lngLivr = longitude || course.gps_arrivee_lng || course.longitude_arrivee_livraison;
 
       if (latRecup && lngRecup && latLivr && lngLivr) {
         const dist = haversine(latRecup, lngRecup, latLivr, lngLivr);
@@ -114,11 +115,23 @@ Deno.serve(async (req) => {
         updateData.prix_final = prixFinal;
         updateData.commission_silga = commission;
         updateData.montant_livreur = montantLivreur;
-        // Sauvegarder la destination finale GPS si destination_inconnue
-        if (course.destination_inconnue && latitude && longitude) {
+        // Sauvegarder la destination finale GPS
+        if (latitude && longitude) {
           updateData.gps_arrivee_lat = latitude;
           updateData.gps_arrivee_lng = longitude;
+          updateData.latitude_arrivee_livraison = latitude;
+          updateData.longitude_arrivee_livraison = longitude;
         }
+      } else if (course.prix_estimate && course.prix_estimate > 0) {
+        // Dernier recours : utiliser le prix estimé si aucun GPS disponible
+        const prixFinal = course.prix_estimate;
+        const distEstimee = prixFinal / 100;
+        const commission = Math.round(prixFinal * 0.3);
+        const montantLivreur = prixFinal - commission;
+        updateData.distance_reelle_km = distEstimee;
+        updateData.prix_final = prixFinal;
+        updateData.commission_silga = commission;
+        updateData.montant_livreur = montantLivreur;
       }
 
       await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);

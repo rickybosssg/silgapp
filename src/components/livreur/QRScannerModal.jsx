@@ -120,17 +120,49 @@ export default function QRScannerModal({ course, type, onSuccess, onClose }) {
     if (verifying) return;
     setVerifying(true);
     try {
+      // Capturer GPS avant validation (critique pour calcul distance)
+      let latitude = null;
+      let longitude = null;
+      if (type === "delivery" || type === "pickup") {
+        try {
+          await new Promise((resolve) => {
+            navigator.geolocation?.getCurrentPosition(
+              (pos) => {
+                latitude = pos.coords.latitude;
+                longitude = pos.coords.longitude;
+                resolve();
+              },
+              () => resolve(), // continuer même sans GPS
+              { enableHighAccuracy: true, timeout: 6000 }
+            );
+          });
+        } catch (_) {}
+      }
+
       const res = await base44.functions.invoke("validateQRCode", {
         course_id: course.id,
         type: type,
         value: value,
-        method: method, // "qr" | "manual_code"
+        method: method,
+        latitude,
+        longitude,
       });
       const data = res?.data;
       if (data?.success) {
         setResult("success");
+        // Enrichir les données course avec les champs calculés du backend
+        const courseData = {
+          ...data.course,
+          prix_final: data.prix_final ?? data.course?.prix_final,
+          distance_reelle_km: data.distance_km ?? data.course?.distance_reelle_km,
+          montant_livreur: data.montant_livreur ?? data.course?.montant_livreur,
+          commission_silga: data.commission_silga ?? data.course?.commission_silga,
+          // GPS livraison pour fallback client
+          latitude_livraison: latitude,
+          longitude_livraison: longitude,
+        };
         setTimeout(() => {
-          onSuccess(data.course || {});
+          onSuccess(courseData);
         }, 1200);
       } else {
         setResult("error");

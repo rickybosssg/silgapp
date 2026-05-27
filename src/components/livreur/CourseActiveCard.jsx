@@ -114,26 +114,54 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   };
 
   // Handler succès scan QR delivery (externe) — livraison confirmée par le backend
-  // courseData contient les champs retournés par validateQRCode (prix_final, distance_km, montant_livreur, etc.)
   const handleQRDeliverySuccess = (courseData) => {
     setShowQRScanner(null);
-    // Fusionner les données du backend avec la course locale
+
+    // Fusionner les données backend avec la course locale — priorité aux données backend
+    let prixFinal = courseData?.prix_final ?? course.prix_final ?? 0;
+    let distanceKm = courseData?.distance_reelle_km ?? course.distance_reelle_km ?? 0;
+    let montantLivreur = courseData?.montant_livreur ?? course.montant_livreur ?? 0;
+    let commissionSilga = courseData?.commission_silga ?? course.commission_silga ?? 0;
+
+    // Fallback local : si le backend n'a pas pu calculer (GPS manquant),
+    // recalculer depuis les points GPS disponibles dans la course
+    if ((!distanceKm || distanceKm <= 0) && course.latitude_recuperation && course.longitude_recuperation) {
+      const latLivr = courseData?.latitude_livraison || course.gps_arrivee_lat;
+      const lngLivr = courseData?.longitude_livraison || course.gps_arrivee_lng;
+      if (latLivr && lngLivr) {
+        const R = 6371;
+        const dLat = ((latLivr - course.latitude_recuperation) * Math.PI) / 180;
+        const dLon = ((lngLivr - course.longitude_recuperation) * Math.PI) / 180;
+        const a = Math.sin(dLat / 2) ** 2 +
+          Math.cos((course.latitude_recuperation * Math.PI) / 180) *
+          Math.cos((latLivr * Math.PI) / 180) *
+          Math.sin(dLon / 2) ** 2;
+        const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        distanceKm = Math.max(dist, 0.5);
+        prixFinal = Math.round(distanceKm * 100);
+        montantLivreur = Math.round(prixFinal * 0.7);
+        commissionSilga = Math.round(prixFinal * 0.3);
+        // Sauvegarder le recalcul en base
+        base44.entities.CourseExterne.update(course.id, {
+          distance_reelle_km: distanceKm,
+          prix_final: prixFinal,
+          montant_livreur: montantLivreur,
+          commission_silga: commissionSilga,
+        }).catch(() => null);
+      }
+    }
+
     const merged = {
       ...course,
+      ...courseData,
       statut: "livree",
-      prix_final: courseData?.prix_final || courseData?.course?.prix_final || course.prix_final,
-      distance_reelle_km: courseData?.distance_km || courseData?.course?.distance_reelle_km || course.distance_reelle_km,
-      montant_livreur: courseData?.montant_livreur || courseData?.course?.montant_livreur || course.montant_livreur,
-      commission_silga: courseData?.commission_silga || courseData?.course?.commission_silga || course.commission_silga,
+      prix_final: prixFinal,
+      distance_reelle_km: distanceKm,
+      montant_livreur: montantLivreur,
+      commission_silga: commissionSilga,
     };
     setCourseLivreeData(merged);
     setShowRecapitulatif(true);
-    // Stocker GPS si disponible
-    navigator.geolocation?.getCurrentPosition(
-      (pos) => setGpsArrivee({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => null,
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
   };
 
   const handleFermerCourse = () => {
@@ -487,47 +515,53 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             </div>
           )}
 
-          {colisLivre && (
-            <div className="py-4 bg-green-50 rounded-2xl border border-green-200 space-y-3 px-4">
-              <div className="text-center">
-                <p className="text-2xl mb-1">🎉</p>
-                <p className="font-black text-green-700 text-base">Course terminée !</p>
-              </div>
-              {isExterne ? (
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
-                    <p className="text-[10px] text-gray-400 font-semibold uppercase">Distance</p>
-                    <p className="text-sm font-black text-gray-800">
-                      {course.distance_reelle_km ? `${Number(course.distance_reelle_km).toFixed(1)} km` : "—"}
-                    </p>
-                  </div>
-                  <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
-                    <p className="text-[10px] text-gray-400 font-semibold uppercase">Prix final</p>
-                    <p className="text-sm font-black text-blue-700">
-                      {course.prix_final ? `${course.prix_final.toLocaleString()} F` : "—"}
-                    </p>
-                  </div>
-                  <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
-                    <p className="text-[10px] text-gray-400 font-semibold uppercase">Ton gain</p>
-                    <p className="text-sm font-black text-green-700">
-                      {course.montant_livreur ? `+${course.montant_livreur.toLocaleString()} F` : "—"}
-                    </p>
-                  </div>
+          {colisLivre && (() => {
+            const dist = Number(course.distance_reelle_km || 0);
+            const prix = Number(course.prix_final || (dist > 0 ? Math.round(dist * 100) : 0));
+            const gain = Number(course.montant_livreur > 0 ? course.montant_livreur : Math.round(prix * 0.7));
+            const commission = Number(course.commission_silga > 0 ? course.commission_silga : Math.round(prix * 0.3));
+            return (
+              <div className="py-4 bg-green-50 rounded-2xl border border-green-200 space-y-3 px-4">
+                <div className="text-center">
+                  <p className="text-2xl mb-1">🎉</p>
+                  <p className="font-black text-green-700 text-base">Course terminée !</p>
                 </div>
-              ) : (
-                course.prix_reel && (
-                  <p className="text-center text-green-600 text-sm font-semibold">
-                    {course.prix_reel.toLocaleString()} FCFA encaissés
+                {isExterne ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
+                      <p className="text-[10px] text-gray-400 font-semibold uppercase">Distance</p>
+                      <p className="text-sm font-black text-gray-800">
+                        {dist > 0 ? `${dist.toFixed(1)} km` : "GPS requis"}
+                      </p>
+                    </div>
+                    <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
+                      <p className="text-[10px] text-gray-400 font-semibold uppercase">Prix final</p>
+                      <p className="text-sm font-black text-blue-700">
+                        {prix > 0 ? `${prix.toLocaleString()} F` : "—"}
+                      </p>
+                    </div>
+                    <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
+                      <p className="text-[10px] text-gray-400 font-semibold uppercase">Ton gain</p>
+                      <p className="text-sm font-black text-green-700">
+                        {gain > 0 ? `+${gain.toLocaleString()} F` : "—"}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  course.prix_reel && (
+                    <p className="text-center text-green-600 text-sm font-semibold">
+                      {course.prix_reel.toLocaleString()} FCFA encaissés
+                    </p>
+                  )
+                )}
+                {isExterne && commission > 0 && (
+                  <p className="text-center text-xs text-gray-400">
+                    Commission Silga : {commission.toLocaleString()} F (30%)
                   </p>
-                )
-              )}
-              {isExterne && course.commission_silga > 0 && (
-                <p className="text-center text-xs text-gray-400">
-                  Commission Silga : {course.commission_silga.toLocaleString()} F (30%)
-                </p>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
     </>

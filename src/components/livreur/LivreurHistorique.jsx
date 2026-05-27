@@ -208,36 +208,48 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
                     {course.statut === "livree" && (
                       isExterne ? (
                         <div className="flex flex-wrap gap-1 mt-1">
-                          {course.distance_reelle_km > 0 && (
-                            <span className="text-xs text-blue-600 bg-blue-50 rounded px-2 py-0.5">
-                              📏 {Number(course.distance_reelle_km).toFixed(1)} km
-                            </span>
-                          )}
-                          {course.heure_livraison && course.heure_acceptation && (
-                            <span className="text-xs text-purple-600 bg-purple-50 rounded px-2 py-0.5">
-                              ⏱ {Math.round((new Date(course.heure_livraison) - new Date(course.heure_acceptation)) / 60000)} min
-                            </span>
-                          )}
-                          {course.prix_final > 0 && (
-                            <span className="text-xs font-semibold text-gray-700 bg-gray-50 rounded px-2 py-0.5">
-                              💰 {course.prix_final.toLocaleString()} F total
-                            </span>
-                          )}
-                          {course.montant_livreur > 0 && (
-                            <span className="text-xs font-bold text-green-700 bg-green-50 rounded px-2 py-0.5">
-                              ✅ +{course.montant_livreur.toLocaleString()} F (70%)
-                            </span>
-                          )}
-                          {course.commission_silga > 0 && (
-                            <span className="text-xs text-orange-600 bg-orange-50 rounded px-2 py-0.5">
-                              Dû Silga: {course.commission_silga.toLocaleString()} F (30%)
-                            </span>
-                          )}
-                          {course.note_livreur > 0 && (
-                            <span className="text-xs text-yellow-700 bg-yellow-50 rounded px-2 py-0.5 flex items-center gap-0.5">
-                              {"⭐".repeat(course.note_livreur)}
-                            </span>
-                          )}
+                          {(() => {
+                            const dist = Number(course.distance_reelle_km || 0);
+                            const prix = Number(course.prix_final || (dist > 0 ? dist * 100 : 0));
+                            const gain = Number(course.montant_livreur > 0 ? course.montant_livreur : Math.round(prix * 0.7));
+                            const commission = Number(course.commission_silga > 0 ? course.commission_silga : Math.round(prix * 0.3));
+                            let dureeMin = null;
+                            if (course.heure_livraison && course.heure_recuperation) {
+                              dureeMin = Math.round((new Date(course.heure_livraison) - new Date(course.heure_recuperation)) / 60000);
+                            }
+                            return <>
+                              {dist > 0 && (
+                                <span className="text-xs text-blue-600 bg-blue-50 rounded px-2 py-0.5">
+                                  📏 {dist.toFixed(1)} km
+                                </span>
+                              )}
+                              {dureeMin !== null && dureeMin > 0 && (
+                                <span className="text-xs text-purple-600 bg-purple-50 rounded px-2 py-0.5">
+                                  ⏱ {dureeMin} min
+                                </span>
+                              )}
+                              {prix > 0 && (
+                                <span className="text-xs font-semibold text-gray-700 bg-gray-50 rounded px-2 py-0.5">
+                                  💰 {prix.toLocaleString()} F
+                                </span>
+                              )}
+                              {gain > 0 && (
+                                <span className="text-xs font-bold text-green-700 bg-green-50 rounded px-2 py-0.5">
+                                  ✅ +{gain.toLocaleString()} F
+                                </span>
+                              )}
+                              {commission > 0 && (
+                                <span className="text-xs text-orange-600 bg-orange-50 rounded px-2 py-0.5">
+                                  Silga: {commission.toLocaleString()} F
+                                </span>
+                              )}
+                              {course.note_livreur > 0 && (
+                                <span className="text-xs text-yellow-700 bg-yellow-50 rounded px-2 py-0.5">
+                                  {"⭐".repeat(course.note_livreur)}
+                                </span>
+                              )}
+                            </>;
+                          })()}
                         </div>
                       ) : (
                         course.prix_reel && (
