@@ -44,7 +44,7 @@ export default function ETADisplay({ livreurLat, livreurLng, targetLat, targetLn
   if (isRecup) {
     message = eta <= 1 ? `${prenom} arrive dans moins d'1 min` : `${prenom} arrive dans environ ${eta} min`;
   } else {
-    message = eta <= 1 ? "Votre colis arrive dans moins d'1 min" : `Votre colis sera livré dans environ ${eta} min`;
+    message = eta <= 1 ? `${prenom} arrive chez vous dans moins d'1 min` : `${prenom} arrive chez vous dans ${eta} min`;
   }
 
   return (

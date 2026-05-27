@@ -159,6 +159,14 @@ export default function ClientSuiviCourse() {
     );
   }
 
+  // Helper : détermine si l'utilisateur est l'expéditeur (client principal) ou le destinataire
+  function isClientPrincipalForETA(course, uid, profilId) {
+    return (
+      (course.type_course === "expedier" && (course.expediteur_client_id === profilId || course.created_by_id === uid)) ||
+      (course.type_course === "recevoir" && (course.destinataire_client_id === profilId || course.created_by_id === uid))
+    );
+  }
+
   const statutLabels = {
     nouvelle: "Nouvelle course",
     recherche_livreur: "Recherche de livreur...",
@@ -272,10 +280,9 @@ export default function ClientSuiviCourse() {
           <LivreurAssigneCard course={maCourse} />
         )}
 
-        {/* ETA temps réel — affiché si livreur a position GPS et course active */}
-        {["livreur_en_route", "colis_recupere", "en_livraison"].includes(maCourse.statut) && maCourse.livreur_id && (
+        {/* ETA temps réel — expéditeur : vers récupération puis vers livraison */}
+        {["livreur_en_route", "colis_recupere", "en_livraison"].includes(maCourse.statut) && maCourse.livreur_id && isClientPrincipalForETA(maCourse, userId, clientProfilId) && (
           (() => {
-            // Position du livreur (depuis les champs Livreur mis à jour en temps réel)
             const livreurLat = maCourse._livreur?.latitude;
             const livreurLng = maCourse._livreur?.longitude;
             const isVersRecup = maCourse.statut === "livreur_en_route";
@@ -289,6 +296,25 @@ export default function ClientSuiviCourse() {
                 targetLng={targetLng}
                 livreurNom={maCourse.livreur_nom}
                 phase={isVersRecup ? "vers_recuperation" : "vers_livraison"}
+                statut={maCourse.statut}
+              />
+            );
+          })()
+        )}
+
+        {/* ETA temps réel — destinataire : vers livraison uniquement (après récupération) */}
+        {["colis_recupere", "en_livraison"].includes(maCourse.statut) && maCourse.livreur_id && !isClientPrincipalForETA(maCourse, userId, clientProfilId) && (
+          (() => {
+            const livreurLat = maCourse._livreur?.latitude;
+            const livreurLng = maCourse._livreur?.longitude;
+            return (
+              <ETADisplay
+                livreurLat={livreurLat}
+                livreurLng={livreurLng}
+                targetLat={maCourse.gps_arrivee_lat}
+                targetLng={maCourse.gps_arrivee_lng}
+                livreurNom={maCourse.livreur_nom}
+                phase="vers_livraison"
                 statut={maCourse.statut}
               />
             );
