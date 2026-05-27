@@ -96,19 +96,35 @@ export default function CreateLivreurDialog({ reseau = "interne" }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    console.log("🔍 Début validation - form:", form);
     
     // Validation stricte
     const errors = [];
-    if (!form.prenom?.trim()) errors.push("Le prénom est obligatoire");
-    if (!form.nom?.trim()) errors.push("Le nom est obligatoire");
-    if (!form.telephone?.trim()) errors.push("Le téléphone est obligatoire");
-    if (!form.user_email?.trim()) errors.push("L'email du compte livreur est obligatoire");
+    if (!form.prenom?.trim()) {
+      errors.push("Le prénom est obligatoire");
+      console.log("❌ Prénom manquant");
+    }
+    if (!form.nom?.trim()) {
+      errors.push("Le nom est obligatoire");
+      console.log("❌ Nom manquant");
+    }
+    if (!form.telephone?.trim()) {
+      errors.push("Le téléphone est obligatoire");
+      console.log("❌ Téléphone manquant");
+    }
+    if (!form.user_email?.trim()) {
+      errors.push("L'email du compte livreur est obligatoire");
+      console.log("❌ Email manquant");
+    }
+    
+    console.log("📋 Erreurs trouvées:", errors);
     
     if (errors.length > 0) {
       errors.forEach(err => toast.error(err));
       return;
     }
 
+    console.log("✅ Validation OK, création du livreur...");
     createMutation.mutate();
   };
 
