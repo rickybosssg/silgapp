@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { TestStatusBadge, TestSuccessDisplay, TestErrorDisplay } from "@/components/test/TestResults";
 
 /**
  * 🧪 TEST TERRAIN BOUT-EN-BOUT COMPLET
@@ -30,6 +31,7 @@ export default function TestTerrainComplet() {
     timings: {},
     errors: [],
   });
+  const [detailedError, setDetailedError] = useState(null);
   
   const logsEndRef = useRef(null);
 
@@ -40,8 +42,21 @@ export default function TestTerrainComplet() {
 
   const addLog = (category, message, data = null, level = "info") => {
     const timestamp = new Date().toISOString();
-    setLogs(prev => [...prev, { timestamp, category, message, data, level }]);
+    const log = { timestamp, category, message, data, level };
+    setLogs(prev => [...prev, log]);
     console.log(`[${timestamp}] [${category}] [${level}] ${message}`, data || "");
+    
+    // Log détaillé pour débogage
+    if (level === "error" && data) {
+      console.group("🔍 DÉTAILS ERREUR");
+      console.log("Component:", "TestTerrainComplet");
+      console.log("Step:", currentStep);
+      console.log("Expected:", "Aucune erreur");
+      console.log("Received:", data);
+      console.log("Timestamp:", timestamp);
+      if (data.stack) console.trace("Stack trace:", data.stack);
+      console.groupEnd();
+    }
   };
 
   const startTest = async () => {
@@ -199,7 +214,17 @@ export default function TestTerrainComplet() {
       
     } catch (error) {
       console.error("❌ [TEST] Erreur critique:", error);
-      addLog("ERROR", "❌ Erreur critique", { error: error.message, stack: error.stack }, "error");
+      const errorDetails = {
+        message: error.message,
+        stack: error.stack,
+        step: currentStep,
+        timestamp: new Date().toISOString(),
+        component: "TestTerrainComplet",
+        expected: "Aucune erreur",
+        received: error.message,
+      };
+      setDetailedError(errorDetails);
+      addLog("ERROR", "❌ Erreur critique", errorDetails, "error");
       setTestData(prev => ({ ...prev, errors: [...prev.errors, error.message] }));
       setTestState("failed");
     }
@@ -277,11 +302,16 @@ export default function TestTerrainComplet() {
 
   return (
     <div className="p-4 space-y-4 max-w-6xl mx-auto">
-      {/* Header */}
+      {/* Header avec indicateur TEST EN COURS */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">🧪 Test Terrain Bout-en-Bout</h1>
-          <p className="text-sm text-muted-foreground">20 étapes • Conditions réelles • Logs complets</p>
+        <div className="flex items-center gap-3">
+          <TestStatusBadge testState={testState} />
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">🧪 Test Terrain Bout-en-Bout</h1>
+            <p className="text-sm text-muted-foreground">
+              20 étapes • GPS réels • Temps réel • Multi-appareils
+            </p>
+          </div>
         </div>
         <div className="flex gap-2">
           <Button
@@ -368,60 +398,17 @@ export default function TestTerrainComplet() {
         </div>
       </Card>
 
-      {/* Résultats */}
+      {/* Résultats avec statistiques */}
       {testState === "completed" && (
-        <Card className="p-6 bg-green-50 border-green-200">
-          <div className="flex items-center gap-4">
-            <CheckCircle2 className="w-12 h-12 text-green-600" />
-            <div>
-              <h2 className="text-xl font-bold text-green-900">✅ TEST RÉUSSI !</h2>
-              <p className="text-sm text-green-700">
-                Chaîne SILGAPP totalement stable et cohérente
-              </p>
-              <div className="grid grid-cols-3 gap-4 mt-4">
-                <div>
-                  <p className="text-xs text-green-600">Temps total</p>
-                  <p className="text-lg font-bold text-green-900">
-                    {Object.values(testData.timings).reduce((a, b) => a + b, 0)} ms
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-green-600">Prix final</p>
-                  <p className="text-lg font-bold text-green-900">
-                    {testData.course?.prix_final} FCFA
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-green-600">Distance</p>
-                  <p className="text-lg font-bold text-green-900">
-                    {testData.course?.distance_reelle_km?.toFixed(2)} km
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Card>
+        <TestSuccessDisplay testData={testData} timings={testData.timings} />
       )}
 
       {testState === "failed" && (
-        <Card className="p-6 bg-red-50 border-red-200">
-          <div className="flex items-center gap-4">
-            <XCircle className="w-12 h-12 text-red-600" />
-            <div>
-              <h2 className="text-xl font-bold text-red-900">❌ TEST ÉCHOUÉ</h2>
-              <p className="text-sm text-red-700">
-                {testData.errors.length} erreur(s) détectée(s)
-              </p>
-              <div className="mt-4 space-y-2">
-                {testData.errors.map((err, i) => (
-                  <div key={i} className="text-sm text-red-800 bg-white p-2 rounded border border-red-200">
-                    {err}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </Card>
+        <TestErrorDisplay 
+          detailedError={detailedError} 
+          errors={testData.errors} 
+          currentStep={currentStep} 
+        />
       )}
     </div>
   );

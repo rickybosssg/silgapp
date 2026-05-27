@@ -59,6 +59,27 @@ function App() {
   const [isClient, setIsClient] = useState(false);
   const [reseau, setReseau] = useState(null);
 
+  // ⚠️ ROUTES DE TEST TOUJOURS ACCESSIBLES - PRIORITÉ ABSOLUE
+  // Ces routes doivent fonctionner même sans auth/réseau/rôle
+  const isTestRoute = window.location.pathname.startsWith('/test-') || window.location.pathname === '/maintenance';
+  
+  if (isTestRoute) {
+    return (
+      <Router>
+        <Suspense fallback={<LoadingScreen />}>
+          <Routes>
+            <Route path="/test-terrain" element={<TestTerrainComplet />} />
+            <Route path="/test-diagnostics" element={<TestDiagnosticsComplet />} />
+            <Route path="/test-bout-en-bout" element={<TestBoutEnBout />} />
+            <Route path="/maintenance" element={<Maintenance />} />
+            <Route path="*" element={<PageNotFound />} />
+          </Routes>
+        </Suspense>
+        <Toaster />
+      </Router>
+    );
+  }
+
   // Si un profil livreur a été détecté, afficher directement l'app appropriée
   if (livreurProfil) {
     // Livreur externe ?
@@ -104,12 +125,6 @@ function App() {
       <Router>
         <Suspense fallback={<LoadingScreen />}>
           <Routes>
-            {/* Routes de test accessibles sans sélection de réseau */}
-            <Route path="/test-terrain" element={<TestTerrainComplet />} />
-            <Route path="/test-diagnostics" element={<TestDiagnosticsComplet />} />
-            <Route path="/test-bout-en-bout" element={<TestBoutEnBout />} />
-            <Route path="/maintenance" element={<Maintenance />} />
-            
             <Route
               path="*"
               element={
