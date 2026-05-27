@@ -246,13 +246,13 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   const handleColisLivre = (course, gpsArrivee) => {
     // Si le backend QR a déjà mis statut=livree + prix calculé, on invalide juste le cache
-    // et on remet le livreur disponible (le backend a déjà mis statut=disponible)
-    if (course.statut === "livree" && course.prix_final) {
-      // Déjà traité par validateQRCode côté backend — forcer le refresh
+    if (course.statut === "livree") {
+      // Déjà traité par validateQRCode côté backend — forcer le refresh de tout
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
-      statutMutation.mutate("disponible");
-      toast.success("Livraison confirmée ! 🎉");
+      const gains = course.montant_livreur || 0;
+      const dist = course.distance_reelle_km;
+      toast.success(`Livraison confirmée ! 🎉${gains > 0 ? ` +${gains.toLocaleString()} F gagnés` : ""}`);
       return;
     }
 

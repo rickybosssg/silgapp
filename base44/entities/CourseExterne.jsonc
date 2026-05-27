@@ -212,6 +212,19 @@
       "type": "number",
       "description": "Longitude au moment de 'Colis livr\u00e9'"
     },
+    "latitude_arrivee_livraison": {
+      "type": "number",
+      "description": "Latitude finale de livraison (alias standard)"
+    },
+    "longitude_arrivee_livraison": {
+      "type": "number",
+      "description": "Longitude finale de livraison (alias standard)"
+    },
+    "colis_livre_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp exact de la livraison"
+    },
     "commission_silga": {
       "type": "number",
       "description": "Commission Silga (30% du prix final)"
@@ -242,7 +255,20 @@
     "note_date": {
       "type": "string",
       "format": "date-time",
-      "description": "Date et heure de la notation"
+      "description": "Date et heure de la notation par l'exp\u00e9diteur"
+    },
+    "destinataire_feedback": {
+      "type": "string",
+      "enum": [
+        "bon",
+        "mauvais"
+      ],
+      "description": "Feedback simple du destinataire (bon/mauvais) \u2014 ne compte pas dans la note officielle"
+    },
+    "destinataire_feedback_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date du feedback destinataire"
     },
     "tracking_token": {
       "type": "string",

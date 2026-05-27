@@ -29,6 +29,7 @@ function openWhatsApp(phone, message = "") {
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
+import DestinataireReactionButton from "@/components/client/DestinataireReactionButton";
 import QRCodeDisplay from "@/components/client/QRCodeDisplay";
 import AnnulerCourseDialog from "@/components/client/AnnulerCourseDialog";
 import ETADisplay from "@/components/client/ETADisplay";
@@ -49,6 +50,11 @@ export default function ClientSuiviCourse() {
   const [showRating, setShowRating] = useState(false);
   const [showAnnulerDialog, setShowAnnulerDialog] = useState(false);
   const [selectedCourseId, setSelectedCourseId] = useState(null);
+  const [userEmail, setUserEmail] = useState(null);
+
+  useEffect(() => {
+    base44.auth.me().then(u => setUserEmail(u?.email)).catch(() => null);
+  }, []);
 
   // Récupérer l'ID user pour filtrer correctement
   useEffect(() => {
@@ -411,63 +417,95 @@ export default function ClientSuiviCourse() {
         </Card>
 
         {/* Course terminée */}
-        {maCourse.statut === "livree" && (
-          <>
-            <Card className="p-4 bg-green-50 border-green-200">
-              <div className="flex items-center gap-2 mb-3">
-                <CheckCircle2 className="w-5 h-5 text-green-600" />
-                <h3 className="font-bold text-green-900">Course livrée</h3>
-              </div>
-              <div className="space-y-2 text-sm text-green-800">
-                {maCourse.distance_reelle_km != null && (
-                  <p>Distance parcourue : <span className="font-bold">{Number(maCourse.distance_reelle_km || 0).toFixed(1)} km</span></p>
-                )}
-                {maCourse.prix_final ? (
-                  <p className="text-base font-black text-green-900">Prix à payer : {maCourse.prix_final.toLocaleString()} FCFA</p>
-                ) : null}
-              </div>
-            </Card>
+        {maCourse.statut === "livree" && (() => {
+          // Déterminer le rôle de l'utilisateur dans cette course
+          const isExpediteur = maCourse.type_course === "expedier"
+            || (maCourse.expediteur_client_id && maCourse.created_by_id === userId)
+            || (!maCourse.destinataire_client_id);
 
-            {!maCourse.note_livreur && (
-              <Card className="p-4 border-l-4 border-l-yellow-400 bg-gradient-to-r from-yellow-50 to-orange-50">
-                <div className="flex items-start gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-xl bg-yellow-100 flex items-center justify-center flex-shrink-0">
-                    <Star className="w-5 h-5 text-yellow-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-yellow-900">Comment s'est passée la livraison ?</p>
-                    <p className="text-xs text-yellow-700 mt-1">Évaluez {maCourse.livreur_nom || "le livreur"}</p>
-                  </div>
+          const isDestinataire = !isExpediteur && (
+            maCourse.destinataire_client_id === clientProfilId
+            || maCourse.created_by_id !== userId
+          );
+
+          return (
+            <>
+              <Card className="p-4 bg-green-50 border-green-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                  <h3 className="font-bold text-green-900">Course livrée ✅</h3>
                 </div>
-                <Button
-                  className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold"
-                  onClick={() => setShowRating(true)}
-                >
-                  <Star className="w-4 h-4 mr-2 fill-white" />
-                  Évaluer le livreur
-                </Button>
+                <div className="grid grid-cols-3 gap-2 mt-2">
+                  {maCourse.distance_reelle_km != null && (
+                    <div className="bg-white rounded-xl p-2.5 text-center">
+                      <p className="text-[9px] text-gray-400 uppercase font-semibold">Distance</p>
+                      <p className="text-sm font-black text-gray-800">{Number(maCourse.distance_reelle_km).toFixed(1)} km</p>
+                    </div>
+                  )}
+                  {maCourse.heure_livraison && maCourse.heure_acceptation && (
+                    <div className="bg-white rounded-xl p-2.5 text-center">
+                      <p className="text-[9px] text-gray-400 uppercase font-semibold">Durée</p>
+                      <p className="text-sm font-black text-gray-800">
+                        {Math.round((new Date(maCourse.heure_livraison) - new Date(maCourse.heure_acceptation)) / 60000)} min
+                      </p>
+                    </div>
+                  )}
+                  {maCourse.prix_final ? (
+                    <div className="bg-white rounded-xl p-2.5 text-center">
+                      <p className="text-[9px] text-gray-400 uppercase font-semibold">Prix final</p>
+                      <p className="text-sm font-black text-green-700">{maCourse.prix_final.toLocaleString()} F</p>
+                    </div>
+                  ) : null}
+                </div>
               </Card>
-            )}
 
-            {maCourse.note_livreur && (
-              <Card className="p-4 border-l-4 border-l-green-500 bg-gradient-to-r from-green-50 to-emerald-50">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
-                    <CheckCircle2 className="w-5 h-5 text-green-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-semibold text-green-900">Merci pour votre évaluation !</p>
-                    <div className="flex items-center gap-1 mt-1">
-                      {[...Array(5)].map((_, i) => (
-                        <Star key={i} className={`w-4 h-4 ${i < maCourse.note_livreur ? "fill-yellow-400 text-yellow-400" : "fill-gray-200 text-gray-300"}`} />
-                      ))}
+              {/* Évaluation expéditeur — note officielle étoiles */}
+              {isExpediteur && !maCourse.note_livreur && (
+                <Card className="p-4 border-l-4 border-l-yellow-400 bg-gradient-to-r from-yellow-50 to-orange-50">
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-yellow-100 flex items-center justify-center flex-shrink-0">
+                      <Star className="w-5 h-5 text-yellow-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-bold text-yellow-900">Comment s'est passée votre livraison ?</p>
+                      <p className="text-xs text-yellow-700 mt-1">Évaluez {maCourse.livreur_nom || "le livreur"} en tant qu'expéditeur</p>
                     </div>
                   </div>
-                </div>
-              </Card>
-            )}
-          </>
-        )}
+                  <Button
+                    className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold"
+                    onClick={() => setShowRating(true)}
+                  >
+                    <Star className="w-4 h-4 mr-2 fill-white" />
+                    Évaluer le livreur
+                  </Button>
+                </Card>
+              )}
+
+              {isExpediteur && maCourse.note_livreur && (
+                <Card className="p-4 border-l-4 border-l-green-500 bg-gradient-to-r from-green-50 to-emerald-50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
+                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-green-900">Merci pour votre évaluation !</p>
+                      <div className="flex items-center gap-1 mt-1">
+                        {[...Array(5)].map((_, i) => (
+                          <Star key={i} className={`w-4 h-4 ${i < maCourse.note_livreur ? "fill-yellow-400 text-yellow-400" : "fill-gray-200 text-gray-300"}`} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Feedback destinataire — pouce simple */}
+              {isDestinataire && (
+                <DestinataireReactionButton course={maCourse} onDone={refetch} />
+              )}
+            </>
+          );
+        })()}
 
         {showRating && (
           <LivreurRatingDialog

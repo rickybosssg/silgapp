@@ -15,6 +15,13 @@ function vehiculeLabel(v) {
   return "🏍️ Moto";
 }
 
+const STATUT_MESSAGE = {
+  livreur_en_route: (prenom) => `🚀 ${prenom} est en route vers le point de récupération`,
+  colis_recupere: (prenom) => `📦 ${prenom} a récupéré le colis`,
+  en_livraison: (prenom) => `🏃 ${prenom} est en route vers vous`,
+  livree: (_prenom) => `✅ Livraison terminée avec succès !`,
+};
+
 export default function LivreurAssigneCard({ course }) {
   if (!course?.livreur_id) return null;
 
@@ -25,12 +32,21 @@ export default function LivreurAssigneCard({ course }) {
   const noteMoyenne = course.livreur_note_moyenne || 0;
   const nombreAvis = course.livreur_nombre_avis || 0;
 
+  const headerMsg = STATUT_MESSAGE[course.statut]?.(prenom)
+    ?? `🎉 ${prenom} a accepté votre course !`;
+
+  const headerColor = course.statut === "livree"
+    ? "bg-gradient-to-r from-green-600 to-emerald-700"
+    : course.statut === "en_livraison"
+    ? "bg-gradient-to-r from-blue-500 to-blue-700"
+    : "bg-gradient-to-r from-green-500 to-emerald-600";
+
   return (
     <Card className="overflow-hidden border-2 border-green-200 shadow-lg">
-      {/* Header vert style Uber */}
-      <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-4 py-3">
+      {/* Header dynamique selon statut */}
+      <div className={`${headerColor} px-4 py-3`}>
         <p className="text-white text-xs font-semibold opacity-90">
-          🎉 {prenom} a accepté votre course !
+          {headerMsg}
         </p>
       </div>
 

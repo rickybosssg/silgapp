@@ -84,37 +84,58 @@ Deno.serve(async (req) => {
       }
 
       // ── DELIVERY validé ──
+      const now = new Date().toISOString();
       const updateData = {
         statut: 'livree',
-        heure_livraison: new Date().toISOString(),
+        heure_livraison: now,
         latitude_livraison: latitude || null,
         longitude_livraison: longitude || null,
         delivery_confirmed_by: method,
-        delivery_confirmed_at: new Date().toISOString(),
+        delivery_confirmed_at: now,
+        // Sauvegarder aussi dans les champs standards de suivi
+        latitude_arrivee_livraison: latitude || null,
+        longitude_arrivee_livraison: longitude || null,
+        colis_livre_at: now,
       };
 
-      // Calcul prix final si GPS disponible
-      if (course.latitude_recuperation && course.longitude_recuperation && latitude && longitude) {
-        const dist = haversine(course.latitude_recuperation, course.longitude_recuperation, latitude, longitude);
-        const distSafe = Number(dist || 0);
+      // Calcul prix final — utiliser GPS récupération (latitude_recuperation) OU depart estimé
+      const latRecup = course.latitude_recuperation || course.gps_depart_lat;
+      const lngRecup = course.longitude_recuperation || course.gps_depart_lng;
+      const latLivr = latitude || course.gps_arrivee_lat;
+      const lngLivr = longitude || course.gps_arrivee_lng;
+
+      if (latRecup && lngRecup && latLivr && lngLivr) {
+        const dist = haversine(latRecup, lngRecup, latLivr, lngLivr);
+        const distSafe = Math.max(Number(dist || 0), 0.5); // minimum 0.5 km → 50 F
         const prixFinal = Math.round(distSafe * 100);
         const commission = Math.round(prixFinal * 0.3);
+        const montantLivreur = prixFinal - commission;
         updateData.distance_reelle_km = distSafe;
         updateData.prix_final = prixFinal;
         updateData.commission_silga = commission;
-        updateData.montant_livreur = prixFinal - commission;
+        updateData.montant_livreur = montantLivreur;
+        // Sauvegarder la destination finale GPS si destination_inconnue
+        if (course.destination_inconnue && latitude && longitude) {
+          updateData.gps_arrivee_lat = latitude;
+          updateData.gps_arrivee_lng = longitude;
+        }
       }
 
       await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
 
-      // Mettre à jour montant_du_silga du livreur
-      if (course.livreur_id && updateData.commission_silga) {
+      // Mettre à jour le livreur : montant_du_silga + courses_du_jour + statut
+      if (course.livreur_id) {
         const livreur = await base44.asServiceRole.entities.Livreur.get(course.livreur_id);
         if (livreur) {
-          await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
+          const livreurUpdate = {
             statut: 'disponible',
-            montant_du_silga: (Number(livreur.montant_du_silga) || 0) + updateData.commission_silga,
-          });
+          };
+          if (updateData.commission_silga) {
+            livreurUpdate.montant_du_silga = (Number(livreur.montant_du_silga) || 0) + updateData.commission_silga;
+          }
+          // Incrémenter courses_du_jour
+          livreurUpdate.courses_du_jour = (Number(livreur.courses_du_jour) || 0) + 1;
+          await base44.asServiceRole.entities.Livreur.update(course.livreur_id, livreurUpdate);
         }
       }
 
@@ -123,7 +144,15 @@ Deno.serve(async (req) => {
         message: 'Livraison confirmée !',
         prix_final: updateData.prix_final || null,
         distance_km: updateData.distance_reelle_km || null,
-        course: { statut: 'livree', prix_final: updateData.prix_final },
+        montant_livreur: updateData.montant_livreur || null,
+        commission_silga: updateData.commission_silga || null,
+        course: {
+          statut: 'livree',
+          prix_final: updateData.prix_final || null,
+          distance_reelle_km: updateData.distance_reelle_km || null,
+          montant_livreur: updateData.montant_livreur || null,
+          commission_silga: updateData.commission_silga || null,
+        },
       });
     }
 
