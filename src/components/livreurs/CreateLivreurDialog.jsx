@@ -18,14 +18,10 @@ export default function CreateLivreurDialog({ reseau = "interne" }) {
     prenom: "",
     nom: "",
     telephone: "",
+    user_email: "",
     quartier: "",
     photo_url: "",
     vehicule: "moto",
-    type_vehicule: "moto",
-    numero_plaque: "",
-    photo_cnib_recto_url: "",
-    photo_cnib_verso_url: "",
-    photo_moto_url: "",
     type_livreur: reseau,
     reseau: reseau,
   });
@@ -40,20 +36,17 @@ export default function CreateLivreurDialog({ reseau = "interne" }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["livreurs"] });
-      toast.success("Livreur créé avec succès");
+      queryClient.invalidateQueries({ queryKey: ["livreurs-externes"] });
+      toast.success("Livreur créé avec succès ✅");
       setOpen(false);
       setForm({
         prenom: "",
         nom: "",
         telephone: "",
+        user_email: "",
         quartier: "",
         photo_url: "",
         vehicule: "moto",
-        type_vehicule: "moto",
-        numero_plaque: "",
-        photo_cnib_recto_url: "",
-        photo_cnib_verso_url: "",
-        photo_moto_url: "",
         type_livreur: reseau,
         reseau: reseau,
       });
@@ -77,10 +70,18 @@ export default function CreateLivreurDialog({ reseau = "interne" }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!form.nom || !form.telephone) {
-      toast.error("Nom et téléphone requis");
+    
+    // Validation stricte
+    const errors = [];
+    if (!form.nom?.trim()) errors.push("Le nom est obligatoire");
+    if (!form.telephone?.trim()) errors.push("Le téléphone est obligatoire");
+    if (!form.user_email?.trim()) errors.push("L'email du compte livreur est obligatoire");
+    
+    if (errors.length > 0) {
+      errors.forEach(err => toast.error(err));
       return;
     }
+
     createMutation.mutate();
   };
 
@@ -151,13 +152,24 @@ export default function CreateLivreurDialog({ reseau = "interne" }) {
             </div>
           </div>
 
+          <div className="space-y-1.5">
+            <Label className="text-xs">Email du compte livreur *</Label>
+            <Input
+              type="email"
+              value={form.user_email}
+              onChange={(e) => setForm(p => ({ ...p, user_email: e.target.value.trim().toLowerCase() }))}
+              placeholder="livreur@gmail.com"
+            />
+            <p className="text-[10px] text-muted-foreground">Cet email sera utilisé pour la connexion</p>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Téléphone *</Label>
               <Input
                 value={form.telephone}
                 onChange={(e) => setForm(p => ({ ...p, telephone: e.target.value }))}
-                placeholder="01 23 45 67 89"
+                placeholder="+226 70 00 00 00"
               />
             </div>
             <div className="space-y-1.5">
@@ -165,7 +177,7 @@ export default function CreateLivreurDialog({ reseau = "interne" }) {
               <Input
                 value={form.quartier}
                 onChange={(e) => setForm(p => ({ ...p, quartier: e.target.value }))}
-                placeholder="Quartier"
+                placeholder="Ex: Ouaga 2000"
               />
             </div>
           </div>
@@ -193,65 +205,14 @@ export default function CreateLivreurDialog({ reseau = "interne" }) {
             </CardContent>
           </Card>
 
-          {/* Documents pour externes */}
-          {form.type_livreur === "externe" && (
-            <>
-              <Card>
-                <CardContent className="pt-4">
-                  <Label className="text-xs mb-2 block">CNIB (Recto)</Label>
-                  <label className="cursor-pointer">
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhoto(e, "photo_cnib_recto_url")} />
-                    <div className="flex items-center gap-2 text-sm border border-border rounded-lg px-3 py-2 hover:bg-muted transition-colors">
-                      <Upload className="w-4 h-4" />
-                      {form.photo_cnib_recto_url ? "✓ Ajoutée" : "Télécharger"}
-                    </div>
-                  </label>
-                </CardContent>
-              </Card>
 
-              <Card>
-                <CardContent className="pt-4">
-                  <Label className="text-xs mb-2 block">CNIB (Verso)</Label>
-                  <label className="cursor-pointer">
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhoto(e, "photo_cnib_verso_url")} />
-                    <div className="flex items-center gap-2 text-sm border border-border rounded-lg px-3 py-2 hover:bg-muted transition-colors">
-                      <Upload className="w-4 h-4" />
-                      {form.photo_cnib_verso_url ? "✓ Ajoutée" : "Télécharger"}
-                    </div>
-                  </label>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="pt-4">
-                  <Label className="text-xs mb-2 block">Photo de la moto</Label>
-                  <label className="cursor-pointer">
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhoto(e, "photo_moto_url")} />
-                    <div className="flex items-center gap-2 text-sm border border-border rounded-lg px-3 py-2 hover:bg-muted transition-colors">
-                      <Upload className="w-4 h-4" />
-                      {form.photo_moto_url ? "✓ Ajoutée" : "Télécharger"}
-                    </div>
-                  </label>
-                </CardContent>
-              </Card>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs">Numéro de plaque (optionnel)</Label>
-                <Input
-                  placeholder="AA 123 BB"
-                  value={form.numero_plaque}
-                  onChange={(e) => setForm(p => ({ ...p, numero_plaque: e.target.value }))}
-                />
-              </div>
-            </>
-          )}
 
           <div className="flex justify-end gap-2 pt-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Annuler
             </Button>
-            <Button type="submit" disabled={createMutation.isPending || uploading}>
-              {createMutation.isPending ? "Création..." : "Créer le livreur"}
+            <Button type="submit" className="bg-primary" disabled={createMutation.isPending || uploading}>
+              {createMutation.isPending ? "Création en cours..." : `Créer le livreur ${reseau === "externe" ? "externe" : ""}`}
             </Button>
           </div>
         </form>
