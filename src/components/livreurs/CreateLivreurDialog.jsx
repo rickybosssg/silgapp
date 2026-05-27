@@ -95,6 +95,7 @@ export default function CreateLivreurDialog({ reseau = "interne" }) {
   };
 
   const handleSubmit = (e) => {
+    console.log("🔴 handleSubmit appelé, target:", e.target.tagName);
     e.preventDefault();
     console.log("🔍 Début validation - form:", form);
     
