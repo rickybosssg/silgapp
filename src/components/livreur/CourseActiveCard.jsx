@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import LivraisonResume from "./LivraisonResume";
 import QRScannerModal from "./QRScannerModal";
 import LivraisonRecapitulatif from "./LivraisonRecapitulatif";
+import NavigationGPS from "./NavigationGPS";
 
 const STEPS = [
   { key: "acceptee", label: "Acceptée", icon: "✅" },
@@ -359,6 +360,28 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             <p className="text-xs text-gray-500 bg-amber-50 border border-amber-100 p-3 rounded-2xl leading-relaxed">
               📝 {course.notes}
             </p>
+          )}
+
+          {/* Navigation GPS — uniquement externe */}
+          {isExterne && !colisLivre && (
+            !colisRecupere ? (
+              <NavigationGPS
+                phase="recuperation"
+                destLat={course.gps_depart_lat}
+                destLng={course.gps_depart_lng}
+                destLabel={course.adresse_depart}
+                destinataireTelephone={course.expediteur_telephone || course.client_telephone}
+              />
+            ) : (
+              <NavigationGPS
+                phase="livraison"
+                destLat={course.gps_arrivee_lat}
+                destLng={course.gps_arrivee_lng}
+                destLabel={course.adresse_arrivee}
+                destinataireTelephone={course.destinataire_telephone}
+                destinationInconnue={!course.gps_arrivee_lat && course.destination_inconnue}
+              />
+            )
           )}
 
           {/* Boutons d'action */}

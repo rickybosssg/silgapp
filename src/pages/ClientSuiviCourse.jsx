@@ -23,6 +23,7 @@ import { fr } from "date-fns/locale";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import QRCodeDisplay from "@/components/client/QRCodeDisplay";
 import AnnulerCourseDialog from "@/components/client/AnnulerCourseDialog";
+import ETADisplay from "@/components/client/ETADisplay";
 
 const APK_URL = "/telecharger-app";
 
@@ -75,7 +76,7 @@ export default function ClientSuiviCourse() {
       [...(byCreator || []), ...(byDest || [])].forEach(c => map.set(c.id, c));
       const courses = [...map.values()].sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
 
-      // Enrichir avec note_moyenne + nombre_avis du livreur
+      // Enrichir avec note_moyenne + nombre_avis + GPS temps réel du livreur
       const livreurIds = [...new Set(courses.filter(c => c.livreur_id).map(c => c.livreur_id))];
       if (livreurIds.length > 0) {
         const livreursData = await Promise.all(
@@ -92,6 +93,7 @@ export default function ClientSuiviCourse() {
             livreur_note_moyenne: l.note_moyenne || 0,
             livreur_nombre_avis: l.nombre_avis || 0,
             livreur_vehicule: c.livreur_vehicule || l.vehicule || l.type_vehicule || null,
+            _livreur: l,
           };
         });
       }
@@ -248,6 +250,29 @@ export default function ClientSuiviCourse() {
         {/* Infos livreur — Card style Uber dès acceptation */}
         {maCourse.livreur_id && (
           <LivreurAssigneCard course={maCourse} />
+        )}
+
+        {/* ETA temps réel — affiché si livreur a position GPS et course active */}
+        {["livreur_en_route", "colis_recupere", "en_livraison"].includes(maCourse.statut) && maCourse.livreur_id && (
+          (() => {
+            // Position du livreur (depuis les champs Livreur mis à jour en temps réel)
+            const livreurLat = maCourse._livreur?.latitude;
+            const livreurLng = maCourse._livreur?.longitude;
+            const isVersRecup = maCourse.statut === "livreur_en_route";
+            const targetLat = isVersRecup ? maCourse.gps_depart_lat : maCourse.gps_arrivee_lat;
+            const targetLng = isVersRecup ? maCourse.gps_depart_lng : maCourse.gps_arrivee_lng;
+            return (
+              <ETADisplay
+                livreurLat={livreurLat}
+                livreurLng={livreurLng}
+                targetLat={targetLat}
+                targetLng={targetLng}
+                livreurNom={maCourse.livreur_nom}
+                phase={isVersRecup ? "vers_recuperation" : "vers_livraison"}
+                statut={maCourse.statut}
+              />
+            );
+          })()
         )}
 
         {/* Trajet */}
