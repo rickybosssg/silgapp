@@ -57,7 +57,7 @@ export default function ETADisplay({ livreurLat, livreurLng, targetLat, targetLn
         <div className="flex items-center gap-3 mt-1">
           <span className="flex items-center gap-1 text-xs text-blue-600">
             <Ruler className="w-3 h-3" />
-            {dist < 1 ? `${Math.round(dist * 1000)} m` : `${dist.toFixed(1)} km`}
+            {dist < 1 ? `${Math.max(1, Math.round(dist * 1000))} m` : `${dist.toFixed(1)} km`}
           </span>
           <span className="flex items-center gap-1 text-xs text-blue-600">
             <MapPin className="w-3 h-3" />

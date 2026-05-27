@@ -358,7 +358,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
           {/* Prix */}
           {isExterne ? (
-            course.prix_estimate > 0 && (
+            course.prix_estimate && course.prix_estimate > 0 && (
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs text-blue-700 font-semibold">Prix estimé</span>
