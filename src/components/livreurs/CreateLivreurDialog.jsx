@@ -61,20 +61,31 @@ export default function CreateLivreurDialog({ reseau = "interne" }) {
     // Vérifier la taille du fichier (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error("La photo ne doit pas dépasser 5MB");
+      e.target.value = "";
       return;
     }
     
     setUploading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      setForm(p => ({ ...p, [fieldName]: file_url }));
-      toast.success("Photo ajoutée ✅");
+      // Lire le fichier comme ArrayBuffer
+      const arrayBuffer = await file.arrayBuffer();
+      
+      // Utiliser l'intégration Core.UploadFile avec le fichier brut
+      const result = await base44.integrations.Core.UploadFile({ 
+        file: arrayBuffer
+      });
+      
+      if (result && result.file_url) {
+        setForm(p => ({ ...p, [fieldName]: result.file_url }));
+        toast.success("Photo ajoutée ✅");
+      } else {
+        throw new Error("Résultat d'upload invalide");
+      }
     } catch (err) {
       console.error("Erreur upload photo:", err);
-      toast.error("Erreur lors de l'upload: " + (err.message || "échec de l'upload"));
+      toast.error("Erreur upload: " + (err.message || "échec"));
     } finally {
       setUploading(false);
-      // Reset input file
       e.target.value = "";
     }
   };
