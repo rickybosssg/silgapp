@@ -439,15 +439,15 @@ export default function ClientSuiviCourse() {
 
         {/* Course terminée */}
         {maCourse.statut === "livree" && (() => {
-          // Déterminer le rôle de l'utilisateur dans cette course
-          const isExpediteur = maCourse.type_course === "expedier"
-            || (maCourse.expediteur_client_id && maCourse.created_by_id === userId)
-            || (!maCourse.destinataire_client_id);
+          // Déterminer le rôle : client principal = celui qui a commandé
+          // "expedier" → expéditeur est le client principal (note officielle)
+          // "recevoir" → destinataire est le client principal (note officielle)
+          const isClientPrincipal =
+            (maCourse.type_course === "expedier" && (maCourse.expediteur_client_id === clientProfilId || maCourse.created_by_id === userId)) ||
+            (maCourse.type_course === "recevoir" && (maCourse.destinataire_client_id === clientProfilId || maCourse.created_by_id === userId));
 
-          const isDestinataire = !isExpediteur && (
-            maCourse.destinataire_client_id === clientProfilId
-            || maCourse.created_by_id !== userId
-          );
+          const isExpediteur = isClientPrincipal; // Note officielle = client principal
+          const isDestinataire = !isClientPrincipal; // Feedback simple = autre partie
 
           return (
             <>

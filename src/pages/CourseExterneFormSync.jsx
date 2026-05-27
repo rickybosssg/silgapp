@@ -51,28 +51,34 @@ export default function CourseExterneFormSync() {
 
   const draft = getDraftFromStorage();
 
-  const [formData, setFormData] = useState(
-    draft || {
-      type_course: typeCourse,
-      client_nom: clientProfil?.nom || "",
-      client_telephone: clientProfil?.telephone || "",
-      expediteur_nom: "",
-      expediteur_telephone: "",
-      destinataire_nom: "",
-      destinataire_telephone: "",
-      type_colis: "petit_colis",
-      adresse_depart: "",
-      adresse_arrivee: "",
-      destination_inconnue: false,
-      notes: "",
-      gps_depart_lat: position?.latitude || null,
-      gps_depart_lng: position?.longitude || null,
-      gps_arrivee_lat: null,
-      gps_arrivee_lng: null,
-      recuperationGPS: false,
-      livraisonGPS: false,
-    }
-  );
+  // Pour "recevoir" : pré-remplir la destination avec la position GPS du client
+  const clientGpsLat = position?.latitude || null;
+  const clientGpsLng = position?.longitude || null;
+  const clientAdresse = clientProfil?.quartier || "";
+
+  const initialData = draft || {
+    type_course: typeCourse,
+    client_nom: clientProfil?.nom || "",
+    client_telephone: clientProfil?.telephone || "",
+    expediteur_nom: "",
+    expediteur_telephone: "",
+    destinataire_nom: "",
+    destinataire_telephone: "",
+    type_colis: "petit_colis",
+    adresse_depart: "",
+    adresse_arrivee: "",
+    destination_inconnue: false,
+    notes: "",
+    // Pour "recevoir" : départ = inconnu (chez l'expéditeur), arrivée = position client
+    gps_depart_lat: typeCourse === "expedier" ? clientGpsLat : null,
+    gps_depart_lng: typeCourse === "expedier" ? clientGpsLng : null,
+    gps_arrivee_lat: typeCourse === "recevoir" ? clientGpsLat : null,
+    gps_arrivee_lng: typeCourse === "recevoir" ? clientGpsLng : null,
+    recuperationGPS: false,
+    livraisonGPS: typeCourse === "recevoir" && !!clientGpsLat,
+  };
+
+  const [formData, setFormData] = useState(initialData);
 
   // Pré-remplir depuis profil si pas de brouillon
   useEffect(() => {
@@ -81,6 +87,11 @@ export default function CourseExterneFormSync() {
         ...prev,
         client_nom: clientProfil.nom || "",
         client_telephone: clientProfil.telephone || "",
+        // Pour "recevoir" : arrivée auto = position client si dispo
+        gps_arrivee_lat: prev.type_course === "recevoir" ? (clientGpsLat || prev.gps_arrivee_lat) : prev.gps_arrivee_lat,
+        gps_arrivee_lng: prev.type_course === "recevoir" ? (clientGpsLng || prev.gps_arrivee_lng) : prev.gps_arrivee_lng,
+        adresse_arrivee: prev.type_course === "recevoir" && !prev.adresse_arrivee ? (clientAdresse || prev.adresse_arrivee) : prev.adresse_arrivee,
+        livraisonGPS: prev.type_course === "recevoir" && !!clientGpsLat ? true : prev.livraisonGPS,
       }));
     }
   }, [clientProfil]);
@@ -90,21 +101,25 @@ export default function CourseExterneFormSync() {
     localStorage.setItem(STEP_KEY, String(currentStep));
   }, [currentStep]);
 
-  // Handlers GPS — fonctions séparées de formData
+  // Helper geocoding inverse
+  const reverseGeocode = async (lat, lng) => {
+    try {
+      const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=fr`);
+      const geo = await resp.json();
+      return geo?.address?.suburb || geo?.address?.neighbourhood || geo?.address?.quarter || geo?.address?.city_district || geo?.address?.village || "";
+    } catch (_) { return ""; }
+  };
+
+  // Handlers GPS
   const gpsHandlers = {
+    // Récupération GPS — pour l'expéditeur (expedier) OU l'endroit où récupérer (recevoir)
     onGetGPSDepart: () => {
       if (!navigator.geolocation) { toast.error("GPS non disponible"); return; }
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
           const lat = pos.coords.latitude;
           const lng = pos.coords.longitude;
-          // Geocoding inverse pour auto-remplir l'adresse
-          let adresse = "";
-          try {
-            const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=fr`);
-            const geo = await resp.json();
-            adresse = geo?.address?.suburb || geo?.address?.neighbourhood || geo?.address?.quarter || geo?.address?.city_district || geo?.address?.village || "";
-          } catch (_) {}
+          const adresse = await reverseGeocode(lat, lng);
           setFormData((prev) => ({
             ...prev,
             gps_depart_lat: lat,
@@ -116,21 +131,52 @@ export default function CourseExterneFormSync() {
         () => toast.error("Impossible d'obtenir la position GPS")
       );
     },
-    // GPS livraison supprimé — le client n'est pas à la destination
-
+    // Livraison GPS — pour "recevoir" : position actuelle du client destinataire
+    onGetGPSArrivee: () => {
+      if (!navigator.geolocation) { toast.error("GPS non disponible"); return; }
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const adresse = await reverseGeocode(lat, lng);
+          setFormData((prev) => ({
+            ...prev,
+            gps_arrivee_lat: lat,
+            gps_arrivee_lng: lng,
+            livraisonGPS: true,
+            adresse_arrivee: prev.adresse_arrivee || adresse,
+          }));
+        },
+        () => toast.error("Impossible d'obtenir la position GPS")
+      );
+    },
   };
 
   const createMutation = useMutation({
     mutationFn: async (data) => {
-      // Lookup destinataire par téléphone normalisé si pas encore lié
       let finalData = { ...data };
+
+      // Lookup destinataire (pour "expedier") — lie si inscrit
       if (!finalData.destinataire_client_id && finalData.destinataire_telephone) {
         try {
-          const telNorm = "+226" + finalData.destinataire_telephone.replace(/\D/g, "").slice(-8);
-          const found = await base44.entities.ClientExterne.filter({ telephone: telNorm });
+          const digits = finalData.destinataire_telephone.replace(/\D/g, "").slice(-8);
+          const found = await base44.entities.ClientExterne.filter({ telephone: digits })
+            || await base44.entities.ClientExterne.filter({ telephone: "+226" + digits });
           if (found?.length > 0) {
             finalData.destinataire_client_id = found[0].id;
             finalData.recipient_has_app = true;
+          }
+        } catch (_) {}
+      }
+
+      // Lookup expéditeur (pour "recevoir") — lie si inscrit dans la base clients
+      if (finalData.type_course === "recevoir" && !finalData.expediteur_client_id && finalData.expediteur_telephone) {
+        try {
+          const digits = finalData.expediteur_telephone.replace(/\D/g, "").slice(-8);
+          const found = await base44.entities.ClientExterne.filter({ telephone: digits })
+            || await base44.entities.ClientExterne.filter({ telephone: "+226" + digits });
+          if (found?.length > 0) {
+            finalData.expediteur_client_id = found[0].id;
           }
         } catch (_) {}
       }
@@ -211,6 +257,16 @@ export default function CourseExterneFormSync() {
       prixEstime = Math.round(distance * 100);
     }
 
+    // Pour "recevoir" : la destination = position du client destinataire (jamais inconnue)
+    const isRecevoir = formData.type_course === "recevoir";
+    const adresseArrivee = isRecevoir
+      ? (formData.adresse_arrivee || (formData.livraisonGPS ? "Position GPS client" : clientProfil?.quartier || "Chez le destinataire"))
+      : (formData.destination_inconnue ? "Destination à définir" : formData.adresse_arrivee);
+
+    const gpsArriveLat = isRecevoir ? formData.gps_arrivee_lat : (formData.destination_inconnue ? null : formData.gps_arrivee_lat);
+    const gpsArriveLng = isRecevoir ? formData.gps_arrivee_lng : (formData.destination_inconnue ? null : formData.gps_arrivee_lng);
+    const destInconnue = isRecevoir ? false : (formData.destination_inconnue || false);
+
     createMutation.mutate({
       client_nom: formData.client_nom,
       client_telephone: formData.client_telephone,
@@ -225,14 +281,14 @@ export default function CourseExterneFormSync() {
       destinataire_client_id: destinataireClientId,
       recipient_has_app: false,
       adresse_depart: formData.adresse_depart || (formData.recuperationGPS ? "Position GPS" : ""),
-      adresse_arrivee: formData.destination_inconnue ? "Destination à définir" : formData.adresse_arrivee,
+      adresse_arrivee: adresseArrivee,
       type_colis: formData.type_colis,
       notes: formData.notes,
       gps_depart_lat: formData.gps_depart_lat,
       gps_depart_lng: formData.gps_depart_lng,
-      gps_arrivee_lat: formData.destination_inconnue ? null : formData.gps_arrivee_lat,
-      gps_arrivee_lng: formData.destination_inconnue ? null : formData.gps_arrivee_lng,
-      destination_inconnue: formData.destination_inconnue || false,
+      gps_arrivee_lat: gpsArriveLat,
+      gps_arrivee_lng: gpsArriveLng,
+      destination_inconnue: destInconnue,
       prix_estimate: prixEstime,
       statut: "recherche_livreur",
     });
