@@ -323,15 +323,15 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] text-gray-400 font-semibold uppercase">Livrer</p>
-                <p className="text-sm font-bold text-gray-800">{course.adresse_arrivee}</p>
+                <p className="text-sm font-bold text-gray-800">
+                  {course.destination_inconnue && !course.gps_arrivee_lat
+                    ? "📍 Position GPS du destinataire"
+                    : (course.adresse_arrivee || "Destination")}
+                </p>
+                {course.destination_inconnue && !course.gps_arrivee_lat && (
+                  <p className="text-[10px] text-green-600 font-medium">Suivi en temps réel</p>
+                )}
               </div>
-              {course.gps_arrivee_lat && colisRecupere && (
-                <a href={`https://www.google.com/maps?q=${course.gps_arrivee_lat},${course.gps_arrivee_lng}`} target="_blank" rel="noreferrer">
-                  <div className="w-9 h-9 rounded-xl bg-green-100 flex items-center justify-center">
-                    <Navigation className="w-4 h-4 text-green-600" />
-                  </div>
-                </a>
-              )}
             </div>
           </div>
 
@@ -386,7 +386,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 destLng={course.gps_arrivee_lng}
                 destLabel={course.adresse_arrivee}
                 destinataireTelephone={course.destinataire_telephone}
-                destinationInconnue={!course.gps_arrivee_lat && course.destination_inconnue}
+                // "Destination à définir" seulement si PAS de GPS fixe ET destination_inconnue
+                // Le composant gérera automatiquement le GPS live du destinataire
+                destinationInconnue={!course.gps_arrivee_lat && !!course.destination_inconnue}
               />
             )
           )}
