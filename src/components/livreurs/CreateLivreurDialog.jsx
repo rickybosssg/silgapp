@@ -29,12 +29,16 @@ export default function CreateLivreurDialog({ reseau = "interne" }) {
   const createMutation = useMutation({
     mutationFn: async () => {
       const code = `LIV-${Date.now()}`;
-      await base44.functions.invoke("createLivreur", {
+      console.log("Création livreur avec données:", { ...form, code_identification: code });
+      const result = await base44.functions.invoke("createLivreur", {
         ...form,
         code_identification: code,
       });
+      console.log("Résultat création:", result);
+      return result;
     },
     onSuccess: () => {
+      console.log("✅ Livreur créé avec succès");
       queryClient.invalidateQueries({ queryKey: ["livreurs"] });
       queryClient.invalidateQueries({ queryKey: ["livreurs-externes"] });
       toast.success("Livreur créé avec succès ✅");
@@ -51,7 +55,10 @@ export default function CreateLivreurDialog({ reseau = "interne" }) {
         reseau: reseau,
       });
     },
-    onError: (err) => toast.error("Erreur : " + err.message),
+    onError: (err) => {
+      console.error("❌ Erreur création livreur:", err);
+      toast.error("Erreur : " + err.message);
+    },
   });
 
   const handlePhoto = async (e, fieldName) => {
