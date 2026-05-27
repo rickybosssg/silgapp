@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
       let distanceKm = null;
       let source = null;
 
-      // Essai 1 : GPS récupération → GPS livraison
+      // Règle métier : distance = GPS récupération → GPS livraison UNIQUEMENT
       if (course.latitude_recuperation && course.longitude_recuperation &&
           course.latitude_livraison && course.longitude_livraison) {
         distanceKm = haversine(
@@ -47,29 +47,13 @@ Deno.serve(async (req) => {
         source = 'gps_reel';
       }
 
-      // Essai 2 : GPS depart fixe → GPS arrivee fixe
-      if (!distanceKm && course.gps_depart_lat && course.gps_depart_lng &&
-          course.gps_arrivee_lat && course.gps_arrivee_lng) {
-        distanceKm = haversine(
-          course.gps_depart_lat, course.gps_depart_lng,
-          course.gps_arrivee_lat, course.gps_arrivee_lng
-        );
-        source = 'gps_fixe';
-      }
-
-      // Essai 3 : prix_estimate (si > 0)
-      if (!distanceKm && course.prix_estimate && course.prix_estimate > 0) {
-        distanceKm = course.prix_estimate / 100;
-        source = 'prix_estimate';
-      }
-
-      // Essai 4 : distance minimum 1 km (prix minimum 100F)
+      // Fallback anti-bug : GPS manquant → 1 km minimum
       if (!distanceKm || distanceKm <= 0) {
         distanceKm = 1.0;
         source = 'minimum_fallback';
       }
 
-      const distSafe = Math.max(distanceKm, 1.0);
+      const distSafe = distanceKm;
       const prixFinal = Math.round(distSafe * 100);
       const commission = Math.round(prixFinal * 0.3);
       const montantLivreur = prixFinal - commission;

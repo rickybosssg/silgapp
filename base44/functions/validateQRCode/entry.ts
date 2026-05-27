@@ -98,16 +98,18 @@ Deno.serve(async (req) => {
         colis_livre_at: now,
       };
 
-      // Calcul prix final — cascade de fallbacks GPS
-      const latRecup = course.latitude_recuperation || course.gps_depart_lat;
-      const lngRecup = course.longitude_recuperation || course.gps_depart_lng;
-      // Priorité : GPS livreur au moment livraison, puis GPS fixe arrivée, puis GPS destinataire
-      const latLivr = latitude || course.gps_arrivee_lat || course.latitude_arrivee_livraison;
-      const lngLivr = longitude || course.gps_arrivee_lng || course.longitude_arrivee_livraison;
+      // ── Calcul prix final ──────────────────────────────────────────────────
+      // Règle métier : distance = GPS récupération → GPS livraison UNIQUEMENT
+      // Le fallback minimum ne s'active qu'en cas d'absence totale de GPS.
+      const latRecup = course.latitude_recuperation;
+      const lngRecup = course.longitude_recuperation;
+      const latLivr = latitude; // GPS du livreur au moment du scan de livraison
+      const lngLivr = longitude;
 
       if (latRecup && lngRecup && latLivr && lngLivr) {
+        // Cas normal : distance récupération → livraison
         const dist = haversine(latRecup, lngRecup, latLivr, lngLivr);
-        const distSafe = Math.max(Number(dist || 0), 0.5); // minimum 0.5 km → 50 F
+        const distSafe = Math.max(Number(dist || 0), 0.1); // sécurité anti-zéro uniquement
         const prixFinal = Math.round(distSafe * 100);
         const commission = Math.round(prixFinal * 0.3);
         const montantLivreur = prixFinal - commission;
@@ -115,20 +117,18 @@ Deno.serve(async (req) => {
         updateData.prix_final = prixFinal;
         updateData.commission_silga = commission;
         updateData.montant_livreur = montantLivreur;
-        // Sauvegarder la destination finale GPS
-        if (latitude && longitude) {
-          updateData.gps_arrivee_lat = latitude;
-          updateData.gps_arrivee_lng = longitude;
-          updateData.latitude_arrivee_livraison = latitude;
-          updateData.longitude_arrivee_livraison = longitude;
-        }
-      } else if (course.prix_estimate && course.prix_estimate > 0) {
-        // Dernier recours : utiliser le prix estimé si aucun GPS disponible
-        const prixFinal = course.prix_estimate;
-        const distEstimee = prixFinal / 100;
+        updateData.gps_arrivee_lat = latitude;
+        updateData.gps_arrivee_lng = longitude;
+        updateData.latitude_arrivee_livraison = latitude;
+        updateData.longitude_arrivee_livraison = longitude;
+      } else {
+        // Fallback anti-bug : GPS manquant (récupération ou livraison non capturé)
+        // Prix minimum 1 km = 100 F pour éviter une course à 0 F
+        const distFallback = 1.0;
+        const prixFinal = 100;
         const commission = Math.round(prixFinal * 0.3);
         const montantLivreur = prixFinal - commission;
-        updateData.distance_reelle_km = distEstimee;
+        updateData.distance_reelle_km = distFallback;
         updateData.prix_final = prixFinal;
         updateData.commission_silga = commission;
         updateData.montant_livreur = montantLivreur;

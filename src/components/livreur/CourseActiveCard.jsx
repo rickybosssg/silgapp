@@ -124,31 +124,27 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     let commissionSilga = courseData?.commission_silga ?? course.commission_silga ?? 0;
 
     // Fallback local : si le backend n'a pas pu calculer (GPS manquant),
-    // recalculer depuis les points GPS disponibles dans la course
-    if ((!distanceKm || distanceKm <= 0) && course.latitude_recuperation && course.longitude_recuperation) {
-      const latLivr = courseData?.latitude_livraison || course.gps_arrivee_lat;
-      const lngLivr = courseData?.longitude_livraison || course.gps_arrivee_lng;
-      if (latLivr && lngLivr) {
-        const R = 6371;
-        const dLat = ((latLivr - course.latitude_recuperation) * Math.PI) / 180;
-        const dLon = ((lngLivr - course.longitude_recuperation) * Math.PI) / 180;
-        const a = Math.sin(dLat / 2) ** 2 +
-          Math.cos((course.latitude_recuperation * Math.PI) / 180) *
-          Math.cos((latLivr * Math.PI) / 180) *
-          Math.sin(dLon / 2) ** 2;
-        const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        distanceKm = Math.max(dist, 0.5);
-        prixFinal = Math.round(distanceKm * 100);
-        montantLivreur = Math.round(prixFinal * 0.7);
-        commissionSilga = Math.round(prixFinal * 0.3);
-        // Sauvegarder le recalcul en base
-        base44.entities.CourseExterne.update(course.id, {
-          distance_reelle_km: distanceKm,
-          prix_final: prixFinal,
-          montant_livreur: montantLivreur,
-          commission_silga: commissionSilga,
-        }).catch(() => null);
-      }
+    // recalculer uniquement depuis GPS récupération → GPS livraison (règle métier)
+    if ((!distanceKm || distanceKm <= 0) && course.latitude_recuperation && course.longitude_recuperation &&
+        courseData?.latitude_livraison && courseData?.longitude_livraison) {
+      const latR = course.latitude_recuperation, lngR = course.longitude_recuperation;
+      const latL = courseData.latitude_livraison, lngL = courseData.longitude_livraison;
+      const R = 6371;
+      const dLat = ((latL - latR) * Math.PI) / 180;
+      const dLon = ((lngL - lngR) * Math.PI) / 180;
+      const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos((latR * Math.PI) / 180) * Math.cos((latL * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+      const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      distanceKm = Math.max(dist, 0.1);
+      prixFinal = Math.round(distanceKm * 100);
+      montantLivreur = Math.round(prixFinal * 0.7);
+      commissionSilga = Math.round(prixFinal * 0.3);
+      base44.entities.CourseExterne.update(course.id, {
+        distance_reelle_km: distanceKm,
+        prix_final: prixFinal,
+        montant_livreur: montantLivreur,
+        commission_silga: commissionSilga,
+      }).catch(() => null);
     }
 
     const merged = {
