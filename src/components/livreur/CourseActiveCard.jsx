@@ -524,12 +524,12 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 </div>
                 {isExterne ? (
                   <div className="grid grid-cols-3 gap-2">
-                    <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
-                      <p className="text-[10px] text-gray-400 font-semibold uppercase">Distance</p>
-                      <p className="text-sm font-black text-gray-800">
-                        {dist > 0 ? `${dist.toFixed(1)} km` : "GPS requis"}
-                      </p>
-                    </div>
+                    {dist > 0 && (
+                      <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
+                        <p className="text-[10px] text-gray-400 font-semibold uppercase">Distance</p>
+                        <p className="text-sm font-black text-gray-800">{dist.toFixed(1)} km</p>
+                      </div>
+                    )}
                     <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
                       <p className="text-[10px] text-gray-400 font-semibold uppercase">Prix final</p>
                       <p className="text-sm font-black text-blue-700">

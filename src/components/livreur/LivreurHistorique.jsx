@@ -209,10 +209,10 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
                       isExterne ? (
                         <div className="flex flex-wrap gap-1 mt-1">
                           {(() => {
-                            const dist = Number(course.distance_reelle_km || 0);
-                            const prix = Number(course.prix_final || (dist > 0 ? dist * 100 : 0));
-                            const gain = Number(course.montant_livreur > 0 ? course.montant_livreur : Math.round(prix * 0.7));
-                            const commission = Number(course.commission_silga > 0 ? course.commission_silga : Math.round(prix * 0.3));
+                            const dist = course.distance_reelle_km > 0 ? Number(course.distance_reelle_km) : 0;
+                            const prix = course.prix_final > 0 ? Number(course.prix_final) : 0;
+                            const gain = course.montant_livreur > 0 ? Number(course.montant_livreur) : 0;
+                            const commission = course.commission_silga > 0 ? Number(course.commission_silga) : 0;
                             let dureeMin = null;
                             if (course.heure_livraison && course.heure_recuperation) {
                               dureeMin = Math.round((new Date(course.heure_livraison) - new Date(course.heure_recuperation)) / 60000);

@@ -20,22 +20,24 @@ export default function HistoriqueDuJour({ courses }) {
 
   const livrees = coursesHistorique.filter(c => c.statut === "livree");
 
-  // Fonctions de fallback pour les calculs
-  const getDistance = (c) => c.distance_reelle_km
-    || (c.latitude_recuperation && c.longitude_recuperation && c.latitude_livraison && c.longitude_livraison
-      ? (() => {
-          const R = 6371, dLat = ((c.latitude_livraison - c.latitude_recuperation) * Math.PI) / 180;
-          const dLon = ((c.longitude_livraison - c.longitude_recuperation) * Math.PI) / 180;
-          const a = Math.sin(dLat/2)**2 + Math.cos(c.latitude_recuperation*Math.PI/180)*Math.cos(c.latitude_livraison*Math.PI/180)*Math.sin(dLon/2)**2;
-          return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        })()
-      : null) || 0;
-  const getPrix = (c) => c.prix_final || (getDistance(c) > 0 ? Math.round(getDistance(c) * 100) : 0);
-  const getCommission = (c) => c.commission_silga || (getPrix(c) > 0 ? Math.round(getPrix(c) * 0.3) : 0);
+  // Fonctions de calcul — retournent null si donnée absente (jamais 0)
+  const getDistance = (c) => {
+    if (c.distance_reelle_km > 0) return c.distance_reelle_km;
+    if (c.latitude_recuperation && c.longitude_recuperation && c.latitude_livraison && c.longitude_livraison) {
+      const R = 6371, dLat = ((c.latitude_livraison - c.latitude_recuperation) * Math.PI) / 180;
+      const dLon = ((c.longitude_livraison - c.longitude_recuperation) * Math.PI) / 180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(c.latitude_recuperation*Math.PI/180)*Math.cos(c.latitude_livraison*Math.PI/180)*Math.sin(dLon/2)**2;
+      const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return d > 0 ? d : null;
+    }
+    return null;
+  };
+  const getPrix = (c) => c.prix_final > 0 ? c.prix_final : null;
+  const getCommission = (c) => c.commission_silga > 0 ? c.commission_silga : null;
 
-  const totalCA = livrees.reduce((sum, c) => sum + getPrix(c), 0);
-  const totalCommission = livrees.reduce((sum, c) => sum + getCommission(c), 0);
-  const totalDistance = livrees.reduce((sum, c) => sum + getDistance(c), 0);
+  const totalCA = livrees.reduce((sum, c) => sum + (getPrix(c) || 0), 0);
+  const totalCommission = livrees.reduce((sum, c) => sum + (getCommission(c) || 0), 0);
+  const totalDistance = livrees.reduce((sum, c) => sum + (getDistance(c) || 0), 0);
 
   if (coursesHistorique.length === 0) {
     return (
@@ -102,13 +104,12 @@ function CourseHistoriqueRow({ course }) {
     : course.heure_livraison && course.heure_acceptation
       ? Math.round((new Date(course.heure_livraison) - new Date(course.heure_acceptation)) / 60000)
       : null;
-  // Distance avec fallback GPS
-  const distance = course.distance_reelle_km
-    || haversineKm(course.latitude_recuperation, course.longitude_recuperation, course.latitude_livraison, course.longitude_livraison)
-    || haversineKm(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng);
-  // Prix avec fallback distance
-  const prixFinal = course.prix_final || (distance ? Math.round(distance * 100) : null);
-  const commission = course.commission_silga || (prixFinal ? Math.round(prixFinal * 0.3) : null);
+  // Distance : GPS récupération → GPS livraison uniquement (règle métier)
+  const distance = course.distance_reelle_km > 0 ? course.distance_reelle_km
+    : haversineKm(course.latitude_recuperation, course.longitude_recuperation, course.latitude_livraison, course.longitude_livraison)
+    || null;
+  const prixFinal = course.prix_final > 0 ? course.prix_final : null;
+  const commission = course.commission_silga > 0 ? course.commission_silga : null;
 
   return (
     <div className={`border rounded-xl p-3 ${isLivree ? "bg-green-50/50 border-green-200" : "bg-red-50/50 border-red-200"}`}>

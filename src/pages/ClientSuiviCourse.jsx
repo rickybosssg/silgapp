@@ -485,8 +485,8 @@ export default function ClientSuiviCourse() {
                   {(() => {
                     const distFinal = maCourse.distance_reelle_km
                       || haversineKm(maCourse.latitude_recuperation, maCourse.longitude_recuperation, maCourse.latitude_livraison, maCourse.longitude_livraison)
-                      || haversineKm(maCourse.gps_depart_lat, maCourse.gps_depart_lng, maCourse.gps_arrivee_lat, maCourse.gps_arrivee_lng);
-                    const prixFinal = maCourse.prix_final || (distFinal ? Math.round(distFinal * 100) : 0);
+                      || null;
+                    const prixFinal = maCourse.prix_final > 0 ? maCourse.prix_final : (distFinal > 0 ? Math.round(distFinal * 100) : null);
                     const dureeMs = maCourse.heure_livraison && maCourse.heure_recuperation
                       ? new Date(maCourse.heure_livraison) - new Date(maCourse.heure_recuperation)
                       : maCourse.heure_livraison && maCourse.heure_acceptation
@@ -578,8 +578,8 @@ export default function ClientSuiviCourse() {
                     {(() => {
                       const distD = maCourse.distance_reelle_km
                         || haversineKm(maCourse.latitude_recuperation, maCourse.longitude_recuperation, maCourse.latitude_livraison, maCourse.longitude_livraison)
-                        || haversineKm(maCourse.gps_depart_lat, maCourse.gps_depart_lng, maCourse.gps_arrivee_lat, maCourse.gps_arrivee_lng);
-                      const prixD = maCourse.prix_final || (distD ? Math.round(distD * 100) : 0);
+                        || null;
+                      const prixD = maCourse.prix_final > 0 ? maCourse.prix_final : (distD > 0 ? Math.round(distD * 100) : null);
                       const dureeD = maCourse.heure_livraison && maCourse.heure_recuperation
                         ? Math.round((new Date(maCourse.heure_livraison) - new Date(maCourse.heure_recuperation)) / 60000)
                         : maCourse.heure_livraison && maCourse.heure_acceptation
