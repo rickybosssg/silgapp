@@ -348,7 +348,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] text-gray-400 font-semibold uppercase">Livrer</p>
                 <p className="text-sm font-bold text-gray-800">
-                  {course.adresse_arrivee || (course.destination_inconnue ? "À définir avec le destinataire" : "Destination")}
+                  {colisRecupere && course.destination_inconnue
+                    ? "📍 GPS du destinataire requis"
+                    : course.adresse_arrivee || "Destination"}
                 </p>
               </div>
             </div>
@@ -405,9 +407,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 destLng={course.gps_arrivee_lng}
                 destLabel={course.adresse_arrivee}
                 destinataireTelephone={course.destinataire_telephone}
-                // "Destination à définir" seulement si PAS de GPS fixe ET destination_inconnue
-                // Le composant gérera automatiquement le GPS live du destinataire
-                destinationInconnue={!course.gps_arrivee_lat && !!course.destination_inconnue}
+                destinationInconnue={!!course.destination_inconnue}
               />
             )
           )}

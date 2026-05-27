@@ -134,10 +134,13 @@ export default function NavigationGPS({
   const { gps: destGps, connecte, gpsActif: destGpsActif, lastUpdate, loading: destLoading, client: destClient, refetch } =
     useDestinataireLive(isLivraison ? destinataireTelephone : null, isLivraison);
 
-  // Destination effective : GPS destinataire si disponible, sinon coordonnées fixes
+  // Destination effective : GPS destinataire si disponible (PRIORITÉ ABSOLUE), sinon coordonnées fixes
   const effectiveLat = (isLivraison && destGps?.lat) ? destGps.lat : destLat;
   const effectiveLng = (isLivraison && destGps?.lng) ? destGps.lng : destLng;
   const usesLiveGps = isLivraison && !!(destGps?.lat && destGps?.lng);
+
+  // CRITICAL : canNavigate doit être vrai si le GPS du destinataire existe, même si destinationInconnue=true
+  const canNavigate = !!(effectiveLat && effectiveLng);
 
   // Suivi GPS livreur (watchPosition)
   useEffect(() => {
@@ -158,7 +161,6 @@ export default function NavigationGPS({
     return () => navigator.geolocation.clearWatch(watchId);
   }, [effectiveLat, effectiveLng]);
 
-  const canNavigate = !!(effectiveLat && effectiveLng);
   const isRecup = phase === "recuperation";
 
   // Boutons contact
