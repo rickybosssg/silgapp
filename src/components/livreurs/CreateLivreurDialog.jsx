@@ -67,12 +67,9 @@ export default function CreateLivreurDialog({ reseau = "interne" }) {
     
     setUploading(true);
     try {
-      // Lire le fichier comme ArrayBuffer
-      const arrayBuffer = await file.arrayBuffer();
-      
-      // Utiliser l'intégration Core.UploadFile avec le fichier brut
+      // Utiliser le fichier directement (l'SDK gère la conversion)
       const result = await base44.integrations.Core.UploadFile({ 
-        file: arrayBuffer
+        file
       });
       
       if (result && result.file_url) {
