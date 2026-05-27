@@ -5,12 +5,13 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, Package, DollarSign, TrendingUp, ArrowLeft, Truck, AlertCircle, Eye, MapPin, CreditCard, Download, Save, ExternalLink } from "lucide-react";
+import { Users, Package, DollarSign, TrendingUp, ArrowLeft, Truck, AlertCircle, Eye, MapPin, CreditCard, Download, Save, ExternalLink, Bug, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import ClientsExternesPanel from "@/components/admin/ClientsExternesPanel";
 import HistoriqueDuJour from "@/components/admin/HistoriqueDuJour";
+import DiagnosticLivreurCard from "@/components/admin/DiagnosticLivreurCard";
 
 export default function DashboardAdminExterne() {
   const { data: courses = [] } = useQuery({
@@ -146,7 +147,8 @@ export default function DashboardAdminExterne() {
       )}
 
       {/* Actions rapides */}
-      <div className="grid sm:grid-cols-2 gap-3">
+      <div className="grid sm:grid-cols-3 gap-3">
+        <DiagnosticLivreurCard />
         <Link to="/livreurs" className="flex-1">
           <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer">
             <div className="flex items-center gap-3">
