@@ -262,7 +262,8 @@ export default function CourseExterneFormSync() {
         formData.gps_depart_lat, formData.gps_depart_lng,
         formData.gps_arrivee_lat, formData.gps_arrivee_lng
       );
-      prixEstime = Math.round(distance * 100);
+      // Minimum 0.1 km = 10F pour éviter prix_estimate = 0
+      prixEstime = Math.max(Math.round(distance * 100), 10);
     }
 
     // Pour "recevoir" : la destination = position du client destinataire (jamais inconnue)

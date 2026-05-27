@@ -109,11 +109,12 @@ Deno.serve(async (req) => {
       if (latRecup && lngRecup && latLivr && lngLivr) {
         // Cas normal : distance récupération → livraison
         const dist = haversine(latRecup, lngRecup, latLivr, lngLivr);
-        const distSafe = Math.max(Number(dist || 0), 0.1); // sécurité anti-zéro uniquement
-        const prixFinal = Math.round(distSafe * 100);
+        // Arrondir à 1 décimale pour éviter les effets de bord (ex: 0.0015 → 0.0 → prix=0)
+        const distArrondie = Math.max(Number(dist) || 0, 0.1); // Minimum 0.1 km = 10F
+        const prixFinal = Math.round(distArrondie * 100);
         const commission = Math.round(prixFinal * 0.3);
         const montantLivreur = prixFinal - commission;
-        updateData.distance_reelle_km = distSafe;
+        updateData.distance_reelle_km = distArrondie;
         updateData.prix_final = prixFinal;
         updateData.commission_silga = commission;
         updateData.montant_livreur = montantLivreur;

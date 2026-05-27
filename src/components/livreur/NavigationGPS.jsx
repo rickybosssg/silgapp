@@ -196,7 +196,7 @@ export default function NavigationGPS({
     if (!canNavigate) return null;
     return (
       <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
-        {dist !== null && dist > 0 && (
+        {dist !== null && (
           <ETABar dist={dist} eta={eta} color="amber" />
         )}
         <NavButtons
@@ -305,8 +305,8 @@ export default function NavigationGPS({
         </div>
       )}
 
-      {/* ETA + distance — seulement si valeurs réelles > 0 */}
-      {dist !== null && dist > 0 && (
+      {/* ETA + distance — affiché même si très proche */}
+      {dist !== null && (
         <ETABar dist={dist} eta={eta} color="green" />
       )}
 
@@ -351,21 +351,25 @@ export default function NavigationGPS({
 function ETABar({ dist, eta, color }) {
   const textColor = color === "amber" ? "text-amber-800" : "text-green-800";
   const iconColor = color === "amber" ? "text-amber-600" : "text-green-600";
+  
+  // Calcul ETA : si distance < 0.1 km (100m), afficher "~1 min"
+  const etaMinutes = eta !== null ? eta : (dist !== null && dist < 0.1 ? 1 : null);
+  
   return (
     <div className="flex items-center gap-4">
       {dist !== null && (
         <div className="flex items-center gap-1.5">
           <Ruler className={cn("w-4 h-4", iconColor)} />
           <span className={cn("text-sm font-bold", textColor)}>
-            {dist < 1 ? `${Math.round(dist * 1000)} m` : `${dist.toFixed(1)} km`}
+            {dist < 0.1 ? `${Math.round(dist * 1000)} m` : dist < 1 ? `${(dist * 1000).toFixed(0)} m` : `${dist.toFixed(1)} km`}
           </span>
         </div>
       )}
-      {eta !== null && (
+      {etaMinutes !== null && (
         <div className="flex items-center gap-1.5">
           <Clock className={cn("w-4 h-4", iconColor)} />
           <span className={cn("text-sm font-bold", textColor)}>
-            {eta <= 1 ? "~1 min" : `~${eta} min`}
+            {etaMinutes <= 1 ? "~1 min" : `~${etaMinutes} min`}
           </span>
         </div>
       )}

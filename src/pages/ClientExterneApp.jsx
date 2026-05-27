@@ -60,13 +60,37 @@ export default function ClientExterneApp() {
     try {
       if (!pos?.latitude || !pos?.longitude || !profil?.id) return;
       const user = await base44.auth.me();
-      // Trouver les courses où ce client est destinataire (recevoir) et qui sont en cours
-      const courses = await base44.entities.CourseExterne.filter({
+      
+      // Trouver les courses où ce client est destinataire (PAR ID OU PAR TÉLÉPHONE)
+      const coursesById = await base44.entities.CourseExterne.filter({
         destinataire_client_id: profil.id,
         statut: ["nouvelle", "recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison"]
       });
+      
+      // Fallback : chercher par téléphone si destinataire_client_id manquant
+      let coursesByPhone = [];
+      if (profil.telephone) {
+        const phoneNorm = profil.telephone.replace(/\D/g, "");
+        const local = phoneNorm.startsWith("226") ? phoneNorm.slice(3) : phoneNorm;
+        // Essais successifs
+        for (const fmt of [profil.telephone, phoneNorm, local]) {
+          const res = await base44.entities.CourseExterne.filter({
+            destinataire_telephone: fmt,
+            statut: ["nouvelle", "recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison"]
+          });
+          if (res?.length > 0) {
+            coursesByPhone = [...coursesByPhone, ...res];
+          }
+        }
+      }
+      
+      // Fusionner et dédupliquer
+      const map = new Map();
+      [...(coursesById || []), ...coursesByPhone].forEach(c => map.set(c.id, c));
+      const courses = [...map.values()];
+      
       // Mettre à jour uniquement si GPS différent ou absent
-      for (const course of (courses || [])) {
+      for (const course of courses) {
         const needsUpdate = 
           !course.gps_arrivee_lat || 
           !course.gps_arrivee_lng ||
