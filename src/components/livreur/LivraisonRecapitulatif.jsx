@@ -101,12 +101,19 @@ export default function LivraisonRecapitulatif({ course, onClose }) {
             </div>
           )}
 
-          {/* Bouton principal */}
+          {/* Message d'instruction */}
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-center">
+            <p className="text-sm font-bold text-amber-800">💵 Encaissez le paiement du client</p>
+            <p className="text-xs text-amber-600 mt-0.5">Appuyez sur PAYER après avoir reçu le montant</p>
+          </div>
+
+          {/* Bouton PAYER — impossible à rater */}
           <button
-            className="w-full h-14 rounded-2xl bg-gradient-to-b from-green-600 to-emerald-700 text-white font-black text-base shadow-lg shadow-green-200 active:scale-[0.98] transition-all mt-2"
+            className="w-full rounded-2xl bg-gradient-to-b from-green-500 to-green-700 text-white font-black text-xl shadow-xl shadow-green-300 active:scale-[0.97] transition-all mt-1"
+            style={{ minHeight: "72px", letterSpacing: "0.05em" }}
             onClick={onClose}
           >
-            ✅ Paiement reçu — Retour disponible
+            💰 PAYER
           </button>
         </div>
       </div>
