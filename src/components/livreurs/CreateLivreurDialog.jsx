@@ -99,6 +99,7 @@ export default function CreateLivreurDialog({ reseau = "interne" }) {
     
     // Validation stricte
     const errors = [];
+    if (!form.prenom?.trim()) errors.push("Le prénom est obligatoire");
     if (!form.nom?.trim()) errors.push("Le nom est obligatoire");
     if (!form.telephone?.trim()) errors.push("Le téléphone est obligatoire");
     if (!form.user_email?.trim()) errors.push("L'email du compte livreur est obligatoire");
