@@ -324,13 +324,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] text-gray-400 font-semibold uppercase">Livrer</p>
                 <p className="text-sm font-bold text-gray-800">
-                  {course.destination_inconnue && !course.gps_arrivee_lat
-                    ? "📍 Position GPS du destinataire"
-                    : (course.adresse_arrivee || "Destination")}
+                  {course.adresse_arrivee || (course.destination_inconnue ? "À définir avec le destinataire" : "Destination")}
                 </p>
-                {course.destination_inconnue && !course.gps_arrivee_lat && (
-                  <p className="text-[10px] text-green-600 font-medium">Suivi en temps réel</p>
-                )}
               </div>
             </div>
           </div>
