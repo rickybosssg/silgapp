@@ -1,21 +1,28 @@
 import React from "react";
 
 const SUPPORT_NUMBER = "22667572857";
-const SUPPORT_MSG = "Bonjour SILGAPP 👋\nJ'ai besoin d'aide concernant ma course.";
+const SUPPORT_MSG = "Bonjour SILGAPP 👋\nJ'ai besoin d'aide sur SILGAPP.";
 
 export function openWhatsAppNative(phone, message = "") {
-  // Normaliser le numéro : chiffres uniquement, avec indicatif
   let num = phone?.replace(/\D/g, "") || "";
-  // Si commence par 0, remplacer par 226
   if (num.startsWith("0") && num.length <= 9) num = "226" + num.slice(1);
-  // Si numéro local (8 chiffres BF), ajouter 226
   if (num.length === 8) num = "226" + num;
 
   const encoded = encodeURIComponent(message);
-  // Sur Android/iOS, whatsapp:// ouvre l'app directement
-  // On utilise un lien <a> avec window.open pour éviter de naviguer dans la SPA
-  const waUrl = `https://wa.me/${num}?text=${encoded}`;
-  window.open(waUrl, "_blank", "noopener,noreferrer");
+  // Deep link natif — ouvre WhatsApp directement sans passer par le navigateur
+  const deepLink = `whatsapp://send?phone=${num}&text=${encoded}`;
+  const fallback = `https://wa.me/${num}?text=${encoded}`;
+
+  const a = document.createElement("a");
+  a.href = deepLink;
+  a.click();
+
+  // Fallback : si WhatsApp n'est pas installé, ouvrir wa.me après 500ms
+  setTimeout(() => {
+    if (document.hasFocus()) {
+      window.open(fallback, "_blank", "noopener,noreferrer");
+    }
+  }, 500);
 }
 
 export default function SupportWhatsApp({ compact = false }) {
@@ -46,7 +53,7 @@ export default function SupportWhatsApp({ compact = false }) {
           <p className="text-xs text-green-700 mt-0.5 leading-relaxed">
             Notre équipe SILGAPP est disponible pour vous assister.
           </p>
-          <p className="text-xs text-green-600 font-bold mt-1">📞 67 57 28 57</p>
+          <p className="text-xs text-green-600 font-bold mt-1">67 57 28 57</p>
         </div>
       </div>
       <button
