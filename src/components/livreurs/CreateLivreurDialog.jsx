@@ -30,8 +30,10 @@ export default function CreateLivreurDialog({ reseau = "interne" }) {
     mutationFn: async () => {
       const code = `LIV-${Date.now()}`;
       const response = await base44.functions.invoke("createLivreur", {
-        ...form,
-        code_identification: code,
+        data: {
+          ...form,
+          code_identification: code,
+        }
       });
       // Vérifier si la fonction a retourné une erreur métier
       if (response.data && response.data.success === false) {
