@@ -29,16 +29,17 @@ export default function CreateLivreurDialog({ reseau = "interne" }) {
   const createMutation = useMutation({
     mutationFn: async () => {
       const code = `LIV-${Date.now()}`;
-      console.log("Création livreur avec données:", { ...form, code_identification: code });
-      const result = await base44.functions.invoke("createLivreur", {
+      const response = await base44.functions.invoke("createLivreur", {
         ...form,
         code_identification: code,
       });
-      console.log("Résultat création:", result);
-      return result;
+      // Vérifier si la fonction a retourné une erreur métier
+      if (response.data && response.data.success === false) {
+        throw new Error(response.data.error || "Erreur lors de la création");
+      }
+      return response.data;
     },
     onSuccess: () => {
-      console.log("✅ Livreur créé avec succès");
       queryClient.invalidateQueries({ queryKey: ["livreurs"] });
       queryClient.invalidateQueries({ queryKey: ["livreurs-externes"] });
       toast.success("Livreur créé avec succès ✅");
@@ -56,7 +57,6 @@ export default function CreateLivreurDialog({ reseau = "interne" }) {
       });
     },
     onError: (err) => {
-      console.error("❌ Erreur création livreur:", err);
       toast.error("Erreur : " + err.message);
     },
   });
