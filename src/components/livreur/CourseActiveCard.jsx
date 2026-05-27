@@ -158,6 +158,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     };
     setCourseLivreeData(merged);
     setShowRecapitulatif(true);
+    
+    // IMPORTANT: Ne pas appeler onColisLivre ici, car le backend a déjà tout fait.
+    // Le livreur verra le récapitulatif, puis en fermant, onColisLivre sera appelé pour cleanup.
   };
 
   const handleFermerCourse = () => {

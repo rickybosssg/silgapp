@@ -269,6 +269,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       const gains = course.montant_livreur || 0;
       const dist = course.distance_reelle_km;
       toast.success(`Livraison confirmée ! 🎉${gains > 0 ? ` +${gains.toLocaleString()} F gagnés` : ""}`);
+      // Stocker les données pour affichage du récapitulatif
+      queryClient.setQueryData(["course-livree-data"], course);
       return;
     }
 
