@@ -66,14 +66,6 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const colisRecupere = course.statut === "colis_recupere" || course.statut === "en_livraison";
   const colisLivre = course.statut === "livree";
 
-  // Afficher automatiquement le récapitulatif si la course est passée à "livree" (sans QR)
-  useEffect(() => {
-    if (colisLivre && !showRecapitulatif && !courseLivreeData) {
-      setCourseLivreeData(course);
-      setShowRecapitulatif(true);
-    }
-  }, [colisLivre]);
-
   // Nettoyer le GPS watch quand le composant se démonte
   useEffect(() => {
     return () => {
@@ -460,20 +452,32 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     Scanner pour livrer ✅
                   </button>
                 ) : (
-                  /* ── INTERNE : bouton classique ── */
+                  /* ── INTERNE : bouton classique avec GPS + récapitulatif ── */
                   <button
                     className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                     onClick={() => {
                       if (!navigator.geolocation) {
-                        toast.error("GPS non disponible");
+                        // Pas de GPS → confirmation directe avec récapitulatif
+                        onColisLivre(course, null);
+                        setCourseLivreeData(course);
+                        setShowRecapitulatif(true);
                         return;
                       }
                       navigator.geolocation.getCurrentPosition(
                         (pos) => {
-                          setGpsArrivee({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-                          setShowResume(true);
+                          const gpsArrivee = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                          setGpsArrivee(gpsArrivee);
+                          // Confirmer livraison avec GPS → récapitulatif
+                          onColisLivre(course, gpsArrivee);
+                          setCourseLivreeData({ ...course, latitude_livraison: pos.coords.latitude, longitude_livraison: pos.coords.longitude });
+                          setShowRecapitulatif(true);
                         },
-                        () => setShowPrixModal(true),
+                        () => {
+                          // GPS échec → confirmation quand même avec récapitulatif
+                          onColisLivre(course, null);
+                          setCourseLivreeData(course);
+                          setShowRecapitulatif(true);
+                        },
                         { enableHighAccuracy: true, timeout: 10000 }
                       );
                     }}
