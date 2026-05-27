@@ -262,9 +262,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 </div>
               </a>
               <button onClick={() => {
-                const num = course.client_telephone?.replace(/\D/g, "") || "";
-                window.location.href = `whatsapp://send?phone=${num}`;
-                setTimeout(() => window.open(`https://wa.me/${num}`, "_blank"), 1500);
+                let num = course.client_telephone?.replace(/\D/g, "") || "";
+                if (num.length === 8) num = "226" + num;
+                window.open(`https://wa.me/${num}`, "_blank", "noopener,noreferrer");
               }}>
                 <div className="w-11 h-11 rounded-2xl bg-green-50 border border-green-100 flex items-center justify-center">
                   <svg viewBox="0 0 24 24" className="w-5 h-5 fill-green-600" xmlns="http://www.w3.org/2000/svg">

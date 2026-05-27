@@ -1,13 +1,24 @@
 import React from "react";
-import { CheckCircle2, MapPin, Banknote } from "lucide-react";
+import { CheckCircle2, MapPin, Banknote, Clock, TrendingUp } from "lucide-react";
 
 /**
- * Écran récapitulatif après livraison confirmée.
- * Affiche uniquement distance et prix total — sans détail financier interne.
+ * Écran récapitulatif après livraison confirmée (côté livreur externe).
+ * Affiche distance réelle, temps, prix final, et part livreur.
  */
 export default function LivraisonRecapitulatif({ course, onClose }) {
   const prixFinal = Number(course.prix_final || 0);
   const distance = Number(course.distance_reelle_km || 0);
+  const montantLivreur = Number(course.montant_livreur || (prixFinal * 0.7) || 0);
+  const commission = Number(course.commission_silga || (prixFinal * 0.3) || 0);
+
+  // Calcul temps réel si heures disponibles
+  let tempsMinutes = null;
+  if (course.heure_recuperation && course.heure_livraison) {
+    const diff = new Date(course.heure_livraison) - new Date(course.heure_recuperation);
+    tempsMinutes = Math.round(diff / 60000);
+  } else if (distance > 0) {
+    tempsMinutes = Math.round((distance / 25) * 60);
+  }
 
   return (
     <div
@@ -20,11 +31,11 @@ export default function LivraisonRecapitulatif({ course, onClose }) {
           <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-3">
             <CheckCircle2 className="w-9 h-9 text-white" />
           </div>
-          <p className="text-white font-black text-2xl">Course livrée</p>
+          <p className="text-white font-black text-2xl">Course livrée !</p>
           <p className="text-white/70 text-sm mt-1">Course #{course.id?.slice(-6)}</p>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-3">
           {/* Distance */}
           <div className="flex items-center gap-4 bg-blue-50 rounded-2xl p-4">
             <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
@@ -38,18 +49,45 @@ export default function LivraisonRecapitulatif({ course, onClose }) {
             </div>
           </div>
 
-          {/* Prix */}
+          {/* Temps */}
+          {tempsMinutes !== null && (
+            <div className="flex items-center gap-4 bg-purple-50 rounded-2xl p-4">
+              <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center flex-shrink-0">
+                <Clock className="w-5 h-5 text-purple-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs text-purple-600 font-semibold uppercase tracking-wide">Durée de livraison</p>
+                <p className="text-xl font-black text-purple-900">{tempsMinutes} min</p>
+              </div>
+            </div>
+          )}
+
+          {/* Prix à payer (client) */}
           <div className="flex items-center gap-4 bg-green-50 rounded-2xl p-4">
             <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
               <Banknote className="w-5 h-5 text-green-600" />
             </div>
             <div className="flex-1">
-              <p className="text-xs text-green-600 font-semibold uppercase tracking-wide">Prix à payer</p>
+              <p className="text-xs text-green-600 font-semibold uppercase tracking-wide">Prix à encaisser</p>
               <p className="text-2xl font-black text-green-900">
                 {prixFinal > 0 ? `${prixFinal.toLocaleString()} FCFA` : "—"}
               </p>
             </div>
           </div>
+
+          {/* Gain livreur */}
+          {montantLivreur > 0 && (
+            <div className="flex items-center gap-4 bg-amber-50 rounded-2xl p-4">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <TrendingUp className="w-5 h-5 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs text-amber-600 font-semibold uppercase tracking-wide">Votre gain (70%)</p>
+                <p className="text-xl font-black text-amber-900">{Math.round(montantLivreur).toLocaleString()} FCFA</p>
+                <p className="text-[10px] text-amber-500 mt-0.5">Commission SILGA : {Math.round(commission).toLocaleString()} F (30%)</p>
+              </div>
+            </div>
+          )}
 
           {/* Bouton principal */}
           <button
