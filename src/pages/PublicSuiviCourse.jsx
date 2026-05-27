@@ -26,6 +26,7 @@ const APK_DOWNLOAD_URL = "/telecharger-app";
 export default function PublicSuiviCourse({ token }) {
   const [course, setCourse] = useState(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [livreurPos, setLivreurPos] = useState(null); // Position live du livreur
 
   // Récupérer la course par token ou par ID direct
   useEffect(() => {
@@ -75,9 +76,27 @@ export default function PublicSuiviCourse({ token }) {
     }
   }, [freshCourse]);
 
+  // Charger la position live du livreur (GPS temps réel depuis entité Livreur)
+  useEffect(() => {
+    if (!course?.livreur_id) return;
+    const fetchPos = () => {
+      base44.entities.Livreur.filter({ id: course.livreur_id })
+        .then(r => {
+          const l = r?.[0];
+          if (l?.latitude && l?.longitude) {
+            setLivreurPos({ lat: l.latitude, lng: l.longitude, nom: l.prenom ? `${l.prenom} ${l.nom}` : l.nom });
+          }
+        })
+        .catch(() => null);
+    };
+    fetchPos();
+    const iv = setInterval(fetchPos, 10000);
+    return () => clearInterval(iv);
+  }, [course?.livreur_id]);
+
   // Charger Leaflet pour la carte
   useEffect(() => {
-    if (!course?.livreur_id || !course.latitude_recuperation) return;
+    if (!course?.livreur_id || !livreurPos) return;
 
     const loadLeaflet = async () => {
       // Injecter CSS
@@ -102,31 +121,35 @@ export default function PublicSuiviCourse({ token }) {
     loadLeaflet();
   }, [course]);
 
-  // Initialiser la carte
+  // Initialiser la carte avec position live du livreur
   useEffect(() => {
-    if (!mapLoaded || !course?.livreur_id || !course.latitude_recuperation) return;
+    if (!mapLoaded || !livreurPos) return;
 
-    const map = window.L.map("public-map").setView(
-      [course.latitude_recuperation, course.longitude_recuperation],
-      13
-    );
+    const map = window.L.map("public-map").setView([livreurPos.lat, livreurPos.lng], 14);
 
     window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Marker livreur
-    if (course.latitude_recuperation && course.longitude_recuperation) {
-      window.L.marker([course.latitude_recuperation, course.longitude_recuperation])
-        .addTo(map)
-        .bindPopup(`<b>${course.livreur_nom}</b><br>En position`)
-        .openPopup();
+    const marker = window.L.marker([livreurPos.lat, livreurPos.lng])
+      .addTo(map)
+      .bindPopup(`<b>🚴 ${course?.livreur_nom || livreurPos.nom || 'Livreur'}</b><br>Position en temps réel`)
+      .openPopup();
+
+    // Ajouter marqueurs départ et arrivée si GPS disponible
+    if (course?.gps_depart_lat && course?.gps_depart_lng) {
+      window.L.marker([course.gps_depart_lat, course.gps_depart_lng], {
+        icon: window.L.divIcon({ html: '📍', iconSize: [24, 24], className: '' })
+      }).addTo(map).bindPopup('Point de récupération');
+    }
+    if (course?.gps_arrivee_lat && course?.gps_arrivee_lng) {
+      window.L.marker([course.gps_arrivee_lat, course.gps_arrivee_lng], {
+        icon: window.L.divIcon({ html: '🏁', iconSize: [24, 24], className: '' })
+      }).addTo(map).bindPopup('Point de livraison');
     }
 
-    return () => {
-      map.remove();
-    };
-  }, [mapLoaded, course]);
+    return () => { map.remove(); };
+  }, [mapLoaded, livreurPos]);
 
   if (!course) {
     return (
@@ -260,8 +283,8 @@ export default function PublicSuiviCourse({ token }) {
           </Card>
         )}
 
-        {/* Carte */}
-        {course.livreur_id && course.latitude_recuperation && (
+        {/* Carte — position live du livreur */}
+        {course.livreur_id && livreurPos && (
           <Card className="p-4">
             <h2 className="font-bold text-lg mb-4 flex items-center gap-2">
               <MapPin className="w-5 h-5 text-primary" />

@@ -13,7 +13,7 @@ import CourseStatusBadge from "@/components/courses/CourseStatusBadge";
 export default function ToutesCoursesExternes() {
   const { data: courses = [] } = useQuery({
     queryKey: ["courses-externes"],
-    queryFn: () => base44.entities.Course.filter({ reseau: "externe" }, "-created_date", 200),
+    queryFn: () => base44.entities.CourseExterne.list("-created_date", 200),
     initialData: [],
     refetchInterval: 10000,
   });
@@ -22,7 +22,7 @@ export default function ToutesCoursesExternes() {
     return {
       totale: courses.length,
       nouvelle: courses.filter(c => c.statut === "nouvelle").length,
-      enCours: courses.filter(c => ["acceptee", "en_route_recuperation", "colis_recupere", "en_livraison"].includes(c.statut)).length,
+      enCours: courses.filter(c => ["recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut)).length,
       livree: courses.filter(c => c.statut === "livree").length,
       annulee: courses.filter(c => c.statut === "annulee").length,
     };
@@ -77,8 +77,14 @@ export default function ToutesCoursesExternes() {
                     <span>{format(new Date(course.created_date), "dd/MM HH:mm", { locale: fr })}</span>
                   </div>
                 </div>
-                <div className="flex-shrink-0 ml-4">
-                  <span className="text-sm font-semibold">{course.prix?.toLocaleString() || "0"} FCFA</span>
+                <div className="flex-shrink-0 ml-4 text-right">
+                  {course.prix_final ? (
+                    <span className="text-sm font-semibold text-green-700">{course.prix_final.toLocaleString()} F</span>
+                  ) : course.prix_estimate ? (
+                    <span className="text-xs text-muted-foreground">~{course.prix_estimate.toLocaleString()} F</span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
                 </div>
               </div>
             ))}

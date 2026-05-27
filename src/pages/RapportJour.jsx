@@ -14,7 +14,7 @@ const COLORS = ["#dc2626", "#f59e0b", "#16a34a", "#3b82f6", "#8b5cf6", "#ec4899"
 export default function RapportJour() {
   const { data: courses = [] } = useQuery({
     queryKey: ["courses"],
-    queryFn: () => base44.entities.Course.list("-created_date", 500),
+    queryFn: () => base44.entities.Course.filter({ reseau: "interne" }, "-created_date", 500),
     initialData: [],
   });
 

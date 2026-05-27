@@ -133,7 +133,7 @@ export default function DashboardAdminExterne() {
 
       {/* Actions rapides */}
       <div className="grid sm:grid-cols-2 gap-3">
-        <Link to="/admin/externe/livreurs" className="flex-1">
+        <Link to="/livreurs" className="flex-1">
           <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
@@ -257,13 +257,12 @@ export default function DashboardAdminExterne() {
   );
 }
 
-function StatCard({ title, value, icon: Icon, color, suffix }) {
-  // Icon est déjà passé comme composant depuis les imports lucide-react
+function StatCard({ title, value, icon: IconComp, color, suffix }) {
   return (
     <Card className={`p-4 ${color} text-white`}>
       <div className="flex items-center justify-between mb-2">
         <p className="text-xs opacity-90">{title}</p>
-        <Icon className="w-4 h-4 opacity-80" />
+        {IconComp && <IconComp className="w-4 h-4 opacity-80" />}
       </div>
       <p className="text-2xl font-bold">
         {value}

@@ -263,7 +263,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               </a>
               <button onClick={() => {
                 let num = course.client_telephone?.replace(/\D/g, "") || "";
-                if (num.length === 8) num = "226" + num;
+                if (num.startsWith("226") && num.length === 11) { /* ok */ }
+                else if (num.startsWith("0") && num.length === 9) num = "226" + num.slice(1);
+                else if (num.length === 8) num = "226" + num;
                 window.open(`https://wa.me/${num}`, "_blank", "noopener,noreferrer");
               }}>
                 <div className="w-11 h-11 rounded-2xl bg-green-50 border border-green-100 flex items-center justify-center">
