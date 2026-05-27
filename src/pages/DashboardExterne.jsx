@@ -22,21 +22,24 @@ export default function DashboardExterne() {
   const [selectedCourse, setSelectedCourse] = useState(null);
 
   const { data: courses = [], isLoading } = useQuery({
-    queryKey: ["courses-externes"],
-    queryFn: () => base44.entities.Course.filter({ reseau: "externe" }, "-created_date", 300),
+    queryKey: ["courses-externes-dashboard"],
+    queryFn: () => base44.entities.CourseExterne.list("-created_date", 300),
     initialData: [],
-    refetchInterval: 10000,
+    refetchInterval: 5000,
   });
 
   const { data: livreurs = [] } = useQuery({
     queryKey: ["livreurs-externes"],
-    queryFn: () => base44.entities.Livreur.filter({ reseau: "externe", type_livreur: "externe" }),
+    queryFn: () => base44.entities.Livreur.filter({ type_livreur: "externe" }),
     initialData: [],
-    refetchInterval: 15000,
+    refetchInterval: 5000,
   });
 
+  // Courses du jour OU encore actives
   const todayCourses = useMemo(
-    () => courses.filter(c => isToday(new Date(c.created_date))),
+    () => courses.filter(c =>
+      isToday(new Date(c.created_date)) || !["livree", "annulee"].includes(c.statut)
+    ),
     [courses]
   );
 
@@ -46,19 +49,28 @@ export default function DashboardExterne() {
   );
 
   const coursesTerminees = useMemo(
-    () => todayCourses.filter(c => ["livree", "annulee"].includes(c.statut)),
-    [todayCourses]
+    () => courses.filter(c =>
+      ["livree", "annulee"].includes(c.statut) &&
+      isToday(new Date(c.heure_livraison || c.updated_date || c.created_date))
+    ),
+    [courses]
+  );
+
+  const livreursEnLigne = useMemo(
+    () => livreurs.filter(l => l.statut !== "hors_ligne" && l.validation === "valide" && l.actif !== false),
+    [livreurs]
   );
 
   const stats = useMemo(() => {
-    const total = todayCourses.length;
+    const todayAll = courses.filter(c => isToday(new Date(c.created_date)));
+    const total = todayAll.length;
     const livrees = coursesTerminees.filter(c => c.statut === "livree").length;
     const annulees = coursesTerminees.filter(c => c.statut === "annulee").length;
     const enCours = coursesEnTraitement.length;
-    const ca = coursesTerminees.filter(c => c.statut === "livree").reduce((s, c) => s + (c.prix_reel || c.prix || 0), 0);
-    const dispoLivreurs = livreurs.filter(l => l.statut === "disponible" && l.validation === "valide" && l.actif !== false).length;
+    const ca = coursesTerminees.filter(c => c.statut === "livree").reduce((s, c) => s + (c.prix_final || 0), 0);
+    const dispoLivreurs = livreursEnLigne.filter(l => l.statut === "disponible").length;
     return { total, livrees, annulees, enCours, ca, dispoLivreurs };
-  }, [todayCourses, coursesEnTraitement, coursesTerminees, livreurs]);
+  }, [courses, coursesEnTraitement, coursesTerminees, livreursEnLigne]);
 
   return (
     <div className="px-4 py-4 lg:p-6 space-y-4 lg:space-y-5 max-w-7xl mx-auto">
@@ -101,12 +113,13 @@ export default function DashboardExterne() {
       </div>
 
       {/* Livreurs en ligne */}
-      <LivreursEnLigne livreurs={livreurs} />
+      <LivreursEnLigne livreurs={livreursEnLigne} />
 
       {/* Courses en traitement */}
       <CoursesEnTraitement
         courses={coursesEnTraitement}
         onView={setSelectedCourse}
+        isExterne={true}
       />
 
       {/* Historique du jour */}
