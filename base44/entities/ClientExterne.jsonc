@@ -4,7 +4,11 @@
   "properties": {
     "nom": {
       "type": "string",
-      "description": "Nom complet du client"
+      "description": "Nom de famille du client"
+    },
+    "prenom": {
+      "type": "string",
+      "description": "Pr\u00e9nom du client"
     },
     "telephone": {
       "type": "string",

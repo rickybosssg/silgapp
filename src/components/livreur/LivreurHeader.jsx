@@ -93,7 +93,7 @@ export default function LivreurHeader({
             <p className="text-xs text-white/50">
               {new Date().getHours() < 12 ? "Bonjour" : new Date().getHours() < 18 ? "Bonne journée" : "Bonsoir"} 👋
             </p>
-            <p className="text-base font-bold truncate">{nomComplet}</p>
+            <p className="text-base font-bold truncate">{prenom}</p>
             <p className="text-xs text-white/40">{livreur.telephone}</p>
           </div>
 
