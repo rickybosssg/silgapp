@@ -358,49 +358,7 @@ export default function ClientSuiviCourse() {
             </div>
           </div>
 
-          {/* Estimation distance / temps / prix */}
-          {(() => {
-            // Cascade de fallbacks pour la distance
-            const distEst = maCourse.distance_reelle_km
-              || haversineKm(maCourse.latitude_recuperation, maCourse.longitude_recuperation, maCourse.latitude_livraison, maCourse.longitude_livraison)
-              || haversineKm(maCourse.gps_depart_lat, maCourse.gps_depart_lng, maCourse.gps_arrivee_lat, maCourse.gps_arrivee_lng);
-            const prix = maCourse.prix_final || (distEst ? Math.round(distEst * 100) : maCourse.prix_estimate || null);
-            // Durée depuis heure_recuperation → heure_livraison (plus précis que acceptation → livraison)
-            const dureeMs = maCourse.heure_livraison && maCourse.heure_recuperation
-              ? new Date(maCourse.heure_livraison) - new Date(maCourse.heure_recuperation)
-              : maCourse.heure_livraison && maCourse.heure_acceptation
-                ? new Date(maCourse.heure_livraison) - new Date(maCourse.heure_acceptation)
-                : null;
-            const temps = dureeMs ? Math.round(dureeMs / 60000) : distEst ? Math.round((distEst / 25) * 60) : null;
-            const isFinal = !!maCourse.prix_final;
-            if (!distEst && !prix) return null;
-            return (
-              <div className={`grid gap-2 pt-2 border-t border-dashed ${isFinal ? "border-green-200" : "border-gray-200"}`}
-                style={{ gridTemplateColumns: `repeat(${[distEst && distEst > 0, temps && temps > 0, prix && prix > 0].filter(Boolean).length}, 1fr)` }}>
-                {distEst && distEst > 0 && (
-                  <div className={`rounded-xl p-2.5 text-center ${isFinal ? "bg-blue-50" : "bg-gray-50"}`}>
-                    <Ruler className="w-3.5 h-3.5 mx-auto mb-1 text-blue-500" />
-                    <p className="text-xs font-black text-gray-800">{Number(distEst).toFixed(1)} km</p>
-                    <p className="text-[9px] text-gray-400">{isFinal ? "Réelle" : "Estimée"}</p>
-                  </div>
-                )}
-                {temps && temps > 0 && (
-                  <div className={`rounded-xl p-2.5 text-center ${isFinal ? "bg-purple-50" : "bg-gray-50"}`}>
-                    <Clock className="w-3.5 h-3.5 mx-auto mb-1 text-purple-500" />
-                    <p className="text-xs font-black text-gray-800">{temps} min</p>
-                    <p className="text-[9px] text-gray-400">{isFinal ? "Réel" : "Estimé"}</p>
-                  </div>
-                )}
-                {prix && prix > 0 && (
-                  <div className={`rounded-xl p-2.5 text-center ${isFinal ? "bg-green-50" : "bg-gray-50"}`}>
-                    <Banknote className="w-3.5 h-3.5 mx-auto mb-1 text-green-600" />
-                    <p className="text-xs font-black text-gray-800">{prix.toLocaleString()} F</p>
-                    <p className="text-[9px] text-gray-400">{isFinal ? "À payer" : "~Estimé"}</p>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
+
         </Card>
 
         {/* QR Codes — dès que les codes existent */}
