@@ -6,10 +6,34 @@ import { CheckCircle2, MapPin, Banknote, Clock, TrendingUp, Star } from "lucide-
  * Affiche distance réelle, temps, prix final, et part livreur.
  */
 export default function LivraisonRecapitulatif({ course, onClose }) {
-  const prixFinal = Number(course.prix_final || 0);
-  const distance = Number(course.distance_reelle_km || 0);
-  const montantLivreur = Number(course.montant_livreur > 0 ? course.montant_livreur : (prixFinal * 0.7));
-  const commission = Number(course.commission_silga > 0 ? course.commission_silga : (prixFinal * 0.3));
+  // Calcul distance avec fallback (comme ClientSuiviCourse)
+  function haversine(lat1, lon1, lat2, lon2) {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  // Fallbacks pour données manquantes
+  const distance = Number(course.distance_reelle_km) > 0 
+    ? Number(course.distance_reelle_km)
+    : haversine(course.latitude_recuperation, course.longitude_recuperation, course.latitude_livraison, course.longitude_livraison)
+    || haversine(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng)
+    || 0;
+
+  const prixFinal = Number(course.prix_final) > 0 
+    ? Number(course.prix_final)
+    : (distance > 0 ? Math.round(distance * 100) : 0);
+
+  const montantLivreur = Number(course.montant_livreur) > 0 
+    ? Number(course.montant_livreur)
+    : Math.round(prixFinal * 0.7);
+
+  const commission = Number(course.commission_silga) > 0 
+    ? Number(course.commission_silga)
+    : Math.round(prixFinal * 0.3);
 
   // Calcul temps réel si heures disponibles
   let tempsMinutes = null;
@@ -36,18 +60,20 @@ export default function LivraisonRecapitulatif({ course, onClose }) {
         </div>
 
         <div className="p-6 space-y-3">
-          {/* Distance */}
-          <div className="flex items-center gap-4 bg-blue-50 rounded-2xl p-4">
-            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
-              <MapPin className="w-5 h-5 text-blue-600" />
+          {/* Distance — toujours afficher si disponible ou calculable */}
+          {distance > 0 && (
+            <div className="flex items-center gap-4 bg-blue-50 rounded-2xl p-4">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+                <MapPin className="w-5 h-5 text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs text-blue-600 font-semibold uppercase tracking-wide">Distance parcourue</p>
+                <p className="text-xl font-black text-blue-900">
+                  {distance.toFixed(1)} km
+                </p>
+              </div>
             </div>
-            <div className="flex-1">
-              <p className="text-xs text-blue-600 font-semibold uppercase tracking-wide">Distance parcourue</p>
-              <p className="text-xl font-black text-blue-900">
-                {distance > 0 ? `${distance.toFixed(1)} km` : "—"}
-              </p>
-            </div>
-          </div>
+          )}
 
           {/* Temps */}
           {tempsMinutes !== null && (
@@ -62,7 +88,7 @@ export default function LivraisonRecapitulatif({ course, onClose }) {
             </div>
           )}
 
-          {/* Prix à payer (client) */}
+          {/* Prix à payer (client) — toujours affiché (minimum 100F) */}
           <div className="flex items-center gap-4 bg-green-50 rounded-2xl p-4">
             <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
               <Banknote className="w-5 h-5 text-green-600" />
@@ -70,24 +96,22 @@ export default function LivraisonRecapitulatif({ course, onClose }) {
             <div className="flex-1">
               <p className="text-xs text-green-600 font-semibold uppercase tracking-wide">Prix à encaisser</p>
               <p className="text-2xl font-black text-green-900">
-                {prixFinal > 0 ? `${prixFinal.toLocaleString()} FCFA` : "—"}
+                {prixFinal > 0 ? `${prixFinal.toLocaleString()} FCFA` : "100 FCFA"}
               </p>
             </div>
           </div>
 
-          {/* Gain livreur */}
-          {montantLivreur > 0 && (
-            <div className="flex items-center gap-4 bg-amber-50 rounded-2xl p-4">
-              <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
-                <TrendingUp className="w-5 h-5 text-amber-600" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs text-amber-600 font-semibold uppercase tracking-wide">Votre gain (70%)</p>
-                <p className="text-xl font-black text-amber-900">{Math.round(montantLivreur).toLocaleString()} FCFA</p>
-                <p className="text-[10px] text-amber-500 mt-0.5">Commission SILGA : {Math.round(commission).toLocaleString()} F (30%)</p>
-              </div>
+          {/* Gain livreur — toujours affiché */}
+          <div className="flex items-center gap-4 bg-amber-50 rounded-2xl p-4">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <TrendingUp className="w-5 h-5 text-amber-600" />
             </div>
-          )}
+            <div className="flex-1">
+              <p className="text-xs text-amber-600 font-semibold uppercase tracking-wide">Votre gain (70%)</p>
+              <p className="text-xl font-black text-amber-900">{Math.max(montantLivreur, 70).toLocaleString()} FCFA</p>
+              <p className="text-[10px] text-amber-500 mt-0.5">Commission SILGA : {Math.max(commission, 30).toLocaleString()} F (30%)</p>
+            </div>
+          </div>
 
           {/* Note reçue si disponible */}
           {course.note_livreur > 0 && (
