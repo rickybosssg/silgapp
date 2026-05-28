@@ -210,13 +210,15 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
     setCourseLivreeData(merged);
     setShowRecapitulatif(true);
+    // Ne pas appeler onColisLivre ici — sera appelé après fermeture du récap via handleFermerCourse
   };
 
   const handleFermerCourse = () => {
     const data = courseLivreeData;
     setShowRecapitulatif(false);
     setCourseLivreeData(null);
-    onColisLivre({ ...data }, gpsArrivee);
+    // Nettoyer le statut livreur après fermeture du récap
+    onColisLivre({ ...data, statut: "livree" }, null);
   };
 
   return (
