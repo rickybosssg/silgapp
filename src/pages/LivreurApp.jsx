@@ -285,51 +285,52 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
   };
 
   const handleColisLivre = (course, prixReel, gpsArrivee) => {
-    let courseData = { ...course };
-    if (!navigator.geolocation || !gpsArrivee) {
-      updateCourseMutation.mutate({
-        id: course.id,
-        data: {
-          statut: "livree",
-          heure_livraison: new Date().toISOString(),
-          colis_livre_at: new Date().toISOString(),
-          prix_reel: prixReel,
-        },
-      });
-    } else {
-      const gpsDepart = { lat: course.latitude_depart_livraison, lng: course.longitude_depart_livraison };
-      const distance = gpsDepart.lat ? calculerDistance(gpsDepart.lat, gpsDepart.lng, gpsArrivee.lat, gpsArrivee.lng) : null;
-      const duree = course.colis_recupere_at ? Math.round((new Date().getTime() - new Date(course.colis_recupere_at).getTime()) / 60000) : null;
-      courseData = {
-        ...course,
+    const gpsDepart = { lat: course.latitude_depart_livraison, lng: course.longitude_depart_livraison };
+    const distance = (gpsDepart.lat && gpsArrivee)
+      ? calculerDistance(gpsDepart.lat, gpsDepart.lng, gpsArrivee.lat, gpsArrivee.lng)
+      : null;
+    const duree = course.colis_recupere_at
+      ? Math.round((new Date().getTime() - new Date(course.colis_recupere_at).getTime()) / 60000)
+      : null;
+
+    const updateData = {
+      statut: "livree",
+      heure_livraison: new Date().toISOString(),
+      colis_livre_at: new Date().toISOString(),
+      prix_reel: prixReel,
+      ...(gpsArrivee && {
         latitude_arrivee_livraison: gpsArrivee.lat,
         longitude_arrivee_livraison: gpsArrivee.lng,
+      }),
+      ...(distance && {
         distance_km: distance,
-      };
-      updateCourseMutation.mutate({
-        id: course.id,
-        data: {
-          statut: "livree",
-          heure_livraison: new Date().toISOString(),
-          colis_livre_at: new Date().toISOString(),
-          latitude_arrivee_livraison: gpsArrivee.lat,
-          longitude_arrivee_livraison: gpsArrivee.lng,
-          distance_km: distance,
-          duree_livraison_minutes: duree,
-          gps_distance_type: distance ? "estimee" : null,
-          prix_reel: prixReel,
-        },
-      });
-    }
+        duree_livraison_minutes: duree,
+        gps_distance_type: "estimee",
+      }),
+    };
+
+    updateCourseMutation.mutate({ id: course.id, data: updateData });
+
     saveLivreur(livreurProfil.id, { statut: "disponible" }).then(() =>
       queryClient.invalidateQueries({ queryKey: ["livreur-profil"] })
     );
-    // Afficher le popup prix — une seule fois par course (clé localStorage)
+
+    // Construire courseData enrichi pour le popup — inclut les coords récup→livraison
+    const courseData = {
+      ...course,
+      ...(gpsArrivee && {
+        latitude_arrivee_livraison: gpsArrivee.lat,
+        longitude_arrivee_livraison: gpsArrivee.lng,
+      }),
+      ...(distance && { distance_km: distance }),
+    };
+
+    // Afficher le popup prix — une seule fois par course
     const seenKey = `prix_popup_seen_${course.id}`;
     if (!localStorage.getItem(seenKey)) {
       setCourseLivreePopup(courseData);
     }
-    toast.success(`Livraison terminée ! 🎉`);
+    toast.success("Livraison terminée ! 🎉");
   };
 
   const handleClientAnnule = (course) => {

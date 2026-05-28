@@ -16,28 +16,31 @@ export default function PrixCoursePopup({ course, onClose }) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  // Priorité : distance stockée sur la course, sinon calcul Haversine récup→livraison
-  const distanceBrute =
+  // Priorité 1 : distance déjà calculée et stockée
+  const distStockee =
     (Number(course.distance_reelle_km) > 0 ? Number(course.distance_reelle_km) : null) ||
-    haversine(
-      course.latitude_recuperation, course.longitude_recuperation,
-      course.latitude_livraison, course.longitude_livraison
-    ) ||
-    haversine(
-      course.latitude_recuperation, course.longitude_recuperation,
-      course.latitude_arrivee_livraison, course.longitude_arrivee_livraison
-    ) ||
-    // Pour l'interne : champs différents
-    haversine(
-      course.latitude_depart_livraison, course.longitude_depart_livraison,
-      course.latitude_arrivee_livraison, course.longitude_arrivee_livraison
-    ) ||
     (Number(course.distance_km) > 0 ? Number(course.distance_km) : null);
 
-  const distance = distanceBrute !== null ? Math.max(distanceBrute, 0.1) : null;
-  const prixFinal = distance !== null ? Math.round(distance * 100) : (Number(course.prix_final) > 0 ? Number(course.prix_final) : null);
-  const distLabel = distance !== null
-    ? distance < 1 ? `${Math.round(distance * 1000)} m` : `${distance.toFixed(1)} km`
+  // Priorité 2 : calcul Haversine depuis les coords GPS récup → livraison
+  const distCalculee =
+    haversine(course.latitude_recuperation, course.longitude_recuperation,
+              course.latitude_livraison, course.longitude_livraison) ||
+    haversine(course.latitude_recuperation, course.longitude_recuperation,
+              course.latitude_arrivee_livraison, course.longitude_arrivee_livraison) ||
+    haversine(course.latitude_depart_livraison, course.longitude_depart_livraison,
+              course.latitude_arrivee_livraison, course.longitude_arrivee_livraison);
+
+  const distanceBrute = distStockee || distCalculee;
+  const distance = distanceBrute != null ? Math.max(distanceBrute, 0.1) : null;
+
+  // Prix : distance × 100 F (interne : prix_reel déjà saisi par le livreur, externe : calculé)
+  const prixFinal = distance != null
+    ? Math.round(distance * 100)
+    : (Number(course.prix_final) > 0 ? Number(course.prix_final) : null);
+
+  // Libellé distance
+  const distLabel = distance != null
+    ? (distance < 1 ? `${Math.round(distance * 1000)} m` : `${distance.toFixed(2)} km`)
     : null;
 
   return (
