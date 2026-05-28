@@ -75,35 +75,30 @@ export default function CourseStepForm({
         const client = clients[0];
         setExpediteurFound(client);
         
-        // Mettre à jour formData avec les infos client
-        setFormData({
-          ...formData,
+        // Construire l'update formData en une seule fois pour éviter la fusion
+        const hasGps = !!(client.latitude && client.longitude);
+        
+        setFormData(prev => ({
+          ...prev,
           expediteur_nom: client.nom || client.prenom || "",
           expediteur_client_id: client.id,
           expediteur_has_app: true,
-        });
-        
-        toast.success(`✅ ${client.nom || client.prenom} trouvé dans SILGAPP !`);
-        
-        // Si GPS disponible, activer automatiquement
-        if (client.latitude && client.longitude) {
-          setFormData(prev => ({
-            ...prev,
+          // GPS expéditeur
+          expediteur_gps_available: hasGps,
+          expediteur_gps_lat: hasGps ? client.latitude : null,
+          expediteur_gps_lng: hasGps ? client.longitude : null,
+          // Si GPS dispo, utiliser automatiquement
+          ...(hasGps ? {
             gps_depart_lat: client.latitude,
             gps_depart_lng: client.longitude,
             recuperationGPS: true,
             adresse_depart: "Position GPS de l'expéditeur",
-            expediteur_gps_available: true,
-            expediteur_gps_lat: client.latitude,
-            expediteur_gps_lng: client.longitude,
-          }));
+          } : {}),
+        }));
+        
+        toast.success(`✅ ${client.nom || client.prenom} trouvé dans SILGAPP !`);
+        if (hasGps) {
           toast.success("📍 Position GPS de l'expéditeur disponible !");
-        } else {
-          // Expéditeur trouvé mais sans GPS
-          setFormData(prev => ({
-            ...prev,
-            expediteur_gps_available: false,
-          }));
         }
         
         // Notifier l'expéditeur
@@ -117,11 +112,14 @@ export default function CourseStepForm({
         
       } else {
         setExpediteurFound(null);
-        setFormData({
-          ...formData,
+        setFormData(prev => ({
+          ...prev,
           expediteur_client_id: null,
           expediteur_has_app: false,
-        });
+          expediteur_gps_available: false,
+          expediteur_gps_lat: null,
+          expediteur_gps_lng: null,
+        }));
         toast.info("ℹ️ Expéditeur non trouvé dans SILGAPP - flux standard activé");
       }
     } catch (err) {

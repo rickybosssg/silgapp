@@ -76,6 +76,10 @@ export default function CourseExterneFormSync() {
     gps_arrivee_lng: typeCourse === "recevoir" ? clientGpsLng : null,
     recuperationGPS: false,
     livraisonGPS: typeCourse === "recevoir" && !!clientGpsLat,
+    // Champs GPS expéditeur (pour "recevoir") - IMPORTANT : persister entre étapes
+    expediteur_gps_available: false,
+    expediteur_gps_lat: null,
+    expediteur_gps_lng: null,
   };
 
   const [formData, setFormData] = useState(initialData);
