@@ -3,10 +3,11 @@ import { CheckCircle2, Banknote, MapPin, Clock, Ruler } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
 export default function LivreurRecapitulatifPaiement({ course }) {
+  // Calcul du montant : distance réelle × 100 FCFA
   const distance = course.distance_reelle_km || 0;
-  const prixFinal = course.prix_final || 0;
-  const commissionSilga = course.commission_silga || 0;
-  const montantLivreur = course.montant_livreur || 0;
+  const montantTotal = Math.round(distance * 100);
+  const commissionSilga = Math.round(montantTotal * 0.3);
+  const montantLivreur = montantTotal - commissionSilga;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -70,17 +71,17 @@ export default function LivreurRecapitulatifPaiement({ course }) {
             </div>
             
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Prix final</span>
-                <span className="font-bold text-gray-900">{prixFinal.toLocaleString()} FCFA</span>
+              <div className="flex justify-between text-gray-600">
+                <span>Distance parcourue</span>
+                <span className="font-bold text-gray-900">{distance.toFixed(2)} km</span>
               </div>
-              <div className="flex justify-between text-red-600">
-                <span>Commission Silga (30%)</span>
-                <span className="font-bold">-{commissionSilga.toLocaleString()} FCFA</span>
+              <div className="flex justify-between text-gray-600">
+                <span>Tarif au km</span>
+                <span className="font-bold text-gray-900">100 FCFA/km</span>
               </div>
               <div className="border-t border-green-300 pt-2 flex justify-between">
-                <span className="font-bold text-green-900">Votre gain</span>
-                <span className="font-black text-lg text-green-700">+{montantLivreur.toLocaleString()} FCFA</span>
+                <span className="font-bold text-green-900">Total à payer</span>
+                <span className="font-black text-lg text-green-700">{montantTotal.toLocaleString()} FCFA</span>
               </div>
             </div>
           </div>
