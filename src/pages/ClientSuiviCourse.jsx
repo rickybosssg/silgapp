@@ -139,10 +139,8 @@ export default function ClientSuiviCourse() {
 
   const handleRated = () => {
     setShowRating(false);
-    // Forcer un refetch puis rediriger vers le dashboard après notation
-    refetch().finally(() => {
-      setTimeout(() => navigate("/"), 500);
-    });
+    // Rediriger immédiatement vers le dashboard — la course passera en historique
+    navigate("/", { replace: true });
   };
 
   if (!userId) {
@@ -600,7 +598,10 @@ export default function ClientSuiviCourse() {
               {isDestinataire && (
                 <div className="space-y-3">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">👍/👎 Votre avis sur la livraison</p>
-                  <DestinataireReactionButton course={maCourse} onDone={refetch} />
+                  <DestinataireReactionButton
+                    course={maCourse}
+                    onDone={() => navigate("/", { replace: true })}
+                  />
                 </div>
               )}
             </>

@@ -62,7 +62,7 @@ export default function LivreurRatingDialog({ course, onClose, onRated }) {
 
       setDone(true);
       toast.success("Merci pour votre évaluation !");
-      setTimeout(() => onRated?.(), 1200);
+      setTimeout(() => onRated?.(), 800);
     } catch (err) {
       toast.error("Erreur lors de l'envoi");
     } finally {
