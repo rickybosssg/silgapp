@@ -13,6 +13,7 @@ import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 import ClientsExternesPanel from "@/components/admin/ClientsExternesPanel";
 import HistoriqueDuJour from "@/components/admin/HistoriqueDuJour";
+import SyncClientGPSPanel from "@/components/admin/SyncClientGPSPanel";
 
 export default function DashboardAdminExterne() {
   const { data: courses = [] } = useQuery({
@@ -290,6 +291,9 @@ export default function DashboardAdminExterne() {
       <Card className="p-4">
         <ClientsExternesPanel />
       </Card>
+
+      {/* Synchronisation GPS */}
+      <SyncClientGPSPanel />
     </div>
   );
 }
