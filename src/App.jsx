@@ -1,4 +1,5 @@
 import { Suspense, lazy, useState } from 'react';
+import SplashScreen from './components/SplashScreen';
 import { Toaster } from '@/components/ui/toaster';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
@@ -38,29 +39,7 @@ const TestDiagnosticsComplet = lazy(() => import('./pages/TestDiagnosticsComplet
 const TestTerrainComplet = lazy(() => import('./pages/TestTerrainComplet.jsx'));
 const TestRecapitulatifPaiement = lazy(() => import('./pages/TestRecapitulatifPaiement.jsx'));
 
-const LoadingScreen = () => (
-  <div className="fixed inset-0 flex flex-col items-center justify-center" style={{ backgroundColor: '#1a7a3c' }}>
-    <div className="flex flex-col items-center gap-6 px-8">
-      {/* Nouveau logo SILGAPP */}
-      <img
-        src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/666943399_IMG-20260523-WA00032.jpg"
-        alt="SILGAPP Logo"
-        className="w-36 h-36 rounded-3xl shadow-2xl object-contain"
-      />
-      {/* Texte de bienvenue */}
-      <div className="text-center space-y-2">
-        <p className="text-white text-2xl font-extrabold tracking-wide">Bienvenue sur SILGAPP</p>
-        <p className="text-white/90 text-sm font-medium tracking-wider">💚 PLUS QU'UN SERVICE, UNE PROMESSE 💚</p>
-      </div>
-      {/* Indicateur de chargement */}
-      <div className="flex gap-1.5 mt-4">
-        <span className="w-2 h-2 rounded-full bg-white/60 animate-bounce" style={{ animationDelay: '0ms' }} />
-        <span className="w-2 h-2 rounded-full bg-white/60 animate-bounce" style={{ animationDelay: '150ms' }} />
-        <span className="w-2 h-2 rounded-full bg-white/60 animate-bounce" style={{ animationDelay: '300ms' }} />
-      </div>
-    </div>
-  </div>
-);
+const LoadingScreen = () => <SplashScreen />;
 
 const InscriptionLivreur = () => null;
 
