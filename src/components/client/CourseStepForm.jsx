@@ -68,8 +68,19 @@ export default function CourseStepForm({
       // Normaliser le numéro
       const normalized = phone.startsWith("226") ? "+" + phone : phone.length === 8 ? "+226" + phone : "+" + phone;
       
-      // Chercher dans la base clients
-      const clients = await base44.entities.ClientExterne.filter({ telephone: normalized, actif: true });
+      // Chercher dans la base clients - essayer plusieurs formats
+      let clients = await base44.entities.ClientExterne.filter({ telephone: normalized, actif: true });
+      
+      // Fallback : chercher par email si pas trouvé par téléphone
+      if (!clients || clients.length === 0) {
+        try {
+          const user = await base44.auth.me();
+          const byEmail = await base44.entities.ClientExterne.filter({ user_email: user.email, actif: true });
+          if (byEmail && byEmail.length > 0) {
+            clients = byEmail;
+          }
+        } catch (_) {}
+      }
       
       if (clients && clients.length > 0) {
         const client = clients[0];
