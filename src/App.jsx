@@ -9,6 +9,7 @@ import PageNotFound from './lib/PageNotFound';
 import AuthGate from './components/auth/AuthGate.jsx';
 import SelectionReseau from './pages/SelectionReseau.jsx';
 
+
 const AppLayout = lazy(() => import('./components/layout/AppLayout'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const DashboardExterne = lazy(() => import('./pages/DashboardExterne'));
@@ -70,7 +71,45 @@ function AnimatedRoutes({ children }) {
   );
 }
 
+// Hook to apply system theme preference
+function useSystemTheme() {
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const applyTheme = (e) => {
+      if (e.matches) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    };
+    applyTheme(mediaQuery);
+    mediaQuery.addEventListener('change', applyTheme);
+    return () => mediaQuery.removeEventListener('change', applyTheme);
+  }, []);
+}
+
+// Hook for Android hardware back button
+function useHardwareBackButton() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  useEffect(() => {
+    const handleBackButton = (e) => {
+      e.preventDefault();
+      if (location.pathname !== '/') {
+        navigate(-1);
+      }
+    };
+    
+    document.addEventListener('backbutton', handleBackButton, false);
+    return () => document.removeEventListener('backbutton', handleBackButton);
+  }, [navigate, location]);
+}
+
 function App() {
+  useSystemTheme();
+  useHardwareBackButton();
+  
   const [livreurProfil, setLivreurProfil] = useState(null);
   const [isClient, setIsClient] = useState(false);
   const [reseau, setReseau] = useState(null);
@@ -203,54 +242,12 @@ function App() {
 
 
 
-// Hook to apply system theme preference
-function useSystemTheme() {
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const applyTheme = (e) => {
-      if (e.matches) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    };
-    applyTheme(mediaQuery);
-    mediaQuery.addEventListener('change', applyTheme);
-    return () => mediaQuery.removeEventListener('change', applyTheme);
-  }, []);
-}
-
-// Hook for Android hardware back button
-function useHardwareBackButton() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  
-  useEffect(() => {
-    const handleBackButton = (e) => {
-      e.preventDefault();
-      if (location.pathname !== '/') {
-        navigate(-1);
-      }
-    };
-    
-    document.addEventListener('backbutton', handleBackButton, false);
-    return () => document.removeEventListener('backbutton', handleBackButton);
-  }, [navigate, location]);
-}
-
 function AppWithProviders() {
   return (
     <QueryClientProvider client={queryClientInstance}>
-      <MobileEnhancements />
       <App />
     </QueryClientProvider>
   );
-}
-
-function MobileEnhancements() {
-  useSystemTheme();
-  useHardwareBackButton();
-  return null;
 }
 
 export default AppWithProviders;

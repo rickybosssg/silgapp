@@ -36,26 +36,8 @@ export default function MobileNav({ notificationCount = 0 }) {
   const [user, setUser] = useState(null);
   useEffect(() => { base44.auth.me().then(setUser).catch(() => null); }, []);
   
-  // Update status bar based on theme (Capacitor) - only when package is installed
-  useEffect(() => {
-    const updateStatusBar = async () => {
-      try {
-        const isDark = document.documentElement.classList.contains('dark');
-        // Dynamic import to avoid build errors when package not installed
-        const capacitorStatusBar = await import('@capacitor/status-bar').catch(() => null);
-        if (!capacitorStatusBar) return;
-        const { StatusBar, Style } = capacitorStatusBar;
-        await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light });
-        await StatusBar.setBackgroundColor({ color: isDark ? '#000000' : '#ffffff' });
-      } catch (err) {
-        // Not running in Capacitor environment
-      }
-    };
-    updateStatusBar();
-    const observer = new MutationObserver(updateStatusBar);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  // Status bar will be handled by native app when @capacitor/status-bar is installed
+  // TODO: Install @capacitor/status-bar package to enable dynamic status bar coloring
   
   // Hardware back button for Android
   useEffect(() => {
