@@ -1,20 +1,26 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
+/**
+ * Déclenché par automation quand une CourseExterne est créée.
+ * Crée une Notification neutre (sans infos sensibles) pour l'expéditeur/destinataire.
+ * La Notification déclenche ensuite envoyerAlerteWhatsApp si l'utilisateur est inactif.
+ */
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     
-    // Payload d'automation entity : { event: { entity_id, ... }, data: { ... }, old_data: { ... } }
+    // Payload d'automation entity : { event: { entity_id, ... }, data: { ... } }
     const payload = await req.json();
     const courseId = payload.event?.entity_id || payload.course_id || payload.data?.id;
     
     if (!courseId) {
-      console.error('[notifyClientSync] ❌ course_id manquant dans payload:', payload);
+      console.error('[notifyClientSync] ❌ course_id manquant dans payload:', JSON.stringify(payload));
       return Response.json({ error: "course_id manquant" }, { status: 400 });
     }
 
-    // Récupérer la course
-    const course = await base44.entities.CourseExterne.get(courseId);
+    // Utiliser service role pour récupérer la course
+    const course = await base44.asServiceRole.entities.CourseExterne.get(courseId);
     if (!course) {
       return Response.json({ error: "Course non trouvée" }, { status: 404 });
     }
@@ -24,7 +30,7 @@ Deno.serve(async (req) => {
     // Helper : résoudre un client par id OU par téléphone normalisé
     const resolveClient = async (clientId, telephone) => {
       if (clientId) {
-        try { return await base44.entities.ClientExterne.get(clientId); } catch (_) {}
+        try { return await base44.asServiceRole.entities.ClientExterne.get(clientId); } catch (_) {}
       }
       if (telephone) {
         const tel = telephone.replace(/\D/g, "");
@@ -39,6 +45,10 @@ Deno.serve(async (req) => {
       return null;
     };
 
+    // Message neutre — pas d'infos sensibles (prix, adresse, GPS, détails course)
+    const TITRE_NOTIFICATION = "📦 Nouvelle notification SILGAPP";
+    const MESSAGE_NOTIFICATION = "Vous avez reçu une notification importante sur SILGAPP. Ouvrez l'application pour consulter les détails.";
+
     // 1. Notifier le destinataire (course type "expedier")
     if (course.type_course === "expedier") {
       const destinataireClient = await resolveClient(course.destinataire_client_id, course.destinataire_telephone);
@@ -51,43 +61,41 @@ Deno.serve(async (req) => {
           });
         }
         const notification = await base44.asServiceRole.entities.Notification.create({
-          titre: "📦 Vous allez recevoir un colis",
-          message: `${course.expediteur_nom || "Un expéditeur"} vous envoie un colis${course.type_colis ? " (" + course.type_colis.replace(/_/g, " ") + ")" : ""}. ${course.adresse_depart ? "Récupération depuis : " + course.adresse_depart : ""}`,
+          titre: TITRE_NOTIFICATION,
+          message: MESSAGE_NOTIFICATION,
           type: "nouvelle_course",
           course_id: course.id,
           destinataire_email: destinataireClient.user_email,
           lue: false
         });
         notifications.push(notification);
+        console.log(`[notifyClientSync] ✅ Notif destinataire (${destinataireClient.user_email})`);
       }
     }
 
-    // 2. Notifier l'expéditeur (course type "recevoir") — TOUJOURS, même sans client_id
+    // 2. Notifier l'expéditeur (course type "recevoir")
     if (course.type_course === "recevoir") {
-      // Chercher l'expéditeur par ID ou par téléphone
       const expediteurClient = await resolveClient(course.expediteur_client_id, course.expediteur_telephone);
       
-      // Si trouvé dans la base, notifier et lier
       if (expediteurClient && expediteurClient.user_email) {
-        // Mettre à jour la course avec le lien
-        if (!course.expediteur_client_id || !course.expediteur_has_app) {
+        // Lier automatiquement si pas encore lié
+        if (!course.expediteur_client_id) {
           await base44.asServiceRole.entities.CourseExterne.update(course.id, {
             expediteur_client_id: expediteurClient.id,
-            expediteur_has_app: true,
           });
         }
         const notification = await base44.asServiceRole.entities.Notification.create({
-          titre: "📦 Colis à récupérer chez vous",
-          message: `${course.destinataire_nom || "Un client"} veut récupérer un colis chez vous. Un livreur viendra le chercher. ${course.adresse_depart ? "Récupération : " + course.adresse_depart : ""}`,
+          titre: TITRE_NOTIFICATION,
+          message: MESSAGE_NOTIFICATION,
           type: "nouvelle_course",
           course_id: course.id,
           destinataire_email: expediteurClient.user_email,
           lue: false
         });
         notifications.push(notification);
+        console.log(`[notifyClientSync] ✅ Notif expéditeur (${expediteurClient.user_email})`);
       } else {
-        // Expéditeur non trouvé dans la base — notifier quand même via le numéro
-        console.log(`[notifyClientSync] Expéditeur non trouvé: ${course.expediteur_telephone}`);
+        console.log(`[notifyClientSync] Expéditeur non trouvé dans la base: ${course.expediteur_telephone}`);
       }
     }
 
@@ -97,6 +105,7 @@ Deno.serve(async (req) => {
     });
     
   } catch (error) {
+    console.error('[notifyClientSync] ❌ Erreur:', error.message);
     return Response.json({ error: error.message }, { status: 500 });
   }
 });

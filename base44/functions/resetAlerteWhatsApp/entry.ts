@@ -2,9 +2,9 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 /**
  * Déclenché quand une Notification est marquée comme lue.
- * Vérifie s'il reste des notifications non lues pour ce livreur.
- * Si plus aucune → supprime les alertes WhatsApp "sent" pour permettre
- * un prochain envoi lors de la prochaine notification.
+ * Vérifie s'il reste des notifications non lues pour ce destinataire.
+ * Si plus aucune → supprime les alertes WhatsApp "sent" (livreur ou client)
+ * pour permettre un prochain envoi lors de la prochaine notification.
  */
 Deno.serve(async (req) => {
   try {
@@ -16,7 +16,6 @@ Deno.serve(async (req) => {
       return Response.json({ skipped: true, reason: 'no_data' });
     }
 
-    // On ne traite que si la notification vient d'être lue
     if (!notification.lue) {
       return Response.json({ skipped: true, reason: 'not_lue' });
     }
@@ -33,24 +32,33 @@ Deno.serve(async (req) => {
     });
 
     if (notifsNonLues.length > 0) {
-      // Encore des notifs non lues → on garde le verrou anti-doublon
       return Response.json({ skipped: true, reason: 'still_unread', count: notifsNonLues.length });
     }
 
-    // Plus de notifs non lues → chercher le livreur et supprimer ses alertes "sent"
-    const livreurs = await base44.asServiceRole.entities.Livreur.filter({
-      user_email: destinataireEmail
-    });
+    // Chercher l'ID du profil (livreur OU client externe) pour supprimer ses alertes
+    let profileId = null;
 
-    if (!livreurs || livreurs.length === 0) {
-      return Response.json({ skipped: true, reason: 'not_a_livreur' });
+    // Chercher dans Livreur
+    const livreurs = await base44.asServiceRole.entities.Livreur.filter({ user_email: destinataireEmail });
+    if (livreurs && livreurs.length > 0) {
+      profileId = livreurs[0].id;
     }
 
-    const livreur = livreurs[0];
+    // Sinon chercher dans ClientExterne
+    if (!profileId) {
+      const clients = await base44.asServiceRole.entities.ClientExterne.filter({ user_email: destinataireEmail });
+      if (clients && clients.length > 0) {
+        profileId = clients[0].id;
+      }
+    }
 
-    // Lister et supprimer les alertes "sent" pour ce livreur
+    if (!profileId) {
+      return Response.json({ skipped: true, reason: 'no_profile_found', email: destinataireEmail });
+    }
+
+    // Supprimer les alertes "sent" pour permettre la prochaine notification
     const alertesSent = await base44.asServiceRole.entities.WhatsAppAlerte.filter({
-      livreur_id: livreur.id,
+      livreur_id: profileId,
       statut: 'sent'
     });
 
@@ -58,9 +66,11 @@ Deno.serve(async (req) => {
       await base44.asServiceRole.entities.WhatsAppAlerte.delete(alerte.id);
     }
 
+    console.log(`[resetWhatsApp] ${alertesSent.length} alerte(s) supprimées pour ${destinataireEmail}`);
     return Response.json({ success: true, alertes_supprimees: alertesSent.length });
 
   } catch (error) {
+    console.error('[resetWhatsApp] Erreur:', error.message);
     return Response.json({ error: error.message }, { status: 500 });
   }
 });

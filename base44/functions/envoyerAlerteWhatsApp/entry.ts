@@ -1,17 +1,20 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 /**
- * Envoi d'alerte WhatsApp via Twilio pour :
- * - Livreurs externes inactifs dans l'app
- * - Clients externes inactifs dans l'app
+ * Envoi d'alerte WhatsApp via Twilio.
+ * Déclenché sur création de Notification (toute entity Notification).
+ * Couvre : livreurs internes/externes + clients externes.
  *
  * Règles :
  * - Si l'utilisateur est actif (app_active=true ET last_seen_at < 2 min) → pas de WhatsApp
  * - Anti-doublon : pas d'envoi si alerte "sent" déjà présente avec notifs non lues
  * - Numéros normalisés : +226XXXXXXXX
+ * - Message neutre : pas d'infos sensibles (prix, adresse, GPS, détails course)
  */
 
 const SEUIL_INACTIVITE_MS = 2 * 60 * 1000; // 2 minutes
+
+const MESSAGE_WHATSAPP = `Bonjour 👋\nVous avez reçu une notification importante sur SILGAPP.\nVeuillez ouvrir l'application pour consulter les détails.`;
 
 function normaliserTelephone(tel) {
   if (!tel) return null;
@@ -31,15 +34,15 @@ function estActifDansApp(entity) {
 
 async function envoyerWhatsApp(telephone, accountSid, authToken, fromNumber) {
   const to = `whatsapp:${telephone}`;
-  const message = `🚨 SILGAPP\nVous avez une notification en attente.\nOuvrez l'application SILGAPP pour consulter.`;
+  const from = fromNumber.startsWith('whatsapp:') ? fromNumber : `whatsapp:${fromNumber}`;
 
   const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
   const credentials = btoa(`${accountSid}:${authToken}`);
 
   const formData = new URLSearchParams();
-  formData.append('From', fromNumber.startsWith('whatsapp:') ? fromNumber : `whatsapp:${fromNumber}`);
+  formData.append('From', from);
   formData.append('To', to);
-  formData.append('Body', message);
+  formData.append('Body', MESSAGE_WHATSAPP);
 
   const resp = await fetch(twilioUrl, {
     method: 'POST',
@@ -75,7 +78,12 @@ Deno.serve(async (req) => {
     const fromRaw = Deno.env.get('TWILIO_WHATSAPP_FROM') || '';
     const fromNumber = fromRaw.startsWith('whatsapp:') ? fromRaw : `whatsapp:${fromRaw}`;
 
-    // ── 1. Chercher si c'est un LIVREUR ──────────────────────────────────────
+    if (!accountSid || !authToken || !fromRaw) {
+      console.error('[WhatsApp] Variables Twilio manquantes');
+      return Response.json({ skipped: true, reason: 'twilio_config_missing' });
+    }
+
+    // ── 1. Chercher si c'est un LIVREUR (interne ou externe) ─────────────────
     const livreurs = await base44.asServiceRole.entities.Livreur.filter({
       user_email: destinataireEmail,
       actif: true
@@ -149,10 +157,10 @@ Deno.serve(async (req) => {
         return Response.json({ skipped: true, reason: 'client_actif_dans_app' });
       }
 
-      // Anti-doublon client : vérifier via WhatsAppAlerte en cherchant par téléphone
       const telephone = normaliserTelephone(client.telephone);
       if (!telephone) return Response.json({ skipped: true, reason: 'telephone_invalide_client' });
 
+      // Anti-doublon client
       const [alertesExistantes, notifsNonLues] = await Promise.all([
         base44.asServiceRole.entities.WhatsAppAlerte.filter({ livreur_telephone: telephone, statut: 'sent' }),
         base44.asServiceRole.entities.Notification.filter({ destinataire_email: destinataireEmail, lue: false })
@@ -162,7 +170,6 @@ Deno.serve(async (req) => {
         return Response.json({ skipped: true, reason: 'alerte_deja_envoyee_client' });
       }
 
-      // Enregistrer alerte (on réutilise WhatsAppAlerte, livreur_id = client.id pour traçabilité)
       const alerte = await base44.asServiceRole.entities.WhatsAppAlerte.create({
         livreur_id: client.id,
         livreur_telephone: telephone,
@@ -189,9 +196,11 @@ Deno.serve(async (req) => {
     }
 
     // ── 3. Ni livreur ni client trouvé ───────────────────────────────────────
+    console.log(`[WhatsApp] Aucun profil trouvé pour email: ${destinataireEmail}`);
     return Response.json({ skipped: true, reason: 'no_livreur_ni_client_externe', email: destinataireEmail });
 
   } catch (error) {
+    console.error('[WhatsApp] Erreur:', error.message);
     return Response.json({ error: error.message }, { status: 500 });
   }
 });
