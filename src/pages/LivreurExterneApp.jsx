@@ -194,7 +194,21 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     statutMutation.mutate(estHorsLigne ? "disponible" : "hors_ligne");
   };
 
-  // ─── GPS ──────────────────────────────────────────────────────────────────
+  // ─── GPS — Architecture unifiée clients = livreurs ─────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SYSTÈME GPS UNIFIÉ — MÊME LOGIQUE POUR CLIENTS ET LIVREURS
+  // 
+  // 📋 ARCHITECTURE (identique pour ClientExterneApp et LivreurExterneApp)
+  // ───────────────────────────────────────────────────────────────────────────
+  // 1. ONBOARDING → getCurrentPosition → update BDD (lat/lng)
+  // 2. WATCH GPS (15s) → setInterval → update BDD systématique
+  // 3. VISIBILITY CHANGE → sync immédiate
+  // 4. DASHBOARD POLLING → Livreurs: 2s | Clients: 5s
+  // 5. BADGE GPS → Check: latitude && longitude
+  // 
+  // 🗄️ CHAMPS BDD: latitude (number), longitude (number)
+  // ✅ Sync directe, pas de logique conditionnelle
+  // ═══════════════════════════════════════════════════════════════════════════
   const handleActiverGPS = () => {
     if (!navigator.geolocation) {
       toast.error("GPS non disponible sur cet appareil");

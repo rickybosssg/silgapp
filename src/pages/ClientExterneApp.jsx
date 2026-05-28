@@ -73,7 +73,42 @@ export default function ClientExterneApp() {
     loadProfil();
   }, []);
 
-  // ─── GPS — EXACTEMENT comme les livreurs ──────────────────────────────────
+  // ─── GPS — Architecture unifiée clients = livreurs ─────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SYSTÈME GPS UNIFIÉ — MÊME LOGIQUE POUR CLIENTS ET LIVREURS
+  // 
+  // 📋 ARCHITECTURE (identique pour ClientExterneApp et LivreurExterneApp)
+  // ───────────────────────────────────────────────────────────────────────────
+  // 1. ONBOARDING
+  //    → getCurrentPosition() 
+  //    → localStorage.setItem("client_gps_active", "true")
+  //    → base44.entities.ClientExterne.update(id, { latitude, longitude })
+  //
+  // 2. WATCH GPS (toutes les 15 secondes)
+  //    → setInterval(getCurrentPosition → update BDD, 15000)
+  //    → Pas de filtrage distance/délai (sync systématique)
+  //
+  // 3. VISIBILITY CHANGE
+  //    → document.visibilitychange → sync immédiate
+  //
+  // 4. DASHBOARD POLLING
+  //    → Clients: 5s | Livreurs: 2s
+  //
+  // 5. BADGE GPS
+  //    → Check simple: latitude && longitude
+  //    → Pas de calcul de date (juste présence coords)
+  //
+  // 🗄️ CHAMPS BDD
+  //    - latitude (number)
+  //    - longitude (number)
+  //    - Pas de champ gps_actif ou current_location
+  //
+  // ✅ POURQUOI ÇA MARCHE
+  //    - Plus de logique conditionnelle complexe
+  //    - Sync directe et systématique
+  //    - Même code que livreurs (prouvé fonctionnel)
+  //    - BDD mise à jour immédiatement à chaque position
+  // ═══════════════════════════════════════════════════════════════════════════
   // Sync immédiate au chargement du profil
   useEffect(() => {
     if (!clientProfil?.id || !onboardingDone) return;
