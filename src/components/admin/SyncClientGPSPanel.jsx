@@ -89,13 +89,18 @@ export default function SyncClientGPSPanel() {
                       <p className="text-sm font-semibold">{client.nom || 'Inconnu'}</p>
                       <p className="text-xs text-muted-foreground">{client.telephone}</p>
                     </div>
-                    {client.status === 'déjà synchronisé' ? (
-                      <Badge className="bg-green-200 text-green-800">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        GPS actif
-                      </Badge>
+                    {client.latitude && client.longitude ? (
+                      <div className="text-right">
+                        <Badge className="bg-green-200 text-green-800">
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          GPS synchronisé
+                        </Badge>
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          {Number(client.latitude).toFixed(4)}, {Number(client.longitude).toFixed(4)}
+                        </p>
+                      </div>
                     ) : (
-                      <Badge className="bg-amber-200 text-amber-800">
+                      <Badge className="bg-red-200 text-red-800">
                         <AlertCircle className="w-3 h-3 mr-1" />
                         GPS manquant
                       </Badge>

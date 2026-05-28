@@ -45,6 +45,12 @@ export default function ClientExterneApp() {
     loadProfil();
   }, []);
 
+  // Sync GPS vers BDD dès que position disponible + onboarding terminé
+  useEffect(() => {
+    if (!onboardingDone || !clientProfil?.id || !position?.latitude || !position?.longitude) return;
+    syncGpsVersBDD(position, clientProfil.id);
+  }, [onboardingDone, clientProfil?.id, position?.latitude, position?.longitude]);
+
   // Polling automatique des courses actives toutes les 5s + synchronisation GPS destinataire
   useEffect(() => {
     if (!onboardingDone || !clientProfil || !position) return;
@@ -54,6 +60,19 @@ export default function ClientExterneApp() {
     }, 5000);
     return () => clearInterval(interval);
   }, [onboardingDone, clientProfil?.id, position]);
+
+  // Synchroniser latitude/longitude vers ClientExterne en BDD
+  const syncGpsVersBDD = async (pos, clientId) => {
+    try {
+      await base44.entities.ClientExterne.update(clientId, {
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+      });
+      console.log("✅ GPS synchronisé en BDD:", pos.latitude, pos.longitude);
+    } catch (err) {
+      console.error("❌ Erreur sync GPS BDD:", err);
+    }
+  };
 
   // Synchroniser le GPS du destinataire vers les courses où il est notifié
   const syncGpsDestinataire = async (pos, profil) => {
@@ -136,13 +155,27 @@ export default function ClientExterneApp() {
     }
   };
 
-  const handleOnboardingComplete = ({ gps, profil }) => {
+  const handleOnboardingComplete = async ({ gps, profil }) => {
     if (gps) {
       try { localStorage.setItem("client_gps_position", JSON.stringify(gps)); } catch (_) {}
     }
     setPosition(gps);
-    setClientProfil(profil);
     setOnboardingDone(true);
+    // Synchroniser GPS en BDD immédiatement
+    if (gps?.latitude && gps?.longitude && profil?.id) {
+      try {
+        const updated = await base44.entities.ClientExterne.update(profil.id, {
+          latitude: gps.latitude,
+          longitude: gps.longitude,
+        });
+        setClientProfil(updated || profil);
+        console.log("✅ GPS synchronisé à l'onboarding:", gps.latitude, gps.longitude);
+      } catch {
+        setClientProfil(profil);
+      }
+    } else {
+      setClientProfil(profil);
+    }
     checkStatus(gps, profil);
   };
 
@@ -204,6 +237,15 @@ export default function ClientExterneApp() {
   };
 
 
+
+  // Au chargement du profil : si GPS déjà en BDD, l'utiliser pour mettre à jour le localStorage
+  useEffect(() => {
+    if (!clientProfil?.latitude || !clientProfil?.longitude) return;
+    const dbPos = { latitude: clientProfil.latitude, longitude: clientProfil.longitude };
+    // Mettre à jour localStorage avec les coordonnées BDD (source de vérité)
+    try { localStorage.setItem("client_gps_position", JSON.stringify(dbPos)); } catch (_) {}
+    if (!position) setPosition(dbPos);
+  }, [clientProfil?.id, clientProfil?.latitude, clientProfil?.longitude]);
 
   // Spinner uniquement si vraiment en chargement et pas encore de profil
   if (loading) {
@@ -316,9 +358,11 @@ export default function ClientExterneApp() {
                     <MapPin className="w-3 h-3 text-white" />
                     <span className="text-xs text-white font-medium">Ouagadougou</span>
                   </div>
-                  <div className="flex items-center gap-1.5 bg-green-500/90 px-2.5 py-1 rounded-full">
+                  <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${clientProfil?.latitude && clientProfil?.longitude ? "bg-green-500/90" : "bg-amber-500/90"}`}>
                     <Navigation className="w-3 h-3 text-white" />
-                    <span className="text-xs text-white font-medium">GPS actif</span>
+                    <span className="text-xs text-white font-medium">
+                      {clientProfil?.latitude && clientProfil?.longitude ? "GPS synchronisé ✓" : "GPS local (sync...)"}
+                    </span>
                   </div>
                 </div>
               </div>
