@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -8,14 +8,14 @@ import { toast } from "sonner";
 import { 
   MapPin, Navigation, Phone, MessageCircle, User, Package, 
   Clock, HelpCircle, ChevronRight, TrendingUp, 
-  Shield, Zap, Star, Loader2, ArrowLeft
+  Shield, Zap, Star, Loader2, ArrowLeft, RefreshCw
 } from "lucide-react";
-// Note: MapPin, Navigation conservés pour usage dans le header
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import ModernMap from "@/components/client/ModernMap";
 import ProfilModal from "@/components/client/ProfilModal";
 import SupportWhatsApp from "@/components/client/SupportWhatsApp";
 import ClientOnboarding, { profilClientComplet } from "@/components/client/ClientOnboarding";
+import { getCurrentPositionAndSync, startGPSWatch, stopGPSWatch, gpsValideEnBDD } from "@/lib/gpsSync";
 
 function haversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -26,9 +26,32 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// Badge GPS basé sur BDD réelle (pas localStorage)
+function GPSBadge({ profil, onForceSync }) {
+  const synced = gpsValideEnBDD(profil, 120); // valide si coords présentes et < 2h
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${synced ? "bg-green-500/90" : "bg-amber-500/90"}`}>
+        <Navigation className="w-3 h-3 text-white" />
+        <span className="text-xs text-white font-medium">
+          {synced ? "GPS actif ✓" : "GPS sync..."}
+        </span>
+      </div>
+      {!synced && (
+        <button
+          onClick={onForceSync}
+          className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center"
+          title="Forcer sync GPS"
+        >
+          <RefreshCw className="w-3 h-3 text-white" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function ClientExterneApp() {
   const navigate = useNavigate();
-  // Déjà passé par l'onboarding si GPS actif en localStorage
   const gpsDejaActif = (() => { try { return localStorage.getItem("client_gps_active") === "true"; } catch { return false; } })();
   const [onboardingDone, setOnboardingDone] = useState(gpsDejaActif);
   const [showProfilModal, setShowProfilModal] = useState(false);
@@ -40,16 +63,43 @@ export default function ClientExterneApp() {
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
   const [showMap, setShowMap] = useState(false);
+  const [gpsSyncing, setGpsSyncing] = useState(false);
+  const clientProfilRef = useRef(null);
+  useEffect(() => { clientProfilRef.current = clientProfil; }, [clientProfil]);
 
   useEffect(() => {
     loadProfil();
   }, []);
 
-  // Sync GPS vers BDD dès que position disponible + onboarding terminé
+  // Démarrer le watch GPS continu dès que l'onboarding est terminé + profil disponible
   useEffect(() => {
-    if (!onboardingDone || !clientProfil?.id || !position?.latitude || !position?.longitude) return;
-    syncGpsVersBDD(position, clientProfil.id);
-  }, [onboardingDone, clientProfil?.id, position?.latitude, position?.longitude]);
+    if (!onboardingDone || !clientProfil?.id) return;
+    console.log("[GPS] Démarrage surveillance GPS pour client", clientProfil.id);
+    startGPSWatch(clientProfil.id, (pos) => {
+      setPosition(pos);
+      setClientProfil(prev => prev ? { ...prev, latitude: pos.latitude, longitude: pos.longitude } : prev);
+    });
+    return () => stopGPSWatch();
+  }, [onboardingDone, clientProfil?.id]);
+
+  // Sync GPS au retour au premier plan (visibilité)
+  useEffect(() => {
+    if (!onboardingDone) return;
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        const profil = clientProfilRef.current;
+        if (profil?.id) {
+          console.log("[GPS] App revenue au premier plan → sync GPS");
+          getCurrentPositionAndSync(profil.id, (pos) => {
+            setPosition(pos);
+            setClientProfil(prev => prev ? { ...prev, latitude: pos.latitude, longitude: pos.longitude } : prev);
+          });
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [onboardingDone]);
 
   // Polling automatique des courses actives toutes les 5s + synchronisation GPS destinataire
   useEffect(() => {
@@ -61,17 +111,17 @@ export default function ClientExterneApp() {
     return () => clearInterval(interval);
   }, [onboardingDone, clientProfil?.id, position]);
 
-  // Synchroniser latitude/longitude vers ClientExterne en BDD
-  const syncGpsVersBDD = async (pos, clientId) => {
-    try {
-      await base44.entities.ClientExterne.update(clientId, {
-        latitude: pos.latitude,
-        longitude: pos.longitude,
-      });
-      console.log("✅ GPS synchronisé en BDD:", pos.latitude, pos.longitude);
-    } catch (err) {
-      console.error("❌ Erreur sync GPS BDD:", err);
-    }
+  // Forcer une sync GPS manuelle
+  const handleForceGPSSync = async () => {
+    if (!clientProfil?.id || gpsSyncing) return;
+    setGpsSyncing(true);
+    const pos = await getCurrentPositionAndSync(clientProfil.id, (pos) => {
+      setPosition(pos);
+      setClientProfil(prev => prev ? { ...prev, latitude: pos.latitude, longitude: pos.longitude } : prev);
+    });
+    setGpsSyncing(false);
+    if (pos) toast.success("GPS synchronisé ✓");
+    else toast.error("Impossible d'obtenir le GPS");
   };
 
   // Synchroniser le GPS du destinataire vers les courses où il est notifié
@@ -143,10 +193,21 @@ export default function ClientExterneApp() {
         });
       }
       setClientProfil(profil);
-      // Si onboarding déjà fait (GPS en localStorage), charger les courses directement
+
       if (gpsDejaActif) {
-        const pos = (() => { try { return JSON.parse(localStorage.getItem("client_gps_position") || "null"); } catch { return null; } })();
-        checkStatus(pos, profil);
+        // Récupérer position depuis GPS réel (pas seulement localStorage) et sync BDD
+        const localPos = (() => { try { return JSON.parse(localStorage.getItem("client_gps_position") || "null"); } catch { return null; } })();
+        if (localPos) setPosition(localPos);
+
+        // Forcer une sync GPS réelle au démarrage pour s'assurer que la BDD est à jour
+        if (profil?.id) {
+          console.log("[GPS] Chargement profil → sync GPS immédiate au démarrage");
+          getCurrentPositionAndSync(profil.id, (pos) => {
+            setPosition(pos);
+            setClientProfil(prev => prev ? { ...prev, latitude: pos.latitude, longitude: pos.longitude } : prev);
+          });
+        }
+        checkStatus(localPos, profil);
       }
     } catch (err) {
       console.error("Erreur chargement profil:", err);
@@ -156,25 +217,16 @@ export default function ClientExterneApp() {
   };
 
   const handleOnboardingComplete = async ({ gps, profil }) => {
-    if (gps) {
-      try { localStorage.setItem("client_gps_position", JSON.stringify(gps)); } catch (_) {}
-    }
-    setPosition(gps);
     setOnboardingDone(true);
-    // Synchroniser GPS en BDD immédiatement
-    if (gps?.latitude && gps?.longitude && profil?.id) {
-      try {
-        const updated = await base44.entities.ClientExterne.update(profil.id, {
-          latitude: gps.latitude,
-          longitude: gps.longitude,
-        });
-        setClientProfil(updated || profil);
-        console.log("✅ GPS synchronisé à l'onboarding:", gps.latitude, gps.longitude);
-      } catch {
-        setClientProfil(profil);
+    setClientProfil(profil);
+    if (gps?.latitude && gps?.longitude) {
+      setPosition(gps);
+      // Sync immédiate en BDD depuis le module centralisé (avec logs)
+      if (profil?.id) {
+        const { syncGPSVersBDD } = await import("@/lib/gpsSync");
+        const ok = await syncGPSVersBDD(profil.id, gps);
+        if (ok) setClientProfil(prev => prev ? { ...prev, latitude: gps.latitude, longitude: gps.longitude } : prev);
       }
-    } else {
-      setClientProfil(profil);
     }
     checkStatus(gps, profil);
   };
@@ -238,14 +290,7 @@ export default function ClientExterneApp() {
 
 
 
-  // Au chargement du profil : si GPS déjà en BDD, l'utiliser pour mettre à jour le localStorage
-  useEffect(() => {
-    if (!clientProfil?.latitude || !clientProfil?.longitude) return;
-    const dbPos = { latitude: clientProfil.latitude, longitude: clientProfil.longitude };
-    // Mettre à jour localStorage avec les coordonnées BDD (source de vérité)
-    try { localStorage.setItem("client_gps_position", JSON.stringify(dbPos)); } catch (_) {}
-    if (!position) setPosition(dbPos);
-  }, [clientProfil?.id, clientProfil?.latitude, clientProfil?.longitude]);
+
 
   // Spinner uniquement si vraiment en chargement et pas encore de profil
   if (loading) {
@@ -358,12 +403,7 @@ export default function ClientExterneApp() {
                     <MapPin className="w-3 h-3 text-white" />
                     <span className="text-xs text-white font-medium">Ouagadougou</span>
                   </div>
-                  <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${clientProfil?.latitude && clientProfil?.longitude ? "bg-green-500/90" : "bg-amber-500/90"}`}>
-                    <Navigation className="w-3 h-3 text-white" />
-                    <span className="text-xs text-white font-medium">
-                      {clientProfil?.latitude && clientProfil?.longitude ? "GPS synchronisé ✓" : "GPS local (sync...)"}
-                    </span>
-                  </div>
+                  <GPSBadge profil={clientProfil} onForceSync={handleForceGPSSync} />
                 </div>
               </div>
               <Button

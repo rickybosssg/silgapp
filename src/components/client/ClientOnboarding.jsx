@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import { MapPin, User, Check, Loader2 } from "lucide-react";
+import { syncGPSVersBDD } from "@/lib/gpsSync";
 
 // ─── Helpers téléphone ────────────────────────────────────────────────────────
 export function normaliserTelephone(raw) {
@@ -26,7 +27,7 @@ export function profilClientComplet(p) {
 }
 
 // ─── GPS ──────────────────────────────────────────────────────────────────────
-function EtapeGPS({ onSuccess }) {
+function EtapeGPS({ onSuccess, clientId }) {
   const [loading, setLoading] = useState(false);
 
   const handleGPS = () => {
@@ -36,10 +37,17 @@ function EtapeGPS({ onSuccess }) {
     }
     setLoading(true);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const posData = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+        console.log("[GPS Onboarding] 📍 Position obtenue:", posData.latitude, posData.longitude);
         try { localStorage.setItem("client_gps_active", "true"); } catch (_) {}
         try { localStorage.setItem("client_gps_position", JSON.stringify(posData)); } catch (_) {}
+        // Sync immédiate en BDD si on a déjà l'ID client
+        if (clientId) {
+          console.log("[GPS Onboarding] → Sync BDD pour client", clientId);
+          const ok = await syncGPSVersBDD(clientId, posData);
+          console.log("[GPS Onboarding]", ok ? "✅ BDD OK" : "❌ BDD KO");
+        }
         setLoading(false);
         onSuccess(posData);
       },
@@ -250,6 +258,7 @@ export default function ClientOnboarding({ clientProfil, onComplete }) {
   if (step === "gps") {
     return (
       <EtapeGPS
+        clientId={clientProfil?.id}
         onSuccess={(posData) => {
           if (profilClientComplet(clientProfil)) {
             setStep("done");
