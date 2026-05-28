@@ -173,6 +173,36 @@ export default function CourseExterneFormSync() {
     mutationFn: async (data) => {
       let finalData = { ...data };
 
+      // ─── ANTI-DOUBLON : Vérifier si une course similaire existe déjà ───
+      // Critères : même client, même type, même adresse départ, créée < 5 min
+      const now = Date.now();
+      const fiveMinutesAgo = new Date(now - 5 * 60 * 1000).toISOString();
+      
+      try {
+        const coursesRecentes = await base44.entities.CourseExterne.filter({
+          client_telephone: finalData.client_telephone,
+          type_course: finalData.type_course,
+          adresse_depart: finalData.adresse_depart,
+        });
+        
+        // Vérifier si une course a été créée dans les 5 dernières minutes
+        const doublon = coursesRecentes?.find(course => {
+          const courseDate = new Date(course.created_date);
+          const timeDiff = now - courseDate.getTime();
+          return timeDiff < 5 * 60 * 1000; // 5 minutes
+        });
+        
+        if (doublon) {
+          const minutesAgo = Math.round((now - new Date(doublon.created_date).getTime()) / 60000);
+          throw new Error(`Une course similaire a déjà été créée il y a ${minutesAgo} minute(s). ID: ${doublon.id?.slice(-6)}`);
+        }
+      } catch (err) {
+        if (err.message?.includes('Une course similaire')) {
+          throw err; // Rejeter l'erreur anti-doublon
+        }
+        // Ignorer les autres erreurs de vérification
+      }
+
       // Lookup destinataire (pour "expedier") — lie si inscrit
       if (!finalData.destinataire_client_id && finalData.destinataire_telephone) {
         try {
