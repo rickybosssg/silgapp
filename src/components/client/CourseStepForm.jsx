@@ -306,10 +306,10 @@ export default function CourseStepForm({
 
       case 2: {
         const isRecevoir = formData.type_course === "recevoir";
+        const destinationInconnue = formData.destination_inconnue || false;
 
         // "Recevoir" : ADRESSE DE RÉCUPÉRATION avec GPS optionnel
         if (isRecevoir) {
-          const destinationInconnue = formData.destination_inconnue || false;
           const gpsDispo = formData.gps_depart_lat && formData.gps_depart_lng;
           
           return (
