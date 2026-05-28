@@ -15,8 +15,7 @@ import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import ModernMap from "@/components/client/ModernMap";
 import ProfilModal from "@/components/client/ProfilModal";
 import SupportWhatsApp from "@/components/client/SupportWhatsApp";
-import ClientOnboarding, { profilClientComplet } from "@/components/client/ClientOnboarding";
-
+import ClientOnboarding from "@/components/client/ClientOnboarding";
 
 function haversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -27,7 +26,6 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Badge GPS — basé sur coords réelles en BDD (comme les livreurs)
 function GPSBadge({ profil, onForceSync }) {
   const hasCoords = !!(profil?.latitude && profil?.longitude);
   const synced = hasCoords;
