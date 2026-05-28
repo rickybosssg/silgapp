@@ -1,4 +1,5 @@
 export default function SplashScreen() {
+  // Variables initialisées DANS le composant (pas au niveau module)
   const stars = Array.from({ length: 18 }, (_, i) => ({
     id: i,
     left: Math.random() * 100,

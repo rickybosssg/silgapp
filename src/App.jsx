@@ -46,13 +46,14 @@ const LoadingScreen = () => <SplashScreen />;
 const InscriptionLivreur = () => null;
 
 function AnimatedRoutes({ children }) {
+  // Variables définies DANS la fonction pour éviter init issues
+  const location = useLocation();
   const pageVariants = {
     initial: { opacity: 0, x: 24 },
     animate: { opacity: 1, x: 0 },
     exit: { opacity: 0, x: -24 },
   };
   const pageTransition = { duration: 0.22, ease: "easeInOut" };
-  const location = useLocation();
   return (
     <AnimatePresence mode="wait" initial={false}>
       <motion.div
