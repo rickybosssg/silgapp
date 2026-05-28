@@ -71,8 +71,8 @@ function AnimatedRoutes({ children }) {
   );
 }
 
-// Hook to apply system theme preference
-function useSystemTheme() {
+function AppContent() {
+  // Hook to apply system theme preference
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const applyTheme = (e) => {
@@ -86,13 +86,10 @@ function useSystemTheme() {
     mediaQuery.addEventListener('change', applyTheme);
     return () => mediaQuery.removeEventListener('change', applyTheme);
   }, []);
-}
-
-// Hook for Android hardware back button
-function useHardwareBackButton() {
+  
+  // Hook for Android hardware back button
   const navigate = useNavigate();
   const location = useLocation();
-  
   useEffect(() => {
     const handleBackButton = (e) => {
       e.preventDefault();
@@ -104,11 +101,6 @@ function useHardwareBackButton() {
     document.addEventListener('backbutton', handleBackButton, false);
     return () => document.removeEventListener('backbutton', handleBackButton);
   }, [navigate, location]);
-}
-
-function App() {
-  useSystemTheme();
-  useHardwareBackButton();
   
   const [livreurProfil, setLivreurProfil] = useState(null);
   const [isClient, setIsClient] = useState(false);
@@ -238,9 +230,13 @@ function App() {
   );
 }
 
-
-
-
+function App() {
+  return (
+    <Router>
+      <AppContent />
+    </Router>
+  );
+}
 
 function AppWithProviders() {
   return (
