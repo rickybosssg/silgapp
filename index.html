@@ -13,23 +13,45 @@
       avant que createClient() soit appelé.
     -->
     <script>
+      // Diagnostic APK — détecte l'erreur exacte
+      window.addEventListener('error', function(e) {
+        console.error('[DIAGNOSTIC]', e.message, 'at', e.filename, ':', e.lineno, ':', e.colno);
+        if (e.message && e.message.includes('before initialization')) {
+          console.error('[DIAGNOSTIC] ERREUR INITIALISATION:', e.message);
+          console.error('[DIAGNOSTIC] Stack:', e.error?.stack);
+        }
+      });
+      window.addEventListener('unhandledrejection', function(e) {
+        console.error('[DIAGNOSTIC] Promise rejected:', e.reason);
+      });
+      console.log('[DIAGNOSTIC] Script chargé à', new Date().toISOString());
+    </script>
+    <script>
       (function() {
+        console.log('[TOKEN] Début capture token');
         try {
           var search = window.location.search;
           if (search && search.indexOf('access_token=') !== -1) {
+            console.log('[TOKEN] access_token trouvé dans URL');
             var params = new URLSearchParams(search);
             var token = params.get('access_token');
             if (token && token.length > 10 && token !== 'null' && token !== 'undefined') {
-              // Stocker dans toutes les clés que le SDK Base44 pourrait lire
+              console.log('[TOKEN] Token valide, stockage...');
               localStorage.setItem('base44_access_token', token);
               localStorage.setItem('access_token', token);
-              // Nettoyer l'URL
               params.delete('access_token');
               var clean = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
               window.history.replaceState({}, document.title, clean);
+              console.log('[TOKEN] Token stocké avec succès');
+            } else {
+              console.log('[TOKEN] Token invalide:', token);
             }
+          } else {
+            console.log('[TOKEN] Pas de token dans URL');
           }
-        } catch(e) {}
+        } catch(e) {
+          console.error('[TOKEN] Erreur capture token:', e);
+        }
       })();
     </script>
   </head>

@@ -40,12 +40,19 @@ const getToken = () => {
 
 const isCapacitor = () => {
   try {
+    console.log('[base44Client] Check Capacitor:', !!(window.Capacitor));
     return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-  } catch(e) { return false; }
+  } catch(e) { 
+    console.error('[base44Client] Erreur Capacitor:', e);
+    return false; 
+  }
 };
 
+console.log('[base44Client] Début initialisation');
 const token = getToken();
+console.log('[base44Client] Token trouvé:', token ? 'oui' : 'non');
 const cap = isCapacitor();
+console.log('[base44Client] Mode Capacitor:', cap);
 
 // Sur Capacitor, pointer vers le domaine public pour que les appels API fonctionnent
 const serverUrl = cap ? APP_PUBLIC_URL : '';
