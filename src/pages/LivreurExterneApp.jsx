@@ -15,6 +15,7 @@ import LivreurHistorique from "@/components/livreur/LivreurHistorique";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LivreurExterneOnboarding, { profilLivreurComplet, normaliserTelephone, formaterTelephone } from "@/components/livreur/LivreurExterneOnboarding";
 import LivreurMesInfosModal from "@/components/livreur/LivreurMesInfosModal";
+import LivreurRecapitulatifPaiement from "@/components/livreur/LivreurRecapitulatifPaiement";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -35,6 +36,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [gpsActif, setGpsActif] = useState(false);
   const [onboardingTermine, setOnboardingTermine] = useState(false);
   const [showMesInfos, setShowMesInfos] = useState(false);
+  const [showRecapitulatif, setShowRecapitulatif] = useState(null); // course à payer
+  const [isPaying, setIsPaying] = useState(false);
 
 
   // ─── Profil livreur — CORRECTION CRITIQUE : 2s + GPS temps réel ──────────
@@ -277,14 +280,13 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const handleColisLivre = (course, gpsArrivee) => {
     // Si le backend QR a déjà mis statut=livree + prix calculé, on affiche le récapitulatif
     if (course.statut === "livree") {
-      // Déjà traité par validateQRCode côté backend — le récapitulatif s'affiche via CourseActiveCard
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
       const gains = course.montant_livreur || 0;
       const dist = course.distance_reelle_km;
       toast.success(`Livraison confirmée ! 🎉${gains > 0 ? ` +${gains.toLocaleString()} F gagnés` : ""}`);
-      // Stocker les données pour affichage du récapitulatif
-      queryClient.setQueryData(["course-livree-data"], course);
+      // Afficher le récapitulatif avec bouton Payer
+      setShowRecapitulatif(course);
       return;
     }
 
@@ -332,6 +334,30 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     });
     base44.auth.logout();
     setTimeout(() => window.location.reload(), 300);
+  };
+
+  // Gestion du paiement
+  const handlePayer = async (course) => {
+    if (!livreurProfil?.id || !course?.id) return;
+    
+    setIsPaying(true);
+    try {
+      const result = await base44.functions.invoke('paiementLivreur', {
+        course_id: course.id,
+        livreur_id: livreurProfil.id,
+        montant_silga: course.commission_silga || 0,
+        montant_livreur: course.montant_livreur || 0,
+      });
+
+      toast.success(`✅ ${result.data.message}`);
+      setShowRecapitulatif(null);
+      queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+    } catch (err) {
+      toast.error(`Erreur : ${err?.response?.data?.error || err?.message || "Échec du paiement"}`);
+    } finally {
+      setIsPaying(false);
+    }
   };
 
   // ─── Onboarding externe obligatoire (GPS + profil) ───────────────────────
@@ -452,6 +478,15 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
         {activeTab === "historique" && (
           <LivreurHistorique mesCourses={mesCourses} livreurProfil={livreurProfil} isExterne={true} />
+        )}
+
+        {/* Récapitulatif avec bouton Payer */}
+        {showRecapitulatif && (
+          <LivreurRecapitulatifPaiement
+            course={showRecapitulatif}
+            onPayer={() => handlePayer(showRecapitulatif)}
+            isPaying={isPaying}
+          />
         )}
 
         {activeTab === "infos" && livreurProfil && (

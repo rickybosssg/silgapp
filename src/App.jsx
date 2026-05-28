@@ -37,6 +37,7 @@ const Maintenance = lazy(() => import('./pages/Maintenance.jsx'));
 const TestBoutEnBout = lazy(() => import('./pages/TestBoutEnBout.jsx'));
 const TestDiagnosticsComplet = lazy(() => import('./pages/TestDiagnosticsComplet.jsx'));
 const TestTerrainComplet = lazy(() => import('./pages/TestTerrainComplet.jsx'));
+const TestRecapitulatifPaiement = lazy(() => import('./pages/TestRecapitulatifPaiement.jsx'));
 
 const LoadingScreen = () => (
   <div className="fixed inset-0 flex items-center justify-center bg-background">
@@ -71,6 +72,7 @@ function App() {
             <Route path="/test-terrain" element={<TestTerrainComplet />} />
             <Route path="/test-diagnostics" element={<TestDiagnosticsComplet />} />
             <Route path="/test-bout-en-bout" element={<TestBoutEnBout />} />
+            <Route path="/test-recapitulatif" element={<TestRecapitulatifPaiement />} />
             <Route path="/maintenance" element={<Maintenance />} />
             <Route path="*" element={<PageNotFound />} />
           </Routes>
