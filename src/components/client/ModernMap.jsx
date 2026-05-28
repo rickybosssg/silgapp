@@ -57,60 +57,86 @@ export default function ModernMap({
     });
   }, [position]);
 
-  // Mettre à jour les marqueurs de livreurs
+  // Mettre à jour les marqueurs de livreurs et clients
   useEffect(() => {
     if (!mapInstanceRef.current || !livreursProches) return;
 
     const map = mapInstanceRef.current;
     
-    // Nettoyer les anciens marqueurs de livreurs (garder seulement le client)
+    // Nettoyer les anciens marqueurs (garder seulement le marqueur principal)
     markersRef.current.slice(1).forEach(marker => marker.remove());
     markersRef.current = markersRef.current.slice(0, 1);
 
     // Ajouter les nouveaux marqueurs
-    livreursProches.forEach((livreur, index) => {
-      if (!livreur.latitude || !livreur.longitude) return;
+    livreursProches.forEach((personne, index) => {
+      if (!personne.latitude || !personne.longitude) return;
+
+      // Déterminer si c'est un livreur ou un client
+      const isLivreur = !!personne.vehicule || !!personne.type_vehicule || !!personne.statut;
+      const isClient = !isLivreur;
 
       const markerIcon = window.L.divIcon({
-        html: `
+        html: isClient ? `
+          <div class="client-marker-wrapper">
+            <div class="client-marker-pulse"></div>
+            <div class="client-marker">
+              <div class="client-marker-dot"></div>
+            </div>
+          </div>
+        ` : `
           <div class="livreur-marker-wrapper">
             <div class="livreur-marker-pulse"></div>
             <div class="livreur-marker">
-              ${livreur.photo_url 
-                ? `<img src="${livreur.photo_url}" alt="${livreur.nom}" class="livreur-photo" />`
-                : `<div class="livreur-avatar">${livreur.nom?.charAt(0) || 'L'}</div>`
+              ${personne.photo_url 
+                ? `<img src="${personne.photo_url}" alt="${personne.nom}" class="livreur-photo" />`
+                : `<div class="livreur-avatar">${personne.nom?.charAt(0) || 'L'}</div>`
               }
             </div>
           </div>
         `,
-        className: "livreur-marker-container",
-        iconSize: [48, 48],
-        iconAnchor: [24, 24],
+        className: isClient ? "client-marker-container" : "livreur-marker-container",
+        iconSize: isClient ? [60, 60] : [48, 48],
+        iconAnchor: isClient ? [30, 30] : [24, 24],
       });
 
-      const marker = window.L.marker([livreur.latitude, livreur.longitude], { 
+      const marker = window.L.marker([personne.latitude, personne.longitude], { 
         icon: markerIcon,
         zIndexOffset: 1000
       }).addTo(map);
 
-      // Popup avec infos livreur
-      marker.bindPopup(`
-        <div class="livreur-popup">
-          <div class="livreur-popup-header">
-            ${livreur.photo_url 
-              ? `<img src="${livreur.photo_url}" alt="${livreur.nom}" />`
-              : `<div class="livreur-popup-avatar">${livreur.nom?.charAt(0) || 'L'}</div>`
-            }
-            <div>
-              <p class="livreur-popup-name">${livreur.nom}</p>
-              <div class="livreur-popup-rating">
-                ⭐ 4.8
+      // Popup avec infos
+      if (isClient) {
+        marker.bindPopup(`
+          <div class="client-popup">
+            <div class="client-popup-header">
+              <div class="client-popup-avatar">${personne.nom?.charAt(0) || 'C'}</div>
+              <div>
+                <p class="client-popup-name">${personne.prenom || ''} ${personne.nom || ''}</p>
+                <p class="client-popup-status">Client avec GPS</p>
               </div>
             </div>
+            ${personne.telephone ? `<p class="client-popup-phone">📞 ${personne.telephone}</p>` : ''}
           </div>
-          <p class="livreur-popup-vehicle">${livreur.vehicule || 'Moto'}</p>
-        </div>
-      `);
+        `);
+      } else {
+        marker.bindPopup(`
+          <div class="livreur-popup">
+            <div class="livreur-popup-header">
+              ${personne.photo_url 
+                ? `<img src="${personne.photo_url}" alt="${personne.nom}" />`
+                : `<div class="livreur-popup-avatar">${personne.nom?.charAt(0) || 'L'}</div>`
+              }
+              <div>
+                <p class="livreur-popup-name">${personne.nom}</p>
+                <div class="livreur-popup-rating">
+                  ⭐ 4.8
+                </div>
+              </div>
+            </div>
+            <p class="livreur-popup-vehicle">${personne.vehicule || 'Moto'}</p>
+          </div>
+        `);
+      }
 
       markersRef.current.push(marker);
     });
@@ -322,6 +348,7 @@ export default function ModernMap({
         font-size: 18px;
       }
       
+parameter=replace>
       /* Popup livreurs */
       .livreur-popup {
         min-width: 180px;
@@ -368,6 +395,51 @@ export default function ModernMap({
       }
       
       .livreur-popup-vehicle {
+        font-size: 12px;
+        color: #666;
+        margin: 0;
+      }
+      
+      /* Popup clients */
+      .client-popup {
+        min-width: 200px;
+      }
+      
+      .client-popup-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+      
+      .client-popup-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 20px;
+      }
+      
+      .client-popup-name {
+        font-weight: 700;
+        color: #1a1a1a;
+        margin: 0;
+        font-size: 14px;
+      }
+      
+      .client-popup-status {
+        font-size: 11px;
+        color: #dc2626;
+        margin-top: 2px;
+        font-weight: 600;
+      }
+      
+      .client-popup-phone {
         font-size: 12px;
         color: #666;
         margin: 0;
@@ -436,17 +508,38 @@ export default function ModernMap({
         </div>
       )}
       
-      {/* Badge livreurs à proximité */}
-      {livreursProches.length > 0 && mapLoaded && (
-        <div className="absolute top-4 right-4 z-[1000]">
-          <div className="bg-white/95 backdrop-blur-sm rounded-2xl px-4 py-2.5 shadow-lg border border-slate-200">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-xs font-bold text-slate-700">
-                {livreursProches.length} livr{livreursProches.length === 1 ? "eur" : "eurs"} à proximité
-              </span>
-            </div>
-          </div>
+      {/* Badge livreurs et clients à proximité */}
+      {mapLoaded && livreursProches.length > 0 && (
+        <div className="absolute top-4 right-4 z-[1000] space-y-2">
+          {(() => {
+            const livreurs = livreursProches.filter(p => p.vehicule || p.type_vehicule || p.statut);
+            const clients = livreursProches.filter(p => !p.vehicule && !p.type_vehicule && !p.statut);
+            
+            return (
+              <>
+                {livreurs.length > 0 && (
+                  <div className="bg-white/95 backdrop-blur-sm rounded-2xl px-4 py-2.5 shadow-lg border border-slate-200">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <span className="text-xs font-bold text-slate-700">
+                        {livreurs.length} livr{livreurs.length === 1 ? "eur" : "eurs"}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {clients.length > 0 && (
+                  <div className="bg-white/95 backdrop-blur-sm rounded-2xl px-4 py-2.5 shadow-lg border border-slate-200">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                      <span className="text-xs font-bold text-slate-700">
+                        {clients.length} client{clients.length === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
     </div>

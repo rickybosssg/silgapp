@@ -8,6 +8,7 @@ import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
 import StatCard from "@/components/dashboard/StatCard";
 import LivreursEnLigne from "@/components/dashboard/LivreursEnLigne";
+import ClientsEnLigne from "@/components/dashboard/ClientsEnLigne";
 
 import CoursesEnTraitement from "@/components/dashboard/CoursesEnTraitement";
 import CoursesTerminees from "@/components/dashboard/CoursesTerminees";
@@ -70,6 +71,11 @@ export default function DashboardExterne() {
     [livreurs]
   );
 
+  const clientsEnLigne = useMemo(
+    () => clients.filter(c => c.actif !== false && c.latitude && c.longitude),
+    [clients]
+  );
+
   const stats = useMemo(() => {
     const todayAll = courses.filter(c => isToday(new Date(c.created_date)));
     const total = todayAll.length;
@@ -128,6 +134,9 @@ export default function DashboardExterne() {
         <StatCard title="CA du jour" value={`${stats.ca.toLocaleString()}`} icon={TrendingUp} iconBg="bg-indigo-500" trendLabel="FCFA" />
         <StatCard title="Livreurs dispo" value={stats.dispoLivreurs} icon={Truck} iconBg="bg-accent" />
       </div>
+
+      {/* Clients en ligne (avec GPS) */}
+      <ClientsEnLigne clients={clientsEnLigne} />
 
       {/* Livreurs en ligne */}
       <LivreursEnLigne livreurs={livreursEnLigne} />

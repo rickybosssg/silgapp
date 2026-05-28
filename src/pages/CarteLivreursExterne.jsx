@@ -18,11 +18,23 @@ export default function CarteLivreursExterne() {
     refetchInterval: 15000,
   });
 
+  const { data: clients = [] } = useQuery({
+    queryKey: ["clients-externes-carte"],
+    queryFn: () => base44.entities.ClientExterne.filter({ actif: true }),
+    initialData: [],
+    refetchInterval: 15000,
+  });
+
   const enLigne = livreurs.filter(l => l.statut !== "hors_ligne" && l.app_active === true);
+  const clientsEnLigne = clients.filter(c => c.actif !== false && c.latitude && c.longitude);
   
-  // Position centrale (Ouagadougou) si pas de livreurs
-  const centerPosition = enLigne.length > 0 && enLigne[0].latitude && enLigne[0].longitude
-    ? { latitude: enLigne[0].latitude, longitude: enLigne[0].longitude }
+  // Position centrale (Ouagadougou) si pas de livreurs/clients
+  const centerPosition = (enLigne.length > 0 || clientsEnLigne.length > 0) && 
+    ((enLigne[0]?.latitude && enLigne[0]?.longitude) || (clientsEnLigne[0]?.latitude && clientsEnLigne[0]?.longitude))
+    ? { 
+        latitude: (enLigne[0]?.latitude || clientsEnLigne[0]?.latitude), 
+        longitude: (enLigne[0]?.longitude || clientsEnLigne[0]?.longitude) 
+      }
     : { latitude: 12.3714, longitude: -1.5197 }; // Ouagadougou
 
   return (
@@ -35,8 +47,8 @@ export default function CarteLivreursExterne() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Carte - Livreurs Externes</h1>
-          <p className="text-sm text-muted-foreground">{enLigne.length} livreurs externes en ligne</p>
+          <h1 className="text-2xl font-bold text-foreground">Carte - Livreurs & Clients</h1>
+          <p className="text-sm text-muted-foreground">{enLigne.length} livreurs • {clientsEnLigne.length} clients en ligne</p>
         </div>
       </div>
 
@@ -48,7 +60,7 @@ export default function CarteLivreursExterne() {
           </div>
           <div className="flex-1">
             <p className="font-semibold text-foreground">🗺️ Voir la carte interactive</p>
-            <p className="text-xs text-muted-foreground">{enLigne.length} livreurs en ligne</p>
+            <p className="text-xs text-muted-foreground">{enLigne.length} livreurs • {clientsEnLigne.length} clients</p>
           </div>
         </div>
       </Card>
@@ -57,7 +69,7 @@ export default function CarteLivreursExterne() {
       <Card className="p-6">
         <div className="flex items-center gap-3 mb-4">
           <Truck className="w-5 h-5 text-accent" />
-          <h2 className="font-semibold">Livreurs Externes Actifs</h2>
+          <h2 className="font-semibold">Livreurs Externes Actifs ({enLigne.length})</h2>
         </div>
 
         {enLigne.length === 0 ? (
@@ -85,6 +97,32 @@ export default function CarteLivreursExterne() {
         )}
       </Card>
 
+      {/* Clients avec GPS */}
+      {clientsEnLigne.length > 0 && (
+        <Card className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <MapPin className="w-5 h-5 text-red-500" />
+            <h2 className="font-semibold">Clients avec GPS Actif ({clientsEnLigne.length})</h2>
+          </div>
+          <div className="space-y-2">
+            {clientsEnLigne.map(client => (
+              <div key={client.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div>
+                  <p className="font-semibold">{client.prenom} {client.nom}</p>
+                  <p className="text-sm text-muted-foreground">{client.quartier || "Position GPS"}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-red-500" />
+                  <a href={`tel:${client.telephone}`} className="text-sm text-primary hover:underline">
+                    {client.telephone}
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {/* Modale carte interactive */}
       {showMap && (
         <div className="fixed inset-0 z-50 bg-background">
@@ -97,7 +135,7 @@ export default function CarteLivreursExterne() {
           <div className="h-[calc(100vh-80px)]">
             <ModernMap
               position={centerPosition}
-              livreursProches={enLigne}
+              livreursProches={[...enLigne, ...clientsEnLigne]}
               courseActive={null}
             />
           </div>
