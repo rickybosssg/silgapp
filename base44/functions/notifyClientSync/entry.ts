@@ -1,33 +1,97 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 /**
- * Déclenché par automation quand une CourseExterne est créée.
- * Crée une Notification neutre (sans infos sensibles) pour l'expéditeur/destinataire.
- * La Notification déclenche ensuite envoyerAlerteWhatsApp si l'utilisateur est inactif.
+ * Déclenché par automation quand une CourseExterne est créée/mise à jour.
+ * Crée UNE notification contextualisée par utilisateur concerné.
+ * Anti-doublon : vérifie si une notif avec la même clé unique existe déjà.
  */
+
+// Génère le titre et message selon le contexte de la course
+function buildNotificationContent(course, recipientRole) {
+  const expediteurNom = course.expediteur_nom || "Quelqu'un";
+  const destinataireNom = course.destinataire_nom || "votre destinataire";
+  const livreurNom = course.livreur_nom || "Le livreur";
+  const statut = course.statut;
+
+  // Nouvelle course créée → notifier le destinataire
+  if (recipientRole === "destinataire" && statut === "recherche_livreur") {
+    return {
+      titre: `📦 ${expediteurNom} vous envoie un colis`,
+      message: `Appuyez pour voir les détails de la livraison.`,
+      type: "nouvelle_course",
+    };
+  }
+
+  // Nouvelle course "recevoir" → notifier l'expéditeur
+  if (recipientRole === "expediteur" && statut === "recherche_livreur") {
+    return {
+      titre: `📦 Une demande de récupération vous concerne`,
+      message: `${destinataireNom} attend un colis de votre part via SILGAPP.`,
+      type: "nouvelle_course",
+    };
+  }
+
+  // Course acceptée par un livreur
+  if (statut === "livreur_en_route") {
+    return {
+      titre: `🛵 Votre course a été acceptée`,
+      message: `${livreurNom} est en route pour récupérer le colis.`,
+      type: "course_acceptee",
+    };
+  }
+
+  // Colis récupéré → livreur parti vers destination
+  if (statut === "colis_recupere" || statut === "en_livraison") {
+    return {
+      titre: `📦 ${livreurNom} récupère votre colis`,
+      message: `La livraison est en cours. Appuyez pour suivre en temps réel.`,
+      type: "course_livree",
+    };
+  }
+
+  // Course livrée
+  if (statut === "livree") {
+    return {
+      titre: `✅ Colis livré avec succès`,
+      message: `${livreurNom} a livré votre colis. Appuyez pour voir le récapitulatif.`,
+      type: "course_livree",
+    };
+  }
+
+  // Annulée
+  if (statut === "annulee") {
+    return {
+      titre: `❌ Course annulée`,
+      message: `La course a été annulée. Appuyez pour voir les détails.`,
+      type: "course_annulee",
+    };
+  }
+
+  // Fallback minimal
+  return {
+    titre: `📦 Mise à jour de votre course`,
+    message: `Appuyez pour voir les détails.`,
+    type: "nouvelle_course",
+  };
+}
 
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    
-    // Payload d'automation entity : { event: { entity_id, ... }, data: { ... } }
     const payload = await req.json();
     const courseId = payload.event?.entity_id || payload.course_id || payload.data?.id;
-    
+
     if (!courseId) {
-      console.error('[notifyClientSync] ❌ course_id manquant dans payload:', JSON.stringify(payload));
+      console.error('[notifyClientSync] ❌ course_id manquant');
       return Response.json({ error: "course_id manquant" }, { status: 400 });
     }
 
-    // Utiliser service role pour récupérer la course
     const course = await base44.asServiceRole.entities.CourseExterne.get(courseId);
     if (!course) {
       return Response.json({ error: "Course non trouvée" }, { status: 404 });
     }
 
-    const notifications = [];
-
-    // Helper : résoudre un client par id OU par téléphone normalisé
+    // Helper : résoudre un client par id OU par téléphone
     const resolveClient = async (clientId, telephone) => {
       if (clientId) {
         try { return await base44.asServiceRole.entities.ClientExterne.get(clientId); } catch (_) {}
@@ -45,65 +109,76 @@ Deno.serve(async (req) => {
       return null;
     };
 
-    // Message neutre — pas d'infos sensibles (prix, adresse, GPS, détails course)
-    const TITRE_NOTIFICATION = "📦 Nouvelle notification SILGAPP";
-    const MESSAGE_NOTIFICATION = "Vous avez reçu une notification importante sur SILGAPP. Ouvrez l'application pour consulter les détails.";
+    // Anti-doublon : vérifie si une notif avec cette clé unique existe déjà
+    const createNotifIfNotExists = async (userEmail, recipientRole) => {
+      const deduplicationKey = `${course.id}_${userEmail}_${course.statut}`;
 
-    // 1. Notifier le destinataire (course type "expedier")
+      // Chercher une notif existante avec la même course + email + statut
+      const existing = await base44.asServiceRole.entities.Notification.filter({
+        course_id: course.id,
+        destinataire_email: userEmail,
+        type: recipientRole === "destinataire" || recipientRole === "expediteur" ? "nouvelle_course" : undefined,
+      });
+
+      // Vérifier doublon par clé dans le message (on stocke la clé dedans)
+      if (existing?.length > 0) {
+        const alreadyExists = existing.some(n => n.message?.includes(deduplicationKey) || 
+          (n.course_id === course.id && n.destinataire_email === userEmail && 
+           new Date(n.created_date) > new Date(Date.now() - 60000)) // moins d'1 min
+        );
+        if (alreadyExists) {
+          console.log(`[notifyClientSync] ⏭ Doublon évité pour ${userEmail} (${course.statut})`);
+          return null;
+        }
+      }
+
+      const content = buildNotificationContent(course, recipientRole);
+
+      const notif = await base44.asServiceRole.entities.Notification.create({
+        titre: content.titre,
+        message: content.message,
+        type: content.type,
+        course_id: course.id,
+        destinataire_email: userEmail,
+        lue: false,
+      });
+
+      console.log(`[notifyClientSync] ✅ Notif créée pour ${userEmail}: "${content.titre}"`);
+      return notif;
+    };
+
+    const notifications = [];
+
+    // 1. Course "expedier" → notifier le destinataire
     if (course.type_course === "expedier") {
-      const destinataireClient = await resolveClient(course.destinataire_client_id, course.destinataire_telephone);
-      if (destinataireClient && destinataireClient.user_email) {
-        // Lier automatiquement si pas encore lié
+      const dest = await resolveClient(course.destinataire_client_id, course.destinataire_telephone);
+      if (dest?.user_email) {
         if (!course.destinataire_client_id) {
           await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-            destinataire_client_id: destinataireClient.id,
-            recipient_has_app: true,
+            destinataire_client_id: dest.id, recipient_has_app: true,
           });
         }
-        const notification = await base44.asServiceRole.entities.Notification.create({
-          titre: TITRE_NOTIFICATION,
-          message: MESSAGE_NOTIFICATION,
-          type: "nouvelle_course",
-          course_id: course.id,
-          destinataire_email: destinataireClient.user_email,
-          lue: false
-        });
-        notifications.push(notification);
-        console.log(`[notifyClientSync] ✅ Notif destinataire (${destinataireClient.user_email})`);
+        const notif = await createNotifIfNotExists(dest.user_email, "destinataire");
+        if (notif) notifications.push(notif);
       }
     }
 
-    // 2. Notifier l'expéditeur (course type "recevoir")
+    // 2. Course "recevoir" → notifier l'expéditeur
     if (course.type_course === "recevoir") {
-      const expediteurClient = await resolveClient(course.expediteur_client_id, course.expediteur_telephone);
-      
-      if (expediteurClient && expediteurClient.user_email) {
-        // Lier automatiquement si pas encore lié
+      const exped = await resolveClient(course.expediteur_client_id, course.expediteur_telephone);
+      if (exped?.user_email) {
         if (!course.expediteur_client_id) {
           await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-            expediteur_client_id: expediteurClient.id,
+            expediteur_client_id: exped.id,
           });
         }
-        const notification = await base44.asServiceRole.entities.Notification.create({
-          titre: TITRE_NOTIFICATION,
-          message: MESSAGE_NOTIFICATION,
-          type: "nouvelle_course",
-          course_id: course.id,
-          destinataire_email: expediteurClient.user_email,
-          lue: false
-        });
-        notifications.push(notification);
-        console.log(`[notifyClientSync] ✅ Notif expéditeur (${expediteurClient.user_email})`);
-      } else {
-        console.log(`[notifyClientSync] Expéditeur non trouvé dans la base: ${course.expediteur_telephone}`);
+        const notif = await createNotifIfNotExists(exped.user_email, "expediteur");
+        if (notif) notifications.push(notif);
       }
     }
 
-    return Response.json({ 
-      success: true,
-      notifications_created: notifications.length
-    });
-    
+    return Response.json({ success: true, notifications_created: notifications.length });
+
   } catch (error) {
     console.error('[notifyClientSync] ❌ Erreur:', error.message);
     return Response.json({ error: error.message }, { status: 500 });

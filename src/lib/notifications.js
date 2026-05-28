@@ -346,18 +346,27 @@ export async function getCurrentFCMToken() {
 }
 
 export function subscribeToNotifications(onNotification, userEmail) {
+  // Garde-fou anti-doublon : IDs déjà traités dans cette session
+  const processedIds = new Set();
+
   const unsubscribe = base44.entities.Notification.subscribe((event) => {
-    if (event.type === "create" && event.data.destinataire_email === userEmail) {
+    if (event.type === "create" && event.data?.destinataire_email === userEmail) {
       const notification = event.data;
 
+      // Anti-doublon : ignorer si déjà traité
+      if (processedIds.has(notification.id)) return;
+      processedIds.add(notification.id);
+
+      // Notification système locale (barre de statut)
       showLocalNotification(notification.titre, notification.message, {
-        tag: `notification-${notification.id}`,
+        tag: `silgapp-${notification.id}`, // tag unique → évite doublon système
         data: {
           type: notification.type,
           course_id: notification.course_id,
         },
       });
 
+      // Callback (pour afficher toast ou mettre à jour l'UI)
       if (onNotification) onNotification(notification);
     }
   });

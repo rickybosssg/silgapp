@@ -65,7 +65,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     if (!livreurId || !livreurEmail) return;
     registerPushToken(livreurId, { email: livreurEmail }).catch(() => null);
     const unsub = subscribeToNotifications(
-      (n) => toast.info(`${n.titre}: ${n.message}`),
+      (n) => toast.info(n.titre, { description: n.message }),
       livreurEmail
     );
     return () => unsub?.();
