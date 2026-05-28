@@ -64,15 +64,20 @@ export default function AuthGate({ children, onLivreur, onClient }) {
       if (livreurs && livreurs.length > 0) {
         const livreur = livreurs[0];
         if (livreur.type_livreur === "externe") {
-          // Livreur externe → charger component externe
-          import("@/pages/LivreurExterneApp.jsx").then(module => {
+          // Livreur externe → attendre que le module soit chargé AVANT setState
+          try {
+            const module = await import("@/pages/LivreurExterneApp.jsx");
             const LivreurExterneApp = module.default;
             onLivreur?.({ ...livreur, component: LivreurExterneApp });
-          });
+          } catch (err) {
+            console.error("[AuthGate] Erreur chargement LivreurExterneApp:", err);
+            onLivreur?.(livreur); // fallback sans component
+          }
         } else {
           // Livreur interne
           onLivreur?.(livreur);
         }
+        if (!mounted) return;
         setState("livreur");
         return;
       }
