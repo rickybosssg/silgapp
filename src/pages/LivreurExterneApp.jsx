@@ -18,6 +18,7 @@ import LivreurExterneOnboarding from "@/components/livreur/LivreurExterneOnboard
 import LivreurMesInfosModal from "@/components/livreur/LivreurMesInfosModal";
 import LivreurRecapitulatifPaiement from "@/components/livreur/LivreurRecapitulatifPaiement";
 import LivraisonRecapitulatif from "@/components/livreur/LivraisonRecapitulatif";
+import PrixCoursePopup from "@/components/livreur/PrixCoursePopup";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -40,6 +41,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [showMesInfos, setShowMesInfos] = useState(false);
   const [showRecapitulatif, setShowRecapitulatif] = useState(null);
   const [recapLivraison, setRecapLivraison] = useState(null);
+  const [courseLivreePopup, setCourseLivreePopup] = useState(null);
 
 
   // ─── Profil livreur ───────────────────────────────────────────────────────
@@ -316,6 +318,21 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       saveLivreur(livreurProfil.id, {
         montant_du_silga: (livreurProfil.montant_du_silga || 0) + commissionSilga
       });
+      
+      // Afficher le popup prix après livraison
+      const courseData = {
+        ...course,
+        latitude_livraison: gpsArrivee.lat,
+        longitude_livraison: gpsArrivee.lng,
+        distance_reelle_km: distanceVal,
+        prix_final: prixFinal,
+        commission_silga: commissionSilga,
+        montant_livreur: montantLivreur,
+      };
+      const seenKey = `prix_popup_seen_${course.id}`;
+      if (!localStorage.getItem(seenKey)) {
+        setCourseLivreePopup(courseData);
+      }
     } else {
       updateCourseMutation.mutate({ id: course.id, data: baseData });
     }
@@ -390,6 +407,17 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // ─── Dashboard principal ──────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50">
+
+      {/* Popup prix de course — affiché une seule fois après livraison */}
+      {courseLivreePopup && (
+        <PrixCoursePopup
+          course={courseLivreePopup}
+          onClose={() => {
+            localStorage.setItem(`prix_popup_seen_${courseLivreePopup.id}`, "1");
+            setCourseLivreePopup(null);
+          }}
+        />
+      )}
 
       {/* Récapitulatif livraison — géré maintenant dans CourseActiveCard */}
 
