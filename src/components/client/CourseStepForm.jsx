@@ -296,7 +296,7 @@ export default function CourseStepForm({
           );
         }
 
-        // ÉTAPE 1 : ADRESSE DE RÉCUPÉRATION (pour "expedier") - inchangé
+        // ÉTAPE 1 : ADRESSE DE RÉCUPÉRATION (pour "expedier")
         return (
           <div className="space-y-4">
             <div className="text-center mb-6">
@@ -320,10 +320,21 @@ export default function CourseStepForm({
               <div className="flex items-center gap-3 p-4 rounded-2xl bg-green-50 border border-green-200">
                 <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
                 <div className="flex-1">
-                  <p className="text-sm font-bold text-green-900">Position actuelle utilisée</p>
-                  {formData.adresse_depart && <p className="text-xs text-green-700 mt-0.5">{formData.adresse_depart}</p>}
+                  <p className="text-sm font-bold text-green-900">✅ Position GPS récupérée</p>
+                  <p className="text-xs text-green-700 mt-0.5">{formData.adresse_depart || "Position GPS"}</p>
+                  {formData.gps_depart_lat && formData.gps_depart_lng && (
+                    <p className="text-xs text-green-600 mt-0.5">
+                      📍 {Number(formData.gps_depart_lat).toFixed(4)}, {Number(formData.gps_depart_lng).toFixed(4)}
+                    </p>
+                  )}
                 </div>
-                <button type="button" onClick={() => setFormData({ ...formData, recuperationGPS: false, gps_depart_lat: null, gps_depart_lng: null })} className="text-green-600 text-xs underline">Changer</button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, recuperationGPS: false, gps_depart_lat: null, gps_depart_lng: null, adresse_depart: "" })}
+                  className="text-green-600 text-xs underline"
+                >
+                  Changer
+                </button>
               </div>
             )}
 
@@ -334,7 +345,7 @@ export default function CourseStepForm({
             </div>
 
             <div>
-              <Label>Adresse de récupération *</Label>
+              <Label>Adresse de récupération {formData.recuperationGPS ? "(optionnel)" : "*"}</Label>
               <Input
                 value={formData.adresse_depart}
                 onChange={(e) => setFormData({ ...formData, adresse_depart: e.target.value })}

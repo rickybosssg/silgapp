@@ -118,7 +118,10 @@ export default function CourseExterneFormSync() {
   const gpsHandlers = {
     // Récupération GPS — pour l'expéditeur (expedier) OU l'endroit où récupérer (recevoir)
     onGetGPSDepart: () => {
-      if (!navigator.geolocation) { toast.error("GPS non disponible"); return; }
+      if (!navigator.geolocation) {
+        toast.error("GPS non disponible sur cet appareil");
+        return;
+      }
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
           const lat = pos.coords.latitude;
@@ -129,10 +132,20 @@ export default function CourseExterneFormSync() {
             gps_depart_lat: lat,
             gps_depart_lng: lng,
             recuperationGPS: true,
-            adresse_depart: prev.adresse_depart || adresse,
+            adresse_depart: adresse || "Position GPS",
           }));
+          toast.success("📍 Position GPS récupérée avec succès !");
         },
-        () => toast.error("Impossible d'obtenir la position GPS")
+        (err) => {
+          if (err.code === 1) {
+            toast.error("Permission GPS refusée. Autorisez la localisation dans les paramètres.");
+          } else if (err.code === 2) {
+            toast.error("Position GPS indisponible. Vérifiez votre GPS.");
+          } else {
+            toast.error("Délai dépassé. Réessayez en extérieur.");
+          }
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
       );
     },
     // Livraison GPS — pour "recevoir" : position actuelle du client destinataire
