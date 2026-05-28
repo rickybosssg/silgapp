@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import LivraisonResume from "./LivraisonResume";
 import QRScannerModal from "./QRScannerModal";
 import LivraisonRecapitulatif from "./LivraisonRecapitulatif";
+import PrixCoursePopup from "./PrixCoursePopup";
 import NavigationGPS from "./NavigationGPS";
 
 // Haversine
@@ -114,6 +115,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const [showQRScanner, setShowQRScanner] = useState(null); // "pickup" | "delivery" | null
   const [showRecapitulatif, setShowRecapitulatif] = useState(false);
   const [courseLivreeData, setCourseLivreeData] = useState(null);
+  const [showPrixPopup, setShowPrixPopup] = useState(false);
+  const [prixPopupData, setPrixPopupData] = useState(null);
   // Optimistic status — overrides course.statut immediately on tap
   const [optimisticStatut, setOptimisticStatut] = useState(null);
 
@@ -171,6 +174,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
   // Handler succès scan QR delivery (externe) — livraison confirmée par le backend
   const handleQRDeliverySuccess = (courseData) => {
+    console.log("[EVENT_SCAN_COLIS_LIVRE]", { course_id: course.id, statut: courseData?.statut, distance: courseData?.distance_reelle_km, prix: courseData?.prix_final, livreur_id: course.livreur_id });
     setShowQRScanner(null);
     setOptimisticStatut("livree");
 
@@ -180,8 +184,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     let montantLivreur = courseData?.montant_livreur ?? course.montant_livreur ?? 0;
     let commissionSilga = courseData?.commission_silga ?? course.commission_silga ?? 0;
 
-    // Fallback local : si le backend n'a pas pu calculer (GPS manquant),
-    // recalculer uniquement depuis GPS récupération → GPS livraison (règle métier)
+    // Fallback local : recalcul GPS si backend n'a pas pu calculer
     if ((!distanceKm || distanceKm <= 0) && course.latitude_recuperation && course.longitude_recuperation &&
         courseData?.latitude_livraison && courseData?.longitude_livraison) {
       const latR = course.latitude_recuperation, lngR = course.longitude_recuperation;
@@ -196,12 +199,6 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       prixFinal = Math.round(distanceKm * 100);
       montantLivreur = Math.round(prixFinal * 0.7);
       commissionSilga = Math.round(prixFinal * 0.3);
-      base44.entities.CourseExterne.update(course.id, {
-        distance_reelle_km: distanceKm,
-        prix_final: prixFinal,
-        montant_livreur: montantLivreur,
-        commission_silga: commissionSilga,
-      }).catch(() => null);
     }
 
     const merged = {
@@ -213,11 +210,30 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       montant_livreur: montantLivreur,
       commission_silga: commissionSilga,
     };
-    setCourseLivreeData(merged);
-    setShowRecapitulatif(true);
-    
-    // IMPORTANT: Ne pas appeler onColisLivre ici, car le backend a déjà tout fait.
-    // Le livreur verra le récapitulatif, puis en fermant, onColisLivre sera appelé pour cleanup.
+
+    console.log("[COURSE_TERMINEE]", { course_id: merged.id, statut: merged.statut, distance: merged.distance_reelle_km, prix: merged.prix_final, livreur_id: merged.livreur_id });
+    console.log("[POPUP_TRIGGER]", { course_id: merged.id, prixFinal, distanceKm });
+
+    // Afficher directement le popup prix dans ce composant — local, immédiat, sans dépendance externe
+    const seenKey = `prix_popup_seen_${course.id}`;
+    if (!localStorage.getItem(seenKey)) {
+      setPrixPopupData(merged);
+      setShowPrixPopup(true);
+      console.log("[POPUP_VISIBLE]", { course_id: merged.id });
+    } else {
+      // Popup déjà vu — aller directement au cleanup
+      onColisLivre({ ...merged }, gpsArrivee);
+    }
+  };
+
+  const handleFermerPrixPopup = () => {
+    console.log("[POPUP_CLOSED]", { course_id: prixPopupData?.id });
+    localStorage.setItem(`prix_popup_seen_${course.id}`, "1");
+    setShowPrixPopup(false);
+    const data = prixPopupData;
+    setPrixPopupData(null);
+    // APRÈS fermeture popup : cleanup livreur
+    onColisLivre({ ...data }, gpsArrivee);
   };
 
   const handleFermerCourse = () => {
@@ -228,7 +244,18 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
   return (
     <>
-      {/* Récapitulatif post-livraison (externe) */}
+      {/* Popup PRIX DE LA COURSE — local, immédiat, bloquant */}
+      {showPrixPopup && prixPopupData && (() => {
+        console.log("[POPUP_RENDER]", { course_id: prixPopupData.id, prix: prixPopupData.prix_final, distance: prixPopupData.distance_reelle_km });
+        return (
+          <PrixCoursePopup
+            course={prixPopupData}
+            onClose={handleFermerPrixPopup}
+          />
+        );
+      })()}
+
+      {/* Récapitulatif post-livraison (interne uniquement) */}
       {showRecapitulatif && courseLivreeData && (
         <LivraisonRecapitulatif
           course={courseLivreeData}

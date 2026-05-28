@@ -17,7 +17,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LivreurExterneOnboarding from "@/components/livreur/LivreurExterneOnboarding";
 import LivreurMesInfosModal from "@/components/livreur/LivreurMesInfosModal";
 import LivreurRecapitulatifPaiement from "@/components/livreur/LivreurRecapitulatifPaiement";
-import PrixCoursePopup from "@/components/livreur/PrixCoursePopup";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -39,7 +38,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [onboardingTermine, setOnboardingTermine] = useState(false);
   const [showMesInfos, setShowMesInfos] = useState(false);
   const [showRecapitulatif, setShowRecapitulatif] = useState(null);
-  const [courseLivreePopup, setCourseLivreePopup] = useState(null);
+
 
   // ─── Profil livreur ───────────────────────────────────────────────────────
   const { data: livreurProfil } = useQuery({
@@ -279,22 +278,13 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     );
   };
 
-  const handleColisLivre = async (course, gpsArrivee) => {
+  const handleColisLivre = (course, gpsArrivee) => {
     if (course.statut === "livree") {
+      // Le popup prix est géré directement dans CourseActiveCard (local, immédiat)
+      // Ici on fait juste le cleanup du statut livreur
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
-      // Afficher popup prix une seule fois — récupérer les données fraîches du backend
-      const seenKey = `prix_popup_seen_${course.id}`;
-      if (!localStorage.getItem(seenKey)) {
-        // Fetch course fraîche depuis le backend pour avoir prix_final et distance_reelle_km à jour
-        try {
-          const fresh = await base44.entities.CourseExterne.filter({ id: course.id });
-          const freshCourse = (fresh && fresh[0]) ? fresh[0] : course;
-          setCourseLivreePopup(freshCourse);
-        } catch (_) {
-          setCourseLivreePopup(course);
-        }
-      }
+      statutMutation.mutate("disponible");
       return;
     }
 
@@ -330,20 +320,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     }
     statutMutation.mutate("disponible");
     toast.success("Livraison terminée ! 🎉");
-
-    // Afficher popup prix — attendre un peu que le backend enregistre les données
-    const seenKey = `prix_popup_seen_${course.id}`;
-    if (!localStorage.getItem(seenKey)) {
-      setTimeout(async () => {
-        try {
-          const fresh = await base44.entities.CourseExterne.filter({ id: course.id });
-          const freshCourse = (fresh && fresh[0]) ? fresh[0] : course;
-          setCourseLivreePopup(freshCourse);
-        } catch (_) {
-          setCourseLivreePopup(course);
-        }
-      }, 1500);
-    }
   };
 
   const handleLogout = () => {
@@ -413,16 +389,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // ─── Dashboard principal ──────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Popup prix de course — affiché une seule fois après livraison */}
-      {courseLivreePopup && (
-        <PrixCoursePopup
-          course={courseLivreePopup}
-          onClose={() => {
-            localStorage.setItem(`prix_popup_seen_${courseLivreePopup.id}`, "1");
-            setCourseLivreePopup(null);
-          }}
-        />
-      )}
+
       <div className="max-w-lg mx-auto p-4 pb-12">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
           <TabsList className="w-full">
