@@ -31,6 +31,21 @@ export default function CourseStepForm({
   const [verifying, setVerifying] = useState(false);
   const progress = ((step + 1) / totalSteps) * 100;
 
+  // Cocher automatiquement GPS expéditeur si disponible au montage du composant ou quand GPS devient disponible
+  useEffect(() => {
+    const isRecevoir = formData.type_course === "recevoir";
+    const gpsDispo = !!(formData.expediteur_gps_lat && formData.expediteur_gps_lng && formData.expediteur_gps_available);
+    
+    if (isRecevoir && gpsDispo && !formData.recuperationGPS) {
+      // GPS disponible mais pas encore coché - activer automatiquement
+      setFormData(prev => ({
+        ...prev,
+        recuperationGPS: true,
+        adresse_depart: prev.adresse_depart && prev.adresse_depart !== "" ? prev.adresse_depart : "Position GPS de l'expéditeur",
+      }));
+    }
+  }, [formData.expediteur_gps_lat, formData.expediteur_gps_lng, formData.expediteur_gps_available, formData.type_course]);
+
   // Sauvegarder les données du formulaire dans localStorage
   useEffect(() => {
     try {
@@ -77,9 +92,18 @@ export default function CourseStepForm({
             gps_depart_lat: client.latitude,
             gps_depart_lng: client.longitude,
             recuperationGPS: true,
-            adresse_depart: client.quartier || "Position GPS disponible",
+            adresse_depart: "Position GPS de l'expéditeur",
+            expediteur_gps_available: true,
+            expediteur_gps_lat: client.latitude,
+            expediteur_gps_lng: client.longitude,
           }));
           toast.success("📍 Position GPS de l'expéditeur disponible !");
+        } else {
+          // Expéditeur trouvé mais sans GPS
+          setFormData(prev => ({
+            ...prev,
+            expediteur_gps_available: false,
+          }));
         }
         
         // Notifier l'expéditeur
@@ -310,7 +334,8 @@ export default function CourseStepForm({
 
         // "Recevoir" : ADRESSE DE RÉCUPÉRATION avec GPS optionnel
         if (isRecevoir) {
-          const gpsDispo = formData.gps_depart_lat && formData.gps_depart_lng;
+          // Vérifier si GPS expéditeur est disponible et persisté
+          const gpsDispo = !!(formData.expediteur_gps_lat && formData.expediteur_gps_lng && formData.expediteur_gps_available);
           
           return (
             <div className="space-y-4">
@@ -340,6 +365,7 @@ export default function CourseStepForm({
                         setFormData({
                           ...formData,
                           recuperationGPS: false,
+                          adresse_depart: formData.adresse_depart === "Position GPS de l'expéditeur" ? "" : formData.adresse_depart,
                         });
                       }
                     }}
@@ -353,6 +379,11 @@ export default function CourseStepForm({
                   <div className="mt-3 ml-6 flex items-center gap-2 text-green-700">
                     <CheckCircle className="w-4 h-4" />
                     <p className="text-sm font-semibold">Position GPS disponible</p>
+                    {formData.expediteur_gps_lat && formData.expediteur_gps_lng && (
+                      <p className="text-xs text-green-600 mt-1">
+                        📍 {Number(formData.expediteur_gps_lat).toFixed(4)}, {Number(formData.expediteur_gps_lng).toFixed(4)}
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div className="mt-3 ml-6 flex items-center gap-2 text-red-700">
