@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 import LivraisonResume from "./LivraisonResume";
 import QRScannerModal from "./QRScannerModal";
 import LivraisonRecapitulatif from "./LivraisonRecapitulatif";
-import PrixCoursePopup from "./PrixCoursePopup";
 import NavigationGPS from "./NavigationGPS";
 
 // Haversine
@@ -115,8 +114,6 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const [showQRScanner, setShowQRScanner] = useState(null); // "pickup" | "delivery" | null
   const [showRecapitulatif, setShowRecapitulatif] = useState(false);
   const [courseLivreeData, setCourseLivreeData] = useState(null);
-  const [showPrixPopup, setShowPrixPopup] = useState(false);
-  const [prixPopupData, setPrixPopupData] = useState(null);
   // Optimistic status — overrides course.statut immediately on tap
   const [optimisticStatut, setOptimisticStatut] = useState(null);
 
@@ -211,51 +208,20 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       commission_silga: commissionSilga,
     };
 
-    console.log("[COURSE_TERMINEE]", { course_id: merged.id, statut: merged.statut, distance: merged.distance_reelle_km, prix: merged.prix_final, livreur_id: merged.livreur_id });
-    console.log("[POPUP_TRIGGER]", { course_id: merged.id, prixFinal, distanceKm });
-
-    // Afficher directement le popup prix dans ce composant — local, immédiat, sans dépendance externe
-    const seenKey = `prix_popup_seen_${course.id}`;
-    if (!localStorage.getItem(seenKey)) {
-      setPrixPopupData(merged);
-      setShowPrixPopup(true);
-      console.log("[POPUP_VISIBLE]", { course_id: merged.id });
-    } else {
-      // Popup déjà vu — aller directement au cleanup
-      onColisLivre({ ...merged }, gpsArrivee);
-    }
-  };
-
-  const handleFermerPrixPopup = () => {
-    console.log("[POPUP_CLOSED]", { course_id: prixPopupData?.id });
-    localStorage.setItem(`prix_popup_seen_${course.id}`, "1");
-    setShowPrixPopup(false);
-    const data = prixPopupData;
-    setPrixPopupData(null);
-    // APRÈS fermeture popup : cleanup livreur
-    onColisLivre({ ...data }, gpsArrivee);
+    setCourseLivreeData(merged);
+    setShowRecapitulatif(true);
   };
 
   const handleFermerCourse = () => {
+    const data = courseLivreeData;
     setShowRecapitulatif(false);
-    onColisLivre({ ...course, ...(courseLivreeData || {}), statut: "livree" }, gpsArrivee);
     setCourseLivreeData(null);
+    onColisLivre({ ...data }, gpsArrivee);
   };
 
   return (
     <>
-      {/* Popup PRIX DE LA COURSE — local, immédiat, bloquant */}
-      {showPrixPopup && prixPopupData && (() => {
-        console.log("[POPUP_RENDER]", { course_id: prixPopupData.id, prix: prixPopupData.prix_final, distance: prixPopupData.distance_reelle_km });
-        return (
-          <PrixCoursePopup
-            course={prixPopupData}
-            onClose={handleFermerPrixPopup}
-          />
-        );
-      })()}
-
-      {/* Récapitulatif post-livraison (interne uniquement) */}
+      {/* Récapitulatif post-livraison */}
       {showRecapitulatif && courseLivreeData && (
         <LivraisonRecapitulatif
           course={courseLivreeData}
