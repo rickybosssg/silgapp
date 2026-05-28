@@ -14,7 +14,7 @@ import CourseEnAttenteModal from "@/components/livreur/CourseEnAttenteModal";
 import CourseActiveCard from "@/components/livreur/CourseActiveCard";
 import LivreurHistorique from "@/components/livreur/LivreurHistorique";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import LivreurExterneOnboarding, { profilLivreurComplet, normaliserTelephone, formaterTelephone } from "@/components/livreur/LivreurExterneOnboarding";
+import LivreurExterneOnboarding from "@/components/livreur/LivreurExterneOnboarding";
 import LivreurMesInfosModal from "@/components/livreur/LivreurMesInfosModal";
 import LivreurRecapitulatifPaiement from "@/components/livreur/LivreurRecapitulatifPaiement";
 
