@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
     const results = [];
 
     for (const livreur of livreurs) {
-      // Si le livreur a déjà un GPS, on le garde
+      // Si le livreur a déjà un GPS, on le compte comme synchronisé
       if (livreur.latitude && livreur.longitude) {
         synced++;
         results.push({
@@ -41,13 +41,13 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Livreur sans GPS
+      // Livreur sans GPS - on ne peut pas synchroniser sans données
       sansGps++;
       results.push({
         id: livreur.id,
         nom: `${livreur.prenom} ${livreur.nom}`,
         telephone: livreur.telephone,
-        status: 'GPS manquant - devra activer dans l\'app',
+        status: 'GPS manquant - livreur doit activer dans son app',
         latitude: null,
         longitude: null,
         statut: livreur.statut,
@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
 
     return Response.json({
       success: true,
-      message: `${synced} livreurs avec GPS, ${sansGps} sans GPS`,
+      message: `${synced} livreurs ont le GPS activé, ${sansGps} doivent l'activer`,
       stats: {
         total: livreurs.length,
         synced,

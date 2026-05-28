@@ -16,21 +16,22 @@ Deno.serve(async (req) => {
       return Response.json({ 
         success: true, 
         message: 'Aucun client trouvé',
-        stats: { total: 0, synced: 0, skipped: 0 }
+        stats: { total: 0, synced: 0, sans_gps: 0 }
       });
     }
 
     let synced = 0;
-    let skipped = 0;
+    let sansGps = 0;
     const results = [];
 
     for (const client of clients) {
-      // Si le client a déjà un GPS, on le garde
+      // Si le client a déjà un GPS, on le compte comme synchronisé
       if (client.latitude && client.longitude) {
-        skipped++;
+        synced++;
         results.push({
           id: client.id,
           nom: client.nom,
+          telephone: client.telephone,
           status: 'déjà synchronisé',
           latitude: client.latitude,
           longitude: client.longitude
@@ -38,27 +39,25 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Client sans GPS - on marque comme nécessitant une mise à jour
-      // Note: On ne peut pas deviner le GPS, donc on laisse null
-      // Mais on compte le client comme "nécessitant synchronisation"
+      // Client sans GPS - on ne peut pas synchroniser sans données
+      sansGps++;
       results.push({
         id: client.id,
         nom: client.nom,
         telephone: client.telephone,
-        status: 'GPS manquant - devra activer dans le profil',
+        status: 'GPS manquant - client doit activer dans son profil',
         latitude: null,
         longitude: null
       });
-      skipped++;
     }
 
     return Response.json({
       success: true,
-      message: `${synced} clients synchronisés avec GPS, ${skipped} clients sans GPS`,
+      message: `${synced} clients ont le GPS activé, ${sansGps} doivent l'activer`,
       stats: {
         total: clients.length,
         synced,
-        skipped
+        sans_gps: sansGps
       },
       details: results
     });
