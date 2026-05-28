@@ -208,11 +208,14 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       commission_silga: commissionSilga,
     };
 
-    // Afficher le récapitulatif ICI (composant reste monté)
+    // Afficher le récapitulatif IMMÉDIATEMENT
     setCourseLivreeData(merged);
     setShowRecapitulatif(true);
-    // Mettre à jour le statut du livreur après
-    onColisLivre(merged, null);
+    
+    // Mettre à jour le statut du livreur après un délai pour laisser le récap s'afficher
+    setTimeout(() => {
+      onColisLivre(merged, null);
+    }, 500);
   };
 
   const handleFermerCourse = () => {
