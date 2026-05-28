@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Phone, Package, CheckCircle2, Clock, User, Star, XCircle, ArrowLeft, Share2, Download, Ruler, Banknote } from "lucide-react";
+import { MapPin, Phone, Package, CheckCircle2, Clock, User, Star, XCircle, ArrowLeft, Share2, Ruler, Banknote } from "lucide-react";
 
 function haversineKm(lat1, lon1, lat2, lon2) {
   if (!lat1 || !lon1 || !lat2 || !lon2) return null;
@@ -34,22 +34,23 @@ import QRCodeDisplay from "@/components/client/QRCodeDisplay";
 import AnnulerCourseDialog from "@/components/client/AnnulerCourseDialog";
 import ETADisplay from "@/components/client/ETADisplay";
 
-const APK_URL = "/telecharger-app";
-
 function buildWhatsAppMessage(course) {
   const trackingUrl = course.tracking_token
     ? `${window.location.origin}/suivi-public/${course.tracking_token}`
     : `${window.location.origin}/suivi-public/${course.id}`;
-  const appUrl = `${window.location.origin}/telecharger-app`;
-  return `Bonjour 👋\nUn colis SILGAPP est en route pour vous.\n\n📍 Suivre la livraison :\n${trackingUrl}\n\n📲 Télécharger SILGAPP :\n${appUrl}\n\nMerci.`;
+  return `Bonjour 👋\nUn colis SILGAPP est en route pour vous.\n\n📍 Suivre la livraison :\n${trackingUrl}\n\nMerci.`;
 }
 
 export default function ClientSuiviCourse() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [userId, setUserId] = useState(null);
   const [showRating, setShowRating] = useState(false);
   const [showAnnulerDialog, setShowAnnulerDialog] = useState(false);
-  const [selectedCourseId, setSelectedCourseId] = useState(null);
+  // Pré-sélectionner la course depuis la navigation (bouton "Voir la course")
+  const [selectedCourseId, setSelectedCourseId] = useState(
+    location.state?.course_id || null
+  );
   const [userEmail, setUserEmail] = useState(null);
 
   useEffect(() => {
@@ -82,15 +83,22 @@ export default function ClientSuiviCourse() {
         { created_by_id: userId }, "-updated_date", 50
       );
       let byDest = [];
+      let byExpediteur = [];
       if (clientProfilId) {
+        // Courses où l'utilisateur est destinataire
         const allByDest = await base44.entities.CourseExterne.filter(
           { destinataire_client_id: clientProfilId }, "-updated_date", 50
         );
         byDest = (allByDest || []).filter(c => c.created_by_id !== userId);
+        // Courses où l'utilisateur est expéditeur réel (mode "recevoir" initié par quelqu'un d'autre)
+        const allByExp = await base44.entities.CourseExterne.filter(
+          { expediteur_client_id: clientProfilId }, "-updated_date", 50
+        );
+        byExpediteur = (allByExp || []).filter(c => c.created_by_id !== userId);
       }
       // Fusionner sans doublons
       const map = new Map();
-      [...(byCreator || []), ...(byDest || [])].forEach(c => map.set(c.id, c));
+      [...(byCreator || []), ...(byDest || []), ...(byExpediteur || [])].forEach(c => map.set(c.id, c));
       const courses = [...map.values()].sort((a, b) => new Date(b.updated_date) - new Date(a.updated_date));
 
       // CORRECTION CRITIQUE : Enrichir avec GPS TEMPS RÉEL du livreur (poll 2s)
@@ -131,7 +139,10 @@ export default function ClientSuiviCourse() {
 
   const handleRated = () => {
     setShowRating(false);
-    refetch();
+    // Forcer un refetch puis rediriger vers le dashboard après notation
+    refetch().finally(() => {
+      setTimeout(() => navigate("/"), 500);
+    });
   };
 
   if (!userId) {
@@ -604,26 +615,7 @@ export default function ClientSuiviCourse() {
           />
         )}
 
-        {/* Bandeau téléchargement — après livraison pour le destinataire */}
-        {maCourse.statut === "livree" && maCourse.type_course === "recevoir" && (
-          <Card className="p-4 bg-gradient-to-r from-red-50 to-orange-50 border-red-200">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <Download className="w-5 h-5 text-primary" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-bold text-gray-800">Suivez vos prochaines livraisons</p>
-                <p className="text-xs text-gray-500">Téléchargez SILGAPP pour commander et suivre en direct</p>
-              </div>
-            </div>
-            <a href={APK_URL} className="block mt-3">
-              <Button className="w-full bg-primary hover:bg-primary/90 font-semibold text-sm rounded-xl">
-                <Download className="w-4 h-4 mr-2" />
-                Télécharger SILGAPP
-              </Button>
-            </a>
-          </Card>
-        )}
+
 
         <AnnulerCourseDialog
           course={maCourse}
