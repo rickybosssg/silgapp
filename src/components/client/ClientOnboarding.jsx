@@ -105,15 +105,23 @@ function EtapeProfil({ clientProfil, onSuccess }) {
     const telNormalise = normaliserTelephone(telDigits);
     setLoading(true);
     try {
+      // Récupérer le GPS depuis localStorage (devrait être actif à ce stade)
+      let gpsData = null;
+      try { gpsData = JSON.parse(localStorage.getItem("client_gps_position") || "null"); } catch (_) {}
+      
       // Utiliser update ou create selon que le profil existe
       let updated;
+      const profileData = {
+        nom: nom.trim(),
+        prenom: prenom.trim(),
+        telephone: telNormalise,
+        actif: true,
+        // Persister aussi le GPS dans ClientExterne
+        ...(gpsData ? { latitude: gpsData.latitude, longitude: gpsData.longitude } : {}),
+      };
+      
       if (clientProfil?.id) {
-        updated = await base44.entities.ClientExterne.update(clientProfil.id, {
-          nom: nom.trim(),
-          prenom: prenom.trim(),
-          telephone: telNormalise,
-          actif: true,
-        });
+        updated = await base44.entities.ClientExterne.update(clientProfil.id, profileData);
       } else {
         const user = await base44.auth.me();
         // Vérifier s'il n'existe pas déjà un profil avec ce téléphone
@@ -124,26 +132,20 @@ function EtapeProfil({ clientProfil, onSuccess }) {
         } catch (_) {}
         if (existing) {
           updated = await base44.entities.ClientExterne.update(existing.id, {
-            nom: nom.trim(),
-            prenom: prenom.trim(),
-            telephone: telNormalise,
+            ...profileData,
             user_email: user?.email || "",
-            actif: true,
           });
         } else {
           updated = await base44.entities.ClientExterne.create({
-            nom: nom.trim(),
-            prenom: prenom.trim(),
-            telephone: telNormalise,
+            ...profileData,
             user_email: user?.email || "",
-            actif: true,
           });
         }
       }
       // Marquer en localStorage aussi
       try { localStorage.setItem("client_profil_complet", "true"); } catch (_) {}
       toast.success("Profil complété !");
-      onSuccess(updated || { ...(clientProfil || {}), nom: nom.trim(), prenom: prenom.trim(), telephone: telNormalise });
+      onSuccess(updated || { ...(clientProfil || {}), ...profileData });
     } catch {
       toast.error("Erreur lors de la sauvegarde – réessayez");
     } finally {
