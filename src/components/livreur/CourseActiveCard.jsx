@@ -9,6 +9,7 @@ import LivraisonResume from "./LivraisonResume";
 import QRScannerModal from "./QRScannerModal";
 import LivraisonRecapitulatif from "./LivraisonRecapitulatif";
 import NavigationGPS from "./NavigationGPS";
+import PrixCoursePopup from "./PrixCoursePopup";
 
 // Haversine
 function haversine(lat1, lon1, lat2, lon2) {
@@ -114,6 +115,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const [showQRScanner, setShowQRScanner] = useState(null); // "pickup" | "delivery" | null
   const [showRecapitulatif, setShowRecapitulatif] = useState(false);
   const [courseLivreeData, setCourseLivreeData] = useState(null);
+  const [showPrixPopupAfterRecap, setShowPrixPopupAfterRecap] = useState(false);
   // Optimistic status — overrides course.statut immediately on tap
   const [optimisticStatut, setOptimisticStatut] = useState(null);
 
@@ -220,7 +222,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
   const handleFermerCourse = () => {
     setShowRecapitulatif(false);
-    setCourseLivreeData(null);
+    setShowPrixPopupAfterRecap(true);
   };
 
   return (
@@ -229,8 +231,17 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       {showRecapitulatif && courseLivreeData && (
         <LivraisonRecapitulatif
           course={courseLivreeData}
+          onClose={handleFermerCourse}
+        />
+      )}
+
+      {/* Popup prix — affiché après fermeture du récapitulatif */}
+      {showPrixPopupAfterRecap && courseLivreeData && (
+        <PrixCoursePopup
+          course={courseLivreeData}
           onClose={() => {
-            setShowRecapitulatif(false);
+            localStorage.setItem(`prix_popup_seen_${courseLivreeData.id}`, "1");
+            setShowPrixPopupAfterRecap(false);
             setCourseLivreeData(null);
           }}
         />
