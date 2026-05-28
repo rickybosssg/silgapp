@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import ClientsExternesPanel from "@/components/admin/ClientsExternesPanel";
 import HistoriqueDuJour from "@/components/admin/HistoriqueDuJour";
 import SyncClientGPSPanel from "@/components/admin/SyncClientGPSPanel";
+import SyncLivreurGPSPanel from "@/components/admin/SyncLivreurGPSPanel";
 
 export default function DashboardAdminExterne() {
   const { data: courses = [] } = useQuery({
@@ -293,7 +294,10 @@ export default function DashboardAdminExterne() {
       </Card>
 
       {/* Synchronisation GPS */}
-      <SyncClientGPSPanel />
+      <div className="grid gap-4">
+        <SyncClientGPSPanel />
+        <SyncLivreurGPSPanel />
+      </div>
     </div>
   );
 }
