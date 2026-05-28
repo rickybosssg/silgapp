@@ -63,11 +63,11 @@ export default function LivreurRecapitulatifPaiement({ course }) {
             </div>
           </div>
 
-          {/* Paiement */}
+          {/* Montant à payer */}
           <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 space-y-3 border border-green-200">
             <div className="flex items-center gap-2 mb-2">
               <Banknote className="w-5 h-5 text-green-600" />
-              <p className="text-green-900 font-black">Récapitulatif financier</p>
+              <p className="text-green-900 font-black">Détails du paiement</p>
             </div>
             
             <div className="space-y-2 text-sm">
@@ -92,11 +92,7 @@ export default function LivreurRecapitulatifPaiement({ course }) {
             <p className="text-3xl font-black text-white">{montantLivreur.toLocaleString()} FCFA</p>
           </div>
 
-          <div className="text-center">
-            <p className="text-[10px] text-gray-400">
-              Commission Silga (30%) : {commissionSilga.toLocaleString()} FCFA
-            </p>
-          </div>
+
         </div>
       </Card>
     </div>
