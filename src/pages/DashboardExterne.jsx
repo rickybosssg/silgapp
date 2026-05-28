@@ -17,7 +17,6 @@ import DispatchMonitor from "@/components/dispatch/DispatchMonitor";
 import BatterieAlertesPanel from "@/components/admin/BatterieAlertesPanel";
 import SyncClientGPSPanel from "@/components/admin/SyncClientGPSPanel";
 import SyncLivreurGPSPanel from "@/components/admin/SyncLivreurGPSPanel";
-import ForceGPSSyncPanel from "@/components/admin/ForceGPSSyncPanel";
 import { Card } from "@/components/ui/card";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 
@@ -107,7 +106,7 @@ export default function DashboardExterne() {
 
       {/* Synchronisation GPS */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <ForceGPSSyncPanel />
+        <SyncClientGPSPanel />
         <SyncLivreurGPSPanel />
       </div>
 

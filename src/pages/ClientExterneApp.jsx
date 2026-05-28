@@ -15,7 +15,7 @@ import ModernMap from "@/components/client/ModernMap";
 import ProfilModal from "@/components/client/ProfilModal";
 import SupportWhatsApp from "@/components/client/SupportWhatsApp";
 import ClientOnboarding, { profilClientComplet } from "@/components/client/ClientOnboarding";
-import { getCurrentPositionAndSync, startGPSWatch, stopGPSWatch, gpsValideEnBDD } from "@/lib/gpsSync";
+
 
 function haversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -26,15 +26,16 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Badge GPS basé sur BDD réelle (pas localStorage)
+// Badge GPS — basé sur coords réelles en BDD (comme les livreurs)
 function GPSBadge({ profil, onForceSync }) {
-  const synced = gpsValideEnBDD(profil, 120); // valide si coords présentes et < 2h
+  const hasCoords = !!(profil?.latitude && profil?.longitude);
+  const synced = hasCoords;
   return (
     <div className="flex items-center gap-1.5">
       <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${synced ? "bg-green-500/90" : "bg-amber-500/90"}`}>
         <Navigation className="w-3 h-3 text-white" />
         <span className="text-xs text-white font-medium">
-          {synced ? "GPS actif ✓" : "GPS sync..."}
+          {synced ? "GPS actif ✓" : "GPS manquant"}
         </span>
       </div>
       {!synced && (
@@ -64,6 +65,7 @@ export default function ClientExterneApp() {
   const [notifications, setNotifications] = useState([]);
   const [showMap, setShowMap] = useState(false);
   const [gpsSyncing, setGpsSyncing] = useState(false);
+  const [gpsActif, setGpsActif] = useState(false);
   const clientProfilRef = useRef(null);
   useEffect(() => { clientProfilRef.current = clientProfil; }, [clientProfil]);
 
@@ -71,35 +73,71 @@ export default function ClientExterneApp() {
     loadProfil();
   }, []);
 
-  // Démarrer le watch GPS continu dès que l'onboarding est terminé + profil disponible
+  // ─── GPS — EXACTEMENT comme les livreurs ──────────────────────────────────
+  // Sync immédiate au chargement du profil
+  useEffect(() => {
+    if (!clientProfil?.id || !onboardingDone) return;
+    console.log("[GPS Client] Sync immédiate au chargement");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const posData = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+        setPosition(posData);
+        setGpsActif(true);
+        base44.entities.ClientExterne.update(clientProfil.id, {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        }).then(() => {
+          console.log("[GPS Client] ✅ BDD synchronisée", posData.latitude, posData.longitude);
+        }).catch(err => console.error("[GPS Client] ❌ Erreur BDD:", err));
+      },
+      (err) => console.error("[GPS Client] ❌ Permission refusée:", err),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }, [clientProfil?.id, onboardingDone]);
+
+  // Watch GPS continu (15s) — comme les livreurs
+  useEffect(() => {
+    if (!clientProfil?.id || !onboardingDone || !gpsActif) return;
+    const interval = setInterval(() => {
+      navigator.geolocation?.getCurrentPosition(
+        (pos) => {
+          const posData = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+          setPosition(posData);
+          base44.entities.ClientExterne.update(clientProfil.id, {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          }).catch(() => null);
+        },
+        () => setGpsActif(false),
+        { enableHighAccuracy: true }
+      );
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [clientProfil?.id, onboardingDone, gpsActif]);
+
+  // Sync GPS au retour au premier plan
   useEffect(() => {
     if (!onboardingDone || !clientProfil?.id) return;
-    console.log("[GPS] Démarrage surveillance GPS pour client", clientProfil.id);
-    startGPSWatch(clientProfil.id, (pos) => {
-      setPosition(pos);
-      setClientProfil(prev => prev ? { ...prev, latitude: pos.latitude, longitude: pos.longitude } : prev);
-    });
-    return () => stopGPSWatch();
-  }, [onboardingDone, clientProfil?.id]);
-
-  // Sync GPS au retour au premier plan (visibilité)
-  useEffect(() => {
-    if (!onboardingDone) return;
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
-        const profil = clientProfilRef.current;
-        if (profil?.id) {
-          console.log("[GPS] App revenue au premier plan → sync GPS");
-          getCurrentPositionAndSync(profil.id, (pos) => {
-            setPosition(pos);
-            setClientProfil(prev => prev ? { ...prev, latitude: pos.latitude, longitude: pos.longitude } : prev);
-          });
-        }
+        console.log("[GPS Client] App au premier plan → sync GPS");
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const posData = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+            setPosition(posData);
+            base44.entities.ClientExterne.update(clientProfil.id, {
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+            }).catch(() => null);
+          },
+          () => null,
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
       }
     };
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [onboardingDone]);
+  }, [onboardingDone, clientProfil?.id]);
 
   // Polling automatique des courses actives toutes les 5s + synchronisation GPS destinataire
   useEffect(() => {
@@ -111,17 +149,32 @@ export default function ClientExterneApp() {
     return () => clearInterval(interval);
   }, [onboardingDone, clientProfil?.id, position]);
 
-  // Forcer une sync GPS manuelle
-  const handleForceGPSSync = async () => {
+  // Forcer une sync GPS manuelle — EXACTEMENT comme les livreurs
+  const handleForceGPSSync = () => {
     if (!clientProfil?.id || gpsSyncing) return;
     setGpsSyncing(true);
-    const pos = await getCurrentPositionAndSync(clientProfil.id, (pos) => {
-      setPosition(pos);
-      setClientProfil(prev => prev ? { ...prev, latitude: pos.latitude, longitude: pos.longitude } : prev);
-    });
-    setGpsSyncing(false);
-    if (pos) toast.success("GPS synchronisé ✓");
-    else toast.error("Impossible d'obtenir le GPS");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const posData = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+        setPosition(posData);
+        setGpsActif(true);
+        base44.entities.ClientExterne.update(clientProfil.id, {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        }).then(() => {
+          toast.success("GPS synchronisé ✓");
+        }).catch(() => {
+          toast.error("Erreur synchronisation");
+        }).finally(() => {
+          setGpsSyncing(false);
+        });
+      },
+      () => {
+        setGpsSyncing(false);
+        toast.error("Permission GPS refusée");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   };
 
   // Synchroniser le GPS du destinataire vers les courses où il est notifié
@@ -195,17 +248,10 @@ export default function ClientExterneApp() {
       setClientProfil(profil);
 
       if (gpsDejaActif) {
-        // Récupérer position depuis GPS réel (pas seulement localStorage) et sync BDD
         const localPos = (() => { try { return JSON.parse(localStorage.getItem("client_gps_position") || "null"); } catch { return null; } })();
-        if (localPos) setPosition(localPos);
-
-        // Forcer une sync GPS réelle au démarrage pour s'assurer que la BDD est à jour
-        if (profil?.id) {
-          console.log("[GPS] Chargement profil → sync GPS immédiate au démarrage");
-          getCurrentPositionAndSync(profil.id, (pos) => {
-            setPosition(pos);
-            setClientProfil(prev => prev ? { ...prev, latitude: pos.latitude, longitude: pos.longitude } : prev);
-          });
+        if (localPos) {
+          setPosition(localPos);
+          setGpsActif(true);
         }
         checkStatus(localPos, profil);
       }
@@ -221,11 +267,15 @@ export default function ClientExterneApp() {
     setClientProfil(profil);
     if (gps?.latitude && gps?.longitude) {
       setPosition(gps);
-      // Sync immédiate en BDD depuis le module centralisé (avec logs)
+      setGpsActif(true);
+      // Sync immédiate en BDD — EXACTEMENT comme les livreurs
       if (profil?.id) {
-        const { syncGPSVersBDD } = await import("@/lib/gpsSync");
-        const ok = await syncGPSVersBDD(profil.id, gps);
-        if (ok) setClientProfil(prev => prev ? { ...prev, latitude: gps.latitude, longitude: gps.longitude } : prev);
+        base44.entities.ClientExterne.update(profil.id, {
+          latitude: gps.latitude,
+          longitude: gps.longitude,
+        }).then(() => {
+          console.log("[GPS Client] ✅ Onboarding sync BDD OK", gps.latitude, gps.longitude);
+        }).catch(err => console.error("[GPS Client] ❌ Erreur sync onboarding:", err));
       }
     }
     checkStatus(gps, profil);

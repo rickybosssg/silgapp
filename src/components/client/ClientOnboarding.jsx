@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import { MapPin, User, Check, Loader2 } from "lucide-react";
-import { syncGPSVersBDD } from "@/lib/gpsSync";
 
 // ─── Helpers téléphone ────────────────────────────────────────────────────────
 export function normaliserTelephone(raw) {
@@ -42,11 +41,18 @@ function EtapeGPS({ onSuccess, clientId }) {
         console.log("[GPS Onboarding] 📍 Position obtenue:", posData.latitude, posData.longitude);
         try { localStorage.setItem("client_gps_active", "true"); } catch (_) {}
         try { localStorage.setItem("client_gps_position", JSON.stringify(posData)); } catch (_) {}
-        // Sync immédiate en BDD si on a déjà l'ID client
+        // Sync immédiate en BDD — EXACTEMENT comme les livreurs
         if (clientId) {
           console.log("[GPS Onboarding] → Sync BDD pour client", clientId);
-          const ok = await syncGPSVersBDD(clientId, posData);
-          console.log("[GPS Onboarding]", ok ? "✅ BDD OK" : "❌ BDD KO");
+          try {
+            await base44.entities.ClientExterne.update(clientId, {
+              latitude: posData.latitude,
+              longitude: posData.longitude,
+            });
+            console.log("[GPS Onboarding] ✅ BDD synchronisée");
+          } catch (err) {
+            console.error("[GPS Onboarding] ❌ Erreur BDD:", err);
+          }
         }
         setLoading(false);
         onSuccess(posData);
