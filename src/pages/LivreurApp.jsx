@@ -28,6 +28,8 @@ import CourseEnAttenteModal from "@/components/livreur/CourseEnAttenteModal";
 import CourseActiveCard from "@/components/livreur/CourseActiveCard";
 import LivreurHistorique from "@/components/livreur/LivreurHistorique";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 
 const saveLivreur = (id, data) => base44.functions.invoke('updateLivreur', { id, data });
 
@@ -177,6 +179,11 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
     }, 30000);
     return () => clearInterval(interval);
   }, [livreurProfil?.id, livreurProfil?.statut, gpsActif]);
+
+  const { pulling, refreshing } = usePullToRefresh(async () => {
+    await queryClient.invalidateQueries({ queryKey: ["mes-courses"] });
+    await queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
+  });
 
   // Mutation courses
   const updateCourseMutation = useMutation({
@@ -383,6 +390,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PullToRefreshIndicator pulling={pulling} refreshing={refreshing} />
       {courseEnAttente && (
         <CourseEnAttenteModal
           course={courseEnAttente}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
   Package, TrendingUp, Menu, X, LogOut, Wallet
@@ -29,6 +29,7 @@ const allNavItems = [
 
 export default function MobileNav({ notificationCount = 0 }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   useEffect(() => { base44.auth.me().then(setUser).catch(() => null); }, []);
   const logout = () => {
@@ -143,9 +144,17 @@ export default function MobileNav({ notificationCount = 0 }) {
             const isActive = location.pathname === item.path;
             const Icon = item.icon;
             return (
-              <Link
+              <button
                 key={item.path}
-                to={item.path}
+                onClick={() => {
+                  if (isActive) {
+                    // Reset to root of this tab
+                    navigate(item.path, { replace: true });
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  } else {
+                    navigate(item.path);
+                  }
+                }}
                 className={cn(
                   "flex flex-col items-center justify-center py-2 px-1 flex-1 transition-all min-h-[56px]",
                   isActive ? "text-primary" : "text-muted-foreground"
@@ -163,7 +172,7 @@ export default function MobileNav({ notificationCount = 0 }) {
                 )}>
                   {item.label}
                 </span>
-              </Link>
+              </button>
             );
           })}
 

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
-import { User, Phone, Save, X, Check } from "lucide-react";
+import { User, Save, X, Check, Trash2 } from "lucide-react";
 
 // Normalise +226XXXXXXXX
 function normaliserTel(raw) {
@@ -22,12 +22,11 @@ function formaterAffichage(raw) {
 export default function ProfilModal({ clientProfil, onClose, onSave }) {
   const [nom, setNom] = useState(clientProfil?.nom || "");
   const [prenom, setPrenom] = useState(clientProfil?.prenom || "");
-  // Afficher les 8 derniers chiffres du tel existant
-  const initTel = clientProfil?.telephone
-    ? formaterAffichage(clientProfil.telephone)
-    : "";
+  const initTel = clientProfil?.telephone ? formaterAffichage(clientProfil.telephone) : "";
   const [telAffiche, setTelAffiche] = useState(initTel);
   const [loading, setLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const handleTelChange = (e) => {
     const raw = e.target.value.replace(/\D/g, "").slice(0, 8);
@@ -143,6 +142,46 @@ export default function ProfilModal({ clientProfil, onClose, onSave }) {
             )}
           </button>
         </div>
+
+        {/* Supprimer le compte */}
+        {!showDeleteConfirm ? (
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="w-full h-10 rounded-xl border border-red-200 text-red-500 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-red-50 transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" /> Supprimer mon compte
+          </button>
+        ) : (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-3">
+            <p className="text-sm font-bold text-red-700 text-center">⚠️ Confirmer la suppression ?</p>
+            <p className="text-xs text-red-500 text-center">Cette action est irréversible. Votre compte client sera désactivé.</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 h-10 rounded-xl border border-gray-200 text-gray-600 text-xs font-semibold"
+              >
+                Annuler
+              </button>
+              <button
+                disabled={deleting}
+                onClick={async () => {
+                  setDeleting(true);
+                  try {
+                    await base44.entities.ClientExterne.update(clientProfil.id, { actif: false });
+                    toast.success("Compte désactivé. Contactez le support pour toute question.");
+                    base44.auth.logout();
+                  } catch {
+                    toast.error("Erreur lors de la suppression");
+                    setDeleting(false);
+                  }
+                }}
+                className="flex-1 h-10 rounded-xl bg-red-500 text-white text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-50"
+              >
+                {deleting ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> En cours...</> : "Oui, supprimer"}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

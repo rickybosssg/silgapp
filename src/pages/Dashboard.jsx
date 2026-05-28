@@ -7,6 +7,7 @@ import { Plus, MapPin, Package, Truck, Clock, CheckCircle2, XCircle, AlertTriang
 import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
 import StatCard from "@/components/dashboard/StatCard";
+import { useQueryClient } from "@tanstack/react-query";
 import LivreursEnLigne from "@/components/dashboard/LivreursEnLigne";
 import CoursesADispatcher from "@/components/dashboard/CoursesADispatcher";
 import CoursesEnTraitement from "@/components/dashboard/CoursesEnTraitement";
@@ -18,10 +19,13 @@ import BatterieAlertesPanel from "@/components/admin/BatterieAlertesPanel";
 import SyncClientGPSPanel from "@/components/admin/SyncClientGPSPanel";
 import SyncLivreurGPSPanel from "@/components/admin/SyncLivreurGPSPanel";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 
 export default function Dashboard() {
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [assignCourse, setAssignCourse] = useState(null);
+  const queryClient = useQueryClient();
 
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ["courses"],
@@ -94,8 +98,14 @@ export default function Dashboard() {
     return { total, livrees, annulees, enCours, aDispatcher, ca, dispoLivreurs };
   }, [courses, coursesADispatcher, coursesEnTraitement, livreursEnLigne]);
 
+  const { pulling, refreshing } = usePullToRefresh(async () => {
+    await queryClient.invalidateQueries({ queryKey: ["courses"] });
+    await queryClient.invalidateQueries({ queryKey: ["livreurs"] });
+  });
+
   return (
     <div className="px-4 py-4 lg:p-6 space-y-4 lg:space-y-5 max-w-7xl mx-auto">
+      <PullToRefreshIndicator pulling={pulling} refreshing={refreshing} />
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex-1">

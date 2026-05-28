@@ -1,12 +1,14 @@
 import React, { useState } from "react";
 import { toast } from "sonner";
-import { Check, User } from "lucide-react";
+import { Check, Trash2 } from "lucide-react";
 import { normaliserTelephone, formaterTelephone } from "./LivreurExterneOnboarding";
 import PhotoPicker from "./PhotoPicker";
 import LivreurPhotoUploader from "./LivreurPhotoUploader";
 import { base44 } from "@/api/base44Client";
 
 export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [form, setForm] = useState({
     nom: livreurProfil?.nom || "",
     prenom: livreurProfil?.prenom || "",
@@ -155,6 +157,46 @@ export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
           <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Sauvegarde...</>
         ) : <><Check className="w-4 h-4" /> Enregistrer les modifications</>}
       </button>
+
+      {/* Supprimer le compte */}
+      {!showDeleteConfirm ? (
+        <button
+          onClick={() => setShowDeleteConfirm(true)}
+          className="w-full h-10 rounded-xl border border-red-200 text-red-500 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-red-50 transition-colors"
+        >
+          <Trash2 className="w-3.5 h-3.5" /> Supprimer mon compte
+        </button>
+      ) : (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-3">
+          <p className="text-sm font-bold text-red-700 text-center">⚠️ Confirmer la suppression ?</p>
+          <p className="text-xs text-red-500 text-center">Cette action est irréversible. Votre profil livreur sera désactivé.</p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowDeleteConfirm(false)}
+              className="flex-1 h-10 rounded-xl border border-gray-200 text-gray-600 text-xs font-semibold"
+            >
+              Annuler
+            </button>
+            <button
+              disabled={deleting}
+              onClick={async () => {
+                setDeleting(true);
+                try {
+                  await base44.functions.invoke('updateLivreur', { id: livreurProfil.id, data: { actif: false, validation: "refuse" } });
+                  toast.success("Compte désactivé. Contactez le support pour toute question.");
+                  base44.auth.logout();
+                } catch {
+                  toast.error("Erreur lors de la suppression");
+                  setDeleting(false);
+                }
+              }}
+              className="flex-1 h-10 rounded-xl bg-red-500 text-white text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-50"
+            >
+              {deleting ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> En cours...</> : "Oui, supprimer"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
