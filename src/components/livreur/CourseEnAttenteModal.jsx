@@ -1,6 +1,15 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { MapPin, Phone, Navigation, Check, X, Package, Clock, Truck, AlertCircle, MessageCircle } from "lucide-react";
+import { MapPin, Phone, Navigation, Check, X, Package, Clock, Truck, AlertCircle, MessageCircle, Ruler } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+
+function haversine(lat1, lon1, lat2, lon2) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 // Vibration continue pendant que le modal est ouvert
 function useVibration(active) {
@@ -366,7 +375,7 @@ export default function CourseEnAttenteModal({
             </div>
           </div>
 
-          {/* Infos course */}
+          {/* Infos course : prix + ETA estimé + type colis */}
           <div className="flex items-center justify-between">
             <div>
               {course.prix_estimate ? (
@@ -379,6 +388,25 @@ export default function CourseEnAttenteModal({
                 </div>
               )}
             </div>
+            {/* ETA estimé (trajet départ → arrivée) */}
+            {(() => {
+              const dist = haversine(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng);
+              if (!dist || dist <= 0) return null;
+              const etaMin = dist < 0.1 ? 1 : Math.round((dist / 25) * 60);
+              const distLabel = dist < 1 ? `${Math.round(dist * 1000)} m` : `${dist.toFixed(1)} km`;
+              return (
+                <div className="flex flex-col items-end gap-1">
+                  <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-xl px-3 py-1.5">
+                    <Clock className="w-3.5 h-3.5 text-blue-600" />
+                    <span className="text-sm font-black text-blue-900">~ {etaMin} min</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-gray-400">
+                    <Ruler className="w-3 h-3" />
+                    {distLabel}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {course.notes && (

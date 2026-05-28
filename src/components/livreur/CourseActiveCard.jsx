@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { MapPin, Phone, Navigation, Package, Check, X, AlertTriangle, ChevronRight, QrCode } from "lucide-react";
+import { MapPin, Phone, Navigation, Package, Check, X, AlertTriangle, ChevronRight, QrCode, Clock, Ruler } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -9,6 +9,58 @@ import LivraisonResume from "./LivraisonResume";
 import QRScannerModal from "./QRScannerModal";
 import LivraisonRecapitulatif from "./LivraisonRecapitulatif";
 import NavigationGPS from "./NavigationGPS";
+
+// Haversine
+function haversine(lat1, lon1, lat2, lon2) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Badge ETA affiché en haut de la carte, calculé depuis la position GPS réelle du livreur
+function ETABadge({ course, colisRecupere }) {
+  const [livreurPos, setLivreurPos] = useState(null);
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    const id = navigator.geolocation.watchPosition(
+      (pos) => setLivreurPos({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      null,
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+    );
+    return () => navigator.geolocation.clearWatch(id);
+  }, []);
+
+  // Cible : vers la récupération si colis pas encore pris, sinon vers la livraison
+  const targetLat = colisRecupere ? (course.gps_arrivee_lat || course.latitude_arrivee_livraison) : course.gps_depart_lat;
+  const targetLng = colisRecupere ? (course.gps_arrivee_lng || course.longitude_arrivee_livraison) : course.gps_depart_lng;
+
+  if (!livreurPos || !targetLat || !targetLng) return null;
+
+  const dist = haversine(livreurPos.lat, livreurPos.lng, targetLat, targetLng);
+  if (dist === null || dist < 0) return null;
+
+  const etaMin = dist < 0.1 ? 1 : Math.round((dist / 25) * 60);
+  const distLabel = dist < 0.1 ? `${Math.round(dist * 1000)} m` : dist < 1 ? `${Math.round(dist * 1000)} m` : `${dist.toFixed(1)} km`;
+
+  return (
+    <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-4 py-2.5">
+      <div className="flex items-center gap-1.5">
+        <Clock className="w-4 h-4 text-blue-600" />
+        <span className="text-sm font-bold text-blue-900">~ {etaMin} min</span>
+      </div>
+      <div className="w-px h-4 bg-blue-200" />
+      <div className="flex items-center gap-1.5">
+        <Ruler className="w-4 h-4 text-blue-500" />
+        <span className="text-sm font-semibold text-blue-700">{distLabel}</span>
+      </div>
+      <span className="ml-auto text-xs text-blue-500">{colisRecupere ? "→ Livraison" : "→ Récupération"}</span>
+    </div>
+  );
+}
 
 const STEPS = [
   { key: "acceptee", label: "Acceptée", icon: "✅" },
@@ -284,6 +336,11 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
         <div className="p-5 space-y-4">
           {/* Barre de progression */}
           <ProgressBar statut={effectiveStatut} />
+
+          {/* Badge ETA temps réel */}
+          {!colisLivre && (
+            <ETABadge course={course} colisRecupere={colisRecupere} />
+          )}
 
           {/* Client */}
           <div className="flex items-center justify-between bg-gray-50 rounded-2xl p-3">
