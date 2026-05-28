@@ -1,18 +1,21 @@
-import React, { useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { 
   ArrowLeft, ArrowRight, MapPin, Navigation, Package, 
-  User, FileText, CheckCircle, Smartphone, Truck, AlertCircle
+  User, FileText, CheckCircle, Smartphone, Truck, AlertCircle,
+  Loader2, Search, XCircle
 } from "lucide-react";
+import { base44 } from "@/api/base44Client";
+import { toast } from "sonner";
 
 const STORAGE_KEY = "silgapp_course_draft";
 
-// Props séparées : formData (données pures), gpsHandlers (fonctions)
 export default function CourseStepForm({ 
   step, 
   totalSteps, 
@@ -24,6 +27,8 @@ export default function CourseStepForm({
   onAnnuler,
   isLoading 
 }) {
+  const [expediteurFound, setExpediteurFound] = useState(null);
+  const [verifying, setVerifying] = useState(false);
   const progress = ((step + 1) / totalSteps) * 100;
 
   // Sauvegarder les données du formulaire dans localStorage
@@ -34,6 +39,75 @@ export default function CourseStepForm({
       console.error("Erreur sauvegarde brouillon:", err);
     }
   }, [formData]);
+
+  // Vérifier si l'expéditeur existe dans la base clients
+  const verifyExpediteur = async () => {
+    const phone = formData.expediteur_telephone?.replace(/\D/g, "") || "";
+    if (phone.length < 8) {
+      toast.error("Numéro de téléphone invalide");
+      return;
+    }
+
+    setVerifying(true);
+    try {
+      // Normaliser le numéro
+      const normalized = phone.startsWith("226") ? "+" + phone : phone.length === 8 ? "+226" + phone : "+" + phone;
+      
+      // Chercher dans la base clients
+      const clients = await base44.entities.ClientExterne.filter({ telephone: normalized, actif: true });
+      
+      if (clients && clients.length > 0) {
+        const client = clients[0];
+        setExpediteurFound(client);
+        
+        // Mettre à jour formData avec les infos client
+        setFormData({
+          ...formData,
+          expediteur_nom: client.nom || client.prenom || "",
+          expediteur_client_id: client.id,
+          expediteur_has_app: true,
+        });
+        
+        toast.success(`✅ ${client.nom || client.prenom} trouvé dans SILGAPP !`);
+        
+        // Si GPS disponible, activer automatiquement
+        if (client.latitude && client.longitude) {
+          setFormData(prev => ({
+            ...prev,
+            gps_depart_lat: client.latitude,
+            gps_depart_lng: client.longitude,
+            recuperationGPS: true,
+            adresse_depart: client.quartier || "Position GPS disponible",
+          }));
+          toast.success("📍 Position GPS de l'expéditeur disponible !");
+        }
+        
+        // Notifier l'expéditeur
+        try {
+          await base44.functions.invoke("notifyClientSync", {
+            course_id: "pending",
+            expediteur_id: client.id,
+            notification_type: "preparation_expedition"
+          });
+        } catch (_) {}
+        
+      } else {
+        setExpediteurFound(null);
+        setFormData({
+          ...formData,
+          expediteur_client_id: null,
+          expediteur_has_app: false,
+        });
+        toast.info("ℹ️ Expéditeur non trouvé dans SILGAPP - flux standard activé");
+      }
+    } catch (err) {
+      console.error("Erreur vérification:", err);
+      toast.error("Erreur lors de la vérification");
+      setExpediteurFound(null);
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   const renderStep = () => {
     switch (step) {
@@ -80,75 +154,142 @@ export default function CourseStepForm({
 
       case 1: {
         const isRecevoir = formData.type_course === "recevoir";
+        
+        // ÉTAPE 1 : IDENTITÉ EXPÉDITEUR (pour "recevoir")
+        if (isRecevoir) {
+          return (
+            <div className="space-y-4">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 rounded-2xl bg-blue-100 flex items-center justify-center mx-auto mb-3">
+                  <User className="w-8 h-8 text-blue-600" />
+                </div>
+                <h2 className="text-xl font-bold text-foreground">Chez qui récupérer le colis ?</h2>
+                <p className="text-sm text-muted-foreground mt-1">Identifiez la personne qui détient votre colis</p>
+              </div>
+
+              {/* Nom optionnel */}
+              <div>
+                <Label>Nom de l'expéditeur <span className="text-muted-foreground text-xs">(optionnel)</span></Label>
+                <Input
+                  value={formData.expediteur_nom}
+                  onChange={(e) => setFormData({ ...formData, expediteur_nom: e.target.value })}
+                  placeholder="Nom complet"
+                  className="h-12"
+                  autoFocus
+                />
+              </div>
+
+              {/* Téléphone obligatoire */}
+              <div>
+                <Label>Téléphone de l'expéditeur *</Label>
+                <Input
+                  type="tel"
+                  value={formData.expediteur_telephone}
+                  onChange={(e) => setFormData({ ...formData, expediteur_telephone: e.target.value })}
+                  placeholder="+226 XX XX XX XX"
+                  className="h-12"
+                />
+                <p className="text-xs text-muted-foreground mt-1.5">Format : +226 XX XX XX XX</p>
+              </div>
+
+              {/* Bouton vérifier */}
+              <Button
+                type="button"
+                onClick={verifyExpediteur}
+                disabled={!formData.expediteur_telephone || verifying}
+                className="w-full h-14 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold"
+              >
+                {verifying ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Recherche dans SILGAPP...
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-5 h-5 mr-2" />
+                    Vérifier dans la base clients
+                  </>
+                )}
+              </Button>
+
+              {/* Résultat recherche */}
+              {expediteurFound && (
+                <Card className="p-4 bg-green-50 border-green-200">
+                  <div className="flex items-start gap-3">
+                    <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-bold text-green-900">✅ Expéditeur trouvé !</p>
+                      <p className="text-sm text-green-700 mt-1">
+                        <strong>{expediteurFound.nom || expediteurFound.prenom}</strong> est inscrit dans SILGAPP
+                      </p>
+                      <div className="flex gap-2 mt-2">
+                        <Badge className="bg-green-200 text-green-800">✓ Synchronisation activée</Badge>
+                        <Badge className="bg-green-200 text-green-800">✓ GPS disponible</Badge>
+                        <Badge className="bg-green-200 text-green-800">✓ Notifications temps réel</Badge>
+                      </div>
+                      {expediteurFound.latitude && expediteurFound.longitude && (
+                        <p className="text-xs text-green-600 mt-2">
+                          📍 Position GPS : {Number(expediteurFound.latitude).toFixed(4)}, {Number(expediteurFound.longitude).toFixed(4)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {expediteurFound === null && formData.expediteur_telephone && !verifying && (
+                <Card className="p-4 bg-amber-50 border-amber-200">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-bold text-amber-900">Expéditeur non trouvé</p>
+                      <p className="text-sm text-amber-700 mt-1">
+                        Ce numéro n'est pas dans la base SILGAPP. Vous pourrez quand même créer la course.
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+              )}
+            </div>
+          );
+        }
+
+        // ÉTAPE 1 : ADRESSE DE RÉCUPÉRATION (pour "expedier") - inchangé
         return (
           <div className="space-y-4">
             <div className="text-center mb-6">
               <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
                 <MapPin className="w-8 h-8 text-primary" />
               </div>
-              <h2 className="text-xl font-bold text-foreground">
-                {isRecevoir ? "Où récupérer votre colis ?" : "Où récupérer le colis ?"}
-              </h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                {isRecevoir ? "Adresse chez l'expéditeur (où se trouve le colis)" : "Vous êtes au point de récupération"}
-              </p>
+              <h2 className="text-xl font-bold text-foreground">Où récupérer le colis ?</h2>
+              <p className="text-sm text-muted-foreground mt-1">Adresse ou quartier de récupération</p>
             </div>
 
-            {/* Pour "expedier" seulement : GPS de sa position actuelle */}
-            {!isRecevoir && (
-              <>
-                {!formData.recuperationGPS ? (
-                  <button
-                    type="button"
-                    onClick={gpsHandlers?.onGetGPSDepart}
-                    className="w-full h-14 rounded-2xl bg-primary text-white font-bold flex items-center justify-center gap-3 shadow-lg shadow-primary/20 active:scale-[0.98] transition-all"
-                  >
-                    <Navigation className="w-5 h-5" />
-                    Utiliser ma position actuelle
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-3 p-4 rounded-2xl bg-green-50 border border-green-200">
-                    <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-sm font-bold text-green-900">Position actuelle utilisée</p>
-                      {formData.adresse_depart && <p className="text-xs text-green-700 mt-0.5">{formData.adresse_depart}</p>}
-                    </div>
-                    <button type="button" onClick={() => setFormData({ ...formData, recuperationGPS: false, gps_depart_lat: null, gps_depart_lng: null })} className="text-green-600 text-xs underline">Changer</button>
-                  </div>
-                )}
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-px bg-gray-200" />
-                  <span className="text-xs text-muted-foreground">ou saisir manuellement</span>
-                  <div className="flex-1 h-px bg-gray-200" />
+            {!formData.recuperationGPS ? (
+              <button
+                type="button"
+                onClick={gpsHandlers?.onGetGPSDepart}
+                className="w-full h-14 rounded-2xl bg-primary text-white font-bold flex items-center justify-center gap-3 shadow-lg shadow-primary/20 active:scale-[0.98] transition-all"
+              >
+                <Navigation className="w-5 h-5" />
+                Utiliser ma position actuelle
+              </button>
+            ) : (
+              <div className="flex items-center gap-3 p-4 rounded-2xl bg-green-50 border border-green-200">
+                <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-green-900">Position actuelle utilisée</p>
+                  {formData.adresse_depart && <p className="text-xs text-green-700 mt-0.5">{formData.adresse_depart}</p>}
                 </div>
-              </>
+                <button type="button" onClick={() => setFormData({ ...formData, recuperationGPS: false, gps_depart_lat: null, gps_depart_lng: null })} className="text-green-600 text-xs underline">Changer</button>
+              </div>
             )}
 
-            {/* Pour "recevoir" : bannière info + saisie manuelle adresse expéditeur */}
-            {isRecevoir && (
-              <>
-                <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-50 border border-blue-200">
-                  <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm text-blue-800">Indiquez l'adresse de <strong>la personne qui détient votre colis</strong>.</p>
-                    <p className="text-xs text-blue-700 mt-1">Le livreur ira récupérer le colis à cette adresse.</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={gpsHandlers?.onGetGPSDepart}
-                  className="w-full h-14 rounded-2xl bg-accent text-white font-bold flex items-center justify-center gap-3 shadow-lg shadow-accent/20 active:scale-[0.98] transition-all"
-                >
-                  <Navigation className="w-5 h-5" />
-                  Utiliser la position de l'expéditeur
-                </button>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-px bg-gray-200" />
-                  <span className="text-xs text-muted-foreground">ou saisir manuellement</span>
-                  <div className="flex-1 h-px bg-gray-200" />
-                </div>
-              </>
-            )}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-gray-200" />
+              <span className="text-xs text-muted-foreground">ou saisir manuellement</span>
+              <div className="flex-1 h-px bg-gray-200" />
+            </div>
 
             <div>
               <Label>Adresse de récupération *</Label>
@@ -157,7 +298,6 @@ export default function CourseStepForm({
                 onChange={(e) => setFormData({ ...formData, adresse_depart: e.target.value })}
                 placeholder="Quartier, rue, point de repère..."
                 className="h-12"
-                autoFocus={isRecevoir}
               />
             </div>
           </div>
@@ -166,75 +306,110 @@ export default function CourseStepForm({
 
       case 2: {
         const isRecevoir = formData.type_course === "recevoir";
-        const destinationInconnue = formData.destination_inconnue || false;
 
-        // "Recevoir" : la destination = position du client lui-même (automatique)
+        // "Recevoir" : ADRESSE DE RÉCUPÉRATION avec GPS optionnel
         if (isRecevoir) {
+          const destinationInconnue = formData.destination_inconnue || false;
+          const gpsDispo = formData.gps_depart_lat && formData.gps_depart_lng;
+          
           return (
             <div className="space-y-4">
               <div className="text-center mb-6">
                 <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-3">
                   <MapPin className="w-8 h-8 text-accent" />
                 </div>
-                <h2 className="text-xl font-bold text-foreground">📍 Votre position = lieu de livraison</h2>
-                <p className="text-sm text-muted-foreground mt-1">Le livreur vous livrera à votre position actuelle</p>
+                <h2 className="text-xl font-bold text-foreground">Adresse de récupération</h2>
+                <p className="text-sm text-muted-foreground mt-1">Où le livreur doit récupérer le colis</p>
               </div>
 
-              {/* GPS déjà disponible → affichage automatique */}
-              {formData.livraisonGPS && formData.gps_arrivee_lat ? (
-                <div className="flex items-center gap-3 p-4 rounded-2xl bg-green-50 border border-green-200">
-                  <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-sm font-bold text-green-900">✅ Position GPS enregistrée</p>
-                    {formData.adresse_arrivee && <p className="text-xs text-green-700 mt-0.5">{formData.adresse_arrivee}</p>}
-                    <p className="text-xs text-green-600 mt-1">Coordonnées : {Number(formData.gps_arrivee_lat).toFixed(4)}, {Number(formData.gps_arrivee_lng).toFixed(4)}</p>
-                  </div>
-                  <button type="button" onClick={() => setFormData({ ...formData, livraisonGPS: false, gps_arrivee_lat: null, gps_arrivee_lng: null, adresse_arrivee: "" })} className="text-green-600 text-xs underline">Modifier</button>
+              {/* Case à cocher GPS */}
+              <Card className={`p-4 border-2 transition-all ${gpsDispo ? "bg-green-50 border-green-300" : "bg-red-50 border-red-300"}`}>
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    id="gps-expediteur"
+                    checked={gpsDispo && formData.recuperationGPS}
+                    disabled={!gpsDispo}
+                    onCheckedChange={(checked) => {
+                      if (checked && gpsDispo) {
+                        setFormData({
+                          ...formData,
+                          recuperationGPS: true,
+                          adresse_depart: "Position GPS de l'expéditeur",
+                        });
+                      } else {
+                        setFormData({
+                          ...formData,
+                          recuperationGPS: false,
+                        });
+                      }
+                    }}
+                    className={`data-[state=checked]:bg-accent ${!gpsDispo ? "opacity-50 cursor-not-allowed" : ""}`}
+                  />
+                  <Label htmlFor="gps-expediteur" className="font-bold cursor-pointer flex-1">
+                    📍 Utiliser la position de l'expéditeur si disponible
+                  </Label>
                 </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={gpsHandlers?.onGetGPSArrivee}
-                  className="w-full h-14 rounded-2xl bg-accent text-white font-bold flex items-center justify-center gap-3 shadow-lg shadow-accent/20 active:scale-[0.98] transition-all"
-                >
-                  <Navigation className="w-5 h-5" />
-                  Enregistrer ma position GPS
-                </button>
-              )}
-
-              {!formData.livraisonGPS && (
-                <>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 h-px bg-gray-200" />
-                    <span className="text-xs text-muted-foreground">ou saisir manuellement</span>
-                    <div className="flex-1 h-px bg-gray-200" />
+                {gpsDispo ? (
+                  <div className="mt-3 ml-6 flex items-center gap-2 text-green-700">
+                    <CheckCircle className="w-4 h-4" />
+                    <p className="text-sm font-semibold">Position GPS disponible</p>
                   </div>
-
-                  <div>
-                    <Label>Mon adresse de livraison</Label>
-                    <Input
-                      value={formData.adresse_arrivee}
-                      onChange={(e) => setFormData({ ...formData, adresse_arrivee: e.target.value })}
-                      placeholder="Votre quartier, rue, point de repère..."
-                      className="h-12"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1.5">Indiquez où vous voulez recevoir le colis.</p>
+                ) : (
+                  <div className="mt-3 ml-6 flex items-center gap-2 text-red-700">
+                    <XCircle className="w-4 h-4" />
+                    <p className="text-sm font-semibold">Position GPS indisponible</p>
                   </div>
-                </>
-              )}
+                )}
+              </Card>
 
-              <div className="flex items-start gap-3 p-4 rounded-xl bg-green-50 border border-green-200">
-                <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+              {/* Case destination inconnue */}
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-blue-50 border border-blue-200">
+                <Checkbox
+                  id="destination_inconnue"
+                  checked={destinationInconnue}
+                  onCheckedChange={(checked) => setFormData({ 
+                    ...formData, 
+                    destination_inconnue: checked,
+                    adresse_depart: checked ? "" : formData.adresse_depart,
+                    gps_depart_lat: checked ? null : formData.gps_depart_lat,
+                    gps_depart_lng: checked ? null : formData.gps_depart_lng,
+                    recuperationGPS: checked ? false : formData.recuperationGPS
+                  })}
+                  className="border-blue-400 data-[state=checked]:bg-blue-600"
+                />
+                <Label htmlFor="destination_inconnue" className="text-sm font-medium text-blue-900 cursor-pointer flex-1">
+                  Lieu de récupération inconnu pour le moment
+                </Label>
+              </div>
+
+              {/* Adresse manuelle si pas GPS ou destination inconnue */}
+              {!destinationInconnue && !(gpsDispo && formData.recuperationGPS) && (
                 <div>
-                  <p className="text-sm font-medium text-green-900">Votre position GPS sera automatiquement utilisée comme destination.</p>
-                  <p className="text-xs text-green-700 mt-1">Le livreur vous localisera précisément pour la livraison.</p>
+                  <Label>Adresse de récupération *</Label>
+                  <Input
+                    value={formData.adresse_depart}
+                    onChange={(e) => setFormData({ ...formData, adresse_depart: e.target.value })}
+                    placeholder="Quartier, rue, point de repère..."
+                    className="h-12"
+                    autoFocus
+                  />
                 </div>
-              </div>
+              )}
+
+              {destinationInconnue && (
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
+                  <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-900">Le lieu de récupération sera défini plus tard.</p>
+                    <p className="text-xs text-amber-700 mt-1">L'expéditeur pourra envoyer sa position au livreur.</p>
+                  </div>
+                </div>
+              )}
             </div>
           );
         }
 
-        // "Expedier" : logique inchangée avec destination inconnue possible
+        // "Expedier" : DESTINATION - inchangé
         return (
           <div className="space-y-4">
             <div className="text-center mb-6">
@@ -288,60 +463,9 @@ export default function CourseStepForm({
         );
       }
 
-      case 3:
-        return (
-          <div className="space-y-4">
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 rounded-2xl bg-blue-100 flex items-center justify-center mx-auto mb-3">
-                <User className="w-8 h-8 text-blue-600" />
-              </div>
-              <h2 className="text-xl font-bold text-foreground">
-                {formData.type_course === "expedier" ? "Qui reçoit le colis ?" : "Chez qui récupérer ?"}
-              </h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                {formData.type_course === "expedier" ? "Informations du destinataire" : "Personne qui détient votre colis"}
-              </p>
-            </div>
-            {formData.type_course === "recevoir" && (
-              <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-50 border border-blue-200">
-                <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-blue-900">Entrez les coordonnées de la personne qui remettra le colis au livreur.</p>
-                  <p className="text-xs text-blue-700 mt-1">Si cette personne a SILGAPP, elle recevra une notification automatique.</p>
-                </div>
-              </div>
-            )}
-            <div>
-              <Label>Nom complet <span className="text-muted-foreground text-xs">(optionnel)</span></Label>
-              <Input
-                value={formData.type_course === "expedier" ? formData.destinataire_nom : formData.expediteur_nom}
-                onChange={(e) => setFormData({ 
-                  ...formData, 
-                  [formData.type_course === "expedier" ? "destinataire_nom" : "expediteur_nom"]: e.target.value 
-                })}
-                placeholder={formData.type_course === "expedier" ? "Nom du destinataire" : "Nom de la personne"}
-                className="h-12"
-                autoFocus
-              />
-            </div>
-            <div>
-              <Label>Téléphone *</Label>
-              <Input
-                type="tel"
-                value={formData.type_course === "expedier" ? formData.destinataire_telephone : formData.expediteur_telephone}
-                onChange={(e) => setFormData({ 
-                  ...formData, 
-                  [formData.type_course === "expedier" ? "destinataire_telephone" : "expediteur_telephone"]: e.target.value 
-                })}
-                placeholder="+226 XX XX XX XX"
-                className="h-12"
-              />
-              <p className="text-xs text-muted-foreground mt-1.5">Format : +226 XX XX XX XX</p>
-            </div>
-          </div>
-        );
-
-      case 4:
+      case 3: {
+        const isRecevoir = formData.type_course === "recevoir";
+        
         return (
           <div className="space-y-4">
             <div className="text-center mb-6">
@@ -373,8 +497,9 @@ export default function CourseStepForm({
             </div>
           </div>
         );
+      }
 
-      case 5:
+      case 4:
         return (
           <div className="space-y-4">
             <div className="text-center mb-6">
@@ -398,7 +523,7 @@ export default function CourseStepForm({
           </div>
         );
 
-      case 6:
+      case 5:
         return (
           <div className="space-y-4">
             <div className="text-center mb-6">
@@ -411,10 +536,9 @@ export default function CourseStepForm({
             <Card className="p-4 space-y-3 bg-gradient-to-br from-white to-gray-50">
               {[
                 { icon: <Truck className="w-4 h-4 text-primary" />, bg: "bg-primary/10", label: "Type", value: formData.type_course === "expedier" ? "Expédition" : "Réception" },
-                { icon: <MapPin className="w-4 h-4 text-red-600" />, bg: "bg-red-100", label: "Récupération", value: formData.adresse_depart || (formData.recuperationGPS ? "📍 Position actuelle" : "") },
+                { icon: <MapPin className="w-4 h-4 text-red-600" />, bg: "bg-red-100", label: "Récupération", value: formData.adresse_depart || (formData.recuperationGPS ? "📍 Position GPS" : "") },
                 { icon: <MapPin className="w-4 h-4 text-green-600" />, bg: "bg-green-100", label: "Livraison", value: formData.destination_inconnue ? "📍 Destination à définir" : formData.adresse_arrivee },
                 { icon: <User className="w-4 h-4 text-blue-600" />, bg: "bg-blue-100", label: "Contact", value: formData.type_course === "expedier" ? `${formData.destinataire_nom || "Destinataire"} - ${formData.destinataire_telephone}` : `${formData.expediteur_nom || "Expéditeur"} - ${formData.expediteur_telephone}` },
-                { icon: <MapPin className="w-4 h-4 text-accent" />, bg: "bg-accent-100", label: "Votre position", value: formData.type_course === "recevoir" ? (formData.livraisonGPS ? "✅ GPS utilisé" : "📍 " + (formData.adresse_arrivee || "À définir")) : "—" },
                 { icon: <Package className="w-4 h-4 text-purple-600" />, bg: "bg-purple-100", label: "Colis", value: formData.type_colis?.replace(/_/g, " ") },
               ].map((row, i) => (
                 <div key={i} className="flex items-start gap-3">
@@ -479,11 +603,11 @@ export default function CourseStepForm({
             onClick={onNext}
             disabled={
               (step === 0 && !formData.type_course) ||
-              (step === 1 && !formData.adresse_depart && !formData.recuperationGPS) ||
+              (step === 1 && formData.type_course === "recevoir" && !formData.expediteur_telephone) ||
+              (step === 1 && formData.type_course === "expedier" && !formData.adresse_depart && !formData.recuperationGPS) ||
+              (step === 2 && formData.type_course === "recevoir" && !formData.destination_inconnue && !formData.adresse_depart && !formData.recuperationGPS) ||
               (step === 2 && formData.type_course === "expedier" && !formData.destination_inconnue && !formData.adresse_arrivee) ||
-              (step === 2 && formData.type_course === "recevoir" && !formData.adresse_arrivee && !formData.livraisonGPS) ||
-              (step === 3 && !(formData.type_course === "expedier" ? formData.destinataire_telephone : formData.expediteur_telephone)) ||
-              (step === 4 && !formData.type_colis)
+              (step === 3 && !formData.type_colis)
             }
             className="flex-1 h-12 bg-primary"
           >
@@ -493,7 +617,7 @@ export default function CourseStepForm({
         ) : (
           <Button
             type="submit"
-            disabled={isLoading || (!formData.adresse_depart && !formData.recuperationGPS) || !(formData.type_course === "expedier" ? formData.destinataire_telephone : formData.expediteur_telephone) || !formData.type_colis}
+            disabled={isLoading}
             className="flex-1 h-12 bg-gradient-to-r from-primary to-red-600"
           >
             {isLoading ? (
