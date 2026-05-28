@@ -36,8 +36,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [gpsActif, setGpsActif] = useState(false);
   const [onboardingTermine, setOnboardingTermine] = useState(false);
   const [showMesInfos, setShowMesInfos] = useState(false);
-  const [showRecapitulatif, setShowRecapitulatif] = useState(null); // course à payer
-  const [isPaying, setIsPaying] = useState(false);
+  const [showRecapitulatif, setShowRecapitulatif] = useState(null);
 
 
   // ─── Profil livreur — CORRECTION CRITIQUE : 2s + GPS temps réel ──────────
@@ -336,29 +335,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     setTimeout(() => window.location.reload(), 300);
   };
 
-  // Gestion du paiement
-  const handlePayer = async (course) => {
-    if (!livreurProfil?.id || !course?.id) return;
-    
-    setIsPaying(true);
-    try {
-      const result = await base44.functions.invoke('paiementLivreur', {
-        course_id: course.id,
-        livreur_id: livreurProfil.id,
-        montant_silga: course.commission_silga || 0,
-        montant_livreur: course.montant_livreur || 0,
-      });
 
-      toast.success(`✅ ${result.data.message}`);
-      setShowRecapitulatif(null);
-      queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
-      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-    } catch (err) {
-      toast.error(`Erreur : ${err?.response?.data?.error || err?.message || "Échec du paiement"}`);
-    } finally {
-      setIsPaying(false);
-    }
-  };
 
   // ─── Onboarding externe obligatoire (GPS + profil) ───────────────────────
   if (!onboardingTermine) {
@@ -480,12 +457,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           <LivreurHistorique mesCourses={mesCourses} livreurProfil={livreurProfil} isExterne={true} />
         )}
 
-        {/* Récapitulatif avec bouton Payer */}
+        {/* Récapitulatif de paiement */}
         {showRecapitulatif && (
           <LivreurRecapitulatifPaiement
             course={showRecapitulatif}
-            onPayer={() => handlePayer(showRecapitulatif)}
-            isPaying={isPaying}
           />
         )}
 

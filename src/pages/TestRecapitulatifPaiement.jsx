@@ -5,7 +5,6 @@ import LivreurRecapitulatifPaiement from "@/components/livreur/LivreurRecapitula
 
 export default function TestRecapitulatifPaiement() {
   const [showRecap, setShowRecap] = React.useState(false);
-  const [isPaying, setIsPaying] = React.useState(false);
 
   const courseExemple = {
     id: "test-123",
@@ -20,22 +19,13 @@ export default function TestRecapitulatifPaiement() {
     statut: "livree",
   };
 
-  const handlePayer = () => {
-    setIsPaying(true);
-    setTimeout(() => {
-      setIsPaying(false);
-      setShowRecap(false);
-      alert("✅ Paiement simulé réussi !");
-    }, 2000);
-  };
-
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-lg mx-auto space-y-4">
         <Card className="p-6">
           <h1 className="text-2xl font-bold mb-4">Test Récapitulatif Paiement</h1>
           <p className="text-sm text-muted-foreground mb-4">
-            Ce test affiche le récapitulatif que le livreur verra après une livraison.
+            Ce test affiche le récapitulatif montrant ce que le client doit payer au livreur.
           </p>
           <Button
             className="w-full h-12"
@@ -48,8 +38,6 @@ export default function TestRecapitulatifPaiement() {
         {showRecap && (
           <LivreurRecapitulatifPaiement
             course={courseExemple}
-            onPayer={handlePayer}
-            isPaying={isPaying}
           />
         )}
       </div>

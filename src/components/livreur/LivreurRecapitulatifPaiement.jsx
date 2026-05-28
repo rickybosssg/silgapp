@@ -1,9 +1,8 @@
 import React from "react";
 import { CheckCircle2, Banknote, MapPin, Clock, Ruler } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
-export default function LivreurRecapitulatifPaiement({ course, onPayer, isPaying }) {
+export default function LivreurRecapitulatifPaiement({ course }) {
   const distance = course.distance_reelle_km || 0;
   const prixFinal = course.prix_final || 0;
   const commissionSilga = course.commission_silga || 0;
@@ -86,28 +85,17 @@ export default function LivreurRecapitulatifPaiement({ course, onPayer, isPaying
             </div>
           </div>
 
-          {/* Bouton Payer */}
-          <Button
-            className="w-full h-14 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-black text-lg shadow-lg"
-            onClick={onPayer}
-            disabled={isPaying}
-          >
-            {isPaying ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                Traitement...
-              </>
-            ) : (
-              <>
-                <Banknote className="w-6 h-6 mr-2" />
-                Payer {montantLivreur.toLocaleString()} FCFA à Silga
-              </>
-            )}
-          </Button>
+          {/* Montant à payer au livreur */}
+          <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl p-4 text-center shadow-lg">
+            <p className="text-green-100 text-xs font-bold uppercase mb-1">Total à payer au livreur</p>
+            <p className="text-3xl font-black text-white">{montantLivreur.toLocaleString()} FCFA</p>
+          </div>
 
-          <p className="text-[10px] text-gray-400 text-center">
-            Ce paiement correspond à la commission Silga de {commissionSilga.toLocaleString()} FCFA
-          </p>
+          <div className="text-center">
+            <p className="text-[10px] text-gray-400">
+              Commission Silga (30%) : {commissionSilga.toLocaleString()} FCFA
+            </p>
+          </div>
         </div>
       </Card>
     </div>
