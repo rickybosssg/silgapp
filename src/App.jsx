@@ -9,6 +9,9 @@ import PageNotFound from './lib/PageNotFound';
 import AuthGate from './components/auth/AuthGate.jsx';
 import SelectionReseau from './pages/SelectionReseau.jsx';
 
+// LoadingScreen défini IMMÉDIATEMENT avant lazy loading
+const LoadingScreen = () => <SplashScreen />;
+const InscriptionLivreur = () => null;
 
 const AppLayout = lazy(() => import('./components/layout/AppLayout'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -41,10 +44,6 @@ const TestDiagnosticsComplet = lazy(() => import('./pages/TestDiagnosticsComplet
 const TestTerrainComplet = lazy(() => import('./pages/TestTerrainComplet.jsx'));
 const TestRecapitulatifPaiement = lazy(() => import('./pages/TestRecapitulatifPaiement.jsx'));
 const TestConnexion = lazy(() => import('./pages/TestConnexion.jsx'));
-
-const LoadingScreen = () => <SplashScreen />;
-
-const InscriptionLivreur = () => null;
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
