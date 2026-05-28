@@ -1,21 +1,18 @@
-import { useEffect, useRef } from "react";
-
-const STAR_COUNT = 18;
-
-function generateStars() {
-  return Array.from({ length: STAR_COUNT }, (_, i) => ({
-    id: i,
-    left: Math.random() * 100,
-    delay: Math.random() * 3,
-    duration: 2.5 + Math.random() * 2,
-    size: 8 + Math.random() * 10,
-    opacity: 0.6 + Math.random() * 0.4,
-  }));
-}
-
-const stars = generateStars();
+import { useMemo } from "react";
 
 export default function SplashScreen() {
+  const stars = useMemo(() => 
+    Array.from({ length: 18 }, (_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      delay: Math.random() * 3,
+      duration: 2.5 + Math.random() * 2,
+      size: 8 + Math.random() * 10,
+      opacity: 0.6 + Math.random() * 0.4,
+    })),
+    []
+  );
+
   return (
     <div
       className="fixed inset-0 flex flex-col items-center justify-center overflow-hidden"
