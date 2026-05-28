@@ -38,7 +38,6 @@ const ClientSuiviCourse = lazy(() => import('./pages/ClientSuiviCourse.jsx'));
 const DashboardAdminExterne = lazy(() => import('./pages/DashboardAdminExterne.jsx'));
 const DusLivreursExternes = lazy(() => import('./pages/DusLivreursExternes.jsx'));
 const PublicSuiviCourse = lazy(() => import('./pages/PublicSuiviCourse.jsx'));
-const TelechargerApp = lazy(() => import('./pages/TelechargerApp.jsx'));
 const Maintenance = lazy(() => import('./pages/Maintenance.jsx'));
 const TestBoutEnBout = lazy(() => import('./pages/TestBoutEnBout.jsx'));
 const TestDiagnosticsComplet = lazy(() => import('./pages/TestDiagnosticsComplet.jsx'));
@@ -155,7 +154,6 @@ function AppContent() {
           <Route path="/client/course/recevoir" element={<CourseExterneFormSync />} />
           <Route path="/client/suivi" element={<ClientSuiviCourse />} />
           <Route path="/suivi-public/:token" element={<PublicSuiviCourse />} />
-          <Route path="/telecharger-app" element={<TelechargerApp />} />
           <Route path="*" element={<ClientExterneApp />} />
         </Routes>
       </Suspense>
