@@ -52,11 +52,9 @@ function GPSBadge({ profil, onForceSync }) {
 
 export default function ClientExterneApp() {
   const navigate = useNavigate();
-  const gpsDejaActif = (() => { try { return localStorage.getItem("client_gps_active") === "true"; } catch { return false; } })();
-  const [onboardingDone, setOnboardingDone] = useState(gpsDejaActif);
+  const [onboardingDone, setOnboardingDone] = useState(false);
   const [showProfilModal, setShowProfilModal] = useState(false);
-  const savedGpsPos = (() => { try { return JSON.parse(localStorage.getItem("client_gps_position") || "null"); } catch { return null; } })();
-  const [position, setPosition] = useState(savedGpsPos);
+  const [position, setPosition] = useState(null);
   const [clientProfil, setClientProfil] = useState(null);
   const [coursesActives, setCoursesActives] = useState([]);
   const [livreursProches, setLivreursProches] = useState([]);
@@ -67,6 +65,18 @@ export default function ClientExterneApp() {
   const [gpsActif, setGpsActif] = useState(false);
   const clientProfilRef = useRef(null);
   useEffect(() => { clientProfilRef.current = clientProfil; }, [clientProfil]);
+
+  // Charger localStorage au montage (pas avant le rendu)
+  useEffect(() => {
+    try {
+      const gpsActive = localStorage.getItem("client_gps_active") === "true";
+      const savedPos = localStorage.getItem("client_gps_position");
+      if (gpsActive) setOnboardingDone(true);
+      if (savedPos) setPosition(JSON.parse(savedPos));
+    } catch (e) {
+      console.error("Erreur lecture localStorage:", e);
+    }
+  }, []);
 
   // Heartbeat automatique — sync toutes les 30s + événements lifecycle
   useHeartbeat({
@@ -288,14 +298,7 @@ export default function ClientExterneApp() {
       }
       setClientProfil(profil);
 
-      if (gpsDejaActif) {
-        const localPos = (() => { try { return JSON.parse(localStorage.getItem("client_gps_position") || "null"); } catch { return null; } })();
-        if (localPos) {
-          setPosition(localPos);
-          setGpsActif(true);
-        }
-        checkStatus(localPos, profil);
-      }
+      // GPS déjà chargé via useEffect
     } catch (err) {
       console.error("Erreur chargement profil:", err);
     } finally {
