@@ -319,22 +319,35 @@ export default function ClientExterneApp() {
   const checkStatus = async (pos, profil) => {
     try {
       const user = await base44.auth.me();
+      
+      // 1. Courses créées par l'utilisateur
       const coursesClient = await base44.entities.CourseExterne.filter({ created_by_id: user.id }, "-created_date", 20);
       const actives = (coursesClient || []).filter(c => !["livree", "annulee"].includes(c.statut));
 
+      // 2. Courses où l'utilisateur est destinataire
       let activesDestinataire = [];
       if (profil?.id) {
         const coursesDestinataire = await base44.entities.CourseExterne.filter({ destinataire_client_id: profil.id }, "-created_date", 20);
-        // Exclure : courses déjà dans byCreator (même userId) + courses "recevoir" dont le créateur est le destinataire lui-même (même compte)
         activesDestinataire = (coursesDestinataire || []).filter(c =>
           !["livree", "annulee"].includes(c.statut) &&
-          c.created_by_id !== user.id // ne pas dupliquer les courses que l'utilisateur a lui-même créées
+          c.created_by_id !== user.id
+        );
+      }
+
+      // 3. Courses où l'utilisateur est expéditeur (mode "recevoir") — IMPORTANT : miroir du mode expedier
+      let activesExpediteur = [];
+      if (profil?.id) {
+        const coursesExpediteur = await base44.entities.CourseExterne.filter({ expediteur_client_id: profil.id }, "-created_date", 20);
+        activesExpediteur = (coursesExpediteur || []).filter(c =>
+          !["livree", "annulee"].includes(c.statut) &&
+          c.created_by_id !== user.id && // ne pas dupliquer
+          c.type_course === "recevoir" // seulement mode recevoir
         );
       }
 
       // Fusionner sans doublons par id
       const map = new Map();
-      [...actives, ...activesDestinataire].forEach(c => map.set(c.id, c));
+      [...actives, ...activesDestinataire, ...activesExpediteur].forEach(c => map.set(c.id, c));
       const toutes = [...map.values()];
       setCoursesActives(toutes);
 

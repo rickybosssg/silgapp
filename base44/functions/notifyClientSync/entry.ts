@@ -60,12 +60,15 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 2. Notifier l'expéditeur s'il a l'application (course type "recevoir")
+    // 2. Notifier l'expéditeur (course type "recevoir") — TOUJOURS, même sans client_id
     if (course.type_course === "recevoir") {
+      // Chercher l'expéditeur par ID ou par téléphone
       const expediteurClient = await resolveClient(course.expediteur_client_id, course.expediteur_telephone);
+      
+      // Si trouvé dans la base, notifier et lier
       if (expediteurClient && expediteurClient.user_email) {
-        // Lier automatiquement si pas encore lié
-        if (!course.expediteur_client_id) {
+        // Mettre à jour la course avec le lien
+        if (!course.expediteur_client_id || !course.expediteur_has_app) {
           await base44.asServiceRole.entities.CourseExterne.update(course.id, {
             expediteur_client_id: expediteurClient.id,
             expediteur_has_app: true,
@@ -80,6 +83,9 @@ Deno.serve(async (req) => {
           lue: false
         });
         notifications.push(notification);
+      } else {
+        // Expéditeur non trouvé dans la base — notifier quand même via le numéro
+        console.log(`[notifyClientSync] Expéditeur non trouvé: ${course.expediteur_telephone}`);
       }
     }
 

@@ -176,15 +176,30 @@ export default function CourseExterneFormSync() {
       // Lookup expéditeur (pour "recevoir") — lie si inscrit dans la base clients
       if (finalData.type_course === "recevoir" && !finalData.expediteur_client_id && finalData.expediteur_telephone) {
         try {
-          const digits = finalData.expediteur_telephone.replace(/\D/g, "").slice(-8);
-          // Essayer avec le numéro normalisé
-          const found = await base44.entities.ClientExterne.filter({ telephone: "+226" + digits });
-          if (found?.length > 0) {
-            finalData.expediteur_client_id = found[0].id;
-            // Marquer que cette personne a l'application pour synchronisation
-            finalData.expediteur_has_app = true;
+          const phoneRaw = finalData.expediteur_telephone.replace(/\D/g, "");
+          const digits = phoneRaw.slice(-8);
+          const indicatif = phoneRaw.startsWith("226") ? "+226" : "+226";
+          const phoneNormalized = indicatif + digits;
+          
+          // Essayer plusieurs formats de recherche
+          const searchFormats = [
+            { telephone: phoneNormalized },
+            { telephone: digits },
+            { telephone: phoneRaw }
+          ];
+          
+          for (const format of searchFormats) {
+            const found = await base44.asServiceRole.entities.ClientExterne.filter(format);
+            if (found && found.length > 0) {
+              finalData.expediteur_client_id = found[0].id;
+              finalData.expediteur_has_app = true;
+              console.log(`[Lookup Expéditeur] ✅ Trouvé: ${found[0].nom} ${found[0].prenom} (${found[0].telephone})`);
+              break;
+            }
           }
-        } catch (_) {}
+        } catch (err) {
+          console.error("[Lookup Expéditeur] ❌ Erreur:", err);
+        }
       }
       // Génération QR/codes dès la création
       // Pour "recevoir" : pickup = chez l'expéditeur, delivery = chez le destinataire
