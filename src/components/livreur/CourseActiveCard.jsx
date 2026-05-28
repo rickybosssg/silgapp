@@ -102,7 +102,7 @@ function ProgressBar({ statut }) {
   );
 }
 
-export default function CourseActiveCard({ course, onColisRecupere, onColisLivre, onClientAnnule, isPending, isExterne = false }) {
+export default function CourseActiveCard({ course, onColisRecupere, onColisLivre, onClientAnnule, isPending, isExterne = false, onShowRecapitulatif }) {
   const [prixReel, setPrixReel] = useState("");
   const [showPrixModal, setShowPrixModal] = useState(false);
   const [remarque, setRemarque] = useState("");
@@ -208,28 +208,20 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       commission_silga: commissionSilga,
     };
 
-    setCourseLivreeData(merged);
-    setShowRecapitulatif(true);
-    // Ne pas appeler onColisLivre ici — sera appelé après fermeture du récap via handleFermerCourse
+    // Afficher le récapitulatif au niveau parent (pour éviter démontage du composant)
+    if (onShowRecapitulatif) {
+      onShowRecapitulatif(merged);
+    }
+    // Ne pas appeler onColisLivre ici — le parent gérera après fermeture du récap
   };
 
   const handleFermerCourse = () => {
-    const data = courseLivreeData;
-    setShowRecapitulatif(false);
-    setCourseLivreeData(null);
-    // Nettoyer le statut livreur après fermeture du récap
-    onColisLivre({ ...data, statut: "livree" }, null);
+    // Le parent gère la fermeture du récapitulatif
   };
 
   return (
     <>
-      {/* Récapitulatif post-livraison */}
-      {showRecapitulatif && courseLivreeData && (
-        <LivraisonRecapitulatif
-          course={courseLivreeData}
-          onClose={handleFermerCourse}
-        />
-      )}
+      {/* Récapitulatif post-livraison — géré par le parent maintenant */}
 
       {/* Modal scan QR (externe) */}
       {showQRScanner && (

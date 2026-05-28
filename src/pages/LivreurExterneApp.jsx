@@ -448,6 +448,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                     onColisLivre={handleColisLivre}
                     isPending={updateCourseMutation.isPending}
                     isExterne={true}
+                    onShowRecapitulatif={(courseData) => {
+                      setRecapLivraison(courseData);
+                    }}
                   />
                 ))}
               </div>
