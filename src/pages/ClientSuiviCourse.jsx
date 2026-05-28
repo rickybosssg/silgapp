@@ -328,35 +328,36 @@ export default function ClientSuiviCourse() {
           })()
         )}
 
-        {/* Trajet + Estimation */}
+        {/* Trajet + Estimation — affiché dès que la course existe */}
         <Card className="p-4 space-y-3">
-          {/* Estimation style Uber */}
+          {/* Estimation style Uber — toujours visible */}
           {(() => {
+            // Calcul distance : priorité GPS réels, puis estimation
             const distEst = maCourse.distance_reelle_km
               || haversineKm(maCourse.latitude_recuperation, maCourse.longitude_recuperation, maCourse.latitude_livraison, maCourse.longitude_livraison)
               || haversineKm(maCourse.gps_depart_lat, maCourse.gps_depart_lng, maCourse.gps_arrivee_lat, maCourse.gps_arrivee_lng);
-            const prix = maCourse.prix_final || (distEst ? Math.round(distEst * 100) : maCourse.prix_estimate || null);
+            const prix = maCourse.prix_final || (distEst ? Math.round(distEst * 100) : maCourse.prix_estimate || 0);
             const dureeMs = maCourse.heure_livraison && maCourse.heure_recuperation
               ? new Date(maCourse.heure_livraison) - new Date(maCourse.heure_recuperation)
               : maCourse.heure_livraison && maCourse.heure_acceptation
                 ? new Date(maCourse.heure_livraison) - new Date(maCourse.heure_acceptation)
                 : null;
-            const temps = dureeMs ? Math.round(dureeMs / 60000) : distEst ? Math.round((distEst / 25) * 60) : null;
+            const temps = dureeMs ? Math.round(dureeMs / 60000) : distEst ? Math.round((distEst / 25) * 60) : 0;
             const isFinal = !!maCourse.prix_final;
             return (
               <div className={`flex items-center justify-between pt-3 mt-1 border-t ${isFinal ? "border-green-200" : "border-gray-200"}`}>
                 <div className="flex flex-col items-center">
-                  <span className="text-lg font-bold text-gray-900">{distEst ? `${Number(distEst).toFixed(1)}` : "—"}</span>
+                  <span className="text-lg font-bold text-gray-900">{distEst ? Number(distEst).toFixed(1) : "—"}</span>
                   <span className="text-[10px] text-gray-500 uppercase tracking-wide">km</span>
                 </div>
                 <div className="w-px h-8 bg-gray-200" />
                 <div className="flex flex-col items-center">
-                  <span className="text-lg font-bold text-gray-900">{temps ? `${temps}` : "—"}</span>
+                  <span className="text-lg font-bold text-gray-900">{temps || "—"}</span>
                   <span className="text-[10px] text-gray-500 uppercase tracking-wide">min</span>
                 </div>
                 <div className="w-px h-8 bg-gray-200" />
                 <div className="flex flex-col items-center">
-                  <span className="text-lg font-bold text-gray-900">{prix ? `${prix.toLocaleString()}` : "—"}</span>
+                  <span className="text-lg font-bold text-gray-900">{prix > 0 ? prix.toLocaleString() : "—"}</span>
                   <span className="text-[10px] text-gray-500 uppercase tracking-wide">FCFA</span>
                 </div>
               </div>
