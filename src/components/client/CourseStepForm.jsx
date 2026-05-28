@@ -244,14 +244,23 @@ export default function CourseStepForm({
                       <p className="text-sm text-green-700 mt-1">
                         <strong>{expediteurFound.nom || expediteurFound.prenom}</strong> est inscrit dans SILGAPP
                       </p>
-                      <div className="flex gap-2 mt-2">
+                      <div className="flex flex-wrap gap-2 mt-2">
                         <Badge className="bg-green-200 text-green-800">✓ Synchronisation activée</Badge>
-                        <Badge className="bg-green-200 text-green-800">✓ GPS disponible</Badge>
                         <Badge className="bg-green-200 text-green-800">✓ Notifications temps réel</Badge>
+                        {expediteurFound.latitude && expediteurFound.longitude ? (
+                          <Badge className="bg-green-200 text-green-800">✓ GPS disponible</Badge>
+                        ) : (
+                          <Badge className="bg-amber-200 text-amber-800">⚠ GPS non activé</Badge>
+                        )}
                       </div>
-                      {expediteurFound.latitude && expediteurFound.longitude && (
+                      {expediteurFound.latitude && expediteurFound.longitude ? (
                         <p className="text-xs text-green-600 mt-2">
                           📍 Position GPS : {Number(expediteurFound.latitude).toFixed(4)}, {Number(expediteurFound.longitude).toFixed(4)}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-amber-700 mt-2 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          L'expéditeur doit activer son GPS dans son profil
                         </p>
                       )}
                     </div>
@@ -334,6 +343,7 @@ export default function CourseStepForm({
         if (isRecevoir) {
           // Vérifier si GPS expéditeur est disponible et persisté
           const gpsDispo = !!(formData.expediteur_gps_lat && formData.expediteur_gps_lng && formData.expediteur_gps_available);
+          console.log("ÉTAPE 2 DEBUG - gpsDispo:", gpsDispo, "formData.expediteur_gps_lat:", formData.expediteur_gps_lat, "formData.recuperationGPS:", formData.recuperationGPS);
           
           return (
             <div className="space-y-4">
