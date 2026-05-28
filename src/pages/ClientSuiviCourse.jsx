@@ -345,20 +345,18 @@ export default function ClientSuiviCourse() {
             const temps = dureeMs ? Math.round(dureeMs / 60000) : distEst ? Math.round((distEst / 25) * 60) : 0;
             const isFinal = !!maCourse.prix_final;
             return (
-              <div className={`flex items-center justify-between pt-3 mt-1 border-t ${isFinal ? "border-green-200" : "border-gray-200"}`}>
-                <div className="flex flex-col items-center">
-                  <span className="text-lg font-bold text-gray-900">{distEst ? Number(distEst).toFixed(1) : "—"}</span>
-                  <span className="text-[10px] text-gray-500 uppercase tracking-wide">km</span>
+              <div className={`grid grid-cols-3 gap-3 pt-3 mt-1 border-t ${isFinal ? "border-green-200" : "border-gray-200"}`}>
+                <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-3 text-center shadow-lg">
+                  <span className="text-2xl font-black text-white block">{distEst ? Number(distEst).toFixed(1) : "—"}</span>
+                  <span className="text-[10px] font-bold text-blue-100 uppercase tracking-wide">Distance (km)</span>
                 </div>
-                <div className="w-px h-8 bg-gray-200" />
-                <div className="flex flex-col items-center">
-                  <span className="text-lg font-bold text-gray-900">{temps || "—"}</span>
-                  <span className="text-[10px] text-gray-500 uppercase tracking-wide">min</span>
+                <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-3 text-center shadow-lg">
+                  <span className="text-2xl font-black text-white block">{temps || "—"}</span>
+                  <span className="text-[10px] font-bold text-blue-100 uppercase tracking-wide">Durée (min)</span>
                 </div>
-                <div className="w-px h-8 bg-gray-200" />
-                <div className="flex flex-col items-center">
-                  <span className="text-lg font-bold text-gray-900">{prix > 0 ? prix.toLocaleString() : "—"}</span>
-                  <span className="text-[10px] text-gray-500 uppercase tracking-wide">FCFA</span>
+                <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-3 text-center shadow-lg">
+                  <span className="text-2xl font-black text-white block">{prix > 0 ? prix.toLocaleString() : "—"}</span>
+                  <span className="text-[10px] font-bold text-blue-100 uppercase tracking-wide">Prix (FCFA)</span>
                 </div>
               </div>
             );
