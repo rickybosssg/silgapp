@@ -208,11 +208,12 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       commission_silga: commissionSilga,
     };
 
-    // Afficher le récapitulatif au niveau parent (pour éviter démontage du composant)
+    // Afficher le récapitulatif IMMÉDIATEMENT au niveau parent
     if (onShowRecapitulatif) {
       onShowRecapitulatif(merged);
     }
-    // Ne pas appeler onColisLivre ici — le parent gérera après fermeture du récap
+    // Mettre à jour le statut du livreur après
+    onColisLivre(merged, null);
   };
 
   const handleFermerCourse = () => {
