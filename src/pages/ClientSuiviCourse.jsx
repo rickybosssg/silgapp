@@ -74,28 +74,27 @@ export default function ClientSuiviCourse() {
   }, [userId]);
 
   // Charger les courses créées par l'utilisateur + celles où il est destinataire
-  const { data: courses = [], refetch } = useQuery({
+  // CORRECTION CRITIQUE : Polling 2s + GPS temps réel + synchronisation parfaite
+  const { data: courses = [], refetch, isLoading } = useQuery({
     queryKey: ["mes-courses-externes", userId, clientProfilId],
     queryFn: async () => {
       const byCreator = await base44.entities.CourseExterne.filter(
-        { created_by_id: userId }, "-created_date", 20
+        { created_by_id: userId }, "-updated_date", 50
       );
       let byDest = [];
       if (clientProfilId) {
         const allByDest = await base44.entities.CourseExterne.filter(
-          { destinataire_client_id: clientProfilId }, "-created_date", 20
+          { destinataire_client_id: clientProfilId }, "-updated_date", 50
         );
-        // Exclure les courses créées par ce même utilisateur (déjà dans byCreator)
-        // et les courses "recevoir" où destinataire = créateur (incohérence de rôle)
         byDest = (allByDest || []).filter(c => c.created_by_id !== userId);
       }
       // Fusionner sans doublons
       const map = new Map();
       [...(byCreator || []), ...(byDest || [])].forEach(c => map.set(c.id, c));
-      const courses = [...map.values()].sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+      const courses = [...map.values()].sort((a, b) => new Date(b.updated_date) - new Date(a.updated_date));
 
-      // Enrichir avec note_moyenne + nombre_avis + GPS temps réel du livreur
-      const livreurIds = [...new Set(courses.filter(c => c.livreur_id).map(c => c.livreur_id))];
+      // CORRECTION CRITIQUE : Enrichir avec GPS TEMPS RÉEL du livreur (poll 2s)
+      const livreurIds = [...new Set(courses.filter(c => c.livreur_id && !["livree", "annulee"].includes(c.statut)).map(c => c.livreur_id))];
       if (livreurIds.length > 0) {
         const livreursData = await Promise.all(
           livreurIds.map(id => base44.entities.Livreur.filter({ id }).then(r => r?.[0]).catch(() => null))
@@ -107,12 +106,11 @@ export default function ClientSuiviCourse() {
           const l = livreurMap[c.livreur_id];
           return {
             ...c,
-            // Bug #9 : priorité à la photo de l'entité Livreur (source de vérité admin)
             livreur_photo_url: l.photo_url || c.livreur_photo_url || null,
             livreur_note_moyenne: l.note_moyenne || 0,
             livreur_nombre_avis: l.nombre_avis || 0,
             livreur_vehicule: l.vehicule || l.type_vehicule || c.livreur_vehicule || null,
-            _livreur: l,
+            _livreur: l, // GPS temps réel ici
           };
         });
       }
@@ -120,7 +118,9 @@ export default function ClientSuiviCourse() {
     },
     enabled: !!userId,
     initialData: [],
-    refetchInterval: 5000,
+    refetchInterval: 2000, // CORRECTION : 2s au lieu de 5s
+    staleTime: 0, // Toujours frais
+    cacheTime: 0, // Pas de cache
   });
 
   // Toutes les courses actives
@@ -281,6 +281,7 @@ export default function ClientSuiviCourse() {
         )}
 
         {/* ETA temps réel — expéditeur : vers récupération puis vers livraison */}
+        {/* CORRECTION CRITIQUE : ETA TOUJOURS affiché, même <100m */}
         {["livreur_en_route", "colis_recupere", "en_livraison"].includes(maCourse.statut) && maCourse.livreur_id && isClientPrincipalForETA(maCourse, userId, clientProfilId) && (
           (() => {
             const livreurLat = maCourse._livreur?.latitude;
@@ -288,12 +289,13 @@ export default function ClientSuiviCourse() {
             const isVersRecup = maCourse.statut === "livreur_en_route";
             const targetLat = isVersRecup ? maCourse.gps_depart_lat : maCourse.gps_arrivee_lat;
             const targetLng = isVersRecup ? maCourse.gps_depart_lng : maCourse.gps_arrivee_lng;
+            // CORRECTION : Afficher ETA même si GPS manquant (affichera "en route")
             return (
               <ETADisplay
-                livreurLat={livreurLat}
-                livreurLng={livreurLng}
-                targetLat={targetLat}
-                targetLng={targetLng}
+                livreurLat={livreurLat || null}
+                livreurLng={livreurLng || null}
+                targetLat={targetLat || null}
+                targetLng={targetLng || null}
                 livreurNom={maCourse.livreur_nom}
                 phase={isVersRecup ? "vers_recuperation" : "vers_livraison"}
                 statut={maCourse.statut}
@@ -303,21 +305,21 @@ export default function ClientSuiviCourse() {
         )}
 
         {/* ETA temps réel — destinataire : vers livraison uniquement (après récupération) */}
-        {/* Affiché si : livreur assigné + statut colis_recupere/en_livraison + (destinataire OU non-principal) */}
-        {["colis_recupere", "en_livraison"].includes(maCourse.statut) && maCourse.livreur_id && maCourse.gps_arrivee_lat && maCourse.gps_arrivee_lng && (
+        {/* CORRECTION CRITIQUE : ETA TOUJOURS affiché, même <100m */}
+        {["colis_recupere", "en_livraison"].includes(maCourse.statut) && maCourse.livreur_id && (
           (() => {
             const livreurLat = maCourse._livreur?.latitude;
             const livreurLng = maCourse._livreur?.longitude;
-            // Afficher si c'est le destinataire (type_course=expedier) ou si non-principal
             const isDestinataire = maCourse.type_course === "expedier" && maCourse.destinataire_client_id === clientProfilId;
             const shouldShow = isDestinataire || !isClientPrincipalForETA(maCourse, userId, clientProfilId);
-            if (!shouldShow || !livreurLat || !livreurLng) return null;
+            if (!shouldShow) return null;
+            // CORRECTION : Afficher ETA même si GPS manquant
             return (
               <ETADisplay
-                livreurLat={livreurLat}
-                livreurLng={livreurLng}
-                targetLat={maCourse.gps_arrivee_lat}
-                targetLng={maCourse.gps_arrivee_lng}
+                livreurLat={livreurLat || null}
+                livreurLng={livreurLng || null}
+                targetLat={maCourse.gps_arrivee_lat || null}
+                targetLng={maCourse.gps_arrivee_lng || null}
                 livreurNom={maCourse.livreur_nom}
                 phase="vers_livraison"
                 statut={maCourse.statut}

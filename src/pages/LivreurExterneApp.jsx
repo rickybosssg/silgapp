@@ -37,14 +37,16 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [showMesInfos, setShowMesInfos] = useState(false);
 
 
-  // ─── Profil livreur (rechargé toutes les 10s) ─────────────────────────────
+  // ─── Profil livreur — CORRECTION CRITIQUE : 2s + GPS temps réel ──────────
   const { data: livreurProfil } = useQuery({
     queryKey: ["livreur-externe-profil", initialProfil?.id],
     queryFn: () => base44.entities.Livreur.filter({ id: initialProfil.id }),
     select: (data) => Array.isArray(data) ? (data[0] || initialProfil) : initialProfil,
     initialData: [initialProfil],
     enabled: !!initialProfil?.id,
-    refetchInterval: 10000,
+    refetchInterval: 2000, // CORRECTION : 2s au lieu de 10s
+    staleTime: 0,
+    cacheTime: 0,
   });
 
   // ─── Notifications push — dépendances stables ─────────────────────────────
@@ -60,21 +62,31 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     return () => unsub?.();
   }, [livreurId, livreurEmail]); // Stables : ne changent pas si profil rechargé avec mêmes valeurs
 
-  // ─── Heartbeat app_active ─────────────────────────────────────────────────
+  // ─── Heartbeat app_active — CORRECTION CRITIQUE ──────────────────────────
   useEffect(() => {
     if (!initialProfil?.id) return;
     const id = initialProfil.id;
 
-    const pingActif = () =>
-      saveLivreur(id, { app_active: true, last_seen_at: new Date().toISOString() }).catch(() => null);
+    const pingActif = () => {
+      const now = new Date().toISOString();
+      saveLivreur(id, { 
+        app_active: true, 
+        last_seen_at: now,
+        statut: livreurProfil?.statut === "hors_ligne" ? "hors_ligne" : (livreurProfil?.statut || "disponible")
+      }).catch(() => null);
+    };
     const pingInactif = () =>
-      saveLivreur(id, { app_active: false }).catch(() => null);
+      saveLivreur(id, { app_active: false, statut: "hors_ligne" }).catch(() => null);
 
+    // CORRECTION : Ping immédiat + toutes les 5s (pas 10s)
     pingActif();
-    const interval = setInterval(pingActif, 10000);
+    const interval = setInterval(pingActif, 5000);
     const handleVisibility = () => {
-      if (document.visibilityState === 'hidden') pingInactif();
-      else pingActif();
+      if (document.visibilityState === 'hidden') {
+        pingInactif();
+      } else {
+        pingActif();
+      }
     };
     document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('beforeunload', pingInactif);
@@ -85,22 +97,24 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       window.removeEventListener('beforeunload', pingInactif);
       pingInactif();
     };
-  }, [initialProfil?.id]);
+  }, [initialProfil?.id, livreurProfil?.statut]);
 
-  // ─── Mes courses (poll 2s) ─────────────────────────────────────────────────
+  // ─── Mes courses — CORRECTION CRITIQUE : 1s + tri updated_date ───────────
   const { data: mesCourses = [] } = useQuery({
     queryKey: ["mes-courses-externes", livreurId],
     queryFn: async () => {
       const courses = await base44.entities.CourseExterne.filter(
         { livreur_id: livreurId },
-        "-created_date",
+        "-updated_date", // CORRECTION : tri par updated_date
         50
       );
       return courses || [];
     },
     enabled: !!livreurId,
     initialData: [],
-    refetchInterval: 2000,
+    refetchInterval: 1000, // CORRECTION : 1s au lieu de 2s
+    staleTime: 0,
+    cacheTime: 0,
   });
 
   // ─── Course en attente de réponse ─────────────────────────────────────────
