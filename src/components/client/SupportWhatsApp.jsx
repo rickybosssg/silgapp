@@ -1,6 +1,6 @@
 import React from "react";
 
-const SUPPORT_NUMBER = "22667572857";
+const SUPPORT_NUMBER = "22666925190";
 const SUPPORT_MSG = "Bonjour SILGAPP 👋\nJ'ai besoin d'aide sur SILGAPP.";
 
 export function openWhatsAppNative(phone, message = "") {
@@ -53,7 +53,7 @@ export default function SupportWhatsApp({ compact = false }) {
           <p className="text-xs text-green-700 mt-0.5 leading-relaxed">
             Notre équipe SILGAPP est disponible pour vous assister.
           </p>
-          <p className="text-xs text-green-600 font-bold mt-1">67 57 28 57</p>
+          <p className="text-xs text-green-600 font-bold mt-1">66 92 51 90</p>
         </div>
       </div>
       <button
