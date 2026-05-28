@@ -279,16 +279,22 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     );
   };
 
-  const handleColisLivre = (course, gpsArrivee) => {
+  const handleColisLivre = async (course, gpsArrivee) => {
     if (course.statut === "livree") {
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
-      // Afficher popup prix une seule fois
+      // Afficher popup prix une seule fois — récupérer les données fraîches du backend
       const seenKey = `prix_popup_seen_${course.id}`;
       if (!localStorage.getItem(seenKey)) {
-        setCourseLivreePopup(course);
+        // Fetch course fraîche depuis le backend pour avoir prix_final et distance_reelle_km à jour
+        try {
+          const fresh = await base44.entities.CourseExterne.filter({ id: course.id });
+          const freshCourse = (fresh && fresh[0]) ? fresh[0] : course;
+          setCourseLivreePopup(freshCourse);
+        } catch (_) {
+          setCourseLivreePopup(course);
+        }
       }
-      setShowRecapitulatif(course);
       return;
     }
 
@@ -324,6 +330,20 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     }
     statutMutation.mutate("disponible");
     toast.success("Livraison terminée ! 🎉");
+
+    // Afficher popup prix — attendre un peu que le backend enregistre les données
+    const seenKey = `prix_popup_seen_${course.id}`;
+    if (!localStorage.getItem(seenKey)) {
+      setTimeout(async () => {
+        try {
+          const fresh = await base44.entities.CourseExterne.filter({ id: course.id });
+          const freshCourse = (fresh && fresh[0]) ? fresh[0] : course;
+          setCourseLivreePopup(freshCourse);
+        } catch (_) {
+          setCourseLivreePopup(course);
+        }
+      }, 1500);
+    }
   };
 
   const handleLogout = () => {
