@@ -37,6 +37,13 @@ export default function DashboardExterne() {
     refetchInterval: 5000,
   });
 
+  const { data: clients = [] } = useQuery({
+    queryKey: ["clients-externes"],
+    queryFn: () => base44.entities.ClientExterne.filter({ actif: true }),
+    initialData: [],
+    refetchInterval: 10000,
+  });
+
   // Courses du jour OU encore actives
   const todayCourses = useMemo(
     () => courses.filter(c =>
@@ -71,8 +78,9 @@ export default function DashboardExterne() {
     const enCours = coursesEnTraitement.length;
     const ca = coursesTerminees.filter(c => c.statut === "livree").reduce((s, c) => s + (c.prix_final || 0), 0);
     const dispoLivreurs = livreursEnLigne.filter(l => l.statut === "disponible").length;
-    return { total, livrees, annulees, enCours, ca, dispoLivreurs };
-  }, [courses, coursesEnTraitement, coursesTerminees, livreursEnLigne]);
+    const totalClients = clients.length;
+    return { total, livrees, annulees, enCours, ca, dispoLivreurs, totalClients };
+  }, [courses, coursesEnTraitement, coursesTerminees, livreursEnLigne, clients]);
 
   return (
     <div className="px-4 py-4 lg:p-6 space-y-4 lg:space-y-5 max-w-7xl mx-auto">
@@ -111,7 +119,8 @@ export default function DashboardExterne() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+        <StatCard title="Total clients" value={stats.totalClients} icon={Package} iconBg="bg-purple-500" />
         <StatCard title="Total" value={stats.total} icon={Package} iconBg="bg-accent" />
         <StatCard title="En traitement" value={stats.enCours} icon={Clock} iconBg="bg-blue-500" />
         <StatCard title="Livrées" value={stats.livrees} icon={CheckCircle2} iconBg="bg-emerald-500" />
