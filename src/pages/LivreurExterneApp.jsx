@@ -17,6 +17,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LivreurExterneOnboarding from "@/components/livreur/LivreurExterneOnboarding";
 import LivreurMesInfosModal from "@/components/livreur/LivreurMesInfosModal";
 import LivreurRecapitulatifPaiement from "@/components/livreur/LivreurRecapitulatifPaiement";
+import PrixCoursePopup from "@/components/livreur/PrixCoursePopup";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -38,6 +39,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [onboardingTermine, setOnboardingTermine] = useState(false);
   const [showMesInfos, setShowMesInfos] = useState(false);
   const [showRecapitulatif, setShowRecapitulatif] = useState(null);
+  const [courseLivreePopup, setCourseLivreePopup] = useState(null);
 
   // ─── Profil livreur ───────────────────────────────────────────────────────
   const { data: livreurProfil } = useQuery({
@@ -281,8 +283,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     if (course.statut === "livree") {
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
-      const gains = course.montant_livreur || 0;
-      toast.success(`Livraison confirmée ! 🎉${gains > 0 ? ` +${gains.toLocaleString()} F gagnés` : ""}`);
+      // Afficher popup prix une seule fois
+      const seenKey = `prix_popup_seen_${course.id}`;
+      if (!localStorage.getItem(seenKey)) {
+        setCourseLivreePopup(course);
+      }
       setShowRecapitulatif(course);
       return;
     }
@@ -388,6 +393,16 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // ─── Dashboard principal ──────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Popup prix de course — affiché une seule fois après livraison */}
+      {courseLivreePopup && (
+        <PrixCoursePopup
+          course={courseLivreePopup}
+          onClose={() => {
+            localStorage.setItem(`prix_popup_seen_${courseLivreePopup.id}`, "1");
+            setCourseLivreePopup(null);
+          }}
+        />
+      )}
       <div className="max-w-lg mx-auto p-4 pb-12">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
           <TabsList className="w-full">

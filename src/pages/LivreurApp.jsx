@@ -28,6 +28,7 @@ import EmptyStateAttente from "@/components/livreur/EmptyStateAttente";
 import CourseEnAttenteModal from "@/components/livreur/CourseEnAttenteModal";
 import CourseActiveCard from "@/components/livreur/CourseActiveCard";
 import LivreurHistorique from "@/components/livreur/LivreurHistorique";
+import PrixCoursePopup from "@/components/livreur/PrixCoursePopup";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
@@ -43,6 +44,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
   const [activeTab, setActiveTab] = useState("courses");
   const [gpsActif, setGpsActif] = useState(false);
   const [gpsRequis, setGpsRequis] = useState(true);
+  const [courseLivreePopup, setCourseLivreePopup] = useState(null); // course à afficher dans le popup prix
 
   // Recharger le profil livreur en temps réel
   const { data: livreurProfil } = useQuery({
@@ -283,6 +285,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
   };
 
   const handleColisLivre = (course, prixReel, gpsArrivee) => {
+    let courseData = { ...course };
     if (!navigator.geolocation || !gpsArrivee) {
       updateCourseMutation.mutate({
         id: course.id,
@@ -294,11 +297,15 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
         },
       });
     } else {
-      // Calcul distance et durée
       const gpsDepart = { lat: course.latitude_depart_livraison, lng: course.longitude_depart_livraison };
       const distance = gpsDepart.lat ? calculerDistance(gpsDepart.lat, gpsDepart.lng, gpsArrivee.lat, gpsArrivee.lng) : null;
       const duree = course.colis_recupere_at ? Math.round((new Date().getTime() - new Date(course.colis_recupere_at).getTime()) / 60000) : null;
-
+      courseData = {
+        ...course,
+        latitude_arrivee_livraison: gpsArrivee.lat,
+        longitude_arrivee_livraison: gpsArrivee.lng,
+        distance_km: distance,
+      };
       updateCourseMutation.mutate({
         id: course.id,
         data: {
@@ -317,7 +324,12 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
     saveLivreur(livreurProfil.id, { statut: "disponible" }).then(() =>
       queryClient.invalidateQueries({ queryKey: ["livreur-profil"] })
     );
-    toast.success(`Livraison terminée ! 🎉 ${prixReel.toLocaleString()} FCFA encaissés`);
+    // Afficher le popup prix — une seule fois par course (clé localStorage)
+    const seenKey = `prix_popup_seen_${course.id}`;
+    if (!localStorage.getItem(seenKey)) {
+      setCourseLivreePopup(courseData);
+    }
+    toast.success(`Livraison terminée ! 🎉`);
   };
 
   const handleClientAnnule = (course) => {
@@ -392,6 +404,18 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
   return (
     <div className="min-h-screen bg-gray-50">
       <PullToRefreshIndicator pulling={pulling} refreshing={refreshing} />
+
+      {/* Popup prix de course — affiché une seule fois après livraison */}
+      {courseLivreePopup && (
+        <PrixCoursePopup
+          course={courseLivreePopup}
+          onClose={() => {
+            localStorage.setItem(`prix_popup_seen_${courseLivreePopup.id}`, "1");
+            setCourseLivreePopup(null);
+          }}
+        />
+      )}
+
       {courseEnAttente && (
         <CourseEnAttenteModal
           course={courseEnAttente}
