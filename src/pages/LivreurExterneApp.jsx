@@ -195,7 +195,34 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   const handleToggleLigne = () => {
     const estHorsLigne = livreurProfil.statut === "hors_ligne";
-    statutMutation.mutate(estHorsLigne ? "disponible" : "hors_ligne");
+    const nouveauStatut = estHorsLigne ? "disponible" : "hors_ligne";
+    
+    // Si on passe en ligne, forcer une sync GPS immédiate
+    if (estHorsLigne && navigator.geolocation && gpsActif) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          saveLivreur(livreurProfil.id, {
+            statut: nouveauStatut,
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            derniere_position_date: new Date().toISOString(),
+            last_seen_at: new Date().toISOString(),
+          }).then(() => {
+            queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+            toast.success("En ligne ✓");
+          }).catch(() => {
+            statutMutation.mutate(nouveauStatut);
+          });
+        },
+        () => {
+          // GPS échoué, mais on passe quand même en ligne
+          statutMutation.mutate(nouveauStatut);
+        },
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    } else {
+      statutMutation.mutate(nouveauStatut);
+    }
   };
 
   // ─── GPS ──────────────────────────────────────────────────────────────────
