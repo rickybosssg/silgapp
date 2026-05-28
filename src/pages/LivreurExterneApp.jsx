@@ -281,14 +281,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   };
 
   const handleColisLivre = (course, gpsArrivee) => {
-    console.log("[PARENT handleColisLivre]", { course_id: course.id, statut: course.statut, prixFinal: course.prix_final, montantLivreur: course.montant_livreur });
     if (course.statut === "livree") {
-      // Cleanup du statut livreur + afficher le récapitulatif au niveau parent
-      console.log("[PARENT] Course livrée - affichage récapitulatif", course);
+      // Cleanup du statut livreur
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
       statutMutation.mutate("disponible");
-      setRecapLivraison(course);
       return;
     }
 
@@ -394,16 +391,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   return (
     <div className="min-h-screen bg-gray-50">
 
-      {/* Récapitulatif livraison — persiste au niveau parent */}
-      {(() => {
-        console.log("[PARENT RENDER] recapLivraison:", recapLivraison ? { id: recapLivraison.id, statut: recapLivraison.statut, prix: recapLivraison.prix_final } : null);
-        return recapLivraison && (
-          <LivraisonRecapitulatif
-            course={recapLivraison}
-            onClose={() => setRecapLivraison(null)}
-          />
-        );
-      })()}
+      {/* Récapitulatif livraison — géré maintenant dans CourseActiveCard */}
 
       <div className="max-w-lg mx-auto p-4 pb-12">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
@@ -453,9 +441,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                     onColisLivre={handleColisLivre}
                     isPending={updateCourseMutation.isPending}
                     isExterne={true}
-                    onShowRecapitulatif={(courseData) => {
-                      setRecapLivraison(courseData);
-                    }}
                   />
                 ))}
               </div>

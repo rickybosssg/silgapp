@@ -208,21 +208,30 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       commission_silga: commissionSilga,
     };
 
-    // Afficher le récapitulatif IMMÉDIATEMENT au niveau parent
-    if (onShowRecapitulatif) {
-      onShowRecapitulatif(merged);
-    }
+    // Afficher le récapitulatif ICI (composant reste monté)
+    setCourseLivreeData(merged);
+    setShowRecapitulatif(true);
     // Mettre à jour le statut du livreur après
     onColisLivre(merged, null);
   };
 
   const handleFermerCourse = () => {
-    // Le parent gère la fermeture du récapitulatif
+    setShowRecapitulatif(false);
+    setCourseLivreeData(null);
   };
 
   return (
     <>
-      {/* Récapitulatif post-livraison — géré par le parent maintenant */}
+      {/* Récapitulatif post-livraison */}
+      {showRecapitulatif && courseLivreeData && (
+        <LivraisonRecapitulatif
+          course={courseLivreeData}
+          onClose={() => {
+            setShowRecapitulatif(false);
+            setCourseLivreeData(null);
+          }}
+        />
+      )}
 
       {/* Modal scan QR (externe) */}
       {showQRScanner && (
