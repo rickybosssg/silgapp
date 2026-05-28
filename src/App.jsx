@@ -2,7 +2,8 @@ import { Suspense, lazy, useState } from 'react';
 import SplashScreen from './components/SplashScreen';
 import { Toaster } from '@/components/ui/toaster';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import { queryClientInstance } from '@/lib/query-client';
 import PageNotFound from './lib/PageNotFound';
 import AuthGate from './components/auth/AuthGate.jsx';
@@ -42,6 +43,32 @@ const TestRecapitulatifPaiement = lazy(() => import('./pages/TestRecapitulatifPa
 const LoadingScreen = () => <SplashScreen />;
 
 const InscriptionLivreur = () => null;
+
+const pageVariants = {
+  initial: { opacity: 0, x: 24 },
+  animate: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: -24 },
+};
+const pageTransition = { duration: 0.22, ease: "easeInOut" };
+
+function AnimatedRoutes({ children }) {
+  const location = useLocation();
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={location.pathname}
+        variants={pageVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        transition={pageTransition}
+        style={{ width: "100%", minHeight: "100%" }}
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
+  );
+}
 
 function App() {
   const [livreurProfil, setLivreurProfil] = useState(null);
@@ -142,28 +169,27 @@ function App() {
           <Route element={<AppLayout reseau={reseau} />}>
             {reseau === "interne" ? (
               <>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/nouvelle-course" element={<NouvelleCourse />} />
-                <Route path="/carte" element={<CarteLivreurs />} />
-                <Route path="/courses" element={<ToutesCourses />} />
-                <Route path="/livreurs" element={<Livreurs />} />
-                <Route path="/rapport" element={<RapportJour />} />
-                <Route path="/recapitulatif" element={<RecapitulatifAdmin />} />
-                {/* Routes admin externe accessibles depuis interne */}
-                <Route path="/admin/externe" element={<DashboardAdminExterne />} />
-                <Route path="/admin/externe/dus-livreurs" element={<DusLivreursExternes />} />
+                <Route path="/" element={<AnimatedRoutes><Dashboard /></AnimatedRoutes>} />
+                <Route path="/nouvelle-course" element={<AnimatedRoutes><NouvelleCourse /></AnimatedRoutes>} />
+                <Route path="/carte" element={<AnimatedRoutes><CarteLivreurs /></AnimatedRoutes>} />
+                <Route path="/courses" element={<AnimatedRoutes><ToutesCourses /></AnimatedRoutes>} />
+                <Route path="/livreurs" element={<AnimatedRoutes><Livreurs /></AnimatedRoutes>} />
+                <Route path="/rapport" element={<AnimatedRoutes><RapportJour /></AnimatedRoutes>} />
+                <Route path="/recapitulatif" element={<AnimatedRoutes><RecapitulatifAdmin /></AnimatedRoutes>} />
+                <Route path="/admin/externe" element={<AnimatedRoutes><DashboardAdminExterne /></AnimatedRoutes>} />
+                <Route path="/admin/externe/dus-livreurs" element={<AnimatedRoutes><DusLivreursExternes /></AnimatedRoutes>} />
               </>
             ) : (
               <>
-                <Route path="/" element={<DashboardExterne />} />
-                <Route path="/carte" element={<CarteLivreursExterne />} />
-                <Route path="/courses" element={<ToutesCoursesExternes />} />
-                <Route path="/livreurs" element={<LivreursExternes />} />
-                <Route path="/rapport" element={<RapportJourExterne />} />
-                <Route path="/recapitulatif" element={<RecapitulatifAdmin reseau="externe" />} />
+                <Route path="/" element={<AnimatedRoutes><DashboardExterne /></AnimatedRoutes>} />
+                <Route path="/carte" element={<AnimatedRoutes><CarteLivreursExterne /></AnimatedRoutes>} />
+                <Route path="/courses" element={<AnimatedRoutes><ToutesCoursesExternes /></AnimatedRoutes>} />
+                <Route path="/livreurs" element={<AnimatedRoutes><LivreursExternes /></AnimatedRoutes>} />
+                <Route path="/rapport" element={<AnimatedRoutes><RapportJourExterne /></AnimatedRoutes>} />
+                <Route path="/recapitulatif" element={<AnimatedRoutes><RecapitulatifAdmin reseau="externe" /></AnimatedRoutes>} />
               </>
             )}
-            <Route path="/notifications" element={<Notifications />} />
+            <Route path="/notifications" element={<AnimatedRoutes><Notifications /></AnimatedRoutes>} />
           </Route>
           <Route path="*" element={<PageNotFound />} />
         </Routes>

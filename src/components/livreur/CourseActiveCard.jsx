@@ -62,9 +62,12 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const [showQRScanner, setShowQRScanner] = useState(null); // "pickup" | "delivery" | null
   const [showRecapitulatif, setShowRecapitulatif] = useState(false);
   const [courseLivreeData, setCourseLivreeData] = useState(null);
+  // Optimistic status — overrides course.statut immediately on tap
+  const [optimisticStatut, setOptimisticStatut] = useState(null);
 
-  const colisRecupere = course.statut === "colis_recupere" || course.statut === "en_livraison";
-  const colisLivre = course.statut === "livree";
+  const effectiveStatut = optimisticStatut || course.statut;
+  const colisRecupere = effectiveStatut === "colis_recupere" || effectiveStatut === "en_livraison";
+  const colisLivre = effectiveStatut === "livree";
 
   // Nettoyer le GPS watch quand le composant se démonte
   useEffect(() => {
@@ -105,6 +108,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   // Handler succès scan QR pickup (externe)
   const handleQRPickupSuccess = (courseData) => {
     setShowQRScanner(null);
+    setOptimisticStatut("colis_recupere");
     navigator.geolocation?.getCurrentPosition(
       (pos) => onColisRecupere({ ...course, _gps: { lat: pos.coords.latitude, lng: pos.coords.longitude } }),
       () => onColisRecupere(course),
@@ -116,6 +120,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   // Handler succès scan QR delivery (externe) — livraison confirmée par le backend
   const handleQRDeliverySuccess = (courseData) => {
     setShowQRScanner(null);
+    setOptimisticStatut("livree");
 
     // Fusionner les données backend avec la course locale — priorité aux données backend
     let prixFinal = courseData?.prix_final ?? course.prix_final ?? 0;
@@ -278,7 +283,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
         <div className="p-5 space-y-4">
           {/* Barre de progression */}
-          <ProgressBar statut={course.statut} />
+          <ProgressBar statut={effectiveStatut} />
 
           {/* Client */}
           <div className="flex items-center justify-between bg-gray-50 rounded-2xl p-3">
@@ -435,7 +440,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   /* ── INTERNE : bouton classique ── */
                   <button
                     className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                    onClick={() => onColisRecupere(course)}
+                    onClick={() => { setOptimisticStatut("colis_recupere"); onColisRecupere(course); }}
                     disabled={isPending}
                   >
                     <Package className="w-6 h-6" />
@@ -460,23 +465,23 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                     onClick={() => {
                       if (!navigator.geolocation) {
-                        // Pas de GPS → confirmation directe avec récapitulatif
+                        setOptimisticStatut("livree");
                         onColisLivre(course, null);
                         setCourseLivreeData(course);
                         setShowRecapitulatif(true);
                         return;
                       }
                       navigator.geolocation.getCurrentPosition(
-                        (pos) => {
-                          const gpsArrivee = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                          setGpsArrivee(gpsArrivee);
-                          // Confirmer livraison avec GPS → récapitulatif
-                          onColisLivre(course, gpsArrivee);
+                      (pos) => {
+                        const gpsArrivee = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                        setGpsArrivee(gpsArrivee);
+                        setOptimisticStatut("livree");
+                        onColisLivre(course, gpsArrivee);
                           setCourseLivreeData({ ...course, latitude_livraison: pos.coords.latitude, longitude_livraison: pos.coords.longitude });
                           setShowRecapitulatif(true);
                         },
                         () => {
-                          // GPS échec → confirmation quand même avec récapitulatif
+                          setOptimisticStatut("livree");
                           onColisLivre(course, null);
                           setCourseLivreeData(course);
                           setShowRecapitulatif(true);

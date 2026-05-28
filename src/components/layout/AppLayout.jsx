@@ -26,7 +26,7 @@ export default function AppLayout() {
       {/* Mobile layout */}
       <div className="lg:hidden">
         <MobileNav notificationCount={notifications.length} />
-        <main className="pt-14 pb-16 min-h-screen">
+        <main className="pt-14 pb-16 min-h-screen safe-area-top safe-area-bottom">
           <Outlet />
         </main>
       </div>

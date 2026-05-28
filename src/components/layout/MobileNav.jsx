@@ -44,7 +44,7 @@ export default function MobileNav({ notificationCount = 0 }) {
   return (
     <>
       {/* ===== MOBILE HEADER ===== */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-card border-b border-border z-40 flex items-center justify-between px-4 shadow-sm">
+      <header className="lg:hidden fixed top-0 left-0 right-0 bg-card border-b border-border z-40 flex items-center justify-between px-4 shadow-sm safe-area-top" style={{ minHeight: '3.5rem' }}>
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-sm">
             <span className="text-primary-foreground font-black text-sm">S</span>
