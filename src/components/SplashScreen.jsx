@@ -1,13 +1,15 @@
+import React, { useMemo } from 'react';
+
 export default function SplashScreen() {
-  // Variables initialisées DANS le composant (pas au niveau module)
-  const stars = Array.from({ length: 18 }, (_, i) => ({
+  // CRITICAL FIX: Use useMemo to ensure stars are generated AFTER React initialization
+  const stars = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
     id: i,
     left: Math.random() * 100,
     delay: Math.random() * 3,
     duration: 2.5 + Math.random() * 2,
     size: 8 + Math.random() * 10,
     opacity: 0.6 + Math.random() * 0.4,
-  }));
+  })), []);
 
   return (
     <div
