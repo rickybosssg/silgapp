@@ -29,6 +29,7 @@ const RapportJourExterne = lazy(() => import('./pages/RapportJourExterne'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 const RecapitulatifAdmin = lazy(() => import('./pages/RecapitulatifAdmin'));
 const LivreurApp = lazy(() => import('./pages/LivreurApp.jsx'));
+const LivreurExterneApp = lazy(() => import('./pages/LivreurExterneApp.jsx'));
 
 const ClientExterneApp = lazy(() => import('./pages/ClientExterneApp.jsx'));
 const CourseExterneForm = lazy(() => import('./pages/CourseExterneForm.jsx'));
@@ -128,9 +129,8 @@ function AppContent() {
 
   // Si un profil livreur a été détecté, afficher directement l'app appropriée
   if (livreurProfil) {
-    // Livreur externe ?
+    // Livreur externe → utiliser le lazy import défini en haut du fichier
     if (livreurProfil.type_livreur === "externe") {
-      const LivreurExterneApp = livreurProfil.component || LivreurApp;
       return (
         <Suspense fallback={<LoadingScreen />}>
           <LivreurExterneApp livreurProfil={livreurProfil} />
