@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { 
   MapPin, Navigation, Phone, MessageCircle, User, Package, 
   Clock, HelpCircle, ChevronRight, TrendingUp, 
@@ -68,6 +69,13 @@ export default function ClientExterneApp() {
   const [gpsActif, setGpsActif] = useState(false);
   const clientProfilRef = useRef(null);
   useEffect(() => { clientProfilRef.current = clientProfil; }, [clientProfil]);
+
+  // Heartbeat automatique — sync toutes les 30s + événements lifecycle
+  useHeartbeat({
+    user_type: "client",
+    position: position,
+    enabled: onboardingDone && gpsActif,
+  });
 
   useEffect(() => {
     loadProfil();

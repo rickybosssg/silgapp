@@ -1,0 +1,27 @@
+{
+  "name": "SystemConfig",
+  "type": "object",
+  "properties": {
+    "cle": {
+      "type": "string",
+      "description": "Cl\u00e9 de configuration (ex: GPS_OBLIGATOIRE, SYNC_INTERVAL)"
+    },
+    "valeur": {
+      "type": "string",
+      "description": "Valeur de la configuration (JSON ou string)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description de la config"
+    },
+    "actif": {
+      "type": "boolean",
+      "default": true,
+      "description": "Configuration active ou non"
+    }
+  },
+  "required": [
+    "cle",
+    "valeur"
+  ]
+}

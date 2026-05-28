@@ -3,16 +3,18 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
     
-    if (!user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    // Payload d'automation entity : { event: { entity_id, ... }, data: { ... }, old_data: { ... } }
+    const payload = await req.json();
+    const courseId = payload.event?.entity_id || payload.course_id || payload.data?.id;
+    
+    if (!courseId) {
+      console.error('[notifyClientSync] ❌ course_id manquant dans payload:', payload);
+      return Response.json({ error: "course_id manquant" }, { status: 400 });
     }
 
-    const { course_id } = await req.json();
-
     // Récupérer la course
-    const course = await base44.entities.CourseExterne.get(course_id);
+    const course = await base44.entities.CourseExterne.get(courseId);
     if (!course) {
       return Response.json({ error: "Course non trouvée" }, { status: 404 });
     }

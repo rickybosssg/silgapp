@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Truck } from "lucide-react";
 import { toast } from "sonner";
+import { useHeartbeat } from "@/hooks/useHeartbeat";
 
 import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
 import LivreurHeader from "@/components/livreur/LivreurHeader";
@@ -37,6 +38,13 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [onboardingTermine, setOnboardingTermine] = useState(false);
   const [showMesInfos, setShowMesInfos] = useState(false);
   const [showRecapitulatif, setShowRecapitulatif] = useState(null);
+
+  // Heartbeat automatique — sync toutes les 30s + événements lifecycle
+  const { syncHeartbeat } = useHeartbeat({
+    user_type: "livreur",
+    position: livreurProfil?.latitude && livreurProfil?.longitude ? { latitude: livreurProfil.latitude, longitude: livreurProfil.longitude } : null,
+    enabled: onboardingTermine && gpsActif && livreurProfil?.statut !== "hors_ligne",
+  });
 
 
   // ─── Profil livreur — CORRECTION CRITIQUE : 2s + GPS temps réel ──────────

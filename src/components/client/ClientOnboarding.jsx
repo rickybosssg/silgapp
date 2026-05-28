@@ -159,6 +159,16 @@ function EtapeProfil({ clientProfil, onSuccess }) {
       // Marquer en localStorage aussi
       try { localStorage.setItem("client_profil_complet", "true"); } catch (_) {}
       toast.success("Profil complété !");
+
+      // Initialisation automatique système
+      base44.functions.invoke('initClientAuto', {
+        device_id: navigator.userAgent.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 50),
+        platform: "web",
+        notification_token: null,
+        latitude: gpsData?.latitude,
+        longitude: gpsData?.longitude,
+      }).catch(() => null);
+
       onSuccess(updated || { ...(clientProfil || {}), ...profileData });
     } catch {
       toast.error("Erreur lors de la sauvegarde – réessayez");

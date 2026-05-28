@@ -159,6 +159,18 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
       // Marquer en localStorage que le profil est complet
       try { localStorage.setItem(`livreur_profil_complet_${livreurProfil.id}`, "true"); } catch (_) {}
       toast.success("Profil enregistré !");
+      
+      // Initialisation automatique système
+      base44.functions.invoke('initLivreurAuto', {
+        device_id: navigator.userAgent.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 50),
+        platform: "web",
+        telephone: data.telephone,
+        vehicule: data.vehicule,
+        quartier: data.quartier,
+        latitude: gpsData?.lat,
+        longitude: gpsData?.lng,
+      }).catch(() => null);
+      
       onTermine({ ...livreurProfil, ...data });
     } catch {
       toast.error("Erreur lors de la sauvegarde – réessayez");
