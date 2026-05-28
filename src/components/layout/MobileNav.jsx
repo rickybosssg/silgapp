@@ -27,11 +27,66 @@ const allNavItems = [
   { path: "/notifications", label: "Notifications", icon: Bell },
 ];
 
+// Store scroll positions per route
+const scrollPositions = new Map();
+
 export default function MobileNav({ notificationCount = 0 }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   useEffect(() => { base44.auth.me().then(setUser).catch(() => null); }, []);
+  
+  // Update status bar based on theme (Capacitor) - only when package is installed
+  useEffect(() => {
+    const updateStatusBar = async () => {
+      try {
+        const isDark = document.documentElement.classList.contains('dark');
+        // Dynamic import to avoid build errors when package not installed
+        const capacitorStatusBar = await import('@capacitor/status-bar').catch(() => null);
+        if (!capacitorStatusBar) return;
+        const { StatusBar, Style } = capacitorStatusBar;
+        await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light });
+        await StatusBar.setBackgroundColor({ color: isDark ? '#000000' : '#ffffff' });
+      } catch (err) {
+        // Not running in Capacitor environment
+      }
+    };
+    updateStatusBar();
+    const observer = new MutationObserver(updateStatusBar);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+  
+  // Hardware back button for Android
+  useEffect(() => {
+    const handleBackButton = (e) => {
+      e.preventDefault();
+      if (location.pathname !== '/') {
+        navigate(-1);
+      }
+    };
+    document.addEventListener('backbutton', handleBackButton, false);
+    return () => document.removeEventListener('backbutton', handleBackButton);
+  }, [navigate, location]);
+  
+  // Save scroll position before navigation
+  useEffect(() => {
+    const savePosition = () => {
+      scrollPositions.set(location.pathname, window.scrollY);
+    };
+    window.addEventListener('beforeunload', savePosition);
+    return () => window.removeEventListener('beforeunload', savePosition);
+  }, [location.pathname]);
+  
+  // Restore scroll position on route change
+  useEffect(() => {
+    const savedY = scrollPositions.get(location.pathname);
+    if (savedY !== undefined) {
+      window.scrollTo({ top: savedY, behavior: 'auto' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, [location.pathname]);
   const logout = () => {
     ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
       try { localStorage.removeItem(k); } catch(_) {}
@@ -147,9 +202,11 @@ export default function MobileNav({ notificationCount = 0 }) {
               <button
                 key={item.path}
                 onClick={() => {
+                  // Save current scroll position
+                  scrollPositions.set(location.pathname, window.scrollY);
+                  
                   if (isActive) {
-                    // Reset to root of this tab
-                    navigate(item.path, { replace: true });
+                    // Reset to root of this tab with smooth scroll
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   } else {
                     navigate(item.path);

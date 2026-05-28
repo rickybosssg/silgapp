@@ -1,8 +1,8 @@
-import { Suspense, lazy, useState } from 'react';
+import { Suspense, lazy, useState, useEffect } from 'react';
 import SplashScreen from './components/SplashScreen';
 import { Toaster } from '@/components/ui/toaster';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { queryClientInstance } from '@/lib/query-client';
 import PageNotFound from './lib/PageNotFound';
@@ -203,12 +203,54 @@ function App() {
 
 
 
+// Hook to apply system theme preference
+function useSystemTheme() {
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const applyTheme = (e) => {
+      if (e.matches) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    };
+    applyTheme(mediaQuery);
+    mediaQuery.addEventListener('change', applyTheme);
+    return () => mediaQuery.removeEventListener('change', applyTheme);
+  }, []);
+}
+
+// Hook for Android hardware back button
+function useHardwareBackButton() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  useEffect(() => {
+    const handleBackButton = (e) => {
+      e.preventDefault();
+      if (location.pathname !== '/') {
+        navigate(-1);
+      }
+    };
+    
+    document.addEventListener('backbutton', handleBackButton, false);
+    return () => document.removeEventListener('backbutton', handleBackButton);
+  }, [navigate, location]);
+}
+
 function AppWithProviders() {
   return (
     <QueryClientProvider client={queryClientInstance}>
+      <MobileEnhancements />
       <App />
     </QueryClientProvider>
   );
+}
+
+function MobileEnhancements() {
+  useSystemTheme();
+  useHardwareBackButton();
+  return null;
 }
 
 export default AppWithProviders;
