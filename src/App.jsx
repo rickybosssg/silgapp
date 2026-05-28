@@ -112,19 +112,16 @@ function AppContent() {
   
   if (isTestRoute) {
     return (
-      <Router>
-        <Suspense fallback={<LoadingScreen />}>
-          <Routes>
-            <Route path="/test-terrain" element={<TestTerrainComplet />} />
-            <Route path="/test-diagnostics" element={<TestDiagnosticsComplet />} />
-            <Route path="/test-bout-en-bout" element={<TestBoutEnBout />} />
-            <Route path="/test-recapitulatif" element={<TestRecapitulatifPaiement />} />
-            <Route path="/maintenance" element={<Maintenance />} />
-            <Route path="*" element={<PageNotFound />} />
-          </Routes>
-        </Suspense>
-        <Toaster />
-      </Router>
+      <Suspense fallback={<LoadingScreen />}>
+        <Routes>
+          <Route path="/test-terrain" element={<TestTerrainComplet />} />
+          <Route path="/test-diagnostics" element={<TestDiagnosticsComplet />} />
+          <Route path="/test-bout-en-bout" element={<TestBoutEnBout />} />
+          <Route path="/test-recapitulatif" element={<TestRecapitulatifPaiement />} />
+          <Route path="/maintenance" element={<Maintenance />} />
+          <Route path="*" element={<PageNotFound />} />
+        </Routes>
+      </Suspense>
     );
   }
 
@@ -150,83 +147,74 @@ function AppContent() {
   // Client → afficher directement le dashboard client
   if (isClient) {
     return (
-      <Router>
-        <Suspense fallback={<LoadingScreen />}>
-          <Routes>
-            <Route path="/" element={<ClientExterneApp />} />
-            <Route path="/client/course/expedier" element={<CourseExterneFormSync />} />
-            <Route path="/client/course/recevoir" element={<CourseExterneFormSync />} />
-            <Route path="/client/suivi" element={<ClientSuiviCourse />} />
-            <Route path="/suivi-public/:token" element={<PublicSuiviCourse />} />
-            <Route path="/telecharger-app" element={<TelechargerApp />} />
-            <Route path="*" element={<ClientExterneApp />} />
-          </Routes>
-        </Suspense>
-        <Toaster />
-      </Router>
+      <Suspense fallback={<LoadingScreen />}>
+        <Routes>
+          <Route path="/" element={<ClientExterneApp />} />
+          <Route path="/client/course/expedier" element={<CourseExterneFormSync />} />
+          <Route path="/client/course/recevoir" element={<CourseExterneFormSync />} />
+          <Route path="/client/suivi" element={<ClientSuiviCourse />} />
+          <Route path="/suivi-public/:token" element={<PublicSuiviCourse />} />
+          <Route path="/telecharger-app" element={<TelechargerApp />} />
+          <Route path="*" element={<ClientExterneApp />} />
+        </Routes>
+      </Suspense>
     );
   }
 
   // Admin → afficher SelectionReseau ou le dashboard selon le réseau sélectionné
   if (!reseau) {
     return (
-      <Router>
-        <Suspense fallback={<LoadingScreen />}>
-          <Routes>
-            <Route
-              path="*"
-              element={
-                <AuthGate 
-                  onLivreur={setLivreurProfil}
-                  onClient={() => setIsClient(true)}
-                >
-                  <SelectionReseau onSelect={setReseau} />
-                </AuthGate>
-              }
-            />
-          </Routes>
-        </Suspense>
-        <Toaster />
-      </Router>
+      <Suspense fallback={<LoadingScreen />}>
+        <Routes>
+          <Route
+            path="*"
+            element={
+              <AuthGate 
+                onLivreur={setLivreurProfil}
+                onClient={() => setIsClient(true)}
+              >
+                <SelectionReseau onSelect={setReseau} />
+              </AuthGate>
+            }
+          />
+        </Routes>
+      </Suspense>
     );
   }
 
   // Réseau sélectionné → afficher le dashboard approprié + routes admin communes
   return (
-    <Router>
-      <Suspense fallback={<LoadingScreen />}>
-        <Routes>
-          <Route path="/inscription-livreur" element={<InscriptionLivreur />} />
-          <Route element={<AppLayout reseau={reseau} />}>
-            {reseau === "interne" ? (
-              <>
-                <Route path="/" element={<AnimatedRoutes><Dashboard /></AnimatedRoutes>} />
-                <Route path="/nouvelle-course" element={<AnimatedRoutes><NouvelleCourse /></AnimatedRoutes>} />
-                <Route path="/carte" element={<AnimatedRoutes><CarteLivreurs /></AnimatedRoutes>} />
-                <Route path="/courses" element={<AnimatedRoutes><ToutesCourses /></AnimatedRoutes>} />
-                <Route path="/livreurs" element={<AnimatedRoutes><Livreurs /></AnimatedRoutes>} />
-                <Route path="/rapport" element={<AnimatedRoutes><RapportJour /></AnimatedRoutes>} />
-                <Route path="/recapitulatif" element={<AnimatedRoutes><RecapitulatifAdmin /></AnimatedRoutes>} />
-                <Route path="/admin/externe" element={<AnimatedRoutes><DashboardAdminExterne /></AnimatedRoutes>} />
-                <Route path="/admin/externe/dus-livreurs" element={<AnimatedRoutes><DusLivreursExternes /></AnimatedRoutes>} />
-              </>
-            ) : (
-              <>
-                <Route path="/" element={<AnimatedRoutes><DashboardExterne /></AnimatedRoutes>} />
-                <Route path="/carte" element={<AnimatedRoutes><CarteLivreursExterne /></AnimatedRoutes>} />
-                <Route path="/courses" element={<AnimatedRoutes><ToutesCoursesExternes /></AnimatedRoutes>} />
-                <Route path="/livreurs" element={<AnimatedRoutes><LivreursExternes /></AnimatedRoutes>} />
-                <Route path="/rapport" element={<AnimatedRoutes><RapportJourExterne /></AnimatedRoutes>} />
-                <Route path="/recapitulatif" element={<AnimatedRoutes><RecapitulatifAdmin reseau="externe" /></AnimatedRoutes>} />
-              </>
-            )}
-            <Route path="/notifications" element={<AnimatedRoutes><Notifications /></AnimatedRoutes>} />
-          </Route>
-          <Route path="*" element={<PageNotFound />} />
-        </Routes>
-      </Suspense>
-      <Toaster />
-    </Router>
+    <Suspense fallback={<LoadingScreen />}>
+      <Routes>
+        <Route path="/inscription-livreur" element={<InscriptionLivreur />} />
+        <Route element={<AppLayout reseau={reseau} />}>
+          {reseau === "interne" ? (
+            <>
+              <Route path="/" element={<AnimatedRoutes><Dashboard /></AnimatedRoutes>} />
+              <Route path="/nouvelle-course" element={<AnimatedRoutes><NouvelleCourse /></AnimatedRoutes>} />
+              <Route path="/carte" element={<AnimatedRoutes><CarteLivreurs /></AnimatedRoutes>} />
+              <Route path="/courses" element={<AnimatedRoutes><ToutesCourses /></AnimatedRoutes>} />
+              <Route path="/livreurs" element={<AnimatedRoutes><Livreurs /></AnimatedRoutes>} />
+              <Route path="/rapport" element={<AnimatedRoutes><RapportJour /></AnimatedRoutes>} />
+              <Route path="/recapitulatif" element={<AnimatedRoutes><RecapitulatifAdmin /></AnimatedRoutes>} />
+              <Route path="/admin/externe" element={<AnimatedRoutes><DashboardAdminExterne /></AnimatedRoutes>} />
+              <Route path="/admin/externe/dus-livreurs" element={<AnimatedRoutes><DusLivreursExternes /></AnimatedRoutes>} />
+            </>
+          ) : (
+            <>
+              <Route path="/" element={<AnimatedRoutes><DashboardExterne /></AnimatedRoutes>} />
+              <Route path="/carte" element={<AnimatedRoutes><CarteLivreursExterne /></AnimatedRoutes>} />
+              <Route path="/courses" element={<AnimatedRoutes><ToutesCoursesExternes /></AnimatedRoutes>} />
+              <Route path="/livreurs" element={<AnimatedRoutes><LivreursExternes /></AnimatedRoutes>} />
+              <Route path="/rapport" element={<AnimatedRoutes><RapportJourExterne /></AnimatedRoutes>} />
+              <Route path="/recapitulatif" element={<AnimatedRoutes><RecapitulatifAdmin reseau="externe" /></AnimatedRoutes>} />
+            </>
+          )}
+          <Route path="/notifications" element={<AnimatedRoutes><Notifications /></AnimatedRoutes>} />
+        </Route>
+        <Route path="*" element={<PageNotFound />} />
+      </Routes>
+    </Suspense>
   );
 }
 
