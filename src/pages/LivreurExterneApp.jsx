@@ -17,6 +17,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LivreurExterneOnboarding from "@/components/livreur/LivreurExterneOnboarding";
 import LivreurMesInfosModal from "@/components/livreur/LivreurMesInfosModal";
 import LivreurRecapitulatifPaiement from "@/components/livreur/LivreurRecapitulatifPaiement";
+import LivraisonRecapitulatif from "@/components/livreur/LivraisonRecapitulatif";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -38,6 +39,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [onboardingTermine, setOnboardingTermine] = useState(false);
   const [showMesInfos, setShowMesInfos] = useState(false);
   const [showRecapitulatif, setShowRecapitulatif] = useState(null);
+  const [recapLivraison, setRecapLivraison] = useState(null);
 
 
   // ─── Profil livreur ───────────────────────────────────────────────────────
@@ -280,11 +282,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   const handleColisLivre = (course, gpsArrivee) => {
     if (course.statut === "livree") {
-      // Le popup prix est géré directement dans CourseActiveCard (local, immédiat)
-      // Ici on fait juste le cleanup du statut livreur
+      // Cleanup du statut livreur + afficher le récapitulatif au niveau parent
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
       statutMutation.mutate("disponible");
+      setRecapLivraison(course);
       return;
     }
 
@@ -389,6 +391,14 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // ─── Dashboard principal ──────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50">
+
+      {/* Récapitulatif livraison — persiste au niveau parent */}
+      {recapLivraison && (
+        <LivraisonRecapitulatif
+          course={recapLivraison}
+          onClose={() => setRecapLivraison(null)}
+        />
+      )}
 
       <div className="max-w-lg mx-auto p-4 pb-12">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
