@@ -84,14 +84,15 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
     const pingActif = () => {
       const now = new Date().toISOString();
+      // Ne jamais modifier le statut ici — seulement app_active et last_seen_at
       saveLivreur(id, {
         app_active: true,
         last_seen_at: now,
-        statut: livreurProfil?.statut === "hors_ligne" ? "hors_ligne" : (livreurProfil?.statut || "disponible")
       }).catch(() => null);
     };
     const pingInactif = () =>
-      saveLivreur(id, { app_active: false, statut: "hors_ligne" }).catch(() => null);
+      // Ne jamais passer hors_ligne automatiquement — seulement marquer app_active=false
+      saveLivreur(id, { app_active: false }).catch(() => null);
 
     pingActif();
     const interval = setInterval(pingActif, 5000);
@@ -144,18 +145,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     [mesCourses]
   );
 
-  // ─── Auto-resync statut ───────────────────────────────────────────────────
-  useEffect(() => {
-    if (!livreurProfil || !livreurId || mesCourses.length === 0) return;
-    if (livreurProfil.statut === "en_course" && coursesActives.length === 0) {
-      const timer = setTimeout(() => {
-        saveLivreur(livreurId, { statut: "disponible" }).then(() => {
-          queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
-        }).catch(() => null);
-      }, 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [livreurProfil?.statut, coursesActives.length, livreurId]);
+  // Auto-resync statut supprimé — le statut ne se change QUE manuellement via le bouton
 
   // ─── Gains du jour ────────────────────────────────────────────────────────
   const livreesToday = useMemo(() => {
@@ -285,10 +275,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   const handleColisLivre = (course, gpsArrivee) => {
     if (course.statut === "livree") {
-      // Cleanup du statut livreur
+      // Juste rafraîchir les données, ne pas changer le statut
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
-      statutMutation.mutate("disponible");
       return;
     }
 
@@ -337,7 +326,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     } else {
       updateCourseMutation.mutate({ id: course.id, data: baseData });
     }
-    statutMutation.mutate("disponible");
+    // Ne pas remettre "disponible" automatiquement — le livreur doit le faire manuellement
     toast.success("Livraison terminée ! 🎉");
   };
 
