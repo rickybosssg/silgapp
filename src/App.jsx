@@ -44,6 +44,7 @@ const TestDiagnosticsComplet = lazy(() => import('./pages/TestDiagnosticsComplet
 const TestTerrainComplet = lazy(() => import('./pages/TestTerrainComplet.jsx'));
 const TestRecapitulatifPaiement = lazy(() => import('./pages/TestRecapitulatifPaiement.jsx'));
 const TestConnexion = lazy(() => import('./pages/TestConnexion.jsx'));
+const TestWhatsAppAlertes = lazy(() => import('./pages/TestWhatsAppAlertes.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -119,6 +120,7 @@ function AppContent() {
           <Route path="/test-bout-en-bout" element={<TestBoutEnBout />} />
           <Route path="/test-recapitulatif" element={<TestRecapitulatifPaiement />} />
           <Route path="/test-connexion" element={<TestConnexion />} />
+          <Route path="/test-whatsapp" element={<TestWhatsAppAlertes />} />
           <Route path="/maintenance" element={<Maintenance />} />
           <Route path="*" element={<PageNotFound />} />
         </Routes>

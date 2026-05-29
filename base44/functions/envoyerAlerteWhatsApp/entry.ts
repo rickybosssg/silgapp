@@ -26,10 +26,23 @@ function normaliserTelephone(tel) {
   return '+226' + t;
 }
 
-function estActifDansApp(entity) {
-  if (!entity.app_active || !entity.last_seen_at) return false;
+function estActifDansApp(entity, courseId, livreurId) {
+  if (!entity.app_active) {
+    console.log(`[WhatsApp] Course ${courseId} Livreur ${livreurId}: app_active=false → WhatsApp`);
+    return false;
+  }
+  if (!entity.last_seen_at) {
+    console.log(`[WhatsApp] Course ${courseId} Livreur ${livreurId}: last_seen_at=null → WhatsApp`);
+    return false;
+  }
   const ecart = Date.now() - new Date(entity.last_seen_at).getTime();
-  return ecart < SEUIL_INACTIVITE_MS;
+  const actif = ecart < SEUIL_INACTIVITE_MS;
+  if (!actif) {
+    console.log(`[WhatsApp] Course ${courseId} Livreur ${livreurId}: last_seen_at=${entity.last_seen_at} (écart=${Math.round(ecart/1000)}s) → WhatsApp`);
+  } else {
+    console.log(`[WhatsApp] Course ${courseId} Livreur ${livreurId}: app_active=true + last_seen_recent → BLOQUÉ`);
+  }
+  return actif;
 }
 
 async function envoyerWhatsApp(telephone, accountSid, authToken, fromNumber) {
@@ -91,29 +104,46 @@ Deno.serve(async (req) => {
 
     if (livreurs && livreurs.length > 0) {
       const livreur = livreurs[0];
+      const courseId = notification.course_id || 'inconnu';
+
+      console.log(`\n[WhatsApp] === DÉBUT CHECK Course ${courseId} Livreur ${livreur.id} ===`);
+      console.log(`[WhatsApp] app_active=${livreur.app_active}, last_seen_at=${livreur.last_seen_at}`);
 
       if (!livreur.telephone) {
+        console.log(`[WhatsApp] Course ${courseId} Livreur ${livreur.id}: telephone manquant → SKIP`);
         return Response.json({ skipped: true, reason: 'livreur_no_telephone' });
       }
 
-      // Logique : Si livreur n'est PAS dans l'app → WhatsApp pour lui dire d'ouvrir
-      if (estActifDansApp(livreur)) {
-        console.log(`[WhatsApp] Livreur ${livreur.id} actif dans l'app → pas de WhatsApp`);
+      // Vérifier si livreur est actif dans l'app (avec logs détaillés)
+      if (estActifDansApp(livreur, courseId, livreur.id)) {
+        console.log(`[WhatsApp] Course ${courseId} Livreur ${livreur.id}: BLOQUÉ - livreur actif dans l'app\n`);
         return Response.json({ skipped: true, reason: 'livreur_actif_dans_app' });
       }
       
-      // Livreur n'est pas dans l'app → WhatsApp envoyé
-      console.log(`[WhatsApp] Livreur ${livreur.id} hors ligne → WhatsApp envoyé`);
+      // Vérifier si WhatsApp déjà envoyé pour cette course
+      const alertesCourse = await base44.asServiceRole.entities.WhatsAppAlerte.filter({ 
+        livreur_id: livreur.id,
+        notification_id: notification.id || '',
+        statut: 'sent'
+      });
+      
+      if (alertesCourse.length > 0) {
+        console.log(`[WhatsApp] Course ${courseId} Livreur ${livreur.id}: WhatsApp DÉJÀ ENVOYÉ (notification_id=${notification.id}) → SKIP\n`);
+        return Response.json({ skipped: true, reason: 'whatsapp_deja_envoye_course' });
+      }
 
-      // Anti-doublon livreur
+      // Anti-doublon global (si livreur a déjà reçu WhatsApp + notifs non lues)
       const [alertesExistantes, notifsNonLues] = await Promise.all([
         base44.asServiceRole.entities.WhatsAppAlerte.filter({ livreur_id: livreur.id, statut: 'sent' }),
         base44.asServiceRole.entities.Notification.filter({ destinataire_email: destinataireEmail, lue: false })
       ]);
 
       if (alertesExistantes.length > 0 && notifsNonLues.length > 1) {
+        console.log(`[WhatsApp] Course ${courseId} Livreur ${livreur.id}: alerte déjà envoyée + notifs non lues → SKIP\n`);
         return Response.json({ skipped: true, reason: 'alerte_deja_envoyee_livreur' });
       }
+
+      console.log(`[WhatsApp] Course ${courseId} Livreur ${livreur.id}: WhatsApp AUTORISÉ → envoi...`);
 
       const telephone = normaliserTelephone(livreur.telephone);
       if (!telephone) return Response.json({ skipped: true, reason: 'telephone_invalide' });
@@ -133,13 +163,21 @@ Deno.serve(async (req) => {
           twilio_sid: data.sid,
           heure_envoi: new Date().toISOString()
         });
-        console.log(`[WhatsApp] Livreur ${livreur.id} → envoyé (${data.sid})`);
-        return Response.json({ success: true, type: 'livreur', twilio_sid: data.sid, to });
+        console.log(`[WhatsApp] Course ${courseId} Livreur ${livreur.id} → ENVOYÉ (${data.sid}) SID=${data.sid}\n`);
+        return Response.json({ 
+          success: true, 
+          type: 'livreur', 
+          twilio_sid: data.sid, 
+          to,
+          course_id: courseId,
+          livreur_id: livreur.id,
+          whatsapp_sent: true
+        });
       } else {
         const erreur = `[${data.code || ''}] ${data.message || ''} raw:${JSON.stringify(data)}`.slice(0, 500);
         await base44.asServiceRole.entities.WhatsAppAlerte.update(alerte.id, { statut: 'failed', erreur });
-        console.error('[WhatsApp] Twilio erreur livreur:', erreur);
-        return Response.json({ success: false, type: 'livreur', erreur });
+        console.error(`[WhatsApp] Course ${courseId} Livreur ${livreur.id} → ÉCHEC: ${erreur}\n`);
+        return Response.json({ success: false, type: 'livreur', erreur, course_id: courseId });
       }
     }
 
@@ -151,28 +189,52 @@ Deno.serve(async (req) => {
 
     if (clients && clients.length > 0) {
       const client = clients[0];
+      const courseId = notification.course_id || 'inconnu';
+
+      console.log(`\n[WhatsApp] === DÉBUT CHECK Client ${client.id} Course ${courseId} ===`);
+      console.log(`[WhatsApp] app_active=${client.app_active}, last_seen_at=${client.last_seen_at}`);
 
       if (!client.telephone) {
+        console.log(`[WhatsApp] Course ${courseId} Client ${client.id}: telephone manquant → SKIP`);
         return Response.json({ skipped: true, reason: 'client_no_telephone' });
       }
 
-      if (estActifDansApp(client)) {
-        console.log(`[WhatsApp] Client ${client.id} actif → pas de WhatsApp`);
+      // Vérifier si client est actif dans l'app
+      if (estActifDansApp(client, courseId, client.id)) {
+        console.log(`[WhatsApp] Course ${courseId} Client ${client.id}: BLOQUÉ - client actif dans l'app\n`);
         return Response.json({ skipped: true, reason: 'client_actif_dans_app' });
       }
 
-      const telephone = normaliserTelephone(client.telephone);
-      if (!telephone) return Response.json({ skipped: true, reason: 'telephone_invalide_client' });
+      // Vérifier si WhatsApp déjà envoyé pour cette course
+      const alertesCourse = await base44.asServiceRole.entities.WhatsAppAlerte.filter({ 
+        livreur_telephone: normaliserTelephone(client.telephone),
+        notification_id: notification.id || '',
+        statut: 'sent'
+      });
+      
+      if (alertesCourse.length > 0) {
+        console.log(`[WhatsApp] Course ${courseId} Client ${client.id}: WhatsApp DÉJÀ ENVOYÉ → SKIP\n`);
+        return Response.json({ skipped: true, reason: 'whatsapp_deja_envoye_client' });
+      }
 
-      // Anti-doublon client
+      const telephone = normaliserTelephone(client.telephone);
+      if (!telephone) {
+        console.log(`[WhatsApp] Course ${courseId} Client ${client.id}: téléphone invalide → SKIP\n`);
+        return Response.json({ skipped: true, reason: 'telephone_invalide_client' });
+      }
+
+      // Anti-doublon global
       const [alertesExistantes, notifsNonLues] = await Promise.all([
         base44.asServiceRole.entities.WhatsAppAlerte.filter({ livreur_telephone: telephone, statut: 'sent' }),
         base44.asServiceRole.entities.Notification.filter({ destinataire_email: destinataireEmail, lue: false })
       ]);
 
       if (alertesExistantes.length > 0 && notifsNonLues.length > 1) {
+        console.log(`[WhatsApp] Course ${courseId} Client ${client.id}: alerte déjà envoyée → SKIP\n`);
         return Response.json({ skipped: true, reason: 'alerte_deja_envoyee_client' });
       }
+
+      console.log(`[WhatsApp] Course ${courseId} Client ${client.id}: WhatsApp AUTORISÉ → envoi...`);
 
       const alerte = await base44.asServiceRole.entities.WhatsAppAlerte.create({
         livreur_id: client.id,
@@ -189,13 +251,21 @@ Deno.serve(async (req) => {
           twilio_sid: data.sid,
           heure_envoi: new Date().toISOString()
         });
-        console.log(`[WhatsApp] Client ${client.id} → envoyé (${data.sid})`);
-        return Response.json({ success: true, type: 'client', twilio_sid: data.sid, to });
+        console.log(`[WhatsApp] Course ${courseId} Client ${client.id} → ENVOYÉ (${data.sid}) SID=${data.sid}\n`);
+        return Response.json({ 
+          success: true, 
+          type: 'client', 
+          twilio_sid: data.sid, 
+          to,
+          course_id: courseId,
+          client_id: client.id,
+          whatsapp_sent: true
+        });
       } else {
         const erreur = `[${data.code || ''}] ${data.message || ''} raw:${JSON.stringify(data)}`.slice(0, 500);
         await base44.asServiceRole.entities.WhatsAppAlerte.update(alerte.id, { statut: 'failed', erreur });
-        console.error('[WhatsApp] Twilio erreur client:', erreur);
-        return Response.json({ success: false, type: 'client', erreur });
+        console.error(`[WhatsApp] Course ${courseId} Client ${client.id} → ÉCHEC: ${erreur}\n`);
+        return Response.json({ success: false, type: 'client', erreur, course_id: courseId });
       }
     }
 
