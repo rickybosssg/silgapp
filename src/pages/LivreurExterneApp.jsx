@@ -295,6 +295,12 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       const commissionSilga = Math.round(prixFinal * 0.3);
       const montantLivreur = prixFinal - commissionSilga;
 
+      // Logs de contrôle GPS
+      console.log('[PRIX_CALCUL] Départ GPS récupération:', course.latitude_recuperation, course.longitude_recuperation);
+      console.log('[PRIX_CALCUL] Arrivée GPS livraison:', gpsArrivee.lat, gpsArrivee.lng);
+      console.log('[PRIX_CALCUL] Distance totale calculée:', distanceVal.toFixed(3), 'km');
+      console.log('[PRIX_CALCUL] Prix final:', prixFinal, 'FCFA | Gain livreur (70%):', montantLivreur, 'FCFA | Commission Silga (30%):', commissionSilga, 'FCFA');
+
       updateCourseMutation.mutate({
         id: course.id,
         data: {

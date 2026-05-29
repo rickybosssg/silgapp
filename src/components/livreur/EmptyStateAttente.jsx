@@ -15,7 +15,8 @@ export default function EmptyStateAttente() {
         <div className="space-y-1.5">
           <p className="text-xl font-bold text-gray-800">En veille active</p>
           <p className="text-sm text-gray-500 leading-relaxed">
-            Rayon : 3 → 5 → 8km<br />
+            Recherche dans un rayon de <strong>3 km</strong><br />
+            <span className="text-xs">Extension automatique à 5 km puis 8 km si aucun livreur trouvé</span><br />
             Alertes sonores + vibrations 🚀
           </p>
         </div>

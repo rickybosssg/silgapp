@@ -7,7 +7,7 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
     c.statut === "livree" && new Date(c.heure_livraison || c.updated_date).toDateString() === today
   );
   const coursesAujourdHui = mesCourses.filter(c =>
-    new Date(c.created_date || c.updated_date).toDateString() === today
+    new Date(c.created_date).toDateString() === today
   ).length;
 
   // Calculs financiers du jour — priorité aux champs sauvegardés, fallback calcul local
@@ -46,7 +46,9 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
             <div className="w-7 h-7 rounded-xl bg-amber-50 flex items-center justify-center mx-auto mb-1">
               <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
             </div>
-            <p className="text-sm font-bold text-orange-700 leading-tight">{(montantDüSilga / 1000).toFixed(1)}k</p>
+            <p className="text-sm font-bold text-orange-700 leading-tight">
+              {montantDüSilga > 0 ? `${montantDüSilga.toLocaleString()} FCFA` : "0 FCFA"}
+            </p>
             <p className="text-[10px] text-gray-400 font-medium">Dû Silga</p>
           </div>
         </div>
@@ -55,15 +57,15 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
             <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-2">Aujourd'hui</p>
             <div className="grid grid-cols-3 gap-2 text-center">
               <div>
-                <p className="text-sm font-bold text-gray-900">{prixTotalToday.toLocaleString()}</p>
+                <p className="text-sm font-bold text-gray-900">{prixTotalToday.toLocaleString()} FCFA</p>
                 <p className="text-[10px] text-gray-400">Prix total</p>
               </div>
               <div>
-                <p className="text-sm font-bold text-green-700">{gainToday.toLocaleString()}</p>
+                <p className="text-sm font-bold text-green-700">{gainToday.toLocaleString()} FCFA</p>
                 <p className="text-[10px] text-gray-400">Votre gain (70%)</p>
               </div>
               <div>
-                <p className="text-sm font-bold text-orange-600">{commissionToday.toLocaleString()}</p>
+                <p className="text-sm font-bold text-orange-600">{commissionToday.toLocaleString()} FCFA</p>
                 <p className="text-[10px] text-gray-400">Commission (30%)</p>
               </div>
             </div>
@@ -94,10 +96,10 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
         <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center mx-auto mb-1.5">
           <TrendingUp className="w-4 h-4 text-amber-500" />
         </div>
-        <p className="text-base font-bold text-gray-900 leading-tight">
-          {totalEncaisse > 0 ? `${(Number(totalEncaisse || 0) / 1000).toFixed(1)}k` : "0"}
+        <p className="text-sm font-bold text-gray-900 leading-tight">
+          {totalEncaisse > 0 ? `${totalEncaisse.toLocaleString()} FCFA` : "0 FCFA"}
         </p>
-        <p className="text-[10px] text-gray-400 font-medium">FCFA</p>
+        <p className="text-[10px] text-gray-400 font-medium">Encaissé</p>
       </div>
     </div>
   );

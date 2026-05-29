@@ -128,17 +128,27 @@ export default function LivreurHeader({
               type="button"
               onClick={onActiverGps}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all",
+                "flex flex-col items-start px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all",
                 "active:scale-95",
                 gpsActif
                   ? "bg-green-500/20 text-green-300 border-green-400/40"
                   : "bg-white/10 text-white/60 border-white/20 hover:bg-white/20"
               )}
             >
-              {gpsActif
-                ? <><MapPin className="w-3 h-3" /> GPS actif</>
-                : <><MapPinOff className="w-3 h-3" /> Activer GPS</>
-              }
+              <span className="flex items-center gap-1">
+                {gpsActif
+                  ? <><MapPin className="w-3 h-3" /> GPS actif ✓</>
+                  : <><MapPinOff className="w-3 h-3" /> Activer GPS</>
+                }
+              </span>
+              {gpsActif && livreur?.quartier && (
+                <span className="text-[9px] text-green-400/80 font-normal leading-tight mt-0.5">{livreur.quartier}</span>
+              )}
+              {gpsActif && !livreur?.quartier && livreur?.latitude && livreur?.longitude && (
+                <span className="text-[9px] text-green-400/80 font-normal leading-tight mt-0.5">
+                  {livreur.latitude.toFixed(4)}, {livreur.longitude.toFixed(4)}
+                </span>
+              )}
             </button>
           </div>
         </div>

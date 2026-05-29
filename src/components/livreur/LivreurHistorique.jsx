@@ -90,23 +90,23 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
               <div className="bg-white/70 rounded-lg p-3 border border-amber-200">
                 <div className="flex items-center gap-1 text-gray-700 font-semibold text-sm mb-1">
                   <Banknote className="w-4 h-4" />
-                  {totalEncaisseToday.toLocaleString()} F
+                  {totalEncaisseToday.toLocaleString()} FCFA
                 </div>
                 <p className="text-xs text-amber-600">Prix total courses</p>
               </div>
             </div>
             <div className="grid grid-cols-3 gap-2">
               <div className="bg-green-50 rounded-lg p-2 border border-green-200 text-center">
-                <p className="text-xs font-bold text-green-700">{gainLivreurToday.toLocaleString()} F</p>
+                <p className="text-xs font-bold text-green-700">{gainLivreurToday.toLocaleString()} FCFA</p>
                 <p className="text-[10px] text-green-600 mt-0.5">Votre gain (70%)</p>
               </div>
               <div className="bg-orange-50 rounded-lg p-2 border border-orange-200 text-center">
-                <p className="text-xs font-bold text-orange-700">{commissionToday.toLocaleString()} F</p>
+                <p className="text-xs font-bold text-orange-700">{commissionToday.toLocaleString()} FCFA</p>
                 <p className="text-[10px] text-orange-600 mt-0.5">Commission (30%)</p>
               </div>
               <div className="bg-red-50 rounded-lg p-2 border border-red-200 text-center">
-                <p className="text-xs font-bold text-red-700">{montantDuSilga.toLocaleString()} F</p>
-                <p className="text-[10px] text-red-600 mt-0.5">Dû à Silga</p>
+                <p className="text-xs font-bold text-red-700">{commissionToday.toLocaleString()} FCFA</p>
+                <p className="text-[10px] text-red-600 mt-0.5">Dû à Silga (auj.)</p>
               </div>
             </div>
           </div>
