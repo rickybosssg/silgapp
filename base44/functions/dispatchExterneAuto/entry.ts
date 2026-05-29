@@ -208,6 +208,20 @@ Deno.serve(async (req) => {
 
       if (!course_id) return Response.json({ error: 'course_id requis' }, { status: 400 });
 
+      // Vérifier si la course a un GPS valide
+      const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+      if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
+      
+      if (!course.gps_depart_lat || !course.gps_depart_lng) {
+        console.warn(`[DISPATCH] ⚠️ Course ${course_id} sans GPS — dispatch ignoré`);
+        return Response.json({ 
+          success: false, 
+          noLivreur: true, 
+          message: 'Course sans GPS — veuillez ajouter la position de départ',
+          missing_gps: true
+        });
+      }
+
       const result = await lancerDispatch(base44, course_id, []);
 
       if (result.erreur) return Response.json({ error: result.erreur }, { status: 404 });

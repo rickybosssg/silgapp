@@ -62,12 +62,21 @@ Deno.serve(async (req) => {
       statut: 'sent'
     });
 
+    let deletedCount = 0;
     for (const alerte of alertesSent) {
-      await base44.asServiceRole.entities.WhatsAppAlerte.delete(alerte.id);
+      try {
+        await base44.asServiceRole.entities.WhatsAppAlerte.delete(alerte.id);
+        deletedCount++;
+      } catch (deleteErr) {
+        // Ignorer silencieusement si l'alerte n'existe plus (déjà supprimée)
+        if (!deleteErr.message?.includes('not found')) {
+          console.warn(`[resetWhatsApp] Erreur suppression alerte ${alerte.id}:`, deleteErr.message);
+        }
+      }
     }
 
-    console.log(`[resetWhatsApp] ${alertesSent.length} alerte(s) supprimées pour ${destinataireEmail}`);
-    return Response.json({ success: true, alertes_supprimees: alertesSent.length });
+    console.log(`[resetWhatsApp] ${deletedCount} alerte(s) supprimée(s) pour ${destinataireEmail}`);
+    return Response.json({ success: true, alertes_supprimees: deletedCount });
 
   } catch (error) {
     console.error('[resetWhatsApp] Erreur:', error.message);

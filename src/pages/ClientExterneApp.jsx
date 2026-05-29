@@ -134,9 +134,9 @@ export default function ClientExterneApp() {
     } catch (_) { return ""; }
   };
 
-  // Sync immédiate au chargement du profil
+  // Sync immédiate au chargement du profil — UNIQUEMENT si pas déjà fait par onboarding
   useEffect(() => {
-    if (!clientProfil?.id || !onboardingDone) return;
+    if (!clientProfil?.id || !onboardingDone || position?.latitude) return;
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const posData = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
@@ -242,26 +242,25 @@ export default function ClientExterneApp() {
       if (!pos?.latitude || !pos?.longitude || !profil?.id) return;
       const user = await base44.auth.me();
       
+      // Normaliser le téléphone UNE FOIS
+      const phoneNorm = profil.telephone ? profil.telephone.replace(/\D/g, "") : null;
+      const local = phoneNorm && phoneNorm.startsWith("226") ? phoneNorm.slice(3) : phoneNorm;
+      
       // Trouver les courses où ce client est destinataire (PAR ID OU PAR TÉLÉPHONE)
       const coursesById = await base44.entities.CourseExterne.filter({
         destinataire_client_id: profil.id,
         statut: ["nouvelle", "recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison"]
       });
       
-      // Fallback : chercher par téléphone si destinataire_client_id manquant
+      // Fallback : chercher par téléphone normalisé UNIQUEMENT
       let coursesByPhone = [];
-      if (profil.telephone) {
-        const phoneNorm = profil.telephone.replace(/\D/g, "");
-        const local = phoneNorm.startsWith("226") ? phoneNorm.slice(3) : phoneNorm;
-        // Essais successifs
-        for (const fmt of [profil.telephone, phoneNorm, local]) {
-          const res = await base44.entities.CourseExterne.filter({
-            destinataire_telephone: fmt,
-            statut: ["nouvelle", "recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison"]
-          });
-          if (res?.length > 0) {
-            coursesByPhone = [...coursesByPhone, ...res];
-          }
+      if (local) {
+        const res = await base44.entities.CourseExterne.filter({
+          destinataire_telephone: local,
+          statut: ["nouvelle", "recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison"]
+        });
+        if (res?.length > 0) {
+          coursesByPhone = res;
         }
       }
       

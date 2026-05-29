@@ -72,41 +72,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   }, [livreurId, livreurEmail]);
 
   // ─── Heartbeat app_active ─────────────────────────────────────────────────
-  useEffect(() => {
-    if (!initialProfil?.id) return;
-    const id = initialProfil.id;
-
-    const pingActif = () => {
-      const now = new Date().toISOString();
-      // Ne jamais modifier le statut ici — seulement app_active et last_seen_at
-      saveLivreur(id, {
-        app_active: true,
-        last_seen_at: now,
-      }).catch(() => null);
-    };
-    const pingInactif = () =>
-      // Ne jamais passer hors_ligne automatiquement — seulement marquer app_active=false
-      saveLivreur(id, { app_active: false }).catch(() => null);
-
-    pingActif();
-    const interval = setInterval(pingActif, 5000);
-    const handleVisibility = () => {
-      if (document.visibilityState === 'hidden') {
-        pingInactif();
-      } else {
-        pingActif();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('beforeunload', pingInactif);
-
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('beforeunload', pingInactif);
-      pingInactif();
-    };
-  }, [initialProfil?.id, livreurProfil?.statut]);
+  // Géré par useHeartbeat hook + heartbeatAuto backend — supprimé pour éviter doublon
 
   // ─── Mes courses ──────────────────────────────────────────────────────────
   const { data: mesCourses = [] } = useQuery({
