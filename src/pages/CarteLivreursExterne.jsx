@@ -205,35 +205,21 @@ export default function CarteLivreursExterne() {
               const zone = getZone(livreur);
               const lastGPS = getLastGPS(livreur);
               return (
-                <div key={livreur.id} className={`flex items-start justify-between p-3 border rounded-lg ${enLigne ? "border-green-200 bg-green-50/30" : "border-gray-200"}`}>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <div key={livreur.id} className={`flex items-center justify-between p-3 border rounded-lg ${enLigne ? "border-green-200 bg-green-50/30" : "border-gray-200"}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-sm">{livreur.prenom} {livreur.nom}</p>
                       <DispoStatutBadge statut={livreur.statut} />
                     </div>
-                    <div className="flex items-center gap-1 mb-1">
-                      <MapPin className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                      <p className="text-xs text-muted-foreground">
-                        {enLigne ? "En ligne — " : "Disponible dans sa zone — "}
-                        {zone}
-                      </p>
-                    </div>
-                    {lastGPS && (
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                        <p className="text-xs text-muted-foreground">Dernier GPS : {lastGPS}</p>
-                      </div>
-                    )}
-                    <div className="mt-1.5">
+                    <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{zone}</span>
+                      {lastGPS && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />Dernier GPS : {lastGPS}</span>}
                       <PresenceBadge livreur={livreur} />
                     </div>
                   </div>
-                  <div className="flex flex-col items-end gap-1 ml-3 flex-shrink-0">
-                    <a href={`tel:${livreur.telephone}`} className="text-sm text-primary hover:underline">
-                      {livreur.telephone}
-                    </a>
-                    <span className="text-xs text-muted-foreground">{livreur.vehicule || "moto"}</span>
-                  </div>
+                  <a href={`tel:${livreur.telephone}`} className="text-sm text-primary hover:underline ml-3 flex-shrink-0">
+                    {livreur.telephone}
+                  </a>
                 </div>
               );
             })}
@@ -259,26 +245,18 @@ export default function CarteLivreursExterne() {
               const zone = getZone(client);
               const lastGPS = getLastGPS(client);
               return (
-                <div key={client.id} className={`flex items-start justify-between p-3 border rounded-lg ${enLigne ? "border-green-200 bg-green-50/30" : "border-gray-200"}`}>
-                  <div className="flex-1">
-                    <p className="font-semibold text-sm mb-1">{client.prenom} {client.nom}</p>
-                    <div className="flex items-center gap-1 mb-1">
-                      <MapPin className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                      <p className="text-xs text-muted-foreground">{zone}</p>
+                <div key={client.id} className={`flex items-center justify-between p-3 border rounded-lg ${enLigne ? "border-green-200 bg-green-50/30" : "border-gray-200"}`}>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm">{client.prenom} {client.nom}</p>
+                    <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{zone}</span>
+                      {lastGPS && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />Dernier GPS : {lastGPS}</span>}
+                      <PresenceBadge livreur={client} />
                     </div>
-                    {lastGPS && (
-                      <div className="flex items-center gap-1 mb-1.5">
-                        <Clock className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                        <p className="text-xs text-muted-foreground">Dernier GPS : {lastGPS}</p>
-                      </div>
-                    )}
-                    <PresenceBadge livreur={client} />
                   </div>
-                  <div className="ml-3 flex-shrink-0">
-                    <a href={`tel:${client.telephone}`} className="text-sm text-primary hover:underline">
-                      {client.telephone}
-                    </a>
-                  </div>
+                  <a href={`tel:${client.telephone}`} className="text-sm text-primary hover:underline ml-3 flex-shrink-0">
+                    {client.telephone}
+                  </a>
                 </div>
               );
             })}
