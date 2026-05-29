@@ -19,6 +19,7 @@ import LivreurMesInfosModal from "@/components/livreur/LivreurMesInfosModal";
 import LivreurRecapitulatifPaiement from "@/components/livreur/LivreurRecapitulatifPaiement";
 import LivraisonRecapitulatif from "@/components/livreur/LivraisonRecapitulatif";
 import PrixCoursePopup from "@/components/livreur/PrixCoursePopup";
+import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -419,7 +420,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         />
       )}
 
-      {/* Récapitulatif livraison — géré maintenant dans CourseActiveCard */}
+      <VenusFloatingButton />
 
       <div className="max-w-lg mx-auto p-4 pb-12">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
