@@ -109,7 +109,8 @@ async function proposerAuLivreur(base44, courseId, course, livreur) {
     // Notification push (en plus)
     try {
       await base44.functions.invoke('envoiNotificationPush', {
-        email: livreur.user_email,
+        destinataire_email: livreur.user_email,
+        livreur_id: livreur.id,
         titre: '🚨 Nouvelle course disponible !',
         message: `Course à ${distanceSafe.toFixed(1)}km — ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`,
         type: 'nouvelle_course',

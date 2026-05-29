@@ -39,7 +39,7 @@ function resolveNotificationIdentity(livreurId = null, currentUser = null) {
     : `livreur-${resolvedLivreurId || "unknown"}@silgapp2.local`;
 
   return {
-    user_email: (currentUser?.email || currentUser?.livreur?.user_email || fallbackEmail).trim().toLowerCase(),
+    user_email: (currentUser?.email || currentUser?.user_email || currentUser?.livreur?.user_email || fallbackEmail).trim().toLowerCase(),
     user_type: userType,
     livreur_id: resolvedLivreurId,
   };
