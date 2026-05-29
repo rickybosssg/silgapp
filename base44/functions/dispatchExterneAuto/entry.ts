@@ -90,8 +90,23 @@ async function proposerAuLivreur(base44, courseId, course, livreur) {
     timeout_expires_at: new Date(Date.now() + 60000).toISOString(),
   });
 
-  // Notification push au livreur
+  // Créer une Notification en base → déclenche l'automation WhatsApp
   if (livreur.user_email) {
+    try {
+      await base44.asServiceRole.entities.Notification.create({
+        titre: '🚨 Nouvelle course disponible !',
+        message: `Course à ${distanceSafe.toFixed(1)}km — ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`,
+        type: 'nouvelle_course',
+        course_id: courseId,
+        destinataire_email: livreur.user_email,
+        lue: false,
+      });
+      console.log(`[DISPATCH] 🔔 Notification créée pour ${livreur.user_email} → déclenchement WhatsApp si hors app`);
+    } catch (err) {
+      console.error('[DISPATCH] ❌ Erreur création notification:', err.message);
+    }
+
+    // Notification push (en plus)
     try {
       await base44.functions.invoke('envoiNotificationPush', {
         email: livreur.user_email,
