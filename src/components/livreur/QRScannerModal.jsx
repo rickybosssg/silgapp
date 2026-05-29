@@ -120,23 +120,40 @@ export default function QRScannerModal({ course, type, onSuccess, onClose }) {
     if (verifying) return;
     setVerifying(true);
     try {
-      // Capturer GPS avant validation (critique pour calcul distance)
+      // ── GPS OBLIGATOIRE avant toute validation ────────────────────────────
       let latitude = null;
       let longitude = null;
-      if (type === "delivery" || type === "pickup") {
-        try {
-          await new Promise((resolve) => {
-            navigator.geolocation?.getCurrentPosition(
-              (pos) => {
-                latitude = pos.coords.latitude;
-                longitude = pos.coords.longitude;
-                resolve();
-              },
-              () => resolve(), // continuer même sans GPS
-              { enableHighAccuracy: true, timeout: 6000 }
-            );
-          });
-        } catch (_) {}
+
+      if (!navigator.geolocation) {
+        toast.error("GPS non disponible sur cet appareil — impossible de valider");
+        setVerifying(false);
+        return;
+      }
+
+      try {
+        await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              latitude = pos.coords.latitude;
+              longitude = pos.coords.longitude;
+              resolve();
+            },
+            (err) => reject(err),
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+          );
+        });
+      } catch (_) {
+        // GPS refusé ou timeout — bloquer la validation
+        toast.error("📍 GPS requis pour valider cette étape — activez la localisation et réessayez");
+        setVerifying(false);
+        return;
+      }
+
+      // Vérification finale : coordonnées valides
+      if (!latitude || !longitude || isNaN(latitude) || isNaN(longitude)) {
+        toast.error("📍 GPS requis pour valider cette étape — position non détectée");
+        setVerifying(false);
+        return;
       }
 
       const res = await base44.functions.invoke("validateQRCode", {

@@ -64,6 +64,13 @@ Deno.serve(async (req) => {
         return Response.json({ success: false, error: 'Ce code a déjà été utilisé' });
       }
 
+      // ── GPS OBLIGATOIRE — bloquer si coordonnées absentes ou invalides ──
+      const latOk = latitude && !isNaN(Number(latitude)) && Number(latitude) !== 0;
+      const lngOk = longitude && !isNaN(Number(longitude)) && Number(longitude) !== 0;
+      if (!latOk || !lngOk) {
+        return Response.json({ success: false, error: 'GPS requis pour valider cette étape — coordonnées manquantes' });
+      }
+
       // Vérifier la valeur
       const isValid = method === 'qr' ? value === expectedQR : value === expectedPIN;
       if (!isValid) {
@@ -123,16 +130,11 @@ Deno.serve(async (req) => {
         updateData.latitude_arrivee_livraison = latitude;
         updateData.longitude_arrivee_livraison = longitude;
       } else {
-        // Fallback anti-bug : GPS manquant (récupération ou livraison non capturé)
-        // Prix minimum 1 km = 100 F pour éviter une course à 0 F
-        const distFallback = 1.0;
-        const prixFinal = 100;
-        const commission = Math.round(prixFinal * 0.3);
-        const montantLivreur = prixFinal - commission;
-        updateData.distance_reelle_km = distFallback;
-        updateData.prix_final = prixFinal;
-        updateData.commission_silga = commission;
-        updateData.montant_livreur = montantLivreur;
+        // GPS récupération manquant → bloquer la livraison
+        return Response.json({
+          success: false,
+          error: 'GPS de récupération manquant — impossible de calculer la distance réelle. Contactez l\'admin.'
+        });
       }
 
       await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
