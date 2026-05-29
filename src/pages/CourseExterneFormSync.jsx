@@ -28,6 +28,9 @@ export default function CourseExterneFormSync() {
   const typeCourse = location.pathname.includes("expedier") ? "expedier" : "recevoir";
   const position = location.state?.position || JSON.parse(localStorage.getItem("client_gps_position") || "null");
   const clientProfil = location.state?.clientProfil;
+  // Coords sauvegardées en DB — utilisées comme fallback si getCurrentPosition timeout
+  const savedLat = clientProfil?.latitude || position?.latitude || null;
+  const savedLng = clientProfil?.longitude || position?.longitude || null;
 
   // Restaurer l'étape depuis localStorage si disponible
   const savedStep = parseInt(localStorage.getItem(STEP_KEY) || "0", 10);
@@ -118,53 +121,59 @@ export default function CourseExterneFormSync() {
   const gpsHandlers = {
     // Récupération GPS — pour l'expéditeur (expedier) OU l'endroit où récupérer (recevoir)
     onGetGPSDepart: () => {
+      const applyDepart = async (lat, lng) => {
+        const adresse = await reverseGeocode(lat, lng);
+        setFormData((prev) => ({
+          ...prev,
+          gps_depart_lat: lat,
+          gps_depart_lng: lng,
+          recuperationGPS: true,
+          adresse_depart: adresse || "Position GPS",
+        }));
+        toast.success("📍 Position GPS récupérée avec succès !");
+      };
+
       if (!navigator.geolocation) {
+        if (savedLat && savedLng) { applyDepart(savedLat, savedLng); return; }
         toast.error("GPS non disponible sur cet appareil");
         return;
       }
       navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          const adresse = await reverseGeocode(lat, lng);
-          setFormData((prev) => ({
-            ...prev,
-            gps_depart_lat: lat,
-            gps_depart_lng: lng,
-            recuperationGPS: true,
-            adresse_depart: adresse || "Position GPS",
-          }));
-          toast.success("📍 Position GPS récupérée avec succès !");
-        },
+        (pos) => applyDepart(pos.coords.latitude, pos.coords.longitude),
         (err) => {
-          if (err.code === 1) {
-            toast.error("Permission GPS refusée. Autorisez la localisation dans les paramètres.");
-          } else if (err.code === 2) {
-            toast.error("Position GPS indisponible. Vérifiez votre GPS.");
-          } else {
-            toast.error("Délai dépassé. Réessayez en extérieur.");
-          }
+          // Fallback sur la dernière position connue sauvegardée en DB
+          if (savedLat && savedLng) { applyDepart(savedLat, savedLng); return; }
+          if (err.code === 1) toast.error("Permission GPS refusée. Autorisez la localisation dans les paramètres.");
+          else if (err.code === 2) toast.error("Position GPS indisponible. Vérifiez votre GPS.");
+          else toast.error("Délai dépassé. Réessayez en extérieur.");
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
       );
     },
     // Livraison GPS — pour "recevoir" : position actuelle du client destinataire
     onGetGPSArrivee: () => {
-      if (!navigator.geolocation) { toast.error("GPS non disponible"); return; }
+      const applyArrivee = async (lat, lng) => {
+        const adresse = await reverseGeocode(lat, lng);
+        setFormData((prev) => ({
+          ...prev,
+          gps_arrivee_lat: lat,
+          gps_arrivee_lng: lng,
+          livraisonGPS: true,
+          adresse_arrivee: prev.adresse_arrivee || adresse,
+        }));
+      };
+
+      if (!navigator.geolocation) {
+        if (savedLat && savedLng) { applyArrivee(savedLat, savedLng); return; }
+        toast.error("GPS non disponible"); return;
+      }
       navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          const adresse = await reverseGeocode(lat, lng);
-          setFormData((prev) => ({
-            ...prev,
-            gps_arrivee_lat: lat,
-            gps_arrivee_lng: lng,
-            livraisonGPS: true,
-            adresse_arrivee: prev.adresse_arrivee || adresse,
-          }));
+        (pos) => applyArrivee(pos.coords.latitude, pos.coords.longitude),
+        () => {
+          if (savedLat && savedLng) { applyArrivee(savedLat, savedLng); return; }
+          toast.error("Impossible d'obtenir la position GPS");
         },
-        () => toast.error("Impossible d'obtenir la position GPS")
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
       );
     },
   };
