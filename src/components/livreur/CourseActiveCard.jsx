@@ -121,7 +121,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
   const effectiveStatut = optimisticStatut || course.statut;
   const colisRecupere = effectiveStatut === "colis_recupere" || effectiveStatut === "en_livraison";
-  const colisLivre = effectiveStatut === "livree";
+  // IMPORTANT: Ne pas utiliser optimisticStatut pour colisLivre — seulement le statut réel de la course
+  // Cela évite que la carte ne change de rendu AVANT que le récap ne s'affiche
+  const colisLivre = course.statut === "livree" && !showRecapitulatif;
 
   // Nettoyer le GPS watch quand le composant se démonte
   useEffect(() => {
@@ -209,20 +211,24 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       commission_silga: commissionSilga,
     };
 
-    // Afficher le récapitulatif IMMÉDIATEMENT (avant toute mise à jour)
+    // Étape 1: Afficher le récapitulatif IMMÉDIATEMENT avec les données fusionnées
     setCourseLivreeData(merged);
     setShowRecapitulatif(true);
     
-    // Mettre à jour le statut du livreur APRÈS (délai pour laisser le récap s'afficher)
+    // Étape 2: Mettre optimisticStatut pour que la barre de progression montre "Livré"
+    setOptimisticStatut("livree");
+    
+    // Étape 3: Mettre à jour le backend et le statut livreur APRÈS (délai pour laisser le récap s'afficher)
     setTimeout(() => {
       onColisLivre(merged, null);
-    }, 100);
+    }, 150);
   };
 
   const handleFermerCourse = () => {
     setShowRecapitulatif(false);
-    // Nettoyer optimisticStatut pour que la carte retourne à l'état normal
+    // Nettoyer optimisticStatut ET courseLivreeData pour que la carte retourne à l'état normal
     setOptimisticStatut(null);
+    setCourseLivreeData(null);
     setShowPrixPopupAfterRecap(true);
   };
 
@@ -533,27 +539,30 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   <button
                     className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                     onClick={() => {
-                      if (!navigator.geolocation) {
-                        setOptimisticStatut("livree");
-                        onColisLivre(course, null);
-                        setCourseLivreeData(course);
+                      const prepareRecap = (gpsData = null) => {
+                        const recapData = gpsData 
+                          ? { ...course, latitude_livraison: gpsData.lat, longitude_livraison: gpsData.lng }
+                          : course;
+                        // Afficher le récap IMMÉDIATEMENT
+                        setCourseLivreeData(recapData);
                         setShowRecapitulatif(true);
+                        setOptimisticStatut("livree");
+                        // Mettre à jour le backend APRÈS délai
+                        setTimeout(() => {
+                          onColisLivre(course, gpsData);
+                        }, 150);
+                      };
+
+                      if (!navigator.geolocation) {
+                        prepareRecap(null);
                         return;
                       }
                       navigator.geolocation.getCurrentPosition(
-                      (pos) => {
-                        const gpsArrivee = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                        setGpsArrivee(gpsArrivee);
-                        setOptimisticStatut("livree");
-                        onColisLivre(course, gpsArrivee);
-                          setCourseLivreeData({ ...course, latitude_livraison: pos.coords.latitude, longitude_livraison: pos.coords.longitude });
-                          setShowRecapitulatif(true);
+                        (pos) => {
+                          prepareRecap({ lat: pos.coords.latitude, lng: pos.coords.longitude });
                         },
                         () => {
-                          setOptimisticStatut("livree");
-                          onColisLivre(course, null);
-                          setCourseLivreeData(course);
-                          setShowRecapitulatif(true);
+                          prepareRecap(null);
                         },
                         { enableHighAccuracy: true, timeout: 10000 }
                       );
