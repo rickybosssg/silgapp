@@ -116,7 +116,9 @@ export default function CarteLivreursExterne() {
     return livreurs;
   }, [livreurs, livreursConnectes, livreursDisponibles, filtrePresence]);
 
-  const clientsEnLigne = clients.filter(c => c.actif !== false && c.latitude && c.longitude);
+  // Clients : tous ceux avec GPS connu (même ancienne position)
+  const clientsAvecGPS = clients.filter(c => c.actif !== false && c.latitude && c.longitude);
+  const clientsEnLigne = clientsAvecGPS; // alias pour compatibilité carte
 
   const centerPosition = livreursAvecGPS[0]?.latitude
     ? { latitude: livreursAvecGPS[0].latitude, longitude: livreursAvecGPS[0].longitude }
@@ -237,34 +239,50 @@ export default function CarteLivreursExterne() {
         )}
       </Card>
 
-      {/* Clients avec GPS */}
-      {clientsEnLigne.length > 0 && (
-        <Card className="p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <MapPin className="w-5 h-5 text-red-500" />
-            <h2 className="font-semibold">Clients avec GPS Actif ({clientsEnLigne.length})</h2>
+      {/* Clients */}
+      <Card className="p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <MapPin className="w-5 h-5 text-red-500" />
+          <h2 className="font-semibold">Clients ({clientsAvecGPS.length})</h2>
+        </div>
+        {clientsAvecGPS.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <MapPin className="w-12 h-12 mx-auto mb-2 opacity-50" />
+            <p>Aucun client avec position GPS</p>
           </div>
-          <div className="space-y-2">
-            {clientsEnLigne.map(client => (
-              <div key={client.id} className="flex items-center justify-between p-3 border rounded-lg">
-                <div>
-                  <p className="font-semibold text-sm">{client.prenom} {client.nom}</p>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <MapPin className="w-3 h-3" />
-                    {client.quartier || "Position GPS active"}
-                  </p>
+        ) : (
+          <div className="space-y-3">
+            {clientsAvecGPS.map(client => {
+              const enLigne = isPresenceApp(client);
+              const zone = client.quartier || "Zone inconnue";
+              const lastGPS = getLastGPS(client);
+              return (
+                <div key={client.id} className={`flex items-start justify-between p-3 border rounded-lg ${enLigne ? "border-green-200 bg-green-50/30" : "border-gray-200"}`}>
+                  <div className="flex-1">
+                    <p className="font-semibold text-sm mb-1">{client.prenom} {client.nom}</p>
+                    <div className="flex items-center gap-1 mb-1">
+                      <MapPin className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                      <p className="text-xs text-muted-foreground">{zone}</p>
+                    </div>
+                    {lastGPS && (
+                      <div className="flex items-center gap-1 mb-1.5">
+                        <Clock className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                        <p className="text-xs text-muted-foreground">Dernier GPS : {lastGPS}</p>
+                      </div>
+                    )}
+                    <PresenceBadge livreur={client} />
+                  </div>
+                  <div className="ml-3 flex-shrink-0">
+                    <a href={`tel:${client.telephone}`} className="text-sm text-primary hover:underline">
+                      {client.telephone}
+                    </a>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-red-500" />
-                  <a href={`tel:${client.telephone}`} className="text-sm text-primary hover:underline">
-                    {client.telephone}
-                  </a>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
-        </Card>
-      )}
+        )}
+      </Card>
 
       {/* Modale carte interactive */}
       {showMap && (
