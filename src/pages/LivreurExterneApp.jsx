@@ -261,15 +261,19 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   };
 
   const handleColisLivre = (course, gpsArrivee) => {
+    // Cas QR externe : la course est déjà "livree" en DB (validée par le backend validateQRCode)
+    // On fait juste les invalidations + statut livreur, le récap est géré dans CourseActiveCard
     if (course.statut === "livree") {
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
       if (livreurProfil?.statut !== "hors_ligne") {
         statutMutation.mutate("disponible");
       }
+      toast.success("Livraison terminée ! 🎉");
       return;
     }
 
+    // Cas interne (bouton manuel) : calcul prix via GPS
     const baseData = { statut: "livree", heure_livraison: new Date().toISOString() };
 
     if (gpsArrivee && course.latitude_recuperation && course.longitude_recuperation) {
@@ -281,12 +285,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       const prixFinal = Math.round(distanceVal * 100);
       const commissionSilga = Math.round(prixFinal * 0.3);
       const montantLivreur = prixFinal - commissionSilga;
-
-      // Logs de contrôle GPS
-      console.log('[PRIX_CALCUL] Départ GPS récupération:', course.latitude_recuperation, course.longitude_recuperation);
-      console.log('[PRIX_CALCUL] Arrivée GPS livraison:', gpsArrivee.lat, gpsArrivee.lng);
-      console.log('[PRIX_CALCUL] Distance totale calculée:', distanceVal.toFixed(3), 'km');
-      console.log('[PRIX_CALCUL] Prix final:', prixFinal, 'FCFA | Gain livreur (70%):', montantLivreur, 'FCFA | Commission Silga (30%):', commissionSilga, 'FCFA');
 
       updateCourseMutation.mutate({
         id: course.id,
@@ -303,25 +301,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       saveLivreur(livreurProfil.id, {
         montant_du_silga: (livreurProfil.montant_du_silga || 0) + commissionSilga
       });
-      
-      // Afficher le popup prix après livraison
-      const courseData = {
-        ...course,
-        latitude_livraison: gpsArrivee.lat,
-        longitude_livraison: gpsArrivee.lng,
-        distance_reelle_km: distanceVal,
-        prix_final: prixFinal,
-        commission_silga: commissionSilga,
-        montant_livreur: montantLivreur,
-      };
-      const seenKey = `prix_popup_seen_${course.id}`;
-      if (!localStorage.getItem(seenKey)) {
-        setCourseLivreePopup(courseData);
-      }
     } else {
       updateCourseMutation.mutate({ id: course.id, data: baseData });
     }
-    // Repasser automatiquement en disponible après livraison (sauf si hors_ligne volontairement)
+
     if (livreurProfil?.statut !== "hors_ligne") {
       statutMutation.mutate("disponible");
     }
