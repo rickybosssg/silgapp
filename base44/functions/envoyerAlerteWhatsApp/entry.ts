@@ -122,10 +122,23 @@ Deno.serve(async (req) => {
         return Response.json({ skipped: true, reason: 'alerte_deja_envoyee_livreur' });
       }
 
-      console.log(`[WhatsApp] Course ${courseId} Livreur ${livreur.id}: WhatsApp AUTORISÉ → envoi...`);
-
       const telephone = normaliserTelephone(livreur.telephone);
-      if (!telephone) return Response.json({ skipped: true, reason: 'telephone_invalide' });
+      if (!telephone) {
+        console.log(`[WhatsApp] Course ${courseId} Livreur ${livreur.id}: téléphone invalide "${livreur.telephone}" → SKIP\n`);
+        return Response.json({ skipped: true, reason: 'telephone_invalide' });
+      }
+
+      // 🔍 LOG COMPLET AVANT ENVOI
+      console.log(`\n[WhatsApp] 🚀 TENTATIVE ENVOI LIVREUR`);
+      console.log(`   Course: ${courseId}`);
+      console.log(`   Livreur: ${livreur.nom} (${livreur.id})`);
+      console.log(`   Email: ${destinataireEmail}`);
+      console.log(`   Téléphone BRUT: "${livreur.telephone}"`);
+      console.log(`   Téléphone NORMALISÉ: "${telephone}"`);
+      console.log(`   To: "whatsapp:${telephone}"`);
+      console.log(`   From: "${fromNumber}"`);
+      console.log(`   Type: "nouvelle_course"`);
+      console.log(`   Notification ID: ${notification.id || 'N/A'}\n`);
 
       const alerte = await base44.asServiceRole.entities.WhatsAppAlerte.create({
         livreur_id: livreur.id,
@@ -142,7 +155,7 @@ Deno.serve(async (req) => {
           twilio_sid: data.sid,
           heure_envoi: new Date().toISOString()
         });
-        console.log(`[WhatsApp] Course ${courseId} Livreur ${livreur.id} → ENVOYÉ (${data.sid}) SID=${data.sid}\n`);
+        console.log(`[WhatsApp] ✅ SUCCÈS LIVREUR: SID=${data.sid}, To=${to}\n`);
         return Response.json({ 
           success: true, 
           type: 'livreur', 
@@ -155,7 +168,7 @@ Deno.serve(async (req) => {
       } else {
         const erreur = `[${data.code || ''}] ${data.message || ''} raw:${JSON.stringify(data)}`.slice(0, 500);
         await base44.asServiceRole.entities.WhatsAppAlerte.update(alerte.id, { statut: 'failed', erreur });
-        console.error(`[WhatsApp] Course ${courseId} Livreur ${livreur.id} → ÉCHEC: ${erreur}\n`);
+        console.error(`[WhatsApp] ❌ ÉCHEC LIVREUR: Code=${data.code}, Message=${data.message}, To=${to}, From=${fromNumber}\n`);
         return Response.json({ success: false, type: 'livreur', erreur, course_id: courseId });
       }
     }
@@ -194,15 +207,9 @@ Deno.serve(async (req) => {
         return Response.json({ skipped: true, reason: 'whatsapp_deja_envoye_client' });
       }
 
-      const telephone = normaliserTelephone(client.telephone);
-      if (!telephone) {
-        console.log(`[WhatsApp] Course ${courseId} Client ${client.id}: téléphone invalide → SKIP\n`);
-        return Response.json({ skipped: true, reason: 'telephone_invalide_client' });
-      }
-
       // Anti-doublon global
       const [alertesExistantes, notifsNonLues] = await Promise.all([
-        base44.asServiceRole.entities.WhatsAppAlerte.filter({ livreur_telephone: telephone, statut: 'sent' }),
+        base44.asServiceRole.entities.WhatsAppAlerte.filter({ livreur_telephone: normaliserTelephone(client.telephone), statut: 'sent' }),
         base44.asServiceRole.entities.Notification.filter({ destinataire_email: destinataireEmail, lue: false })
       ]);
 
@@ -211,7 +218,23 @@ Deno.serve(async (req) => {
         return Response.json({ skipped: true, reason: 'alerte_deja_envoyee_client' });
       }
 
-      console.log(`[WhatsApp] Course ${courseId} Client ${client.id}: WhatsApp AUTORISÉ → envoi...`);
+      const telephone = normaliserTelephone(client.telephone);
+      if (!telephone) {
+        console.log(`[WhatsApp] Course ${courseId} Client ${client.id}: téléphone invalide "${client.telephone}" → SKIP\n`);
+        return Response.json({ skipped: true, reason: 'telephone_invalide_client' });
+      }
+
+      // 🔍 LOG COMPLET AVANT ENVOI
+      console.log(`\n[WhatsApp] 🚀 TENTATIVE ENVOI CLIENT`);
+      console.log(`   Course: ${courseId}`);
+      console.log(`   Client: ${client.nom} (${client.id})`);
+      console.log(`   Email: ${destinataireEmail}`);
+      console.log(`   Téléphone BRUT: "${client.telephone}"`);
+      console.log(`   Téléphone NORMALISÉ: "${telephone}"`);
+      console.log(`   To: "whatsapp:${telephone}"`);
+      console.log(`   From: "${fromNumber}"`);
+      console.log(`   Type: "nouvelle_course"`);
+      console.log(`   Notification ID: ${notification.id || 'N/A'}\n`);
 
       const alerte = await base44.asServiceRole.entities.WhatsAppAlerte.create({
         livreur_id: client.id,
@@ -228,7 +251,7 @@ Deno.serve(async (req) => {
           twilio_sid: data.sid,
           heure_envoi: new Date().toISOString()
         });
-        console.log(`[WhatsApp] Course ${courseId} Client ${client.id} → ENVOYÉ (${data.sid}) SID=${data.sid}\n`);
+        console.log(`[WhatsApp] ✅ SUCCÈS CLIENT: SID=${data.sid}, To=${to}\n`);
         return Response.json({ 
           success: true, 
           type: 'client', 
@@ -241,7 +264,7 @@ Deno.serve(async (req) => {
       } else {
         const erreur = `[${data.code || ''}] ${data.message || ''} raw:${JSON.stringify(data)}`.slice(0, 500);
         await base44.asServiceRole.entities.WhatsAppAlerte.update(alerte.id, { statut: 'failed', erreur });
-        console.error(`[WhatsApp] Course ${courseId} Client ${client.id} → ÉCHEC: ${erreur}\n`);
+        console.error(`[WhatsApp] ❌ ÉCHEC CLIENT: Code=${data.code}, Message=${data.message}, To=${to}, From=${fromNumber}\n`);
         return Response.json({ success: false, type: 'client', erreur, course_id: courseId });
       }
     }
