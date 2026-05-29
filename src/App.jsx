@@ -46,6 +46,7 @@ const TestTerrainComplet = lazy(() => import('./pages/TestTerrainComplet.jsx'));
 const TestRecapitulatifPaiement = lazy(() => import('./pages/TestRecapitulatifPaiement.jsx'));
 const TestConnexion = lazy(() => import('./pages/TestConnexion.jsx'));
 const TestWhatsAppAlertes = lazy(() => import('./pages/TestWhatsAppAlertes.jsx'));
+const TwilioSandboxMonitor = lazy(() => import('./pages/TwilioSandboxMonitor.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -205,6 +206,7 @@ function AppContent() {
               <Route path="/recapitulatif" element={<AnimatedRoutes><RecapitulatifAdmin /></AnimatedRoutes>} />
               <Route path="/admin/externe" element={<AnimatedRoutes><DashboardAdminExterne /></AnimatedRoutes>} />
               <Route path="/admin/externe/dus-livreurs" element={<AnimatedRoutes><DusLivreursExternes /></AnimatedRoutes>} />
+              <Route path="/admin/externe/twilio-sandbox" element={<AnimatedRoutes><TwilioSandboxMonitor /></AnimatedRoutes>} />
             </>
           ) : (
             <>

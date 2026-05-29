@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, Package, DollarSign, TrendingUp, ArrowLeft, Truck, AlertCircle, AlertTriangle, Eye, MapPin, CreditCard, Download, Save, ExternalLink, Bug, Search, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Users, Package, DollarSign, TrendingUp, ArrowLeft, Truck, AlertCircle, AlertTriangle, Eye, MapPin, CreditCard, Download, Save, ExternalLink, Bug, Search, CheckCircle2, XCircle, Loader2, MessageCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
@@ -190,6 +190,20 @@ export default function DashboardAdminExterne() {
                 <div>
                   <p className="font-semibold text-foreground">Dus livreurs</p>
                   <p className="text-xs text-muted-foreground">Récapitulatif commissions 30%</p>
+                </div>
+              </div>
+            </Card>
+          </Link>
+
+          <Link to="/admin/externe/twilio-sandbox" className="flex-1">
+            <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer border-blue-200 bg-blue-50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <MessageCircle className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground">Twilio WhatsApp</p>
+                  <p className="text-xs text-muted-foreground">Status sandbox & stats</p>
                 </div>
               </div>
             </Card>
