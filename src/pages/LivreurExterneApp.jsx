@@ -456,6 +456,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                     onColisLivre={handleColisLivre}
                     isPending={updateCourseMutation.isPending}
                     isExterne={true}
+                    livreurLat={livreurProfil?.latitude}
+                    livreurLng={livreurProfil?.longitude}
                   />
                 ))}
               </div>

@@ -103,7 +103,7 @@ function ProgressBar({ statut }) {
   );
 }
 
-export default function CourseActiveCard({ course, onColisRecupere, onColisLivre, onClientAnnule, isPending, isExterne = false, onShowRecapitulatif }) {
+export default function CourseActiveCard({ course, onColisRecupere, onColisLivre, onClientAnnule, isPending, isExterne = false, onShowRecapitulatif, livreurLat, livreurLng }) {
   const [prixReel, setPrixReel] = useState("");
   const [showPrixModal, setShowPrixModal] = useState(false);
   const [remarque, setRemarque] = useState("");
@@ -243,6 +243,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           type={showQRScanner}
           onSuccess={showQRScanner === "pickup" ? handleQRPickupSuccess : handleQRDeliverySuccess}
           onClose={() => setShowQRScanner(null)}
+          livreurLat={livreurLat}
+          livreurLng={livreurLng}
         />
       )}
 
@@ -521,27 +523,30 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   <button
                     className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                     onClick={() => {
+                      const confirmerAvecGPS = (gpsData) => {
+                        if (!gpsData?.lat || !gpsData?.lng || isNaN(gpsData.lat) || isNaN(gpsData.lng)) {
+                          toast.error("📍 GPS requis pour valider cette étape — activez la localisation et réessayez");
+                          return;
+                        }
+                        const recapData = { ...course, latitude_livraison: gpsData.lat, longitude_livraison: gpsData.lng };
+                        setCourseLivreeData(recapData);
+                        setShowRecapitulatif(true);
+                        setOptimisticStatut("livree");
+                        setTimeout(() => onColisLivre(course, gpsData), 150);
+                      };
+
                       if (!navigator.geolocation) {
-                        toast.error("GPS non disponible — impossible de confirmer la livraison");
+                        // Utiliser la dernière position sauvegardée du livreur
+                        confirmerAvecGPS(livreurLat && livreurLng ? { lat: livreurLat, lng: livreurLng } : null);
                         return;
                       }
                       navigator.geolocation.getCurrentPosition(
-                        (pos) => {
-                          const gpsData = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                          if (!gpsData.lat || !gpsData.lng || isNaN(gpsData.lat) || isNaN(gpsData.lng)) {
-                            toast.error("📍 GPS requis pour valider cette étape — position non détectée");
-                            return;
-                          }
-                          const recapData = { ...course, latitude_livraison: gpsData.lat, longitude_livraison: gpsData.lng };
-                          setCourseLivreeData(recapData);
-                          setShowRecapitulatif(true);
-                          setOptimisticStatut("livree");
-                          setTimeout(() => onColisLivre(course, gpsData), 150);
-                        },
+                        (pos) => confirmerAvecGPS({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
                         () => {
-                          toast.error("📍 GPS requis pour valider cette étape — activez la localisation et réessayez");
+                          // Fallback sur la dernière position connue sauvegardée en DB
+                          confirmerAvecGPS(livreurLat && livreurLng ? { lat: livreurLat, lng: livreurLng } : null);
                         },
-                        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                        { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
                       );
                     }}
                     disabled={isPending}

@@ -12,7 +12,7 @@ import { base44 } from "@/api/base44Client";
  *   onSuccess(courseData) — appelé quand validation OK
  *   onClose()     — fermer le modal
  */
-export default function QRScannerModal({ course, type, onSuccess, onClose }) {
+export default function QRScannerModal({ course, type, onSuccess, onClose, livreurLat, livreurLng }) {
   const [mode, setMode] = useState("camera"); // "camera" | "code"
   const [code4, setCode4] = useState("");
   const [scanning, setScanning] = useState(false);
@@ -124,34 +124,36 @@ export default function QRScannerModal({ course, type, onSuccess, onClose }) {
       let latitude = null;
       let longitude = null;
 
-      if (!navigator.geolocation) {
-        toast.error("GPS non disponible sur cet appareil — impossible de valider");
-        setVerifying(false);
-        return;
-      }
-
-      try {
-        await new Promise((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              latitude = pos.coords.latitude;
-              longitude = pos.coords.longitude;
-              resolve();
-            },
-            (err) => reject(err),
-            { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-          );
-        });
-      } catch (_) {
-        // GPS refusé ou timeout — bloquer la validation
-        toast.error("📍 GPS requis pour valider cette étape — activez la localisation et réessayez");
-        setVerifying(false);
-        return;
+      // Essayer d'abord une position fraîche via l'API
+      if (navigator.geolocation) {
+        try {
+          await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => {
+                latitude = pos.coords.latitude;
+                longitude = pos.coords.longitude;
+                resolve();
+              },
+              (err) => reject(err),
+              { enableHighAccuracy: true, timeout: 8000, maximumAge: 5000 }
+            );
+          });
+        } catch (_) {
+          // Timeout ou refus — utiliser la dernière position connue du livreur (déjà sauvegardée en DB)
+          if (livreurLat && livreurLng && !isNaN(livreurLat) && !isNaN(livreurLng)) {
+            latitude = livreurLat;
+            longitude = livreurLng;
+          }
+        }
+      } else if (livreurLat && livreurLng && !isNaN(livreurLat) && !isNaN(livreurLng)) {
+        // Pas de geolocation API — utiliser la dernière position sauvegardée
+        latitude = livreurLat;
+        longitude = livreurLng;
       }
 
       // Vérification finale : coordonnées valides
       if (!latitude || !longitude || isNaN(latitude) || isNaN(longitude)) {
-        toast.error("📍 GPS requis pour valider cette étape — position non détectée");
+        toast.error("📍 GPS requis pour valider cette étape — activez la localisation et réessayez");
         setVerifying(false);
         return;
       }
