@@ -16,9 +16,6 @@ import LivreurHistorique from "@/components/livreur/LivreurHistorique";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LivreurExterneOnboarding from "@/components/livreur/LivreurExterneOnboarding";
 import LivreurMesInfosModal from "@/components/livreur/LivreurMesInfosModal";
-import LivreurRecapitulatifPaiement from "@/components/livreur/LivreurRecapitulatifPaiement";
-import LivraisonRecapitulatif from "@/components/livreur/LivraisonRecapitulatif";
-import PrixCoursePopup from "@/components/livreur/PrixCoursePopup";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 
 // Haversine — utilisée aussi pour le calcul de prix
@@ -40,9 +37,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [gpsActif, setGpsActif] = useState(false);
   const [onboardingTermine, setOnboardingTermine] = useState(false);
   const [showMesInfos, setShowMesInfos] = useState(false);
-  const [showRecapitulatif, setShowRecapitulatif] = useState(null);
-  const [recapLivraison, setRecapLivraison] = useState(null);
-  const [courseLivreePopup, setCourseLivreePopup] = useState(null);
 
 
   // ─── Profil livreur ───────────────────────────────────────────────────────
@@ -380,17 +374,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         />
       )}
 
-      {/* Popup prix de course — affiché une seule fois après livraison */}
-      {courseLivreePopup && (
-        <PrixCoursePopup
-          course={courseLivreePopup}
-          onClose={() => {
-            localStorage.setItem(`prix_popup_seen_${courseLivreePopup.id}`, "1");
-            setCourseLivreePopup(null);
-          }}
-        />
-      )}
-
       <div className="max-w-lg mx-auto p-4 pb-12">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
           <TabsList className="w-full">
@@ -452,12 +435,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
         {activeTab === "historique" && (
           <LivreurHistorique mesCourses={mesCourses} livreurProfil={livreurProfil} isExterne={true} />
-        )}
-
-        {showRecapitulatif && (
-          <LivreurRecapitulatifPaiement
-            course={showRecapitulatif}
-          />
         )}
 
         {activeTab === "infos" && livreurProfil && (

@@ -32,6 +32,7 @@ const LivreurApp = lazy(() => import('./pages/LivreurApp.jsx'));
 const LivreurExterneApp = lazy(() => import('./pages/LivreurExterneApp.jsx'));
 
 const ClientExterneApp = lazy(() => import('./pages/ClientExterneApp.jsx'));
+const RecapCourseLivreur = lazy(() => import('./pages/RecapCourseLivreur.jsx'));
 const CourseExterneForm = lazy(() => import('./pages/CourseExterneForm.jsx'));
 const CourseExterneFormSync = lazy(() => import('./pages/CourseExterneFormSync.jsx'));
 const ClientSuiviCourse = lazy(() => import('./pages/ClientSuiviCourse.jsx'));
@@ -134,7 +135,10 @@ function AppContent() {
     if (livreurProfil.type_livreur === "externe") {
       return (
         <Suspense fallback={<LoadingScreen />}>
-          <LivreurExterneApp livreurProfil={livreurProfil} />
+          <Routes>
+            <Route path="/livreur/recap-course/:courseId" element={<RecapCourseLivreur />} />
+            <Route path="*" element={<LivreurExterneApp livreurProfil={livreurProfil} />} />
+          </Routes>
         </Suspense>
       );
     }
@@ -156,6 +160,7 @@ function AppContent() {
           <Route path="/client/course/recevoir" element={<CourseExterneFormSync />} />
           <Route path="/client/suivi" element={<ClientSuiviCourse />} />
           <Route path="/suivi-public/:token" element={<PublicSuiviCourse />} />
+          <Route path="/livreur/recap-course/:courseId" element={<RecapCourseLivreur />} />
           <Route path="*" element={<ClientExterneApp />} />
         </Routes>
       </Suspense>

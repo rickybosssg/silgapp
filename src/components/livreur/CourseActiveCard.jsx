@@ -5,11 +5,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
 import LivraisonResume from "./LivraisonResume";
 import QRScannerModal from "./QRScannerModal";
-import LivraisonRecapitulatif from "./LivraisonRecapitulatif";
 import NavigationGPS from "./NavigationGPS";
-import PrixCoursePopup from "./PrixCoursePopup";
 
 // Haversine
 function haversine(lat1, lon1, lat2, lon2) {
@@ -103,36 +102,21 @@ function ProgressBar({ statut }) {
   );
 }
 
-export default function CourseActiveCard({ course, onColisRecupere, onColisLivre, onClientAnnule, isPending, isExterne = false, onShowRecapitulatif, livreurLat, livreurLng }) {
+export default function CourseActiveCard({ course, onColisRecupere, onColisLivre, onClientAnnule, isPending, isExterne = false, livreurLat, livreurLng }) {
+  const navigate = useNavigate();
   const [prixReel, setPrixReel] = useState("");
   const [showPrixModal, setShowPrixModal] = useState(false);
   const [remarque, setRemarque] = useState("");
   const [showRemarque, setShowRemarque] = useState(false);
   const [showResume, setShowResume] = useState(false);
-  const [gpsDepart, setGpsDepart] = useState(null);
   const [gpsArrivee, setGpsArrivee] = useState(null);
-  const [gpsWatchId, setGpsWatchId] = useState(null);
   const [showQRScanner, setShowQRScanner] = useState(null); // "pickup" | "delivery" | null
-  const [showRecapitulatif, setShowRecapitulatif] = useState(false);
-  const [courseLivreeData, setCourseLivreeData] = useState(null);
-  const [showPrixPopupAfterRecap, setShowPrixPopupAfterRecap] = useState(false);
   // Optimistic status — overrides course.statut immediately on tap
   const [optimisticStatut, setOptimisticStatut] = useState(null);
 
   const effectiveStatut = optimisticStatut || course.statut;
   const colisRecupere = effectiveStatut === "colis_recupere" || effectiveStatut === "en_livraison";
-  // IMPORTANT: Ne pas utiliser optimisticStatut pour colisLivre — seulement le statut réel de la course
-  // Cela évite que la carte ne change de rendu AVANT que le récap ne s'affiche
-  const colisLivre = course.statut === "livree" && !showRecapitulatif;
-
-  // Nettoyer le GPS watch quand le composant se démonte
-  useEffect(() => {
-    return () => {
-      if (gpsWatchId && navigator.geolocation) {
-        navigator.geolocation.clearWatch(gpsWatchId);
-      }
-    };
-  }, [gpsWatchId]);
+  const colisLivre = course.statut === "livree";
 
   const handleConfirmerLivraison = () => {
     if (isExterne) {
@@ -171,71 +155,19 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   };
 
   // Handler succès scan QR delivery (externe) — livraison confirmée par le backend
+  // → Redirection immédiate vers la page récapitulatif dédiée
   const handleQRDeliverySuccess = (courseData) => {
-    console.log("[EVENT_SCAN_COLIS_LIVRE]", { course_id: course.id, statut: courseData?.statut, distance: courseData?.distance_reelle_km, prix: courseData?.prix_final, livreur_id: course.livreur_id });
     setShowQRScanner(null);
-
-    // Fusionner les données backend avec la course locale — priorité aux données backend
-    let prixFinal = courseData?.prix_final ?? course.prix_final ?? 0;
-    let distanceKm = courseData?.distance_reelle_km ?? course.distance_reelle_km ?? 0;
-    let montantLivreur = courseData?.montant_livreur ?? course.montant_livreur ?? 0;
-    let commissionSilga = courseData?.commission_silga ?? course.commission_silga ?? 0;
-
-    // Pas de recalcul local — le backend a déjà validé avec GPS obligatoire
-
-    const merged = {
-      ...course,
-      ...courseData,
-      statut: "livree",
-      prix_final: prixFinal,
-      distance_reelle_km: distanceKm,
-      montant_livreur: montantLivreur,
-      commission_silga: commissionSilga,
-    };
-
-    // Étape 1: Afficher le récapitulatif IMMÉDIATEMENT avec les données fusionnées
-    setCourseLivreeData(merged);
-    setShowRecapitulatif(true);
-    
-    // Étape 2: Mettre optimisticStatut pour que la barre de progression montre "Livré"
     setOptimisticStatut("livree");
-    
-    // Étape 3: Passer la course originale (pas merged) pour éviter le court-circuit statut="livree"
-    setTimeout(() => {
-      onColisLivre(course, null);
-    }, 150);
-  };
-
-  const handleFermerCourse = () => {
-    setShowRecapitulatif(false);
-    // Nettoyer optimisticStatut ET courseLivreeData pour que la carte retourne à l'état normal
-    setOptimisticStatut(null);
-    setCourseLivreeData(null);
-    setShowPrixPopupAfterRecap(true);
+    // Notifier le parent (invalidations + statut disponible)
+    onColisLivre(course, null);
+    // Rediriger vers la page dédiée
+    const courseId = courseData?.id || course.id;
+    navigate(`/livreur/recap-course/${courseId}`);
   };
 
   return (
     <>
-      {/* Récapitulatif post-livraison */}
-      {showRecapitulatif && courseLivreeData && (
-        <LivraisonRecapitulatif
-          course={courseLivreeData}
-          onClose={handleFermerCourse}
-        />
-      )}
-
-      {/* Popup prix — affiché après fermeture du récapitulatif */}
-      {showPrixPopupAfterRecap && courseLivreeData && (
-        <PrixCoursePopup
-          course={courseLivreeData}
-          onClose={() => {
-            localStorage.setItem(`prix_popup_seen_${courseLivreeData.id}`, "1");
-            setShowPrixPopupAfterRecap(false);
-            setCourseLivreeData(null);
-          }}
-        />
-      )}
-
       {/* Modal scan QR (externe) */}
       {showQRScanner && (
         <QRScannerModal
@@ -252,7 +184,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       {showResume && (
         <LivraisonResume
           course={course}
-          gpsDepart={gpsDepart || { lat: course.latitude_depart_livraison, lng: course.longitude_depart_livraison }}
+          gpsDepart={{ lat: course.latitude_depart_livraison, lng: course.longitude_depart_livraison }}
           gpsArrivee={gpsArrivee}
           onContinuer={() => {
             setShowResume(false);
@@ -528,9 +460,6 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                           toast.error("📍 GPS requis pour valider cette étape — activez la localisation et réessayez");
                           return;
                         }
-                        const recapData = { ...course, latitude_livraison: gpsData.lat, longitude_livraison: gpsData.lng };
-                        setCourseLivreeData(recapData);
-                        setShowRecapitulatif(true);
                         setOptimisticStatut("livree");
                         setTimeout(() => onColisLivre(course, gpsData), 150);
                       };
