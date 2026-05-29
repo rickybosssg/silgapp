@@ -109,30 +109,24 @@ Deno.serve(async (req) => {
       return null;
     };
 
-    // Anti-doublon : vérifie si une notif avec cette clé unique existe déjà
+    // Anti-doublon strict : une seule notif par course + email + statut
     const createNotifIfNotExists = async (userEmail, recipientRole) => {
-      const deduplicationKey = `${course.id}_${userEmail}_${course.statut}`;
-
-      // Chercher une notif existante avec la même course + email + statut
+      // Chercher une notif existante avec la même course + email
       const existing = await base44.asServiceRole.entities.Notification.filter({
         course_id: course.id,
         destinataire_email: userEmail,
-        type: recipientRole === "destinataire" || recipientRole === "expediteur" ? "nouvelle_course" : undefined,
       });
 
-      // Vérifier doublon par clé dans le message (on stocke la clé dedans)
+      const content = buildNotificationContent(course, recipientRole);
+
+      // Si une notif avec ce même titre existe déjà pour cette course + email → skip
       if (existing?.length > 0) {
-        const alreadyExists = existing.some(n => n.message?.includes(deduplicationKey) || 
-          (n.course_id === course.id && n.destinataire_email === userEmail && 
-           new Date(n.created_date) > new Date(Date.now() - 60000)) // moins d'1 min
-        );
+        const alreadyExists = existing.some(n => n.titre === content.titre);
         if (alreadyExists) {
           console.log(`[notifyClientSync] ⏭ Doublon évité pour ${userEmail} (${course.statut})`);
           return null;
         }
       }
-
-      const content = buildNotificationContent(course, recipientRole);
 
       const notif = await base44.asServiceRole.entities.Notification.create({
         titre: content.titre,
