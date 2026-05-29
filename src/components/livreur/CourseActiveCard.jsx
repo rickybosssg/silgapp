@@ -161,15 +161,12 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     toast.success("Remarque enregistrée");
   };
 
-  // Handler succès scan QR pickup (externe)
+  // Handler succès scan QR pickup (externe) — GPS déjà validé côté QRScannerModal
   const handleQRPickupSuccess = (courseData) => {
     setShowQRScanner(null);
     setOptimisticStatut("colis_recupere");
-    navigator.geolocation?.getCurrentPosition(
-      (pos) => onColisRecupere({ ...course, _gps: { lat: pos.coords.latitude, lng: pos.coords.longitude } }),
-      () => onColisRecupere(course),
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
+    // Le GPS a déjà été capturé et validé par validateQRCode — pas de nouveau GPS requis ici
+    onColisRecupere({ ...course, ...courseData });
     toast.success("Colis récupéré avec succès ! 📦");
   };
 
@@ -184,22 +181,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     let montantLivreur = courseData?.montant_livreur ?? course.montant_livreur ?? 0;
     let commissionSilga = courseData?.commission_silga ?? course.commission_silga ?? 0;
 
-    // Fallback local : recalcul GPS si backend n'a pas pu calculer
-    if ((!distanceKm || distanceKm <= 0) && course.latitude_recuperation && course.longitude_recuperation &&
-        courseData?.latitude_livraison && courseData?.longitude_livraison) {
-      const latR = course.latitude_recuperation, lngR = course.longitude_recuperation;
-      const latL = courseData.latitude_livraison, lngL = courseData.longitude_livraison;
-      const R = 6371;
-      const dLat = ((latL - latR) * Math.PI) / 180;
-      const dLon = ((lngL - lngR) * Math.PI) / 180;
-      const a = Math.sin(dLat / 2) ** 2 +
-        Math.cos((latR * Math.PI) / 180) * Math.cos((latL * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
-      const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      distanceKm = Math.max(dist, 0.1);
-      prixFinal = Math.round(distanceKm * 100);
-      montantLivreur = Math.round(prixFinal * 0.7);
-      commissionSilga = Math.round(prixFinal * 0.3);
-    }
+    // Pas de recalcul local — le backend a déjà validé avec GPS obligatoire
 
     const merged = {
       ...course,
@@ -539,32 +521,27 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   <button
                     className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                     onClick={() => {
-                      const prepareRecap = (gpsData = null) => {
-                        const recapData = gpsData 
-                          ? { ...course, latitude_livraison: gpsData.lat, longitude_livraison: gpsData.lng }
-                          : course;
-                        // Afficher le récap IMMÉDIATEMENT
-                        setCourseLivreeData(recapData);
-                        setShowRecapitulatif(true);
-                        setOptimisticStatut("livree");
-                        // Mettre à jour le backend APRÈS délai
-                        setTimeout(() => {
-                          onColisLivre(course, gpsData);
-                        }, 150);
-                      };
-
                       if (!navigator.geolocation) {
-                        prepareRecap(null);
+                        toast.error("GPS non disponible — impossible de confirmer la livraison");
                         return;
                       }
                       navigator.geolocation.getCurrentPosition(
                         (pos) => {
-                          prepareRecap({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                          const gpsData = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                          if (!gpsData.lat || !gpsData.lng || isNaN(gpsData.lat) || isNaN(gpsData.lng)) {
+                            toast.error("📍 GPS requis pour valider cette étape — position non détectée");
+                            return;
+                          }
+                          const recapData = { ...course, latitude_livraison: gpsData.lat, longitude_livraison: gpsData.lng };
+                          setCourseLivreeData(recapData);
+                          setShowRecapitulatif(true);
+                          setOptimisticStatut("livree");
+                          setTimeout(() => onColisLivre(course, gpsData), 150);
                         },
                         () => {
-                          prepareRecap(null);
+                          toast.error("📍 GPS requis pour valider cette étape — activez la localisation et réessayez");
                         },
-                        { enableHighAccuracy: true, timeout: 10000 }
+                        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
                       );
                     }}
                     disabled={isPending}

@@ -252,25 +252,12 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     toast("Course refusée – recherche du prochain livreur...");
   };
 
+  // handleColisRecupere — pour le réseau externe, la récupération se fait via QR (GPS déjà capturé par validateQRCode).
+  // Cette fonction est appelée APRÈS validation QR avec les données de la course mises à jour.
   const handleColisRecupere = (course) => {
-    const doUpdate = (extraData = {}) => updateCourseMutation.mutate({
-      id: course.id,
-      data: { statut: "colis_recupere", heure_recuperation: new Date().toISOString(), ...extraData },
-    });
-
-    if (!navigator.geolocation) {
-      doUpdate();
-      toast.warning("Colis récupéré (GPS non disponible)");
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        doUpdate({ latitude_recuperation: pos.coords.latitude, longitude_recuperation: pos.coords.longitude });
-        toast.success("Colis récupéré ! 📦 Position GPS enregistrée");
-      },
-      () => { doUpdate(); toast.warning("Colis récupéré (GPS non disponible)"); },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+    // Les coordonnées GPS sont déjà dans course (latitude_recuperation, longitude_recuperation)
+    // enregistrées par validateQRCode côté backend — rien à faire ici
+    queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
   };
 
   const handleColisLivre = (course, gpsArrivee) => {
