@@ -200,9 +200,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     // Étape 2: Mettre optimisticStatut pour que la barre de progression montre "Livré"
     setOptimisticStatut("livree");
     
-    // Étape 3: Mettre à jour le backend et le statut livreur APRÈS (délai pour laisser le récap s'afficher)
+    // Étape 3: Passer la course originale (pas merged) pour éviter le court-circuit statut="livree"
     setTimeout(() => {
-      onColisLivre(merged, null);
+      onColisLivre(course, null);
     }, 150);
   };
 
