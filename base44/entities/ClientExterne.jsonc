@@ -20,7 +20,7 @@
     },
     "quartier": {
       "type": "string",
-      "description": "Quartier de r\u00e9sidence"
+      "description": "Quartier de r\u00e9sidence (d\u00e9duit du GPS)"
     },
     "latitude": {
       "type": "number",
@@ -38,6 +38,16 @@
     "user_email": {
       "type": "string",
       "description": "Email du compte utilisateur li\u00e9"
+    },
+    "app_active": {
+      "type": "boolean",
+      "default": false,
+      "description": "Application actuellement ouverte"
+    },
+    "last_seen_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Derni\u00e8re activit\u00e9 dans l'application (heartbeat)"
     }
   },
   "required": [

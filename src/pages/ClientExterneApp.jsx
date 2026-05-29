@@ -155,16 +155,30 @@ export default function ClientExterneApp() {
   }, [clientProfil?.id, onboardingDone]);
 
   // Watch GPS continu (15s) — comme les livreurs
+  // Met aussi à jour le quartier toutes les 5 min via reverse geocoding
+  const lastQuartierSync = useRef(0);
   useEffect(() => {
     if (!clientProfil?.id || !onboardingDone || !gpsActif) return;
     const interval = setInterval(() => {
       navigator.geolocation?.getCurrentPosition(
-        (pos) => {
+        async (pos) => {
           const posData = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
           setPosition(posData);
+          const now = Date.now();
+          // Reverse geocoding toutes les 5 minutes pour maintenir le quartier à jour
+          let quartierUpdate = {};
+          if (now - lastQuartierSync.current > 5 * 60 * 1000) {
+            lastQuartierSync.current = now;
+            const q = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+            if (q) {
+              quartierUpdate = { quartier: q };
+              setClientProfil(prev => prev ? { ...prev, quartier: q } : prev);
+            }
+          }
           base44.entities.ClientExterne.update(clientProfil.id, {
             latitude: pos.coords.latitude,
             longitude: pos.coords.longitude,
+            ...quartierUpdate,
           }).catch(() => null);
         },
         () => setGpsActif(false),

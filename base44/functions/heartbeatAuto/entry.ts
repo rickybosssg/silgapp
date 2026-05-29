@@ -52,6 +52,8 @@ Deno.serve(async (req) => {
         await base44.asServiceRole.entities.ClientExterne.update(client.id, {
           latitude: latitude || client.latitude,
           longitude: longitude || client.longitude,
+          last_seen_at: now,
+          app_active: app_active,
         });
       }
     } else if (user_type === "livreur") {

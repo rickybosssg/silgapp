@@ -23,18 +23,20 @@ function isPresenceApp(livreur) {
 }
 
 /**
- * Formatte la zone à partir du quartier ou de la dernière position GPS.
- * Utilise le quartier déclaré si pas de GPS récent.
+ * Formatte la zone à partir du quartier ou des coordonnées GPS.
+ * Pour les clients, on utilise le quartier stocké en BDD (mis à jour lors des syncs GPS).
  */
-function getZone(livreur) {
-  return livreur.quartier || "Zone inconnue";
+function getZone(entity) {
+  return entity.quartier || (entity.latitude ? `${entity.latitude.toFixed(3)}, ${entity.longitude.toFixed(3)}` : "Zone inconnue");
 }
 
 /**
  * Formatte le délai depuis le dernier GPS.
+ * Clients : last_seen_at (heartbeat) ou updated_date (fallback)
+ * Livreurs : derniere_position_date ou last_seen_at
  */
-function getLastGPS(livreur) {
-  const dt = livreur.derniere_position_date || livreur.last_seen_at;
+function getLastGPS(entity) {
+  const dt = entity.derniere_position_date || entity.last_seen_at || entity.updated_date;
   if (!dt) return null;
   try {
     return formatDistanceToNow(new Date(dt), { addSuffix: true, locale: fr });
