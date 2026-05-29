@@ -125,21 +125,29 @@ export default function ClientExterneApp() {
   //    - Même code que livreurs (prouvé fonctionnel)
   //    - BDD mise à jour immédiatement à chaque position
   // ═══════════════════════════════════════════════════════════════════════════
+  // Helper reverse geocoding
+  const reverseGeocode = async (lat, lng) => {
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=fr`);
+      const geo = await res.json();
+      return geo?.address?.suburb || geo?.address?.neighbourhood || geo?.address?.quarter || geo?.address?.city_district || geo?.address?.village || "";
+    } catch (_) { return ""; }
+  };
+
   // Sync immédiate au chargement du profil
   useEffect(() => {
     if (!clientProfil?.id || !onboardingDone) return;
-    console.log("[GPS Client] Sync immédiate au chargement");
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const posData = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
         setPosition(posData);
         setGpsActif(true);
+        const q = !clientProfil.quartier ? await reverseGeocode(pos.coords.latitude, pos.coords.longitude) : "";
         base44.entities.ClientExterne.update(clientProfil.id, {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
-        }).then(() => {
-          console.log("[GPS Client] ✅ BDD synchronisée", posData.latitude, posData.longitude);
-        }).catch(err => console.error("[GPS Client] ❌ Erreur BDD:", err));
+          ...(q ? { quartier: q } : {}),
+        }).catch(() => null);
       },
       (err) => console.error("[GPS Client] ❌ Permission refusée:", err),
       { enableHighAccuracy: true, timeout: 10000 }

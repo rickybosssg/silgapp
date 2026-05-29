@@ -25,9 +25,19 @@ export function profilClientComplet(p) {
   return !!(p.nom && p.nom.trim() && p.prenom && p.prenom.trim() && tel.length >= 8);
 }
 
+// ─── Reverse geocoding ────────────────────────────────────────────────────────
+async function reverseGeocode(lat, lng) {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=fr`);
+    const geo = await res.json();
+    return geo?.address?.suburb || geo?.address?.neighbourhood || geo?.address?.quarter || geo?.address?.city_district || geo?.address?.village || "";
+  } catch (_) { return ""; }
+}
+
 // ─── GPS ──────────────────────────────────────────────────────────────────────
 function EtapeGPS({ onSuccess, clientId }) {
   const [loading, setLoading] = useState(false);
+  const [quartier, setQuartier] = useState("");
 
   const handleGPS = () => {
     if (!navigator.geolocation) {
@@ -38,18 +48,21 @@ function EtapeGPS({ onSuccess, clientId }) {
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const posData = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-        console.log("[GPS Onboarding] 📍 Position obtenue:", posData.latitude, posData.longitude);
         try { localStorage.setItem("client_gps_active", "true"); } catch (_) {}
         try { localStorage.setItem("client_gps_position", JSON.stringify(posData)); } catch (_) {}
-        // Sync immédiate en BDD — EXACTEMENT comme les livreurs
+
+        // Reverse geocoding pour afficher le quartier
+        const q = await reverseGeocode(posData.latitude, posData.longitude);
+        if (q) setQuartier(q);
+
+        // Sync BDD avec le quartier
         if (clientId) {
-          console.log("[GPS Onboarding] → Sync BDD pour client", clientId);
           try {
             await base44.entities.ClientExterne.update(clientId, {
               latitude: posData.latitude,
               longitude: posData.longitude,
+              ...(q ? { quartier: q } : {}),
             });
-            console.log("[GPS Onboarding] ✅ BDD synchronisée");
           } catch (err) {
             console.error("[GPS Onboarding] ❌ Erreur BDD:", err);
           }
@@ -77,18 +90,25 @@ function EtapeGPS({ onSuccess, clientId }) {
             Le GPS est obligatoire pour créer une course et être localisé par le livreur.
           </p>
         </div>
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3">
-          <p className="text-xs text-amber-700 font-semibold">
-            ⚠️ Sans GPS, vous ne pourrez pas commander une livraison.
-          </p>
-        </div>
+        {quartier ? (
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-3 flex items-center justify-center gap-2">
+            <MapPin className="w-4 h-4 text-green-600 flex-shrink-0" />
+            <p className="text-sm font-bold text-green-800">{quartier}</p>
+          </div>
+        ) : (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3">
+            <p className="text-xs text-amber-700 font-semibold">
+              ⚠️ Sans GPS, vous ne pourrez pas commander une livraison.
+            </p>
+          </div>
+        )}
         <button
           onClick={handleGPS}
           disabled={loading}
           className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-95 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
         >
           {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <MapPin className="w-5 h-5" />}
-          {loading ? "Activation..." : "Activer le GPS"}
+          {loading ? "Localisation en cours..." : "Activer le GPS"}
         </button>
         <p className="text-xs text-gray-400">Appuyez sur "Autoriser" lorsque votre appareil vous demande</p>
       </div>
