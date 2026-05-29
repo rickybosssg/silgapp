@@ -175,7 +175,6 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const handleQRDeliverySuccess = (courseData) => {
     console.log("[EVENT_SCAN_COLIS_LIVRE]", { course_id: course.id, statut: courseData?.statut, distance: courseData?.distance_reelle_km, prix: courseData?.prix_final, livreur_id: course.livreur_id });
     setShowQRScanner(null);
-    setOptimisticStatut("livree");
 
     // Fusionner les données backend avec la course locale — priorité aux données backend
     let prixFinal = courseData?.prix_final ?? course.prix_final ?? 0;
@@ -210,18 +209,18 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       commission_silga: commissionSilga,
     };
 
-    // Afficher le récapitulatif IMMÉDIATEMENT
+    // Mettre à jour le statut du livreur D'ABORD
+    onColisLivre(merged, null);
+    
+    // Afficher le récapitulatif APRÈS (sans optimisticStatut pour garder la carte visible)
     setCourseLivreeData(merged);
     setShowRecapitulatif(true);
-    
-    // Mettre à jour le statut du livreur après un délai pour laisser le récap s'afficher
-    setTimeout(() => {
-      onColisLivre(merged, null);
-    }, 500);
   };
 
   const handleFermerCourse = () => {
     setShowRecapitulatif(false);
+    // Nettoyer optimisticStatut pour que la carte retourne à l'état normal
+    setOptimisticStatut(null);
     setShowPrixPopupAfterRecap(true);
   };
 
