@@ -388,26 +388,27 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     );
   }
 
-  // ─── Modal plein écran si course en attente ───────────────────────────────
-  if (courseEnAttente) {
-    return (
-      <CourseEnAttenteModal
-        course={courseEnAttente}
-        livreurId={livreurProfil.id}
-        onAccepter={handleAccepter}
-        onRefuser={handleRefuser}
-        isPending={updateCourseMutation.isPending}
-        onExpire={() => {
-          queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-          queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
-        }}
-      />
-    );
-  }
-
   // ─── Dashboard principal ──────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50">
+
+      {/* VENUS — toujours visible, tous les états */}
+      <VenusFloatingButton />
+
+      {/* Modal plein écran si course en attente */}
+      {courseEnAttente && (
+        <CourseEnAttenteModal
+          course={courseEnAttente}
+          livreurId={livreurProfil.id}
+          onAccepter={handleAccepter}
+          onRefuser={handleRefuser}
+          isPending={updateCourseMutation.isPending}
+          onExpire={() => {
+            queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+            queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
+          }}
+        />
+      )}
 
       {/* Popup prix de course — affiché une seule fois après livraison */}
       {courseLivreePopup && (
@@ -419,8 +420,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           }}
         />
       )}
-
-      <VenusFloatingButton />
 
       <div className="max-w-lg mx-auto p-4 pb-12">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
