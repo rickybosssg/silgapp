@@ -367,7 +367,13 @@ export default function ClientExterneApp() {
         const notificationsValides = userNotifications.filter(n => 
           !n.course_id || validCourseIds.has(n.course_id)
         );
-        setNotifications(notificationsValides);
+        // Dédupliquer : garder une seule notif par course_id (la plus récente)
+        const seen = new Map();
+        for (const n of notificationsValides) {
+          const key = n.course_id || n.id;
+          if (!seen.has(key)) seen.set(key, n);
+        }
+        setNotifications([...seen.values()]);
       }
 
       await loadLivreursProches(pos);
