@@ -88,14 +88,14 @@ function EnLigneBadge({ entity }) {
     return (
       <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700">
         <Wifi className="w-3 h-3" />
-        En ligne
+        Application ouverte
       </span>
     );
   }
   return (
     <span className="inline-flex items-center gap-1 text-xs text-gray-400">
       <WifiOff className="w-3 h-3" />
-      Hors ligne
+      Application fermée
     </span>
   );
 }
@@ -163,8 +163,8 @@ export default function CarteLivreursExterne() {
     { key: "off",       label: `OFF (${compteurs.off})` },
     { key: "libres",    label: `Libres (${compteurs.libres})` },
     { key: "en_course", label: `En course (${compteurs.enCourse})` },
-    { key: "en_ligne",  label: `En ligne (${compteurs.enLigne})` },
-    { key: "hors_ligne",label: `Hors ligne (${compteurs.horsLigne})` },
+    { key: "en_ligne",  label: `App ouverte (${compteurs.enLigne})` },
+    { key: "hors_ligne",label: `App fermée (${compteurs.horsLigne})` },
   ];
 
   return (
@@ -193,8 +193,8 @@ export default function CarteLivreursExterne() {
           { label: "OFF",       count: compteurs.off,       color: "text-gray-500 bg-gray-50 border-gray-200" },
           { label: "Libres",    count: compteurs.libres,    color: "text-emerald-700 bg-emerald-50 border-emerald-200" },
           { label: "En course", count: compteurs.enCourse,  color: "text-blue-700 bg-blue-50 border-blue-200" },
-          { label: "En ligne",  count: compteurs.enLigne,   color: "text-green-700 bg-green-50 border-green-200" },
-          { label: "Hors ligne",count: compteurs.horsLigne, color: "text-gray-500 bg-gray-50 border-gray-200" },
+          { label: "App ouverte",  count: compteurs.enLigne,   color: "text-green-700 bg-green-50 border-green-200" },
+          { label: "App fermée",   count: compteurs.horsLigne, color: "text-gray-500 bg-gray-50 border-gray-200" },
         ].map(c => (
           <div key={c.label} className={`border rounded-lg p-2 text-center ${c.color}`}>
             <p className="text-lg font-bold leading-none">{c.count}</p>
@@ -211,8 +211,8 @@ export default function CarteLivreursExterne() {
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-300" /><b>OFF</b> = n'accepte plus de nouvelles courses</span>
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" /><b>Libre</b> = peut recevoir une course</span>
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500" /><b>En course</b> = mission en cours</span>
-          <span className="flex items-center gap-1.5"><Wifi className="w-3 h-3 text-green-600" /><b>En ligne</b> = présent dans l'application</span>
-          <span className="flex items-center gap-1.5"><WifiOff className="w-3 h-3 text-gray-400" /><b>Hors ligne</b> = absent de l'application</span>
+          <span className="flex items-center gap-1.5"><Wifi className="w-3 h-3 text-green-600" /><b>Application ouverte</b> = présent dans l'application</span>
+          <span className="flex items-center gap-1.5"><WifiOff className="w-3 h-3 text-gray-400" /><b>Application fermée</b> = absent de l'application</span>
         </div>
       </Card>
 

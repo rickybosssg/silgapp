@@ -120,7 +120,7 @@ export default function LivreurHeader({
               )}
             >
               <Power className="w-3.5 h-3.5" />
-              {isUpdatingStatut ? "..." : isEnLigne ? "Passer hors ligne" : "Passer en ligne"}
+              {isUpdatingStatut ? "..." : isEnLigne ? "⚪ Désactiver les courses (OFF)" : "🟢 Activer les courses (ON)"}
             </button>
 
             {/* Bouton GPS */}
