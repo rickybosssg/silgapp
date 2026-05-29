@@ -142,12 +142,15 @@ export default function ClientExterneApp() {
         const posData = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
         setPosition(posData);
         setGpsActif(true);
-        const q = !clientProfil.quartier ? await reverseGeocode(pos.coords.latitude, pos.coords.longitude) : "";
+        // Toujours faire le reverse geocoding au 1er GPS (pas seulement si quartier vide)
+        const q = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+        const quartierFinal = q || "Ouagadougou";
         base44.entities.ClientExterne.update(clientProfil.id, {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
-          ...(q ? { quartier: q } : {}),
+          quartier: quartierFinal,
         }).catch(() => null);
+        if (quartierFinal) setClientProfil(prev => prev ? { ...prev, quartier: quartierFinal } : prev);
       },
       (err) => console.error("[GPS Client] ❌ Permission refusée:", err),
       { enableHighAccuracy: true, timeout: 10000 }

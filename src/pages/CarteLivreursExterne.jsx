@@ -27,7 +27,7 @@ function isPresenceApp(livreur) {
  * Pour les clients, on utilise le quartier stocké en BDD (mis à jour lors des syncs GPS).
  */
 function getZone(entity) {
-  return entity.quartier || (entity.latitude ? `${entity.latitude.toFixed(3)}, ${entity.longitude.toFixed(3)}` : "Zone inconnue");
+  return entity.quartier || (entity.latitude ? "Ouagadougou" : "Zone inconnue");
 }
 
 /**
