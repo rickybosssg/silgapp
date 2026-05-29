@@ -256,7 +256,7 @@ export default function CarteLivreursExterne() {
           <div className="space-y-3">
             {clientsAvecGPS.map(client => {
               const enLigne = isPresenceApp(client);
-              const zone = client.quartier || "Zone inconnue";
+              const zone = getZone(client);
               const lastGPS = getLastGPS(client);
               return (
                 <div key={client.id} className={`flex items-start justify-between p-3 border rounded-lg ${enLigne ? "border-green-200 bg-green-50/30" : "border-gray-200"}`}>
