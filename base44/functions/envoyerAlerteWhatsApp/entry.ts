@@ -114,12 +114,6 @@ Deno.serve(async (req) => {
         return Response.json({ skipped: true, reason: 'livreur_no_telephone' });
       }
 
-      // Vérifier si livreur est actif dans l'app (avec logs détaillés)
-      if (estActifDansApp(livreur, courseId, livreur.id)) {
-        console.log(`[WhatsApp] Course ${courseId} Livreur ${livreur.id}: BLOQUÉ - livreur actif dans l'app\n`);
-        return Response.json({ skipped: true, reason: 'livreur_actif_dans_app' });
-      }
-      
       // Vérifier si WhatsApp déjà envoyé pour cette course
       const alertesCourse = await base44.asServiceRole.entities.WhatsAppAlerte.filter({ 
         livreur_id: livreur.id,
@@ -197,12 +191,6 @@ Deno.serve(async (req) => {
       if (!client.telephone) {
         console.log(`[WhatsApp] Course ${courseId} Client ${client.id}: telephone manquant → SKIP`);
         return Response.json({ skipped: true, reason: 'client_no_telephone' });
-      }
-
-      // Vérifier si client est actif dans l'app
-      if (estActifDansApp(client, courseId, client.id)) {
-        console.log(`[WhatsApp] Course ${courseId} Client ${client.id}: BLOQUÉ - client actif dans l'app\n`);
-        return Response.json({ skipped: true, reason: 'client_actif_dans_app' });
       }
 
       // Vérifier si WhatsApp déjà envoyé pour cette course

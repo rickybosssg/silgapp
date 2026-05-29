@@ -33,7 +33,6 @@ async function trouverLivreursCandidats(base44, course, rayonKm, exclusions = []
     validation: 'valide',
     actif: true,
     statut: 'disponible',
-    app_active: true,
   });
 
   if (!livreurs || livreurs.length === 0) return [];
@@ -47,12 +46,11 @@ async function trouverLivreursCandidats(base44, course, rayonKm, exclusions = []
   );
   console.log(`[DISPATCH] 🚫 Livreurs déjà en course exclus: ${livreurIdsEnCourse.size}`);
 
-  // GPS valide = mis à jour dans les 5 dernières minutes
+  // GPS valide = coordonnées présentes (peu importe la date de mise à jour)
   const livreursGPS = livreurs.filter(l =>
-    l.latitude && l.longitude && l.derniere_position_date &&
-    new Date(l.derniere_position_date).getTime() > Date.now() - 300000 &&
+    l.latitude && l.longitude &&
     !exclusions.includes(l.id) &&
-    !livreurIdsEnCourse.has(l.id)  // Exclure les livreurs déjà en course active
+    !livreurIdsEnCourse.has(l.id)
   );
 
   if (!course.gps_depart_lat || !course.gps_depart_lng) {
