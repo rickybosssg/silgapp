@@ -209,12 +209,14 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       commission_silga: commissionSilga,
     };
 
-    // Mettre à jour le statut du livreur D'ABORD
-    onColisLivre(merged, null);
-    
-    // Afficher le récapitulatif APRÈS (sans optimisticStatut pour garder la carte visible)
+    // Afficher le récapitulatif IMMÉDIATEMENT (avant toute mise à jour)
     setCourseLivreeData(merged);
     setShowRecapitulatif(true);
+    
+    // Mettre à jour le statut du livreur APRÈS (délai pour laisser le récap s'afficher)
+    setTimeout(() => {
+      onColisLivre(merged, null);
+    }, 100);
   };
 
   const handleFermerCourse = () => {
