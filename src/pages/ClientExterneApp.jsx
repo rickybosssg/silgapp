@@ -362,10 +362,10 @@ export default function ClientExterneApp() {
         );
       }
 
-      // Fusionner sans doublons par id
+      // Fusionner sans doublons par id, trier par date desc
       const map = new Map();
       [...actives, ...activesDestinataire, ...activesExpediteur].forEach(c => map.set(c.id, c));
-      const toutes = [...map.values()];
+      const toutes = [...map.values()].sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
       setCoursesActives(toutes);
 
       // Nettoyer les notifications obsolètes (courses supprimées ou terminées)
@@ -375,10 +375,10 @@ export default function ClientExterneApp() {
         const notificationsValides = userNotifications.filter(n => 
           !n.course_id || validCourseIds.has(n.course_id)
         );
-        // Dédupliquer : garder une seule notif par course_id (la plus récente)
+        // Dédupliquer : garder une seule notif par course_id + type (la plus récente)
         const seen = new Map();
         for (const n of notificationsValides) {
-          const key = n.course_id || n.id;
+          const key = `${n.course_id || n.id}_${n.type || ''}`;
           if (!seen.has(key)) seen.set(key, n);
         }
         setNotifications([...seen.values()]);

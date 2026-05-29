@@ -109,23 +109,28 @@ Deno.serve(async (req) => {
       return null;
     };
 
-    // Anti-doublon strict : une seule notif par course + email + statut
+    // Anti-doublon strict : une seule notif par course + email + type
     const createNotifIfNotExists = async (userEmail, recipientRole) => {
-      // Chercher une notif existante avec la même course + email
+      const content = buildNotificationContent(course, recipientRole);
+
+      // Chercher une notif existante avec la même course + email + type (doublon exact)
       const existing = await base44.asServiceRole.entities.Notification.filter({
         course_id: course.id,
         destinataire_email: userEmail,
+        type: content.type,
       });
 
-      const content = buildNotificationContent(course, recipientRole);
-
-      // Si une notif avec ce même titre existe déjà pour cette course + email → skip
       if (existing?.length > 0) {
-        const alreadyExists = existing.some(n => n.titre === content.titre);
-        if (alreadyExists) {
-          console.log(`[notifyClientSync] ⏭ Doublon évité pour ${userEmail} (${course.statut})`);
-          return null;
+        console.log(`[notifyClientSync] ⏭ Doublon évité pour ${userEmail} (type=${content.type}, course=${course.id})`);
+        // Supprimer les doublons en trop (garder le plus récent)
+        if (existing.length > 1) {
+          const sorted = existing.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+          for (let i = 1; i < sorted.length; i++) {
+            await base44.asServiceRole.entities.Notification.delete(sorted[i].id);
+            console.log(`[notifyClientSync] 🗑 Doublon supprimé: ${sorted[i].id}`);
+          }
         }
+        return null;
       }
 
       const notif = await base44.asServiceRole.entities.Notification.create({
