@@ -114,6 +114,16 @@ Deno.serve(async (req) => {
         return Response.json({ skipped: true, reason: 'livreur_no_telephone' });
       }
 
+      // ✅ LOGIQUE : WhatsApp = alerte AVANT la course uniquement
+      // Si livreur est dans l'app → il voit déjà la modale, pas besoin de WhatsApp
+      if (livreur.app_active && livreur.last_seen_at) {
+        const ecart = Date.now() - new Date(livreur.last_seen_at).getTime();
+        if (ecart < SEUIL_INACTIVITE_MS) {
+          console.log(`[WhatsApp] Course ${courseId} Livreur ${livreur.id}: app ouverte (${Math.round(ecart/1000)}s) → SKIP, modale visible`);
+          return Response.json({ skipped: true, reason: 'livreur_dans_app' });
+        }
+      }
+
       // Vérifier si WhatsApp déjà envoyé pour cette course
       const alertesCourse = await base44.asServiceRole.entities.WhatsAppAlerte.filter({ 
         livreur_id: livreur.id,
@@ -191,6 +201,16 @@ Deno.serve(async (req) => {
       if (!client.telephone) {
         console.log(`[WhatsApp] Course ${courseId} Client ${client.id}: telephone manquant → SKIP`);
         return Response.json({ skipped: true, reason: 'client_no_telephone' });
+      }
+
+      // ✅ LOGIQUE : WhatsApp = alerte AVANT la course uniquement
+      // Si client est dans l'app → il voit déjà le statut en temps réel, pas besoin de WhatsApp
+      if (client.app_active && client.last_seen_at) {
+        const ecart = Date.now() - new Date(client.last_seen_at).getTime();
+        if (ecart < SEUIL_INACTIVITE_MS) {
+          console.log(`[WhatsApp] Course ${courseId} Client ${client.id}: app ouverte (${Math.round(ecart/1000)}s) → SKIP, temps réel visible`);
+          return Response.json({ skipped: true, reason: 'client_dans_app' });
+        }
       }
 
       // Vérifier si WhatsApp déjà envoyé pour cette course
