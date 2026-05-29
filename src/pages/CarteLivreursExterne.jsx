@@ -139,7 +139,7 @@ export default function CarteLivreursExterne() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Carte - Livreurs & Clients</h1>
           <p className="text-sm text-muted-foreground">
-            {livreurs.length} disponibles • {livreursConnectes.length} connectés • {clientsEnLigne.length} clients
+            {livreurs.length} disponibles • {livreursConnectes.length} en ligne • {clientsEnLigne.length} clients
           </p>
         </div>
       </div>
@@ -158,7 +158,7 @@ export default function CarteLivreursExterne() {
       <div className="flex gap-2 flex-wrap">
         {[
           { key: "tous", label: `Tous (${livreurs.length})` },
-          { key: "connectes", label: `Connectés (${livreursConnectes.length})` },
+          { key: "connectes", label: `En ligne (${livreursConnectes.length})` },
           { key: "disponibles", label: `Disponibles (${livreursDisponibles.length})` },
         ].map(f => (
           <Button
