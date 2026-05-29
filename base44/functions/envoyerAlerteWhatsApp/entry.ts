@@ -12,8 +12,6 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
  * - Message neutre : pas d'infos sensibles (prix, adresse, GPS, détails course)
  */
 
-const SEUIL_INACTIVITE_MS = 2 * 60 * 1000; // 2 minutes
-
 const MESSAGE_WHATSAPP = `Bonjour 👋\nVous avez reçu une notification importante sur SILGAPP.\nVeuillez ouvrir l'application pour consulter les détails.`;
 
 function normaliserTelephone(tel) {
@@ -26,24 +24,6 @@ function normaliserTelephone(tel) {
   return '+226' + t;
 }
 
-function estActifDansApp(entity, courseId, livreurId) {
-  if (!entity.app_active) {
-    console.log(`[WhatsApp] Course ${courseId} Livreur ${livreurId}: app_active=false → WhatsApp`);
-    return false;
-  }
-  if (!entity.last_seen_at) {
-    console.log(`[WhatsApp] Course ${courseId} Livreur ${livreurId}: last_seen_at=null → WhatsApp`);
-    return false;
-  }
-  const ecart = Date.now() - new Date(entity.last_seen_at).getTime();
-  const actif = ecart < SEUIL_INACTIVITE_MS;
-  if (!actif) {
-    console.log(`[WhatsApp] Course ${courseId} Livreur ${livreurId}: last_seen_at=${entity.last_seen_at} (écart=${Math.round(ecart/1000)}s) → WhatsApp`);
-  } else {
-    console.log(`[WhatsApp] Course ${courseId} Livreur ${livreurId}: app_active=true + last_seen_recent → BLOQUÉ`);
-  }
-  return actif;
-}
 
 async function envoyerWhatsApp(telephone, accountSid, authToken, fromNumber) {
   const to = `whatsapp:${telephone}`;
@@ -114,15 +94,10 @@ Deno.serve(async (req) => {
         return Response.json({ skipped: true, reason: 'livreur_no_telephone' });
       }
 
-      // ✅ LOGIQUE : WhatsApp = alerte AVANT la course uniquement
-      // Si livreur est dans l'app → il voit déjà la modale, pas besoin de WhatsApp
-      if (livreur.app_active && livreur.last_seen_at) {
-        const ecart = Date.now() - new Date(livreur.last_seen_at).getTime();
-        if (ecart < SEUIL_INACTIVITE_MS) {
-          console.log(`[WhatsApp] Course ${courseId} Livreur ${livreur.id}: app ouverte (${Math.round(ecart/1000)}s) → SKIP, modale visible`);
-          return Response.json({ skipped: true, reason: 'livreur_dans_app' });
-        }
-      }
+      // ✅ LOGIQUE : WhatsApp envoyé systématiquement — l'écran peut être verrouillé
+      // même si app_active=true (heartbeat Android tourne en arrière-plan)
+      // L'anti-doublon par notification_id suffit à éviter le spam
+      console.log(`[WhatsApp] Course ${courseId} Livreur ${livreur.id}: envoi systématique (app_active=${livreur.app_active})`)
 
       // Vérifier si WhatsApp déjà envoyé pour cette course
       const alertesCourse = await base44.asServiceRole.entities.WhatsAppAlerte.filter({ 
@@ -203,15 +178,9 @@ Deno.serve(async (req) => {
         return Response.json({ skipped: true, reason: 'client_no_telephone' });
       }
 
-      // ✅ LOGIQUE : WhatsApp = alerte AVANT la course uniquement
-      // Si client est dans l'app → il voit déjà le statut en temps réel, pas besoin de WhatsApp
-      if (client.app_active && client.last_seen_at) {
-        const ecart = Date.now() - new Date(client.last_seen_at).getTime();
-        if (ecart < SEUIL_INACTIVITE_MS) {
-          console.log(`[WhatsApp] Course ${courseId} Client ${client.id}: app ouverte (${Math.round(ecart/1000)}s) → SKIP, temps réel visible`);
-          return Response.json({ skipped: true, reason: 'client_dans_app' });
-        }
-      }
+      // ✅ LOGIQUE : WhatsApp envoyé systématiquement — l'écran peut être verrouillé
+      // même si app_active=true (heartbeat Android tourne en arrière-plan)
+      console.log(`[WhatsApp] Course ${courseId} Client ${client.id}: envoi systématique (app_active=${client.app_active})`)
 
       // Vérifier si WhatsApp déjà envoyé pour cette course
       const alertesCourse = await base44.asServiceRole.entities.WhatsAppAlerte.filter({ 
