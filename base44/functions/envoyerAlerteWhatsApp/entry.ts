@@ -26,16 +26,6 @@ function normaliserTelephone(tel) {
   return '+226' + t;
 }
 
-async function aApplicationInstallee(base44, email) {
-  // Vérifier si l'utilisateur a une session mobile active (DeviceSession)
-  const sessions = await base44.asServiceRole.entities.DeviceSession.filter({
-    user_email: email,
-    session_actif: true
-  });
-  // Avoir au moins une session Android/iOS active
-  return sessions && sessions.some(s => s.platform === 'android' || s.platform === 'ios');
-}
-
 function estActifDansApp(entity) {
   if (!entity.app_active || !entity.last_seen_at) return false;
   const ecart = Date.now() - new Date(entity.last_seen_at).getTime();
@@ -106,15 +96,14 @@ Deno.serve(async (req) => {
         return Response.json({ skipped: true, reason: 'livreur_no_telephone' });
       }
 
-      // Vérifier si le livreur a VRAIMENT l'application mobile installée
-      const aApp = await aApplicationInstallee(base44, destinataireEmail);
-      if (!aApp) {
-        console.log(`[WhatsApp] Livreur ${livreur.id} n'a pas l'app mobile → WhatsApp envoyé`);
-        // Continuer l'envoi WhatsApp car il n'a pas l'app
-      } else if (estActifDansApp(livreur)) {
+      // Logique : Si livreur n'est PAS dans l'app → WhatsApp pour lui dire d'ouvrir
+      if (estActifDansApp(livreur)) {
         console.log(`[WhatsApp] Livreur ${livreur.id} actif dans l'app → pas de WhatsApp`);
         return Response.json({ skipped: true, reason: 'livreur_actif_dans_app' });
       }
+      
+      // Livreur n'est pas dans l'app → WhatsApp envoyé
+      console.log(`[WhatsApp] Livreur ${livreur.id} hors ligne → WhatsApp envoyé`);
 
       // Anti-doublon livreur
       const [alertesExistantes, notifsNonLues] = await Promise.all([
