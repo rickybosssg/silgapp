@@ -275,9 +275,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   const handleColisLivre = (course, gpsArrivee) => {
     if (course.statut === "livree") {
-      // Juste rafraîchir les données, ne pas changer le statut
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+      if (livreurProfil?.statut !== "hors_ligne") {
+        statutMutation.mutate("disponible");
+      }
       return;
     }
 
@@ -326,7 +328,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     } else {
       updateCourseMutation.mutate({ id: course.id, data: baseData });
     }
-    // Ne pas remettre "disponible" automatiquement — le livreur doit le faire manuellement
+    // Repasser automatiquement en disponible après livraison (sauf si hors_ligne volontairement)
+    if (livreurProfil?.statut !== "hors_ligne") {
+      statutMutation.mutate("disponible");
+    }
     toast.success("Livraison terminée ! 🎉");
   };
 
