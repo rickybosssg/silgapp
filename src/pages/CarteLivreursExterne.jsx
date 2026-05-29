@@ -49,14 +49,14 @@ function PresenceBadge({ livreur }) {
     return (
       <Badge className="bg-green-100 text-green-800 border-green-200 text-xs flex items-center gap-1">
         <Wifi className="w-3 h-3" />
-        Connecté maintenant
+        En ligne
       </Badge>
     );
   }
   return (
     <Badge variant="outline" className="text-gray-500 text-xs flex items-center gap-1">
       <WifiOff className="w-3 h-3" />
-      Hors application
+      Hors ligne
     </Badge>
   );
 }
@@ -145,8 +145,8 @@ export default function CarteLivreursExterne() {
         <p className="text-xs font-semibold text-blue-900 mb-2">Logique d'affichage :</p>
         <div className="flex flex-wrap gap-3 text-xs text-blue-800">
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span> <b>Disponible</b> = prêt à recevoir une course (même hors app)</span>
-          <span className="flex items-center gap-1"><Wifi className="w-3 h-3 text-green-700" /> <b>Connecté</b> = app ouverte &lt; 3 min</span>
-          <span className="flex items-center gap-1"><WifiOff className="w-3 h-3 text-gray-500" /> <b>Hors app</b> = disponible mais app fermée</span>
+          <span className="flex items-center gap-1"><Wifi className="w-3 h-3 text-green-700" /> <b>En ligne</b> = app ouverte &lt; 3 min</span>
+          <span className="flex items-center gap-1"><WifiOff className="w-3 h-3 text-gray-500" /> <b>Hors ligne</b> = disponible mais app fermée</span>
         </div>
       </Card>
 
@@ -210,7 +210,7 @@ export default function CarteLivreursExterne() {
                     <div className="flex items-center gap-1 mb-1">
                       <MapPin className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                       <p className="text-xs text-muted-foreground">
-                        {enLigne ? "Connecté — " : "Disponible dans sa zone — "}
+                        {enLigne ? "En ligne — " : "Disponible dans sa zone — "}
                         {zone}
                       </p>
                     </div>
