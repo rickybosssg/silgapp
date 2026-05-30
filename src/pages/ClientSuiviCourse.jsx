@@ -76,6 +76,13 @@ export default function ClientSuiviCourse() {
 
   // Charger les courses créées par l'utilisateur + celles où il est destinataire
   // CORRECTION CRITIQUE : Polling 2s + GPS temps réel + synchronisation parfaite
+  // Charger les pays pour récupérer le tarif_km
+  const { data: countries = [] } = useQuery({
+    queryKey: ["countries-tarifs"],
+    queryFn: () => base44.entities.Country.list(),
+    staleTime: 60000,
+  });
+
   const { data: courses = [], refetch, isLoading } = useQuery({
     queryKey: ["mes-courses-externes", userId, clientProfilId],
     queryFn: async () => {
@@ -341,18 +348,30 @@ export default function ClientSuiviCourse() {
         <Card className="p-4 space-y-3">
           {/* Estimation style Uber — toujours visible */}
           {(() => {
-            // Calcul distance : priorité GPS réels, puis estimation
-            const distEst = maCourse.distance_reelle_km
-              || haversineKm(maCourse.latitude_recuperation, maCourse.longitude_recuperation, maCourse.latitude_livraison, maCourse.longitude_livraison)
-              || haversineKm(maCourse.gps_depart_lat, maCourse.gps_depart_lng, maCourse.gps_arrivee_lat, maCourse.gps_arrivee_lng);
-            const prix = maCourse.prix_final || (distEst ? Math.round(distEst * 100) : maCourse.prix_estimate || 0);
+            // Tarif km du pays de la course (fallback 100)
+            const countryData = countries.find(c => c.code === maCourse.country_code);
+            const tarifKm = countryData?.prix_par_km || 100;
+
+            // Calcul distance ETA : expéditeur → destinataire (GPS de la course)
+            const distEta = haversineKm(maCourse.gps_depart_lat, maCourse.gps_depart_lng, maCourse.gps_arrivee_lat, maCourse.gps_arrivee_lng);
+            // Distance réelle (après livraison) : scan récupération → scan livraison
+            const distReelle = maCourse.distance_reelle_km
+              || haversineKm(maCourse.latitude_recuperation, maCourse.longitude_recuperation, maCourse.latitude_livraison, maCourse.longitude_livraison);
+
+            const distEst = distReelle || distEta;
+
+            // Prix : final si livré, sinon approximatif = distance ETA × tarif_km
+            const isFinal = !!maCourse.prix_final;
+            const prix = isFinal
+              ? maCourse.prix_final
+              : (distEta ? Math.round(distEta * tarifKm) : maCourse.prix_estimate || 0);
+
             const dureeMs = maCourse.heure_livraison && maCourse.heure_recuperation
               ? new Date(maCourse.heure_livraison) - new Date(maCourse.heure_recuperation)
               : maCourse.heure_livraison && maCourse.heure_acceptation
                 ? new Date(maCourse.heure_livraison) - new Date(maCourse.heure_acceptation)
                 : null;
             const temps = dureeMs ? Math.round(dureeMs / 60000) : distEst ? Math.round((distEst / 25) * 60) : 0;
-            const isFinal = !!maCourse.prix_final;
             return (
               <div className={`grid grid-cols-3 gap-3 pt-3 mt-1 border-t ${isFinal ? "border-green-200" : "border-gray-200"}`}>
                 <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-3 text-center shadow-lg">
@@ -365,7 +384,9 @@ export default function ClientSuiviCourse() {
                 </div>
                 <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-3 text-center shadow-lg">
                   <span className="text-2xl font-black text-white block">{prix > 0 ? prix.toLocaleString() : "—"}</span>
-                  <span className="text-[10px] font-bold text-blue-100 uppercase tracking-wide">Prix (FCFA)</span>
+                  <span className="text-[10px] font-bold text-blue-100 uppercase tracking-wide">
+                    {isFinal ? "Prix final" : "Prix approx."}
+                  </span>
                 </div>
               </div>
             );
@@ -515,10 +536,12 @@ export default function ClientSuiviCourse() {
                 <div className="p-4 bg-green-50">
                   {/* 3 métriques toujours visibles — avec fallbacks */}
                   {(() => {
+                    const countryDataFinal = countries.find(c => c.code === maCourse.country_code);
+                    const tarifKmFinal = countryDataFinal?.prix_par_km || 100;
                     const distFinal = maCourse.distance_reelle_km
                       || haversineKm(maCourse.latitude_recuperation, maCourse.longitude_recuperation, maCourse.latitude_livraison, maCourse.longitude_livraison)
                       || null;
-                    const prixFinal = maCourse.prix_final > 0 ? maCourse.prix_final : (distFinal > 0 ? Math.round(distFinal * 100) : null);
+                    const prixFinal = maCourse.prix_final > 0 ? maCourse.prix_final : (distFinal > 0 ? Math.round(distFinal * tarifKmFinal) : null);
                     const dureeMs = maCourse.heure_livraison && maCourse.heure_recuperation
                       ? new Date(maCourse.heure_livraison) - new Date(maCourse.heure_recuperation)
                       : maCourse.heure_livraison && maCourse.heure_acceptation
