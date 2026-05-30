@@ -20,9 +20,11 @@ import SyncClientGPSPanel from "@/components/admin/SyncClientGPSPanel";
 import SyncLivreurGPSPanel from "@/components/admin/SyncLivreurGPSPanel";
 import { Card } from "@/components/ui/card";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
+import StatDetailModal from "@/components/dashboard/StatDetailModal";
 
 export default function DashboardExterne() {
   const [selectedCourse, setSelectedCourse] = useState(null);
+  const [statModal, setStatModal] = useState(null); // { type, data }
 
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ["courses-externes-dashboard"],
@@ -124,15 +126,15 @@ export default function DashboardExterne() {
         <SyncLivreurGPSPanel />
       </div>
 
-      {/* Stats */}
+      {/* Stats cliquables */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-        <StatCard title="Total clients" value={stats.totalClients} icon={Package} iconBg="bg-purple-500" />
+        <StatCard title="Total clients" value={stats.totalClients} icon={Package} iconBg="bg-purple-500" onClick={() => setStatModal({ type: "clients", data: clients })} />
         <StatCard title="Total" value={stats.total} icon={Package} iconBg="bg-accent" />
-        <StatCard title="En traitement" value={stats.enCours} icon={Clock} iconBg="bg-blue-500" />
-        <StatCard title="Livrées" value={stats.livrees} icon={CheckCircle2} iconBg="bg-emerald-500" />
-        <StatCard title="Annulées" value={stats.annulees} icon={XCircle} iconBg="bg-red-500" />
-        <StatCard title="CA du jour" value={`${stats.ca.toLocaleString()}`} icon={TrendingUp} iconBg="bg-indigo-500" trendLabel="FCFA" />
-        <StatCard title="Livreurs dispo" value={stats.dispoLivreurs} icon={Truck} iconBg="bg-accent" />
+        <StatCard title="En traitement" value={stats.enCours} icon={Clock} iconBg="bg-blue-500" onClick={() => setStatModal({ type: "en_traitement", data: coursesEnTraitement })} />
+        <StatCard title="Livrées" value={stats.livrees} icon={CheckCircle2} iconBg="bg-emerald-500" onClick={() => setStatModal({ type: "livrees", data: coursesTerminees.filter(c => c.statut === "livree") })} />
+        <StatCard title="Annulées" value={stats.annulees} icon={XCircle} iconBg="bg-red-500" onClick={() => setStatModal({ type: "annulees", data: coursesTerminees.filter(c => c.statut === "annulee") })} />
+        <StatCard title="CA du jour" value={`${stats.ca.toLocaleString()}`} icon={TrendingUp} iconBg="bg-indigo-500" trendLabel="FCFA" onClick={() => setStatModal({ type: "ca", data: coursesTerminees.filter(c => c.statut === "livree") })} />
+        <StatCard title="Livreurs dispo" value={stats.dispoLivreurs} icon={Truck} iconBg="bg-accent" onClick={() => setStatModal({ type: "livreurs_dispo", data: livreursEnLigne.filter(l => l.statut === "disponible") })} />
       </div>
 
       {/* Clients en ligne (avec GPS) */}
@@ -163,6 +165,14 @@ export default function DashboardExterne() {
 
       {/* Bouton flottant VENUS */}
       <VenusFloatingButton />
+
+      {/* Modal détails stats */}
+      <StatDetailModal
+        open={!!statModal}
+        onClose={() => setStatModal(null)}
+        type={statModal?.type}
+        data={statModal?.data}
+      />
     </div>
   );
 }

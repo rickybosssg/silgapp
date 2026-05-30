@@ -2,9 +2,12 @@ import React from "react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-export default function StatCard({ title, value, icon: Icon, trend, trendLabel, className, iconBg }) {
+export default function StatCard({ title, value, icon: Icon, trend, trendLabel, className, iconBg, onClick }) {
   return (
-    <Card className={cn("p-5 relative overflow-hidden", className)}>
+    <Card
+      className={cn("p-5 relative overflow-hidden", onClick && "cursor-pointer hover:shadow-md hover:border-primary/40 transition-all active:scale-95", className)}
+      onClick={onClick}
+    >
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{title}</p>
