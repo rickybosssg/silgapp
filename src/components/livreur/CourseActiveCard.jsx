@@ -101,13 +101,15 @@ function ProgressBar({ statut }) {
   );
 }
 
-export default function CourseActiveCard({ course, onColisRecupere, onColisLivre, onClientAnnule, isPending, isExterne = false, livreurLat, livreurLng }) {
+export default function CourseActiveCard({ course, onColisRecupere, onColisLivre, onClientAnnule, onMettrePause, isPending, isExterne = false, livreurLat, livreurLng }) {
   const navigate = useNavigate();
   const [prixReel, setPrixReel] = useState("");
   const [showPrixModal, setShowPrixModal] = useState(false);
   const [remarque, setRemarque] = useState("");
   const [showRemarque, setShowRemarque] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(null);
+  const [showPauseModal, setShowPauseModal] = useState(false);
+  const [pauseMotif, setPauseMotif] = useState("");
   // Optimistic status — overrides course.statut immediately on tap
   const [optimisticStatut, setOptimisticStatut] = useState(null);
 
@@ -161,6 +163,16 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     navigate(`/livreur/recap-course/${courseId}`);
   };
 
+  const handlePauseSubmit = () => {
+    if (!pauseMotif) {
+      toast.error("Veuillez sélectionner un motif");
+      return;
+    }
+    onMettrePause?.(course, pauseMotif);
+    setShowPauseModal(false);
+    setPauseMotif("");
+  };
+
   return (
     <>
       {/* Modal scan QR (externe) */}
@@ -173,6 +185,59 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           livreurLat={livreurLat}
           livreurLng={livreurLng}
         />
+      )}
+
+      {/* Modal mise en pause */}
+      {showPauseModal && !isExterne && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
+        >
+          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl space-y-5">
+            <div className="text-center">
+              <div className="w-14 h-14 rounded-2xl bg-amber-50 flex items-center justify-center mx-auto mb-3 text-3xl">
+                ⏸️
+              </div>
+              <p className="text-xl font-black text-gray-900">Mettre en pause</p>
+              <p className="text-sm text-gray-500 mt-1">Pourquoi souhaitez-vous mettre cette course en pause ?</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { id: "client_injoignable", label: "Client injoignable", icon: "📞" },
+                { id: "client_absent", label: "Client absent", icon: "🏠" },
+                { id: "adresse_a_confirmer", label: "Adresse à confirmer", icon: "📍" },
+                { id: "autre", label: "Autre", icon: "💬" },
+              ].map((m) => (
+                <button
+                  key={m.id}
+                  className={`h-20 rounded-2xl border-2 font-semibold text-sm transition-all flex flex-col items-center justify-center gap-1 ${
+                    pauseMotif === m.id
+                      ? "border-amber-500 bg-amber-50 text-amber-700"
+                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                  }`}
+                  onClick={() => setPauseMotif(m.id)}
+                >
+                  <span className="text-xl">{m.icon}</span>
+                  <span className="text-xs">{m.label}</span>
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                className="h-12 rounded-2xl border border-gray-200 text-gray-600 font-bold text-sm"
+                onClick={() => { setShowPauseModal(false); setPauseMotif(""); }}
+              >
+                Annuler
+              </button>
+              <button
+                className="h-12 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm disabled:opacity-50"
+                onClick={handlePauseSubmit}
+                disabled={!pauseMotif}
+              >
+                Mettre en pause
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal montant — uniquement pour l'interne */}
@@ -440,6 +505,21 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   disabled={isPending}
                 >
                   <X className="w-4 h-4" /> Le client a annulé
+                </button>
+              )}
+
+              {/* Bouton mettre en pause — uniquement pour l'interne */}
+              {!isExterne && (
+                <button
+                  className="w-full h-11 rounded-2xl border border-amber-200 text-amber-600 font-semibold text-sm flex items-center justify-center gap-2 active:bg-amber-50 transition-colors disabled:opacity-50"
+                  onClick={() => setShowPauseModal(true)}
+                  disabled={isPending}
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <rect x="6" y="4" width="4" height="16" rx="1" />
+                    <rect x="14" y="4" width="4" height="16" rx="1" />
+                  </svg>
+                  Mettre en pause
                 </button>
               )}
 

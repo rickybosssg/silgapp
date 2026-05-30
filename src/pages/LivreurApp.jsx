@@ -28,6 +28,7 @@ import EmptyStateAttente from "@/components/livreur/EmptyStateAttente";
 import CourseEnAttenteModal from "@/components/livreur/CourseEnAttenteModal";
 import CourseActiveCard from "@/components/livreur/CourseActiveCard";
 import LivreurHistorique from "@/components/livreur/LivreurHistorique";
+import CoursesEnPauseTab from "@/components/livreur/CoursesEnPauseTab";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
@@ -118,6 +119,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
 
   const courseEnAttente = useMemo(() => mesCourses.find(c => c.statut === "en_attente_livreur"), [mesCourses]);
   const coursesActives = useMemo(() => mesCourses.filter(c => ["acceptee", "colis_recupere", "en_livraison"].includes(c.statut)), [mesCourses]);
+  const coursesEnPause = useMemo(() => mesCourses.filter(c => c.statut === "pause"), [mesCourses]);
 
   const totalEncaisse = useMemo(() => {
     const today = new Date().toDateString();
@@ -316,6 +318,32 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
     toast("Course annulée par le client");
   };
 
+  // Gestion pause/reprise des courses
+  const handleMettrePause = (course, motif) => {
+    base44.functions.invoke("gestionPauseCourse", {
+      action: "mettre_pause",
+      course_id: course.id,
+      livreur_id: livreurProfil.id,
+      motif: motif,
+    }).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["mes-courses"] });
+      queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
+      toast.success("Course mise en pause");
+    }).catch(err => toast.error("Erreur : " + err.message));
+  };
+
+  const handleReprendreCourse = (course) => {
+    base44.functions.invoke("gestionPauseCourse", {
+      action: "reprendre_course",
+      course_id: course.id,
+      livreur_id: livreurProfil.id,
+    }).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["mes-courses"] });
+      queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
+      toast.success("Course reprise !");
+    }).catch(err => toast.error("Erreur : " + err.message));
+  };
+
   const handleLogout = () => {
     // Marquer inactif avant déconnexion
     if (livreurProfil?.id) {
@@ -395,6 +423,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
           <TabsList className="w-full">
             <TabsTrigger value="courses" className="flex-1 text-xs">Courses</TabsTrigger>
+            <TabsTrigger value="pause" className="flex-1 text-xs">En pause</TabsTrigger>
             <TabsTrigger value="historique" className="flex-1 text-xs">Historique</TabsTrigger>
           </TabsList>
         </Tabs>
@@ -432,6 +461,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
                     onColisRecupere={handleColisRecupere}
                     onColisLivre={handleColisLivre}
                     onClientAnnule={handleClientAnnule}
+                    onMettrePause={handleMettrePause}
                     isPending={updateCourseMutation.isPending}
                   />
                 ))}
@@ -439,21 +469,30 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
             )}
 
             {coursesActives.length === 0 && isEnLigne && <EmptyStateAttente />}
-
-            {totalEncaisse > 0 && (
-              <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-3xl p-5 border border-amber-100 shadow-sm">
-                <p className="text-xs text-amber-600 font-bold uppercase tracking-wide mb-1">Bilan du jour</p>
-                <p className="text-3xl font-black text-amber-700">{totalEncaisse.toLocaleString()} <span className="text-base font-semibold text-amber-500">FCFA</span></p>
-                <p className="text-xs text-amber-500 mt-1">Montant à reverser à Silga Livraison</p>
-              </div>
-            )}
           </div>
+        )}
+
+        {activeTab === "pause" && (
+          <CoursesEnPauseTab
+            courses={coursesEnPause}
+            onReprendre={handleReprendreCourse}
+          />
         )}
 
         {activeTab === "historique" && (
           <LivreurHistorique mesCourses={mesCourses} livreurProfil={livreurProfil} />
         )}
       </div>
+
+      {/* Bilan du jour - visible sur tous les onglets */}
+      {totalEncaisse > 0 && activeTab === "courses" && (
+        <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-3xl p-5 border border-amber-100 shadow-sm mt-4">
+          <p className="text-xs text-amber-600 font-bold uppercase tracking-wide mb-1">Bilan du jour</p>
+          <p className="text-3xl font-black text-amber-700">{totalEncaisse.toLocaleString()} <span className="text-base font-semibold text-amber-500">FCFA</span></p>
+          <p className="text-xs text-amber-500 mt-1">Montant à reverser à Silga Livraison</p>
+        </div>
+      )}
+    </div>
     </div>
   );
 }

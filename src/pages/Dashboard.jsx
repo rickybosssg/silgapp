@@ -16,6 +16,7 @@ import CourseDetailDialog from "@/components/courses/CourseDetailDialog";
 import AssignLivreurDialog from "@/components/courses/AssignLivreurDialog";
 import DispatchMonitor from "@/components/dispatch/DispatchMonitor";
 import BatterieAlertesPanel from "@/components/admin/BatterieAlertesPanel";
+import CoursesEnPausePanel from "@/components/admin/CoursesEnPausePanel";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
@@ -71,6 +72,12 @@ export default function Dashboard() {
       ["livree", "annulee"].includes(c.statut) &&
       isToday(new Date(c.heure_livraison || c.updated_date || c.created_date))
     ),
+    [courses]
+  );
+
+  // Courses en pause
+  const coursesEnPause = useMemo(
+    () => courses.filter(c => c.statut === "pause"),
     [courses]
   );
 
@@ -137,9 +144,21 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Alertes batterie + dispatch monitor */}
+      {/* Alertes batterie + dispatch monitor + courses en pause */}
       <BatterieAlertesPanel currentUser={null} />
       <DispatchMonitor />
+      <CoursesEnPausePanel
+        courses={coursesEnPause}
+        onReprendre={(course) => {
+          base44.functions.invoke("gestionPauseCourse", {
+            action: "reprendre_course",
+            course_id: course.id,
+            livreur_id: course.livreur_id,
+          }).then(() => {
+            queryClient.invalidateQueries({ queryKey: ["courses"] });
+          }).catch(err => alert("Erreur : " + err.message));
+        }}
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
