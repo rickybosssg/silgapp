@@ -454,36 +454,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   /* ── INTERNE : bouton classique avec GPS + récapitulatif ── */
                   <button
                     className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                    onClick={() => {
-                      const confirmerAvecGPS = (gpsData) => {
-                        if (!gpsData?.lat || !gpsData?.lng || isNaN(gpsData.lat) || isNaN(gpsData.lng)) {
-                          toast.error("📍 GPS requis pour valider cette étape — activez la localisation et réessayez");
-                          return;
-                        }
-                        setOptimisticStatut("livree");
-                        setTimeout(() => onColisLivre(course, gpsData), 150);
-                      };
-
-                      if (!navigator.geolocation) {
-                        const confirmerSansGPS = () => {
-                          setOptimisticStatut("livree");
-                          setTimeout(() => onColisLivre(course, null), 150);
-                        };
-                        confirmerSansGPS();
-                        return;
-                      }
-                      navigator.geolocation.getCurrentPosition(
-                        (pos) => confirmerAvecGPS({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                        () => {
-                          const confirmerSansGPS = () => {
-                            setOptimisticStatut("livree");
-                            setTimeout(() => onColisLivre(course, null), 150);
-                          };
-                          confirmerSansGPS();
-                        },
-                        { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
-                      );
-                    }}
+                    onClick={() => setShowPrixModal(true)}
                     disabled={isPending}
                   >
                     <Check className="w-6 h-6" />
