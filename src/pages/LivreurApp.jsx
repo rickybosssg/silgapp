@@ -486,13 +486,12 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
 
       {/* Bilan du jour - visible sur tous les onglets */}
       {totalEncaisse > 0 && activeTab === "courses" && (
-        <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-3xl p-5 border border-amber-100 shadow-sm mt-4">
+        <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-3xl p-5 border border-amber-100 shadow-sm mt-4 max-w-lg mx-auto">
           <p className="text-xs text-amber-600 font-bold uppercase tracking-wide mb-1">Bilan du jour</p>
           <p className="text-3xl font-black text-amber-700">{totalEncaisse.toLocaleString()} <span className="text-base font-semibold text-amber-500">FCFA</span></p>
           <p className="text-xs text-amber-500 mt-1">Montant à reverser à Silga Livraison</p>
         </div>
       )}
-    </div>
     </div>
   );
 }
