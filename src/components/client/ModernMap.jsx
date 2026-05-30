@@ -104,38 +104,44 @@ export default function ModernMap({
         zIndexOffset: 1000
       }).addTo(map);
 
+      // Helpers popup
+      const isEnLigneP = personne.app_active && personne.last_seen_at && (Date.now() - new Date(personne.last_seen_at).getTime()) < 3 * 60 * 1000;
+      const zone = personne.quartier || (personne.latitude ? 'Ouagadougou' : 'Zone inconnue');
+      const lastSeen = (() => {
+        const dt = personne.derniere_position_date || personne.last_seen_at || personne.updated_date;
+        if (!dt) return null;
+        const diff = Math.round((Date.now() - new Date(dt).getTime()) / 60000);
+        if (diff < 1) return 'à l\'instant';
+        if (diff < 60) return `il y a ${diff} min`;
+        const h = Math.round(diff / 60);
+        return `il y a ${h}h`;
+      })();
+
       // Popup avec infos
       if (isClient) {
         marker.bindPopup(`
-          <div class="client-popup">
-            <div class="client-popup-header">
-              <div class="client-popup-avatar">${personne.nom?.charAt(0) || 'C'}</div>
-              <div>
-                <p class="client-popup-name">${personne.prenom || ''} ${personne.nom || ''}</p>
-                <p class="client-popup-status">Client avec GPS</p>
-              </div>
-            </div>
-            ${personne.telephone ? `<p class="client-popup-phone">📞 ${personne.telephone}</p>` : ''}
+          <div style="min-width:200px;font-family:sans-serif;padding:4px 0">
+            <p style="font-weight:700;font-size:14px;margin:0 0 6px 0;color:#1a1a1a">${personne.prenom || ''} ${personne.nom || ''}</p>
+            ${personne.telephone ? `<p style="font-size:12px;color:#444;margin:2px 0">📞 ${personne.telephone}</p>` : ''}
+            <p style="font-size:12px;color:#444;margin:2px 0">${isEnLigneP ? '🟢 Application ouverte' : '⚪ Application fermée'}</p>
+            <p style="font-size:12px;color:#444;margin:2px 0">📍 ${zone}</p>
+            ${lastSeen ? `<p style="font-size:12px;color:#888;margin:2px 0">🕒 Dernier GPS : ${lastSeen}</p>` : ''}
           </div>
-        `);
+        `, { maxWidth: 260 });
       } else {
+        const isON = personne.statut === 'disponible' || personne.statut === 'en_course';
+        const statutLabel = personne.statut === 'disponible' ? '🟢 Libre' : personne.statut === 'en_course' ? '🔵 En course' : null;
         marker.bindPopup(`
-          <div class="livreur-popup">
-            <div class="livreur-popup-header">
-              ${personne.photo_url 
-                ? `<img src="${personne.photo_url}" alt="${personne.nom}" />`
-                : `<div class="livreur-popup-avatar">${personne.nom?.charAt(0) || 'L'}</div>`
-              }
-              <div>
-                <p class="livreur-popup-name">${personne.nom}</p>
-                <div class="livreur-popup-rating">
-                  ⭐ 4.8
-                </div>
-              </div>
-            </div>
-            <p class="livreur-popup-vehicle">${personne.vehicule || 'Moto'}</p>
+          <div style="min-width:200px;font-family:sans-serif;padding:4px 0">
+            <p style="font-weight:700;font-size:14px;margin:0 0 6px 0;color:#1a1a1a">${personne.prenom || ''} ${personne.nom || ''}</p>
+            ${personne.telephone ? `<p style="font-size:12px;color:#444;margin:2px 0">📞 ${personne.telephone}</p>` : ''}
+            <p style="font-size:12px;color:#444;margin:2px 0">${isON ? '🟢 ON' : '⚪ OFF'}</p>
+            ${statutLabel ? `<p style="font-size:12px;color:#444;margin:2px 0">${statutLabel}</p>` : ''}
+            <p style="font-size:12px;color:#444;margin:2px 0">${isEnLigneP ? '🟢 Application ouverte' : '⚪ Application fermée'}</p>
+            <p style="font-size:12px;color:#444;margin:2px 0">📍 ${zone}</p>
+            ${lastSeen ? `<p style="font-size:12px;color:#888;margin:2px 0">🕒 Dernier GPS : ${lastSeen}</p>` : ''}
           </div>
-        `);
+        `, { maxWidth: 260 });
       }
 
       markersRef.current.push(marker);
@@ -348,7 +354,6 @@ export default function ModernMap({
         font-size: 18px;
       }
       
-parameter=replace>
       /* Popup livreurs */
       .livreur-popup {
         min-width: 180px;
