@@ -145,9 +145,8 @@ export default function CourseEnAttenteModal({
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      // Utiliser dispatchMoteur pour interne, dispatchExterneAuto pour externe
-      const functionName = course.reseau === 'externe' ? 'dispatchExterneAuto' : 'dispatchMoteur';
-      const res = await base44.functions.invoke(functionName, {
+      // SILGA INTERNE UNIQUEMENT - dispatchMoteur
+      const res = await base44.functions.invoke('dispatchMoteur', {
         action: 'accepter_course',
         course_id: course.id,
         livreur_id: livreurId,
@@ -180,9 +179,8 @@ export default function CourseEnAttenteModal({
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      // Utiliser dispatchMoteur pour interne, dispatchExterneAuto pour externe
-      const functionName = course.reseau === 'externe' ? 'dispatchExterneAuto' : 'dispatchMoteur';
-      const res = await base44.functions.invoke(functionName, {
+      // SILGA INTERNE UNIQUEMENT - dispatchMoteur
+      const res = await base44.functions.invoke('dispatchMoteur', {
         action: 'refuser_course',
         course_id: course.id,
         livreur_id: livreurId,
