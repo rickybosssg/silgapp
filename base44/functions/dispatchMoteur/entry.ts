@@ -68,7 +68,7 @@ async function proposerAuLivreur(base44, courseId, course, livreur, cycle) {
     livreur_nom: `${livreur.prenom || ''} ${livreur.nom}`.trim(),
     livreur_photo_url: livreur.photo_url || '',
     livreur_telephone: livreur.telephone,
-    statut: 'en_attente_livreur',
+    statut: 'acceptee',
     dispatch_status: 'propose',
     heure_sollicitation: new Date().toISOString(),
     timeout_expires_at: new Date(Date.now() + (TIMEOUT_SECONDES * 1000)).toISOString(),

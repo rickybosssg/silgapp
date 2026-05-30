@@ -79,7 +79,7 @@ export default function CourseEnAttenteModal({
   useVibration(true);
   const [showRaison, setShowRaison] = useState(false);
   const [raison, setRaison] = useState("");
-  const [tempsRestant, setTempsRestant] = useState(60);
+  const [tempsRestant, setTempsRestant] = useState(90);
   const [courseDejaPrise, setCourseDejaPrise] = useState(false);
   const [courseExpiree, setCourseExpiree] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -295,7 +295,7 @@ export default function CourseEnAttenteModal({
             className={`h-full transition-all duration-1000 ${
               tempsRestant <= 10 ? 'bg-red-500' : tempsRestant <= 30 ? 'bg-amber-500' : 'bg-green-500'
             }`}
-            style={{ width: `${(tempsRestant / 60) * 100}%` }}
+            style={{ width: `${(tempsRestant / 90) * 100}%` }}
           />
         </div>
 
@@ -308,7 +308,7 @@ export default function CourseEnAttenteModal({
             </span>
           </div>
           <span className="text-xs text-gray-400">
-            {tempsRestant <= 10 ? '⚠️ Dépêchez-vous !' : tempsRestant <= 30 ? '⏰ Temps limité' : '⏱️ 60s pour accepter'}
+            {tempsRestant <= 10 ? '⚠️ Dépêchez-vous !' : tempsRestant <= 30 ? '⏰ Temps limité' : '⏱️ 90s pour accepter'}
           </span>
         </div>
 

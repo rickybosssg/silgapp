@@ -104,7 +104,7 @@ function CourseItemInterne({ course, onView }) {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <CourseStatusBadge statut={course.statut} />
+            <CourseStatusBadge statut={course.statut} dispatchStatus={course.dispatch_status} />
             {course.livreur_nom && (
               <span className="text-xs font-medium text-foreground">🚴 {course.livreur_nom}</span>
             )}
