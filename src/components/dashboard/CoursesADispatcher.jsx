@@ -22,13 +22,20 @@ function CourseItem({ course, onAssign, onView }) {
   });
 
   const lancerAutoMutation = useMutation({
-    mutationFn: () => base44.functions.invoke("dispatchMoteur", { action: "lancer_auto", course_id: course.id }),
+    mutationFn: () => base44.functions.invoke("dispatchMoteur", { 
+      action: "lancer_auto", 
+      course_id: course.id 
+    }),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["courses"] });
-      if (res?.data?.livreur) {
-        toast.success(`Dispatch auto lancé → ${res.data.livreur}`);
+      if (res?.data?.success && res?.data?.livreur) {
+        toast.success(`Dispatch auto : proposé à ${res.data.livreur.nom} (${res.data.livreur.distance_km}km)`);
+      } else if (res?.data?.noLivreur) {
+        toast.warning(res?.data?.message || "Aucun livreur interne disponible");
+      } else if (res?.data?.missing_gps) {
+        toast.error("⚠️ Course sans GPS — veuillez ajouter la position de départ");
       } else {
-        toast.warning(res?.data?.message || "Aucun livreur disponible");
+        toast.success("Dispatch auto lancé");
       }
     },
     onError: (e) => toast.error("Erreur dispatch : " + e.message),

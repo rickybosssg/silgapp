@@ -221,18 +221,26 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
     console.log("🔴 REFUS:", course.id, "Raison:", raison);
     
     try {
-      const updateData = { 
-        statut: "nouvelle", 
-        livreur_id: "", 
-        livreur_nom: "",
-        remarque_livreur: remarque,
-        dispatch_status: "en_attente_admin",
-        // Garder le mode de dispatch original (manuel ou auto)
-      };
-      
-      console.log("📝 Update data:", updateData);
-      
-      await base44.entities.Course.update(course.id, updateData);
+      // Si dispatch automatique → appeler le moteur pour redispatch
+      if (course.dispatch_mode === "automatique") {
+        console.log("🤖 Dispatch auto → appel dispatchMoteur pour redispatch");
+        await base44.functions.invoke("dispatchMoteur", {
+          action: "refuser_course",
+          course_id: course.id,
+          livreur_id: livreurProfil.id,
+          raison: raison,
+        });
+      } else {
+        // Dispatch manuel → retour à l'admin
+        const updateData = { 
+          statut: "nouvelle", 
+          livreur_id: "", 
+          livreur_nom: "",
+          remarque_livreur: remarque,
+          dispatch_status: "en_attente_admin",
+        };
+        await base44.entities.Course.update(course.id, updateData);
+      }
       
       console.log("✅ Course mise à jour, invalidation...");
       

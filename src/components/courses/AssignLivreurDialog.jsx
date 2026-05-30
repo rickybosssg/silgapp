@@ -27,7 +27,11 @@ export default function AssignLivreurDialog({ course, open, onClose, reseau = "i
 
   const { data: livreurs = [] } = useQuery({
     queryKey: ["livreurs", reseau],
-    queryFn: () => base44.entities.Livreur.filter({ reseau }, "-created_date"),
+    queryFn: () => base44.entities.Livreur.filter({ 
+      reseau,
+      validation: "valide",
+      actif: true
+    }, "-created_date"),
     initialData: [],
   });
 
