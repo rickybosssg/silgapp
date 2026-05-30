@@ -1,99 +1,68 @@
 import React, { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
-import { Globe } from "lucide-react";
-import { PAYS_SILGAPP } from "./CountrySelector";
 
-/** Affiche des statistiques groupées par pays */
 export default function StatsPays({ courses = [], livreurs = [], clients = [] }) {
-  const statsByCountry = useMemo(() => {
-    const groups = {};
+  const { data: pays = [] } = useQuery({
+    queryKey: ["pays-actifs"],
+    queryFn: () => base44.entities.Country.filter({ actif: true }, "ordre"),
+    initialData: [],
+    staleTime: 60000,
+  });
 
-    // Grouper les courses par country_code
-    courses.forEach(c => {
-      const code = c.country_code || "BF";
-      if (!groups[code]) groups[code] = { courses: [], livreurs: new Set(), clients: new Set() };
-      groups[code].courses.push(c);
-    });
+  const statsByPays = useMemo(() => {
+    return pays.map((p) => {
+      const c = courses.filter((x) => (x.country_code || "BF") === p.code);
+      const livrees = c.filter((x) => x.statut === "livree");
+      const enCours = c.filter((x) => !["livree", "annulee"].includes(x.statut));
+      const ca = livrees.reduce((s, x) => s + (x.prix_final || 0), 0);
+      const lvrs = livreurs.filter((x) => (x.country_code || "BF") === p.code);
+      const cls = clients.filter((x) => (x.country_code || "BF") === p.code);
+      return { pays: p, total: c.length, livrees: livrees.length, enCours: enCours.length, ca, livreurs: lvrs.length, clients: cls.length };
+    }).filter((s) => s.total > 0).sort((a, b) => b.total - a.total);
+  }, [pays, courses, livreurs, clients]);
 
-    livreurs.forEach(l => {
-      const code = l.country_code || "BF";
-      if (!groups[code]) groups[code] = { courses: [], livreurs: new Set(), clients: new Set() };
-      groups[code].livreurs.add(l.id);
-    });
-
-    clients.forEach(c => {
-      const code = c.country_code || "BF";
-      if (!groups[code]) groups[code] = { courses: [], livreurs: new Set(), clients: new Set() };
-      groups[code].clients.add(c.id);
-    });
-
-    return Object.entries(groups).map(([code, data]) => {
-      const pays = PAYS_SILGAPP.find(p => p.code === code) || { code, nom: code, emoji_flag: "🌍", devise: "FCFA" };
-      const livrees = data.courses.filter(c => c.statut === "livree");
-      const ca = livrees.reduce((s, c) => s + (c.prix_final || 0), 0);
-      const commission = livrees.reduce((s, c) => s + (c.commission_silga || 0), 0);
-      return {
-        ...pays,
-        total_courses: data.courses.length,
-        livrees: livrees.length,
-        annulees: data.courses.filter(c => c.statut === "annulee").length,
-        en_cours: data.courses.filter(c => !["livree", "annulee"].includes(c.statut)).length,
-        ca,
-        commission,
-        nb_livreurs: data.livreurs.size,
-        nb_clients: data.clients.size,
-      };
-    }).sort((a, b) => b.total_courses - a.total_courses);
-  }, [courses, livreurs, clients]);
-
-  if (statsByCountry.length <= 1) return null;
+  if (statsByPays.length <= 1) return null;
 
   return (
-    <Card className="p-4">
-      <div className="flex items-center gap-2 mb-4">
-        <Globe className="w-4 h-4 text-primary" />
-        <h3 className="font-bold text-foreground">Statistiques par pays</h3>
-        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-          {statsByCountry.length} pays actifs
-        </span>
-      </div>
-      <div className="space-y-3">
-        {statsByCountry.map(p => (
-          <div key={p.code} className="border rounded-xl p-3">
-            <div className="flex items-center gap-2 mb-2">
+    <div className="space-y-2">
+      <h3 className="text-sm font-semibold text-muted-foreground">Statistiques par pays</h3>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {statsByPays.map(({ pays: p, total, livrees, enCours, ca, livreurs: lv, clients: cl }) => (
+          <Card key={p.code} className="p-3 space-y-1.5">
+            <div className="flex items-center gap-2">
               <span className="text-lg">{p.emoji_flag}</span>
-              <span className="font-semibold text-sm">{p.nom}</span>
-              <span className="text-xs text-muted-foreground ml-auto">{p.total_courses} courses</span>
-            </div>
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-xs">
-              <div className="bg-blue-50 rounded p-2 text-center">
-                <p className="font-bold text-blue-700">{p.en_cours}</p>
-                <p className="text-blue-500 text-[10px]">En cours</p>
-              </div>
-              <div className="bg-green-50 rounded p-2 text-center">
-                <p className="font-bold text-green-700">{p.livrees}</p>
-                <p className="text-green-500 text-[10px]">Livrées</p>
-              </div>
-              <div className="bg-red-50 rounded p-2 text-center">
-                <p className="font-bold text-red-700">{p.annulees}</p>
-                <p className="text-red-500 text-[10px]">Annulées</p>
-              </div>
-              <div className="bg-indigo-50 rounded p-2 text-center">
-                <p className="font-bold text-indigo-700">{p.ca.toLocaleString()}</p>
-                <p className="text-indigo-500 text-[10px]">CA {p.devise}</p>
-              </div>
-              <div className="bg-orange-50 rounded p-2 text-center">
-                <p className="font-bold text-orange-700">{p.nb_livreurs}</p>
-                <p className="text-orange-500 text-[10px]">Livreurs</p>
-              </div>
-              <div className="bg-purple-50 rounded p-2 text-center">
-                <p className="font-bold text-purple-700">{p.nb_clients}</p>
-                <p className="text-purple-500 text-[10px]">Clients</p>
+              <div>
+                <p className="font-semibold text-sm text-foreground">{p.nom}</p>
+                <p className="text-xs text-muted-foreground">{p.ville_principale}</p>
               </div>
             </div>
-          </div>
+            <div className="grid grid-cols-2 gap-1 text-xs">
+              <div className="bg-muted rounded px-2 py-1">
+                <p className="font-bold text-foreground">{total}</p>
+                <p className="text-muted-foreground">Courses</p>
+              </div>
+              <div className="bg-emerald-50 rounded px-2 py-1">
+                <p className="font-bold text-emerald-700">{livrees}</p>
+                <p className="text-emerald-600">Livrées</p>
+              </div>
+              <div className="bg-blue-50 rounded px-2 py-1">
+                <p className="font-bold text-blue-700">{enCours}</p>
+                <p className="text-blue-600">En cours</p>
+              </div>
+              <div className="bg-indigo-50 rounded px-2 py-1">
+                <p className="font-bold text-indigo-700">{ca.toLocaleString()}</p>
+                <p className="text-indigo-600">{p.devise}</p>
+              </div>
+            </div>
+            <div className="flex gap-2 text-xs text-muted-foreground pt-1 border-t">
+              <span>🛵 {lv} livreurs</span>
+              <span>👤 {cl} clients</span>
+            </div>
+          </Card>
         ))}
       </div>
-    </Card>
+    </div>
   );
 }
