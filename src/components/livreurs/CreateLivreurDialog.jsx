@@ -31,9 +31,6 @@ export default function CreateLivreurDialog({ reseau = "interne", countryCode = 
     NE: { tel: "+227 90 00 00 00", quartier: "Ex: Niamey, Plateau, Gamkalé" },
   };
 
-  const activeCountry = effectiveCountryCode || form.country_code || "BF";
-  const paysInfo = PAYS_INFO[activeCountry] || PAYS_INFO["BF"];
-
   const [form, setForm] = useState({
     prenom: "",
     nom: "",
@@ -46,6 +43,9 @@ export default function CreateLivreurDialog({ reseau = "interne", countryCode = 
     reseau: reseau,
     country_code: effectiveCountryCode || "BF",
   });
+
+  const activeCountry = effectiveCountryCode || form.country_code || "BF";
+  const paysInfo = PAYS_INFO[activeCountry] || PAYS_INFO["BF"];
 
   const createMutation = useMutation({
     mutationFn: async () => {
