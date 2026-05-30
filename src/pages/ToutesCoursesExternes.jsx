@@ -9,11 +9,17 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import CourseStatusBadge from "@/components/courses/CourseStatusBadge";
+import { useAdminContext } from "@/hooks/useAdminContext.js";
 
 export default function ToutesCoursesExternes() {
+  const { isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
+  const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
+
   const { data: courses = [] } = useQuery({
-    queryKey: ["courses-externes"],
-    queryFn: () => base44.entities.CourseExterne.list("-created_date", 200),
+    queryKey: ["courses-externes", effectiveCountry || "all"],
+    queryFn: () => effectiveCountry
+      ? base44.entities.CourseExterne.filter({ country_code: effectiveCountry }, "-created_date", 200)
+      : base44.entities.CourseExterne.list("-created_date", 200),
     initialData: [],
     refetchInterval: 10000,
   });
@@ -31,15 +37,17 @@ export default function ToutesCoursesExternes() {
   return (
     <div className="p-4 space-y-4 max-w-5xl mx-auto">
       <div className="flex items-center gap-3 mb-4">
-        <Link to="/">
+        <Link to={isPays ? "/" : "/admin/global"}>
           <Button variant="outline" size="sm" className="gap-1.5">
             <ArrowLeft className="w-4 h-4" />
-            Retour
+            {isPays ? "Retour" : "Admin Global"}
           </Button>
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-foreground">Toutes les Courses (Externes)</h1>
-          <p className="text-sm text-muted-foreground">{stats.totale} courses externes au total</p>
+          <p className="text-sm text-muted-foreground">
+            {stats.totale} courses {effectiveCountry ? `(${effectiveCountry})` : "tous pays"}
+          </p>
         </div>
       </div>
 

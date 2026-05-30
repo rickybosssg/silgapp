@@ -7,12 +7,13 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft, Globe, MapPin, Package, Truck, Clock,
-  CheckCircle2, XCircle, TrendingUp, Users, ShieldCheck
+  CheckCircle2, XCircle, TrendingUp, Users, ShieldCheck, RefreshCw
 } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
 import { PAYS_SILGAPP } from "@/components/international/CountrySelector.jsx";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
+import CountrySelector, { usePaysActifs } from "@/components/international/CountrySelector.jsx";
 import StatCard from "@/components/dashboard/StatCard";
 import StatDetailModal from "@/components/dashboard/StatDetailModal";
 import CoursesEnTraitement from "@/components/dashboard/CoursesEnTraitement";
@@ -25,12 +26,13 @@ import DispatchMonitor from "@/components/dispatch/DispatchMonitor";
 
 export default function DashboardPays() {
   const { code: codeParam } = useParams();
-  const { isGlobal, isPays, countryCode: adminCountryCode } = useAdminContext();
+  const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
   const navigate = useNavigate();
+  const paysActifs = usePaysActifs();
 
-  // L'admin global peut naviguer vers n'importe quel pays via /admin/pays/:code
   // L'admin pays est restreint à son propre country_code
-  const effectiveCode = isPays ? adminCountryCode : (codeParam || adminCountryCode || "BF");
+  // L'admin global utilise selectedCountry (depuis localStorage ou URL)
+  const effectiveCode = isPays ? adminCountryCode : (codeParam || selectedCountry || "BF");
 
   const paysInfo = PAYS_SILGAPP.find(p => p.code === effectiveCode) || { code: effectiveCode, nom: effectiveCode, emoji_flag: "🌍", devise: "FCFA" };
 
@@ -106,9 +108,9 @@ export default function DashboardPays() {
 
   return (
     <div className="px-4 py-4 lg:p-6 space-y-4 lg:space-y-5 max-w-7xl mx-auto">
-      {/* Header */}
+      {/* Header avec sélecteur de pays */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-1">
           {isGlobal && (
             <Button variant="outline" size="sm" className="gap-1.5" onClick={() => navigate("/admin/global")}>
               <ArrowLeft className="w-4 h-4" />
@@ -129,7 +131,19 @@ export default function DashboardPays() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Link to="/carte">
+          {isGlobal && paysActifs.length > 1 && (
+            <div className="flex items-center gap-1.5">
+              <CountrySelector
+                value={effectiveCode}
+                onChange={(code) => {
+                  setSelectedCountry(code);
+                  navigate(`/admin/pays/${code}`);
+                }}
+                className="h-9 text-xs"
+              />
+            </div>
+          )}
+          <Link to={`/admin/pays/${effectiveCode}/carte`}>
             <Button variant="outline" size="sm" className="gap-1.5">
               <MapPin className="w-4 h-4" />
               <span className="hidden sm:inline">Carte</span>

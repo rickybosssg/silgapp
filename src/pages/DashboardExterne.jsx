@@ -26,37 +26,37 @@ import StatDetailModal from "@/components/dashboard/StatDetailModal";
 export default function DashboardExterne() {
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [statModal, setStatModal] = useState(null);
-  const { isGlobal, isPays, countryCode: adminCountryCode } = useAdminContext();
-  // Admin pays → filtrage forcé sur son pays. Admin global → peut filtrer librement.
-  const [filterCountry, setFilterCountry] = useState(() => isPays ? (adminCountryCode || "") : "");
+  const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
+  // Admin pays → filtrage forcé sur son pays. Admin global → utilise selectedCountry
+  const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
   const paysActifs = usePaysActifs();
 
   const { data: courses = [], isLoading } = useQuery({
-    queryKey: ["courses-externes-dashboard", isPays ? adminCountryCode : "all"],
-    queryFn: () => isPays && adminCountryCode
-      ? base44.entities.CourseExterne.filter({ country_code: adminCountryCode }, "-created_date")
+    queryKey: ["courses-externes-dashboard", effectiveCountry || "all"],
+    queryFn: () => effectiveCountry
+      ? base44.entities.CourseExterne.filter({ country_code: effectiveCountry }, "-created_date")
       : base44.entities.CourseExterne.list("-created_date", 300),
     initialData: [],
     refetchInterval: 5000,
   });
 
-  const livreurFilter = isPays && adminCountryCode
-    ? { type_livreur: "externe", country_code: adminCountryCode }
+  const livreurFilter = effectiveCountry
+    ? { type_livreur: "externe", country_code: effectiveCountry }
     : { type_livreur: "externe" };
 
   const { data: livreurs = [] } = useQuery({
-    queryKey: ["livreurs-externes", isPays ? adminCountryCode : "all"],
+    queryKey: ["livreurs-externes", effectiveCountry || "all"],
     queryFn: () => base44.entities.Livreur.filter(livreurFilter),
     initialData: [],
     refetchInterval: 5000,
   });
 
-  const clientFilter = isPays && adminCountryCode
-    ? { actif: true, country_code: adminCountryCode }
+  const clientFilter = effectiveCountry
+    ? { actif: true, country_code: effectiveCountry }
     : { actif: true };
 
   const { data: clients = [] } = useQuery({
-    queryKey: ["clients-externes", isPays ? adminCountryCode : "all"],
+    queryKey: ["clients-externes", effectiveCountry || "all"],
     queryFn: () => base44.entities.ClientExterne.filter(clientFilter),
     initialData: [],
     refetchInterval: 10000,
@@ -64,8 +64,8 @@ export default function DashboardExterne() {
 
   // Filtrage par pays
   const coursesFiltrees = useMemo(
-    () => filterCountry ? courses.filter(c => (c.country_code || "BF") === filterCountry) : courses,
-    [courses, filterCountry]
+    () => effectiveCountry ? courses.filter(c => (c.country_code || "BF") === effectiveCountry) : courses,
+    [courses, effectiveCountry]
   );
 
   // Courses du jour OU encore actives
@@ -148,13 +148,10 @@ export default function DashboardExterne() {
           {isGlobal && paysActifs.length > 1 && (
             <div className="flex items-center gap-1.5">
               <CountrySelector
-                value={filterCountry}
-                onChange={setFilterCountry}
+                value={effectiveCountry || ""}
+                onChange={(code) => setSelectedCountry(code)}
                 className="h-9 text-xs"
               />
-              {filterCountry && (
-                <button onClick={() => setFilterCountry("")} className="text-xs text-muted-foreground hover:text-foreground">✕</button>
-              )}
             </div>
           )}
           <Link to="/carte">

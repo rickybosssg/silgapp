@@ -107,13 +107,11 @@ function EnLigneBadge({ entity }) {
 export default function CarteLivreursExterne() {
   const [showMap, setShowMap] = useState(false);
   const [filtre, setFiltre] = useState("tous");
-  const { isGlobal, isPays, countryCode: adminCountryCode } = useAdminContext();
+  const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
   const paysActifs = usePaysActifs();
   
-  // Admin global : peut choisir le pays. Admin pays : forcé sur son pays.
-  const [filterCountry, setFilterCountry] = useState(() => isPays ? (adminCountryCode || "") : "");
-  
-  const effectiveCountry = isPays ? (adminCountryCode || "") : filterCountry;
+  // Admin pays : forcé sur son pays. Admin global : utilise selectedCountry
+  const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || "");
 
   const livreurFilter = effectiveCountry
     ? { type_livreur: "externe", actif: true, validation: "valide", country_code: effectiveCountry }
@@ -185,10 +183,10 @@ export default function CarteLivreursExterne() {
       {/* Header avec sélecteur de pays */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-3 flex-1">
-          <Link to="/">
+          <Link to={isGlobal ? "/admin/global" : "/"}>
             <Button variant="outline" size="sm" className="gap-1.5">
               <ArrowLeft className="w-4 h-4" />
-              Retour
+              {isGlobal ? "Admin Global" : "Retour"}
             </Button>
           </Link>
           <div>
@@ -201,13 +199,12 @@ export default function CarteLivreursExterne() {
         {isGlobal && paysActifs.length > 1 && (
           <div className="flex items-center gap-2">
             <CountrySelector
-              value={filterCountry}
-              onChange={setFilterCountry}
+              value={effectiveCountry}
+              onChange={(code) => {
+                setSelectedCountry(code);
+              }}
               className="h-9 text-xs"
             />
-            {filterCountry && (
-              <button onClick={() => setFilterCountry("")} className="text-xs text-muted-foreground hover:text-foreground">✕</button>
-            )}
           </div>
         )}
       </div>

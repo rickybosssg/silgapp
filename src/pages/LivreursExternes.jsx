@@ -318,20 +318,21 @@ export default function LivreursExternes() {
   const queryClient = useQueryClient();
   const [selectedLivreur, setSelectedLivreur] = useState(null);
   const [filterStatut, setFilterStatut] = useState("tous");
-  const { isPays, countryCode: adminCountryCode } = useAdminContext();
+  const { isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
+  const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
 
-  const livreurFilter = isPays && adminCountryCode
-    ? { type_livreur: "externe", country_code: adminCountryCode }
+  const livreurFilter = effectiveCountry
+    ? { type_livreur: "externe", country_code: effectiveCountry }
     : { type_livreur: "externe" };
 
   const { data: livreurs = [] } = useQuery({
-    queryKey: ["livreurs-externes", isPays ? adminCountryCode : "all"],
+    queryKey: ["livreurs-externes", effectiveCountry || "all"],
     queryFn: () => base44.entities.Livreur.filter(livreurFilter, "-created_date"),
     initialData: [],
     refetchInterval: 10000,
   });
 
-  const coursesFilter = isPays && adminCountryCode ? { country_code: adminCountryCode } : {};
+  const coursesFilter = effectiveCountry ? { country_code: effectiveCountry } : {};
 
   const { data: coursesAll = [] } = useQuery({
     queryKey: ["courses-externes-all-livreurs", isPays ? adminCountryCode : "all"],
@@ -441,15 +442,17 @@ export default function LivreursExternes() {
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Link to="/">
+          <Link to={isPays ? "/" : "/admin/global"}>
             <Button variant="outline" size="sm" className="gap-1.5">
               <ArrowLeft className="w-4 h-4" />
-              <span className="hidden sm:inline">Retour</span>
+              <span className="hidden sm:inline">{isPays ? "Retour" : "Admin Global"}</span>
             </Button>
           </Link>
           <div>
             <h1 className="text-xl font-bold text-foreground">Livreurs Externes</h1>
-            <p className="text-xs text-muted-foreground">{stats.total} livreurs • {stats.valide} validés</p>
+            <p className="text-xs text-muted-foreground">
+              {stats.total} livreurs {effectiveCountry ? `(${effectiveCountry})` : "(tous pays)"} • {stats.valide} validés
+            </p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -474,7 +477,7 @@ export default function LivreursExternes() {
             <RefreshCw className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Resync tous</span>
           </Button>
-          <CreateLivreurDialog reseau="externe" countryCode={isPays ? adminCountryCode : null} />
+          <CreateLivreurDialog reseau="externe" countryCode={effectiveCountry} />
         </div>
       </div>
 
