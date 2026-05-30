@@ -11,6 +11,7 @@ import ModernMap from "@/components/client/ModernMap";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
+import CountrySelector, { usePaysActifs } from "@/components/international/CountrySelector.jsx";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -106,14 +107,20 @@ function EnLigneBadge({ entity }) {
 export default function CarteLivreursExterne() {
   const [showMap, setShowMap] = useState(false);
   const [filtre, setFiltre] = useState("tous");
-  const { isPays, countryCode: adminCountryCode } = useAdminContext();
+  const { isGlobal, isPays, countryCode: adminCountryCode } = useAdminContext();
+  const paysActifs = usePaysActifs();
+  
+  // Admin global : peut choisir le pays. Admin pays : forcé sur son pays.
+  const [filterCountry, setFilterCountry] = useState(() => isPays ? (adminCountryCode || "") : "");
+  
+  const effectiveCountry = isPays ? (adminCountryCode || "") : filterCountry;
 
-  const livreurFilter = isPays && adminCountryCode
-    ? { type_livreur: "externe", actif: true, validation: "valide", country_code: adminCountryCode }
+  const livreurFilter = effectiveCountry
+    ? { type_livreur: "externe", actif: true, validation: "valide", country_code: effectiveCountry }
     : { type_livreur: "externe", actif: true, validation: "valide" };
 
-  const clientFilter = isPays && adminCountryCode
-    ? { actif: true, country_code: adminCountryCode }
+  const clientFilter = effectiveCountry
+    ? { actif: true, country_code: effectiveCountry }
     : { actif: true };
 
   const { data: livreurs = [] } = useQuery({
@@ -175,20 +182,34 @@ export default function CarteLivreursExterne() {
   return (
     <div className="p-4 space-y-4 max-w-4xl mx-auto">
 
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <Link to="/">
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <ArrowLeft className="w-4 h-4" />
-            Retour
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Carte — Livreurs & Clients</h1>
-          <p className="text-sm text-muted-foreground">
-            {livreurs.length} livreurs • {clientsAvecGPS.length} clients GPS
-          </p>
+      {/* Header avec sélecteur de pays */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-3 flex-1">
+          <Link to="/">
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <ArrowLeft className="w-4 h-4" />
+              Retour
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Carte — Livreurs & Clients</h1>
+            <p className="text-sm text-muted-foreground">
+              {livreurs.length} livreurs • {clientsAvecGPS.length} clients GPS
+            </p>
+          </div>
         </div>
+        {isGlobal && paysActifs.length > 1 && (
+          <div className="flex items-center gap-2">
+            <CountrySelector
+              value={filterCountry}
+              onChange={setFilterCountry}
+              className="h-9 text-xs"
+            />
+            {filterCountry && (
+              <button onClick={() => setFilterCountry("")} className="text-xs text-muted-foreground hover:text-foreground">✕</button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Compteurs */}
