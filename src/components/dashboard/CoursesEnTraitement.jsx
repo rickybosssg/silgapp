@@ -81,8 +81,11 @@ function CourseItemExterne({ course, onView }) {
 }
 
 function CourseItemInterne({ course, onView }) {
+  // Badge spécial pour dispatch automatique en cours
+  const isDispatchAuto = course.dispatch_status === 'propose' && course.statut === 'en_attente_livreur';
+  
   return (
-    <Card className="p-3 hover:shadow-sm transition-shadow">
+    <Card className={`p-3 hover:shadow-sm transition-shadow ${isDispatchAuto ? 'border-l-4 border-l-amber-400 bg-amber-50/30' : ''}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0 space-y-1.5">
           <div className="flex items-center gap-2 flex-wrap">
@@ -92,6 +95,11 @@ function CourseItemInterne({ course, onView }) {
             </div>
             {course.urgence && course.urgence !== "normale" && (
               <UrgenceBadge urgence={course.urgence} />
+            )}
+            {isDispatchAuto && (
+              <span className="text-xs px-2 py-0.5 rounded-full border font-medium bg-amber-100 text-amber-700 border-amber-200 flex items-center gap-1">
+                <span className="animate-pulse">🔍</span> Recherche livreur en cours
+              </span>
             )}
           </div>
 
@@ -104,7 +112,7 @@ function CourseItemInterne({ course, onView }) {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <CourseStatusBadge statut={course.statut} dispatchStatus={course.dispatch_status} />
+            {!isDispatchAuto && <CourseStatusBadge statut={course.statut} dispatchStatus={course.dispatch_status} />}
             {course.livreur_nom && (
               <span className="text-xs font-medium text-foreground">🚴 {course.livreur_nom}</span>
             )}

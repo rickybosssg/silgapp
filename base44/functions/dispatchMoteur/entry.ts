@@ -68,11 +68,23 @@ async function proposerAuLivreur(base44, courseId, course, livreur, cycle) {
     livreur_nom: `${livreur.prenom || ''} ${livreur.nom}`.trim(),
     livreur_photo_url: livreur.photo_url || '',
     livreur_telephone: livreur.telephone,
-    statut: 'acceptee',
+    statut: 'en_attente_livreur',
     dispatch_status: 'propose',
     heure_sollicitation: new Date().toISOString(),
     timeout_expires_at: new Date(Date.now() + (TIMEOUT_SECONDES * 1000)).toISOString(),
     dispatch_mode: 'automatique',
+  });
+
+  // Mettre à jour DispatchConfig pour le monitor
+  await base44.asServiceRole.entities.DispatchConfig.update('dispatch_config', {
+    mode: 'automatique',
+    moteur_actif: true,
+    course_en_dispatch_id: courseId,
+    livreur_sollicite_id: livreur.id,
+    livreur_sollicite_nom: `${livreur.prenom || ''} ${livreur.nom}`.trim(),
+    heure_sollicitation: new Date().toISOString(),
+    timeout_secondes: TIMEOUT_SECONDES,
+    dispatch_cycle: cycle,
   });
 
   // Notification push + WhatsApp via Notification entity
@@ -144,6 +156,16 @@ async function lancerDispatch(base44, courseId, exclusions = [], cycle = 1) {
       livreur_id: '',
       livreur_nom: '',
     });
+    // Réinitialiser DispatchConfig
+    await base44.asServiceRole.entities.DispatchConfig.update('dispatch_config', {
+      mode: 'manuel',
+      moteur_actif: false,
+      course_en_dispatch_id: '',
+      livreur_sollicite_id: '',
+      livreur_sollicite_nom: '',
+      heure_sollicitation: '',
+      dispatch_cycle: 0,
+    });
     console.log(`[DISPATCH INTERNE] ⚠️ Aucun livreur interne disponible — course ${courseId} en attente admin`);
     return { noLivreur: true };
   }
@@ -192,6 +214,16 @@ async function verifierExpiration(base44, courseId) {
       livreur_id: '',
       livreur_nom: '',
       remarque_livreur: `Aucun livreur n'a accepté après ${MAX_CYCLES} cycles — intervention admin requise`,
+    });
+    // Réinitialiser DispatchConfig
+    await base44.asServiceRole.entities.DispatchConfig.update('dispatch_config', {
+      mode: 'manuel',
+      moteur_actif: false,
+      course_en_dispatch_id: '',
+      livreur_sollicite_id: '',
+      livreur_sollicite_nom: '',
+      heure_sollicitation: '',
+      dispatch_cycle: 0,
     });
     console.log(`[DISPATCH INTERNE] 🚨 MAX CYCLES (${MAX_CYCLES}) atteint pour course ${courseId}`);
     return { 
@@ -336,6 +368,17 @@ Deno.serve(async (req) => {
       });
 
       await base44.asServiceRole.entities.Livreur.update(livreur_id, { statut: 'en_course' });
+
+      // Réinitialiser DispatchConfig
+      await base44.asServiceRole.entities.DispatchConfig.update('dispatch_config', {
+        mode: 'manuel',
+        moteur_actif: false,
+        course_en_dispatch_id: '',
+        livreur_sollicite_id: '',
+        livreur_sollicite_nom: '',
+        heure_sollicitation: '',
+        dispatch_cycle: 0,
+      });
 
       console.log(`[DISPATCH INTERNE] 🎉 Course ${course_id} acceptée par ${livreur_id}`);
       return Response.json({ success: true, message: 'Course acceptée avec succès' });

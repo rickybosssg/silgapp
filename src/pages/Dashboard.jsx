@@ -47,17 +47,17 @@ export default function Dashboard() {
     );
   }, [courses]);
 
-  // Courses à dispatcher : statut "nouvelle" ou "en_attente_livreur" SANS livreur assigné
+  // Courses à dispatcher : statut "nouvelle" SANS livreur assigné (en attente action admin)
   const coursesADispatcher = useMemo(
     () => todayCourses.filter(c =>
-      (c.statut === "nouvelle" || c.statut === "en_attente_livreur") &&
+      c.statut === "nouvelle" &&
       (!c.livreur_id || c.livreur_id === "") &&
       (!c.dispatch_status || c.dispatch_status === "en_attente_admin" || c.dispatch_status === "expire")
     ),
     [todayCourses]
   );
 
-  // Courses en traitement : tout ce qui est actif (pas nouvelle sans livreur, pas terminé)
+  // Courses en traitement : tout ce qui est actif + dispatch automatique en cours (statut=en_attente_livreur, dispatch_status=propose)
   const coursesEnTraitement = useMemo(
     () => todayCourses.filter(c =>
       !["livree", "annulee"].includes(c.statut) &&
