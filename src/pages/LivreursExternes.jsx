@@ -10,8 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
   ArrowLeft, Users, UserCheck, UserX, Phone, Mail, MapPin,
-  Eye, Ban, CheckCircle2, RefreshCw, Bike, Car, Bike as BikeIcon,
-  XCircle, Package, Banknote, Star, Clock, AlertTriangle, Plus
+  Eye, Ban, CheckCircle2, RefreshCw, Bike, Car,
+  XCircle, Banknote, Star, Wifi, WifiOff, Plus
 } from "lucide-react";
 import CreateLivreurDialog from "@/components/livreurs/CreateLivreurDialog";
 import NotationLivreurPanel from "@/components/admin/NotationLivreurPanel";
@@ -19,12 +19,20 @@ import LivreurPhotoUploader from "@/components/livreur/LivreurPhotoUploader";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-function statutBadge(livreur) {
-  if (!livreur.actif) return { label: "Bloqué", color: "bg-red-100 text-red-700 border-red-200" };
-  if (livreur.statut === "disponible") return { label: "Disponible", color: "bg-green-100 text-green-700 border-green-200" };
-  if (livreur.statut === "en_course") return { label: "En course", color: "bg-blue-100 text-blue-700 border-blue-200" };
-  return { label: "Hors ligne", color: "bg-gray-100 text-gray-600 border-gray-200" };
+// ── Helpers (même logique que CarteLivreursExterne) ───────────────────────────
+/** ON = accepte des courses (disponible ou en_course) */
+function isON(livreur) {
+  return livreur.statut === "disponible" || livreur.statut === "en_course";
+}
+/** Libre = peut recevoir une nouvelle course */
+function isLibre(livreur) {
+  return livreur.statut === "disponible";
+}
+/** App ouverte = app_active ET last_seen_at < 3 min */
+function isEnLigne(livreur) {
+  if (!livreur.app_active) return false;
+  if (!livreur.last_seen_at) return false;
+  return (Date.now() - new Date(livreur.last_seen_at).getTime()) < 3 * 60 * 1000;
 }
 
 function validationBadge(v) {
@@ -42,9 +50,11 @@ function vehiculeIcon(v) {
 function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
   const [showCourses, setShowCourses] = useState(false);
   const nomComplet = `${livreur.prenom || ""} ${livreur.nom}`.trim();
-  const sb = statutBadge(livreur);
   const vb = validationBadge(livreur.validation);
   const isBloque = !livreur.actif;
+  const on = isON(livreur);
+  const libre = isLibre(livreur);
+  const enLigne = isEnLigne(livreur);
 
   // Mise à jour photo livreur
   const handlePhotoChange = async (newPhotoUrl) => {
@@ -84,7 +94,26 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
             <div>
               <p className="font-bold text-lg text-foreground">{nomComplet}</p>
               <div className="flex gap-1.5 mt-1 flex-wrap items-center">
-                <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${sb.color}`}>{sb.label}</span>
+                {isBloque ? (
+                  <span className="text-xs px-2 py-0.5 rounded-full border font-medium bg-red-100 text-red-700 border-red-200">Bloqué</span>
+                ) : (
+                  <>
+                    <span className={`text-xs px-2 py-0.5 rounded-full border font-medium inline-flex items-center gap-1 ${on ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-500 border-gray-200"}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full inline-block ${on ? "bg-green-500" : "bg-gray-300"}`} />
+                      {on ? "ON" : "OFF"}
+                    </span>
+                    {on && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full border font-medium inline-flex items-center gap-1 ${libre ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-blue-100 text-blue-700 border-blue-200"}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full inline-block ${libre ? "bg-emerald-500" : "bg-blue-500"}`} />
+                        {libre ? "Libre" : "En course"}
+                      </span>
+                    )}
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1 ${enLigne ? "text-green-700" : "text-gray-400"}`}>
+                      {enLigne ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+                      {enLigne ? "App ouverte" : "App fermée"}
+                    </span>
+                  </>
+                )}
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${vb.color}`}>{vb.label}</span>
                 {livreur.note_moyenne > 0 && (
                   <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 font-medium flex items-center gap-0.5">
@@ -304,23 +333,27 @@ export default function LivreursExternes() {
   });
 
   const stats = useMemo(() => ({
-    total: livreurs.length,
-    enLigne: livreurs.filter(l => l.app_active === true && l.actif !== false && (l.statut === "disponible" || l.statut === "en_course")).length,
-    disponible: livreurs.filter(l => l.statut === "disponible" && l.actif !== false && l.app_active === true).length,
-    enCourse: livreurs.filter(l => l.statut === "en_course" && l.actif !== false).length,
-    horsLigne: livreurs.filter(l => l.statut === "hors_ligne" || l.app_active === false || l.actif === false).length,
-    valide: livreurs.filter(l => l.validation === "valide").length,
-    bloque: livreurs.filter(l => l.actif === false).length,
+    total:     livreurs.length,
+    on:        livreurs.filter(l => isON(l) && l.actif !== false).length,
+    off:       livreurs.filter(l => !isON(l) && l.actif !== false).length,
+    libres:    livreurs.filter(l => isLibre(l) && l.actif !== false).length,
+    enCourse:  livreurs.filter(l => l.statut === "en_course" && l.actif !== false).length,
+    appOuverte: livreurs.filter(l => isEnLigne(l) && l.actif !== false).length,
+    appFermee:  livreurs.filter(l => !isEnLigne(l) && l.actif !== false).length,
+    valide:    livreurs.filter(l => l.validation === "valide").length,
+    bloque:    livreurs.filter(l => l.actif === false).length,
   }), [livreurs]);
 
   const livreursFiltres = useMemo(() => {
-    if (filterStatut === "tous") return livreurs;
-    if (filterStatut === "en_ligne") return livreurs.filter(l => l.app_active === true && l.actif !== false && (l.statut === "disponible" || l.statut === "en_course"));
-    if (filterStatut === "disponible") return livreurs.filter(l => l.statut === "disponible" && l.actif !== false && l.app_active === true);
-    if (filterStatut === "en_course") return livreurs.filter(l => l.statut === "en_course" && l.actif !== false);
-    if (filterStatut === "hors_ligne") return livreurs.filter(l => l.statut === "hors_ligne" || l.app_active === false || l.actif === false);
-    if (filterStatut === "bloque") return livreurs.filter(l => l.actif === false);
-    if (filterStatut === "en_attente") return livreurs.filter(l => l.validation === "en_attente");
+    if (filterStatut === "tous")        return livreurs;
+    if (filterStatut === "on")          return livreurs.filter(l => isON(l) && l.actif !== false);
+    if (filterStatut === "off")         return livreurs.filter(l => !isON(l) && l.actif !== false);
+    if (filterStatut === "libres")      return livreurs.filter(l => isLibre(l) && l.actif !== false);
+    if (filterStatut === "en_course")   return livreurs.filter(l => l.statut === "en_course" && l.actif !== false);
+    if (filterStatut === "app_ouverte") return livreurs.filter(l => isEnLigne(l) && l.actif !== false);
+    if (filterStatut === "app_fermee")  return livreurs.filter(l => !isEnLigne(l) && l.actif !== false);
+    if (filterStatut === "bloque")      return livreurs.filter(l => l.actif === false);
+    if (filterStatut === "en_attente")  return livreurs.filter(l => l.validation === "en_attente");
     return livreurs;
   }, [livreurs, filterStatut]);
 
@@ -384,13 +417,15 @@ export default function LivreursExternes() {
     coursesAll.filter(c => c.livreur_id === livreurId);
 
   const FILTRES = [
-    { id: "tous", label: `Tous (${stats.total})`, activeClass: "bg-foreground text-background border-foreground", inactiveClass: "bg-background text-muted-foreground border-border hover:border-foreground hover:text-foreground" },
-    { id: "en_ligne", label: `En ligne (${stats.enLigne})`, activeClass: "bg-emerald-500 text-white border-emerald-500", inactiveClass: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" },
-    { id: "disponible", label: `Disponibles (${stats.disponible})`, activeClass: "bg-green-500 text-white border-green-500", inactiveClass: "bg-green-50 text-green-700 border-green-200 hover:bg-green-100" },
-    { id: "en_course", label: `En course (${stats.enCourse})`, activeClass: "bg-blue-500 text-white border-blue-500", inactiveClass: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100" },
-    { id: "hors_ligne", label: `Hors ligne (${stats.horsLigne})`, activeClass: "bg-slate-500 text-white border-slate-500", inactiveClass: "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100" },
-    { id: "bloque", label: `Bloqués (${stats.bloque})`, activeClass: "bg-destructive text-white border-destructive", inactiveClass: "bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20" },
-    { id: "en_attente", label: `En attente`, activeClass: "bg-amber-500 text-white border-amber-500", inactiveClass: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100" },
+    { id: "tous",        label: `Tous (${stats.total})`,              activeClass: "bg-foreground text-background border-foreground",             inactiveClass: "bg-background text-muted-foreground border-border hover:border-foreground hover:text-foreground" },
+    { id: "on",          label: `ON (${stats.on})`,                   activeClass: "bg-green-500 text-white border-green-500",                     inactiveClass: "bg-green-50 text-green-700 border-green-200 hover:bg-green-100" },
+    { id: "off",         label: `OFF (${stats.off})`,                 activeClass: "bg-gray-500 text-white border-gray-500",                       inactiveClass: "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100" },
+    { id: "libres",      label: `Libres (${stats.libres})`,           activeClass: "bg-emerald-500 text-white border-emerald-500",                 inactiveClass: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" },
+    { id: "en_course",   label: `En course (${stats.enCourse})`,      activeClass: "bg-blue-500 text-white border-blue-500",                       inactiveClass: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100" },
+    { id: "app_ouverte", label: `App ouverte (${stats.appOuverte})`,  activeClass: "bg-green-600 text-white border-green-600",                     inactiveClass: "bg-green-50 text-green-700 border-green-200 hover:bg-green-100" },
+    { id: "app_fermee",  label: `App fermée (${stats.appFermee})`,    activeClass: "bg-slate-500 text-white border-slate-500",                     inactiveClass: "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100" },
+    { id: "bloque",      label: `Bloqués (${stats.bloque})`,          activeClass: "bg-destructive text-white border-destructive",                 inactiveClass: "bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20" },
+    { id: "en_attente",  label: `En attente`,                         activeClass: "bg-amber-500 text-white border-amber-500",                     inactiveClass: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100" },
   ];
 
   return (
@@ -436,18 +471,19 @@ export default function LivreursExternes() {
       </div>
 
       {/* Statistiques */}
-      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
         {[
-          { label: "Total", value: stats.total, color: "bg-primary text-white" },
-          { label: "En ligne", value: stats.enLigne, color: "bg-emerald-500 text-white" },
-          { label: "Disponibles", value: stats.disponible, color: "bg-green-500 text-white" },
-          { label: "En course", value: stats.enCourse, color: "bg-blue-500 text-white" },
-          { label: "Hors ligne", value: stats.horsLigne, color: "bg-gray-400 text-white" },
+          { label: "ON",          value: stats.on,         color: "text-green-700 bg-green-50 border-green-200" },
+          { label: "OFF",         value: stats.off,        color: "text-gray-500 bg-gray-50 border-gray-200" },
+          { label: "Libres",      value: stats.libres,     color: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+          { label: "En course",   value: stats.enCourse,   color: "text-blue-700 bg-blue-50 border-blue-200" },
+          { label: "App ouverte", value: stats.appOuverte, color: "text-green-700 bg-green-50 border-green-200" },
+          { label: "App fermée",  value: stats.appFermee,  color: "text-gray-500 bg-gray-50 border-gray-200" },
         ].map(s => (
-          <Card key={s.label} className={`p-3 text-center ${s.color}`}>
-            <p className="text-xl font-bold">{s.value}</p>
-            <p className="text-[10px] opacity-90 mt-0.5">{s.label}</p>
-          </Card>
+          <div key={s.label} className={`border rounded-lg p-2 text-center ${s.color}`}>
+            <p className="text-lg font-bold leading-none">{s.value}</p>
+            <p className="text-xs mt-0.5">{s.label}</p>
+          </div>
         ))}
       </div>
 
@@ -477,9 +513,11 @@ export default function LivreursExternes() {
       <div className="space-y-2">
       {livreursFiltres.map(livreur => {
         const nomComplet = `${livreur.prenom || ""} ${livreur.nom}`.trim();
-        const sb = statutBadge(livreur);
         const vb = validationBadge(livreur.validation);
         const isBloque = livreur.actif === false;
+        const on = isON(livreur);
+        const libre = isLibre(livreur);
+        const enLigne = isEnLigne(livreur);
         const montantDu = livreur.montant_du_silga || 0;
 
         return (
@@ -493,9 +531,28 @@ export default function LivreursExternes() {
               />
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
                       <span className="font-bold text-foreground truncate">{nomComplet}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${sb.color}`}>{sb.label}</span>
+                      {isBloque ? (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full border font-medium bg-red-100 text-red-700 border-red-200">Bloqué</span>
+                      ) : (
+                        <>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium inline-flex items-center gap-1 ${on ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-500 border-gray-200"}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full inline-block ${on ? "bg-green-500" : "bg-gray-300"}`} />
+                            {on ? "ON" : "OFF"}
+                          </span>
+                          {on && (
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium inline-flex items-center gap-1 ${libre ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-blue-100 text-blue-700 border-blue-200"}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full inline-block ${libre ? "bg-emerald-500" : "bg-blue-500"}`} />
+                              {libre ? "Libre" : "En course"}
+                            </span>
+                          )}
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1 ${enLigne ? "text-green-700" : "text-gray-400"}`}>
+                            {enLigne ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+                            {enLigne ? "App ouverte" : "App fermée"}
+                          </span>
+                        </>
+                      )}
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${vb.color}`}>{vb.label}</span>
                     </div>
 
