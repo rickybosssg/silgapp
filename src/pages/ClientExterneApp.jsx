@@ -485,7 +485,11 @@ export default function ClientExterneApp() {
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-xs">{course.livreur_nom || "Recherche livreur..."}</p>
+                    <p className="font-semibold text-xs">
+                      {course.heure_acceptation && course.livreur_nom
+                        ? course.livreur_nom
+                        : "Recherche livreur..."}
+                    </p>
                     <p className="text-xs text-muted-foreground truncate">
                       {course.adresse_depart} → {course.adresse_arrivee}
                     </p>
