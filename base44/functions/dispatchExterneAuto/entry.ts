@@ -71,12 +71,36 @@ async function trouverLivreursCandidats(base44, course, rayonKm, exclusions = []
 }
 
 /**
+ * Anti-doublon : vérifie si une notification "nouvelle_course" existe déjà
+ * pour ce couple (course_id, destinataire_email) dans les 15 dernières minutes.
+ * Retourne true si un doublon existe (ne pas recréer).
+ */
+async function notificationDoublonExiste(base44, courseId, livreurEmail) {
+  const depuis15min = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+  const existantes = await base44.asServiceRole.entities.Notification.filter({
+    course_id: courseId,
+    destinataire_email: livreurEmail,
+    type: 'nouvelle_course',
+  });
+
+  // Filtrer celles créées dans les 15 dernières minutes
+  const recentes = existantes.filter(n => n.created_date > depuis15min);
+  if (recentes.length > 0) {
+    console.log(`[DISPATCH] 🛡️ Doublon détecté — notification déjà créée pour ${livreurEmail} course ${courseId} (${recentes.length} existante(s))`);
+    return true;
+  }
+  return false;
+}
+
+/**
  * Propose la course à un livreur spécifique.
  */
 async function proposerAuLivreur(base44, courseId, course, livreur) {
-  const distance = (course.gps_depart_lat && livreur.latitude)
-    ? calculerDistance(course.gps_depart_lat, course.gps_depart_lng, livreur.latitude, livreur.longitude)
-    : 0;
+  // Calculer la distance réelle si GPS disponible des deux côtés
+  let distance = 0;
+  if (course.gps_depart_lat && course.gps_depart_lng && livreur.latitude && livreur.longitude) {
+    distance = calculerDistance(course.gps_depart_lat, course.gps_depart_lng, livreur.latitude, livreur.longitude);
+  }
   const distanceSafe = Number(distance || 0);
 
   await base44.asServiceRole.entities.CourseExterne.update(courseId, {
@@ -90,34 +114,42 @@ async function proposerAuLivreur(base44, courseId, course, livreur) {
     timeout_expires_at: new Date(Date.now() + 60000).toISOString(),
   });
 
-  // Créer une Notification en base → déclenche l'automation WhatsApp
+  // Créer une Notification en base avec protection anti-doublon
   if (livreur.user_email) {
-    try {
-      await base44.asServiceRole.entities.Notification.create({
-        titre: '🚨 Nouvelle course disponible !',
-        message: `Course à ${distanceSafe.toFixed(1)}km — ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`,
-        type: 'nouvelle_course',
-        course_id: courseId,
-        destinataire_email: livreur.user_email,
-        lue: false,
-      });
-      console.log(`[DISPATCH] 🔔 Notification créée pour ${livreur.user_email} → déclenchement WhatsApp si hors app`);
-    } catch (err) {
-      console.error('[DISPATCH] ❌ Erreur création notification:', err.message);
-    }
+    // ⚡ PROTECTION ANTI-DOUBLON : ne créer la notif que si elle n'existe pas déjà
+    const doublon = await notificationDoublonExiste(base44, courseId, livreur.user_email);
+    if (!doublon) {
+      const distanceLabel = distanceSafe > 0
+        ? `${distanceSafe.toFixed(1)}km`
+        : 'distance inconnue';
 
-    // Notification push (en plus)
-    try {
-      await base44.functions.invoke('envoiNotificationPush', {
-        destinataire_email: livreur.user_email,
-        livreur_id: livreur.id,
-        titre: '🚨 Nouvelle course disponible !',
-        message: `Course à ${distanceSafe.toFixed(1)}km — ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`,
-        type: 'nouvelle_course',
-        course_id: courseId,
-      });
-    } catch (err) {
-      console.error('[DISPATCH] ❌ Erreur notif push:', err.message);
+      try {
+        await base44.asServiceRole.entities.Notification.create({
+          titre: '🚨 Nouvelle course disponible !',
+          message: `Course à ${distanceLabel} — ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`,
+          type: 'nouvelle_course',
+          course_id: courseId,
+          destinataire_email: livreur.user_email,
+          lue: false,
+        });
+        console.log(`[DISPATCH] 🔔 Notification créée pour ${livreur.user_email}`);
+      } catch (err) {
+        console.error('[DISPATCH] ❌ Erreur création notification:', err.message);
+      }
+
+      // Notification push (en plus) — uniquement si notif pas en doublon
+      try {
+        await base44.functions.invoke('envoiNotificationPush', {
+          destinataire_email: livreur.user_email,
+          livreur_id: livreur.id,
+          titre: '🚨 Nouvelle course disponible !',
+          message: `Course à ${distanceLabel} — ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`,
+          type: 'nouvelle_course',
+          course_id: courseId,
+        });
+      } catch (err) {
+        console.error('[DISPATCH] ❌ Erreur notif push:', err.message);
+      }
     }
   }
 
@@ -184,6 +216,28 @@ async function lancerDispatch(base44, courseId, exclusions = []) {
   const livreur = candidats[0];
   const dist = await proposerAuLivreur(base44, courseId, course, livreur);
   return { propose: true, livreur: { id: livreur.id, nom: `${livreur.prenom || ''} ${livreur.nom}`.trim(), distance_km: dist.toFixed(1) }, rayon: rayonUtilise };
+}
+
+/**
+ * Supprime les notifications "nouvelle_course" liées à une course
+ * quand elle est acceptée, refusée ou expirée.
+ */
+async function supprimerNotificationsCourse(base44, courseId) {
+  try {
+    const notifs = await base44.asServiceRole.entities.Notification.filter({
+      course_id: courseId,
+      type: 'nouvelle_course',
+    });
+    const nonLues = notifs.filter(n => !n.lue);
+    for (const n of nonLues) {
+      await base44.asServiceRole.entities.Notification.update(n.id, { lue: true });
+    }
+    if (nonLues.length > 0) {
+      console.log(`[DISPATCH] 🧹 ${nonLues.length} notification(s) archivée(s) pour course ${courseId}`);
+    }
+  } catch (err) {
+    console.warn('[DISPATCH] ⚠️ Erreur archivage notifications:', err.message);
+  }
 }
 
 Deno.serve(async (req) => {
@@ -280,8 +334,11 @@ Deno.serve(async (req) => {
         delivery_code_4_digits: deliveryPIN,
       });
 
-      // Mettre le livreur en_course ET disponible=false (statut suffit pour l'exclusion dispatch)
+      // Mettre le livreur en_course
       await base44.asServiceRole.entities.Livreur.update(livreur_id, { statut: 'en_course' });
+
+      // 🧹 Archiver les notifications "nouvelle_course" liées à cette course
+      await supprimerNotificationsCourse(base44, course_id);
 
       console.log(`[DISPATCH] 🎉 Course ${course_id} acceptée par ${livreur_id}`);
       return Response.json({ success: true, message: 'Course acceptée avec succès' });
