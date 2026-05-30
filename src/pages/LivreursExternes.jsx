@@ -268,6 +268,15 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
               Bloquer le livreur
             </Button>
           )}
+          <Button
+            size="sm"
+            variant="destructive"
+            className="w-full gap-1.5 border-2 border-red-200"
+            onClick={() => { onAction("supprimer", livreur); onClose(); }}
+          >
+            <XCircle className="w-3.5 h-3.5" />
+            Supprimer définitivement
+          </Button>
         </div>
       </div>
     </div>
@@ -333,6 +342,15 @@ export default function LivreursExternes() {
     onError: () => toast.error("Erreur"),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.Livreur.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["livreurs-externes"] });
+      toast.success("Livreur supprimé ✓");
+    },
+    onError: () => toast.error("Erreur lors de la suppression"),
+  });
+
   const handleAction = async (action, livreur) => {
     if (action === "bloquer") {
       updateMutation.mutate({ id: livreur.id, data: { actif: false } });
@@ -354,6 +372,10 @@ export default function LivreursExternes() {
         toast.info("Ce livreur a une course active en cours — statut correct.");
       } else {
         toast.info("Statut déjà synchronisé.");
+      }
+    } else if (action === "supprimer") {
+      if (window.confirm(`Êtes-vous sûr de vouloir supprimer définitivement ${livreur.nom} ? Cette action est irréversible.`)) {
+        deleteMutation.mutate(livreur.id);
       }
     }
   };
