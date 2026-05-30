@@ -271,7 +271,7 @@ Deno.serve(async (req) => {
       return Response.json({
         success: true,
         livreur: result.livreur,
-        message: `Course proposée à ${result.livreur.nom} (${result.livreur.distance_km}km)`,
+        message: `Course proposée à ${result.livreur.nom}`,
         timeout_secondes: TIMEOUT_SECONDES,
       });
     }
