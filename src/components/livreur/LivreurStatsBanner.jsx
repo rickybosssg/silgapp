@@ -49,7 +49,7 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
             <p className="text-sm font-bold text-orange-700 leading-tight">
               {montantDüSilga > 0 ? `${montantDüSilga.toLocaleString()} FCFA` : "0 FCFA"}
             </p>
-            <p className="text-[10px] text-gray-400 font-medium">Dû Silga</p>
+            <p className="text-[10px] text-gray-400 font-medium">💰 Commission Silga</p>
           </div>
         </div>
         {livreesToday.length > 0 && (

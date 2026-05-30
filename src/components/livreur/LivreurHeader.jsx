@@ -89,11 +89,8 @@ export default function LivreurHeader({
                 <span className="text-white font-bold text-xl">{prenom.charAt(0).toUpperCase()}</span>
               </div>
             )}
-            {/* Indicateur ON/OFF sur la photo */}
-            <div className={cn(
-              "absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-gray-900 flex items-center justify-center",
-              isON ? "bg-green-400" : "bg-gray-500"
-            )} />
+            {/* Point : Application ouverte (vert) / fermée (gris) — toujours vert car composant affiché = app ouverte */}
+            <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-gray-900 bg-green-400" />
           </div>
 
           {/* Infos livreur */}
@@ -144,14 +141,9 @@ export default function LivreurHeader({
                 </span>
               )}
 
-              {/* Badge GPS */}
-              <span className={cn(
-                "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold",
-                gpsActif
-                  ? "bg-blue-500/20 text-blue-300 border border-blue-500/40"
-                  : "bg-white/5 text-white/40 border border-white/10"
-              )}>
-                {gpsActif ? "📍 GPS actif" : "📍 GPS off"}
+              {/* Badge Application ouverte/fermée */}
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-white/5 text-white/50 border border-white/10">
+                🟢 App ouverte
               </span>
             </div>
           </div>
@@ -172,7 +164,7 @@ export default function LivreurHeader({
               )}
             >
               <Power className="w-3.5 h-3.5 flex-shrink-0" />
-              {isUpdatingStatut ? "..." : isON ? "Passer OFF" : "Passer ON"}
+              {isUpdatingStatut ? "..." : isON ? "🔴 Désactiver (OFF)" : "Passer ON"}
             </button>
 
             {/* Bouton GPS */}

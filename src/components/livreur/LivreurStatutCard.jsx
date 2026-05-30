@@ -24,9 +24,9 @@ export default function LivreurStatutCard({ statut, livreur, isExterne = false }
             isEnCourse && "bg-white/20",
             isHorsLigne && "bg-gray-200",
           )}>
-            {isDisponible && "✅"}
-            {isEnCourse && "🚀"}
-            {isHorsLigne && "⏸️"}
+            {isDisponible && "🟢"}
+            {isEnCourse && "🔵"}
+            {isHorsLigne && "⚪"}
           </div>
           {(isDisponible || isEnCourse) && (
             <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-white/80 animate-ping" />
@@ -38,9 +38,9 @@ export default function LivreurStatutCard({ statut, livreur, isExterne = false }
             "font-bold text-base leading-tight",
             isHorsLigne && "text-gray-600"
           )}>
-            {isDisponible && "Disponible"}
-            {isEnCourse && "En course"}
-            {isHorsLigne && "Hors ligne"}
+            {isDisponible && "🟢 Libre"}
+            {isEnCourse && "🔵 En course"}
+            {isHorsLigne && "⚪ OFF"}
           </p>
           <p className={cn(
             "text-xs mt-0.5",
@@ -48,9 +48,9 @@ export default function LivreurStatutCard({ statut, livreur, isExterne = false }
             isEnCourse && "text-white/70",
             isHorsLigne && "text-gray-400",
           )}>
-            {isDisponible && "En attente de nouvelles courses…"}
+            {isDisponible && "Prêt à recevoir une mission"}
             {isEnCourse && "Vous êtes en déplacement"}
-            {isHorsLigne && "Activez le switch pour être en ligne"}
+            {isHorsLigne && "Appuyez sur « Passer ON » pour accepter des courses"}
           </p>
         </div>
       </div>

@@ -14,11 +14,12 @@ export default function EmptyStateAttente() {
 
         <div className="space-y-1.5">
           <p className="text-xl font-bold text-gray-800">En veille active</p>
-          <p className="text-sm text-gray-500 leading-relaxed">
-            Recherche dans un rayon de <strong>3 km</strong><br />
-            <span className="text-xs">Extension automatique à 5 km puis 8 km si aucun livreur trouvé</span><br />
-            Alertes sonores + vibrations 🚀
-          </p>
+          <div className="text-sm text-gray-500 space-y-1">
+            <p><span className="font-semibold text-gray-700">Recherche active</span></p>
+            <p>Rayon actuel : <strong className="text-green-700">3 km</strong></p>
+            <p className="text-xs text-gray-400">Extension automatique : 5 km puis 8 km</p>
+            <p className="text-xs text-gray-400">Alertes sonores + vibrations 🚀</p>
+          </div>
         </div>
 
         {/* Dots animation */}
