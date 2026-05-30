@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
-  Package, TrendingUp, Menu, X, LogOut, Wallet
+  Package, TrendingUp, Menu, X, LogOut, Wallet, Globe
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,7 @@ const allNavItems = [
   { path: "/rapport", label: "Rapport du jour", icon: BarChart3 },
   { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp },
   { path: "/admin/externe/dus-livreurs", label: "Comptabilité", icon: Wallet },
+  { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Globe, reseauOnly: "externe" },
   { path: "/notifications", label: "Notifications", icon: Bell },
 ];
 
@@ -132,7 +133,11 @@ export default function MobileNav({ notificationCount = 0, reseau }) {
 
             {/* Nav items */}
             <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
-              {allNavItems.filter(item => !(reseau === "interne" && item.path === "/admin/externe/dus-livreurs")).map((item) => {
+              {allNavItems.filter(item => {
+                if (item.reseauOnly && item.reseauOnly !== reseau) return false;
+                if (reseau === "interne" && item.path === "/admin/externe/dus-livreurs") return false;
+                return true;
+              }).map((item) => {
                 const isActive = location.pathname === item.path;
                 const Icon = item.icon;
                 return (

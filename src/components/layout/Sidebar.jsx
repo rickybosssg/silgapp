@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
-  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield
+  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,7 @@ export const navItems = [
   { path: "/rapport", label: "Rapport du jour", icon: BarChart3 },
   { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp },
   { path: "/admin/externe/dus-livreurs", label: "Comptabilité", icon: Wallet },
+  { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Globe, reseauOnly: "externe" },
   { path: "/notifications", label: "Notifications", icon: Bell },
   { path: "/maintenance", label: "Maintenance", icon: Shield },
 ];
@@ -60,7 +61,11 @@ export default function Sidebar({ notificationCount = 0, reseau }) {
 
       {/* Navigation */}
       <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
-        {navItems.filter(item => !(reseau === "interne" && item.path === "/admin/externe/dus-livreurs")).map((item) => {
+        {navItems.filter(item => {
+          if (item.reseauOnly && item.reseauOnly !== reseau) return false;
+          if (reseau === "interne" && item.path === "/admin/externe/dus-livreurs") return false;
+          return true;
+        }).map((item) => {
           const isActive = location.pathname === item.path;
           const Icon = item.icon;
           return (
