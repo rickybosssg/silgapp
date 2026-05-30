@@ -10,6 +10,7 @@ import { ArrowLeft } from "lucide-react";
 import ModernMap from "@/components/client/ModernMap";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
+import { useAdminContext } from "@/hooks/useAdminContext.js";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -105,22 +106,26 @@ function EnLigneBadge({ entity }) {
 export default function CarteLivreursExterne() {
   const [showMap, setShowMap] = useState(false);
   const [filtre, setFiltre] = useState("tous");
+  const { isPays, countryCode: adminCountryCode } = useAdminContext();
 
-  // Charger TOUS les livreurs externes valides (ON ou OFF)
+  const livreurFilter = isPays && adminCountryCode
+    ? { type_livreur: "externe", actif: true, validation: "valide", country_code: adminCountryCode }
+    : { type_livreur: "externe", actif: true, validation: "valide" };
+
+  const clientFilter = isPays && adminCountryCode
+    ? { actif: true, country_code: adminCountryCode }
+    : { actif: true };
+
   const { data: livreurs = [] } = useQuery({
-    queryKey: ["livreurs-externes-carte"],
-    queryFn: () => base44.entities.Livreur.filter({
-      type_livreur: "externe",
-      actif: true,
-      validation: "valide",
-    }),
+    queryKey: ["livreurs-externes-carte", isPays ? adminCountryCode : "all"],
+    queryFn: () => base44.entities.Livreur.filter(livreurFilter),
     initialData: [],
     refetchInterval: 15000,
   });
 
   const { data: clients = [] } = useQuery({
-    queryKey: ["clients-externes-carte"],
-    queryFn: () => base44.entities.ClientExterne.filter({ actif: true }),
+    queryKey: ["clients-externes-carte", isPays ? adminCountryCode : "all"],
+    queryFn: () => base44.entities.ClientExterne.filter(clientFilter),
     initialData: [],
     refetchInterval: 15000,
   });

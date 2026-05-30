@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAdminContext } from "@/hooks/useAdminContext.js";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import {
@@ -317,17 +318,24 @@ export default function LivreursExternes() {
   const queryClient = useQueryClient();
   const [selectedLivreur, setSelectedLivreur] = useState(null);
   const [filterStatut, setFilterStatut] = useState("tous");
+  const { isPays, countryCode: adminCountryCode } = useAdminContext();
+
+  const livreurFilter = isPays && adminCountryCode
+    ? { type_livreur: "externe", country_code: adminCountryCode }
+    : { type_livreur: "externe" };
 
   const { data: livreurs = [] } = useQuery({
-    queryKey: ["livreurs-externes"],
-    queryFn: () => base44.entities.Livreur.filter({ reseau: "externe" }, "-created_date"),
+    queryKey: ["livreurs-externes", isPays ? adminCountryCode : "all"],
+    queryFn: () => base44.entities.Livreur.filter(livreurFilter, "-created_date"),
     initialData: [],
     refetchInterval: 10000,
   });
 
+  const coursesFilter = isPays && adminCountryCode ? { country_code: adminCountryCode } : {};
+
   const { data: coursesAll = [] } = useQuery({
-    queryKey: ["courses-externes-all-livreurs"],
-    queryFn: () => base44.entities.CourseExterne.filter({}, "-created_date", 500),
+    queryKey: ["courses-externes-all-livreurs", isPays ? adminCountryCode : "all"],
+    queryFn: () => base44.entities.CourseExterne.filter(coursesFilter, "-created_date", 500),
     initialData: [],
     refetchInterval: 30000,
   });
@@ -466,7 +474,7 @@ export default function LivreursExternes() {
             <RefreshCw className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Resync tous</span>
           </Button>
-          <CreateLivreurDialog reseau="externe" />
+          <CreateLivreurDialog reseau="externe" countryCode={isPays ? adminCountryCode : null} />
         </div>
       </div>
 

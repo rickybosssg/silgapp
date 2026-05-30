@@ -4,15 +4,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Upload, User, Camera, Building } from "lucide-react";
+import { Plus, Upload, User, Globe } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAdminContext } from "@/hooks/useAdminContext.js";
 import { toast } from "sonner";
 
-export default function CreateLivreurDialog({ reseau = "interne" }) {
+export default function CreateLivreurDialog({ reseau = "interne", countryCode = null }) {
   const [open, setOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const queryClient = useQueryClient();
+  const { isPays, countryCode: adminCountryCode } = useAdminContext();
+
+  // Priorité : prop countryCode > adminCountryCode si admin pays
+  const effectiveCountryCode = countryCode || (isPays ? adminCountryCode : null);
 
   const [form, setForm] = useState({
     prenom: "",
@@ -24,6 +29,7 @@ export default function CreateLivreurDialog({ reseau = "interne" }) {
     vehicule: "moto",
     type_livreur: reseau,
     reseau: reseau,
+    country_code: effectiveCountryCode || "BF",
   });
 
   const createMutation = useMutation({
@@ -32,6 +38,7 @@ export default function CreateLivreurDialog({ reseau = "interne" }) {
       const response = await base44.functions.invoke("createLivreur", {
         data: {
           ...form,
+          country_code: effectiveCountryCode || form.country_code || "BF",
           code_identification: code,
         }
       });
@@ -56,6 +63,7 @@ export default function CreateLivreurDialog({ reseau = "interne" }) {
         vehicule: "moto",
         type_livreur: reseau,
         reseau: reseau,
+        country_code: effectiveCountryCode || "BF",
       });
     },
     onError: (err) => {
@@ -145,6 +153,29 @@ export default function CreateLivreurDialog({ reseau = "interne" }) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+          {/* Pays (affiché en lecture seule si admin pays, sinon sélectionnable) */}
+          {reseau === "externe" && (
+            <div className="space-y-1.5">
+              <Label className="text-xs flex items-center gap-1"><Globe className="w-3 h-3" />Pays</Label>
+              {effectiveCountryCode ? (
+                <div className="flex items-center gap-2 px-3 py-2 border rounded-lg bg-muted text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">{effectiveCountryCode}</span>
+                  <span className="text-xs">(défini par votre compte admin)</span>
+                </div>
+              ) : (
+                <select
+                  className="w-full border rounded-lg px-3 py-2 text-sm bg-background"
+                  value={form.country_code}
+                  onChange={(e) => setForm(p => ({ ...p, country_code: e.target.value }))}
+                >
+                  {["BF","CI","TG","BJ","SN","ML","GN","NE"].map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
           {/* Type de livreur */}
           <Card>
             <CardContent className="pt-4">
