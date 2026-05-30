@@ -135,7 +135,7 @@ export default function CarteLivreurs() {
 
   const { data: livreurs = [], refetch, isFetching } = useQuery({
     queryKey: ["livreurs"],
-    queryFn: () => base44.entities.Livreur.list(),
+    queryFn: () => base44.entities.Livreur.filter({ type_livreur: "interne" }),
     initialData: [],
     refetchInterval: 15000,
   });
