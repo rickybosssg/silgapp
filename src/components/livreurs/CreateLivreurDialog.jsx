@@ -19,6 +19,21 @@ export default function CreateLivreurDialog({ reseau = "interne", countryCode = 
   // Priorité : prop countryCode > adminCountryCode si admin pays
   const effectiveCountryCode = countryCode || (isPays ? adminCountryCode : null);
 
+  // Infos par pays pour les placeholders
+  const PAYS_INFO = {
+    BF: { tel: "+226 70 00 00 00", quartier: "Ex: Ouaga 2000, Pissy, Hamdalaye" },
+    CI: { tel: "+225 07 00 00 00 00", quartier: "Ex: Cocody, Yopougon, Plateau" },
+    TG: { tel: "+228 90 00 00 00", quartier: "Ex: Lomé, Adidogomé, Tokoin" },
+    BJ: { tel: "+229 97 00 00 00", quartier: "Ex: Cotonou, Akpakpa, Cadjèhoun" },
+    SN: { tel: "+221 77 000 00 00", quartier: "Ex: Dakar, Médina, Parcelles" },
+    ML: { tel: "+223 70 00 00 00", quartier: "Ex: Bamako, ACI, Badalabougou" },
+    GN: { tel: "+224 62 00 00 00", quartier: "Ex: Conakry, Ratoma, Kaloum" },
+    NE: { tel: "+227 90 00 00 00", quartier: "Ex: Niamey, Plateau, Gamkalé" },
+  };
+
+  const activeCountry = effectiveCountryCode || form.country_code || "BF";
+  const paysInfo = PAYS_INFO[activeCountry] || PAYS_INFO["BF"];
+
   const [form, setForm] = useState({
     prenom: "",
     nom: "",
@@ -246,7 +261,7 @@ export default function CreateLivreurDialog({ reseau = "interne", countryCode = 
               <Input
                 value={form.telephone}
                 onChange={(e) => setForm(p => ({ ...p, telephone: e.target.value }))}
-                placeholder="+226 70 00 00 00"
+                placeholder={paysInfo.tel}
               />
             </div>
             <div className="space-y-1.5">
@@ -254,7 +269,7 @@ export default function CreateLivreurDialog({ reseau = "interne", countryCode = 
               <Input
                 value={form.quartier}
                 onChange={(e) => setForm(p => ({ ...p, quartier: e.target.value }))}
-                placeholder="Ex: Ouaga 2000"
+                placeholder={paysInfo.quartier}
               />
             </div>
           </div>
