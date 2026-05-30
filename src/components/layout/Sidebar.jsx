@@ -30,7 +30,7 @@ export const navItems = [
   { path: "/maintenance", label: "Maintenance", icon: Shield },
 ];
 
-export default function Sidebar({ notificationCount = 0 }) {
+export default function Sidebar({ notificationCount = 0, reseau }) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
 
@@ -60,7 +60,7 @@ export default function Sidebar({ notificationCount = 0 }) {
 
       {/* Navigation */}
       <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
-        {navItems.map((item) => {
+        {navItems.filter(item => !(reseau === "interne" && item.path === "/admin/externe/dus-livreurs")).map((item) => {
           const isActive = location.pathname === item.path;
           const Icon = item.icon;
           return (

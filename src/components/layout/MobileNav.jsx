@@ -30,7 +30,7 @@ const allNavItems = [
 // Store scroll positions per route
 const scrollPositions = new Map();
 
-export default function MobileNav({ notificationCount = 0 }) {
+export default function MobileNav({ notificationCount = 0, reseau }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -132,7 +132,7 @@ export default function MobileNav({ notificationCount = 0 }) {
 
             {/* Nav items */}
             <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
-              {allNavItems.map((item) => {
+              {allNavItems.filter(item => !(reseau === "interne" && item.path === "/admin/externe/dus-livreurs")).map((item) => {
                 const isActive = location.pathname === item.path;
                 const Icon = item.icon;
                 return (
