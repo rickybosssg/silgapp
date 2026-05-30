@@ -460,19 +460,17 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                           toast.error("📍 GPS requis pour valider cette étape — activez la localisation et réessayez");
                           return;
                         }
-                        setOptimisticStatut("livree");
-                        setTimeout(() => onColisLivre(course, gpsData), 150);
+                        setGpsArrivee(gpsData);
+                        setShowPrixModal(true);
                       };
 
                       if (!navigator.geolocation) {
-                        // Utiliser la dernière position sauvegardée du livreur
                         confirmerAvecGPS(livreurLat && livreurLng ? { lat: livreurLat, lng: livreurLng } : null);
                         return;
                       }
                       navigator.geolocation.getCurrentPosition(
                         (pos) => confirmerAvecGPS({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
                         () => {
-                          // Fallback sur la dernière position connue sauvegardée en DB
                           confirmerAvecGPS(livreurLat && livreurLng ? { lat: livreurLat, lng: livreurLng } : null);
                         },
                         { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
