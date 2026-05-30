@@ -28,17 +28,25 @@ function CourseItem({ course, onAssign, onView }) {
     }),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["courses"] });
+      console.log("🤖 Dispatch auto response:", res);
       if (res?.data?.success && res?.data?.livreur) {
         toast.success(`Dispatch auto : proposé à ${res.data.livreur.nom} (${res.data.livreur.distance_km}km)`);
       } else if (res?.data?.noLivreur) {
-        toast.warning(res?.data?.message || "Aucun livreur interne disponible");
-      } else if (res?.data?.missing_gps) {
-        toast.error("⚠️ Course sans GPS — veuillez ajouter la position de départ");
+        if (res?.data?.missing_gps) {
+          toast.error("⚠️ Course sans GPS — veuillez ajouter la position de départ");
+        } else {
+          toast.warning(res?.data?.message || "Aucun livreur interne disponible");
+        }
+      } else if (res?.data?.error) {
+        toast.error(res.data.error);
       } else {
         toast.success("Dispatch auto lancé");
       }
     },
-    onError: (e) => toast.error("Erreur dispatch : " + e.message),
+    onError: (e) => {
+      console.error("❌ Erreur dispatch:", e);
+      toast.error("Erreur dispatch : " + e.message);
+    },
   });
 
   return (
