@@ -63,9 +63,8 @@ function ETABadge({ course, colisRecupere }) {
 }
 
 const STEPS = [
-  { key: "acceptee", label: "Acceptée", icon: "✅" },
-  { key: "colis_recupere", label: "Récupéré", icon: "📦" },
-  { key: "en_livraison", label: "En livraison", icon: "🏃" },
+  { key: "acceptee", label: "Accepté", icon: "✅" },
+  { key: "colis_recupere", label: "Récupérer", icon: "📦" },
   { key: "livree", label: "Livré", icon: "🎉" },
 ];
 
