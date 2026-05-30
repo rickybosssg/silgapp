@@ -47,6 +47,7 @@ const TestRecapitulatifPaiement = lazy(() => import('./pages/TestRecapitulatifPa
 const TestConnexion = lazy(() => import('./pages/TestConnexion.jsx'));
 const TestWhatsAppAlertes = lazy(() => import('./pages/TestWhatsAppAlertes.jsx'));
 const TwilioSandboxMonitor = lazy(() => import('./pages/TwilioSandboxMonitor.jsx'));
+const DiagnosticFCM = lazy(() => import('./pages/DiagnosticFCM.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -111,7 +112,7 @@ function AppContent() {
 
   // ⚠️ ROUTES DE TEST TOUJOURS ACCESSIBLES - PRIORITÉ ABSOLUE
   // Ces routes doivent fonctionner même sans auth/réseau/rôle
-  const isTestRoute = window.location.pathname.startsWith('/test-') || window.location.pathname === '/maintenance';
+  const isTestRoute = window.location.pathname.startsWith('/test-') || window.location.pathname === '/maintenance' || window.location.pathname === '/diagnostic-fcm';
   
   if (isTestRoute) {
     return (
@@ -124,6 +125,7 @@ function AppContent() {
           <Route path="/test-connexion" element={<TestConnexion />} />
           <Route path="/test-whatsapp" element={<TestWhatsAppAlertes />} />
           <Route path="/maintenance" element={<Maintenance />} />
+          <Route path="/diagnostic-fcm" element={<DiagnosticFCM />} />
           <Route path="*" element={<PageNotFound />} />
         </Routes>
       </Suspense>
