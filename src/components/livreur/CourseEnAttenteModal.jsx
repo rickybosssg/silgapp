@@ -145,7 +145,9 @@ export default function CourseEnAttenteModal({
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      const res = await base44.functions.invoke('dispatchExterneAuto', {
+      // Utiliser dispatchMoteur pour interne, dispatchExterneAuto pour externe
+      const functionName = course.reseau === 'externe' ? 'dispatchExterneAuto' : 'dispatchMoteur';
+      const res = await base44.functions.invoke(functionName, {
         action: 'accepter_course',
         course_id: course.id,
         livreur_id: livreurId,
@@ -178,7 +180,9 @@ export default function CourseEnAttenteModal({
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      const res = await base44.functions.invoke('dispatchExterneAuto', {
+      // Utiliser dispatchMoteur pour interne, dispatchExterneAuto pour externe
+      const functionName = course.reseau === 'externe' ? 'dispatchExterneAuto' : 'dispatchMoteur';
+      const res = await base44.functions.invoke(functionName, {
         action: 'refuser_course',
         course_id: course.id,
         livreur_id: livreurId,

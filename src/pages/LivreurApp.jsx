@@ -428,6 +428,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
       {courseEnAttente && (
         <CourseEnAttenteModal
           course={courseEnAttente}
+          livreurId={livreurProfil.id}
           onAccepter={handleAccepter}
           onRefuser={handleRefuser}
           isPending={updateCourseMutation.isPending}
