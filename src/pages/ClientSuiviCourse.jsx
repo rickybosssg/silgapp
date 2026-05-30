@@ -291,8 +291,8 @@ export default function ClientSuiviCourse() {
           )}
         </Card>
 
-        {/* Infos livreur — Card style Uber dès acceptation */}
-        {maCourse.livreur_id && (
+        {/* Infos livreur — Card style Uber uniquement si livreur a accepté */}
+        {maCourse.livreur_id && maCourse.heure_acceptation && (
           <LivreurAssigneCard course={maCourse} />
         )}
 

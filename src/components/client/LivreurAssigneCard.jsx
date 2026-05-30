@@ -23,7 +23,8 @@ const STATUT_MESSAGE = {
 };
 
 export default function LivreurAssigneCard({ course }) {
-  if (!course?.livreur_id) return null;
+  // N'afficher la card que si le livreur a réellement accepté (heure_acceptation renseignée)
+  if (!course?.livreur_id || !course?.heure_acceptation) return null;
 
   const prenom = course.livreur_nom
     ? course.livreur_nom.split(" ")[0]
