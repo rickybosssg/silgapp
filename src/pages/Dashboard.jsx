@@ -46,10 +46,11 @@ export default function Dashboard() {
     );
   }, [courses]);
 
-  // Courses à dispatcher : statut "nouvelle" sans livreur assigné
+  // Courses à dispatcher : statut "nouvelle" ou "en_attente_livreur" SANS livreur assigné
   const coursesADispatcher = useMemo(
     () => todayCourses.filter(c =>
-      c.statut === "nouvelle" &&
+      (c.statut === "nouvelle" || c.statut === "en_attente_livreur") &&
+      (!c.livreur_id || c.livreur_id === "") &&
       (!c.dispatch_status || c.dispatch_status === "en_attente_admin" || c.dispatch_status === "expire")
     ),
     [todayCourses]
