@@ -53,14 +53,32 @@ async function trouverLivreursCandidats(base44, course, rayonKm, exclusions = []
     !livreurIdsEnCourse.has(l.id)
   );
 
-  // Silga Externe : pas de tri par distance, retour aléatoire parmi les candidats GPS valides
-  return livreursGPS.sort(() => Math.random() - 0.5);
+  if (!course.gps_depart_lat || !course.gps_depart_lng) {
+    // Pas de GPS course → retourner tous les candidats GPS valides (hors exclusions)
+    return livreursGPS;
+  }
+
+  const proches = livreursGPS.filter(l => {
+    const dist = calculerDistance(course.gps_depart_lat, course.gps_depart_lng, l.latitude, l.longitude);
+    return dist <= rayonKm;
+  });
+
+  return proches.sort((a, b) => {
+    const dA = calculerDistance(course.gps_depart_lat, course.gps_depart_lng, a.latitude, a.longitude);
+    const dB = calculerDistance(course.gps_depart_lat, course.gps_depart_lng, b.latitude, b.longitude);
+    return dA - dB;
+  });
 }
 
 /**
  * Propose la course à un livreur spécifique.
  */
 async function proposerAuLivreur(base44, courseId, course, livreur) {
+  const distance = (course.gps_depart_lat && livreur.latitude)
+    ? calculerDistance(course.gps_depart_lat, course.gps_depart_lng, livreur.latitude, livreur.longitude)
+    : 0;
+  const distanceSafe = Number(distance || 0);
+
   await base44.asServiceRole.entities.CourseExterne.update(courseId, {
     livreur_id: livreur.id,
     livreur_nom: `${livreur.prenom || ''} ${livreur.nom}`.trim(),
@@ -77,7 +95,7 @@ async function proposerAuLivreur(base44, courseId, course, livreur) {
     try {
       await base44.asServiceRole.entities.Notification.create({
         titre: '🚨 Nouvelle course disponible !',
-        message: `Course : ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`,
+        message: `Course à ${distanceSafe.toFixed(1)}km — ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`,
         type: 'nouvelle_course',
         course_id: courseId,
         destinataire_email: livreur.user_email,
@@ -94,7 +112,7 @@ async function proposerAuLivreur(base44, courseId, course, livreur) {
         destinataire_email: livreur.user_email,
         livreur_id: livreur.id,
         titre: '🚨 Nouvelle course disponible !',
-        message: `Course : ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`,
+        message: `Course à ${distanceSafe.toFixed(1)}km — ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`,
         type: 'nouvelle_course',
         course_id: courseId,
       });
@@ -103,8 +121,8 @@ async function proposerAuLivreur(base44, courseId, course, livreur) {
     }
   }
 
-  console.log(`[DISPATCH] 📤 Course ${courseId} proposée à ${livreur.nom}`);
-  return 0;
+  console.log(`[DISPATCH] 📤 Course ${courseId} proposée à ${livreur.nom} (${distanceSafe.toFixed(1)}km)`);
+  return distanceSafe;
 }
 
 /**
@@ -164,8 +182,8 @@ async function lancerDispatch(base44, courseId, exclusions = []) {
   }
 
   const livreur = candidats[0];
-  await proposerAuLivreur(base44, courseId, course, livreur);
-  return { propose: true, livreur: { id: livreur.id, nom: `${livreur.prenom || ''} ${livreur.nom}`.trim() }, rayon: rayonUtilise };
+  const dist = await proposerAuLivreur(base44, courseId, course, livreur);
+  return { propose: true, livreur: { id: livreur.id, nom: `${livreur.prenom || ''} ${livreur.nom}`.trim(), distance_km: dist.toFixed(1) }, rayon: rayonUtilise };
 }
 
 Deno.serve(async (req) => {
