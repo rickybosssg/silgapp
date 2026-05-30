@@ -39,6 +39,7 @@ const ClientSuiviCourse = lazy(() => import('./pages/ClientSuiviCourse.jsx'));
 const DashboardAdminExterne = lazy(() => import('./pages/DashboardAdminExterne.jsx'));
 const DusLivreursExternes = lazy(() => import('./pages/DusLivreursExternes.jsx'));
 const PublicSuiviCourse = lazy(() => import('./pages/PublicSuiviCourse.jsx'));
+const GestionPays = lazy(() => import('./pages/GestionPays.jsx'));
 const Maintenance = lazy(() => import('./pages/Maintenance.jsx'));
 const TestBoutEnBout = lazy(() => import('./pages/TestBoutEnBout.jsx'));
 const TestDiagnosticsComplet = lazy(() => import('./pages/TestDiagnosticsComplet.jsx'));
@@ -219,6 +220,7 @@ function AppContent() {
               <Route path="/rapport" element={<AnimatedRoutes><RapportJourExterne /></AnimatedRoutes>} />
               <Route path="/recapitulatif" element={<AnimatedRoutes><RecapitulatifAdmin reseau="externe" /></AnimatedRoutes>} />
               <Route path="/admin/externe/dus-livreurs" element={<AnimatedRoutes><DusLivreursExternes /></AnimatedRoutes>} />
+              <Route path="/admin/gestion-pays" element={<AnimatedRoutes><GestionPays /></AnimatedRoutes>} />
             </>
           )}
           <Route path="/notifications" element={<AnimatedRoutes><Notifications /></AnimatedRoutes>} />

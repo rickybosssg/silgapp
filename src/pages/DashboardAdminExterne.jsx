@@ -15,6 +15,8 @@ import ClientsExternesPanel from "@/components/admin/ClientsExternesPanel";
 import HistoriqueDuJour from "@/components/admin/HistoriqueDuJour";
 import SyncClientGPSPanel from "@/components/admin/SyncClientGPSPanel";
 import SyncLivreurGPSPanel from "@/components/admin/SyncLivreurGPSPanel";
+import StatsPays from "@/components/international/StatsPays.jsx";
+import { Globe } from "lucide-react";
 
 export default function DashboardAdminExterne() {
   const { data: courses = [] } = useQuery({
@@ -195,6 +197,20 @@ export default function DashboardAdminExterne() {
             </Card>
           </Link>
 
+          <Link to="/admin/gestion-pays" className="flex-1">
+            <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer border-green-200 bg-green-50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+                  <Globe className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground">Gestion des pays</p>
+                  <p className="text-xs text-muted-foreground">Multi-pays, tarifs, activation</p>
+                </div>
+              </div>
+            </Card>
+          </Link>
+
           <Link to="/admin/externe/twilio-sandbox" className="flex-1">
             <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer border-blue-200 bg-blue-50">
               <div className="flex items-center gap-3">
@@ -298,6 +314,9 @@ export default function DashboardAdminExterne() {
           )}
         </div>
       </Card>
+
+      {/* Stats par pays (affiché uniquement si plusieurs pays) */}
+      <StatsPays courses={courses} livreurs={livreurs} clients={clients} />
 
       {/* Historique du jour */}
       <HistoriqueDuJour courses={courses} />

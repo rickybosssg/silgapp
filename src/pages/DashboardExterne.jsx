@@ -3,10 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Plus, MapPin, Package, Truck, Clock, CheckCircle2, XCircle, TrendingUp, ArrowLeft } from "lucide-react";
+import { Plus, MapPin, Package, Truck, Clock, CheckCircle2, XCircle, TrendingUp, ArrowLeft, Globe } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
 import StatCard from "@/components/dashboard/StatCard";
+import CountrySelector, { usePaysActifs } from "@/components/international/CountrySelector.jsx";
+import StatsPays from "@/components/international/StatsPays.jsx";
 import LivreursEnLigne from "@/components/dashboard/LivreursEnLigne";
 import ClientsEnLigne from "@/components/dashboard/ClientsEnLigne";
 
@@ -24,7 +26,9 @@ import StatDetailModal from "@/components/dashboard/StatDetailModal";
 
 export default function DashboardExterne() {
   const [selectedCourse, setSelectedCourse] = useState(null);
-  const [statModal, setStatModal] = useState(null); // { type, data }
+  const [statModal, setStatModal] = useState(null);
+  const [filterCountry, setFilterCountry] = useState(""); // "" = tous les pays
+  const paysActifs = usePaysActifs();
 
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ["courses-externes-dashboard"],
@@ -47,12 +51,18 @@ export default function DashboardExterne() {
     refetchInterval: 10000,
   });
 
+  // Filtrage par pays
+  const coursesFiltrees = useMemo(
+    () => filterCountry ? courses.filter(c => (c.country_code || "BF") === filterCountry) : courses,
+    [courses, filterCountry]
+  );
+
   // Courses du jour OU encore actives
   const todayCourses = useMemo(
-    () => courses.filter(c =>
+    () => coursesFiltrees.filter(c =>
       isToday(new Date(c.created_date)) || !["livree", "annulee"].includes(c.statut)
     ),
-    [courses]
+    [coursesFiltrees]
   );
 
   const coursesEnTraitement = useMemo(
@@ -61,11 +71,11 @@ export default function DashboardExterne() {
   );
 
   const coursesTerminees = useMemo(
-    () => courses.filter(c =>
+    () => coursesFiltrees.filter(c =>
       ["livree", "annulee"].includes(c.statut) &&
       isToday(new Date(c.heure_livraison || c.updated_date || c.created_date))
     ),
-    [courses]
+    [coursesFiltrees]
   );
 
   const livreursEnLigne = useMemo(
@@ -79,7 +89,7 @@ export default function DashboardExterne() {
   );
 
   const stats = useMemo(() => {
-    const todayAll = courses.filter(c => isToday(new Date(c.created_date)));
+    const todayAll = coursesFiltrees.filter(c => isToday(new Date(c.created_date)));
     const total = todayAll.length;
     const livrees = coursesTerminees.filter(c => c.statut === "livree").length;
     const annulees = coursesTerminees.filter(c => c.statut === "annulee").length;
@@ -108,12 +118,27 @@ export default function DashboardExterne() {
             </p>
           </div>
         </div>
-        <Link to="/carte" className="flex-1 sm:flex-none">
-          <Button variant="outline" size="sm" className="w-full sm:w-auto gap-1.5">
-            <MapPin className="w-4 h-4" />
-            <span className="hidden sm:inline">Carte</span>
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          {paysActifs.length > 1 && (
+            <div className="flex items-center gap-1.5">
+              <Globe className="w-3.5 h-3.5 text-muted-foreground" />
+              <CountrySelector
+                value={filterCountry}
+                onChange={setFilterCountry}
+                className="h-9 text-xs"
+              />
+              {filterCountry && (
+                <button onClick={() => setFilterCountry("")} className="text-xs text-muted-foreground hover:text-foreground">✕</button>
+              )}
+            </div>
+          )}
+          <Link to="/carte">
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <MapPin className="w-4 h-4" />
+              <span className="hidden sm:inline">Carte</span>
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Alertes batterie + dispatch monitor */}

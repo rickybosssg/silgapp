@@ -20,6 +20,21 @@
       "default": "interne",
       "description": "Type de livreur (interne ou externe)"
     },
+    "country_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE"
+      ],
+      "default": "BF",
+      "description": "Code pays ISO du livreur (BF=Burkina, CI=C\u00f4te d'Ivoire, etc.)"
+    },
     "prenom": {
       "type": "string",
       "description": "Pr\u00e9nom du livreur"
@@ -38,7 +53,11 @@
     },
     "quartier": {
       "type": "string",
-      "description": "Quartier principal d'activit\u00e9"
+      "description": "Quartier ou zone principale d'activit\u00e9"
+    },
+    "ville": {
+      "type": "string",
+      "description": "Ville d'activit\u00e9 (ex: Ouagadougou, Abidjan, Lom\u00e9)"
     },
     "photo_url": {
       "type": "string",
@@ -168,7 +187,7 @@
     "montant_du_silga": {
       "type": "number",
       "default": 0,
-      "description": "Montant total d\u00fb \u00e0 Silga (commission 30% cumul\u00e9e)"
+      "description": "Montant total d\u00fb \u00e0 Silga (commission cumul\u00e9e)"
     },
     "note_moyenne": {
       "type": "number",

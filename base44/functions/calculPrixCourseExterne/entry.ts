@@ -1,8 +1,17 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-/**
- * Calcule la distance entre 2 points GPS (formule Haversine)
- */
+// Tarifs par pays (fallback si pas de config en DB)
+const TARIFS_PAYS = {
+  BF: { prix_par_km: 100, prix_minimum: 500,  commission_pct: 30, devise: "FCFA" },
+  CI: { prix_par_km: 120, prix_minimum: 600,  commission_pct: 30, devise: "FCFA" },
+  TG: { prix_par_km: 100, prix_minimum: 500,  commission_pct: 30, devise: "FCFA" },
+  BJ: { prix_par_km: 100, prix_minimum: 500,  commission_pct: 30, devise: "FCFA" },
+  SN: { prix_par_km: 150, prix_minimum: 750,  commission_pct: 30, devise: "FCFA" },
+  ML: { prix_par_km: 100, prix_minimum: 500,  commission_pct: 30, devise: "FCFA" },
+  GN: { prix_par_km: 800, prix_minimum: 4000, commission_pct: 30, devise: "GNF"  },
+  NE: { prix_par_km: 100, prix_minimum: 500,  commission_pct: 30, devise: "FCFA" },
+};
+
 function calculerDistance(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -31,25 +40,46 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Course introuvable' }, { status: 404 });
     }
 
-    // Vérifier que la course a les positions GPS de récupération et livraison
     if (!course.latitude_recuperation || !course.longitude_recuperation ||
         !course.latitude_livraison || !course.longitude_livraison) {
-      return Response.json({ 
-        error: 'Positions GPS de récupération ou livraison manquantes' 
+      return Response.json({
+        error: 'Positions GPS de récupération ou livraison manquantes'
       }, { status: 400 });
     }
 
-    // Calculer la distance réelle parcourue
+    // Déterminer le pays de la course
+    const countryCode = course.country_code || "BF";
+
+    // Essayer de récupérer la config depuis la DB
+    let tarif = TARIFS_PAYS[countryCode] || TARIFS_PAYS["BF"];
+    try {
+      const countriesDB = await base44.asServiceRole.entities.Country.filter({ code: countryCode, actif: true });
+      if (countriesDB?.[0]) {
+        const c = countriesDB[0];
+        tarif = {
+          prix_par_km:    c.prix_par_km    || tarif.prix_par_km,
+          prix_minimum:   c.prix_minimum   || tarif.prix_minimum,
+          commission_pct: c.commission_pct || tarif.commission_pct,
+          devise:         c.devise         || tarif.devise,
+        };
+      }
+    } catch (_) {
+      // Fallback silencieux sur le tarif statique
+    }
+
+    // Calculer la distance réelle
     const distanceReelle = calculerDistance(
       course.latitude_recuperation, course.longitude_recuperation,
       course.latitude_livraison, course.longitude_livraison
     );
 
-    // Calculer le prix final (100 F/km)
-    const prixFinal = Math.round(distanceReelle * 100);
+    // Calculer le prix final selon les tarifs du pays
+    const prixBrut = distanceReelle * tarif.prix_par_km;
+    const prixFinal = Math.max(Math.round(prixBrut), tarif.prix_minimum);
 
-    // Calculer commission Silga (30%) et montant livreur (70%)
-    const commissionSilga = Math.round(prixFinal * 0.30);
+    // Commission Silga et montant livreur
+    const commissionRate = (tarif.commission_pct || 30) / 100;
+    const commissionSilga = Math.round(prixFinal * commissionRate);
     const montantLivreur = prixFinal - commissionSilga;
 
     // Mettre à jour la course
@@ -77,7 +107,10 @@ Deno.serve(async (req) => {
     return Response.json({
       success: true,
       course: courseUpdated,
+      country_code: countryCode,
+      devise: tarif.devise,
       distance_km: distanceReelle.toFixed(2),
+      prix_par_km: tarif.prix_par_km,
       prix_final: prixFinal,
       commission_silga: commissionSilga,
       montant_livreur: montantLivreur,

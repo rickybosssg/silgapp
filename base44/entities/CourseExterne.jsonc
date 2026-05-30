@@ -2,6 +2,21 @@
   "name": "CourseExterne",
   "type": "object",
   "properties": {
+    "country_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE"
+      ],
+      "default": "BF",
+      "description": "Code pays de la course"
+    },
     "client_nom": {
       "type": "string",
       "description": "Nom du client"
@@ -63,6 +78,14 @@
       "type": "string",
       "description": "Adresse ou quartier de livraison"
     },
+    "ville_depart": {
+      "type": "string",
+      "description": "Ville de d\u00e9part (d\u00e9tect\u00e9e par GPS)"
+    },
+    "ville_arrivee": {
+      "type": "string",
+      "description": "Ville d'arriv\u00e9e (d\u00e9tect\u00e9e par GPS)"
+    },
     "destination_inconnue": {
       "type": "boolean",
       "default": false,
@@ -102,11 +125,16 @@
     },
     "prix_final": {
       "type": "number",
-      "description": "Prix final calcul\u00e9 apr\u00e8s livraison (distance r\u00e9elle \u00d7 100F)"
+      "description": "Prix final calcul\u00e9 apr\u00e8s livraison"
     },
     "distance_reelle_km": {
       "type": "number",
-      "description": "Distance r\u00e9ellement parcourue en km (GPS entre r\u00e9cup\u00e9ration et livraison)"
+      "description": "Distance r\u00e9ellement parcourue en km"
+    },
+    "devise": {
+      "type": "string",
+      "default": "FCFA",
+      "description": "Devise utilis\u00e9e pour cette course"
     },
     "statut": {
       "type": "string",
@@ -227,11 +255,11 @@
     },
     "commission_silga": {
       "type": "number",
-      "description": "Commission Silga (30% du prix final)"
+      "description": "Commission Silga (% configurable par pays)"
     },
     "montant_livreur": {
       "type": "number",
-      "description": "Montant net pour le livreur (70% du prix final)"
+      "description": "Montant net pour le livreur"
     },
     "statut_paiement_livreur": {
       "type": "string",
@@ -263,7 +291,7 @@
         "bon",
         "mauvais"
       ],
-      "description": "Feedback simple du destinataire (bon/mauvais) \u2014 ne compte pas dans la note officielle"
+      "description": "Feedback simple du destinataire"
     },
     "destinataire_feedback_date": {
       "type": "string",

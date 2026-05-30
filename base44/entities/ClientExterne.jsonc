@@ -18,9 +18,28 @@
       "type": "string",
       "description": "Adresse email"
     },
+    "country_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE"
+      ],
+      "default": "BF",
+      "description": "Code pays ISO du client"
+    },
+    "ville": {
+      "type": "string",
+      "description": "Ville du client (d\u00e9tect\u00e9e par GPS ou saisie)"
+    },
     "quartier": {
       "type": "string",
-      "description": "Quartier de r\u00e9sidence (d\u00e9duit du GPS)"
+      "description": "Quartier de r\u00e9sidence"
     },
     "latitude": {
       "type": "number",
