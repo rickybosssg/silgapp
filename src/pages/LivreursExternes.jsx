@@ -23,7 +23,7 @@ import { fr } from "date-fns/locale";
 function statutBadge(livreur) {
   if (!livreur.actif) return { label: "Bloqué", color: "bg-red-100 text-red-700 border-red-200" };
   if (livreur.statut === "disponible") return { label: "Disponible", color: "bg-green-100 text-green-700 border-green-200" };
-  if (livreur.statut === "en_course") return { label: "En course", color: "bg-red-100 text-red-700 border-red-200" };
+  if (livreur.statut === "en_course") return { label: "En course", color: "bg-blue-100 text-blue-700 border-blue-200" };
   return { label: "Hors ligne", color: "bg-gray-100 text-gray-600 border-gray-200" };
 }
 
@@ -387,7 +387,7 @@ export default function LivreursExternes() {
     { id: "tous", label: `Tous (${stats.total})`, activeClass: "bg-foreground text-background border-foreground", inactiveClass: "bg-background text-muted-foreground border-border hover:border-foreground hover:text-foreground" },
     { id: "en_ligne", label: `En ligne (${stats.enLigne})`, activeClass: "bg-emerald-500 text-white border-emerald-500", inactiveClass: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" },
     { id: "disponible", label: `Disponibles (${stats.disponible})`, activeClass: "bg-green-500 text-white border-green-500", inactiveClass: "bg-green-50 text-green-700 border-green-200 hover:bg-green-100" },
-    { id: "en_course", label: `En course (${stats.enCourse})`, activeClass: "bg-red-500 text-white border-red-500", inactiveClass: "bg-red-50 text-red-700 border-red-200 hover:bg-red-100" },
+    { id: "en_course", label: `En course (${stats.enCourse})`, activeClass: "bg-blue-500 text-white border-blue-500", inactiveClass: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100" },
     { id: "hors_ligne", label: `Hors ligne (${stats.horsLigne})`, activeClass: "bg-slate-500 text-white border-slate-500", inactiveClass: "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100" },
     { id: "bloque", label: `Bloqués (${stats.bloque})`, activeClass: "bg-destructive text-white border-destructive", inactiveClass: "bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20" },
     { id: "en_attente", label: `En attente`, activeClass: "bg-amber-500 text-white border-amber-500", inactiveClass: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100" },
@@ -441,7 +441,7 @@ export default function LivreursExternes() {
           { label: "Total", value: stats.total, color: "bg-primary text-white" },
           { label: "En ligne", value: stats.enLigne, color: "bg-emerald-500 text-white" },
           { label: "Disponibles", value: stats.disponible, color: "bg-green-500 text-white" },
-          { label: "En course", value: stats.enCourse, color: "bg-red-500 text-white" },
+          { label: "En course", value: stats.enCourse, color: "bg-blue-500 text-white" },
           { label: "Hors ligne", value: stats.horsLigne, color: "bg-gray-400 text-white" },
         ].map(s => (
           <Card key={s.label} className={`p-3 text-center ${s.color}`}>
