@@ -245,13 +245,8 @@ Deno.serve(async (req) => {
       const course = await base44.asServiceRole.entities.Course.get(course_id);
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
       
-      // Vérifier mode dispatch
-      if (course.dispatch_mode === 'manuel') {
-        return Response.json({ 
-          error: 'Course en dispatch manuel — utilisez AssignLivreurDialog',
-          dispatch_mode: 'manuel'
-        }, { status: 400 });
-      }
+  // Le mode dispatch peut être mis à jour si l'utilisateur clique sur "Auto"
+  // Pas de blocage pour dispatch_mode='manuel' — on permet le dispatch auto
 
       const result = await lancerDispatch(base44, course_id, [], 1);
 
