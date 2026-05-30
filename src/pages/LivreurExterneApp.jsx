@@ -10,7 +10,7 @@ import LivreurHeader from "@/components/livreur/LivreurHeader";
 import LivreurStatsBanner from "@/components/livreur/LivreurStatsBanner";
 import LivreurStatutCard from "@/components/livreur/LivreurStatutCard";
 import EmptyStateAttente from "@/components/livreur/EmptyStateAttente";
-import CourseEnAttenteModal from "@/components/livreur/CourseEnAttenteModal";
+import CourseEnAttenteModalExterne from "@/components/livreur/CourseEnAttenteModalExterne";
 import CourseActiveCard from "@/components/livreur/CourseActiveCard";
 import LivreurHistorique from "@/components/livreur/LivreurHistorique";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -327,12 +327,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
       {/* Modal plein écran si course en attente */}
       {courseEnAttente && (
-        <CourseEnAttenteModal
+        <CourseEnAttenteModalExterne
           course={courseEnAttente}
           livreurId={livreurProfil.id}
           onAccepter={handleAccepter}
           onRefuser={handleRefuser}
-          isPending={updateCourseMutation.isPending}
           onExpire={() => {
             queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
             queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
