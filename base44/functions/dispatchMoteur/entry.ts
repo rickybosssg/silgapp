@@ -55,27 +55,14 @@ async function trouverLivreursCandidats(base44, course, cycle = 1, exclusions = 
     !exclusions.includes(l.id)
   );
 
-  if (!course.gps_depart_lat || !course.gps_depart_lng) {
-    // Pas de GPS course → retour tous candidats GPS valides (sans tri)
-    return avecGPS;
-  }
-
-  // Trier par distance
-  return avecGPS.sort((a, b) => {
-    const dA = calculerDistance(course.gps_depart_lat, course.gps_depart_lng, a.latitude, a.longitude);
-    const dB = calculerDistance(course.gps_depart_lat, course.gps_depart_lng, b.latitude, b.longitude);
-    return dA - dB;
-  });
+  // Silga Interne : pas de tri par distance, retour aléatoire parmi les candidats GPS valides
+  return avecGPS.sort(() => Math.random() - 0.5);
 }
 
 /**
  * Propose la course à un livreur spécifique
  */
 async function proposerAuLivreur(base44, courseId, course, livreur, cycle) {
-  const distance = (course.gps_depart_lat && livreur.latitude)
-    ? calculerDistance(course.gps_depart_lat, course.gps_depart_lng, livreur.latitude, livreur.longitude)
-    : 0;
-
   await base44.asServiceRole.entities.Course.update(courseId, {
     livreur_id: livreur.id,
     livreur_nom: `${livreur.prenom || ''} ${livreur.nom}`.trim(),
@@ -93,7 +80,7 @@ async function proposerAuLivreur(base44, courseId, course, livreur, cycle) {
     try {
       await base44.asServiceRole.entities.Notification.create({
         titre: '🚨 Nouvelle course disponible !',
-        message: `Course à ${distance.toFixed(1)}km — ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`,
+        message: `Course : ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`,
         type: 'nouvelle_course',
         course_id: courseId,
         destinataire_email: livreur.user_email,
@@ -109,7 +96,7 @@ async function proposerAuLivreur(base44, courseId, course, livreur, cycle) {
         destinataire_email: livreur.user_email,
         livreur_id: livreur.id,
         titre: '🚨 Nouvelle course disponible !',
-        message: `Course à ${distance.toFixed(1)}km — ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`,
+        message: `Course : ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`,
         type: 'nouvelle_course',
         course_id: courseId,
       });
@@ -118,8 +105,8 @@ async function proposerAuLivreur(base44, courseId, course, livreur, cycle) {
     }
   }
 
-  console.log(`[DISPATCH INTERNE] 📤 Course ${courseId} proposée à ${livreur.nom} (${distance.toFixed(1)}km, cycle ${cycle})`);
-  return distance;
+  console.log(`[DISPATCH INTERNE] 📤 Course ${courseId} proposée à ${livreur.nom} (cycle ${cycle})`);
+  return 0;
 }
 
 /**
@@ -171,8 +158,7 @@ async function lancerDispatch(base44, courseId, exclusions = [], cycle = 1) {
     propose: true, 
     livreur: { 
       id: livreur.id, 
-      nom: `${livreur.prenom || ''} ${livreur.nom}`.trim(),
-      distance_km: calculerDistance(course.gps_depart_lat, course.gps_depart_lng, livreur.latitude, livreur.longitude).toFixed(1)
+      nom: `${livreur.prenom || ''} ${livreur.nom}`.trim()
     }
   };
 }
