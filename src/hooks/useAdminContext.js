@@ -1,0 +1,39 @@
+import { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+
+/**
+ * Hook qui détermine le contexte admin de l'utilisateur connecté.
+ * 
+ * - Admin Global : role="admin" ET (pas de country_code OU admin_type="global")
+ * - Admin Pays   : role="admin" ET admin_type="pays" ET country_code renseigné
+ * 
+ * Retourne :
+ *   - isGlobal       : boolean
+ *   - isPays         : boolean
+ *   - countryCode    : string | null (ex: "BF", "CI") — null si global
+ *   - user           : object | null
+ *   - loading        : boolean
+ */
+export function useAdminContext() {
+  const [state, setState] = useState({ user: null, loading: true });
+
+  useEffect(() => {
+    base44.auth.me()
+      .then(u => setState({ user: u, loading: false }))
+      .catch(() => setState({ user: null, loading: false }));
+  }, []);
+
+  const { user, loading } = state;
+
+  if (loading || !user) {
+    return { isGlobal: false, isPays: false, countryCode: null, user, loading };
+  }
+
+  const adminType = user.admin_type || "global";
+  const countryCode = user.country_code || null;
+
+  const isPays = adminType === "pays" && !!countryCode;
+  const isGlobal = !isPays;
+
+  return { isGlobal, isPays, countryCode, user, loading };
+}

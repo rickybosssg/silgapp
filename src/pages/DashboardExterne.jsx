@@ -9,6 +9,7 @@ import { fr } from "date-fns/locale";
 import StatCard from "@/components/dashboard/StatCard";
 import CountrySelector, { usePaysActifs } from "@/components/international/CountrySelector.jsx";
 import StatsPays from "@/components/international/StatsPays.jsx";
+import { useAdminContext } from "@/hooks/useAdminContext.js";
 import LivreursEnLigne from "@/components/dashboard/LivreursEnLigne";
 import ClientsEnLigne from "@/components/dashboard/ClientsEnLigne";
 
@@ -27,26 +28,38 @@ import StatDetailModal from "@/components/dashboard/StatDetailModal";
 export default function DashboardExterne() {
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [statModal, setStatModal] = useState(null);
-  const [filterCountry, setFilterCountry] = useState(""); // "" = tous les pays
+  const { isGlobal, isPays, countryCode: adminCountryCode } = useAdminContext();
+  // Admin pays → filtrage forcé sur son pays. Admin global → peut filtrer librement.
+  const [filterCountry, setFilterCountry] = useState(() => isPays ? (adminCountryCode || "") : "");
   const paysActifs = usePaysActifs();
 
   const { data: courses = [], isLoading } = useQuery({
-    queryKey: ["courses-externes-dashboard"],
-    queryFn: () => base44.entities.CourseExterne.list("-created_date", 300),
+    queryKey: ["courses-externes-dashboard", isPays ? adminCountryCode : "all"],
+    queryFn: () => isPays && adminCountryCode
+      ? base44.entities.CourseExterne.filter({ country_code: adminCountryCode }, "-created_date")
+      : base44.entities.CourseExterne.list("-created_date", 300),
     initialData: [],
     refetchInterval: 5000,
   });
+
+  const livreurFilter = isPays && adminCountryCode
+    ? { type_livreur: "externe", country_code: adminCountryCode }
+    : { type_livreur: "externe" };
 
   const { data: livreurs = [] } = useQuery({
-    queryKey: ["livreurs-externes"],
-    queryFn: () => base44.entities.Livreur.filter({ type_livreur: "externe" }),
+    queryKey: ["livreurs-externes", isPays ? adminCountryCode : "all"],
+    queryFn: () => base44.entities.Livreur.filter(livreurFilter),
     initialData: [],
     refetchInterval: 5000,
   });
 
+  const clientFilter = isPays && adminCountryCode
+    ? { actif: true, country_code: adminCountryCode }
+    : { actif: true };
+
   const { data: clients = [] } = useQuery({
-    queryKey: ["clients-externes"],
-    queryFn: () => base44.entities.ClientExterne.filter({ actif: true }),
+    queryKey: ["clients-externes", isPays ? adminCountryCode : "all"],
+    queryFn: () => base44.entities.ClientExterne.filter(clientFilter),
     initialData: [],
     refetchInterval: 10000,
   });
@@ -112,16 +125,30 @@ export default function DashboardExterne() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-xl lg:text-2xl font-bold text-foreground">Silga Externe</h1>
+            <h1 className="text-xl lg:text-2xl font-bold text-foreground">
+              Silga Externe
+              {isPays && adminCountryCode && (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  — {adminCountryCode}
+                </span>
+              )}
+            </h1>
             <p className="text-xs lg:text-sm text-muted-foreground">
               {format(new Date(), "EEEE d MMMM yyyy", { locale: fr })}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {paysActifs.length > 1 && (
+          {isGlobal && (
+            <Link to="/admin/global">
+              <Button variant="outline" size="sm" className="gap-1.5 border-primary/30 text-primary hover:bg-primary/10">
+                <Globe className="w-4 h-4" />
+                <span className="hidden sm:inline">Admin Global</span>
+              </Button>
+            </Link>
+          )}
+          {isGlobal && paysActifs.length > 1 && (
             <div className="flex items-center gap-1.5">
-              <Globe className="w-3.5 h-3.5 text-muted-foreground" />
               <CountrySelector
                 value={filterCountry}
                 onChange={setFilterCountry}

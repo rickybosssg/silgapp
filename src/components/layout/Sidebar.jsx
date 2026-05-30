@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
-  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe
+  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
@@ -26,7 +26,8 @@ export const navItems = [
   { path: "/rapport", label: "Rapport du jour", icon: BarChart3 },
   { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp },
   { path: "/admin/externe/dus-livreurs", label: "Comptabilité", icon: Wallet },
-  { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Globe, reseauOnly: "externe" },
+  { path: "/admin/global", label: "Admin Global", icon: Globe, reseauOnly: "externe" },
+  { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Settings, reseauOnly: "externe" },
   { path: "/notifications", label: "Notifications", icon: Bell },
   { path: "/maintenance", label: "Maintenance", icon: Shield },
 ];

@@ -1,0 +1,38 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "user"
+      ],
+      "default": "user",
+      "description": "R\u00f4le de l'utilisateur"
+    },
+    "admin_type": {
+      "type": "string",
+      "enum": [
+        "global",
+        "pays"
+      ],
+      "default": "global",
+      "description": "Type d'admin : global (tous les pays) ou pays (un seul pays)"
+    },
+    "country_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE"
+      ],
+      "description": "Code pays ISO de l'admin pays (ex: BF, CI). Vide si admin global."
+    }
+  }
+}

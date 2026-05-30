@@ -40,6 +40,8 @@ const DashboardAdminExterne = lazy(() => import('./pages/DashboardAdminExterne.j
 const DusLivreursExternes = lazy(() => import('./pages/DusLivreursExternes.jsx'));
 const PublicSuiviCourse = lazy(() => import('./pages/PublicSuiviCourse.jsx'));
 const GestionPays = lazy(() => import('./pages/GestionPays.jsx'));
+const AdminGlobal = lazy(() => import('./pages/AdminGlobal.jsx'));
+const DashboardPays = lazy(() => import('./pages/DashboardPays.jsx'));
 const Maintenance = lazy(() => import('./pages/Maintenance.jsx'));
 const TestBoutEnBout = lazy(() => import('./pages/TestBoutEnBout.jsx'));
 const TestDiagnosticsComplet = lazy(() => import('./pages/TestDiagnosticsComplet.jsx'));
@@ -221,6 +223,8 @@ function AppContent() {
               <Route path="/recapitulatif" element={<AnimatedRoutes><RecapitulatifAdmin reseau="externe" /></AnimatedRoutes>} />
               <Route path="/admin/externe/dus-livreurs" element={<AnimatedRoutes><DusLivreursExternes /></AnimatedRoutes>} />
               <Route path="/admin/gestion-pays" element={<AnimatedRoutes><GestionPays /></AnimatedRoutes>} />
+              <Route path="/admin/global" element={<AnimatedRoutes><AdminGlobal /></AnimatedRoutes>} />
+              <Route path="/admin/pays/:code" element={<AnimatedRoutes><DashboardPays /></AnimatedRoutes>} />
             </>
           )}
           <Route path="/notifications" element={<AnimatedRoutes><Notifications /></AnimatedRoutes>} />

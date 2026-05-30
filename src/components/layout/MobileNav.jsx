@@ -24,6 +24,7 @@ const allNavItems = [
   { path: "/rapport", label: "Rapport du jour", icon: BarChart3 },
   { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp },
   { path: "/admin/externe/dus-livreurs", label: "Comptabilité", icon: Wallet },
+  { path: "/admin/global", label: "Admin Global", icon: Globe, reseauOnly: "externe" },
   { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Globe, reseauOnly: "externe" },
   { path: "/notifications", label: "Notifications", icon: Bell },
 ];
