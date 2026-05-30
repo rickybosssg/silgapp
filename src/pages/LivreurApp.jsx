@@ -28,7 +28,6 @@ import EmptyStateAttente from "@/components/livreur/EmptyStateAttente";
 import CourseEnAttenteModal from "@/components/livreur/CourseEnAttenteModal";
 import CourseActiveCard from "@/components/livreur/CourseActiveCard";
 import LivreurHistorique from "@/components/livreur/LivreurHistorique";
-import PrixCoursePopup from "@/components/livreur/PrixCoursePopup";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
@@ -44,7 +43,6 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
   const [activeTab, setActiveTab] = useState("courses");
   const [gpsActif, setGpsActif] = useState(false);
   const [gpsRequis, setGpsRequis] = useState(true);
-  const [courseLivreePopup, setCourseLivreePopup] = useState(null); // course à afficher dans le popup prix
 
   // Recharger le profil livreur en temps réel
   const { data: livreurProfil } = useQuery({
@@ -323,21 +321,6 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
       queryClient.invalidateQueries({ queryKey: ["livreur-profil"] })
     );
 
-    // Construire courseData enrichi pour le popup — inclut les coords récup→livraison
-    const courseData = {
-      ...course,
-      ...(gpsArrivee && {
-        latitude_arrivee_livraison: gpsArrivee.lat,
-        longitude_arrivee_livraison: gpsArrivee.lng,
-      }),
-      ...(distance && { distance_km: distance }),
-    };
-
-    // Afficher le popup prix — une seule fois par course
-    const seenKey = `prix_popup_seen_${course.id}`;
-    if (!localStorage.getItem(seenKey)) {
-      setCourseLivreePopup(courseData);
-    }
     toast.success("Livraison terminée ! 🎉");
   };
 
@@ -413,17 +396,6 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
   return (
     <div className="min-h-screen bg-gray-50">
       <PullToRefreshIndicator pulling={pulling} refreshing={refreshing} />
-
-      {/* Popup prix de course — affiché une seule fois après livraison */}
-      {courseLivreePopup && (
-        <PrixCoursePopup
-          course={courseLivreePopup}
-          onClose={() => {
-            localStorage.setItem(`prix_popup_seen_${courseLivreePopup.id}`, "1");
-            setCourseLivreePopup(null);
-          }}
-        />
-      )}
 
       {courseEnAttente && (
         <CourseEnAttenteModal
