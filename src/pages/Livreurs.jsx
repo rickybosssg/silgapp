@@ -316,7 +316,7 @@ export default function Livreurs() {
           <h1 className="text-xl lg:text-2xl font-bold">Livreurs Internes</h1>
           {!isLoading && (
             <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-              {livreurs.length} total
+              {internes.length} total
             </span>
           )}
           {livreursError && (
