@@ -290,36 +290,20 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
     );
   };
 
-  const handleColisLivre = (course, prixReel, gpsArrivee) => {
-    const gpsDepart = { lat: course.latitude_depart_livraison, lng: course.longitude_depart_livraison };
-    const distance = (gpsDepart.lat && gpsArrivee)
-      ? calculerDistance(gpsDepart.lat, gpsDepart.lng, gpsArrivee.lat, gpsArrivee.lng)
-      : null;
-    const duree = course.colis_recupere_at
-      ? Math.round((new Date().getTime() - new Date(course.colis_recupere_at).getTime()) / 60000)
-      : null;
-
+  const handleColisLivre = (course, prixReel) => {
     const updateData = {
       statut: "livree",
       heure_livraison: new Date().toISOString(),
       colis_livre_at: new Date().toISOString(),
       prix_reel: prixReel,
-      ...(gpsArrivee && {
-        latitude_arrivee_livraison: gpsArrivee.lat,
-        longitude_arrivee_livraison: gpsArrivee.lng,
-      }),
-      ...(distance && {
-        distance_km: distance,
-        duree_livraison_minutes: duree,
-        gps_distance_type: "estimee",
-      }),
     };
 
     updateCourseMutation.mutate({ id: course.id, data: updateData });
 
-    saveLivreur(livreurProfil.id, { statut: "disponible" }).then(() =>
-      queryClient.invalidateQueries({ queryKey: ["livreur-profil"] })
-    );
+    saveLivreur(livreurProfil.id, { statut: "disponible" }).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
+      queryClient.invalidateQueries({ queryKey: ["mes-courses"] });
+    });
 
     toast.success("Livraison terminée ! 🎉");
   };

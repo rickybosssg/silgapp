@@ -107,9 +107,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const [showPrixModal, setShowPrixModal] = useState(false);
   const [remarque, setRemarque] = useState("");
   const [showRemarque, setShowRemarque] = useState(false);
-  const [showResume, setShowResume] = useState(false);
-  const [gpsArrivee, setGpsArrivee] = useState(null);
-  const [showQRScanner, setShowQRScanner] = useState(null); // "pickup" | "delivery" | null
+  const [showQRScanner, setShowQRScanner] = useState(null);
   // Optimistic status — overrides course.statut immediately on tap
   const [optimisticStatut, setOptimisticStatut] = useState(null);
 
@@ -119,19 +117,17 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
   const handleConfirmerLivraison = () => {
     if (isExterne) {
-      // Externe : le prix est calculé depuis le GPS, pas saisi manuellement
-      onColisLivre(course, gpsArrivee);
+      onColisLivre(course);
     } else {
       const montant = parseFloat(prixReel);
       if (!prixReel || isNaN(montant) || montant <= 0) {
         toast.error("Entrez le montant reçu du client");
         return;
       }
-      onColisLivre(course, montant, gpsArrivee);
+      onColisLivre(course, montant);
     }
     setShowPrixModal(false);
     setPrixReel("");
-    setGpsArrivee(null);
   };
 
   const handleRemarque = () => {
@@ -179,35 +175,18 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
         />
       )}
 
-      {/* Modal résumé livraison */}
-      {showResume && (
-        <LivraisonResume
-          course={course}
-          gpsDepart={{ lat: course.latitude_depart_livraison, lng: course.longitude_depart_livraison }}
-          gpsArrivee={gpsArrivee}
-          onContinuer={() => {
-            setShowResume(false);
-            setShowPrixModal(true);
-          }}
-          onCancel={() => {
-            setShowResume(false);
-            setGpsArrivee(null);
-          }}
-        />
-      )}
-
-      {/* Modal montant — uniquement pour l'interne (externe calcule via GPS) */}
+      {/* Modal montant — uniquement pour l'interne */}
       {showPrixModal && !isExterne && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
         >
           <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl space-y-5">
             <div className="text-center">
-              <div className="w-14 h-14 rounded-2xl bg-amber-50 flex items-center justify-center mx-auto mb-3 text-3xl">
-                💰
+              <div className="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center mx-auto mb-3 text-3xl">
+                🎉
               </div>
-              <p className="text-xl font-black text-gray-900">Montant reçu</p>
-              <p className="text-sm text-gray-500 mt-1">Entrez le montant exact payé par le client</p>
+              <p className="text-xl font-black text-gray-900">Course terminée !</p>
+              <p className="text-sm text-gray-500 mt-1">Quel montant avez-vous reçu du client ?</p>
             </div>
             <div className="relative">
               <Input
@@ -232,24 +211,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 onClick={handleConfirmerLivraison}
                 disabled={isPending}
               >
-                Confirmer ✅
+                OK ✅
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Externe : confirmation automatique sans saisie de montant */}
-      {showPrixModal && isExterne && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
-        >
-          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl space-y-5 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center mx-auto text-3xl">🎉</div>
-            <p className="text-xl font-black text-gray-900">Confirmer la livraison ?</p>
-            <p className="text-sm text-gray-500">Le prix final sera calculé automatiquement selon la distance GPS réelle.</p>
-            <div className="grid grid-cols-2 gap-3">
-              <button className="h-12 rounded-2xl border border-gray-200 text-gray-600 font-bold text-sm" onClick={() => setShowPrixModal(false)}>Annuler</button>
-              <button className="h-12 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-sm shadow-lg shadow-red-200 disabled:opacity-50" onClick={handleConfirmerLivraison} disabled={isPending}>Livré ✅</button>
             </div>
           </div>
         </div>
@@ -453,7 +416,13 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   /* ── INTERNE : bouton classique avec GPS + récapitulatif ── */
                   <button
                     className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                    onClick={() => setShowPrixModal(true)}
+                    onClick={() => {
+                      navigator.geolocation.getCurrentPosition(
+                        () => setShowPrixModal(true),
+                        () => setShowPrixModal(true),
+                        { enableHighAccuracy: true, timeout: 5000 }
+                      );
+                    }}
                     disabled={isPending}
                   >
                     <Check className="w-6 h-6" />
