@@ -123,14 +123,10 @@ async function lancerDispatch(base44, courseId, exclusions = [], cycle = 1) {
     return { ignore: true, statut: course.statut };
   }
 
-  // Vérifier GPS course obligatoire
-  if (!course.gps_depart_lat || !course.gps_depart_lng) {
-    console.warn(`[DISPATCH INTERNE] ⚠️ Course ${courseId} sans GPS — dispatch ignoré`);
-    return { 
-      noLivreur: true, 
-      missing_gps: true,
-      message: 'Course sans GPS — veuillez ajouter la position de départ'
-    };
+  // GPS optionnel — si absent, on cherche tous les livreurs avec GPS
+  const hasGPS = course.gps_depart_lat && course.gps_depart_lng;
+  if (!hasGPS) {
+    console.log(`[DISPATCH INTERNE] ℹ️ Course ${courseId} sans GPS — recherche tous les livreurs`);
   }
 
   // Cycle 1 : disponible + GPS + app_active
