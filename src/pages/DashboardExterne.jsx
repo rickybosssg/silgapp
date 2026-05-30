@@ -19,8 +19,6 @@ import CourseDetailDialog from "@/components/courses/CourseDetailDialog";
 
 import DispatchMonitor from "@/components/dispatch/DispatchMonitor";
 import BatterieAlertesPanel from "@/components/admin/BatterieAlertesPanel";
-import SyncClientGPSPanel from "@/components/admin/SyncClientGPSPanel";
-import SyncLivreurGPSPanel from "@/components/admin/SyncLivreurGPSPanel";
 import { Card } from "@/components/ui/card";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import StatDetailModal from "@/components/dashboard/StatDetailModal";
@@ -171,12 +169,6 @@ export default function DashboardExterne() {
       {/* Alertes batterie + dispatch monitor */}
       <BatterieAlertesPanel currentUser={null} />
       <DispatchMonitor />
-
-      {/* Synchronisation GPS */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <SyncClientGPSPanel />
-        <SyncLivreurGPSPanel />
-      </div>
 
       {/* Stats cliquables */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
