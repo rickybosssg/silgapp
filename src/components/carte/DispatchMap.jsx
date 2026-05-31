@@ -463,6 +463,8 @@ export default function DispatchMap({
     if (!mapRef.current || !position || !position.latitude || !position.longitude) return;
 
     const inject = () => {
+      console.log("[DispatchMap] Injection carte...");
+      
       if (!document.getElementById("dmap-styles")) {
         const s = document.createElement("style");
         s.id = "dmap-styles";
@@ -470,39 +472,57 @@ export default function DispatchMap({
         document.head.appendChild(s);
       }
 
-      if (!window.L) return;
+      if (!window.L) {
+        console.error("[DispatchMap] window.L non disponible après chargement script");
+        return;
+      }
 
-      const map = window.L.map(mapRef.current, {
-        zoomControl: false,
-        attributionControl: false,
-        scrollWheelZoom: true,
-        doubleClickZoom: true,
-        dragging: true,
-        keyboard: false,
-      }).setView([position.latitude, position.longitude], position.zoom ?? 12);
+      console.log("[DispatchMap] window.L disponible:", !!window.L);
 
-      window.L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-        { maxZoom: 19, subdomains: "abcd" }
-      ).addTo(map);
+      try {
+        const map = window.L.map(mapRef.current, {
+          zoomControl: false,
+          attributionControl: false,
+          scrollWheelZoom: true,
+          doubleClickZoom: true,
+          dragging: true,
+          keyboard: false,
+        }).setView([position.latitude, position.longitude], position.zoom ?? 12);
 
-      window.L.control.zoom({ position: "bottomright" }).addTo(map);
+        window.L.tileLayer(
+          "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+          { maxZoom: 19, subdomains: "abcd" }
+        ).addTo(map);
 
-      mapInstanceRef.current = map;
-      setMapLoaded(true);
+        window.L.control.zoom({ position: "bottomright" }).addTo(map);
+
+        mapInstanceRef.current = map;
+        setMapLoaded(true);
+        console.log("[DispatchMap] Carte initialisée avec succès");
+      } catch (error) {
+        console.error("[DispatchMap] Erreur initialisation carte:", error);
+      }
     };
 
     if (!window.L) {
+      console.log("[DispatchMap] Chargement Leaflet...");
+      
       const link = document.createElement("link");
       link.rel = "stylesheet";
       link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      link.onerror = () => console.error("[DispatchMap] Erreur chargement CSS Leaflet");
       document.head.appendChild(link);
 
       const script = document.createElement("script");
       script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-      script.onload = inject;
+      script.onload = () => {
+        console.log("[DispatchMap] Script Leaflet chargé");
+        inject();
+      };
+      script.onerror = () => console.error("[DispatchMap] Erreur chargement script Leaflet");
       document.head.appendChild(script);
     } else {
+      console.log("[DispatchMap] Leaflet déjà chargé");
       inject();
     }
 
