@@ -214,21 +214,24 @@ export default function CarteLivreursExterne() {
     refetchInterval: 15000,
   });
   
-  // Filtrage strict : courses VRAIMENT en attente (sans livreur, non terminée/annulée, avec GPS)
+  // Filtrage strict : courses VRAIMENT en attente (statuts initiaux uniquement)
+  // Statuts "en attente" : nouvelle, recherche_livreur (PAS livreur_en_route, colis_recupere, en_livraison, livree, annulee)
   const coursesEnAttente = useMemo(() => {
     const filtered = toutesCoursesExternes.filter(c =>
+      (c.statut === "nouvelle" || c.statut === "recherche_livreur") &&
       !c.livreur_id &&
-      c.statut !== "annulee" &&
-      c.statut !== "livree" &&
-      c.statut !== "en_livraison" &&
-      c.statut !== "colis_recupere" &&
       c.gps_depart_lat &&
       c.gps_depart_lng
     );
-    console.log("[CarteLivreursExterne] coursesEnAttente:", {
+    console.log("[CarteLivreursExterne] coursesEnAttente AUDIT:", {
       total: toutesCoursesExternes.length,
       en_attente: filtered.length,
-      stats: filtered.map(c => ({ id: c.id, statut: c.statut, livreur_id: c.livreur_id }))
+      details: filtered.map(c => ({ 
+        id: c.id.substr(-8), 
+        statut: c.statut, 
+        livreur_id: c.livreur_id || "AUCUN",
+        dispatch_status: c.dispatch_status
+      }))
     });
     return filtered;
   }, [toutesCoursesExternes]);
