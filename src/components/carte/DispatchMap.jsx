@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Globe } from "lucide-react";
+import HeatmapLayer, { HeatmapControls } from "./HeatmapLayer";
+import CountrySelector from "@/components/international/CountrySelector";
 
 /**
  * DispatchMap — Carte dédiée au dispatch temps réel
@@ -436,11 +438,16 @@ export default function DispatchMap({
   clients = [],
   courses = [],
   onMarkerClick,
+  showHeatmap = false,
+  heatmapMode = "off", // "off" | "demande" | "livreurs"
+  countryCode = "",
+  onCountryChange,
 }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [heatmapModeLocal, setHeatmapModeLocal] = useState(heatmapMode);
 
   // Recentrer la carte quand le pays change
   useEffect(() => {
@@ -504,6 +511,17 @@ export default function DispatchMap({
       markersRef.current = [];
     };
   }, [position?.latitude, position?.longitude]);
+
+  // Heatmap layer
+  const heatmapLayerRef = useRef(null);
+  useEffect(() => {
+    if (!mapInstanceRef.current || !mapLoaded) return;
+    if (heatmapModeLocal !== "off") {
+      if (!heatmapLayerRef.current) {
+        heatmapLayerRef.current = true;
+      }
+    }
+  }, [heatmapModeLocal, mapLoaded]);
 
   // Mise à jour des marqueurs
   useEffect(() => {
@@ -600,6 +618,16 @@ export default function DispatchMap({
 
   return (
     <div className="relative w-full h-full">
+      {/* Heatmap layer */}
+      {mapLoaded && heatmapModeLocal !== "off" && (
+        <HeatmapLayer
+          map={mapInstanceRef.current}
+          clients={clients}
+          livreurs={livreurs}
+          mode={heatmapModeLocal}
+        />
+      )}
+
       <div ref={mapRef} className="w-full h-full bg-slate-100" style={{ minHeight: 300 }} />
 
       {!mapLoaded && (
@@ -611,58 +639,83 @@ export default function DispatchMap({
         </div>
       )}
 
-      {/* Légende overlay */}
+      {/* Overlay controls */}
       {mapLoaded && (
-        <div className="absolute top-4 left-4 z-[1000] space-y-2">
-          <div className="dmap-overlay-badge">
-            <div className="space-y-1 text-xs font-medium">
-              {courses.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-red-600 flex-shrink-0" />
-                  <span className="text-red-700 font-bold">{courses.length} en attente !</span>
-                </div>
-              )}
-              {nbLibres > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" />
-                  <span className="text-green-700">{nbLibres} libre{nbLibres > 1 ? "s" : ""}</span>
-                </div>
-              )}
-              {nbCourse > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-orange-500 flex-shrink-0" />
-                  <span className="text-orange-700">{nbCourse} en course</span>
-                </div>
-              )}
-              {clients.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" />
-                  <span className="text-blue-700">{clients.length} client{clients.length > 1 ? "s" : ""}</span>
-                </div>
-              )}
-              {nbLivreursInactifs > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-black flex-shrink-0" />
-                  <span className="text-gray-700 font-medium">⚫ {nbLivreursInactifs} livreur{nbLivreursInactifs > 1 ? "s" : ""} inactif{nbLivreursInactifs > 1 ? "s" : ""}</span>
-                </div>
-              )}
-              {nbClientsInactifs > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-black flex-shrink-0" />
-                  <span className="text-gray-700 font-medium">⚫ {nbClientsInactifs} client{nbClientsInactifs > 1 ? "s" : ""} inactif{nbClientsInactifs > 1 ? "s" : ""}</span>
-                </div>
-              )}
-              {courses.length === 0 && nbLibres === 0 && nbCourse === 0 && clients.length === 0 && nbLivreursInactifs === 0 && nbClientsInactifs === 0 && (
-                <span className="text-gray-400">Aucun élément visible</span>
-              )}
+        <>
+          {/* Stats + légende (top-left) */}
+          <div className="absolute top-4 left-4 z-[1000] space-y-2">
+            <div className="dmap-overlay-badge">
+              <div className="space-y-1 text-xs font-medium">
+                {courses.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-red-600 flex-shrink-0" />
+                    <span className="text-red-700 font-bold">{courses.length} en attente !</span>
+                  </div>
+                )}
+                {nbLibres > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" />
+                    <span className="text-green-700">{nbLibres} libre{nbLibres > 1 ? "s" : ""}</span>
+                  </div>
+                )}
+                {nbCourse > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-orange-500 flex-shrink-0" />
+                    <span className="text-orange-700">{nbCourse} en course</span>
+                  </div>
+                )}
+                {clients.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" />
+                    <span className="text-blue-700">{clients.length} client{clients.length > 1 ? "s" : ""}</span>
+                  </div>
+                )}
+                {nbLivreursInactifs > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-black flex-shrink-0" />
+                    <span className="text-gray-700 font-medium">⚫ {nbLivreursInactifs} livreur{nbLivreursInactifs > 1 ? "s" : ""} inactif{nbLivreursInactifs > 1 ? "s" : ""}</span>
+                  </div>
+                )}
+                {nbClientsInactifs > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-black flex-shrink-0" />
+                    <span className="text-gray-700 font-medium">⚫ {nbClientsInactifs} client{nbClientsInactifs > 1 ? "s" : ""} inactif{nbClientsInactifs > 1 ? "s" : ""}</span>
+                  </div>
+                )}
+                {courses.length === 0 && nbLibres === 0 && nbCourse === 0 && clients.length === 0 && nbLivreursInactifs === 0 && nbClientsInactifs === 0 && (
+                  <span className="text-gray-400">Aucun élément visible</span>
+                )}
+              </div>
+            </div>
+            <div className="dmap-overlay-badge text-xs text-slate-500 space-y-1">
+              <div>❤️ &lt;2 min · 💚 2-5 min · 🧡 5-15 min</div>
+              <div>❤️‍🩹 15-30 min · ❤️‍🔥 &gt;30 min</div>
+              <div className="text-gray-400">⚫ Noir = non dispatchable</div>
             </div>
           </div>
-          <div className="dmap-overlay-badge text-xs text-slate-500 space-y-1">
-            <div>❤️ &lt;2 min · 💚 2-5 min · 🧡 5-15 min</div>
-            <div>❤️‍🩹 15-30 min · ❤️‍🔥 &gt;30 min</div>
-            <div className="text-gray-400">⚫ Noir = non dispatchable</div>
+
+          {/* Contrôles heatmap (top-right) */}
+          <div className="absolute top-4 right-4 z-[1000]">
+            <HeatmapControls mode={heatmapModeLocal} onModeChange={setHeatmapModeLocal} />
           </div>
-        </div>
+
+          {/* Sélecteur pays (bottom-left) */}
+          {onCountryChange && (
+            <div className="absolute bottom-4 left-4 z-[1000]">
+              <div className="dmap-overlay-badge">
+                <div className="flex items-center gap-2 mb-1">
+                  <Globe className="w-3 h-3 text-slate-500" />
+                  <span className="text-xs font-semibold text-slate-700">Pays</span>
+                </div>
+                <CountrySelector
+                  value={countryCode}
+                  onChange={onCountryChange}
+                  className="w-full text-xs"
+                />
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
