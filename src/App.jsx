@@ -8,6 +8,7 @@ import { queryClientInstance } from '@/lib/query-client';
 import PageNotFound from './lib/PageNotFound';
 import AuthGate from './components/auth/AuthGate.jsx';
 import SelectionReseau from './pages/SelectionReseau.jsx';
+import AppMaintenanceGate from './components/admin/AppMaintenanceGate.jsx';
 
 // LoadingScreen défini IMMÉDIATEMENT avant lazy loading
 const LoadingScreen = () => <SplashScreen />;
@@ -141,17 +142,21 @@ function AppContent() {
     if (livreurProfil.type_livreur === "externe") {
       return (
         <Suspense fallback={<LoadingScreen />}>
-          <Routes>
-            <Route path="/livreur/recap-course/:courseId" element={<RecapCourseLivreur />} />
-            <Route path="*" element={<LivreurExterneApp livreurProfil={livreurProfil} />} />
-          </Routes>
+          <AppMaintenanceGate>
+            <Routes>
+              <Route path="/livreur/recap-course/:courseId" element={<RecapCourseLivreur />} />
+              <Route path="*" element={<LivreurExterneApp livreurProfil={livreurProfil} />} />
+            </Routes>
+          </AppMaintenanceGate>
         </Suspense>
       );
     }
     // Livreur interne
     return (
       <Suspense fallback={<LoadingScreen />}>
-        <LivreurApp livreurProfil={livreurProfil} />
+        <AppMaintenanceGate>
+          <LivreurApp livreurProfil={livreurProfil} />
+        </AppMaintenanceGate>
       </Suspense>
     );
   }

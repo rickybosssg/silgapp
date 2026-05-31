@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44, detectedToken } from "@/api/base44Client";
 import { Truck } from "lucide-react";
+import AppMaintenanceGate from "@/components/admin/AppMaintenanceGate";
 
 /**
  * AuthGate — routage post-connexion Base44
@@ -207,16 +208,16 @@ export default function AuthGate({ children, onLivreur, onClient }) {
     );
   }
 
-  // Admin → afficher children (SelectionReseau)
+  // Admin → toujours accessible, pas de gate maintenance
   if (state === "admin") {
     return <>{children}</>;
   }
 
-  // Client → afficher children avec isClient=true
+  // Client → bloqué si app OFF
   if (state === "client") {
-    return <>{children}</>;
+    return <AppMaintenanceGate>{children}</AppMaintenanceGate>;
   }
 
-  // Livreur → rendu géré par App.jsx via onLivreur
+  // Livreur → rendu géré par App.jsx via onLivreur (le gate est dans LivreurApp/LivreurExterneApp)
   return null;
 }

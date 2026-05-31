@@ -22,6 +22,7 @@ import BatterieAlertesPanel from "@/components/admin/BatterieAlertesPanel";
 import { Card } from "@/components/ui/card";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import StatDetailModal from "@/components/dashboard/StatDetailModal";
+import AppToggleButton from "@/components/admin/AppToggleButton";
 
 export default function DashboardExterne() {
   const [selectedCourse, setSelectedCourse] = useState(null);
@@ -155,6 +156,7 @@ export default function DashboardExterne() {
               />
             </div>
           )}
+          <AppToggleButton />
           <Link to="/carte">
             <Button variant="outline" size="sm" className="gap-1.5">
               <MapPin className="w-4 h-4" />
