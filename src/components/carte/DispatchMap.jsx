@@ -19,6 +19,7 @@ import { Loader2 } from "lucide-react";
 
 const GPS_SEUIL_MIN = 5;
 const GPS_EXPIRE_MIN = 10;
+const GPS_CLIENT_SEUIL_MIN = 30;
 
 function isEnCourse(livreur) {
   return livreur.statut === "en_course";
@@ -35,7 +36,7 @@ function isClientNoir(client) {
   if (!client.latitude || !client.longitude) return true;
   const dt = client.last_seen_at;
   if (!dt) return true;
-  return (Date.now() - new Date(dt).getTime()) > GPS_EXPIRE_MIN * 60 * 1000;
+  return (Date.now() - new Date(dt).getTime()) > GPS_CLIENT_SEUIL_MIN * 60 * 1000;
 }
 
 function getLastGPSMin(entity) {
@@ -322,12 +323,24 @@ function buildLivreurPopup(livreur) {
   const gpsMin = getLastGPSMin(livreur);
   const gpsStr = gpsMin === null ? "?" : gpsMin < 1 ? "à l'instant" : `${gpsMin} min`;
   const statutColor = estNoir ? "#374151" : (libre ? "#16a34a" : "#ea580c");
+  
+  // Qualité GPS
+  let gpsQuality = "";
+  if (gpsMin !== null) {
+    if (gpsMin < 2) gpsQuality = "❤️ Excellent";
+    else if (gpsMin < 5) gpsQuality = "💚 Bon";
+    else if (gpsMin < 15) gpsQuality = "🧡 Moyen";
+    else if (gpsMin < 30) gpsQuality = "❤️‍🩹 Faible";
+    else gpsQuality = "❤️‍🔥 Expiré";
+  }
+  
   return `
     <div style="min-width:210px;font-family:sans-serif;padding:4px 0">
       <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#1a1a1a">${livreur.prenom || ""} ${livreur.nom || ""}</p>
       <p style="font-size:12px;margin:2px 0;color:${statutColor}">${statutLabel}</p>
       ${livreur.telephone ? `<p style="font-size:12px;margin:2px 0;color:#444">📞 ${livreur.telephone}</p>` : ""}
       <p style="font-size:12px;margin:2px 0;color:#6b7280">📍 GPS il y a ${gpsStr}</p>
+      ${gpsQuality ? `<p style="font-size:11px;margin:2px 0;color:#999">Qualité: ${gpsQuality}</p>` : ""}
       ${livreur.vehicule ? `<p style="font-size:12px;margin:2px 0;color:#888">🏍 ${livreur.vehicule}</p>` : ""}
       ${livreur.validation !== "valide" ? `<p style="font-size:11px;margin:2px 0;color:#f59e0b">⚠️ Validation: ${livreur.validation || "en attente"}</p>` : ""}
     </div>
@@ -385,12 +398,24 @@ function buildClientPopup(client) {
   const gpsStr = gpsMin === null ? "?" : gpsMin < 1 ? "à l'instant" : `${gpsMin} min`;
   const statutLabel = estNoir ? "⚫ Hors ligne — non dispatchable" : "🔵 Client actif";
   const statutColor = estNoir ? "#374151" : "#2563eb";
+  
+  // Qualité GPS
+  let gpsQuality = "";
+  if (gpsMin !== null) {
+    if (gpsMin < 2) gpsQuality = "❤️ Excellent";
+    else if (gpsMin < 5) gpsQuality = "💚 Bon";
+    else if (gpsMin < 15) gpsQuality = "🧡 Moyen";
+    else if (gpsMin < 30) gpsQuality = "❤️‍🩹 Faible";
+    else gpsQuality = "❤️‍🔥 Expiré";
+  }
+  
   return `
     <div style="min-width:210px;font-family:sans-serif;padding:4px 0">
       <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#1a1a1a">${client.prenom || ""} ${client.nom || ""}</p>
       <p style="font-size:12px;margin:2px 0;color:${statutColor}">${statutLabel}</p>
       ${client.telephone ? `<p style="font-size:12px;margin:2px 0;color:#444">📞 ${client.telephone}</p>` : ""}
       <p style="font-size:12px;margin:2px 0;color:#6b7280">📍 GPS il y a ${gpsStr}</p>
+      ${gpsQuality ? `<p style="font-size:11px;margin:2px 0;color:#999">Qualité: ${gpsQuality}</p>` : ""}
       ${client.quartier ? `<p style="font-size:12px;margin:2px 0;color:#888">📌 ${client.quartier}</p>` : ""}
     </div>
   `;
@@ -554,6 +579,7 @@ export default function DispatchMap({
 
   const nbLibres = livreurs.filter(l => l.statut === "disponible" && !isLivreurNoir(l)).length;
   const nbCourse = livreurs.filter(l => l.statut === "en_course" && !isLivreurNoir(l)).length;
+  const nbInactifs = livreurs.filter(l => isLivreurNoir(l)).length + clients.filter(c => isClientNoir(c)).length;
 
   return (
     <div className="relative w-full h-full">
@@ -608,8 +634,10 @@ export default function DispatchMap({
               )}
             </div>
           </div>
-          <div className="dmap-overlay-badge text-xs text-slate-500">
-            GPS &lt; {GPS_SEUIL_MIN} min · {GPS_EXPIRE_MIN} min = noir
+          <div className="dmap-overlay-badge text-xs text-slate-500 space-y-1">
+            <div>❤️ &lt;2 min · 💚 2-5 min · 🧡 5-15 min</div>
+            <div>❤️‍🩹 15-30 min · ❤️‍🔥 &gt;30 min</div>
+            <div className="text-gray-400">⚫ Noir = non dispatchable</div>
           </div>
         </div>
       )}

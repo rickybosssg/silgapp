@@ -9,6 +9,7 @@ import { ArrowLeft } from "lucide-react";
 import DispatchMap from "@/components/carte/DispatchMap";
 import MarkerInfoPanel from "@/components/carte/MarkerInfoPanel";
 import NetworkHealthBanner from "@/components/carte/NetworkHealthBanner";
+import GPSHealthBadge from "@/components/carte/GPSHealthBadge";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
@@ -19,7 +20,8 @@ import CountrySelector, { usePaysActifs } from "@/components/international/Count
 const GPS_SEUIL_MIN = 5;          // GPS valide si < 5 min
 const HEARTBEAT_SEUIL_MIN = 5;    // App active si heartbeat < 5 min
 const HEARTBEAT_ON_SEUIL_MIN = 10; // ON si heartbeat < 10 min
-const GPS_EXPIRE_MIN = 10;        // GPS expiré si > 10 min → noir
+const GPS_EXPIRE_MIN = 10;        // GPS expiré si > 10 min → noir (livreurs)
+const GPS_CLIENT_SEUIL_MIN = 30;  // Client GPS valide si < 30 min
 
 // ─── Helpers (règles unifiées) ───────────────────────────────────────────────
 
@@ -71,20 +73,22 @@ function isLivreurNoir(livreur) {
 }
 
 /**
- * Client noir = GPS absent ou expiré > 10 min
+ * Client noir = GPS absent ou expiré > 30 min
  */
 function isClientNoir(client) {
   if (!client.latitude || !client.longitude) return true;
   const dt = client.last_seen_at;
   if (!dt) return true;
-  return (Date.now() - new Date(dt).getTime()) > GPS_EXPIRE_MIN * 60 * 1000;
+  return (Date.now() - new Date(dt).getTime()) > GPS_CLIENT_SEUIL_MIN * 60 * 1000;
 }
 
 /**
- * Client GPS récent = position < 5 min
+ * Client GPS récent = position < 30 min
  */
 function isClientGPSRecent(client) {
-  return isGPSRecent(client);
+  const dt = client.last_seen_at;
+  if (!dt) return false;
+  return (Date.now() - new Date(dt).getTime()) < GPS_CLIENT_SEUIL_MIN * 60 * 1000;
 }
 
 const INDICATIFS = {
@@ -332,8 +336,8 @@ export default function CarteLivreursExterne() {
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Clients</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {[
-            { label: "⚫ Noirs",   count: compteursClients.noirs,  color: "text-gray-700 bg-gray-100 border-gray-300", title: "GPS > 10 min ou absent" },
-            { label: "🔵 Bleus",  count: compteursClients.bleus,  color: "text-blue-700 bg-blue-50 border-blue-200", title: "Actifs + GPS < 10 min" },
+            { label: "⚫ Noirs",   count: compteursClients.noirs,  color: "text-gray-700 bg-gray-100 border-gray-300", title: "GPS > 30 min ou absent" },
+            { label: "🔵 Bleus",  count: compteursClients.bleus,  color: "text-blue-700 bg-blue-50 border-blue-200", title: "Actifs + GPS < 30 min" },
             { label: "📍 Total",  count: compteursClients.surCarte,color: "text-purple-700 bg-purple-50 border-purple-200", title: "Tous les clients enregistrés" },
           ].map(c => (
             <div key={c.label} className={`border rounded-lg p-2 text-center ${c.color}`} title={c.title}>
@@ -348,10 +352,10 @@ export default function CarteLivreursExterne() {
       <Card className="p-4 bg-slate-50 border-slate-200">
         <p className="text-xs font-semibold text-slate-700 mb-2">Légende carte — Réseau SILGAPP complet</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs text-slate-600">
-          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-gray-800 flex-shrink-0" /><b>⚫ Noir</b> — Utilisateur enregistré, hors ligne ou GPS &gt; {GPS_EXPIRE_MIN} min</span>
-          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" /><b>🟢 Vert</b> — Livreur disponible + GPS &lt; {GPS_SEUIL_MIN} min + app active</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-gray-800 flex-shrink-0" /><b>⚫ Noir</b> — Utilisateur enregistré, hors ligne ou GPS expiré</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" /><b>🟢 Vert</b> — Livreur libre + GPS &lt; {GPS_SEUIL_MIN} min + app active</span>
           <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-orange-500 flex-shrink-0" /><b>🟠 Orange</b> — Livreur en course + GPS &lt; {GPS_SEUIL_MIN} min</span>
-          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" /><b>🔵 Bleu</b> — Client actif + GPS &lt; {GPS_SEUIL_MIN} min</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" /><b>🔵 Bleu</b> — Client actif + GPS &lt; {GPS_CLIENT_SEUIL_MIN} min</span>
           <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-red-600 flex-shrink-0" /><b>🔴 Rouge</b> — Course en attente (sans livreur)</span>
         </div>
       </Card>
@@ -446,9 +450,10 @@ export default function CarteLivreursExterne() {
                       <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{getZone(livreur)}</span>
                       {getLastGPS(livreur) && (
                         <span className={`flex items-center gap-1 ${hasValidGPS(livreur) ? "text-teal-600" : "text-red-400"}`}>
-                          <Clock className="w-3 h-3" />GPS : {getLastGPS(livreur)}
+                          <Clock className="w-3 h-3" />{getLastGPS(livreur)}
                         </span>
                       )}
+                      {!estNoir && <GPSHealthBadge entity={livreur} compact />}
                     </div>
                   </div>
                   <a href={`tel:${livreur.telephone}`} className="text-sm text-primary hover:underline ml-3 flex-shrink-0">
@@ -491,10 +496,11 @@ export default function CarteLivreursExterne() {
                       <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{getZone(client)}</span>
                       {getLastGPS(client) && (
                         <span className={`flex items-center gap-1 ${gpsRecent ? "text-teal-600" : "text-gray-400"}`}>
-                          <Clock className="w-3 h-3" />GPS : {getLastGPS(client)}
+                          <Clock className="w-3 h-3" />{getLastGPS(client)}
                         </span>
                       )}
                       <AppBadge entity={client} />
+                      {gpsRecent && <GPSHealthBadge entity={client} compact />}
                     </div>
                   </div>
                   <a href={`tel:${client.telephone}`} className="text-sm text-primary hover:underline ml-3 flex-shrink-0">

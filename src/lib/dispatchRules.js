@@ -3,6 +3,7 @@
 export const GPS_SEUIL_MIN = 5;          // GPS valide si < 5 min
 export const HEARTBEAT_SEUIL_MIN = 5;    // App active si heartbeat < 5 min
 export const HEARTBEAT_ON_SEUIL_MIN = 10; // ON si heartbeat < 10 min
+export const GPS_CLIENT_SEUIL_MIN = 30;  // Client GPS valide si < 30 min
 
 // ─── Helpers (règles unifiées) ───────────────────────────────────────────────
 
@@ -68,4 +69,19 @@ export function isClientEligibleCarte(client) {
 /** Client avec GPS (quel que soit l'âge) */
 export function hasGPS(client) {
   return !!(client.latitude && client.longitude);
+}
+
+/** Client GPS récent = position < 30 min */
+export function isClientGPSRecent(client) {
+  const dt = client.last_seen_at;
+  if (!dt) return false;
+  return (Date.now() - new Date(dt).getTime()) < GPS_CLIENT_SEUIL_MIN * 60 * 1000;
+}
+
+/**
+ * Client noir = GPS absent ou expiré > 30 min
+ */
+export function isClientNoir(client) {
+  if (!client.latitude || !client.longitude) return true;
+  return !isClientGPSRecent(client);
 }
