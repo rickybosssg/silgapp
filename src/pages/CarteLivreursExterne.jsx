@@ -231,10 +231,12 @@ export default function CarteLivreursExterne() {
   
   // Filtrage strict : courses VRAIMENT en attente (statuts initiaux uniquement)
   // Statuts "en attente" : nouvelle, recherche_livreur (PAS livreur_en_route, colis_recupere, en_livraison, livree, annulee)
+  // IMPORTANT: Une course peut avoir livreur_id défini mais être encore "en attente" si dispatch_status = "propose" (livreur n'a pas encore accepté)
   const coursesEnAttente = useMemo(() => {
     const filtered = toutesCoursesExternes.filter(c =>
       (c.statut === "nouvelle" || c.statut === "recherche_livreur") &&
-      !c.livreur_id &&
+      // Soit pas de livreur, soit livreur proposé mais pas encore accepté (dispatch_status = "propose")
+      (!c.livreur_id || c.dispatch_status === "propose") &&
       c.gps_depart_lat &&
       c.gps_depart_lng
     );
