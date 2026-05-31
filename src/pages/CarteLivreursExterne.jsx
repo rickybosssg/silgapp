@@ -172,7 +172,7 @@ export default function CarteLivreursExterne() {
     initialData: [],
     staleTime: 300000,
   });
-  const paysData = allPays.find(p => p.code === effectiveCountry);
+  const paysData = useMemo(() => allPays.find(p => p.code === effectiveCountry), [allPays, effectiveCountry]);
 
   const livreurFilter = effectiveCountry
     ? { type_livreur: "externe", actif: true, validation: "valide", country_code: effectiveCountry }
