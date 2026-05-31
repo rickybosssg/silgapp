@@ -61,7 +61,19 @@ async function trouverLivreursCandidats(base44, course, rayonKm, exclusions = []
     // GPS récent = dernière position < 10 min
     const dt = l.derniere_position_date || l.last_seen_at;
     if (!dt) return false;
-    const ageMin = (now - new Date(dt).getTime()) / 60000;
+    
+    // Calcul robuste : s'assurer que dt est une date valide
+    const gpsDate = new Date(dt);
+    if (isNaN(gpsDate.getTime())) {
+      console.log(`[DISPATCH] 🚫 ${l.nom} exclu - date GPS invalide`);
+      return false;
+    }
+    
+    const ageMin = (now - gpsDate.getTime()) / 60000;
+    
+    // DEBUG: log tous les livreurs avec leur âge GPS
+    console.log(`[DISPATCH] 📍 ${l.nom}: GPS il y a ${ageMin.toFixed(1)} min (${dt})`);
+    
     const gpsValide = ageMin < 10;
     if (!gpsValide) {
       console.log(`[DISPATCH] 🚫 ${l.nom} exclu - GPS expiré (${ageMin.toFixed(1)} min)`);
@@ -69,7 +81,7 @@ async function trouverLivreursCandidats(base44, course, rayonKm, exclusions = []
     return gpsValide;
   });
 
-  console.log(`[DISPATCH] ✅ ${livreursGPS.length} livreurs avec GPS récent (< 10 min)`);
+  console.log(`[DISPATCH] ✅ ${livreursGPS.length} livreurs avec GPS récent (< 10 min): ${livreursGPS.map(l => l.nom).join(', ')}`);
 
   // ⚠️ SANS GPS COURSE : retourner TOUS les livreurs avec GPS récent (pas tous les livreurs)
   if (!course.gps_depart_lat || !course.gps_depart_lng) {
