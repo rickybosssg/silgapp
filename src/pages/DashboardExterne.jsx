@@ -146,7 +146,7 @@ export default function DashboardExterne() {
               </Button>
             </Link>
           )}
-          {!isPays && paysActifs.length > 1 && (
+          {!isPays && (
             <div className="flex items-center gap-1.5">
               <CountrySelector
                 value={effectiveCountry || ""}
