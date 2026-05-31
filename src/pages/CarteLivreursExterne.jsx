@@ -180,8 +180,8 @@ export default function CarteLivreursExterne() {
     : { type_livreur: "externe", actif: true, validation: "valide" };
 
   const clientFilter = effectiveCountry
-    ? { actif: true, country_code: effectiveCountry }
-    : { actif: true };
+    ? { country_code: effectiveCountry }
+    : {};
 
   const { data: livreurs = [] } = useQuery({
     queryKey: ["livreurs-externes-carte", effectiveCountry],
