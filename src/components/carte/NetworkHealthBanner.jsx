@@ -4,55 +4,50 @@ import React from "react";
  * Calcule l'état de santé du réseau dispatch.
  * Retourne { heart, label, description, color }
  */
-function getNetworkHealth({ libres, enCourse, enAttente }) {
-  const hasActivity = libres > 0 || enCourse > 0 || enAttente > 0;
+function getNetworkHealth({ libres, enCourse, clientsGPS, enAttente }) {
+  const totalActifs = libres + enCourse + (clientsGPS || 0);
+  const hasActivity = totalActifs > 0 || enAttente > 0;
 
+  // 🔴 Réseau inactif = aucun utilisateur actif
   if (!hasActivity) {
     return {
-      heart: "🖤",
+      heart: "🔴",
       label: "Réseau inactif",
-      description: "Aucun livreur actif, aucune course en attente.",
+      description: "Aucun utilisateur actif visible.",
       bg: "bg-gray-100 border-gray-300",
       text: "text-gray-700",
     };
   }
 
-  if (libres === 0 && enAttente >= 1) {
+  // 🟡 Activité faible = très peu d'utilisateurs (1-2)
+  if (totalActifs <= 2 && enAttente === 0) {
     return {
-      heart: "❤️",
-      label: "Réseau saturé",
-      description: "Aucun livreur libre pour les courses en attente.",
-      bg: "bg-red-50 border-red-300",
-      text: "text-red-800",
-    };
-  }
-
-  if (libres <= 1 && enAttente >= 2) {
-    return {
-      heart: "🧡",
-      label: "Réseau fortement sollicité",
-      description: "Très peu de livreurs disponibles face à la demande.",
-      bg: "bg-orange-50 border-orange-300",
-      text: "text-orange-800",
-    };
-  }
-
-  if (libres <= 2 && enAttente >= 1) {
-    return {
-      heart: "💛",
-      label: "Réseau sous tension",
-      description: "Peu de livreurs libres, la demande est en hausse.",
+      heart: "🟡",
+      label: "Activité faible",
+      description: "Très peu d'utilisateurs actifs sur le réseau.",
       bg: "bg-yellow-50 border-yellow-300",
       text: "text-yellow-800",
     };
   }
 
+  // 🟢 Réseau opérationnel = au moins un livreur libre ou client GPS
+  if (libres > 0 || (clientsGPS || 0) > 0) {
+    return {
+      heart: "🟢",
+      label: "Réseau opérationnel",
+      description: "Utilisateurs actifs et opérationnels.",
+      bg: "bg-green-50 border-green-300",
+      text: "text-green-800",
+    };
+  }
+
+  // 🟠 Situation intermédiaire
   return {
-    heart: "💚",
-    label: "Réseau sain",
-    description: "Livreurs disponibles, situation maîtrisée.",
-    bg: "bg-green-50 border-green-300",
-    text: "text-green-800",
+    heart: "🟠",
+    label: "Activité en cours",
+    description: "Livreurs en mission, réseau actif.",
+    bg: "bg-orange-50 border-orange-300",
+    text: "text-orange-800",
   };
 }
 

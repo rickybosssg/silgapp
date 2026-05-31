@@ -9,7 +9,7 @@ import { Loader2 } from "lucide-react";
  *  🟠 Orange = Livreur en course (mission active + ON + GPS récent)
  *  🔵 Bleu   = Client (actif + GPS récent + app active)
  *  🔴 Rouge  = Course en attente (aucun livreur assigné)
- *  ⚫ Gris   = Inactif / non dispatchable (OFF, GPS expiré, app fermée, non validé)
+ *  ⚫ Noir   = Inactif / non dispatchable (OFF, GPS expiré, app fermée, non validé)
  *
  * Props supplémentaires :
  *  - livreursInactifs  : livreurs masqués normalement (OFF, GPS expiré, etc.)
@@ -45,6 +45,15 @@ function getLastGPSMin(entity) {
   return Math.round((Date.now() - new Date(dt).getTime()) / 60000);
 }
 
+/**
+ * Ajoute un léger offset aléatoire pour éviter le chevauchement des marqueurs
+ * Offset max: ~5 mètres (0.000045 degrés)
+ */
+function addMarkerOffset(lat, lng, index) {
+  const offset = (Math.sin(index * 1.5) * 0.000045);
+  return [lat + offset, lng + offset];
+}
+
 function buildStyles() {
   return `
     /* ─── Livreur LIBRE (🟢 vert) ─── */
@@ -75,17 +84,17 @@ function buildStyles() {
 
     /* ─── Livreur NOIR (⚫ hors ligne) ─── */
     .dmap-livreur-noir .dmap-ring {
-      background: rgba(55, 65, 81, 0.2);
+      background: rgba(0, 0, 0, 0.3);
     }
     .dmap-livreur-noir .dmap-body {
-      border-color: #374151;
-      box-shadow: 0 2px 8px rgba(55, 65, 81, 0.3);
+      border-color: #000000;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
     }
     .dmap-livreur-noir .dmap-avatar-bg {
-      background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+      background: linear-gradient(135deg, #000000 0%, #1f2937 100%);
     }
     .dmap-livreur-container.dmap-inactif-marker {
-      opacity: 0.7;
+      opacity: 0.85;
     }
 
     /* ─── Client (🔵 bleu) ─── */
@@ -101,15 +110,15 @@ function buildStyles() {
 
     /* ─── Client NOIR (⚫ hors ligne) ─── */
     .dmap-client-noir .dmap-client-ring {
-      background: rgba(55, 65, 81, 0.2);
+      background: rgba(0, 0, 0, 0.3);
     }
     .dmap-client-noir .dmap-client-dot {
-      background: #374151;
+      background: #000000;
       border-color: white;
-      box-shadow: 0 2px 6px rgba(55, 65, 81, 0.3);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
     }
     .dmap-client-container.dmap-inactif-marker {
-      opacity: 0.7;
+      opacity: 0.85;
     }
 
     /* ─── Course en attente (🔴 rouge) ─── */
@@ -505,12 +514,14 @@ export default function DispatchMap({
     markersRef.current = [];
 
     // ⚫ Livreurs NOIRS (hors ligne) — zIndex bas
+    let markerIndex = 0;
     livreurs.forEach(livreur => {
       if (!livreur.latitude || !livreur.longitude) return;
       const estNoir = isLivreurNoir(livreur);
       if (!estNoir) return;
       const icon = buildLivreurIcon(livreur);
-      const marker = window.L.marker([livreur.latitude, livreur.longitude], {
+      const [lat, lng] = addMarkerOffset(livreur.latitude, livreur.longitude, markerIndex++);
+      const marker = window.L.marker([lat, lng], {
         icon,
         zIndexOffset: 100,
       }).addTo(map);
@@ -525,7 +536,8 @@ export default function DispatchMap({
       const estNoir = isClientNoir(client);
       if (!estNoir) return;
       const icon = buildClientIcon(client);
-      const marker = window.L.marker([client.latitude, client.longitude], {
+      const [lat, lng] = addMarkerOffset(client.latitude, client.longitude, markerIndex++);
+      const marker = window.L.marker([lat, lng], {
         icon,
         zIndexOffset: 50,
       }).addTo(map);
@@ -540,7 +552,8 @@ export default function DispatchMap({
       const lng = course.gps_depart_lng;
       if (!lat || !lng) return;
       const icon = buildCourseIcon();
-      const marker = window.L.marker([lat, lng], { icon, zIndexOffset: 1500 }).addTo(map);
+      const [latOff, lngOff] = addMarkerOffset(lat, lng, markerIndex++);
+      const marker = window.L.marker([latOff, lngOff], { icon, zIndexOffset: 1500 }).addTo(map);
       marker.bindPopup(buildCoursePopup(course), { maxWidth: 260 });
       if (onMarkerClick) marker.on("click", () => onMarkerClick({ ...course, _type: "course" }));
       markersRef.current.push(marker);
@@ -550,9 +563,10 @@ export default function DispatchMap({
     livreurs.forEach(livreur => {
       if (!livreur.latitude || !livreur.longitude) return;
       const estNoir = isLivreurNoir(livreur);
-      if (estNoir) return; // déjà affiché ci-dessus
+      if (estNoir) return;
       const icon = buildLivreurIcon(livreur);
-      const marker = window.L.marker([livreur.latitude, livreur.longitude], {
+      const [lat, lng] = addMarkerOffset(livreur.latitude, livreur.longitude, markerIndex++);
+      const marker = window.L.marker([lat, lng], {
         icon,
         zIndexOffset: livreur.statut === "disponible" ? 1200 : 1100,
       }).addTo(map);
@@ -565,9 +579,10 @@ export default function DispatchMap({
     clients.forEach(client => {
       if (!client.latitude || !client.longitude) return;
       const estNoir = isClientNoir(client);
-      if (estNoir) return; // déjà affiché ci-dessus
+      if (estNoir) return;
       const icon = buildClientIcon(client);
-      const marker = window.L.marker([client.latitude, client.longitude], {
+      const [lat, lng] = addMarkerOffset(client.latitude, client.longitude, markerIndex++);
+      const marker = window.L.marker([lat, lng], {
         icon,
         zIndexOffset: 900,
       }).addTo(map);
@@ -579,7 +594,9 @@ export default function DispatchMap({
 
   const nbLibres = livreurs.filter(l => l.statut === "disponible" && !isLivreurNoir(l)).length;
   const nbCourse = livreurs.filter(l => l.statut === "en_course" && !isLivreurNoir(l)).length;
-  const nbInactifs = livreurs.filter(l => isLivreurNoir(l)).length + clients.filter(c => isClientNoir(c)).length;
+  const nbLivreursInactifs = livreurs.filter(l => isLivreurNoir(l)).length;
+  const nbClientsInactifs = clients.filter(c => isClientNoir(c)).length;
+  const nbInactifsTotal = nbLivreursInactifs + nbClientsInactifs;
 
   return (
     <div className="relative w-full h-full">
@@ -623,13 +640,19 @@ export default function DispatchMap({
                   <span className="text-blue-700">{clients.length} client{clients.length > 1 ? "s" : ""}</span>
                 </div>
               )}
-              {nbInactifs > 0 && (
+              {nbLivreursInactifs > 0 && (
                 <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-gray-400 flex-shrink-0" />
-                  <span className="text-gray-500">{nbInactifs} inactif{nbInactifs > 1 ? "s" : ""} (non dispatchable)</span>
+                  <span className="w-3 h-3 rounded-full bg-black flex-shrink-0" />
+                  <span className="text-gray-700 font-medium">⚫ {nbLivreursInactifs} livreur{nbLivreursInactifs > 1 ? "s" : ""} inactif{nbLivreursInactifs > 1 ? "s" : ""}</span>
                 </div>
               )}
-              {courses.length === 0 && nbLibres === 0 && nbCourse === 0 && clients.length === 0 && nbInactifs === 0 && (
+              {nbClientsInactifs > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-black flex-shrink-0" />
+                  <span className="text-gray-700 font-medium">⚫ {nbClientsInactifs} client{nbClientsInactifs > 1 ? "s" : ""} inactif{nbClientsInactifs > 1 ? "s" : ""}</span>
+                </div>
+              )}
+              {courses.length === 0 && nbLibres === 0 && nbCourse === 0 && clients.length === 0 && nbLivreursInactifs === 0 && nbClientsInactifs === 0 && (
                 <span className="text-gray-400">Aucun élément visible</span>
               )}
             </div>
