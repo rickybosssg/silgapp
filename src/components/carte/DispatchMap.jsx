@@ -331,6 +331,12 @@ export default function DispatchMap({ position, livreurs = [], clients = [], cou
   const markersRef = useRef([]);
   const [mapLoaded, setMapLoaded] = useState(false);
 
+  // Recentrer la carte quand le pays change
+  useEffect(() => {
+    if (!mapInstanceRef.current || !position) return;
+    mapInstanceRef.current.setView([position.latitude, position.longitude], 13);
+  }, [position?.latitude, position?.longitude]);
+
   // Init carte
   useEffect(() => {
     if (!mapRef.current || !position) return;

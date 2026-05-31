@@ -138,6 +138,15 @@ export default function CarteLivreursExterne() {
   const defaultCountry = paysActifs.length === 1 ? paysActifs[0].code : null;
   const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || defaultCountry || "");
 
+  // Coordonnées du pays sélectionné pour centrer la carte
+  const { data: allPays = [] } = useQuery({
+    queryKey: ["all-pays"],
+    queryFn: () => base44.entities.Country.list(),
+    initialData: [],
+    staleTime: 300000,
+  });
+  const paysData = allPays.find(p => p.code === effectiveCountry);
+
   const livreurFilter = effectiveCountry
     ? { type_livreur: "externe", actif: true, validation: "valide", country_code: effectiveCountry }
     : { type_livreur: "externe", actif: true, validation: "valide" };
@@ -227,10 +236,12 @@ export default function CarteLivreursExterne() {
   const clientsSurCarte = useMemo(() =>
     clients.filter(c => isClientEligibleCarte(c)), [clients]);
 
-  // Centre de la carte sur le premier livreur éligible ou Ouagadougou
-  const centerPosition = livreursSurCarte[0]
-    ? { latitude: livreursSurCarte[0].latitude, longitude: livreursSurCarte[0].longitude }
-    : { latitude: 12.3714, longitude: -1.5197 };
+  // Centre de la carte : pays sélectionné > premier livreur éligible > Ouagadougou (BF)
+  const centerPosition = paysData?.latitude_centre
+    ? { latitude: paysData.latitude_centre, longitude: paysData.longitude_centre }
+    : livreursSurCarte[0]
+      ? { latitude: livreursSurCarte[0].latitude, longitude: livreursSurCarte[0].longitude }
+      : { latitude: 12.3569, longitude: -1.5353 };
 
   const filtresBtns = [
     { key: "tous",      label: `Tous (${compteursLivreurs.total})` },
