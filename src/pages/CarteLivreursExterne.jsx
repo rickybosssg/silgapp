@@ -214,24 +214,33 @@ export default function CarteLivreursExterne() {
     refetchInterval: 15000,
   });
   
-  // Filtrer les courses récentes (< 2h) pour la heatmap
-  const coursesRecents = useMemo(() => {
-    const now = Date.now();
-    return toutesCoursesExternes.filter(c => {
-      if (!c.created_date) return false;
-      return (now - new Date(c.created_date).getTime()) < 2 * 60 * 60 * 1000;
-    });
-  }, [toutesCoursesExternes]);
-
-  // Filtrage côté client : sans livreur, non annulée, non terminée, avec GPS départ
-  const coursesEnAttente = useMemo(() =>
-    toutesCoursesExternes.filter(c =>
+  // Filtrage strict : courses VRAIMENT en attente (sans livreur, non terminée/annulée, avec GPS)
+  const coursesEnAttente = useMemo(() => {
+    const filtered = toutesCoursesExternes.filter(c =>
       !c.livreur_id &&
       c.statut !== "annulee" &&
       c.statut !== "livree" &&
+      c.statut !== "en_livraison" &&
+      c.statut !== "colis_recupere" &&
       c.gps_depart_lat &&
       c.gps_depart_lng
-    ), [toutesCoursesExternes]);
+    );
+    console.log("[CarteLivreursExterne] coursesEnAttente:", {
+      total: toutesCoursesExternes.length,
+      en_attente: filtered.length,
+      stats: filtered.map(c => ({ id: c.id, statut: c.statut, livreur_id: c.livreur_id }))
+    });
+    return filtered;
+  }, [toutesCoursesExternes]);
+
+  // Courses récentes (< 2h) pour la heatmap — utilise le MÊME filtre que coursesEnAttente
+  const coursesRecents = useMemo(() => {
+    const now = Date.now();
+    return coursesEnAttente.filter(c => {
+      if (!c.created_date) return false;
+      return (now - new Date(c.created_date).getTime()) < 2 * 60 * 60 * 1000;
+    });
+  }, [coursesEnAttente]);
 
   // ─── Compteurs livreurs (règles unifiées) ───────────────────────────────
   const compteursLivreurs = useMemo(() => ({
