@@ -212,6 +212,15 @@ export default function CarteLivreursExterne() {
     initialData: [],
     refetchInterval: 15000,
   });
+  
+  // Filtrer les courses récentes (< 2h) pour la heatmap
+  const coursesRecents = useMemo(() => {
+    const now = Date.now();
+    return toutesCoursesExternes.filter(c => {
+      if (!c.created_date) return false;
+      return (now - new Date(c.created_date).getTime()) < 2 * 60 * 60 * 1000;
+    });
+  }, [toutesCoursesExternes]);
 
   // Filtrage côté client : sans livreur, non annulée, non terminée, avec GPS départ
   const coursesEnAttente = useMemo(() =>
@@ -550,7 +559,7 @@ export default function CarteLivreursExterne() {
                 position={centerPosition}
                 livreurs={livreursSurCarte}
                 clients={clientsSurCarte}
-                courses={coursesEnAttente}
+                courses={coursesRecents}
                 onMarkerClick={(entity) => setSelectedMarker(entity)}
                 heatmapMode={heatmapMode}
                 countryCode={effectiveCountry}

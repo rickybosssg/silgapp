@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Loader2, Globe } from "lucide-react";
 import HeatmapLayer from "./HeatmapLayer";
 import HeatmapControls from "./HeatmapControls";
+import HeatmapLegend from "./HeatmapLegend";
 import CountrySelector from "@/components/international/CountrySelector";
 
 /**
@@ -617,6 +618,13 @@ export default function DispatchMap({
   const nbClientsNoirs = clients.filter(c => isClientNoir(c)).length;
   const nbClientsBleus = clients.filter(c => !isClientNoir(c)).length;
   const nbInactifsTotal = nbLivreursInactifs + nbClientsNoirs;
+  
+  // Points heatmap pour légende
+  const nbPointsDemande = clients.filter(c => c.latitude && c.longitude).length + 
+                          courses.filter(c => c.gps_depart_lat && c.gps_depart_lng).length;
+  const nbPointsCouverture = livreurs.filter(l => 
+    l.latitude && l.longitude && (l.statut === "disponible" || l.statut === "en_course")
+  ).length;
 
   return (
     <div className="relative w-full h-full">
@@ -672,21 +680,15 @@ export default function DispatchMap({
                     <span className="text-blue-700">{nbClientsBleus} client{nbClientsBleus > 1 ? "s" : ""} (GPS)</span>
                   </div>
                 )}
-                {nbClientsNoirs > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-black flex-shrink-0" />
-                    <span className="text-gray-700 font-medium">⚫ {nbClientsNoirs} client{nbClientsNoirs > 1 ? "s" : ""} inactif{nbClientsNoirs > 1 ? "s" : ""}</span>
-                  </div>
-                )}
                 {nbLivreursInactifs > 0 && (
                   <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-black flex-shrink-0" />
+                    <span className="w-3 h-3 rounded-full bg-gray-400 flex-shrink-0" />
                     <span className="text-gray-700 font-medium">⚫ {nbLivreursInactifs} livreur{nbLivreursInactifs > 1 ? "s" : ""} inactif{nbLivreursInactifs > 1 ? "s" : ""}</span>
                   </div>
                 )}
                 {nbClientsNoirs > 0 && (
                   <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-black flex-shrink-0" />
+                    <span className="w-3 h-3 rounded-full bg-gray-400 flex-shrink-0" />
                     <span className="text-gray-700 font-medium">⚫ {nbClientsNoirs} client{nbClientsNoirs > 1 ? "s" : ""} inactif{nbClientsNoirs > 1 ? "s" : ""}</span>
                   </div>
                 )}
@@ -695,16 +697,33 @@ export default function DispatchMap({
                 )}
               </div>
             </div>
+            
+            {/* Légende GPS qualité */}
             <div className="dmap-overlay-badge text-xs text-slate-500 space-y-1">
+              <div className="font-semibold text-slate-700 mb-1">Qualité GPS</div>
               <div>❤️ &lt;2 min · 💚 2-5 min · 🧡 5-15 min</div>
               <div>❤️‍🩹 15-30 min · ❤️‍🔥 &gt;30 min</div>
               <div className="text-gray-400">⚫ Noir = non dispatchable</div>
             </div>
           </div>
 
-          {/* Contrôles heatmap (top-right) */}
-          <div className="absolute top-4 right-4 z-[1000]">
-            <HeatmapControls mode={heatmapModeLocal} onModeChange={setHeatmapModeLocal} />
+          {/* Contrôles heatmap + légende (top-right) */}
+          <div className="absolute top-4 right-4 z-[1000] space-y-2">
+            <HeatmapControls
+              mode={heatmapModeLocal}
+              onModeChange={setHeatmapModeLocal}
+              clients={clients}
+              livreurs={livreurs}
+              courses={courses}
+            />
+            
+            {/* Légende contextuelle détaillée */}
+            <HeatmapLegend
+              mode={heatmapModeLocal}
+              clients={clients}
+              livreurs={livreurs}
+              courses={courses}
+            />
           </div>
 
           {/* Sélecteur pays (bottom-left) */}

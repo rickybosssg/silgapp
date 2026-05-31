@@ -189,17 +189,21 @@ export default function HeatmapLayer({
           fillColor = `rgba(255, ${Math.round(68 + 127 * (1 - t))}, ${Math.round(68 * (1 - t))}, ${0.7 + intensity * 0.1})`;
         }
         
-      } else {
-        // Mode couverture : gradient bleu → vert
+      } else if (mode === "couverture") {
+        // Mode couverture : gradient ROUGE → JAUNE → VERT
+        // Rouge = manque de livreurs, Vert = bonne couverture
         if (intensity < 0.33) {
+          // Faible couverture → ROUGE
           const t = intensity / 0.33;
-          fillColor = `rgba(${Math.round(37 + 37 * t)}, ${Math.round(99 + 98 * t)}, ${Math.round(235 - 38 * t)}, ${0.5 + intensity * 0.1})`;
+          fillColor = `rgba(${Math.round(239 - 120 * t)}, ${Math.round(68 + 103 * t)}, ${Math.round(68 - 20 * t)}, ${0.6 + intensity * 0.1})`;
         } else if (intensity < 0.66) {
+          // Couverture moyenne → JAUNE/ORANGE
           const t = (intensity - 0.33) / 0.33;
-          fillColor = `rgba(${Math.round(74 + 148 * t)}, ${Math.round(197 - 73 * t)}, ${Math.round(197 - 103 * t)}, ${0.6 + intensity * 0.1})`;
+          fillColor = `rgba(${Math.round(119 + 120 * t)}, ${Math.round(171 - 27 * t)}, ${Math.round(48 + 46 * t)}, ${0.65 + intensity * 0.1})`;
         } else {
+          // Bonne couverture → VERT
           const t = (intensity - 0.66) / 0.34;
-          fillColor = `rgba(${Math.round(222 - 188 * t)}, ${Math.round(124 + 73 * t)}, ${Math.round(94 - 94 * t)}, ${0.7 + intensity * 0.1})`;
+          fillColor = `rgba(${Math.round(239 - 205 * t)}, ${Math.round(144 + 53 * t)}, ${Math.round(94 - 26 * t)}, ${0.7 + intensity * 0.1})`;
         }
       }
       
