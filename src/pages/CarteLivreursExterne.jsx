@@ -152,9 +152,7 @@ export default function CarteLivreursExterne() {
   const [showMap, setShowMap] = useState(false);
   const [filtreLivreur, setFiltreLivreur] = useState("tous");
   const [selectedMarker, setSelectedMarker] = useState(null);
-  const [showInactifs, setShowInactifs] = useState(() => {
-    try { return localStorage.getItem("silgapp_show_inactifs") === "true"; } catch { return false; }
-  });
+  const [showInactifs, setShowInactifs] = useState(true);
 
   const toggleInactifs = () => {
     setShowInactifs(v => {
