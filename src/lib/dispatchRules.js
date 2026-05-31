@@ -18,11 +18,13 @@ export function hasValidGPS(entity) {
   return !!(entity.latitude && entity.longitude && isGPSRecent(entity));
 }
 
-/** App active = heartbeat < HEARTBEAT_SEUIL_MIN minutes */
+/** App active = heartbeat < HEARTBEAT_SEUIL_MIN minutes (5 min) */
 export function isAppActive(entity) {
   const dt = entity.last_seen_at;
   if (!dt) return false;
-  return (Date.now() - new Date(dt).getTime()) < HEARTBEAT_SEUIL_MIN * 60 * 1000;
+  const heartbeatAge = Date.now() - new Date(dt).getTime();
+  // Heartbeat récent < 5 min = app active
+  return heartbeatAge < HEARTBEAT_SEUIL_MIN * 60 * 1000;
 }
 
 /** ON = statut actif ET heartbeat < HEARTBEAT_ON_SEUIL_MIN */
