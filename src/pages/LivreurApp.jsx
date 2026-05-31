@@ -32,6 +32,7 @@ import CoursesEnPauseTab from "@/components/livreur/CoursesEnPauseTab";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
+import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 
 const saveLivreur = (id, data) => base44.functions.invoke('updateLivreur', { id, data });
 
@@ -407,6 +408,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <VenusFloatingButton />
       <PullToRefreshIndicator pulling={pulling} refreshing={refreshing} />
 
       {courseEnAttente && (
