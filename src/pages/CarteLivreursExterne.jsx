@@ -236,9 +236,7 @@ export default function CarteLivreursExterne() {
     const filtered = toutesCoursesExternes.filter(c =>
       (c.statut === "nouvelle" || c.statut === "recherche_livreur") &&
       // Soit pas de livreur, soit livreur proposé mais pas encore accepté (dispatch_status = "propose")
-      (!c.livreur_id || c.dispatch_status === "propose") &&
-      c.gps_depart_lat &&
-      c.gps_depart_lng
+      (!c.livreur_id || c.dispatch_status === "propose")
     );
     console.log("[CarteLivreursExterne] coursesEnAttente AUDIT:", {
       total: toutesCoursesExternes.length,
@@ -253,14 +251,26 @@ export default function CarteLivreursExterne() {
     return filtered;
   }, [toutesCoursesExternes]);
 
-  // Courses récentes (< 2h) pour la heatmap — utilise le MÊME filtre que coursesEnAttente
+  // Courses en attente AVEC GPS (affichables sur la carte)
+  const coursesEnAttenteAvecGPS = useMemo(() => 
+    coursesEnAttente.filter(c => c.gps_depart_lat && c.gps_depart_lng),
+    [coursesEnAttente]
+  );
+
+  // Courses en attente SANS GPS (comptabilisées mais non affichables sur la carte)
+  const coursesEnAttenteSansGPS = useMemo(() => 
+    coursesEnAttente.filter(c => !c.gps_depart_lat || !c.gps_depart_lng),
+    [coursesEnAttente]
+  );
+
+  // Courses récentes (< 2h) pour la heatmap — utilise le MÊME filtre que coursesEnAttenteAvecGPS
   const coursesRecents = useMemo(() => {
     const now = Date.now();
-    return coursesEnAttente.filter(c => {
+    return coursesEnAttenteAvecGPS.filter(c => {
       if (!c.created_date) return false;
       return (now - new Date(c.created_date).getTime()) < 2 * 60 * 60 * 1000;
     });
-  }, [coursesEnAttente]);
+  }, [coursesEnAttenteAvecGPS]);
 
   // ─── Compteurs livreurs (règles unifiées) ───────────────────────────────
   const compteursLivreurs = useMemo(() => ({
@@ -357,7 +367,7 @@ export default function CarteLivreursExterne() {
           <div>
             <h1 className="text-2xl font-bold text-foreground">Carte Dispatch — Terrain réel</h1>
             <p className="text-sm text-muted-foreground">
-              🟢 {compteursLivreurs.surCarte} livreurs · 🔵 {compteursClients.surCarte} clients · 🔴 {coursesEnAttente.length} en attente
+              🟢 {compteursLivreurs.surCarte} livreurs · 🔵 {compteursClients.surCarte} clients · 🔴 {coursesEnAttente.length} en attente ({coursesEnAttenteAvecGPS.length} avec GPS, {coursesEnAttenteSansGPS.length} sans GPS)
             </p>
           </div>
         </div>
@@ -415,6 +425,19 @@ export default function CarteLivreursExterne() {
           <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" /><b>🔵 Bleu</b> — Client actif + GPS &lt; {GPS_CLIENT_SEUIL_MIN} min</span>
           <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-red-600 flex-shrink-0" /><b>🔴 Rouge</b> — Course en attente (sans livreur)</span>
         </div>
+        <div className="mt-3 pt-3 border-t border-slate-200">
+          <p className="text-xs font-semibold text-slate-700 mb-2">📊 Synthèse courses en attente</p>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-red-600 flex-shrink-0" />
+              <span className="text-slate-600">Avec GPS : <b className="text-slate-900">{coursesEnAttenteAvecGPS.length}</b> (affichées sur la carte)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-gray-400 flex-shrink-0" />
+              <span className="text-slate-600">Sans GPS : <b className="text-slate-900">{coursesEnAttenteSansGPS.length}</b> (en attente de localisation)</span>
+            </div>
+          </div>
+        </div>
       </Card>
 
       {/* Bouton carte */}
@@ -426,7 +449,7 @@ export default function CarteLivreursExterne() {
           <div className="flex-1">
             <p className="font-bold text-purple-900">🗺️ Ouvrir la carte dispatch temps réel</p>
             <p className="text-xs text-purple-700">
-              🟢 {compteursLivreurs.libres} libres · 🟠 {compteursLivreurs.enCourse} en course · 🔵 {compteursClients.surCarte} clients · 🔴 {coursesEnAttente.length} en attente
+              🟢 {compteursLivreurs.libres} libres · 🟠 {compteursLivreurs.enCourse} en course · 🔵 {compteursClients.surCarte} clients · 🔴 {coursesEnAttenteAvecGPS.length}/{coursesEnAttente.length} courses (avec GPS/total)
             </p>
           </div>
         </div>
