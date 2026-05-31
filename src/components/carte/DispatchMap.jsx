@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Loader2, Globe } from "lucide-react";
-import HeatmapLayer, { HeatmapControls } from "./HeatmapLayer";
+import HeatmapLayer from "./HeatmapLayer";
+import HeatmapControls from "./HeatmapControls";
 import CountrySelector from "@/components/international/CountrySelector";
 
 /**
@@ -439,7 +440,7 @@ export default function DispatchMap({
   courses = [],
   onMarkerClick,
   showHeatmap = false,
-  heatmapMode = "off", // "off" | "demande" | "livreurs"
+  heatmapMode = "off", // "off" | "demande" | "couverture" | "opportunite"
   countryCode = "",
   onCountryChange,
 }) {

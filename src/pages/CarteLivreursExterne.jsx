@@ -165,6 +165,7 @@ export default function CarteLivreursExterne() {
   const [showMap, setShowMap] = useState(false);
   const [filtreLivreur, setFiltreLivreur] = useState("tous");
   const [selectedMarker, setSelectedMarker] = useState(null);
+  const [heatmapMode, setHeatmapMode] = useState("off"); // "off" | "demande" | "couverture" | "opportunite"
   const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
   const paysActifs = usePaysActifs();
   const defaultCountry = paysActifs.length === 1 ? paysActifs[0].code : null;
@@ -532,16 +533,16 @@ export default function CarteLivreursExterne() {
               </Button>
             </div>
             <div className="px-4 pb-3 flex items-center gap-3">
-              <div className="flex-1">
-                <NetworkHealthBanner
-                  libres={compteursLivreurs.verts}
-                  enCourse={compteursLivreurs.oranges}
-                  clientsGPS={compteursClients.gpsRecents}
-                  clientsTotal={compteursClients.surCarte}
-                  enAttente={coursesEnAttente.length}
-                />
-              </div>
+            <div className="flex-1">
+              <NetworkHealthBanner
+                libres={compteursLivreurs.verts}
+                enCourse={compteursLivreurs.oranges}
+                clientsGPS={compteursClients.gpsRecents}
+                clientsTotal={compteursClients.surCarte}
+                enAttente={coursesEnAttente.length}
+              />
             </div>
+          </div>
           </div>
           <div className="flex flex-1 min-h-0">
             <div className="flex-1 min-w-0">
@@ -551,6 +552,9 @@ export default function CarteLivreursExterne() {
                 clients={clientsSurCarte}
                 courses={coursesEnAttente}
                 onMarkerClick={(entity) => setSelectedMarker(entity)}
+                heatmapMode={heatmapMode}
+                countryCode={effectiveCountry}
+                onCountryChange={isGlobal ? setSelectedCountry : undefined}
               />
             </div>
             {selectedMarker && (

@@ -1,13 +1,21 @@
 import React, { useEffect, useRef, useState } from "react";
-import { MapPin, AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { AlertCircle } from "lucide-react";
 
 /**
- * HeatmapLayer — Couche thermique pour Leaflet
- * Affiche les zones de forte demande clients ou concentration de livreurs
- * avec gradient de couleur selon la densité (rouge = fort, vert = faible)
+ * HeatmapLayer — Couche thermique intelligente pour Leaflet
+ * 
+ * Modes disponibles :
+ * - "demande" : Clients + courses récentes (rouge = forte demande)
+ * - "couverture" : Livreurs disponibles + en course (bleu/vert = forte couverture)
+ * - "opportunite" : Déséquilibre offre/demande (rouge = opportunité, vert = équilibré)
  */
-export default function HeatmapLayer({ map, clients = [], livreurs = [], mode = "demande" }) {
+export default function HeatmapLayer({ 
+  map, 
+  clients = [], 
+  livreurs = [], 
+  courses = [],
+  mode = "demande" 
+}) {
   const heatmapRef = useRef(null);
   const [insufficientData, setInsufficientData] = useState(false);
 
@@ -25,66 +33,184 @@ export default function HeatmapLayer({ map, clients = [], livreurs = [], mode = 
       return;
     }
 
-    // Données pour heatmap
-    const points = mode === "demande" 
-      ? clients.filter(c => c.latitude && c.longitude)
-      : livreurs.filter(l => l.latitude && l.longitude && l.statut === "disponible");
+    // ─── COLLECTE DES DONNÉES PAR MODE ──────────────────────────────────────
+    
+    let points = [];
+    
+    if (mode === "demande") {
+      // Clients GPS actifs
+      const clientPoints = clients
+        .filter(c => c.latitude && c.longitude)
+        .map(c => ({ lat: c.latitude, lng: c.longitude, type: "client", weight: 1 }));
+      
+      // Courses créées récemment (< 2h)
+      const now = Date.now();
+      const recentCourses = courses.filter(c => {
+        if (!c.created_date) return false;
+        return (now - new Date(c.created_date).getTime()) < 2 * 60 * 60 * 1000;
+      });
+      const coursePoints = recentCourses
+        .filter(c => c.gps_depart_lat && c.gps_depart_lng)
+        .map(c => ({ lat: c.gps_depart_lat, lng: c.gps_depart_lng, type: "course", weight: 2 }));
+      
+      points = [...clientPoints, ...coursePoints];
+      
+    } else if (mode === "couverture") {
+      // Livreurs connectés (disponibles + en course)
+      const livreursPoints = livreurs
+        .filter(l => 
+          l.latitude && 
+          l.longitude && 
+          (l.statut === "disponible" || l.statut === "en_course")
+        )
+        .map(l => ({
+          lat: l.latitude,
+          lng: l.longitude,
+          type: "livreur",
+          weight: l.statut === "disponible" ? 1.5 : 1
+        }));
+      
+      points = livreursPoints;
+      
+    } else if (mode === "opportunite") {
+      // Mode opportunité : comparer offre et demande par cellule
+      const cellSize = 0.003; // ~300m pour opportunité
+      const demandMap = {};
+      const supplyMap = {};
+      
+      // Demande (clients + courses)
+      [...clients, ...courses].forEach(p => {
+        const lat = p.latitude || p.gps_depart_lat;
+        const lng = p.longitude || p.gps_depart_lng;
+        if (!lat || !lng) return;
+        const cellKey = `${Math.floor(lat / cellSize)},${Math.floor(lng / cellSize)}`;
+        demandMap[cellKey] = (demandMap[cellKey] || 0) + 1;
+      });
+      
+      // Offre (livreurs disponibles)
+      livreurs
+        .filter(l => l.latitude && l.longitude && l.statut === "disponible")
+        .forEach(l => {
+          const cellKey = `${Math.floor(l.latitude / cellSize)},${Math.floor(l.longitude / cellSize)}`;
+          supplyMap[cellKey] = (supplyMap[cellKey] || 0) + 1;
+        });
+      
+      // Calculer le ratio offre/demande par cellule
+      const allCells = new Set([...Object.keys(demandMap), ...Object.keys(supplyMap)]);
+      
+      points = Array.from(allCells)
+        .map(cellKey => {
+          const [latCell, lngCell] = cellKey.split(',').map(Number);
+          const lat = latCell * cellSize + cellSize / 2;
+          const lng = lngCell * cellSize + cellSize / 2;
+          
+          const demand = demandMap[cellKey] || 0;
+          const supply = supplyMap[cellKey] || 0;
+          
+          // Ratio : 0 = forte opportunité (beaucoup de demande, pas d'offre)
+          //        1 = équilibré
+          //       >1 = surcouverture
+          const ratio = demand > 0 ? supply / demand : 0;
+          
+          return {
+            lat,
+            lng,
+            type: "opportunite",
+            ratio, // 0 à 2+
+            demand,
+            supply,
+            weight: demand > 0 ? 1 : 0 // Ignorer les zones sans demande
+          };
+        })
+        .filter(p => p.weight > 0);
+    }
 
     // Vérifier données insuffisantes
-    if (points.length < 3) {
+    if (points.filter(p => p.weight > 0).length < 3) {
       setInsufficientData(true);
       return;
     }
     setInsufficientData(false);
 
-    // Calculer la densité locale pour chaque point
-    const heatGroup = window.L.layerGroup().addTo(map);
-    const cellSize = 0.002; // ~200m
+    // ─── CALCUL DE LA DENSITÉ ──────────────────────────────────────────────
     
-    // Compter les points dans chaque cellule
+    const heatGroup = window.L.layerGroup().addTo(map);
+    const cellSize = mode === "opportunite" ? 0.003 : 0.002;
+    
+    // Regrouper par cellule
     const densityMap = {};
     points.forEach(p => {
-      const cellKey = `${Math.floor(p.latitude / cellSize)},${Math.floor(p.longitude / cellSize)}`;
-      densityMap[cellKey] = (densityMap[cellKey] || 0) + 1;
+      const cellKey = `${Math.floor(p.lat / cellSize)},${Math.floor(p.lng / cellSize)}`;
+      densityMap[cellKey] = {
+        count: (densityMap[cellKey]?.count || 0) + p.weight,
+        lat: p.lat,
+        lng: p.lng,
+        ratio: p.ratio,
+        demand: p.demand,
+        supply: p.supply,
+      };
     });
 
-    // Trouver la densité max pour normaliser les couleurs
-    const maxDensity = Math.max(...Object.values(densityMap));
+    // Normaliser
+    const maxDensity = Math.max(...Object.values(densityMap).map(d => d.count));
     
-    // Créer les cercles de chaleur avec gradient
-    Object.entries(densityMap).forEach(([key, count]) => {
-      const [latCell, lngCell] = key.split(',').map(Number);
-      const lat = latCell * cellSize + cellSize / 2;
-      const lng = lngCell * cellSize + cellSize / 2;
-      
-      // Normaliser l'intensité (0 à 1)
-      const intensity = count / maxDensity;
-      
-      // Gradient de couleur : vert → jaune → orange → rouge
-      // Faible densité = vert/bleu, Moyenne = jaune/orange, Forte = rouge
+    // ─── GÉNÉRATION DES CERCLES DE CHALEUR ─────────────────────────────────
+    
+    Object.values(densityMap).forEach(cell => {
+      const intensity = cell.count / maxDensity;
       let fillColor;
-      if (intensity < 0.33) {
-        // Faible : vert à jaune
-        const ratio = intensity / 0.33;
-        fillColor = `rgba(${Math.round(34 + 205 * ratio)}, ${Math.round(197 - 26 * ratio)}, 94, 0.5)`;
-      } else if (intensity < 0.66) {
-        // Moyenne : jaune à orange
-        const ratio = (intensity - 0.33) / 0.33;
-        fillColor = `rgba(${Math.round(239 + 16 * ratio)}, ${Math.round(171 - 103 * ratio)}, ${Math.round(68 - 68 * ratio)}, 0.6)`;
+      
+      if (mode === "opportunite") {
+        // Mode opportunité : rouge = opportunité (ratio bas), vert = équilibré
+        const ratio = cell.ratio || 0;
+        
+        if (ratio < 0.5) {
+          // Forte opportunité : peu de livreurs, beaucoup de demande → ROUGE
+          fillColor = `rgba(220, 38, 38, ${0.5 + intensity * 0.2})`;
+        } else if (ratio < 1) {
+          // Opportunité modérée → ORANGE/JAUNE
+          const t = ratio / 0.5;
+          fillColor = `rgba(${Math.round(220 - 100 * t)}, ${Math.round(38 + 133 * t)}, 38, ${0.5 + intensity * 0.2})`;
+        } else {
+          // Équilibré ou surcouverture → VERT
+          fillColor = `rgba(34, 197, 94, ${0.4 + intensity * 0.2})`;
+        }
+        
+      } else if (mode === "demande") {
+        // Mode demande : gradient vert → jaune → rouge
+        if (intensity < 0.33) {
+          const t = intensity / 0.33;
+          fillColor = `rgba(${Math.round(34 + 205 * t)}, ${Math.round(197 - 26 * t)}, 94, ${0.5 + intensity * 0.1})`;
+        } else if (intensity < 0.66) {
+          const t = (intensity - 0.33) / 0.33;
+          fillColor = `rgba(${Math.round(239 + 16 * t)}, ${Math.round(171 - 103 * t)}, ${Math.round(68 - 68 * t)}, ${0.6 + intensity * 0.1})`;
+        } else {
+          const t = (intensity - 0.66) / 0.34;
+          fillColor = `rgba(255, ${Math.round(68 + 127 * (1 - t))}, ${Math.round(68 * (1 - t))}, ${0.7 + intensity * 0.1})`;
+        }
+        
       } else {
-        // Forte : orange à rouge
-        const ratio = (intensity - 0.66) / 0.34;
-        fillColor = `rgba(255, ${Math.round(68 + 127 * (1 - ratio))}, ${Math.round(68 * (1 - ratio))}, 0.7)`;
+        // Mode couverture : gradient bleu → vert
+        if (intensity < 0.33) {
+          const t = intensity / 0.33;
+          fillColor = `rgba(${Math.round(37 + 37 * t)}, ${Math.round(99 + 98 * t)}, ${Math.round(235 - 38 * t)}, ${0.5 + intensity * 0.1})`;
+        } else if (intensity < 0.66) {
+          const t = (intensity - 0.33) / 0.33;
+          fillColor = `rgba(${Math.round(74 + 148 * t)}, ${Math.round(197 - 73 * t)}, ${Math.round(197 - 103 * t)}, ${0.6 + intensity * 0.1})`;
+        } else {
+          const t = (intensity - 0.66) / 0.34;
+          fillColor = `rgba(${Math.round(222 - 188 * t)}, ${Math.round(124 + 73 * t)}, ${Math.round(94 - 94 * t)}, ${0.7 + intensity * 0.1})`;
+        }
       }
       
-      const radius = mode === "demande" ? 40 : 35;
+      const radius = mode === "opportunite" ? 45 : (mode === "demande" ? 40 : 35);
       
-      window.L.circle([lat, lng], {
+      window.L.circle([cell.lat, cell.lng], {
         radius,
         fillColor,
         color: fillColor,
         weight: 0,
-        fillOpacity: 0.6,
+        fillOpacity: 0.65,
       }).addTo(heatGroup);
     });
 
@@ -96,7 +222,7 @@ export default function HeatmapLayer({ map, clients = [], livreurs = [], mode = 
         heatmapRef.current = null;
       }
     };
-  }, [map, clients, livreurs, mode]);
+  }, [map, clients, livreurs, courses, mode]);
 
   // Message données insuffisantes
   if (insufficientData) {
@@ -110,52 +236,5 @@ export default function HeatmapLayer({ map, clients = [], livreurs = [], mode = 
     );
   }
 
-  return null; // Rendu géré par Leaflet directement
-}
-
-// Contrôles heatmap
-export function HeatmapControls({ mode, onModeChange }) {
-  return (
-    <div className="flex flex-col gap-2 bg-white rounded-lg shadow-lg border border-gray-200 p-2">
-      <p className="text-xs font-semibold text-gray-700 px-1">Carte thermique</p>
-      <Button
-        size="sm"
-        variant={mode === "off" ? "default" : "outline"}
-        onClick={() => onModeChange("off")}
-        className="text-xs justify-start"
-      >
-        <MapPin className="w-3 h-3 mr-1" /> Standard
-      </Button>
-      <Button
-        size="sm"
-        variant={mode === "demande" ? "default" : "outline"}
-        onClick={() => onModeChange("demande")}
-        className="text-xs justify-start bg-red-50 hover:bg-red-100 border-red-200"
-      >
-        🔥 Zones demande
-      </Button>
-      <Button
-        size="sm"
-        variant={mode === "livreurs" ? "default" : "outline"}
-        onClick={() => onModeChange("livreurs")}
-        className="text-xs justify-start bg-green-50 hover:bg-green-100 border-green-200"
-      >
-        🟢 Zones livreurs
-      </Button>
-      
-      {mode !== "off" && (
-        <div className="mt-2 pt-2 border-t border-gray-200">
-          <p className="text-xs font-medium text-gray-600 mb-1">Intensité</p>
-          <div className="flex items-center gap-1 h-3 rounded overflow-hidden">
-            <div className="flex-1 h-full bg-gradient-to-r from-green-500 via-yellow-400 to-red-600" />
-          </div>
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
-            <span>Faible</span>
-            <span>Moyenne</span>
-            <span>Forte</span>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  return null;
 }
