@@ -8,6 +8,7 @@ import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import DispatchMap from "@/components/carte/DispatchMap";
 import MarkerInfoPanel from "@/components/carte/MarkerInfoPanel";
+import NetworkHealthBanner from "@/components/carte/NetworkHealthBanner";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
@@ -443,18 +444,23 @@ export default function CarteLivreursExterne() {
       {/* Modale carte interactive */}
       {showMap && (
         <div className="fixed inset-0 z-50 bg-background flex flex-col">
-          <div className="flex items-center justify-between px-4 py-3 border-b bg-card flex-shrink-0">
-            <div>
+          <div className="flex flex-col gap-0 border-b bg-card flex-shrink-0">
+            <div className="flex items-center justify-between px-4 pt-3 pb-2">
               <h2 className="text-base font-bold text-foreground">
                 🗺️ Carte Dispatch — Terrain temps réel
               </h2>
-              <p className="text-xs text-muted-foreground">
-                🟢 {compteursLivreurs.libres} libres · 🟠 {compteursLivreurs.enCourse} en course · 🔵 {compteursClients.surCarte} clients · 🔴 {coursesEnAttente.length} en attente
-              </p>
+              <Button variant="ghost" size="icon" onClick={() => { setShowMap(false); setSelectedMarker(null); }}>
+                <X className="w-5 h-5" />
+              </Button>
             </div>
-            <Button variant="ghost" size="icon" onClick={() => { setShowMap(false); setSelectedMarker(null); }}>
-              <X className="w-5 h-5" />
-            </Button>
+            <div className="px-4 pb-3">
+              <NetworkHealthBanner
+                libres={compteursLivreurs.libres}
+                enCourse={compteursLivreurs.enCourse}
+                clientsGPS={compteursClients.surCarte}
+                enAttente={coursesEnAttente.length}
+              />
+            </div>
           </div>
           <div className="flex flex-1 min-h-0">
             <div className="flex-1 min-w-0">
