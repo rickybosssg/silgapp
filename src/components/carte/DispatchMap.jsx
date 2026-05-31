@@ -613,8 +613,9 @@ export default function DispatchMap({
   const nbLibres = livreurs.filter(l => l.statut === "disponible" && !isLivreurNoir(l)).length;
   const nbCourse = livreurs.filter(l => l.statut === "en_course" && !isLivreurNoir(l)).length;
   const nbLivreursInactifs = livreurs.filter(l => isLivreurNoir(l)).length;
-  const nbClientsInactifs = clients.filter(c => isClientNoir(c)).length;
-  const nbInactifsTotal = nbLivreursInactifs + nbClientsInactifs;
+  const nbClientsNoirs = clients.filter(c => isClientNoir(c)).length;
+  const nbClientsBleus = clients.filter(c => !isClientNoir(c)).length;
+  const nbInactifsTotal = nbLivreursInactifs + nbClientsNoirs;
 
   return (
     <div className="relative w-full h-full">
@@ -664,10 +665,16 @@ export default function DispatchMap({
                     <span className="text-orange-700">{nbCourse} en course</span>
                   </div>
                 )}
-                {clients.length > 0 && (
+                {nbClientsBleus > 0 && (
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" />
-                    <span className="text-blue-700">{clients.length} client{clients.length > 1 ? "s" : ""}</span>
+                    <span className="text-blue-700">{nbClientsBleus} client{nbClientsBleus > 1 ? "s" : ""} (GPS)</span>
+                  </div>
+                )}
+                {nbClientsNoirs > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-black flex-shrink-0" />
+                    <span className="text-gray-700 font-medium">⚫ {nbClientsNoirs} client{nbClientsNoirs > 1 ? "s" : ""} inactif{nbClientsNoirs > 1 ? "s" : ""}</span>
                   </div>
                 )}
                 {nbLivreursInactifs > 0 && (
@@ -676,13 +683,13 @@ export default function DispatchMap({
                     <span className="text-gray-700 font-medium">⚫ {nbLivreursInactifs} livreur{nbLivreursInactifs > 1 ? "s" : ""} inactif{nbLivreursInactifs > 1 ? "s" : ""}</span>
                   </div>
                 )}
-                {nbClientsInactifs > 0 && (
+                {nbClientsNoirs > 0 && (
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-black flex-shrink-0" />
-                    <span className="text-gray-700 font-medium">⚫ {nbClientsInactifs} client{nbClientsInactifs > 1 ? "s" : ""} inactif{nbClientsInactifs > 1 ? "s" : ""}</span>
+                    <span className="text-gray-700 font-medium">⚫ {nbClientsNoirs} client{nbClientsNoirs > 1 ? "s" : ""} inactif{nbClientsNoirs > 1 ? "s" : ""}</span>
                   </div>
                 )}
-                {courses.length === 0 && nbLibres === 0 && nbCourse === 0 && clients.length === 0 && nbLivreursInactifs === 0 && nbClientsInactifs === 0 && (
+                {courses.length === 0 && nbLibres === 0 && nbCourse === 0 && clients.length === 0 && nbLivreursInactifs === 0 && nbClientsNoirs === 0 && (
                   <span className="text-gray-400">Aucun élément visible</span>
                 )}
               </div>

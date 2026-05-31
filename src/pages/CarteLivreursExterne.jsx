@@ -238,10 +238,11 @@ export default function CarteLivreursExterne() {
 
   // ─── Compteurs clients (règles unifiées) ────────────────────────────────
   const compteursClients = useMemo(() => ({
-    total:       clients.length,
-    noirs:       clients.filter(c => isClientNoir(c)).length,
-    bleus:       clients.filter(c => !isClientNoir(c)).length,
-    surCarte:    clients.length, // TOUS les clients enregistrés
+    total:          clients.length,
+    noirs:          clients.filter(c => isClientNoir(c)).length,
+    bleus:          clients.filter(c => !isClientNoir(c)).length, // GPS < 30 min
+    gpsRecents:     clients.filter(c => isClientGPSRecent(c)).length, // GPS < 30 min (alias)
+    surCarte:       clients.length, // TOUS les clients enregistrés
   }), [clients]);
 
   // ─── Listes filtrées ────────────────────────────────────────────────────
@@ -535,7 +536,8 @@ export default function CarteLivreursExterne() {
                 <NetworkHealthBanner
                   libres={compteursLivreurs.verts}
                   enCourse={compteursLivreurs.oranges}
-                  clientsGPS={compteursClients.bleus}
+                  clientsGPS={compteursClients.gpsRecents}
+                  clientsTotal={compteursClients.surCarte}
                   enAttente={coursesEnAttente.length}
                 />
               </div>

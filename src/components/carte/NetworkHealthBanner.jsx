@@ -4,11 +4,11 @@ import React from "react";
  * Calcule l'état de santé du réseau dispatch.
  * Retourne { heart, label, description, color }
  */
-function getNetworkHealth({ libres, enCourse, clientsGPS, enAttente }) {
+function getNetworkHealth({ libres, enCourse, clientsGPS, clientsTotal, enAttente }) {
   const totalActifs = libres + enCourse + (clientsGPS || 0);
   const hasActivity = totalActifs > 0 || enAttente > 0;
 
-  // 🔴 Réseau inactif = ZERO livreur libre + ZERO client GPS + ZERO course en attente
+  // 🔴 Réseau inactif = ZERO livreur libre + ZERO client GPS récent + ZERO course en attente
   // Les livreurs "en course" ne comptent PAS pour activer le réseau
   if (libres === 0 && (clientsGPS || 0) === 0 && enAttente === 0) {
     return {
@@ -52,8 +52,8 @@ function getNetworkHealth({ libres, enCourse, clientsGPS, enAttente }) {
   };
 }
 
-export default function NetworkHealthBanner({ libres, enCourse, clientsGPS, enAttente }) {
-  const health = getNetworkHealth({ libres, enCourse, enAttente });
+export default function NetworkHealthBanner({ libres, enCourse, clientsGPS, clientsTotal, enAttente }) {
+  const health = getNetworkHealth({ libres, enCourse, clientsGPS, clientsTotal, enAttente });
 
   return (
     <div className={`border rounded-xl px-4 py-3 ${health.bg} flex flex-col sm:flex-row sm:items-center gap-3`}>
@@ -75,7 +75,7 @@ export default function NetworkHealthBanner({ libres, enCourse, clientsGPS, enAt
       <div className="flex flex-wrap gap-x-4 gap-y-1">
         <StatItem emoji="🟢" label="Livreurs libres" value={libres} />
         <StatItem emoji="🟠" label="En course" value={enCourse} />
-        <StatItem emoji="🔵" label="Clients GPS" value={clientsGPS} />
+        <StatItem emoji="🔵" label={`Clients${clientsTotal !== undefined && clientsTotal !== clientsGPS ? ` (${clientsTotal} totaux)` : ''}`} value={clientsGPS} />
         <StatItem emoji="🔴" label="Courses en attente" value={enAttente} />
       </div>
     </div>
