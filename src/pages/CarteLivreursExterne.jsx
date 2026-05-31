@@ -69,10 +69,13 @@ function isEligibleCarte(livreur) {
 }
 
 /**
- * Client éligible carte = actif + GPS récent < 5 min + app active
+ * Client éligible carte = actif + GPS récent < 10 min (app active ou fermée depuis peu)
  */
 function isClientEligibleCarte(client) {
-  return client.actif !== false && hasValidGPS(client) && isAppActive(client);
+  if (client.actif === false) return false;
+  if (!client.latitude || !client.longitude) return false;
+  // GPS < 10 min (plus permissif pour les clients)
+  return isGPSRecent(client) || ((Date.now() - new Date(client.last_seen_at || client.derniere_position_date).getTime()) < 10 * 60 * 1000);
 }
 
 const INDICATIFS = {
@@ -259,7 +262,7 @@ export default function CarteLivreursExterne() {
   const livreursSurCarte = useMemo(() =>
     livreurs.filter(l => isEligibleCarte(l)), [livreurs]);
 
-  // Clients sur carte : actif + GPS < 5 min + app active
+  // Clients sur carte : actif + GPS < 10 min
   const clientsSurCarte = useMemo(() =>
     clients.filter(c => isClientEligibleCarte(c)), [clients]);
 
@@ -393,7 +396,7 @@ export default function CarteLivreursExterne() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs text-slate-600">
           <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" /><b>🟢 Libre</b> — ON + disponible + GPS &lt; {GPS_SEUIL_MIN} min + app active</span>
           <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-orange-500 flex-shrink-0" /><b>🟠 En course</b> — Mission en cours, ON + GPS récent</span>
-          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" /><b>🔵 Client</b> — Actif + GPS &lt; {GPS_SEUIL_MIN} min + app active</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" /><b>🔵 Client</b> — Actif + GPS &lt; 10 min</span>
           <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-red-600 flex-shrink-0" /><b>🔴 Course en attente</b> — créée, sans livreur, non terminée</span>
           <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-gray-400 flex-shrink-0" /><b>⚫ Gris</b> — Inactif / non dispatchable (OFF, GPS expiré, app fermée, non validé)</span>
         </div>
