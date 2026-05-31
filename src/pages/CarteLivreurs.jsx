@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Truck, Phone, RefreshCw, MapPin, Package, Wifi, WifiOff, Clock, X } from "lucide-react";
+import NetworkHealthBanner from "@/components/carte/NetworkHealthBanner";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -377,27 +378,30 @@ export default function CarteLivreurs() {
       {showMap && (
         <div className="fixed inset-0 z-50 bg-slate-950">
           {/* Header */}
-          <div className="absolute top-0 left-0 right-0 z-[1001] flex items-center justify-between px-4 py-3 bg-slate-900/95 backdrop-blur border-b border-slate-700/60">
-            <div className="flex items-center gap-3">
+          <div className="absolute top-0 left-0 right-0 z-[1001] flex flex-col bg-slate-900/95 backdrop-blur border-b border-slate-700/60">
+            <div className="flex items-center justify-between px-4 py-3">
               <h2 className="text-white font-bold text-base">Carte — Livreurs Internes</h2>
-              <div className="flex items-center gap-2 text-xs text-slate-400">
-                <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />{compteurs.on} en ligne</span>
-                <span>•</span>
-                <span className="flex items-center gap-1"><Package className="w-3 h-3 text-blue-400" />{actives.length} actives</span>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={() => refetch()} className="text-slate-400 hover:text-white h-8 w-8 p-0">
+                  <RefreshCw className={cn("w-4 h-4", isFetching && "animate-spin")} />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setShowMap(false)} className="text-slate-400 hover:text-white h-8 w-8 p-0">
+                  <X className="w-5 h-5" />
+                </Button>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={() => refetch()} className="text-slate-400 hover:text-white h-8 w-8 p-0">
-                <RefreshCw className={cn("w-4 h-4", isFetching && "animate-spin")} />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setShowMap(false)} className="text-slate-400 hover:text-white h-8 w-8 p-0">
-                <X className="w-5 h-5" />
-              </Button>
+            <div className="px-4 pb-3">
+              <NetworkHealthBanner
+                libres={compteurs.libres}
+                enCourse={compteurs.enCourse}
+                clientsGPS={0}
+                enAttente={actives.filter(c => !c.livreur_id).length}
+              />
             </div>
           </div>
 
           {/* Carte + panneau latéral */}
-          <div className="flex h-full pt-[52px]">
+          <div className="flex h-full pt-[108px]">
             {/* Carte */}
             <div className="flex-1 relative">
               <MapView
