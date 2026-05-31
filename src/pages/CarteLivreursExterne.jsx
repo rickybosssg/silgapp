@@ -228,7 +228,7 @@ export default function CarteLivreursExterne() {
     appFermee:   livreurs.filter(l => !isAppActive(l)).length,
     gpsRecent:   livreurs.filter(l => hasValidGPS(l)).length,
     gpsExpire:   livreurs.filter(l => l.latitude && l.longitude && !isGPSRecent(l)).length,
-    surCarte:    livreurs.filter(l => isEligibleCarte(l)).length,
+    surCarte:    livreurs.filter(l => l.latitude && l.longitude).length, // TOUS avec GPS
   }), [livreurs]);
 
   // ─── Compteurs clients (règles unifiées) ────────────────────────────────
@@ -238,7 +238,7 @@ export default function CarteLivreursExterne() {
     gpsExpire:   clients.filter(c => c.latitude && c.longitude && !isClientGPSRecent(c)).length,
     sansGPS:     clients.filter(c => !c.latitude || !c.longitude).length,
     appActive:   clients.filter(c => isAppActive(c)).length,
-    surCarte:    clients.filter(c => isClientEligibleCarte(c)).length,
+    surCarte:    clients.filter(c => c.latitude && c.longitude).length, // TOUS avec GPS
   }), [clients]);
 
   // ─── Listes filtrées ────────────────────────────────────────────────────
@@ -254,14 +254,14 @@ export default function CarteLivreursExterne() {
     }
   }, [livreurs, filtreLivreur]);
 
-  // ─── Marqueurs carte — SEULS les éligibles (règles strictes) ────────────
-  // Livreurs sur carte : ON + GPS < 5 min + app active
+  // ─── Marqueurs carte — TOUS les utilisateurs avec GPS ────────────
+  // Livreurs sur carte : TOUS ceux avec coordonnées GPS (couleur selon état)
   const livreursSurCarte = useMemo(() =>
-    livreurs.filter(l => isEligibleCarte(l)), [livreurs]);
+    livreurs.filter(l => l.latitude && l.longitude), [livreurs]);
 
-  // Clients sur carte : actif + GPS (tous, mais couleur selon récence)
+  // Clients sur carte : TOUS ceux avec coordonnées GPS (couleur selon récence)
   const clientsSurCarte = useMemo(() =>
-    clients.filter(c => isClientEligibleCarte(c)), [clients]);
+    clients.filter(c => c.latitude && c.longitude), [clients]);
 
 
 
