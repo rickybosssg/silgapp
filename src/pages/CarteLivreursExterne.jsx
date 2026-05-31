@@ -133,6 +133,17 @@ export default function CarteLivreursExterne() {
   const [showMap, setShowMap] = useState(false);
   const [filtreLivreur, setFiltreLivreur] = useState("tous");
   const [selectedMarker, setSelectedMarker] = useState(null);
+  const [showInactifs, setShowInactifs] = useState(() => {
+    try { return localStorage.getItem("silgapp_show_inactifs") === "true"; } catch { return false; }
+  });
+
+  const toggleInactifs = () => {
+    setShowInactifs(v => {
+      const next = !v;
+      try { localStorage.setItem("silgapp_show_inactifs", String(next)); } catch {}
+      return next;
+    });
+  };
   const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
   const paysActifs = usePaysActifs();
   const defaultCountry = paysActifs.length === 1 ? paysActifs[0].code : null;
@@ -236,6 +247,13 @@ export default function CarteLivreursExterne() {
   const clientsSurCarte = useMemo(() =>
     clients.filter(c => isClientEligibleCarte(c)), [clients]);
 
+  // ─── Inactifs : avec coordonnées GPS mais non éligibles carte ────────────
+  const livreursInactifs = useMemo(() =>
+    livreurs.filter(l => !isEligibleCarte(l) && l.latitude && l.longitude), [livreurs]);
+
+  const clientsInactifs = useMemo(() =>
+    clients.filter(c => !isClientEligibleCarte(c) && c.latitude && c.longitude), [clients]);
+
   // Centre de la carte : pays sélectionné > premier livreur éligible > Ouagadougou (BF)
   const centerPosition = paysData?.latitude_centre
     ? { latitude: paysData.latitude_centre, longitude: paysData.longitude_centre }
@@ -325,16 +343,39 @@ export default function CarteLivreursExterne() {
         </div>
       </div>
 
-      {/* Légende carte */}
+      {/* Légende carte + toggle inactifs */}
       <Card className="p-4 bg-slate-50 border-slate-200">
-        <p className="text-xs font-semibold text-slate-700 mb-2">Légende carte dispatch</p>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-semibold text-slate-700">Légende carte dispatch</p>
+          <button
+            onClick={toggleInactifs}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+              showInactifs
+                ? "bg-gray-700 text-white border-gray-700"
+                : "bg-gray-50 text-gray-600 border-gray-300 hover:bg-gray-100"
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0" />
+            {showInactifs ? "⚫ Masquer les inactifs" : "⚫ Afficher les inactifs"}
+            {!showInactifs && (livreursInactifs.length + clientsInactifs.length) > 0 && (
+              <span className="ml-1 bg-gray-200 text-gray-600 rounded-full px-1.5 py-0.5 text-[10px]">
+                {livreursInactifs.length + clientsInactifs.length}
+              </span>
+            )}
+          </button>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs text-slate-600">
           <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" /><b>🟢 Libre</b> — ON + disponible + GPS &lt; {GPS_SEUIL_MIN} min + app active</span>
           <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-orange-500 flex-shrink-0" /><b>🟠 En course</b> — Mission en cours, ON + GPS récent</span>
           <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" /><b>🔵 Client</b> — Actif + GPS &lt; {GPS_SEUIL_MIN} min + app active</span>
           <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-red-600 flex-shrink-0" /><b>🔴 Course en attente</b> — créée, sans livreur, non terminée</span>
-          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-gray-300 flex-shrink-0" /><b>⚫ Masqués</b> — OFF, GPS expiré, app fermée, non validés</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-gray-400 flex-shrink-0" /><b>⚫ Gris</b> — Inactif / non dispatchable (OFF, GPS expiré, app fermée, non validé)</span>
         </div>
+        {showInactifs && (
+          <p className="mt-2 text-[11px] text-amber-600 bg-amber-50 rounded-lg px-3 py-1.5 border border-amber-200">
+            ⚠️ Mode lancement actif — {livreursInactifs.length} livreur{livreursInactifs.length > 1 ? "s" : ""} et {clientsInactifs.length} client{clientsInactifs.length > 1 ? "s" : ""} inactifs visibles sur la carte. Ils ne sont pas dispatchables.
+          </p>
+        )}
       </Card>
 
       {/* Bouton carte */}
@@ -464,13 +505,27 @@ export default function CarteLivreursExterne() {
                 <X className="w-5 h-5" />
               </Button>
             </div>
-            <div className="px-4 pb-3">
-              <NetworkHealthBanner
-                libres={compteursLivreurs.libres}
-                enCourse={compteursLivreurs.enCourse}
-                clientsGPS={compteursClients.surCarte}
-                enAttente={coursesEnAttente.length}
-              />
+            <div className="px-4 pb-3 flex items-center gap-3">
+              <div className="flex-1">
+                <NetworkHealthBanner
+                  libres={compteursLivreurs.libres}
+                  enCourse={compteursLivreurs.enCourse}
+                  clientsGPS={compteursClients.surCarte}
+                  enAttente={coursesEnAttente.length}
+                />
+              </div>
+              <button
+                onClick={toggleInactifs}
+                className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                  showInactifs
+                    ? "bg-gray-700 text-white border-gray-700"
+                    : "bg-gray-50 text-gray-500 border-gray-300 hover:bg-gray-100"
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0" />
+                {showInactifs ? "Masquer inactifs" : "Voir inactifs"}
+                {showInactifs && <span className="text-gray-300">({livreursInactifs.length + clientsInactifs.length})</span>}
+              </button>
             </div>
           </div>
           <div className="flex flex-1 min-h-0">
@@ -480,6 +535,9 @@ export default function CarteLivreursExterne() {
                 livreurs={livreursSurCarte}
                 clients={clientsSurCarte}
                 courses={coursesEnAttente}
+                livreursInactifs={livreursInactifs}
+                clientsInactifs={clientsInactifs}
+                showInactifs={showInactifs}
                 onMarkerClick={(entity) => setSelectedMarker(entity)}
               />
             </div>
