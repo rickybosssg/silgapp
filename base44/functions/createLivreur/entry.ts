@@ -25,9 +25,15 @@ Deno.serve(async (req) => {
     const created = await base44.asServiceRole.entities.Livreur.create({
       ...data,
       code_identification: codeIdentification,
-      validation: 'valide',
+      validation: 'valide',   // Toujours valide quand créé par admin
       statut: 'hors_ligne',
-      actif: true,
+      actif: true,            // Toujours actif dès la création
+      app_active: false,
+      courses_du_jour: 0,
+      note_moyenne: 0,
+      nombre_avis: 0,
+      montant_du_silga: 0,
+      statut_paiement: 'non_paye',
     });
     console.log("✅ [createLivreur] Livreur créé:", created.id);
     return Response.json({ success: true, livreur: created });

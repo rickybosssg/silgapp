@@ -78,11 +78,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 4. Générer code d'identification unique
-    const codeIdentification = `LIV${Date.now().toString().slice(-6)}`;
-    await base44.asServiceRole.entities.Livreur.update(livreur.id, {
-      code_identification: codeIdentification,
-    });
+    // 4. Conserver le code d'identification existant (créé par l'admin) ou en générer un
+    const codeIdentification = livreur.code_identification || `LIV${Date.now().toString().slice(-6)}`;
+    if (!livreur.code_identification) {
+      await base44.asServiceRole.entities.Livreur.update(livreur.id, {
+        code_identification: codeIdentification,
+      });
+    }
 
     // 5. Tester la notification
     await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
