@@ -19,6 +19,7 @@ import CountrySelector, { usePaysActifs } from "@/components/international/Count
 const GPS_SEUIL_MIN = 5;          // GPS valide si < 5 min
 const HEARTBEAT_SEUIL_MIN = 5;    // App active si heartbeat < 5 min
 const HEARTBEAT_ON_SEUIL_MIN = 10; // ON si heartbeat < 10 min
+const GPS_EXPIRE_MIN = 10;        // GPS expiré si > 10 min → noir
 
 // ─── Helpers (règles unifiées) ───────────────────────────────────────────────
 
@@ -60,23 +61,23 @@ function isEnCourse(livreur) {
 }
 
 /**
- * Éligible carte = visible sur la carte dispatch
- * Conditions : ON + GPS récent < 5 min + app active
- * Inclut libre ET en_course (couleurs différentes)
+ * Livreur noir = hors ligne ou GPS expiré > 10 min
  */
-function isEligibleCarte(livreur) {
-  return isON(livreur) && hasValidGPS(livreur) && isAppActive(livreur);
+function isLivreurNoir(livreur) {
+  const dt = livreur.last_seen_at || livreur.derniere_position_date;
+  if (!dt) return true; // jamais vu
+  const min = (Date.now() - new Date(dt).getTime()) / 60000;
+  return min > GPS_EXPIRE_MIN || livreur.statut === "hors_ligne";
 }
 
 /**
- * Client éligible carte = actif + GPS récent < 5 min
- * Si GPS ancien → affiché en gris
+ * Client noir = GPS absent ou expiré > 10 min
  */
-function isClientEligibleCarte(client) {
-  if (client.actif === false) return false;
-  if (!client.latitude || !client.longitude) return false;
-  // Tous les clients avec GPS sont affichés (bleu si récent, gris si ancien)
-  return true;
+function isClientNoir(client) {
+  if (!client.latitude || !client.longitude) return true;
+  const dt = client.last_seen_at;
+  if (!dt) return true;
+  return (Date.now() - new Date(dt).getTime()) > GPS_EXPIRE_MIN * 60 * 1000;
 }
 
 /**
@@ -220,48 +221,36 @@ export default function CarteLivreursExterne() {
   // ─── Compteurs livreurs (règles unifiées) ───────────────────────────────
   const compteursLivreurs = useMemo(() => ({
     total:       livreurs.length,
-    on:          livreurs.filter(l => isON(l)).length,
-    off:         livreurs.filter(l => !isON(l)).length,
-    libres:      livreurs.filter(l => isLibre(l)).length,
-    enCourse:    livreurs.filter(l => isEnCourse(l)).length,
-    appActive:   livreurs.filter(l => isAppActive(l)).length,
-    appFermee:   livreurs.filter(l => !isAppActive(l)).length,
-    gpsRecent:   livreurs.filter(l => hasValidGPS(l)).length,
-    gpsExpire:   livreurs.filter(l => l.latitude && l.longitude && !isGPSRecent(l)).length,
-    surCarte:    livreurs.filter(l => l.latitude && l.longitude).length, // TOUS avec GPS
+    noirs:       livreurs.filter(l => isLivreurNoir(l)).length,
+    verts:       livreurs.filter(l => isLibre(l)).length,
+    oranges:     livreurs.filter(l => isEnCourse(l)).length,
+    surCarte:    livreurs.length, // TOUS les livreurs enregistrés
   }), [livreurs]);
 
   // ─── Compteurs clients (règles unifiées) ────────────────────────────────
   const compteursClients = useMemo(() => ({
     total:       clients.length,
-    gpsRecent:   clients.filter(c => isClientGPSRecent(c)).length,
-    gpsExpire:   clients.filter(c => c.latitude && c.longitude && !isClientGPSRecent(c)).length,
-    sansGPS:     clients.filter(c => !c.latitude || !c.longitude).length,
-    appActive:   clients.filter(c => isAppActive(c)).length,
-    surCarte:    clients.filter(c => c.latitude && c.longitude).length, // TOUS avec GPS
+    noirs:       clients.filter(c => isClientNoir(c)).length,
+    bleus:       clients.filter(c => !isClientNoir(c)).length,
+    surCarte:    clients.length, // TOUS les clients enregistrés
   }), [clients]);
 
   // ─── Listes filtrées ────────────────────────────────────────────────────
   const livreursAffiches = useMemo(() => {
     switch (filtreLivreur) {
-      case "on":        return livreurs.filter(l => isON(l));
-      case "off":       return livreurs.filter(l => !isON(l));
-      case "libres":    return livreurs.filter(l => isLibre(l));
-      case "en_course": return livreurs.filter(l => isEnCourse(l));
-      case "app_active":return livreurs.filter(l => isAppActive(l));
-      case "carte":     return livreurs.filter(l => isEligibleCarte(l));
+      case "noirs":     return livreurs.filter(l => isLivreurNoir(l));
+      case "verts":     return livreurs.filter(l => isLibre(l));
+      case "oranges":   return livreurs.filter(l => isEnCourse(l));
       default:          return livreurs;
     }
   }, [livreurs, filtreLivreur]);
 
-  // ─── Marqueurs carte — TOUS les utilisateurs avec GPS ────────────
-  // Livreurs sur carte : TOUS ceux avec coordonnées GPS (couleur selon état)
-  const livreursSurCarte = useMemo(() =>
-    livreurs.filter(l => l.latitude && l.longitude), [livreurs]);
+  // ─── Marqueurs carte — TOUS les utilisateurs enregistrés ────────────
+  // Livreurs sur carte : TOUS les livreurs (couleur selon état)
+  const livreursSurCarte = useMemo(() => livreurs, [livreurs]);
 
-  // Clients sur carte : TOUS ceux avec coordonnées GPS (couleur selon récence)
-  const clientsSurCarte = useMemo(() =>
-    clients.filter(c => c.latitude && c.longitude), [clients]);
+  // Clients sur carte : TOUS les clients (couleur selon état)
+  const clientsSurCarte = useMemo(() => clients, [clients]);
 
 
 
@@ -323,18 +312,12 @@ export default function CarteLivreursExterne() {
       {/* Compteurs livreurs */}
       <div>
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Livreurs</p>
-        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
-            { label: "ON",         count: compteursLivreurs.on,       color: "text-green-700 bg-green-50 border-green-200",    title: "Statut actif + heartbeat < 10 min" },
-            { label: "OFF",        count: compteursLivreurs.off,      color: "text-gray-500 bg-gray-50 border-gray-200",      title: "Inactif ou heartbeat > 10 min" },
-            { label: "Libres",     count: compteursLivreurs.libres,   color: "text-emerald-700 bg-emerald-50 border-emerald-200", title: "Disponible + ON + app active + GPS < 5 min" },
-            { label: "En course",  count: compteursLivreurs.enCourse, color: "text-orange-700 bg-orange-50 border-orange-200",title: "Mission en cours + ON" },
-            { label: "Sur carte",  count: compteursLivreurs.surCarte, color: "text-purple-700 bg-purple-50 border-purple-200",title: "Visibles sur carte dispatch (ON + GPS < 5min + app active)" },
-            { label: "App active", count: compteursLivreurs.appActive,color: "text-blue-700 bg-blue-50 border-blue-200",      title: "Heartbeat < 5 min" },
-            { label: "App fermée", count: compteursLivreurs.appFermee,color: "text-gray-400 bg-gray-50 border-gray-200",      title: "Heartbeat > 5 min" },
-            { label: "GPS récent", count: compteursLivreurs.gpsRecent,color: "text-teal-700 bg-teal-50 border-teal-200",      title: "Position GPS < 5 min" },
-            { label: "GPS expiré", count: compteursLivreurs.gpsExpire,color: "text-red-500 bg-red-50 border-red-200",         title: "GPS > 5 min ou absent" },
-            { label: "Total",      count: compteursLivreurs.total,    color: "text-slate-700 bg-slate-50 border-slate-200",   title: "Tous les livreurs valides" },
+            { label: "⚫ Noirs",    count: compteursLivreurs.noirs,   color: "text-gray-700 bg-gray-100 border-gray-300", title: "Hors ligne ou GPS > 10 min" },
+            { label: "🟢 Verts",   count: compteursLivreurs.verts,   color: "text-green-700 bg-green-50 border-green-200", title: "Disponibles + GPS < 5 min" },
+            { label: "🟠 Oranges", count: compteursLivreurs.oranges, color: "text-orange-700 bg-orange-50 border-orange-200", title: "En mission + GPS < 10 min" },
+            { label: "📍 Total",   count: compteursLivreurs.surCarte,color: "text-purple-700 bg-purple-50 border-purple-200", title: "Tous les livreurs enregistrés" },
           ].map(c => (
             <div key={c.label} className={`border rounded-lg p-2 text-center ${c.color}`} title={c.title}>
               <p className="text-lg font-bold leading-none">{c.count}</p>
@@ -347,14 +330,11 @@ export default function CarteLivreursExterne() {
       {/* Compteurs clients */}
       <div>
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Clients</p>
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {[
-            { label: "Sur carte",  count: compteursClients.surCarte,  color: "text-blue-700 bg-blue-50 border-blue-200",      title: "Actif + GPS < 5 min + app active" },
-            { label: "GPS récent", count: compteursClients.gpsRecent, color: "text-teal-700 bg-teal-50 border-teal-200",      title: "Position GPS < 5 min" },
-            { label: "GPS expiré", count: compteursClients.gpsExpire, color: "text-red-500 bg-red-50 border-red-200",         title: "GPS > 5 min" },
-            { label: "Sans GPS",   count: compteursClients.sansGPS,   color: "text-gray-400 bg-gray-50 border-gray-200",      title: "Aucune coordonnée GPS" },
-            { label: "App active", count: compteursClients.appActive, color: "text-green-700 bg-green-50 border-green-200",   title: "Heartbeat < 5 min" },
-            { label: "Total",      count: compteursClients.total,     color: "text-slate-700 bg-slate-50 border-slate-200",   title: "Tous les clients" },
+            { label: "⚫ Noirs",   count: compteursClients.noirs,  color: "text-gray-700 bg-gray-100 border-gray-300", title: "GPS > 10 min ou absent" },
+            { label: "🔵 Bleus",  count: compteursClients.bleus,  color: "text-blue-700 bg-blue-50 border-blue-200", title: "Actifs + GPS < 10 min" },
+            { label: "📍 Total",  count: compteursClients.surCarte,color: "text-purple-700 bg-purple-50 border-purple-200", title: "Tous les clients enregistrés" },
           ].map(c => (
             <div key={c.label} className={`border rounded-lg p-2 text-center ${c.color}`} title={c.title}>
               <p className="text-lg font-bold leading-none">{c.count}</p>
@@ -366,13 +346,13 @@ export default function CarteLivreursExterne() {
 
       {/* Légende carte */}
       <Card className="p-4 bg-slate-50 border-slate-200">
-        <p className="text-xs font-semibold text-slate-700 mb-2">Légende carte dispatch</p>
+        <p className="text-xs font-semibold text-slate-700 mb-2">Légende carte — Réseau SILGAPP complet</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs text-slate-600">
-          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" /><b>🟢 Libre</b> — ON + disponible + GPS &lt; {GPS_SEUIL_MIN} min + app active</span>
-          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-orange-500 flex-shrink-0" /><b>🟠 En course</b> — Mission en cours, ON + GPS récent</span>
-          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" /><b>🔵 Client</b> — Actif + GPS &lt; {GPS_SEUIL_MIN} min</span>
-          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-red-600 flex-shrink-0" /><b>🔴 Course en attente</b> — créée, sans livreur, non terminée</span>
-          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-gray-400 flex-shrink-0" /><b>⚫ Gris</b> — GPS expiré (&gt; {GPS_SEUIL_MIN} min) ou inactif</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-gray-800 flex-shrink-0" /><b>⚫ Noir</b> — Utilisateur enregistré, hors ligne ou GPS &gt; {GPS_EXPIRE_MIN} min</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" /><b>🟢 Vert</b> — Livreur disponible + GPS &lt; {GPS_SEUIL_MIN} min + app active</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-orange-500 flex-shrink-0" /><b>🟠 Orange</b> — Livreur en course + GPS &lt; {GPS_SEUIL_MIN} min</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" /><b>🔵 Bleu</b> — Client actif + GPS &lt; {GPS_SEUIL_MIN} min</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-red-600 flex-shrink-0" /><b>🔴 Rouge</b> — Course en attente (sans livreur)</span>
         </div>
       </Card>
 
@@ -395,17 +375,38 @@ export default function CarteLivreursExterne() {
       <div>
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Filtrer les livreurs</p>
         <div className="flex gap-2 flex-wrap">
-          {filtresBtns.map(f => (
-            <Button
-              key={f.key}
-              size="sm"
-              variant={filtreLivreur === f.key ? "default" : "outline"}
-              onClick={() => setFiltreLivreur(f.key)}
-              className="text-xs"
-            >
-              {f.label}
-            </Button>
-          ))}
+          <Button
+            size="sm"
+            variant={filtreLivreur === "tous" ? "default" : "outline"}
+            onClick={() => setFiltreLivreur("tous")}
+            className="text-xs"
+          >
+            Tous ({compteursLivreurs.total})
+          </Button>
+          <Button
+            size="sm"
+            variant={filtreLivreur === "noirs" ? "default" : "outline"}
+            onClick={() => setFiltreLivreur("noirs")}
+            className="text-xs"
+          >
+            ⚫ Noirs ({compteursLivreurs.noirs})
+          </Button>
+          <Button
+            size="sm"
+            variant={filtreLivreur === "verts" ? "default" : "outline"}
+            onClick={() => setFiltreLivreur("verts")}
+            className="text-xs"
+          >
+            🟢 Verts ({compteursLivreurs.verts})
+          </Button>
+          <Button
+            size="sm"
+            variant={filtreLivreur === "oranges" ? "default" : "outline"}
+            onClick={() => setFiltreLivreur("oranges")}
+            className="text-xs"
+          >
+            🟠 Oranges ({compteursLivreurs.oranges})
+          </Button>
         </div>
       </div>
 
@@ -423,18 +424,23 @@ export default function CarteLivreursExterne() {
         ) : (
           <div className="space-y-3">
             {livreursAffiches.map(livreur => {
-              const eligibleCarte = isEligibleCarte(livreur);
+              const estNoir = isLivreurNoir(livreur);
+              const estVert = isLibre(livreur);
+              const estOrange = isEnCourse(livreur);
+              const couleurBorder = estNoir ? "border-gray-400" : (estVert ? "border-green-200 bg-green-50/30" : (estOrange ? "border-orange-200 bg-orange-50/30" : "border-gray-200"));
               return (
-                <div key={livreur.id} className={`flex items-start justify-between p-3 border rounded-lg ${eligibleCarte ? "border-green-200 bg-green-50/30" : "border-gray-200"}`}>
+                <div key={livreur.id} className={`flex items-start justify-between p-3 border rounded-lg ${couleurBorder}`}>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="font-semibold text-sm">{livreur.prenom} {livreur.nom}</p>
-                      {eligibleCarte && <span className="text-xs text-green-600 font-medium">📍 Sur carte</span>}
+                      {estNoir && <span className="text-xs text-gray-500 font-medium">⚫ Hors ligne</span>}
+                      {estVert && <span className="text-xs text-green-600 font-medium">🟢 Libre</span>}
+                      {estOrange && <span className="text-xs text-orange-600 font-medium">🟠 En course</span>}
                     </div>
                     <div className="flex flex-wrap gap-x-3 gap-y-0.5 mb-1.5">
-                      <ONBadge livreur={livreur} />
-                      <StatutBadge livreur={livreur} />
-                      <AppBadge entity={livreur} />
+                      {!estNoir && <ONBadge livreur={livreur} />}
+                      {!estNoir && <StatutBadge livreur={livreur} />}
+                      {!estNoir && <AppBadge entity={livreur} />}
                     </div>
                     <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{getZone(livreur)}</span>

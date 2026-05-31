@@ -18,9 +18,24 @@ import { Loader2 } from "lucide-react";
  */
 
 const GPS_SEUIL_MIN = 5;
+const GPS_EXPIRE_MIN = 10;
 
 function isEnCourse(livreur) {
   return livreur.statut === "en_course";
+}
+
+function isLivreurNoir(livreur) {
+  const dt = livreur.last_seen_at || livreur.derniere_position_date;
+  if (!dt) return true;
+  const min = (Date.now() - new Date(dt).getTime()) / 60000;
+  return min > GPS_EXPIRE_MIN || livreur.statut === "hors_ligne";
+}
+
+function isClientNoir(client) {
+  if (!client.latitude || !client.longitude) return true;
+  const dt = client.last_seen_at;
+  if (!dt) return true;
+  return (Date.now() - new Date(dt).getTime()) > GPS_EXPIRE_MIN * 60 * 1000;
 }
 
 function getLastGPSMin(entity) {
@@ -57,19 +72,19 @@ function buildStyles() {
       background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
     }
 
-    /* ─── Livreur INACTIF (⚫ gris) ─── */
-    .dmap-livreur-inactif .dmap-ring {
-      background: rgba(107, 114, 128, 0.15);
+    /* ─── Livreur NOIR (⚫ hors ligne) ─── */
+    .dmap-livreur-noir .dmap-ring {
+      background: rgba(55, 65, 81, 0.2);
     }
-    .dmap-livreur-inactif .dmap-body {
-      border-color: #9ca3af;
-      box-shadow: 0 1px 4px rgba(107, 114, 128, 0.2);
+    .dmap-livreur-noir .dmap-body {
+      border-color: #374151;
+      box-shadow: 0 2px 8px rgba(55, 65, 81, 0.3);
     }
-    .dmap-livreur-inactif .dmap-avatar-bg {
-      background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+    .dmap-livreur-noir .dmap-avatar-bg {
+      background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
     }
     .dmap-livreur-container.dmap-inactif-marker {
-      opacity: 0.55;
+      opacity: 0.7;
     }
 
     /* ─── Client (🔵 bleu) ─── */
@@ -83,17 +98,17 @@ function buildStyles() {
       box-shadow: 0 2px 8px rgba(37, 99, 235, 0.45);
     }
 
-    /* ─── Client INACTIF (⚫ gris) ─── */
-    .dmap-client-inactif .dmap-client-ring {
-      background: rgba(107, 114, 128, 0.15);
+    /* ─── Client NOIR (⚫ hors ligne) ─── */
+    .dmap-client-noir .dmap-client-ring {
+      background: rgba(55, 65, 81, 0.2);
     }
-    .dmap-client-inactif .dmap-client-dot {
-      background: #9ca3af;
+    .dmap-client-noir .dmap-client-dot {
+      background: #374151;
       border-color: white;
-      box-shadow: 0 1px 4px rgba(107, 114, 128, 0.2);
+      box-shadow: 0 2px 6px rgba(55, 65, 81, 0.3);
     }
     .dmap-client-container.dmap-inactif-marker {
-      opacity: 0.5;
+      opacity: 0.7;
     }
 
     /* ─── Course en attente (🔴 rouge) ─── */
@@ -260,9 +275,10 @@ function buildStyles() {
   `;
 }
 
-function buildLivreurIcon(livreur, inactif = false) {
+function buildLivreurIcon(livreur) {
+  const estNoir = isLivreurNoir(livreur);
   const libre = livreur.statut === "disponible";
-  const cssClass = inactif ? "dmap-livreur-inactif" : (libre ? "dmap-livreur-libre" : "dmap-livreur-course");
+  const cssClass = estNoir ? "dmap-livreur-noir" : (libre ? "dmap-livreur-libre" : "dmap-livreur-course");
   const initial = livreur.nom?.charAt(0)?.toUpperCase() || "L";
   const photoHtml = livreur.photo_url
     ? `<img src="${livreur.photo_url}" alt="" class="dmap-photo" />`
@@ -275,18 +291,15 @@ function buildLivreurIcon(livreur, inactif = false) {
         <div class="dmap-body">${photoHtml}</div>
       </div>
     `,
-    className: `dmap-livreur-container${inactif ? " dmap-inactif-marker" : ""}`,
+    className: `dmap-livreur-container${estNoir ? " dmap-inactif-marker" : ""}`,
     iconSize: [52, 52],
     iconAnchor: [26, 26],
   });
 }
 
-function buildClientIcon(client, inactif = false) {
-  const gpsMin = getLastGPSMin(client);
-  const gpsRecent = gpsMin !== null && gpsMin < GPS_SEUIL_MIN;
-  // Si GPS ancien → afficher en gris (comme inactif)
-  const useGris = inactif || !gpsRecent;
-  const cssClass = useGris ? "dmap-client-inactif" : "dmap-client";
+function buildClientIcon(client) {
+  const estNoir = isClientNoir(client);
+  const cssClass = estNoir ? "dmap-client-noir" : "dmap-client";
   return window.L.divIcon({
     html: `
       <div class="dmap-client-wrapper ${cssClass}">
@@ -294,26 +307,25 @@ function buildClientIcon(client, inactif = false) {
         <div class="dmap-client-dot"></div>
       </div>
     `,
-    className: `dmap-client-container${useGris ? " dmap-inactif-marker" : ""}`,
+    className: `dmap-client-container${estNoir ? " dmap-inactif-marker" : ""}`,
     iconSize: [44, 44],
     iconAnchor: [22, 22],
   });
 }
 
-function buildLivreurPopup(livreur, inactif = false) {
+function buildLivreurPopup(livreur) {
+  const estNoir = isLivreurNoir(livreur);
   const libre = livreur.statut === "disponible";
-  const statutLabel = inactif
-    ? "⚫ Inactif — non dispatchable"
+  const statutLabel = estNoir
+    ? "⚫ Hors ligne — non dispatchable"
     : libre ? "🟢 Libre — disponible" : "🟠 En course";
   const gpsMin = getLastGPSMin(livreur);
   const gpsStr = gpsMin === null ? "?" : gpsMin < 1 ? "à l'instant" : `${gpsMin} min`;
-  const statutColor = inactif ? "#6b7280" : (libre ? "#16a34a" : "#ea580c");
-  const raison = inactif ? getRaisonInactif(livreur) : "";
+  const statutColor = estNoir ? "#374151" : (libre ? "#16a34a" : "#ea580c");
   return `
     <div style="min-width:210px;font-family:sans-serif;padding:4px 0">
       <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#1a1a1a">${livreur.prenom || ""} ${livreur.nom || ""}</p>
       <p style="font-size:12px;margin:2px 0;color:${statutColor}">${statutLabel}</p>
-      ${raison ? `<p style="font-size:11px;margin:2px 0;color:#9ca3af;font-style:italic">${raison}</p>` : ""}
       ${livreur.telephone ? `<p style="font-size:12px;margin:2px 0;color:#444">📞 ${livreur.telephone}</p>` : ""}
       <p style="font-size:12px;margin:2px 0;color:#6b7280">📍 GPS il y a ${gpsStr}</p>
       ${livreur.vehicule ? `<p style="font-size:12px;margin:2px 0;color:#888">🏍 ${livreur.vehicule}</p>` : ""}
@@ -367,12 +379,12 @@ function buildCoursePopup(course) {
   `;
 }
 
-function buildClientPopup(client, inactif = false) {
+function buildClientPopup(client) {
+  const estNoir = isClientNoir(client);
   const gpsMin = getLastGPSMin(client);
   const gpsStr = gpsMin === null ? "?" : gpsMin < 1 ? "à l'instant" : `${gpsMin} min`;
-  const gpsRecent = gpsMin !== null && gpsMin < GPS_SEUIL_MIN;
-  const statutLabel = !gpsRecent ? "⚫ Client GPS ancien — non dispatchable" : (inactif ? "⚫ Client inactif — non dispatchable" : "🔵 Client actif");
-  const statutColor = !gpsRecent ? "#6b7280" : (inactif ? "#6b7280" : "#2563eb");
+  const statutLabel = estNoir ? "⚫ Hors ligne — non dispatchable" : "🔵 Client actif";
+  const statutColor = estNoir ? "#374151" : "#2563eb";
   return `
     <div style="min-width:210px;font-family:sans-serif;padding:4px 0">
       <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#1a1a1a">${client.prenom || ""} ${client.nom || ""}</p>
@@ -389,9 +401,6 @@ export default function DispatchMap({
   livreurs = [],
   clients = [],
   courses = [],
-  livreursInactifs = [],
-  clientsInactifs = [],
-  showInactifs = false,
   onMarkerClick,
 }) {
   const mapRef = useRef(null);
@@ -470,32 +479,35 @@ export default function DispatchMap({
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
 
-    // ⚫ Inactifs en dessous (zIndex bas) — affichés en premier pour être "sous" les actifs
-    if (showInactifs) {
-      livreursInactifs.forEach(livreur => {
-        if (!livreur.latitude || !livreur.longitude) return;
-        const icon = buildLivreurIcon(livreur, true);
-        const marker = window.L.marker([livreur.latitude, livreur.longitude], {
-          icon,
-          zIndexOffset: 100,
-        }).addTo(map);
-        marker.bindPopup(buildLivreurPopup(livreur, true), { maxWidth: 260 });
-        if (onMarkerClick) marker.on("click", () => onMarkerClick({ ...livreur, _inactif: true }));
-        markersRef.current.push(marker);
-      });
+    // ⚫ Livreurs NOIRS (hors ligne) — zIndex bas
+    livreurs.forEach(livreur => {
+      if (!livreur.latitude || !livreur.longitude) return;
+      const estNoir = isLivreurNoir(livreur);
+      if (!estNoir) return;
+      const icon = buildLivreurIcon(livreur);
+      const marker = window.L.marker([livreur.latitude, livreur.longitude], {
+        icon,
+        zIndexOffset: 100,
+      }).addTo(map);
+      marker.bindPopup(buildLivreurPopup(livreur), { maxWidth: 260 });
+      if (onMarkerClick) marker.on("click", () => onMarkerClick(livreur));
+      markersRef.current.push(marker);
+    });
 
-      clientsInactifs.forEach(client => {
-        if (!client.latitude || !client.longitude) return;
-        const icon = buildClientIcon(true);
-        const marker = window.L.marker([client.latitude, client.longitude], {
-          icon,
-          zIndexOffset: 50,
-        }).addTo(map);
-        marker.bindPopup(buildClientPopup(client, true), { maxWidth: 260 });
-        if (onMarkerClick) marker.on("click", () => onMarkerClick({ ...client, _inactif: true }));
-        markersRef.current.push(marker);
-      });
-    }
+    // ⚫ Clients NOIRS (hors ligne) — zIndex bas
+    clients.forEach(client => {
+      if (!client.latitude || !client.longitude) return;
+      const estNoir = isClientNoir(client);
+      if (!estNoir) return;
+      const icon = buildClientIcon(client);
+      const marker = window.L.marker([client.latitude, client.longitude], {
+        icon,
+        zIndexOffset: 50,
+      }).addTo(map);
+      marker.bindPopup(buildClientPopup(client), { maxWidth: 260 });
+      if (onMarkerClick) marker.on("click", () => onMarkerClick(client));
+      markersRef.current.push(marker);
+    });
 
     // 🔴 Courses en attente
     courses.forEach(course => {
@@ -509,38 +521,39 @@ export default function DispatchMap({
       markersRef.current.push(marker);
     });
 
-    // 🟢🟠 Livreurs actifs
+    // 🟢🟠 Livreurs actifs (déjà filtrés par buildLivreurIcon)
     livreurs.forEach(livreur => {
       if (!livreur.latitude || !livreur.longitude) return;
-      const icon = buildLivreurIcon(livreur, false);
+      const estNoir = isLivreurNoir(livreur);
+      if (estNoir) return; // déjà affiché ci-dessus
+      const icon = buildLivreurIcon(livreur);
       const marker = window.L.marker([livreur.latitude, livreur.longitude], {
         icon,
         zIndexOffset: livreur.statut === "disponible" ? 1200 : 1100,
       }).addTo(map);
-      marker.bindPopup(buildLivreurPopup(livreur, false), { maxWidth: 260 });
+      marker.bindPopup(buildLivreurPopup(livreur), { maxWidth: 260 });
       if (onMarkerClick) marker.on("click", () => onMarkerClick(livreur));
       markersRef.current.push(marker);
     });
 
-    // 🔵 Clients actifs (bleu si GPS < 5 min, gris si GPS ancien)
+    // 🔵 Clients BLEUS (actifs) — zIndex haut
     clients.forEach(client => {
       if (!client.latitude || !client.longitude) return;
-      const icon = buildClientIcon(client, false);
-      const gpsMin = getLastGPSMin(client);
-      const gpsRecent = gpsMin !== null && gpsMin < GPS_SEUIL_MIN;
+      const estNoir = isClientNoir(client);
+      if (estNoir) return; // déjà affiché ci-dessus
+      const icon = buildClientIcon(client);
       const marker = window.L.marker([client.latitude, client.longitude], {
         icon,
-        zIndexOffset: gpsRecent ? 900 : 600, // GPS récent au-dessus
+        zIndexOffset: 900,
       }).addTo(map);
-      marker.bindPopup(buildClientPopup(client, !gpsRecent), { maxWidth: 260 });
+      marker.bindPopup(buildClientPopup(client), { maxWidth: 260 });
       if (onMarkerClick) marker.on("click", () => onMarkerClick(client));
       markersRef.current.push(marker);
     });
-  }, [livreurs, clients, courses, livreursInactifs, clientsInactifs, showInactifs, mapLoaded]);
+  }, [livreurs, clients, courses, mapLoaded]);
 
-  const nbLibres = livreurs.filter(l => l.statut === "disponible").length;
-  const nbCourse = livreurs.filter(l => l.statut === "en_course").length;
-  const nbInactifs = showInactifs ? (livreursInactifs.length + clientsInactifs.length) : 0;
+  const nbLibres = livreurs.filter(l => l.statut === "disponible" && !isLivreurNoir(l)).length;
+  const nbCourse = livreurs.filter(l => l.statut === "en_course" && !isLivreurNoir(l)).length;
 
   return (
     <div className="relative w-full h-full">
@@ -596,8 +609,7 @@ export default function DispatchMap({
             </div>
           </div>
           <div className="dmap-overlay-badge text-xs text-slate-500">
-            GPS &lt; {GPS_SEUIL_MIN} min · Temps réel
-            {showInactifs && <span className="block text-gray-400 mt-0.5">⚫ Gris = inactif / non dispatchable</span>}
+            GPS &lt; {GPS_SEUIL_MIN} min · {GPS_EXPIRE_MIN} min = noir
           </div>
         </div>
       )}
