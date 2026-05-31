@@ -20,20 +20,26 @@ import LivreurPhotoUploader from "@/components/livreur/LivreurPhotoUploader";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
-// ── Helpers (même logique que CarteLivreursExterne) ───────────────────────────
-/** ON = accepte des courses (disponible ou en_course) */
+// ── Helpers (logique unifiée avec CarteLivreursExterne) ───────────────────────
+const HEARTBEAT_ON_SEUIL_MIN = 10;
+const HEARTBEAT_APP_SEUIL_MIN = 5;
+
+/** ON = statut actif EN BASE + heartbeat < 10 min (idem carte) */
 function isON(livreur) {
-  return livreur.statut === "disponible" || livreur.statut === "en_course";
+  const actifEnDB = livreur.statut === "disponible" || livreur.statut === "en_course";
+  const dt = livreur.last_seen_at || livreur.derniere_position_date;
+  if (!dt) return false;
+  return actifEnDB && (Date.now() - new Date(dt).getTime()) < HEARTBEAT_ON_SEUIL_MIN * 60 * 1000;
 }
 /** Libre = peut recevoir une nouvelle course */
 function isLibre(livreur) {
-  return livreur.statut === "disponible";
+  return livreur.statut === "disponible" && isON(livreur);
 }
-/** App ouverte = app_active ET last_seen_at < 3 min */
+/** App ouverte = heartbeat < 5 min (idem carte) */
 function isEnLigne(livreur) {
-  if (!livreur.app_active) return false;
-  if (!livreur.last_seen_at) return false;
-  return (Date.now() - new Date(livreur.last_seen_at).getTime()) < 3 * 60 * 1000;
+  const dt = livreur.last_seen_at;
+  if (!dt) return false;
+  return (Date.now() - new Date(dt).getTime()) < HEARTBEAT_APP_SEUIL_MIN * 60 * 1000;
 }
 
 function validationBadge(v) {
@@ -186,7 +192,7 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Montant dû à Silga</span>
-              <span className="font-bold text-orange-600">{montantDu.toLocaleString()} FCFA</span>
+              <span className="font-bold text-orange-600">{montantDu.toLocaleString()} {livreur.devise || "FCFA"}</span>
             </div>
             <div className="border-t pt-2 flex justify-between text-sm font-bold">
               <span>Reste à payer</span>

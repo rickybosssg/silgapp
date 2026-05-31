@@ -28,12 +28,17 @@ function calculerDistance(lat1, lon1, lat2, lon2) {
  * Exclure les IDs déjà essayés.
  */
 async function trouverLivreursCandidats(base44, course, rayonKm, exclusions = []) {
-  const livreurs = await base44.asServiceRole.entities.Livreur.filter({
+  const filterLivreur = {
     type_livreur: 'externe',
     validation: 'valide',
     actif: true,
     statut: 'disponible',
-  });
+  };
+  // Filtrer par pays si la course a un country_code
+  if (course.country_code) {
+    filterLivreur.country_code = course.country_code;
+  }
+  const livreurs = await base44.asServiceRole.entities.Livreur.filter(filterLivreur);
 
   if (!livreurs || livreurs.length === 0) return [];
 

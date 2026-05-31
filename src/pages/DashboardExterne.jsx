@@ -110,7 +110,7 @@ export default function DashboardExterne() {
     const dispoLivreurs = livreursEnLigne.filter(l => l.statut === "disponible").length;
     const totalClients = clients.length;
     return { total, livrees, annulees, enCours, ca, dispoLivreurs, totalClients };
-  }, [courses, coursesEnTraitement, coursesTerminees, livreursEnLigne, clients]);
+  }, [coursesFiltrees, coursesEnTraitement, coursesTerminees, livreursEnLigne, clients]);
 
   return (
     <div className="px-4 py-4 lg:p-6 space-y-4 lg:space-y-5 max-w-7xl mx-auto">

@@ -29,7 +29,7 @@ export function usePaysActifs() {
 export default function CountrySelector({ value, onChange, className = "" }) {
   const pays = usePaysActifs();
 
-  if (pays.length <= 1) return null;
+  if (pays.length === 0) return null;
 
   return (
     <select
@@ -37,7 +37,7 @@ export default function CountrySelector({ value, onChange, className = "" }) {
       onChange={(e) => onChange(e.target.value)}
       className={`border border-input rounded-md bg-background text-foreground px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring ${className}`}
     >
-      <option value="">🌍 Tous les pays</option>
+      {pays.length > 1 && <option value="">🌍 Tous les pays</option>}
       {pays.map((p) => (
         <option key={p.code} value={p.code}>
           {p.emoji_flag} {p.nom}

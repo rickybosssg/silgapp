@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
-  Package, TrendingUp, Menu, X, LogOut, Wallet, Globe
+  Package, TrendingUp, Menu, X, LogOut, Wallet, Globe, Shield
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,7 @@ const allNavItems = [
   { path: "/admin/global", label: "Admin Global", icon: Globe, reseauOnly: "externe" },
   { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Globe, reseauOnly: "externe" },
   { path: "/notifications", label: "Notifications", icon: Bell },
+  { path: "/maintenance", label: "Maintenance", icon: Shield },
 ];
 
 // Store scroll positions per route
