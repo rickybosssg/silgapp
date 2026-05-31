@@ -323,7 +323,17 @@ export default function ClientExterneApp() {
       }
       setClientProfil(profil);
 
-      // GPS déjà chargé via useEffect
+      // Heartbeat immédiat après chargement du profil (même sans GPS)
+      // Cela mettra à jour last_seen_at et app_active
+      if (profil?.id) {
+        base44.functions.invoke('heartbeatAuto', {
+          user_type: "client",
+          latitude: profil.latitude || 0,
+          longitude: profil.longitude || 0,
+          app_active: true,
+          device_id: navigator.userAgent.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 50),
+        }).catch(() => null);
+      }
     } catch (err) {
       console.error("Erreur chargement profil:", err);
     } finally {
