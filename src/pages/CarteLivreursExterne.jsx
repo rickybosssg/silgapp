@@ -270,12 +270,22 @@ export default function CarteLivreursExterne() {
   const clientsInactifs = useMemo(() =>
     clients.filter(c => !isClientEligibleCarte(c) && c.latitude && c.longitude), [clients]);
 
+  // Zoom adapté au rayon du pays (rayon_km → zoom Leaflet approx)
+  function rayonToZoom(rayon) {
+    if (!rayon) return 12;
+    if (rayon <= 10) return 14;
+    if (rayon <= 20) return 13;
+    if (rayon <= 40) return 12;
+    if (rayon <= 80) return 11;
+    return 10;
+  }
+
   // Centre de la carte : pays sélectionné > premier livreur éligible > Ouagadougou (BF)
   const centerPosition = paysData?.latitude_centre
-    ? { latitude: paysData.latitude_centre, longitude: paysData.longitude_centre }
+    ? { latitude: paysData.latitude_centre, longitude: paysData.longitude_centre, zoom: rayonToZoom(paysData.rayon_km) }
     : livreursSurCarte[0]
-      ? { latitude: livreursSurCarte[0].latitude, longitude: livreursSurCarte[0].longitude }
-      : { latitude: 12.3569, longitude: -1.5353 };
+      ? { latitude: livreursSurCarte[0].latitude, longitude: livreursSurCarte[0].longitude, zoom: 13 }
+      : { latitude: 12.3569, longitude: -1.5353, zoom: 12 };
 
   const filtresBtns = [
     { key: "tous",      label: `Tous (${compteursLivreurs.total})` },

@@ -396,7 +396,7 @@ export default function DispatchMap({
   // Recentrer la carte quand le pays change
   useEffect(() => {
     if (!mapInstanceRef.current || !position) return;
-    mapInstanceRef.current.setView([position.latitude, position.longitude], 13);
+    mapInstanceRef.current.setView([position.latitude, position.longitude], position.zoom ?? 12);
   }, [position?.latitude, position?.longitude]);
 
   // Init carte
@@ -420,7 +420,7 @@ export default function DispatchMap({
         doubleClickZoom: true,
         dragging: true,
         keyboard: false,
-      }).setView([position.latitude, position.longitude], 13);
+      }).setView([position.latitude, position.longitude], position.zoom ?? 12);
 
       window.L.tileLayer(
         "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
