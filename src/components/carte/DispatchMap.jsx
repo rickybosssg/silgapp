@@ -65,6 +65,43 @@ function buildStyles() {
       box-shadow: 0 2px 8px rgba(37, 99, 235, 0.45);
     }
 
+    /* ─── Course en attente (🔴 rouge) ─── */
+    .dmap-course-wrapper {
+      position: relative;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .dmap-course-ring {
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(220, 38, 38, 0.3);
+      animation: dmap-pulse-rouge 1.5s ease-out infinite;
+    }
+    .dmap-course-pin {
+      width: 26px;
+      height: 26px;
+      background: #dc2626;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      border: 3px solid white;
+      box-shadow: 0 2px 10px rgba(220, 38, 38, 0.5);
+      position: relative;
+      z-index: 1;
+    }
+    .dmap-course-container {
+      cursor: pointer;
+      transition: filter 0.2s ease;
+    }
+    .dmap-course-container:hover {
+      filter: brightness(1.15);
+      z-index: 9999 !important;
+    }
+
     /* ─── Animations ─── */
     @keyframes dmap-pulse-vert {
       0%   { transform: scale(0.5); opacity: 1; }
@@ -77,6 +114,10 @@ function buildStyles() {
     @keyframes dmap-pulse-bleu {
       0%   { transform: scale(0.5); opacity: 1; }
       100% { transform: scale(1.6); opacity: 0; }
+    }
+    @keyframes dmap-pulse-rouge {
+      0%   { transform: scale(0.5); opacity: 1; }
+      100% { transform: scale(1.8); opacity: 0; }
     }
 
     /* ─── Structure commune livreur ─── */
@@ -239,6 +280,37 @@ function buildLivreurPopup(livreur) {
   `;
 }
 
+function buildCourseIcon() {
+  return window.L.divIcon({
+    html: `
+      <div class="dmap-course-wrapper">
+        <div class="dmap-course-ring"></div>
+        <div class="dmap-course-pin"></div>
+      </div>
+    `,
+    className: "dmap-course-container",
+    iconSize: [44, 44],
+    iconAnchor: [13, 26],
+  });
+}
+
+function buildCoursePopup(course) {
+  const age = course.created_date
+    ? Math.round((Date.now() - new Date(course.created_date).getTime()) / 60000)
+    : null;
+  const ageStr = age === null ? "" : age < 1 ? "à l'instant" : `il y a ${age} min`;
+  return `
+    <div style="min-width:210px;font-family:sans-serif;padding:4px 0">
+      <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#dc2626">🔴 Course en attente</p>
+      ${course.client_nom ? `<p style="font-size:12px;margin:2px 0;color:#444">👤 ${course.client_nom}</p>` : ""}
+      ${course.client_telephone ? `<p style="font-size:12px;margin:2px 0;color:#444">📞 ${course.client_telephone}</p>` : ""}
+      ${course.adresse_depart ? `<p style="font-size:12px;margin:2px 0;color:#444">📍 Départ : ${course.adresse_depart}</p>` : ""}
+      ${course.adresse_arrivee ? `<p style="font-size:12px;margin:2px 0;color:#888">🏁 Arrivée : ${course.adresse_arrivee}</p>` : ""}
+      ${ageStr ? `<p style="font-size:11px;margin:4px 0 0 0;color:#dc2626;font-weight:600">⏱ Créée ${ageStr}</p>` : ""}
+    </div>
+  `;
+}
+
 function buildClientPopup(client) {
   const gpsMin = getLastGPSMin(client);
   const gpsStr = gpsMin === null ? "?" : gpsMin < 1 ? "à l'instant" : `${gpsMin} min`;
@@ -253,7 +325,7 @@ function buildClientPopup(client) {
   `;
 }
 
-export default function DispatchMap({ position, livreurs = [], clients = [], onMarkerClick }) {
+export default function DispatchMap({ position, livreurs = [], clients = [], courses = [], onMarkerClick }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
@@ -317,7 +389,7 @@ export default function DispatchMap({ position, livreurs = [], clients = [], onM
     };
   }, [position?.latitude, position?.longitude]);
 
-  // Mise à jour des marqueurs quand livreurs/clients changent
+  // Mise à jour des marqueurs quand livreurs/clients/courses changent
   useEffect(() => {
     if (!mapInstanceRef.current || !mapLoaded) return;
     const map = mapInstanceRef.current;
@@ -325,6 +397,21 @@ export default function DispatchMap({ position, livreurs = [], clients = [], onM
     // Supprimer les anciens marqueurs
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
+
+    // Courses en attente (🔴 priorité visuelle maximale)
+    courses.forEach(course => {
+      const lat = course.gps_depart_lat;
+      const lng = course.gps_depart_lng;
+      if (!lat || !lng) return;
+      const icon = buildCourseIcon();
+      const marker = window.L.marker([lat, lng], {
+        icon,
+        zIndexOffset: 1500,
+      }).addTo(map);
+      marker.bindPopup(buildCoursePopup(course), { maxWidth: 260 });
+      if (onMarkerClick) marker.on("click", () => onMarkerClick({ ...course, _type: "course" }));
+      markersRef.current.push(marker);
+    });
 
     // Livreurs
     livreurs.forEach(livreur => {
@@ -334,7 +421,6 @@ export default function DispatchMap({ position, livreurs = [], clients = [], onM
         icon,
         zIndexOffset: livreur.statut === "disponible" ? 1200 : 1100,
       }).addTo(map);
-
       marker.bindPopup(buildLivreurPopup(livreur), { maxWidth: 260 });
       if (onMarkerClick) marker.on("click", () => onMarkerClick(livreur));
       markersRef.current.push(marker);
@@ -348,12 +434,11 @@ export default function DispatchMap({ position, livreurs = [], clients = [], onM
         icon,
         zIndexOffset: 900,
       }).addTo(map);
-
       marker.bindPopup(buildClientPopup(client), { maxWidth: 260 });
       if (onMarkerClick) marker.on("click", () => onMarkerClick(client));
       markersRef.current.push(marker);
     });
-  }, [livreurs, clients, mapLoaded]);
+  }, [livreurs, clients, courses, mapLoaded]);
 
   const nbLibres = livreurs.filter(l => l.statut === "disponible").length;
   const nbCourse = livreurs.filter(l => l.statut === "en_course").length;
@@ -376,6 +461,12 @@ export default function DispatchMap({ position, livreurs = [], clients = [], onM
         <div className="absolute top-4 left-4 z-[1000] space-y-2">
           <div className="dmap-overlay-badge">
             <div className="space-y-1 text-xs font-medium">
+              {courses.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-red-600 flex-shrink-0" />
+                  <span className="text-red-700 font-bold">{courses.length} en attente !</span>
+                </div>
+              )}
               {nbLibres > 0 && (
                 <div className="flex items-center gap-2">
                   <span className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" />
@@ -394,7 +485,7 @@ export default function DispatchMap({ position, livreurs = [], clients = [], onM
                   <span className="text-blue-700">{clients.length} client{clients.length > 1 ? "s" : ""}</span>
                 </div>
               )}
-              {nbLibres === 0 && nbCourse === 0 && clients.length === 0 && (
+              {courses.length === 0 && nbLibres === 0 && nbCourse === 0 && clients.length === 0 && (
                 <span className="text-gray-400">Aucun élément visible</span>
               )}
             </div>

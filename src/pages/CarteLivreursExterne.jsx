@@ -159,6 +159,27 @@ export default function CarteLivreursExterne() {
     refetchInterval: 15000,
   });
 
+  // Courses en attente : créées, sans livreur assigné, non terminées/annulées
+  const coursesAttenteFilter = effectiveCountry
+    ? { country_code: effectiveCountry }
+    : {};
+  const { data: toutesCoursesExternes = [] } = useQuery({
+    queryKey: ["courses-attente-carte", effectiveCountry],
+    queryFn: () => base44.entities.CourseExterne.filter(coursesAttenteFilter, "-created_date", 100),
+    initialData: [],
+    refetchInterval: 15000,
+  });
+
+  // Filtrage côté client : sans livreur, non annulée, non terminée, avec GPS départ
+  const coursesEnAttente = useMemo(() =>
+    toutesCoursesExternes.filter(c =>
+      !c.livreur_id &&
+      c.statut !== "annulee" &&
+      c.statut !== "livree" &&
+      c.gps_depart_lat &&
+      c.gps_depart_lng
+    ), [toutesCoursesExternes]);
+
   // ─── Compteurs livreurs (règles unifiées) ───────────────────────────────
   const compteursLivreurs = useMemo(() => ({
     total:       livreurs.length,
@@ -235,7 +256,7 @@ export default function CarteLivreursExterne() {
           <div>
             <h1 className="text-2xl font-bold text-foreground">Carte Dispatch — Terrain réel</h1>
             <p className="text-sm text-muted-foreground">
-              🟢 {compteursLivreurs.surCarte} livreurs sur carte · 🔵 {compteursClients.surCarte} clients · GPS &lt; {GPS_SEUIL_MIN} min
+              🟢 {compteursLivreurs.surCarte} livreurs · 🔵 {compteursClients.surCarte} clients · 🔴 {coursesEnAttente.length} en attente
             </p>
           </div>
         </div>
@@ -299,6 +320,7 @@ export default function CarteLivreursExterne() {
           <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" /><b>🟢 Libre</b> — ON + disponible + GPS &lt; {GPS_SEUIL_MIN} min + app active</span>
           <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-orange-500 flex-shrink-0" /><b>🟠 En course</b> — Mission en cours, ON + GPS récent</span>
           <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" /><b>🔵 Client</b> — Actif + GPS &lt; {GPS_SEUIL_MIN} min + app active</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-red-600 flex-shrink-0" /><b>🔴 Course en attente</b> — créée, sans livreur, non terminée</span>
           <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-gray-300 flex-shrink-0" /><b>⚫ Masqués</b> — OFF, GPS expiré, app fermée, non validés</span>
         </div>
       </Card>
@@ -312,7 +334,7 @@ export default function CarteLivreursExterne() {
           <div className="flex-1">
             <p className="font-bold text-purple-900">🗺️ Ouvrir la carte dispatch temps réel</p>
             <p className="text-xs text-purple-700">
-              {compteursLivreurs.surCarte} livreurs actifs visibles · {compteursClients.surCarte} clients · GPS fiable &lt; {GPS_SEUIL_MIN} min
+              🟢 {compteursLivreurs.libres} libres · 🟠 {compteursLivreurs.enCourse} en course · 🔵 {compteursClients.surCarte} clients · 🔴 {coursesEnAttente.length} en attente
             </p>
           </div>
         </div>
@@ -427,7 +449,7 @@ export default function CarteLivreursExterne() {
                 🗺️ Carte Dispatch — Terrain temps réel
               </h2>
               <p className="text-xs text-muted-foreground">
-                🟢 {compteursLivreurs.libres} libres · 🟠 {compteursLivreurs.enCourse} en course · 🔵 {compteursClients.surCarte} clients · GPS &lt; {GPS_SEUIL_MIN} min
+                🟢 {compteursLivreurs.libres} libres · 🟠 {compteursLivreurs.enCourse} en course · 🔵 {compteursClients.surCarte} clients · 🔴 {coursesEnAttente.length} en attente
               </p>
             </div>
             <Button variant="ghost" size="icon" onClick={() => { setShowMap(false); setSelectedMarker(null); }}>
@@ -440,6 +462,7 @@ export default function CarteLivreursExterne() {
                 position={centerPosition}
                 livreurs={livreursSurCarte}
                 clients={clientsSurCarte}
+                courses={coursesEnAttente}
                 onMarkerClick={(entity) => setSelectedMarker(entity)}
               />
             </div>
