@@ -135,8 +135,8 @@ export default function CarteLivreursExterne() {
   const [selectedMarker, setSelectedMarker] = useState(null);
   const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
   const paysActifs = usePaysActifs();
-
-  const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || "");
+  const defaultCountry = paysActifs.length === 1 ? paysActifs[0].code : null;
+  const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || defaultCountry || "");
 
   const livreurFilter = effectiveCountry
     ? { type_livreur: "externe", actif: true, validation: "valide", country_code: effectiveCountry }

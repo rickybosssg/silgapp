@@ -27,9 +27,10 @@ export default function DashboardExterne() {
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [statModal, setStatModal] = useState(null);
   const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
-  // Admin pays → filtrage forcé sur son pays. Admin global → utilise selectedCountry
-  const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
   const paysActifs = usePaysActifs();
+  // Admin pays → filtrage forcé sur son pays. Admin global → utilise selectedCountry ou seul pays actif
+  const defaultCountry = paysActifs.length === 1 ? paysActifs[0].code : null;
+  const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || defaultCountry);
 
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ["courses-externes-dashboard", effectiveCountry || "all"],
