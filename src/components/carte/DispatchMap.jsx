@@ -514,16 +514,8 @@ export default function DispatchMap({
     };
   }, [position?.latitude, position?.longitude]);
 
-  // Heatmap layer
-  const heatmapLayerRef = useRef(null);
-  useEffect(() => {
-    if (!mapInstanceRef.current || !mapLoaded) return;
-    if (heatmapModeLocal !== "off") {
-      if (!heatmapLayerRef.current) {
-        heatmapLayerRef.current = true;
-      }
-    }
-  }, [heatmapModeLocal, mapLoaded]);
+  // Heatmap layer - géré directement par le composant HeatmapLayer
+  // Pas besoin d'effet séparé, le composant HeatmapLayer gère son propre cycle de vie
 
   // Mise à jour des marqueurs
   useEffect(() => {
