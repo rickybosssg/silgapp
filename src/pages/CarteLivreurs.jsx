@@ -42,7 +42,7 @@ function getLastGPS(livreur) {
 
 // ─── Carte Leaflet full-screen ────────────────────────────────────────────────
 
-function MapView({ livreurs, coursesActives, onSelectLivreur }) {
+function MapView({ livreurs, livreursInactifs = [], showInactifs = false, coursesActives, onSelectLivreur }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
@@ -85,7 +85,7 @@ function MapView({ livreurs, coursesActives, onSelectLivreur }) {
       }).addTo(map);
 
       L.control.zoom({ position: "bottomright" }).addTo(map);
-      renderMarkers(L, map, livreurs, coursesActives, onSelectLivreur);
+      renderMarkers(L, map, livreurs, livreursInactifs, showInactifs, coursesActives, onSelectLivreur);
     };
     document.head.appendChild(script);
 
@@ -100,12 +100,43 @@ function MapView({ livreurs, coursesActives, onSelectLivreur }) {
   useEffect(() => {
     const L = window.L;
     if (!L || !mapInstanceRef.current) return;
-    renderMarkers(L, mapInstanceRef.current, livreurs, coursesActives, onSelectLivreur);
-  }, [livreurs, coursesActives]);
+    renderMarkers(L, mapInstanceRef.current, livreurs, livreursInactifs, showInactifs, coursesActives, onSelectLivreur);
+  }, [livreurs, livreursInactifs, showInactifs, coursesActives]);
 
-  function renderMarkers(L, map, livreurs, courses, onSelect) {
+  function renderMarkers(L, map, livreurs, inactifs, showInact, courses, onSelect) {
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
+
+    // ⚫ Inactifs en gris (dernière position connue) — en dessous
+    if (showInact) {
+      inactifs.forEach(livreur => {
+        if (!livreur.latitude || !livreur.longitude) return;
+        const icon = L.divIcon({
+          className: "",
+          html: `<div style="position:relative;width:44px;height:44px;opacity:0.5;">
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:36px;height:36px;border-radius:50%;background:#374151;border:3px solid #9ca3af;box-shadow:0 0 0 1px rgba(0,0,0,0.3),0 4px 16px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1;">
+              🛵
+            </div>
+          </div>`,
+          iconSize: [44, 44],
+          iconAnchor: [22, 22],
+          zIndexOffset: -100,
+        });
+        const dt = livreur.derniere_position_date || livreur.last_seen_at;
+        const minAgo = dt ? Math.round((Date.now() - new Date(dt).getTime()) / 60000) : null;
+        const minStr = minAgo === null ? "inconnue" : minAgo < 1 ? "à l'instant" : `il y a ${minAgo} min`;
+        const m = L.marker([livreur.latitude, livreur.longitude], { icon })
+          .bindPopup(`<div style="font-family:sans-serif;font-size:13px;">
+            <b style="color:#f1f5f9">${livreur.prenom ? livreur.prenom + " " + livreur.nom : livreur.nom}</b><br/>
+            <span style="color:#9ca3af">⚫ Inactif — non dispatchable</span><br/>
+            <span style="color:#6b7280;font-size:11px;">Dernière position : ${minStr}</span><br/>
+            ${livreur.telephone ? `<span style="color:#94a3b8">📞 ${livreur.telephone}</span>` : ""}
+          </div>`)
+          .addTo(map);
+        m.on("click", () => onSelect && onSelect(livreur));
+        markersRef.current.push(m);
+      });
+    }
 
     livreurs.filter(l => l.latitude && l.longitude && l.validation === "valide").forEach(livreur => {
       const color = statusColors[livreur.statut] || "#6b7280";
@@ -172,6 +203,14 @@ export default function CarteLivreurs() {
   const [selectedLivreur, setSelectedLivreur] = useState(null);
   const [filtre, setFiltre] = useState("tous");
   const [showMap, setShowMap] = useState(false);
+  const [showInactifs, setShowInactifs] = useState(() => {
+    try { return localStorage.getItem("silgapp_show_inactifs") === "true"; } catch { return false; }
+  });
+  const toggleInactifs = () => setShowInactifs(v => {
+    const next = !v;
+    try { localStorage.setItem("silgapp_show_inactifs", String(next)); } catch {}
+    return next;
+  });
 
   // Données internes uniquement
   const { data: livreurs = [], refetch, isFetching } = useQuery({
@@ -189,6 +228,9 @@ export default function CarteLivreurs() {
   });
 
   const validLivreurs = useMemo(() => livreurs.filter(l => l.validation === "valide"), [livreurs]);
+  // Inactifs = validés mais OFF, ou pas d'app active, ou GPS expiré — avec coordonnées GPS
+  const livreursInactifsGPS = useMemo(() =>
+    validLivreurs.filter(l => !isON(l) && l.latitude && l.longitude), [validLivreurs]);
   const actives = useMemo(() => coursesRaw.filter(c => !["livree", "annulee", "nouvelle"].includes(c.statut)), [coursesRaw]);
 
   const compteurs = useMemo(() => ({
@@ -390,13 +432,26 @@ export default function CarteLivreurs() {
                 </Button>
               </div>
             </div>
-            <div className="px-4 pb-3">
-              <NetworkHealthBanner
-                libres={compteurs.libres}
-                enCourse={compteurs.enCourse}
-                clientsGPS={0}
-                enAttente={actives.filter(c => !c.livreur_id).length}
-              />
+            <div className="px-4 pb-3 flex items-center gap-3">
+              <div className="flex-1">
+                <NetworkHealthBanner
+                  libres={compteurs.libres}
+                  enCourse={compteurs.enCourse}
+                  clientsGPS={0}
+                  enAttente={actives.filter(c => !c.livreur_id).length}
+                />
+              </div>
+              <button
+                onClick={toggleInactifs}
+                className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                  showInactifs
+                    ? "bg-gray-600 text-white border-gray-600"
+                    : "bg-slate-800 text-slate-400 border-slate-600 hover:bg-slate-700"
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0" />
+                {showInactifs ? "Masquer inactifs" : `Voir inactifs (${livreursInactifsGPS.length})`}
+              </button>
             </div>
           </div>
 
@@ -406,6 +461,8 @@ export default function CarteLivreurs() {
             <div className="flex-1 relative">
               <MapView
                 livreurs={validLivreurs}
+                livreursInactifs={livreursInactifsGPS}
+                showInactifs={showInactifs}
                 coursesActives={actives}
                 onSelectLivreur={setSelectedLivreur}
               />
