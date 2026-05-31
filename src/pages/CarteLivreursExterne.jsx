@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { MapPin, Truck, Wifi, WifiOff, X, Clock, Users } from "lucide-react";
@@ -207,12 +207,27 @@ export default function CarteLivreursExterne() {
   const coursesAttenteFilter = effectiveCountry
     ? { country_code: effectiveCountry }
     : {};
-  const { data: toutesCoursesExternes = [] } = useQuery({
+  const { data: toutesCoursesExternes = [], refetch } = useQuery({
     queryKey: ["courses-attente-carte", effectiveCountry],
     queryFn: () => base44.entities.CourseExterne.filter(coursesAttenteFilter, "-created_date", 100),
     initialData: [],
     refetchInterval: 15000,
   });
+
+  // Abonnement temps réel pour mise à jour IMMÉDIATE des courses
+  useEffect(() => {
+    const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
+      console.log("[CarteLivreursExterne] Realtime course event:", {
+        type: event.type,
+        course_id: event.id?.substr(-8),
+        statut: event.data?.statut,
+        livreur_id: event.data?.livreur_id
+      });
+      // Rafraîchissement immédiat pour tout événement (create, update, delete)
+      refetch();
+    });
+    return () => unsubscribe();
+  }, [refetch]);
   
   // Filtrage strict : courses VRAIMENT en attente (statuts initiaux uniquement)
   // Statuts "en attente" : nouvelle, recherche_livreur (PAS livreur_en_route, colis_recupere, en_livraison, livree, annulee)
