@@ -229,6 +229,11 @@ export default function CarteLivreursExterne() {
     verts:       livreurs.filter(l => isLibre(l)).length,
     oranges:     livreurs.filter(l => isEnCourse(l)).length,
     surCarte:    livreurs.length, // TOUS les livreurs enregistrés
+    on:          livreurs.filter(l => isON(l)).length,
+    off:         livreurs.filter(l => !isON(l)).length,
+    libres:      livreurs.filter(l => isLibre(l)).length,
+    enCourse:    livreurs.filter(l => isEnCourse(l)).length,
+    appActive:   livreurs.filter(l => isAppActive(l)).length,
   }), [livreurs]);
 
   // ─── Compteurs clients (règles unifiées) ────────────────────────────────
@@ -528,9 +533,9 @@ export default function CarteLivreursExterne() {
             <div className="px-4 pb-3 flex items-center gap-3">
               <div className="flex-1">
                 <NetworkHealthBanner
-                  libres={compteursLivreurs.libres}
-                  enCourse={compteursLivreurs.enCourse}
-                  clientsGPS={compteursClients.surCarte}
+                  libres={compteursLivreurs.verts}
+                  enCourse={compteursLivreurs.oranges}
+                  clientsGPS={compteursClients.bleus}
                   enAttente={coursesEnAttente.length}
                 />
               </div>

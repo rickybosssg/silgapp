@@ -8,8 +8,9 @@ function getNetworkHealth({ libres, enCourse, clientsGPS, enAttente }) {
   const totalActifs = libres + enCourse + (clientsGPS || 0);
   const hasActivity = totalActifs > 0 || enAttente > 0;
 
-  // 🔴 Réseau inactif = aucun utilisateur actif
-  if (!hasActivity) {
+  // 🔴 Réseau inactif = ZERO livreur libre + ZERO client GPS + ZERO course en attente
+  // Les livreurs "en course" ne comptent PAS pour activer le réseau
+  if (libres === 0 && (clientsGPS || 0) === 0 && enAttente === 0) {
     return {
       heart: "🔴",
       label: "Réseau inactif",
