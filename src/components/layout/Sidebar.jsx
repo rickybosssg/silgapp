@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 const doLogout = () => {
   ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
@@ -14,7 +15,6 @@ const doLogout = () => {
   base44.auth.logout();
   setTimeout(() => window.location.reload(), 300);
 };
-import { Badge } from "@/components/ui/badge";
 
 
 export const navItems = [
