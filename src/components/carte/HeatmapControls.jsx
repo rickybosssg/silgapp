@@ -27,9 +27,10 @@ export default function HeatmapControls({ mode, onModeChange, clients = [], livr
         size="sm"
         variant={mode === "demande" ? "default" : "outline"}
         onClick={() => onModeChange("demande")}
-        className="text-xs justify-start bg-red-50 hover:bg-red-100 border-red-200"
+        className="text-xs justify-start bg-red-50 hover:bg-red-100 border-red-200 relative"
       >
         <TrendingUp className="w-3 h-3 mr-1" /> 🔥 Demande clients
+        <span className="ml-1 px-1.5 py-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full">NOUVEAU</span>
       </Button>
       
       {/* 🟢 Carte thermique Couverture livreurs */}
@@ -37,9 +38,10 @@ export default function HeatmapControls({ mode, onModeChange, clients = [], livr
         size="sm"
         variant={mode === "couverture" ? "default" : "outline"}
         onClick={() => onModeChange("couverture")}
-        className="text-xs justify-start bg-emerald-50 hover:bg-emerald-100 border-emerald-200"
+        className="text-xs justify-start bg-emerald-50 hover:bg-emerald-100 border-emerald-200 relative"
       >
         <Users className="w-3 h-3 mr-1" /> 🟢 Couverture livreurs
+        <span className="ml-1 px-1.5 py-0.5 bg-emerald-500 text-white text-[9px] font-bold rounded-full">NOUVEAU</span>
       </Button>
       
       {/* Légende Demande clients */}

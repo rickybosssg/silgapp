@@ -450,6 +450,7 @@ export default function DispatchMap({
   const markersRef = useRef([]);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [heatmapModeLocal, setHeatmapModeLocal] = useState(heatmapMode);
+  const [showHeatmapHint, setShowHeatmapHint] = useState(true);
 
   // Recentrer la carte quand le pays change
   useEffect(() => {
@@ -701,6 +702,18 @@ export default function DispatchMap({
 
           {/* Contrôles heatmap + légende (top-right) */}
           <div className="absolute top-4 right-4 z-[1000] space-y-2">
+            {showHeatmapHint && heatmapModeLocal === "off" && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 shadow-lg animate-in fade-in slide-in-from-top-2">
+                <p className="text-xs font-semibold text-blue-800 mb-1">✨ Nouveau !</p>
+                <p className="text-xs text-blue-700">Essayez les cartes thermiques pour analyser la demande et la couverture</p>
+                <button 
+                  onClick={() => setShowHeatmapHint(false)}
+                  className="text-xs text-blue-500 hover:text-blue-700 mt-1 underline"
+                >
+                  Ne plus afficher
+                </button>
+              </div>
+            )}
             <HeatmapControls
               mode={heatmapModeLocal}
               onModeChange={setHeatmapModeLocal}

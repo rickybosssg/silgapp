@@ -166,6 +166,7 @@ export default function CarteLivreursExterne() {
   const [filtreLivreur, setFiltreLivreur] = useState("tous");
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [heatmapMode, setHeatmapMode] = useState("off"); // "off" | "demande" | "couverture" | "opportunite"
+  const [showHeatmapHint, setShowHeatmapHint] = useState(true);
   const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
   const paysActifs = usePaysActifs();
   const defaultCountry = paysActifs.length === 1 ? paysActifs[0].code : null;
