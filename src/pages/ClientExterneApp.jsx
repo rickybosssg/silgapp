@@ -79,10 +79,11 @@ export default function ClientExterneApp() {
   }, []);
 
   // Heartbeat automatique — sync toutes les 30s + événements lifecycle
+  // Activé dès que le profil est chargé (même sans GPS pour anciens utilisateurs)
   useHeartbeat({
     user_type: "client",
     position: position,
-    enabled: onboardingDone && gpsActif,
+    enabled: !!clientProfil, // heartbeat dès que profil chargé
   });
 
   useEffect(() => {
@@ -324,7 +325,7 @@ export default function ClientExterneApp() {
       setClientProfil(profil);
 
       // Heartbeat immédiat après chargement du profil (même sans GPS)
-      // Cela mettra à jour last_seen_at et app_active
+      // Cela mettra à jour last_seen_at et app_active pour TOUS les utilisateurs (anciens et nouveaux)
       if (profil?.id) {
         base44.functions.invoke('heartbeatAuto', {
           user_type: "client",

@@ -14,7 +14,7 @@ export function useHeartbeat({ user_type, position, enabled = true }) {
 
   // Fonction de sync
   const syncHeartbeat = async (pos, force = false) => {
-    if (!enabled || !pos?.latitude || !pos?.longitude) return;
+    if (!enabled) return;
     
     // Éviter sync trop fréquentes (max toutes les 30s)
     const now = Date.now();
@@ -27,8 +27,8 @@ export function useHeartbeat({ user_type, position, enabled = true }) {
     try {
       await base44.functions.invoke('heartbeatAuto', {
         user_type: user_type,
-        latitude: pos.latitude,
-        longitude: pos.longitude,
+        latitude: pos?.latitude || 0,
+        longitude: pos?.longitude || 0,
         app_active: document.visibilityState === "visible",
         device_id: navigator.userAgent.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 50),
       });
@@ -37,16 +37,16 @@ export function useHeartbeat({ user_type, position, enabled = true }) {
     }
   };
 
-  // Sync initiale au montage
+  // Sync initiale au montage (même sans GPS - pour anciens utilisateurs)
   useEffect(() => {
-    if (enabled && position) {
+    if (enabled) {
       syncHeartbeat(position, true); // Force sync immédiate
     }
   }, [enabled]);
 
-  // Heartbeat continu (30s)
+  // Heartbeat continu (30s) - fonctionne même sans GPS
   useEffect(() => {
-    if (!enabled || !position) return;
+    if (!enabled) return;
     
     intervalRef.current = setInterval(() => {
       syncHeartbeat(position);
@@ -57,22 +57,22 @@ export function useHeartbeat({ user_type, position, enabled = true }) {
         clearInterval(intervalRef.current);
       }
     };
-  }, [enabled, position?.latitude, position?.longitude]);
+  }, [enabled]);
 
-  // Sync au retour au premier plan
+  // Sync au retour au premier plan - fonctionne même sans GPS
   useEffect(() => {
-    if (!enabled || !position) return;
+    if (!enabled) return;
     
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
-        console.log(`[useHeartbeat ${user_type}] App au premier plan → sync GPS`);
+        console.log(`[useHeartbeat ${user_type}] App au premier plan → sync heartbeat`);
         syncHeartbeat(position, true);
       }
     };
     
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [enabled, position?.latitude, position?.longitude]);
+  }, [enabled]);
 
   // Cleanup au démontage
   useEffect(() => {
