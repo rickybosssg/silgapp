@@ -75,6 +75,12 @@ function isClientEligibleCarte(client) {
   return client.actif !== false && hasValidGPS(client) && isAppActive(client);
 }
 
+function formatTel(tel) {
+  if (!tel) return "";
+  const cleaned = tel.replace(/[^\d+]/g, "");
+  return cleaned;
+}
+
 function getZone(entity) {
   return entity.quartier || entity.ville || (entity.latitude ? "Ouagadougou" : "Zone inconnue");
 }
@@ -448,7 +454,7 @@ export default function CarteLivreursExterne() {
                     </div>
                   </div>
                   <a href={`tel:${livreur.telephone}`} className="text-sm text-primary hover:underline ml-3 flex-shrink-0">
-                    {livreur.telephone}
+                    {formatTel(livreur.telephone)}
                   </a>
                 </div>
               );
@@ -485,7 +491,7 @@ export default function CarteLivreursExterne() {
                   </div>
                 </div>
                 <a href={`tel:${client.telephone}`} className="text-sm text-primary hover:underline ml-3 flex-shrink-0">
-                  {client.telephone}
+                  {formatTel(client.telephone)}
                 </a>
               </div>
             ))}

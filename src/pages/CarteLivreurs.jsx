@@ -33,6 +33,13 @@ function isEnLigne(livreur) {
   return (Date.now() - new Date(livreur.last_seen_at).getTime()) < 3 * 60 * 1000;
 }
 
+function formatTel(tel) {
+  if (!tel) return "";
+  // Supprimer tout sauf chiffres et +
+  const cleaned = tel.replace(/[^\d+]/g, "");
+  return cleaned;
+}
+
 function getLastGPS(livreur) {
   const dt = livreur.derniere_position_date || livreur.last_seen_at || livreur.updated_date;
   if (!dt) return null;
@@ -130,7 +137,7 @@ function MapView({ livreurs, livreursInactifs = [], showInactifs = false, course
             <b style="color:#f1f5f9">${livreur.prenom ? livreur.prenom + " " + livreur.nom : livreur.nom}</b><br/>
             <span style="color:#9ca3af">⚫ Inactif — non dispatchable</span><br/>
             <span style="color:#6b7280;font-size:11px;">Dernière position : ${minStr}</span><br/>
-            ${livreur.telephone ? `<span style="color:#94a3b8">📞 ${livreur.telephone}</span>` : ""}
+            ${livreur.telephone ? `<span style="color:#94a3b8">📞 ${formatTel(livreur.telephone)}</span>` : ""}
           </div>`)
           .addTo(map);
         m.on("click", () => onSelect && onSelect(livreur));
@@ -158,7 +165,7 @@ function MapView({ livreurs, livreursInactifs = [], showInactifs = false, course
       const marker = L.marker([livreur.latitude, livreur.longitude], { icon })
         .bindPopup(`<div style="font-family:sans-serif;font-size:13px;">
           <b style="color:#f1f5f9">${livreur.prenom ? livreur.prenom + " " + livreur.nom : livreur.nom}</b><br/>
-          <span style="color:#94a3b8">${livreur.telephone}</span><br/>
+          <span style="color:#94a3b8">${formatTel(livreur.telephone)}</span><br/>
           <span style="color:${color};font-weight:600">${statusLabels[livreur.statut]}</span>
           ${livreur.courses_du_jour ? `<br/><span style="color:#64748b;font-size:11px">${livreur.courses_du_jour} course(s) aujourd'hui</span>` : ""}
         </div>`)
@@ -407,7 +414,7 @@ export default function CarteLivreurs() {
                     </div>
                   </div>
                   <a href={`tel:${livreur.telephone}`} className="text-sm text-primary hover:underline ml-3 flex-shrink-0">
-                    {livreur.telephone}
+                    {formatTel(livreur.telephone)}
                   </a>
                 </div>
               );
@@ -497,7 +504,7 @@ export default function CarteLivreurs() {
                         <p className="text-white text-sm font-medium truncate">
                           {livreur.prenom ? `${livreur.prenom} ${livreur.nom}` : livreur.nom}
                         </p>
-                        <p className="text-slate-400 text-xs">{livreur.telephone}</p>
+                        <p className="text-slate-400 text-xs">{formatTel(livreur.telephone)}</p>
                       </div>
                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: statusColors[livreur.statut] }} />
                     </div>
