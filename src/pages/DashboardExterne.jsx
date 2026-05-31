@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Plus, MapPin, Package, Truck, Clock, CheckCircle2, XCircle, TrendingUp, ArrowLeft, Globe } from "lucide-react";
+import { Plus, MapPin, Package, Truck, Clock, CheckCircle2, XCircle, TrendingUp, ArrowLeft, Globe, Users } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
 import StatCard from "@/components/dashboard/StatCard";
@@ -12,6 +12,7 @@ import StatsPays from "@/components/international/StatsPays.jsx";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import LivreursEnLigne from "@/components/dashboard/LivreursEnLigne";
 import ClientsEnLigne from "@/components/dashboard/ClientsEnLigne";
+import { isON, isLibre, isEnCourse, isAppActive, hasValidGPS, isEligibleCarte, isClientEligibleCarte, hasGPS } from "@/lib/dispatchRules.js";
 
 import CoursesEnTraitement from "@/components/dashboard/CoursesEnTraitement";
 import CoursesTerminees from "@/components/dashboard/CoursesTerminees";
@@ -23,6 +24,15 @@ import { Card } from "@/components/ui/card";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import StatDetailModal from "@/components/dashboard/StatDetailModal";
 import AppToggleButton from "@/components/admin/AppToggleButton";
+
+function StatMini({ label, value, color }) {
+  return (
+    <div className={`border rounded-lg p-2 text-center ${color}`}>
+      <p className="text-lg font-bold leading-none">{value}</p>
+      <p className="text-xs mt-0.5 leading-tight">{label}</p>
+    </div>
+  );
+}
 
 export default function DashboardExterne() {
   const [selectedCourse, setSelectedCourse] = useState(null);
@@ -91,15 +101,35 @@ export default function DashboardExterne() {
     [coursesFiltrees]
   );
 
+  // Règles unifiées avec la carte interactive
   const livreursEnLigne = useMemo(
-    () => livreurs.filter(l => l.statut !== "hors_ligne" && l.validation === "valide" && l.actif !== false),
+    () => livreurs.filter(l => isON(l) && l.validation === "valide" && l.actif !== false),
     [livreurs]
   );
 
   const clientsEnLigne = useMemo(
-    () => clients.filter(c => c.actif !== false && c.latitude && c.longitude),
+    () => clients.filter(c => isClientEligibleCarte(c)),
     [clients]
   );
+
+  // Compteurs détaillés (comme la carte)
+  const compteursLivreurs = useMemo(() => ({
+    total: livreurs.filter(l => l.validation === "valide" && l.actif !== false).length,
+    on: livreurs.filter(l => isON(l)).length,
+    off: livreurs.filter(l => !isON(l)).length,
+    libres: livreurs.filter(l => isLibre(l)).length,
+    enCourse: livreurs.filter(l => isEnCourse(l)).length,
+    appActive: livreurs.filter(l => isAppActive(l)).length,
+    surCarte: livreurs.filter(l => isEligibleCarte(l)).length,
+  }), [livreurs]);
+
+  const compteursClients = useMemo(() => ({
+    total: clients.length,
+    avecGPS: clients.filter(c => hasGPS(c)).length,
+    gpsRecent: clients.filter(c => hasValidGPS(c)).length,
+    surCarte: clients.filter(c => isClientEligibleCarte(c)).length,
+    appActive: clients.filter(c => isAppActive(c)).length,
+  }), [clients]);
 
   const stats = useMemo(() => {
     const todayAll = coursesFiltrees.filter(c => isToday(new Date(c.created_date)));
@@ -170,15 +200,47 @@ export default function DashboardExterne() {
       <BatterieAlertesPanel currentUser={null} />
       <DispatchMonitor />
 
-      {/* Stats cliquables */}
+      {/* Stats principales */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-        <StatCard title="Total clients" value={stats.totalClients} icon={Package} iconBg="bg-purple-500" onClick={() => setStatModal({ type: "clients", data: clients })} />
-        <StatCard title="Total" value={stats.total} icon={Package} iconBg="bg-accent" />
+        <StatCard title="Total clients" value={compteursClients.total} icon={Package} iconBg="bg-purple-500" onClick={() => setStatModal({ type: "clients", data: clients })} />
+        <StatCard title="Total courses" value={stats.total} icon={Package} iconBg="bg-accent" />
         <StatCard title="En traitement" value={stats.enCours} icon={Clock} iconBg="bg-blue-500" onClick={() => setStatModal({ type: "en_traitement", data: coursesEnTraitement })} />
         <StatCard title="Livrées" value={stats.livrees} icon={CheckCircle2} iconBg="bg-emerald-500" onClick={() => setStatModal({ type: "livrees", data: coursesTerminees.filter(c => c.statut === "livree") })} />
         <StatCard title="Annulées" value={stats.annulees} icon={XCircle} iconBg="bg-red-500" onClick={() => setStatModal({ type: "annulees", data: coursesTerminees.filter(c => c.statut === "annulee") })} />
         <StatCard title="CA du jour" value={`${stats.ca.toLocaleString()}`} icon={TrendingUp} iconBg="bg-indigo-500" trendLabel="FCFA" onClick={() => setStatModal({ type: "ca", data: coursesTerminees.filter(c => c.statut === "livree") })} />
-        <StatCard title="Livreurs dispo" value={stats.dispoLivreurs} icon={Truck} iconBg="bg-accent" onClick={() => setStatModal({ type: "livreurs_dispo", data: livreursEnLigne.filter(l => l.statut === "disponible") })} />
+        <StatCard title="Livreurs dispo" value={compteursLivreurs.libres} icon={Truck} iconBg="bg-accent" onClick={() => setStatModal({ type: "livreurs_dispo", data: livreursEnLigne.filter(l => l.statut === "disponible") })} />
+      </div>
+
+      {/* Compteurs détaillés livreurs (comme la carte) */}
+      <div className="bg-card border rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Truck className="w-5 h-5 text-accent" />
+          <h2 className="font-semibold text-foreground">Livreurs (règles unifiées)</h2>
+        </div>
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+          <StatMini label="ON" value={compteursLivreurs.on} color="text-green-700 bg-green-50 border-green-200" />
+          <StatMini label="OFF" value={compteursLivreurs.off} color="text-gray-500 bg-gray-50 border-gray-200" />
+          <StatMini label="Libres" value={compteursLivreurs.libres} color="text-emerald-700 bg-emerald-50 border-emerald-200" />
+          <StatMini label="En course" value={compteursLivreurs.enCourse} color="text-orange-700 bg-orange-50 border-orange-200" />
+          <StatMini label="Sur carte" value={compteursLivreurs.surCarte} color="text-purple-700 bg-purple-50 border-purple-200" />
+          <StatMini label="App active" value={compteursLivreurs.appActive} color="text-blue-700 bg-blue-50 border-blue-200" />
+          <StatMini label="Total" value={compteursLivreurs.total} color="text-slate-700 bg-slate-50 border-slate-200" />
+        </div>
+      </div>
+
+      {/* Compteurs détaillés clients (comme la carte) */}
+      <div className="bg-card border rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Users className="w-5 h-5 text-blue-500" />
+          <h2 className="font-semibold text-foreground">Clients (règles unifiées)</h2>
+        </div>
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+          <StatMini label="Total" value={compteursClients.total} color="text-slate-700 bg-slate-50 border-slate-200" />
+          <StatMini label="Avec GPS" value={compteursClients.avecGPS} color="text-teal-700 bg-teal-50 border-teal-200" />
+          <StatMini label="GPS récent" value={compteursClients.gpsRecent} color="text-green-700 bg-green-50 border-green-200" />
+          <StatMini label="Sur carte" value={compteursClients.surCarte} color="text-blue-700 bg-blue-50 border-blue-200" />
+          <StatMini label="App active" value={compteursClients.appActive} color="text-emerald-700 bg-emerald-50 border-emerald-200" />
+        </div>
       </div>
 
       {/* Clients en ligne (avec GPS) */}
