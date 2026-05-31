@@ -53,17 +53,34 @@ export default function AuthGate({ children, onLivreur, onClient }) {
         return;
       }
 
-      // 2. Livreur interne ou externe
+      // 2. Livreur interne ou externe (chercher par email SANS filtrer sur validation/actif)
       const livreurs = await base44.entities.Livreur.filter({
-        user_email: user.email,
-        actif: true,
-        validation: "valide"
+        user_email: user.email
       });
       if (!mounted) return;
 
       if (livreurs && livreurs.length > 0) {
         const livreur = livreurs[0];
-        // Passer le profil tel quel — App.jsx gère le bon composant via lazy import
+
+        // Compte désactivé par l'admin
+        if (livreur.actif === false) {
+          setState("livreur_bloque");
+          return;
+        }
+
+        // Compte en attente de validation
+        if (livreur.validation === "en_attente") {
+          setState("livreur_en_attente");
+          return;
+        }
+
+        // Compte refusé
+        if (livreur.validation === "refuse") {
+          setState("livreur_refuse");
+          return;
+        }
+
+        // Compte valide → router vers l'app livreur
         onLivreur?.(livreur);
         if (!mounted) return;
         setState("livreur");
@@ -118,6 +135,76 @@ export default function AuthGate({ children, onLivreur, onClient }) {
   if (state === "unauthenticated") {
     base44.auth.redirectToLogin();
     return null;
+  }
+
+  if (state === "livreur_en_attente") {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background p-6">
+        <div className="text-center space-y-4 max-w-sm">
+          <div className="w-16 h-16 rounded-2xl bg-secondary/20 flex items-center justify-center mx-auto">
+            <Truck className="w-8 h-8 text-secondary" />
+          </div>
+          <h2 className="text-lg font-bold text-foreground">Compte en attente</h2>
+          <p className="text-sm text-muted-foreground">
+            Votre compte livreur est en cours de vérification par l'équipe SILGAPP.
+            Vous serez notifié dès que votre compte sera validé.
+          </p>
+          <p className="text-xs text-muted-foreground">📞 Support : +226 66 92 51 90</p>
+          <button
+            onClick={() => base44.auth.logout()}
+            className="text-xs text-primary underline"
+          >
+            Se déconnecter
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (state === "livreur_refuse") {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background p-6">
+        <div className="text-center space-y-4 max-w-sm">
+          <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto">
+            <Truck className="w-8 h-8 text-destructive" />
+          </div>
+          <h2 className="text-lg font-bold text-foreground">Compte refusé</h2>
+          <p className="text-sm text-muted-foreground">
+            Votre demande d'inscription a été refusée. Contactez le support SILGAPP pour plus d'informations.
+          </p>
+          <p className="text-xs text-muted-foreground">📞 Support : +226 66 92 51 90</p>
+          <button
+            onClick={() => base44.auth.logout()}
+            className="text-xs text-primary underline"
+          >
+            Se déconnecter
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (state === "livreur_bloque") {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background p-6">
+        <div className="text-center space-y-4 max-w-sm">
+          <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto">
+            <Truck className="w-8 h-8 text-destructive" />
+          </div>
+          <h2 className="text-lg font-bold text-foreground">Compte désactivé</h2>
+          <p className="text-sm text-muted-foreground">
+            Votre compte livreur a été désactivé. Contactez le support SILGAPP.
+          </p>
+          <p className="text-xs text-muted-foreground">📞 Support : +226 66 92 51 90</p>
+          <button
+            onClick={() => base44.auth.logout()}
+            className="text-xs text-primary underline"
+          >
+            Se déconnecter
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // Admin → afficher children (SelectionReseau)
