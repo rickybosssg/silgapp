@@ -16,21 +16,40 @@ import CountrySelector, { usePaysActifs } from "@/components/international/Count
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-/** ON = le livreur accepte des courses (statut disponible ou en_course) */
+/** Heartbeat récent = dernière activité < 10 minutes */
+function isHeartbeatRecent(entity) {
+  const dt = entity.last_seen_at || entity.derniere_position_date;
+  if (!dt) return false;
+  return (Date.now() - new Date(dt).getTime()) < 10 * 60 * 1000;
+}
+
+/**
+ * ON = statut disponible ou en_course ET heartbeat récent (< 10 min).
+ * Si le livreur a fermé l'app il y a plus de 10 min, il n'est plus ON
+ * même si la DB dit encore "disponible".
+ */
 function isON(livreur) {
-  return livreur.statut === "disponible" || livreur.statut === "en_course";
+  const actifEnDB = livreur.statut === "disponible" || livreur.statut === "en_course";
+  return actifEnDB && isHeartbeatRecent(livreur);
 }
 
-/** Libre = disponible pour une nouvelle mission */
+/** Libre = disponible ET heartbeat récent */
 function isLibre(livreur) {
-  return livreur.statut === "disponible";
+  return livreur.statut === "disponible" && isHeartbeatRecent(livreur);
 }
 
-/** En ligne = app ouverte < 3 minutes */
+/** En ligne = app ouverte ET heartbeat < 3 minutes */
 function isEnLigne(entity) {
   if (!entity.app_active) return false;
   if (!entity.last_seen_at) return false;
   return (Date.now() - new Date(entity.last_seen_at).getTime()) < 3 * 60 * 1000;
+}
+
+/** GPS récent = dernière position < 15 minutes */
+function isGPSRecent(entity) {
+  const dt = entity.derniere_position_date || entity.last_seen_at;
+  if (!dt) return false;
+  return (Date.now() - new Date(dt).getTime()) < 15 * 60 * 1000;
 }
 
 function getZone(entity) {
@@ -139,12 +158,14 @@ export default function CarteLivreursExterne() {
 
   // ─── Compteurs ──────────────────────────────────────────────────────────
   const compteurs = useMemo(() => ({
-    on:        livreurs.filter(l => isON(l)).length,
-    off:       livreurs.filter(l => !isON(l)).length,
-    libres:    livreurs.filter(l => isLibre(l)).length,
-    enCourse:  livreurs.filter(l => l.statut === "en_course").length,
-    enLigne:   livreurs.filter(l => isEnLigne(l)).length,
-    horsLigne: livreurs.filter(l => !isEnLigne(l)).length,
+    on:         livreurs.filter(l => isON(l)).length,
+    off:        livreurs.filter(l => !isON(l)).length,
+    libres:     livreurs.filter(l => isLibre(l)).length,
+    // En course = statut en_course ET heartbeat récent
+    enCourse:   livreurs.filter(l => l.statut === "en_course" && isHeartbeatRecent(l)).length,
+    enLigne:    livreurs.filter(l => isEnLigne(l)).length,
+    horsLigne:  livreurs.filter(l => !isEnLigne(l)).length,
+    gpsRecent:  livreurs.filter(l => l.latitude && l.longitude && isGPSRecent(l)).length,
   }), [livreurs]);
 
   // ─── Filtres ─────────────────────────────────────────────────────────────
@@ -153,15 +174,17 @@ export default function CarteLivreursExterne() {
       case "on":        return livreurs.filter(l => isON(l));
       case "off":       return livreurs.filter(l => !isON(l));
       case "libres":    return livreurs.filter(l => isLibre(l));
-      case "en_course": return livreurs.filter(l => l.statut === "en_course");
+      // En course : statut en_course ET heartbeat récent
+      case "en_course": return livreurs.filter(l => l.statut === "en_course" && isHeartbeatRecent(l));
       case "en_ligne":  return livreurs.filter(l => isEnLigne(l));
       case "hors_ligne":return livreurs.filter(l => !isEnLigne(l));
       default:          return livreurs;
     }
   }, [livreurs, filtre]);
 
+  // GPS récent uniquement (< 15 min) pour la carte — cohérent avec isGPSRecent
   const livreursAvecGPS = useMemo(() =>
-    livreurs.filter(l => l.latitude && l.longitude), [livreurs]);
+    livreurs.filter(l => l.latitude && l.longitude && isGPSRecent(l)), [livreurs]);
 
   const clientsAvecGPS = clients.filter(c => c.actif !== false && c.latitude && c.longitude);
 
@@ -178,6 +201,9 @@ export default function CarteLivreursExterne() {
     { key: "en_ligne",  label: `App ouverte (${compteurs.enLigne})` },
     { key: "hors_ligne",label: `App fermée (${compteurs.horsLigne})` },
   ];
+  // Note: ON = statut actif (dispo/en_course) ET heartbeat < 10 min
+  // Libre = disponible ET heartbeat < 10 min
+  // App ouverte = app_active ET heartbeat < 3 min
 
   return (
     <div className="p-4 space-y-4 max-w-4xl mx-auto">
@@ -194,7 +220,7 @@ export default function CarteLivreursExterne() {
           <div>
             <h1 className="text-2xl font-bold text-foreground">Carte — Livreurs & Clients</h1>
             <p className="text-sm text-muted-foreground">
-              {livreurs.length} livreurs • {clientsAvecGPS.length} clients GPS
+              {livreurs.length} livreurs • {compteurs.on} actifs • {livreursAvecGPS.length} GPS récent
             </p>
           </div>
         </div>
@@ -212,32 +238,33 @@ export default function CarteLivreursExterne() {
       </div>
 
       {/* Compteurs */}
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+      <div className="grid grid-cols-3 sm:grid-cols-7 gap-2">
         {[
-          { label: "ON",        count: compteurs.on,        color: "text-green-700 bg-green-50 border-green-200" },
-          { label: "OFF",       count: compteurs.off,       color: "text-gray-500 bg-gray-50 border-gray-200" },
-          { label: "Libres",    count: compteurs.libres,    color: "text-emerald-700 bg-emerald-50 border-emerald-200" },
-          { label: "En course", count: compteurs.enCourse,  color: "text-blue-700 bg-blue-50 border-blue-200" },
-          { label: "App ouverte",  count: compteurs.enLigne,   color: "text-green-700 bg-green-50 border-green-200" },
-          { label: "App fermée",   count: compteurs.horsLigne, color: "text-gray-500 bg-gray-50 border-gray-200" },
+          { label: "ON",         count: compteurs.on,        color: "text-green-700 bg-green-50 border-green-200",   title: "Actif + heartbeat < 10 min" },
+          { label: "OFF",        count: compteurs.off,       color: "text-gray-500 bg-gray-50 border-gray-200",     title: "Inactif ou heartbeat expiré" },
+          { label: "Libres",     count: compteurs.libres,    color: "text-emerald-700 bg-emerald-50 border-emerald-200", title: "Disponible + heartbeat < 10 min" },
+          { label: "En course",  count: compteurs.enCourse,  color: "text-blue-700 bg-blue-50 border-blue-200",     title: "En mission + heartbeat récent" },
+          { label: "App ouverte",count: compteurs.enLigne,   color: "text-green-700 bg-green-50 border-green-200",  title: "App ouverte < 3 min" },
+          { label: "App fermée", count: compteurs.horsLigne, color: "text-gray-500 bg-gray-50 border-gray-200",     title: "App fermée ou absente" },
+          { label: "GPS récent", count: compteurs.gpsRecent, color: "text-purple-700 bg-purple-50 border-purple-200", title: "Position GPS < 15 min" },
         ].map(c => (
-          <div key={c.label} className={`border rounded-lg p-2 text-center ${c.color}`}>
+          <div key={c.label} className={`border rounded-lg p-2 text-center ${c.color}`} title={c.title}>
             <p className="text-lg font-bold leading-none">{c.count}</p>
-            <p className="text-xs mt-0.5">{c.label}</p>
+            <p className="text-xs mt-0.5 leading-tight">{c.label}</p>
           </div>
         ))}
       </div>
 
       {/* Légende */}
       <Card className="p-4 bg-slate-50 border-slate-200">
-        <p className="text-xs font-semibold text-slate-700 mb-2">Légende</p>
+        <p className="text-xs font-semibold text-slate-700 mb-2">Légende — Règles de cohérence</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-xs text-slate-600">
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500" /><b>ON</b> = accepte les nouvelles courses</span>
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-300" /><b>OFF</b> = n'accepte plus de nouvelles courses</span>
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" /><b>Libre</b> = peut recevoir une course</span>
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500" /><b>En course</b> = mission en cours</span>
-          <span className="flex items-center gap-1.5"><Wifi className="w-3 h-3 text-green-600" /><b>Application ouverte</b> = présent dans l'application</span>
-          <span className="flex items-center gap-1.5"><WifiOff className="w-3 h-3 text-gray-400" /><b>Application fermée</b> = absent de l'application</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500" /><b>ON</b> = statut actif + heartbeat &lt; 10 min</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-300" /><b>OFF</b> = inactif OU heartbeat expiré (&gt; 10 min)</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" /><b>Libre</b> = disponible + heartbeat &lt; 10 min</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500" /><b>En course</b> = mission en cours + heartbeat récent</span>
+          <span className="flex items-center gap-1.5"><Wifi className="w-3 h-3 text-green-600" /><b>App ouverte</b> = heartbeat &lt; 3 min</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-purple-400" /><b>GPS récent</b> = position envoyée &lt; 15 min</span>
         </div>
       </Card>
 
@@ -264,7 +291,7 @@ export default function CarteLivreursExterne() {
           </div>
           <div className="flex-1">
             <p className="font-semibold text-foreground">🗺️ Voir la carte interactive</p>
-            <p className="text-xs text-muted-foreground">{livreursAvecGPS.length} livreurs avec GPS • {clientsAvecGPS.length} clients</p>
+            <p className="text-xs text-muted-foreground">{livreursAvecGPS.length} livreurs GPS récent • {clientsAvecGPS.length} clients</p>
           </div>
         </div>
       </Card>
