@@ -26,10 +26,11 @@ export function usePaysActifs() {
 }
 
 // Sélecteur de pays (filtre)
+// Utilise PAYS_SILGAPP comme fallback pour éviter de disparaître pendant le chargement
 export default function CountrySelector({ value, onChange, className = "" }) {
-  const pays = usePaysActifs();
-
-  if (pays.length === 0) return null;
+  const paysDB = usePaysActifs();
+  // Si la DB n'a pas encore chargé, on utilise les données statiques pour ne jamais retourner null
+  const pays = paysDB.length > 0 ? paysDB : PAYS_SILGAPP;
 
   return (
     <select
@@ -37,7 +38,7 @@ export default function CountrySelector({ value, onChange, className = "" }) {
       onChange={(e) => onChange(e.target.value)}
       className={`border border-input rounded-md bg-background text-foreground px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring ${className}`}
     >
-      {pays.length > 1 && <option value="">🌍 Tous les pays</option>}
+      <option value="">🌍 Tous les pays</option>
       {pays.map((p) => (
         <option key={p.code} value={p.code}>
           {p.emoji_flag} {p.nom}
