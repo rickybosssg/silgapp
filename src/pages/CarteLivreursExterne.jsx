@@ -82,11 +82,13 @@ const INDICATIFS = {
 
 function formatTel(tel, countryCode) {
   if (!tel) return "";
-  const cleaned = tel.replace(/\s/g, "");
-  if (cleaned.startsWith("+")) return cleaned;
-  const indicatif = INDICATIFS[countryCode];
-  if (indicatif) return `${indicatif}${cleaned}`;
-  return cleaned;
+  let cleaned = tel.replace(/\s/g, "");
+  if (!cleaned.startsWith("+")) {
+    const indicatif = INDICATIFS[countryCode];
+    if (indicatif) cleaned = `${indicatif}${cleaned}`;
+  }
+  // Formatage avec espaces : +226 XX XX XX XX
+  return cleaned.replace(/(\+\d{3})(\d{2})(\d{2})(\d{2})(\d{2})/, "$1 $2 $3 $4 $5");
 }
 
 function getZone(entity) {
