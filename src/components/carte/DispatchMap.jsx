@@ -1,0 +1,409 @@
+import React, { useEffect, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
+
+/**
+ * DispatchMap — Carte dédiée au dispatch temps réel
+ *
+ * Code couleur :
+ *  🟢 Vert  = Livreur libre (disponible + ON + GPS récent + app active)
+ *  🟠 Orange = Livreur en course (mission active + ON + GPS récent)
+ *  🔵 Bleu  = Client (actif + GPS récent + app active)
+ *  🔴 Rouge = Course en attente (aucun livreur assigné) [optionnel, via prop courses]
+ *
+ * Seuls les marqueurs passés en props sont affichés.
+ * La page parent est responsable du filtrage strict.
+ */
+
+const GPS_SEUIL_MIN = 5;
+
+function isEnCourse(livreur) {
+  return livreur.statut === "en_course";
+}
+
+function getLastGPSMin(entity) {
+  const dt = entity.derniere_position_date || entity.last_seen_at;
+  if (!dt) return null;
+  return Math.round((Date.now() - new Date(dt).getTime()) / 60000);
+}
+
+function buildStyles() {
+  return `
+    /* ─── Livreur LIBRE (🟢 vert) ─── */
+    .dmap-livreur-libre .dmap-ring {
+      background: rgba(22, 163, 74, 0.3);
+      animation: dmap-pulse-vert 2s ease-out infinite;
+    }
+    .dmap-livreur-libre .dmap-body {
+      border-color: #16a34a;
+      box-shadow: 0 2px 10px rgba(22, 163, 74, 0.4);
+    }
+    .dmap-livreur-libre .dmap-avatar-bg {
+      background: linear-gradient(135deg, #16a34a 0%, #059669 100%);
+    }
+
+    /* ─── Livreur EN COURSE (🟠 orange) ─── */
+    .dmap-livreur-course .dmap-ring {
+      background: rgba(234, 88, 12, 0.3);
+      animation: dmap-pulse-orange 2s ease-out infinite;
+    }
+    .dmap-livreur-course .dmap-body {
+      border-color: #ea580c;
+      box-shadow: 0 2px 10px rgba(234, 88, 12, 0.4);
+    }
+    .dmap-livreur-course .dmap-avatar-bg {
+      background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+    }
+
+    /* ─── Client (🔵 bleu) ─── */
+    .dmap-client .dmap-client-ring {
+      background: rgba(37, 99, 235, 0.25);
+      animation: dmap-pulse-bleu 2s ease-out infinite;
+    }
+    .dmap-client .dmap-client-dot {
+      background: #2563eb;
+      border-color: white;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.45);
+    }
+
+    /* ─── Animations ─── */
+    @keyframes dmap-pulse-vert {
+      0%   { transform: scale(0.5); opacity: 1; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+    @keyframes dmap-pulse-orange {
+      0%   { transform: scale(0.5); opacity: 1; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+    @keyframes dmap-pulse-bleu {
+      0%   { transform: scale(0.5); opacity: 1; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+
+    /* ─── Structure commune livreur ─── */
+    .dmap-livreur-wrapper {
+      position: relative;
+      width: 52px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .dmap-ring {
+      position: absolute;
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+    }
+    .dmap-body {
+      width: 42px;
+      height: 42px;
+      background: white;
+      border-radius: 50%;
+      border: 3px solid;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      z-index: 1;
+    }
+    .dmap-photo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .dmap-avatar-bg {
+      width: 100%;
+      height: 100%;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    /* ─── Structure client ─── */
+    .dmap-client-wrapper {
+      position: relative;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .dmap-client-ring {
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+    }
+    .dmap-client-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 3px solid;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ─── Containers Leaflet ─── */
+    .dmap-livreur-container,
+    .dmap-client-container {
+      transition: filter 0.2s ease;
+      cursor: pointer;
+    }
+    .dmap-livreur-container:hover,
+    .dmap-client-container:hover {
+      filter: brightness(1.1);
+      z-index: 9999 !important;
+    }
+
+    /* ─── Zoom controls ─── */
+    .leaflet-control-zoom { border: none !important; }
+    .leaflet-control-zoom-in,
+    .leaflet-control-zoom-out {
+      background: white !important;
+      color: #1a1a1a !important;
+      border: 1px solid #e5e5e5 !important;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+      border-radius: 8px !important;
+      font-weight: 600 !important;
+      width: 36px !important;
+      height: 36px !important;
+      line-height: 36px !important;
+      font-size: 20px !important;
+      transition: all 0.2s !important;
+    }
+
+    /* ─── Badge légende en overlay ─── */
+    .dmap-overlay-badge {
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(8px);
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 8px 14px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+    }
+  `;
+}
+
+function buildLivreurIcon(livreur) {
+  const libre = livreur.statut === "disponible";
+  const cssClass = libre ? "dmap-livreur-libre" : "dmap-livreur-course";
+  const initial = livreur.nom?.charAt(0)?.toUpperCase() || "L";
+  const photoHtml = livreur.photo_url
+    ? `<img src="${livreur.photo_url}" alt="" class="dmap-photo" />`
+    : `<div class="dmap-avatar-bg">${initial}</div>`;
+
+  return window.L.divIcon({
+    html: `
+      <div class="dmap-livreur-wrapper ${cssClass}">
+        <div class="dmap-ring"></div>
+        <div class="dmap-body">${photoHtml}</div>
+      </div>
+    `,
+    className: "dmap-livreur-container",
+    iconSize: [52, 52],
+    iconAnchor: [26, 26],
+  });
+}
+
+function buildClientIcon() {
+  return window.L.divIcon({
+    html: `
+      <div class="dmap-client-wrapper dmap-client">
+        <div class="dmap-client-ring"></div>
+        <div class="dmap-client-dot"></div>
+      </div>
+    `,
+    className: "dmap-client-container",
+    iconSize: [44, 44],
+    iconAnchor: [22, 22],
+  });
+}
+
+function buildLivreurPopup(livreur) {
+  const libre = livreur.statut === "disponible";
+  const statutLabel = libre ? "🟢 Libre — disponible" : "🟠 En course";
+  const gpsMin = getLastGPSMin(livreur);
+  const gpsStr = gpsMin === null ? "?" : gpsMin < 1 ? "à l'instant" : `${gpsMin} min`;
+  return `
+    <div style="min-width:210px;font-family:sans-serif;padding:4px 0">
+      <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#1a1a1a">${livreur.prenom || ""} ${livreur.nom || ""}</p>
+      <p style="font-size:12px;margin:2px 0;color:#444">${statutLabel}</p>
+      ${livreur.telephone ? `<p style="font-size:12px;margin:2px 0;color:#444">📞 ${livreur.telephone}</p>` : ""}
+      <p style="font-size:12px;margin:2px 0;color:#16a34a">📍 GPS il y a ${gpsStr}</p>
+      ${livreur.vehicule ? `<p style="font-size:12px;margin:2px 0;color:#888">🏍 ${livreur.vehicule}</p>` : ""}
+    </div>
+  `;
+}
+
+function buildClientPopup(client) {
+  const gpsMin = getLastGPSMin(client);
+  const gpsStr = gpsMin === null ? "?" : gpsMin < 1 ? "à l'instant" : `${gpsMin} min`;
+  return `
+    <div style="min-width:210px;font-family:sans-serif;padding:4px 0">
+      <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#1a1a1a">${client.prenom || ""} ${client.nom || ""}</p>
+      <p style="font-size:12px;margin:2px 0;color:#2563eb">🔵 Client actif</p>
+      ${client.telephone ? `<p style="font-size:12px;margin:2px 0;color:#444">📞 ${client.telephone}</p>` : ""}
+      <p style="font-size:12px;margin:2px 0;color:#2563eb">📍 GPS il y a ${gpsStr}</p>
+      ${client.quartier ? `<p style="font-size:12px;margin:2px 0;color:#888">📌 ${client.quartier}</p>` : ""}
+    </div>
+  `;
+}
+
+export default function DispatchMap({ position, livreurs = [], clients = [], onMarkerClick }) {
+  const mapRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const markersRef = useRef([]);
+  const [mapLoaded, setMapLoaded] = useState(false);
+
+  // Init carte
+  useEffect(() => {
+    if (!mapRef.current || !position) return;
+
+    const inject = () => {
+      // Styles CSS
+      if (!document.getElementById("dmap-styles")) {
+        const s = document.createElement("style");
+        s.id = "dmap-styles";
+        s.textContent = buildStyles();
+        document.head.appendChild(s);
+      }
+
+      if (!window.L) return;
+
+      const map = window.L.map(mapRef.current, {
+        zoomControl: false,
+        attributionControl: false,
+        scrollWheelZoom: true,
+        doubleClickZoom: true,
+        dragging: true,
+        keyboard: false,
+      }).setView([position.latitude, position.longitude], 13);
+
+      window.L.tileLayer(
+        "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+        { maxZoom: 19, subdomains: "abcd" }
+      ).addTo(map);
+
+      window.L.control.zoom({ position: "bottomright" }).addTo(map);
+
+      mapInstanceRef.current = map;
+      setMapLoaded(true);
+    };
+
+    if (!window.L) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      document.head.appendChild(link);
+
+      const script = document.createElement("script");
+      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+      script.onload = inject;
+      document.head.appendChild(script);
+    } else {
+      inject();
+    }
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+      markersRef.current = [];
+    };
+  }, [position?.latitude, position?.longitude]);
+
+  // Mise à jour des marqueurs quand livreurs/clients changent
+  useEffect(() => {
+    if (!mapInstanceRef.current || !mapLoaded) return;
+    const map = mapInstanceRef.current;
+
+    // Supprimer les anciens marqueurs
+    markersRef.current.forEach(m => m.remove());
+    markersRef.current = [];
+
+    // Livreurs
+    livreurs.forEach(livreur => {
+      if (!livreur.latitude || !livreur.longitude) return;
+      const icon = buildLivreurIcon(livreur);
+      const marker = window.L.marker([livreur.latitude, livreur.longitude], {
+        icon,
+        zIndexOffset: livreur.statut === "disponible" ? 1200 : 1100,
+      }).addTo(map);
+
+      marker.bindPopup(buildLivreurPopup(livreur), { maxWidth: 260 });
+      if (onMarkerClick) marker.on("click", () => onMarkerClick(livreur));
+      markersRef.current.push(marker);
+    });
+
+    // Clients
+    clients.forEach(client => {
+      if (!client.latitude || !client.longitude) return;
+      const icon = buildClientIcon();
+      const marker = window.L.marker([client.latitude, client.longitude], {
+        icon,
+        zIndexOffset: 900,
+      }).addTo(map);
+
+      marker.bindPopup(buildClientPopup(client), { maxWidth: 260 });
+      if (onMarkerClick) marker.on("click", () => onMarkerClick(client));
+      markersRef.current.push(marker);
+    });
+  }, [livreurs, clients, mapLoaded]);
+
+  const nbLibres = livreurs.filter(l => l.statut === "disponible").length;
+  const nbCourse = livreurs.filter(l => l.statut === "en_course").length;
+
+  return (
+    <div className="relative w-full h-full">
+      <div ref={mapRef} className="w-full h-full bg-slate-100" style={{ minHeight: 300 }} />
+
+      {!mapLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-100">
+          <div className="text-center space-y-3">
+            <Loader2 className="w-10 h-10 text-primary animate-spin mx-auto" />
+            <p className="text-xs font-medium text-slate-600">Chargement de la carte...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Légende overlay */}
+      {mapLoaded && (
+        <div className="absolute top-4 left-4 z-[1000] space-y-2">
+          <div className="dmap-overlay-badge">
+            <div className="space-y-1 text-xs font-medium">
+              {nbLibres > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" />
+                  <span className="text-green-700">{nbLibres} libre{nbLibres > 1 ? "s" : ""}</span>
+                </div>
+              )}
+              {nbCourse > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-orange-500 flex-shrink-0" />
+                  <span className="text-orange-700">{nbCourse} en course</span>
+                </div>
+              )}
+              {clients.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" />
+                  <span className="text-blue-700">{clients.length} client{clients.length > 1 ? "s" : ""}</span>
+                </div>
+              )}
+              {nbLibres === 0 && nbCourse === 0 && clients.length === 0 && (
+                <span className="text-gray-400">Aucun élément visible</span>
+              )}
+            </div>
+          </div>
+          <div className="dmap-overlay-badge text-xs text-slate-500">
+            GPS &lt; {GPS_SEUIL_MIN} min · Temps réel
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
