@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import ModernMap from "@/components/client/ModernMap";
+import MarkerInfoPanel from "@/components/carte/MarkerInfoPanel";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
@@ -107,6 +108,7 @@ function EnLigneBadge({ entity }) {
 export default function CarteLivreursExterne() {
   const [showMap, setShowMap] = useState(false);
   const [filtre, setFiltre] = useState("tous");
+  const [selectedMarker, setSelectedMarker] = useState(null);
   const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
   const paysActifs = usePaysActifs();
   
@@ -346,19 +348,33 @@ export default function CarteLivreursExterne() {
 
       {/* Modale carte interactive */}
       {showMap && (
-        <div className="fixed inset-0 z-50 bg-background">
-          <div className="flex items-center justify-between p-4 border-b bg-card">
-            <h2 className="text-lg font-bold text-foreground">Carte — Livreurs Externes</h2>
-            <Button variant="ghost" size="icon" onClick={() => setShowMap(false)} className="h-10 w-10">
+        <div className="fixed inset-0 z-50 bg-background flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b bg-card flex-shrink-0">
+            <h2 className="text-base font-bold text-foreground">
+              🗺️ Carte — {livreursAvecGPS.length} livreurs · {clientsAvecGPS.length} clients
+            </h2>
+            <Button variant="ghost" size="icon" onClick={() => { setShowMap(false); setSelectedMarker(null); }} className="h-9 w-9">
               <X className="w-5 h-5" />
             </Button>
           </div>
-          <div className="h-[calc(100vh-80px)]">
-            <ModernMap
-              position={centerPosition}
-              livreursProches={livreursAvecGPS}
-              courseActive={null}
-            />
+          {/* Carte + Panneau latéral */}
+          <div className="flex flex-1 min-h-0">
+            <div className="flex-1 min-w-0">
+              <ModernMap
+                position={centerPosition}
+                livreursProches={[...livreursAvecGPS, ...clientsAvecGPS]}
+                courseActive={null}
+                onMarkerClick={(entity) => setSelectedMarker(entity)}
+              />
+            </div>
+            {/* Panneau résumé à droite */}
+            {selectedMarker && (
+              <MarkerInfoPanel
+                entity={selectedMarker}
+                onClose={() => setSelectedMarker(null)}
+              />
+            )}
           </div>
         </div>
       )}

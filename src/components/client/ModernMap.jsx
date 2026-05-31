@@ -5,7 +5,8 @@ export default function ModernMap({
   position, 
   livreursProches, 
   courseActive,
-  onMapReady 
+  onMapReady,
+  onMarkerClick
 }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -103,6 +104,11 @@ export default function ModernMap({
         icon: markerIcon,
         zIndexOffset: 1000
       }).addTo(map);
+
+      // Callback React quand on clique sur un marqueur
+      if (onMarkerClick) {
+        marker.on('click', () => onMarkerClick(personne));
+      }
 
       // Helpers popup
       const isEnLigneP = personne.app_active && personne.last_seen_at && (Date.now() - new Date(personne.last_seen_at).getTime()) < 3 * 60 * 1000;
