@@ -51,22 +51,25 @@ async function trouverLivreursCandidats(base44, course, rayonKm, exclusions = []
   );
   console.log(`[DISPATCH] 🚫 Livreurs déjà en course exclus: ${livreurIdsEnCourse.size}`);
 
-  // ⚠️ SANS GPS COURSE : retourner TOUS les livreurs disponibles (même sans GPS)
-  if (!course.gps_depart_lat || !course.gps_depart_lng) {
-    const tousLivreurs = livreurs.filter(l =>
-      !exclusions.includes(l.id) &&
-      !livreurIdsEnCourse.has(l.id)
-    );
-    console.log(`[DISPATCH] 🌍 Course sans GPS → ${tousLivreurs.length} livreurs disponibles (global)`);
-    return tousLivreurs;
-  }
+  // Filtrer les livreurs avec GPS valide (coordonnées + récent < 10 min)
+  const now = Date.now();
+  const livreursGPS = livreurs.filter(l => {
+    if (!l.latitude || !l.longitude) return false;
+    if (exclusions.includes(l.id)) return false;
+    if (livreurIdsEnCourse.has(l.id)) return false;
+    
+    // GPS récent = dernière position < 10 min
+    const dt = l.derniere_position_date || l.last_seen_at;
+    if (!dt) return false;
+    const ageMin = (now - new Date(dt).getTime()) / 60000;
+    return ageMin < 10;
+  });
 
-  // AVEC GPS course : filtrer les livreurs avec GPS valide
-  const livreursGPS = livreurs.filter(l =>
-    l.latitude && l.longitude &&
-    !exclusions.includes(l.id) &&
-    !livreurIdsEnCourse.has(l.id)
-  );
+  // ⚠️ SANS GPS COURSE : retourner TOUS les livreurs avec GPS récent (pas tous les livreurs)
+  if (!course.gps_depart_lat || !course.gps_depart_lng) {
+    console.log(`[DISPATCH] 🌍 Course sans GPS → ${livreursGPS.length} livreurs avec GPS récent (global)`);
+    return livreursGPS;
+  }
 
   const proches = livreursGPS.filter(l => {
     const dist = calculerDistance(course.gps_depart_lat, course.gps_depart_lng, l.latitude, l.longitude);
