@@ -51,17 +51,22 @@ async function trouverLivreursCandidats(base44, course, rayonKm, exclusions = []
   );
   console.log(`[DISPATCH] 🚫 Livreurs déjà en course exclus: ${livreurIdsEnCourse.size}`);
 
-  // GPS valide = coordonnées présentes (peu importe la date de mise à jour)
+  // ⚠️ SANS GPS COURSE : retourner TOUS les livreurs disponibles (même sans GPS)
+  if (!course.gps_depart_lat || !course.gps_depart_lng) {
+    const tousLivreurs = livreurs.filter(l =>
+      !exclusions.includes(l.id) &&
+      !livreurIdsEnCourse.has(l.id)
+    );
+    console.log(`[DISPATCH] 🌍 Course sans GPS → ${tousLivreurs.length} livreurs disponibles (global)`);
+    return tousLivreurs;
+  }
+
+  // AVEC GPS course : filtrer les livreurs avec GPS valide
   const livreursGPS = livreurs.filter(l =>
     l.latitude && l.longitude &&
     !exclusions.includes(l.id) &&
     !livreurIdsEnCourse.has(l.id)
   );
-
-  if (!course.gps_depart_lat || !course.gps_depart_lng) {
-    // Pas de GPS course → retourner tous les candidats GPS valides (hors exclusions)
-    return livreursGPS;
-  }
 
   const proches = livreursGPS.filter(l => {
     const dist = calculerDistance(course.gps_depart_lat, course.gps_depart_lng, l.latitude, l.longitude);
@@ -268,18 +273,13 @@ Deno.serve(async (req) => {
 
       if (!course_id) return Response.json({ error: 'course_id requis' }, { status: 400 });
 
-      // Vérifier si la course a un GPS valide
+      // Récupérer la course
       const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
       
+      // ⚠️ SANS GPS : on dispatch quand même à TOUS les livreurs disponibles (cercle infini)
       if (!course.gps_depart_lat || !course.gps_depart_lng) {
-        console.warn(`[DISPATCH] ⚠️ Course ${course_id} sans GPS — dispatch ignoré`);
-        return Response.json({ 
-          success: false, 
-          noLivreur: true, 
-          message: 'Course sans GPS — veuillez ajouter la position de départ',
-          missing_gps: true
-        });
+        console.warn(`[DISPATCH] ⚠️ Course ${course_id} sans GPS — dispatch global (tous livreurs)`);
       }
 
       const result = await lancerDispatch(base44, course_id, []);
