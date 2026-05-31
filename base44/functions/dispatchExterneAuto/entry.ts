@@ -69,9 +69,11 @@ async function trouverLivreursCandidats(base44, course, rayonKm, exclusions = []
     return gpsValide;
   });
 
+  console.log(`[DISPATCH] ✅ ${livreursGPS.length} livreurs avec GPS récent (< 10 min)`);
+
   // ⚠️ SANS GPS COURSE : retourner TOUS les livreurs avec GPS récent (pas tous les livreurs)
   if (!course.gps_depart_lat || !course.gps_depart_lng) {
-    console.log(`[DISPATCH] 🌍 Course sans GPS → ${livreursGPS.length} livreurs avec GPS récent (global)`);
+    console.log(`[DISPATCH] 🌍 Course sans GPS → ${livreursGPS.length} livreurs éligibles (dispatch global)`);
     return livreursGPS;
   }
 
