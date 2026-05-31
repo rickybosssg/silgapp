@@ -230,13 +230,18 @@ export default function CarteLivreursExterne() {
   }, [refetch]);
   
   // Filtrage strict : courses VRAIMENT en attente (statuts initiaux uniquement)
-  // Statuts "en attente" : nouvelle, recherche_livreur (PAS livreur_en_route, colis_recupere, en_livraison, livree, annulee)
+  // Statuts "en attente" : nouvelle, recherche_livreur (EXCLURE: livree, annulee, livreur_en_route, colis_recupere, en_livraison)
   // IMPORTANT: Une course peut avoir livreur_id défini mais être encore "en attente" si dispatch_status = "propose" (livreur n'a pas encore accepté)
   const coursesEnAttente = useMemo(() => {
+    // Statuts de fin de course à exclure absolument
+    const statutsFin = ["livree", "terminee", "completed", "annulee", "livreur_en_route", "colis_recupere", "en_livraison"];
+    
     const filtered = toutesCoursesExternes.filter(c =>
       (c.statut === "nouvelle" || c.statut === "recherche_livreur") &&
       // Soit pas de livreur, soit livreur proposé mais pas encore accepté (dispatch_status = "propose")
-      (!c.livreur_id || c.dispatch_status === "propose")
+      (!c.livreur_id || c.dispatch_status === "propose") &&
+      // EXCLURE les courses terminées
+      !statutsFin.includes(c.statut)
     );
     console.log("[CarteLivreursExterne] coursesEnAttente AUDIT:", {
       total: toutesCoursesExternes.length,
@@ -271,6 +276,29 @@ export default function CarteLivreursExterne() {
       return (now - new Date(c.created_date).getTime()) < 2 * 60 * 60 * 1000;
     });
   }, [coursesEnAttenteAvecGPS]);
+
+  // ─── CONTRÔLE DE COHÉRENCE : compteurs = marqueurs sur la carte ─────────
+  useEffect(() => {
+    const marqueursCourses = document.querySelectorAll('.dmap-course-container').length;
+    const livreursEnCourse = livreurs.filter(l => l.statut === "en_course").length;
+    const marqueursLivreursEnCourse = livreurs.filter(l => 
+      l.statut === "en_course" && l.latitude && l.longitude && !isLivreurNoir(l)
+    ).length;
+    
+    if (marqueursCourses !== coursesEnAttenteAvecGPS.length) {
+      console.warn(`[CarteLivreursExterne] ⚠️ Incohérence courses: ${marqueursCourses} marqueurs vs ${coursesEnAttenteAvecGPS.length} compteur`);
+    }
+    if (marqueursLivreursEnCourse !== livreursEnCourse) {
+      console.warn(`[CarteLivreursExterne] ⚠️ Incohérence livreurs en course: ${marqueursLivreursEnCourse} marqueurs vs ${livreursEnCourse} compteur`);
+    }
+    
+    console.log("[CarteLivreursExterne] ✅ Cohérence vérifiée:", {
+      courses_marqueurs: marqueursCourses,
+      courses_compteur: coursesEnAttenteAvecGPS.length,
+      livreurs_en_course_marqueurs: marqueursLivreursEnCourse,
+      livreurs_en_course_compteur: livreursEnCourse
+    });
+  }, [coursesEnAttenteAvecGPS, livreurs]);
 
   // ─── Compteurs livreurs (règles unifiées) ───────────────────────────────
   const compteursLivreurs = useMemo(() => ({
