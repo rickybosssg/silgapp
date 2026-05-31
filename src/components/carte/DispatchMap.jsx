@@ -452,13 +452,13 @@ export default function DispatchMap({
 
   // Recentrer la carte quand le pays change
   useEffect(() => {
-    if (!mapInstanceRef.current || !position) return;
+    if (!mapInstanceRef.current || !position || !position.latitude || !position.longitude) return;
     mapInstanceRef.current.setView([position.latitude, position.longitude], position.zoom ?? 12);
   }, [position?.latitude, position?.longitude]);
 
   // Init carte
   useEffect(() => {
-    if (!mapRef.current || !position) return;
+    if (!mapRef.current || !position || !position.latitude || !position.longitude) return;
 
     const inject = () => {
       if (!document.getElementById("dmap-styles")) {
