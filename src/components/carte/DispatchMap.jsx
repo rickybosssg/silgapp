@@ -281,15 +281,20 @@ function buildLivreurIcon(livreur, inactif = false) {
   });
 }
 
-function buildClientIcon(inactif = false) {
+function buildClientIcon(client, inactif = false) {
+  const gpsMin = getLastGPSMin(client);
+  const gpsRecent = gpsMin !== null && gpsMin < GPS_SEUIL_MIN;
+  // Si GPS ancien → afficher en gris (comme inactif)
+  const useGris = inactif || !gpsRecent;
+  const cssClass = useGris ? "dmap-client-inactif" : "dmap-client";
   return window.L.divIcon({
     html: `
-      <div class="dmap-client-wrapper ${inactif ? "dmap-client-inactif" : "dmap-client"}">
+      <div class="dmap-client-wrapper ${cssClass}">
         <div class="dmap-client-ring"></div>
         <div class="dmap-client-dot"></div>
       </div>
     `,
-    className: `dmap-client-container${inactif ? " dmap-inactif-marker" : ""}`,
+    className: `dmap-client-container${useGris ? " dmap-inactif-marker" : ""}`,
     iconSize: [44, 44],
     iconAnchor: [22, 22],
   });
@@ -365,8 +370,9 @@ function buildCoursePopup(course) {
 function buildClientPopup(client, inactif = false) {
   const gpsMin = getLastGPSMin(client);
   const gpsStr = gpsMin === null ? "?" : gpsMin < 1 ? "à l'instant" : `${gpsMin} min`;
-  const statutLabel = inactif ? "⚫ Client inactif — non dispatchable" : "🔵 Client actif";
-  const statutColor = inactif ? "#6b7280" : "#2563eb";
+  const gpsRecent = gpsMin !== null && gpsMin < GPS_SEUIL_MIN;
+  const statutLabel = !gpsRecent ? "⚫ Client GPS ancien — non dispatchable" : (inactif ? "⚫ Client inactif — non dispatchable" : "🔵 Client actif");
+  const statutColor = !gpsRecent ? "#6b7280" : (inactif ? "#6b7280" : "#2563eb");
   return `
     <div style="min-width:210px;font-family:sans-serif;padding:4px 0">
       <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#1a1a1a">${client.prenom || ""} ${client.nom || ""}</p>
@@ -516,15 +522,17 @@ export default function DispatchMap({
       markersRef.current.push(marker);
     });
 
-    // 🔵 Clients actifs
+    // 🔵 Clients actifs (bleu si GPS < 5 min, gris si GPS ancien)
     clients.forEach(client => {
       if (!client.latitude || !client.longitude) return;
-      const icon = buildClientIcon(false);
+      const icon = buildClientIcon(client, false);
+      const gpsMin = getLastGPSMin(client);
+      const gpsRecent = gpsMin !== null && gpsMin < GPS_SEUIL_MIN;
       const marker = window.L.marker([client.latitude, client.longitude], {
         icon,
-        zIndexOffset: 900,
+        zIndexOffset: gpsRecent ? 900 : 600, // GPS récent au-dessus
       }).addTo(map);
-      marker.bindPopup(buildClientPopup(client, false), { maxWidth: 260 });
+      marker.bindPopup(buildClientPopup(client, !gpsRecent), { maxWidth: 260 });
       if (onMarkerClick) marker.on("click", () => onMarkerClick(client));
       markersRef.current.push(marker);
     });

@@ -69,14 +69,21 @@ function isEligibleCarte(livreur) {
 }
 
 /**
- * Client éligible carte = actif + a des coordonnées GPS
- * Affiche tous les clients avec GPS, même si ancien (en gris si inactif)
+ * Client éligible carte = actif + GPS récent < 5 min
+ * Si GPS ancien → affiché en gris
  */
 function isClientEligibleCarte(client) {
   if (client.actif === false) return false;
   if (!client.latitude || !client.longitude) return false;
-  // Tous les clients avec GPS sont affichés
+  // Tous les clients avec GPS sont affichés (bleu si récent, gris si ancien)
   return true;
+}
+
+/**
+ * Client GPS récent = position < 5 min
+ */
+function isClientGPSRecent(client) {
+  return isGPSRecent(client);
 }
 
 const INDICATIFS = {
@@ -236,8 +243,8 @@ export default function CarteLivreursExterne() {
   // ─── Compteurs clients (règles unifiées) ────────────────────────────────
   const compteursClients = useMemo(() => ({
     total:       clients.length,
-    gpsRecent:   clients.filter(c => hasValidGPS(c)).length,
-    gpsExpire:   clients.filter(c => c.latitude && c.longitude && !isGPSRecent(c)).length,
+    gpsRecent:   clients.filter(c => isClientGPSRecent(c)).length,
+    gpsExpire:   clients.filter(c => c.latitude && c.longitude && !isClientGPSRecent(c)).length,
     sansGPS:     clients.filter(c => !c.latitude || !c.longitude).length,
     appActive:   clients.filter(c => isAppActive(c)).length,
     surCarte:    clients.filter(c => isClientEligibleCarte(c)).length,
@@ -261,7 +268,7 @@ export default function CarteLivreursExterne() {
   const livreursSurCarte = useMemo(() =>
     livreurs.filter(l => isEligibleCarte(l)), [livreurs]);
 
-  // Clients sur carte : actif + GPS < 10 min
+  // Clients sur carte : actif + GPS (tous, mais couleur selon récence)
   const clientsSurCarte = useMemo(() =>
     clients.filter(c => isClientEligibleCarte(c)), [clients]);
 
@@ -395,9 +402,9 @@ export default function CarteLivreursExterne() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs text-slate-600">
           <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" /><b>🟢 Libre</b> — ON + disponible + GPS &lt; {GPS_SEUIL_MIN} min + app active</span>
           <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-orange-500 flex-shrink-0" /><b>🟠 En course</b> — Mission en cours, ON + GPS récent</span>
-          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" /><b>🔵 Client</b> — Actif + GPS &lt; 10 min</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" /><b>🔵 Client</b> — Actif + GPS &lt; {GPS_SEUIL_MIN} min</span>
           <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-red-600 flex-shrink-0" /><b>🔴 Course en attente</b> — créée, sans livreur, non terminée</span>
-          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-gray-400 flex-shrink-0" /><b>⚫ Gris</b> — Inactif / non dispatchable (OFF, GPS expiré, app fermée, non validé)</span>
+          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-gray-400 flex-shrink-0" /><b>⚫ Gris</b> — GPS expiré (&gt; {GPS_SEUIL_MIN} min) ou inactif</span>
         </div>
         {showInactifs && (
           <p className="mt-2 text-[11px] text-amber-600 bg-amber-50 rounded-lg px-3 py-1.5 border border-amber-200">
@@ -489,34 +496,44 @@ export default function CarteLivreursExterne() {
       <Card className="p-6">
         <div className="flex items-center gap-3 mb-4">
           <Users className="w-5 h-5 text-blue-500" />
-          <h2 className="font-semibold">Clients GPS récents ({compteursClients.surCarte} sur carte)</h2>
+          <h2 className="font-semibold">Clients ({compteursClients.surCarte} sur carte)</h2>
         </div>
         {clientsSurCarte.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <MapPin className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p>Aucun client avec GPS récent et app active</p>
+            <p>Aucun client avec GPS</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {clientsSurCarte.map(client => (
-              <div key={client.id} className="flex items-center justify-between p-3 border border-blue-200 bg-blue-50/30 rounded-lg">
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm">{client.prenom} {client.nom}</p>
-                  <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{getZone(client)}</span>
-                    {getLastGPS(client) && (
-                      <span className="flex items-center gap-1 text-teal-600">
-                        <Clock className="w-3 h-3" />GPS : {getLastGPS(client)}
-                      </span>
-                    )}
-                    <AppBadge entity={client} />
+            {clientsSurCarte.map(client => {
+              const gpsRecent = isClientGPSRecent(client);
+              return (
+                <div key={client.id} className={`flex items-center justify-between p-3 border rounded-lg ${gpsRecent ? "border-blue-200 bg-blue-50/30" : "border-gray-200 bg-gray-50/30"}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-semibold text-sm">{client.prenom} {client.nom}</p>
+                      {gpsRecent ? (
+                        <span className="text-xs text-blue-600 font-medium">🔵 GPS récent</span>
+                      ) : (
+                        <span className="text-xs text-gray-500 font-medium">⚫ GPS ancien</span>
+                      )}
+                    </div>
+                    <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{getZone(client)}</span>
+                      {getLastGPS(client) && (
+                        <span className={`flex items-center gap-1 ${gpsRecent ? "text-teal-600" : "text-gray-400"}`}>
+                          <Clock className="w-3 h-3" />GPS : {getLastGPS(client)}
+                        </span>
+                      )}
+                      <AppBadge entity={client} />
+                    </div>
                   </div>
+                  <a href={`tel:${client.telephone}`} className="text-sm text-primary hover:underline ml-3 flex-shrink-0">
+                    {formatTel(client.telephone, client.country_code)}
+                  </a>
                 </div>
-                <a href={`tel:${client.telephone}`} className="text-sm text-primary hover:underline ml-3 flex-shrink-0">
-                  {formatTel(client.telephone, client.country_code)}
-                </a>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Card>
