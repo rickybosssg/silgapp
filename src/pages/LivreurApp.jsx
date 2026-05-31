@@ -33,6 +33,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
+import { useBackgroundGeolocation } from "@/hooks/useBackgroundGeolocation";
 
 const saveLivreur = (id, data) => base44.functions.invoke('updateLivreur', { id, data });
 
@@ -144,30 +145,51 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
     statutMutation.mutate(estHorsLigne ? "disponible" : "hors_ligne");
   };
 
-  const handleActiverGPS = () => {
+  const handleActiverGPS = async () => {
     if (!navigator.geolocation) {
       toast.error("GPS non disponible sur cet appareil");
       return;
     }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setGpsActif(true);
-        setGpsRequis(false);
-        saveLivreur(livreurProfil.id, {
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          derniere_position_date: new Date().toISOString(),
-        }).then(() => {
-          queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
-          toast.success("GPS activé – vous pouvez accéder au tableau de bord");
-        }).catch(() => toast.error("Position GPS non enregistrée"));
-      },
-      () => { setGpsActif(false); toast.error("Permission GPS refusée – obligatoire pour utiliser l'app"); },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+    try {
+      // Demander permission "Toujours autoriser"
+      const permissionStatus = await Geolocation.requestPermissions();
+      console.log("[LivreurApp] Permission GPS:", permissionStatus);
+      
+      if (permissionStatus.location !== "granted") {
+        toast.error("Permission GPS requise");
+        return;
+      }
+      
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setGpsActif(true);
+          setGpsRequis(false);
+          saveLivreur(livreurProfil.id, {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            derniere_position_date: new Date().toISOString(),
+          }).then(() => {
+            queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
+            toast.success("GPS activé – Suivi permanent activé ✓");
+          }).catch(() => toast.error("Position GPS non enregistrée"));
+        },
+        () => { setGpsActif(false); toast.error("Permission GPS refusée – obligatoire pour utiliser l'app"); },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    } catch (error) {
+      console.error("[LivreurApp] Erreur permission:", error);
+      toast.error("Erreur GPS: " + error.message);
+    }
   };
 
-  // GPS tracking périodique
+  // GPS Background permanent (même écran verrouillé)
+  useBackgroundGeolocation({
+    enabled: livreurProfil?.statut !== "hors_ligne" && gpsActif,
+    livreurId: livreurProfil?.id,
+    user_email: livreurProfil?.user_email,
+  });
+
+  // GPS tracking périodique (fallback si background non supporté)
   useEffect(() => {
     if (!livreurProfil?.id || livreurProfil.statut === "hors_ligne" || !gpsActif) return;
     const interval = setInterval(() => {
@@ -180,7 +202,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
         () => setGpsActif(false),
         { enableHighAccuracy: true }
       );
-    }, 30000);
+    }, 10000); // 10 secondes au lieu de 30s
     return () => clearInterval(interval);
   }, [livreurProfil?.id, livreurProfil?.statut, gpsActif]);
 
