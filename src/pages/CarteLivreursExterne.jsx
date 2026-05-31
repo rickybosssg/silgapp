@@ -75,9 +75,17 @@ function isClientEligibleCarte(client) {
   return client.actif !== false && hasValidGPS(client) && isAppActive(client);
 }
 
-function formatTel(tel) {
+const INDICATIFS = {
+  BF: "+226", CI: "+225", TG: "+228", BJ: "+229",
+  SN: "+221", ML: "+223", GN: "+224", NE: "+227",
+};
+
+function formatTel(tel, countryCode) {
   if (!tel) return "";
-  const cleaned = tel.replace(/[^\d+]/g, "");
+  const cleaned = tel.replace(/\s/g, "");
+  if (cleaned.startsWith("+")) return cleaned;
+  const indicatif = INDICATIFS[countryCode];
+  if (indicatif) return `${indicatif}${cleaned}`;
   return cleaned;
 }
 
@@ -454,7 +462,7 @@ export default function CarteLivreursExterne() {
                     </div>
                   </div>
                   <a href={`tel:${livreur.telephone}`} className="text-sm text-primary hover:underline ml-3 flex-shrink-0">
-                    {formatTel(livreur.telephone)}
+                    {formatTel(livreur.telephone, livreur.country_code)}
                   </a>
                 </div>
               );
@@ -491,7 +499,7 @@ export default function CarteLivreursExterne() {
                   </div>
                 </div>
                 <a href={`tel:${client.telephone}`} className="text-sm text-primary hover:underline ml-3 flex-shrink-0">
-                  {formatTel(client.telephone)}
+                  {formatTel(client.telephone, client.country_code)}
                 </a>
               </div>
             ))}
