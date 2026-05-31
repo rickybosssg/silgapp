@@ -69,13 +69,14 @@ function isEligibleCarte(livreur) {
 }
 
 /**
- * Client éligible carte = actif + GPS récent < 10 min (app active ou fermée depuis peu)
+ * Client éligible carte = actif + a des coordonnées GPS
+ * Affiche tous les clients avec GPS, même si ancien (en gris si inactif)
  */
 function isClientEligibleCarte(client) {
   if (client.actif === false) return false;
   if (!client.latitude || !client.longitude) return false;
-  // GPS < 10 min (plus permissif pour les clients)
-  return isGPSRecent(client) || ((Date.now() - new Date(client.last_seen_at || client.derniere_position_date).getTime()) < 10 * 60 * 1000);
+  // Tous les clients avec GPS sont affichés
+  return true;
 }
 
 const INDICATIFS = {
