@@ -62,7 +62,11 @@ async function trouverLivreursCandidats(base44, course, rayonKm, exclusions = []
     const dt = l.derniere_position_date || l.last_seen_at;
     if (!dt) return false;
     const ageMin = (now - new Date(dt).getTime()) / 60000;
-    return ageMin < 10;
+    const gpsValide = ageMin < 10;
+    if (!gpsValide) {
+      console.log(`[DISPATCH] 🚫 ${l.nom} exclu - GPS expiré (${ageMin.toFixed(1)} min)`);
+    }
+    return gpsValide;
   });
 
   // ⚠️ SANS GPS COURSE : retourner TOUS les livreurs avec GPS récent (pas tous les livreurs)
