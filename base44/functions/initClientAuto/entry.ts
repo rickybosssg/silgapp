@@ -16,7 +16,19 @@ Deno.serve(async (req) => {
     const payload = await req.json();
     const { device_id, platform, notification_token, latitude, longitude } = payload;
 
-    // 1. Créer le profil client s'il n'existe pas
+    // 1. VÉRIFIER si l'email existe déjà dans Livreur (livreur externe)
+    const existingLivreur = await base44.asServiceRole.entities.Livreur.filter({ user_email: user.email });
+    if (existingLivreur && existingLivreur.length > 0) {
+      // C'est un livreur ! Ne pas créer de profil client
+      console.log(`[initClientAuto] Email ${user.email} trouvé dans Livreur → pas de création client`);
+      return Response.json({ 
+        success: false, 
+        reason: "livreur_exists",
+        message: "Cet email est enregistré comme livreur. Redirection vers le dashboard livreur."
+      }, { status: 409 });
+    }
+
+    // 2. Créer le profil client s'il n'existe pas
     let client = await base44.asServiceRole.entities.ClientExterne.filter({ user_email: user.email });
     if (!client || client.length === 0) {
       client = await base44.asServiceRole.entities.ClientExterne.create({
