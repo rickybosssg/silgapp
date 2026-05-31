@@ -317,7 +317,8 @@ export default function ClientExterneApp() {
           nom: user.full_name || user.email.split('@')[0],
           telephone: "",
           user_email: user.email,
-          actif: true
+          actif: true,
+          country_code: "BF"
         });
       }
       setClientProfil(profil);
