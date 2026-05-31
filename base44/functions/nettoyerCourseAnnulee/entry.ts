@@ -1,13 +1,26 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
+/**
+ * NETTOYAGE COURSE ANNULÉE
+ * 
+ * Quand une course est annulée, cette fonction :
+ * 1. Nettoie les champs livreur de la course
+ * 2. Remet le livreur en statut "disponible"
+ * 
+ * Peut être appelée par :
+ * - Un admin (via dashboard)
+ * - Une automation entity (sans user context)
+ */
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     
-    // Vérifier que c'est un admin qui appelle
-    const user = await base44.auth.me();
-    if (!user || user.role !== 'admin') {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    // Vérifier que c'est un admin qui appelle (sauf si appelé par automation)
+    // Les automations n'ont pas de user context, donc on skip la vérification
+    const user = await base44.auth.me().catch(() => null);
+    if (user && user.role !== 'admin') {
+      return Response.json({ error: 'Unauthorized - Admin access required' }, { status: 401 });
     }
 
     const { course_id } = await req.json();
