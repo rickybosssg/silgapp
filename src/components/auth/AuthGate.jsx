@@ -55,13 +55,26 @@ export default function AuthGate({ children, onLivreur, onClient }) {
       }
 
       // 2. Livreur interne ou externe (chercher par email SANS filtrer sur validation/actif)
-      const livreurs = await base44.entities.Livreur.filter({
-        user_email: user.email
-      });
+      // D'abord par user_email, sinon par email (cas livreurs internes sans user_email renseigné)
+      let livreurs = await base44.entities.Livreur.filter({ user_email: user.email });
+      if (!mounted) return;
+
+      // Fallback : chercher aussi par champ email si user_email vide
+      if (!livreurs || livreurs.length === 0) {
+        try {
+          const byEmail = await base44.entities.Livreur.filter({ email: user.email });
+          if (byEmail && byEmail.length > 0) livreurs = byEmail;
+        } catch (_) {}
+      }
       if (!mounted) return;
 
       if (livreurs && livreurs.length > 0) {
         const livreur = livreurs[0];
+
+        // Corriger silencieusement le user_email manquant pour les futures connexions
+        if (!livreur.user_email) {
+          base44.entities.Livreur.update(livreur.id, { user_email: user.email }).catch(() => {});
+        }
 
         // Compte désactivé par l'admin
         if (livreur.actif === false) {
@@ -114,6 +127,10 @@ export default function AuthGate({ children, onLivreur, onClient }) {
       // Router vers dashboard client
       setState("client");
       onClient?.();
+
+      // ⚠️ Sécurité finale : si un profil Livreur existe sans user_email,
+      // il aurait dû être capturé plus haut. Log de diagnostic.
+      console.warn(`[AuthGate] Utilisateur ${user.email} routé en CLIENT. Si c'est un livreur, vérifier que son user_email est bien renseigné dans l'entité Livreur.`);
     }
 
     check();
