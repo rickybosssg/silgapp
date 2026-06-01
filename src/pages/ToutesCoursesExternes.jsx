@@ -1,19 +1,26 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Package, Filter } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Package, MapPin, Clock, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import CourseStatusBadge from "@/components/courses/CourseStatusBadge";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 
+const STATUT_FILTRES = [
+  { key: "tous",        label: "Toutes" },
+  { key: "nouvelle",    label: "Nouvelles" },
+  { key: "en_cours",    label: "En cours" },
+  { key: "livree",      label: "Livrées" },
+  { key: "annulee",     label: "Annulées" },
+];
+
 export default function ToutesCoursesExternes() {
   const { isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
   const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
+  const [filtreActif, setFiltreActif] = useState("tous");
 
   const { data: courses = [] } = useQuery({
     queryKey: ["courses-externes", effectiveCountry || "all"],
@@ -24,90 +31,160 @@ export default function ToutesCoursesExternes() {
     refetchInterval: 10000,
   });
 
-  const stats = useMemo(() => {
-    return {
-      totale: courses.length,
-      nouvelle: courses.filter(c => c.statut === "nouvelle").length,
-      enCours: courses.filter(c => ["recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut)).length,
-      livree: courses.filter(c => c.statut === "livree").length,
-      annulee: courses.filter(c => c.statut === "annulee").length,
-    };
-  }, [courses]);
+  const stats = useMemo(() => ({
+    totale:   courses.length,
+    nouvelle: courses.filter(c => c.statut === "nouvelle").length,
+    enCours:  courses.filter(c => ["recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut)).length,
+    livree:   courses.filter(c => c.statut === "livree").length,
+    annulee:  courses.filter(c => c.statut === "annulee").length,
+  }), [courses]);
+
+  const coursesFiltrees = useMemo(() => {
+    if (filtreActif === "tous")     return courses;
+    if (filtreActif === "nouvelle") return courses.filter(c => c.statut === "nouvelle");
+    if (filtreActif === "en_cours") return courses.filter(c => ["recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut));
+    if (filtreActif === "livree")   return courses.filter(c => c.statut === "livree");
+    if (filtreActif === "annulee")  return courses.filter(c => c.statut === "annulee");
+    return courses;
+  }, [courses, filtreActif]);
 
   return (
-    <div className="p-4 space-y-4 max-w-5xl mx-auto">
-      <div className="flex items-center gap-3 mb-4">
-        <Link to={isPays ? "/" : "/admin/global"}>
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <ArrowLeft className="w-4 h-4" />
-            {isPays ? "Retour" : "Admin Global"}
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Toutes les Courses (Externes)</h1>
-          <p className="text-sm text-muted-foreground">
-            {stats.totale} courses {effectiveCountry ? `(${effectiveCountry})` : "tous pays"}
-          </p>
+    <div className="p-4 space-y-5 max-w-5xl mx-auto">
+
+      {/* ── HERO HEADER ─────────────────────────────────────────── */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary via-red-600 to-rose-600 p-5 shadow-xl shadow-red-200">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute -top-8 -right-8 w-40 h-40 bg-white rounded-full" />
+          <div className="absolute -bottom-12 -left-6 w-56 h-56 bg-white rounded-full" />
+        </div>
+        <div className="relative flex items-center gap-3">
+          <Link to={isPays ? "/" : "/admin/global"}>
+            <Button variant="ghost" size="sm" className="gap-1.5 text-white hover:bg-white/20 border border-white/30">
+              <ArrowLeft className="w-4 h-4" />
+              <span className="hidden sm:inline">{isPays ? "Retour" : "Admin Global"}</span>
+            </Button>
+          </Link>
+          <div className="flex items-center gap-3 flex-1">
+            <div className="w-10 h-10 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center text-xl flex-shrink-0">
+              📦
+            </div>
+            <div>
+              <h1 className="text-xl font-black text-white tracking-tight">Courses Externes</h1>
+              <p className="text-white/65 text-xs mt-0.5">
+                {stats.totale} courses {effectiveCountry ? `· pays ${effectiveCountry}` : "· tous pays"}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <StatCard label="Totale" value={stats.totale} color="bg-primary" />
-        <StatCard label="Nouvelle" value={stats.nouvelle} color="bg-orange-500" />
-        <StatCard label="En cours" value={stats.enCours} color="bg-blue-500" />
-        <StatCard label="Livrée" value={stats.livree} color="bg-green-500" />
-        <StatCard label="Annulée" value={stats.annulee} color="bg-red-500" />
+      {/* ── STATS KPI ───────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5">
+        {[
+          { label: "Total",     value: stats.totale,   grad: "from-primary to-red-600",         shadow: "shadow-red-100" },
+          { label: "Nouvelles", value: stats.nouvelle, grad: "from-orange-500 to-amber-500",    shadow: "shadow-orange-100" },
+          { label: "En cours",  value: stats.enCours,  grad: "from-blue-500 to-indigo-500",     shadow: "shadow-blue-100" },
+          { label: "Livrées",   value: stats.livree,   grad: "from-green-500 to-emerald-500",   shadow: "shadow-green-100" },
+          { label: "Annulées",  value: stats.annulee,  grad: "from-red-400 to-rose-500",        shadow: "shadow-red-100" },
+        ].map(s => (
+          <div key={s.label} className={`bg-gradient-to-br ${s.grad} rounded-2xl p-3.5 text-white shadow-md ${s.shadow}`}>
+            <p className="text-[10px] font-semibold opacity-80 uppercase tracking-wide mb-1">{s.label}</p>
+            <p className="text-2xl font-black leading-none">{s.value}</p>
+          </div>
+        ))}
       </div>
 
-      <Card className="p-4">
-        <div className="flex items-center gap-2 mb-4">
-          <Filter className="w-4 h-4 text-muted-foreground" />
-          <h2 className="font-semibold">Historique complet</h2>
+      {/* ── FILTRES ─────────────────────────────────────────────── */}
+      <div className="flex gap-2 flex-wrap">
+        {STATUT_FILTRES.map(f => (
+          <button
+            key={f.key}
+            onClick={() => setFiltreActif(f.key)}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+              filtreActif === f.key
+                ? "bg-primary text-white border-primary"
+                : "bg-white text-slate-600 border-gray-200 hover:border-primary/40 hover:text-primary"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── LISTE DES COURSES ───────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-red-600 flex items-center justify-center shadow-sm">
+              <Package className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <p className="font-bold text-foreground">Historique complet</p>
+              <p className="text-xs text-muted-foreground">{coursesFiltrees.length} résultat{coursesFiltrees.length > 1 ? "s" : ""}</p>
+            </div>
+          </div>
         </div>
 
-        {courses.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p>Aucune course externe</p>
+        {coursesFiltrees.length === 0 ? (
+          <div className="text-center py-14 text-muted-foreground">
+            <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3 text-2xl">📦</div>
+            <p className="font-semibold text-sm">Aucune course dans cette catégorie</p>
           </div>
         ) : (
           <div className="space-y-2">
-            {courses.map(course => (
-              <div key={course.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+            {coursesFiltrees.map(course => (
+              <div
+                key={course.id}
+                className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all"
+              >
+                {/* Icône statut */}
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-base ${
+                  course.statut === "livree"   ? "bg-green-100" :
+                  course.statut === "annulee"  ? "bg-red-100" :
+                  course.statut === "nouvelle" ? "bg-orange-100" :
+                  "bg-blue-100"
+                }`}>
+                  {course.statut === "livree"   ? "✅" :
+                   course.statut === "annulee"  ? "❌" :
+                   course.statut === "nouvelle" ? "🆕" : "🚀"}
+                </div>
+
+                {/* Infos */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-semibold truncate">{course.client_nom || "Client"}</span>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="font-bold text-sm text-foreground truncate">{course.client_nom || "Client"}</span>
                     <CourseStatusBadge statut={course.statut} />
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{course.adresse_depart} → {course.adresse_arrivee}</span>
-                    <span>•</span>
-                    <span>{format(new Date(course.created_date), "dd/MM HH:mm", { locale: fr })}</span>
+                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
+                    <span className="truncate">{course.adresse_depart} → {course.adresse_arrivee || "?"}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-0.5">
+                    <Clock className="w-2.5 h-2.5 flex-shrink-0" />
+                    <span>{format(new Date(course.created_date), "dd/MM/yyyy · HH:mm", { locale: fr })}</span>
+                    {course.livreur_nom && <><span>·</span><span>👤 {course.livreur_nom}</span></>}
+                    {course.country_code && <span className="ml-1 text-[9px] font-bold bg-gray-200 text-gray-500 rounded px-1">{course.country_code}</span>}
                   </div>
                 </div>
-                <div className="flex-shrink-0 ml-4 text-right">
+
+                {/* Prix */}
+                <div className="flex-shrink-0 text-right ml-2">
                   {course.prix_final ? (
-                    <span className="text-sm font-semibold text-green-700">{course.prix_final.toLocaleString()} F</span>
+                    <span className="font-black text-sm text-green-600">{course.prix_final.toLocaleString()} F</span>
                   ) : course.prix_estimate ? (
                     <span className="text-xs text-muted-foreground">~{course.prix_estimate.toLocaleString()} F</span>
                   ) : (
                     <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                  {course.distance_reelle_km && (
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{Number(course.distance_reelle_km).toFixed(1)} km</p>
                   )}
                 </div>
               </div>
             ))}
           </div>
         )}
-      </Card>
+      </div>
     </div>
-  );
-}
-
-function StatCard({ label, value, color }) {
-  return (
-    <Card className={`p-4 ${color} text-white`}>
-      <p className="text-xs opacity-90">{label}</p>
-      <p className="text-2xl font-bold mt-1">{value}</p>
-    </Card>
   );
 }
