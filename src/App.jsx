@@ -214,7 +214,7 @@ function AppContent() {
               <Route path="/courses" element={<AnimatedRoutes><ToutesCourses /></AnimatedRoutes>} />
               <Route path="/livreurs" element={<AnimatedRoutes><Livreurs /></AnimatedRoutes>} />
               <Route path="/rapport" element={<AnimatedRoutes><RapportJour /></AnimatedRoutes>} />
-              <Route path="/recapitulatif" element={<AnimatedRoutes><RecapitulatifAdmin /></AnimatedRoutes>} />
+              <Route path="/recapitulatif" element={<AnimatedRoutes><RecapitulatifAdmin reseau="interne" /></AnimatedRoutes>} />
               <Route path="/admin/externe" element={<AnimatedRoutes><DashboardAdminExterne /></AnimatedRoutes>} />
               <Route path="/admin/externe/dus-livreurs" element={<AnimatedRoutes><DusLivreursExternes /></AnimatedRoutes>} />
               <Route path="/admin/externe/twilio-sandbox" element={<AnimatedRoutes><TwilioSandboxMonitor /></AnimatedRoutes>} />
