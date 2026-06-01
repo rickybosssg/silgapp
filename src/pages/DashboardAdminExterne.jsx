@@ -168,16 +168,7 @@ export default function DashboardAdminExterne() {
   return (
     <div className="px-4 py-4 lg:p-6 space-y-6 max-w-7xl mx-auto">
 
-      {/* ── 🚨 TEST CODE PROMO PANEL VISIBLE ───────────────────────── */}
-      <div className="bg-red-600 border-4 border-yellow-400 p-6 rounded-2xl mb-6">
-        <h1 className="text-3xl font-black text-white mb-4">🚨 TEST CODE PROMO PANEL VISIBLE</h1>
-        <CodePromoPanel />
-      </div>
 
-      {/* ── 🚨 TEST BLOC ROUGE - À SUPPRIMER APRÈS TEST ───────────────────────────── */}
-      <div style={{background:'red',color:'white',padding:'20px',fontSize:'24px',fontWeight:'bold',border:'5px solid yellow',marginBottom:'20px'}}>
-        🚨 TEST DASHBOARD ADMIN EXTERNE - BLOC ROUGE AFFICHÉ ICI
-      </div>
 
       {/* ── HERO HEADER ────────────────────────────────────────────── */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary via-red-600 to-rose-600 p-5 sm:p-6 shadow-xl shadow-red-200">

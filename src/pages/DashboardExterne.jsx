@@ -13,7 +13,7 @@ import { useAdminContext } from "@/hooks/useAdminContext.js";
 import LivreursEnLigne from "@/components/dashboard/LivreursEnLigne";
 import ClientsEnLigne from "@/components/dashboard/ClientsEnLigne";
 import { isON, isLibre, isEnCourse, isAppActive, hasValidGPS, isEligibleCarte, isClientEligibleCarte, hasGPS } from "@/lib/dispatchRules.js";
-import { calculateLivreurCounters, calculateClientCounters, debugLibreCounters } from "@/lib/livreurCounters.js";
+import { calculateLivreurCounters, calculateClientCounters } from "@/lib/livreurCounters.js";
 
 import CoursesEnTraitement from "@/components/dashboard/CoursesEnTraitement";
 import CoursesTerminees from "@/components/dashboard/CoursesTerminees";
@@ -24,15 +24,6 @@ import CodePromoPanel from "@/components/admin/CodePromoPanel";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import StatDetailModal from "@/components/dashboard/StatDetailModal";
 import AppToggleButton from "@/components/admin/AppToggleButton";
-
-function StatMini({ label, value, color }) {
-  return (
-    <div className={`border rounded-lg p-2 text-center ${color}`}>
-      <p className="text-lg font-bold leading-none">{value}</p>
-      <p className="text-xs mt-0.5 leading-tight">{label}</p>
-    </div>
-  );
-}
 
 export default function DashboardExterne() {
   const [selectedCourse, setSelectedCourse] = useState(null);
@@ -122,34 +113,6 @@ export default function DashboardExterne() {
     calculateClientCounters(clients),
     [clients]
   );
-
-  // 🔍 DIAGNOSTIC COMPARATIF - Affiche les IDs des livreurs libres pour comparaison
-  const diagnosticComparatif = useMemo(() => {
-    const tousLesLivreurs = livreurs.filter(l => l.validation === "valide" && l.actif !== false);
-    const libres = tousLesLivreurs.filter(l => isLibre(l));
-    const surCarte = tousLesLivreurs.filter(l => isEligibleCarte(l));
-    
-    // 🎯 LOG UNIFIÉ - Même format que la carte
-    console.log("🎯 BANDEAU SUPÉRIEUR (Dashboard):", {
-      libres_count: libres.length,
-      libres_ids: libres.map(l => l.id.slice(-8)),
-      details: libres.map(l => ({
-        id: l.id.slice(-8),
-        nom: `${l.prenom} ${l.nom}`,
-        statut: l.statut,
-        isON: isON(l),
-        isAppActive: isAppActive(l),
-        hasValidGPS: hasValidGPS(l),
-      })),
-    });
-    
-    return {
-      total: tousLesLivreurs.length,
-      libres,
-      surCarte,
-      nonLibres: tousLesLivreurs.filter(l => !isLibre(l)),
-    };
-  }, [livreurs]);
 
   const stats = useMemo(() => {
     const todayAll = coursesFiltrees.filter(c => isToday(new Date(c.created_date)));
@@ -254,83 +217,9 @@ export default function DashboardExterne() {
         <StatCard title="Livreurs dispo" value={compteursLivreurs.libres} icon={Truck} iconBg="bg-accent" onClick={() => setStatModal({ type: "livreurs_dispo", data: livreursEnLigne.filter(l => l.statut === "disponible") })} />
       </div>
 
-      {/* 🔍 DIAGNOSTIC COMPARATIF - IDs des livreurs libres */}
-      <div className="bg-card border rounded-lg p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Truck className="w-5 h-5 text-accent" />
-          <h2 className="font-semibold text-foreground">🔍 Diagnostic Unifié (Bandeau vs Carte)</h2>
-        </div>
-        <div className="space-y-2 text-xs">
-          <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
-            <p className="font-bold text-blue-900 mb-2">🎯 Source unique de vérité:</p>
-            <div className="space-y-1">
-              <div className="flex justify-between">
-                <span>Total livreurs (valides + actifs):</span>
-                <span className="font-bold">{diagnosticComparatif.total}</span>
-              </div>
-              <div className="flex justify-between bg-emerald-50 p-2 rounded">
-                <span className="font-bold text-emerald-700">✓ Livreurs Libres (isLibre):</span>
-                <span className="font-black text-emerald-700">{diagnosticComparatif.libres.length}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Sur carte (isEligibleCarte):</span>
-                <span className="font-bold">{diagnosticComparatif.surCarte.length}</span>
-              </div>
-            </div>
-          </div>
 
-          <div className="bg-purple-50 border border-purple-200 p-3 rounded-lg">
-            <p className="font-bold text-purple-900 mb-2">📋 IDs des livreurs libres (Bandeau):</p>
-            <div className="font-mono text-[10px] break-all">
-              {diagnosticComparatif.libres.map(l => l.id.slice(-8)).join(', ') || 'Aucun'}
-            </div>
-          </div>
 
-          <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg">
-            <p className="font-bold text-amber-900 mb-2">⚠️ Livreurs NON libres et pourquoi:</p>
-            <div className="space-y-1 max-h-48 overflow-y-auto">
-              {diagnosticComparatif.nonLibres.slice(0, 10).map(l => (
-                <div key={l.id} className="text-[10px]">
-                  <span className="font-semibold">{l.nom} ({l.id.slice(-8)})</span>
-                  <span className="text-gray-600 ml-2">
-                    {!isON(l) ? '❌ OFF' : ''}
-                    {l.statut !== 'disponible' ? '❌ Statut=' + l.statut : ''}
-                    {!isAppActive(l) ? '❌ App inactive' : ''}
-                    {!hasValidGPS(l) ? '❌ GPS ancien' : ''}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
 
-          <div className="bg-green-50 border border-green-200 p-3 rounded-lg">
-            <p className="font-bold text-green-900 mb-2">✅ Critères "Libre" unifiés:</p>
-            <ul className="text-[10px] space-y-0.5 text-green-800">
-              <li>✓ ON = true (statut actif + heartbeat &lt; 10min)</li>
-              <li>✓ statut = "disponible"</li>
-              <li>✓ Application active (heartbeat &lt; 5min)</li>
-              <li>✓ GPS récent (&lt; 5min)</li>
-              <li>✓ Non suspendu (actif !== false)</li>
-              <li>✓ validation = "valide"</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      {/* Compteurs détaillés clients (comme la carte) */}
-      <div className="bg-card border rounded-lg p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Users className="w-5 h-5 text-blue-500" />
-          <h2 className="font-semibold text-foreground">Clients (règles unifiées)</h2>
-        </div>
-        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-          <StatMini label="Total" value={compteursClients.total} color="text-slate-700 bg-slate-50 border-slate-200" />
-          <StatMini label="Avec GPS" value={compteursClients.avecGPS} color="text-teal-700 bg-teal-50 border-teal-200" />
-          <StatMini label="GPS récent" value={compteursClients.gpsRecent} color="text-green-700 bg-green-50 border-green-200" />
-          <StatMini label="Sur carte" value={compteursClients.surCarte} color="text-blue-700 bg-blue-50 border-blue-200" />
-          <StatMini label="App active" value={compteursClients.appActive} color="text-emerald-700 bg-emerald-50 border-emerald-200" />
-        </div>
-      </div>
 
       {/* Clients en ligne (avec GPS) */}
       <ClientsEnLigne clients={clientsEnLigne} />
