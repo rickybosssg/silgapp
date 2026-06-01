@@ -19,6 +19,7 @@ import CoursesTerminees from "@/components/dashboard/CoursesTerminees";
 import CourseDetailDialog from "@/components/courses/CourseDetailDialog";
 
 import { Card } from "@/components/ui/card";
+import CodePromoPanel from "@/components/admin/CodePromoPanel";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import StatDetailModal from "@/components/dashboard/StatDetailModal";
 import AppToggleButton from "@/components/admin/AppToggleButton";
@@ -204,6 +205,13 @@ export default function DashboardExterne() {
         <p className="text-white text-sm">DashboardExterne.jsx est le fichier chargé</p>
         <p className="text-white text-xs mt-2">Route: / (réseau externe)</p>
       </div>
+
+      {/* ✅ TEST CODE PROMO PANEL MONTÉ */}
+      <div style={{ background: 'green', color: 'white', padding: '20px', marginBottom: '20px', borderRadius: '12px' }}>
+        <h2 className="text-2xl font-bold mb-2">✅ CODE PROMO PANEL MONTÉ</h2>
+        <p>CodePromoPanel component rendering test</p>
+      </div>
+      <CodePromoPanel />
 
       {/* Raccourci Panel Clients Externes */}
       <Card className="p-4 cursor-pointer hover:shadow-lg transition-all border-2 border-pink-200 bg-pink-50">
