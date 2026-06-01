@@ -19,7 +19,6 @@ import CoursesTerminees from "@/components/dashboard/CoursesTerminees";
 import CourseDetailDialog from "@/components/courses/CourseDetailDialog";
 
 import DispatchMonitor from "@/components/dispatch/DispatchMonitor";
-import BatterieAlertesPanel from "@/components/admin/BatterieAlertesPanel";
 import { Card } from "@/components/ui/card";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import StatDetailModal from "@/components/dashboard/StatDetailModal";
@@ -196,8 +195,7 @@ export default function DashboardExterne() {
         </div>
       </div>
 
-      {/* Alertes batterie + dispatch monitor */}
-      <BatterieAlertesPanel currentUser={null} />
+      {/* Dispatch monitor */}
       <DispatchMonitor />
 
       {/* Raccourci Panel Clients Externes */}
