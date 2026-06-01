@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, Package, DollarSign, TrendingUp, ArrowLeft, Truck, AlertCircle, AlertTriangle, Eye, MapPin, CreditCard, Download, Save, ExternalLink, Bug, Search, CheckCircle2, XCircle, Loader2, MessageCircle } from "lucide-react";
+import { Users, Package, DollarSign, TrendingUp, ArrowLeft, Truck, AlertCircle, AlertTriangle, Eye, MapPin, CreditCard, Download, Save, ExternalLink, Bug, Search, CheckCircle2, XCircle, Loader2, MessageCircle, Tag } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
@@ -225,6 +225,20 @@ export default function DashboardAdminExterne() {
               </div>
             </Card>
           </Link>
+
+          <a href="#codes-promo" className="flex-1" onClick={e => { e.preventDefault(); document.getElementById('codes-promo')?.scrollIntoView({ behavior: 'smooth' }); }}>
+            <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer border-purple-200 bg-purple-50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                  <Tag className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground">Codes Promo</p>
+                  <p className="text-xs text-muted-foreground">Ambassadeurs & parrainages</p>
+                </div>
+              </div>
+            </Card>
+          </a>
         </div>
       </div>
 
@@ -323,7 +337,7 @@ export default function DashboardAdminExterne() {
       <HistoriqueDuJour courses={courses} />
 
       {/* Section Codes Promo */}
-      <Card className="p-4 border-purple-200">
+      <Card id="codes-promo" className="p-4 border-purple-200">
         <CodePromoPanel />
       </Card>
 
