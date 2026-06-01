@@ -5,9 +5,10 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Users, Eye, Lock, Unlock, Phone, Mail, Calendar, Activity } from "lucide-react";
+import { Search, Users, Eye, Lock, Unlock, Phone, Mail, Calendar, Activity, Truck } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { toast } from "sonner";
 
 function formaterTel(tel) {
   if (!tel) return "-";
@@ -16,7 +17,7 @@ function formaterTel(tel) {
   return digits.slice(0, 2) + " " + digits.slice(2, 4) + " " + digits.slice(4, 6) + " " + digits.slice(6, 8);
 }
 
-function ClientDetailModal({ client, courses, onClose, onBloquer }) {
+function ClientDetailModal({ client, courses, onClose, onBloquer, onMigrer }) {
   const coursesDuClient = courses.filter(c => {
     const tel = (c.client_telephone || "").replace(/\D/g, "").slice(-8);
     const clientTel = (client.telephone || "").replace(/\D/g, "").slice(-8);
@@ -84,15 +85,27 @@ function ClientDetailModal({ client, courses, onClose, onBloquer }) {
           </div>
         )}
 
-        <div className="flex gap-2 pt-2">
-          <Button
-            variant={client.actif === false ? "default" : "destructive"}
-            className="flex-1"
-            onClick={() => { onBloquer(client); onClose(); }}
-          >
-            {client.actif === false ? <><Unlock className="w-4 h-4 mr-1" />Débloquer</> : <><Lock className="w-4 h-4 mr-1" />Bloquer</>}
-          </Button>
-          <Button variant="outline" onClick={onClose} className="flex-1">Fermer</Button>
+        <div className="space-y-2 pt-2">
+          {!client.deja_livreur && (
+            <Button
+              variant="default"
+              className="w-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600"
+              onClick={() => { onMigrer(client); onClose(); }}
+            >
+              <Truck className="w-4 h-4 mr-2" />
+              🚚 Migrer vers Livreur Externe
+            </Button>
+          )}
+          <div className="flex gap-2">
+            <Button
+              variant={client.actif === false ? "default" : "destructive"}
+              className="flex-1"
+              onClick={() => { onBloquer(client); onClose(); }}
+            >
+              {client.actif === false ? <><Unlock className="w-4 h-4 mr-1" />Débloquer</> : <><Lock className="w-4 h-4 mr-1" />Bloquer</>}
+            </Button>
+            <Button variant="outline" onClick={onClose} className="flex-1">Fermer</Button>
+          </div>
         </div>
       </div>
     </div>
@@ -102,6 +115,7 @@ function ClientDetailModal({ client, courses, onClose, onBloquer }) {
 export default function ClientsExternesPanel() {
   const [recherche, setRecherche] = useState("");
   const [clientDetail, setClientDetail] = useState(null);
+  const [migrationEnCours, setMigrationEnCours] = useState(null);
 
   const { data: clients = [], refetch } = useQuery({
     queryKey: ["clients-externes-panel"],
@@ -132,6 +146,34 @@ export default function ClientsExternesPanel() {
   const handleBloquer = async (client) => {
     await base44.entities.ClientExterne.update(client.id, { actif: client.actif === false ? true : false });
     refetch();
+  };
+
+  const handleMigrer = async (client) => {
+    if (!client.user_email) {
+      toast.error("Client sans email - migration impossible");
+      return;
+    }
+    
+    setMigrationEnCours(client.id);
+    try {
+      const result = await base44.functions.invoke("migrerClientVersLivreur", { client_id: client.id });
+      
+      if (result.error) {
+        if (result.error === "Déjà livreur") {
+          toast.info(result.message);
+        } else {
+          toast.error(result.error);
+        }
+      } else {
+        toast.success(`✅ ${result.livreur.prenom} ${result.livreur.nom} est maintenant livreur externe !`);
+        refetch();
+      }
+    } catch (err) {
+      console.error("Erreur migration:", err);
+      toast.error("Erreur lors de la migration");
+    } finally {
+      setMigrationEnCours(null);
+    }
   };
 
   const getCourseStats = (client) => {
@@ -261,6 +303,7 @@ export default function ClientsExternesPanel() {
           courses={courses}
           onClose={() => setClientDetail(null)}
           onBloquer={handleBloquer}
+          onMigrer={handleMigrer}
         />
       )}
     </div>

@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
   ArrowLeft, Users, UserCheck, UserX, Phone, Mail, MapPin,
-  Eye, Ban, CheckCircle2, RefreshCw, Bike, Car,
+  Eye, Ban, CheckCircle2, RefreshCw, Bike, Car, Truck,
   XCircle, Banknote, Star, Wifi, WifiOff, Plus
 } from "lucide-react";
 import CreateLivreurDialog from "@/components/livreurs/CreateLivreurDialog";
@@ -149,6 +149,12 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Mail className="w-3.5 h-3.5 flex-shrink-0" />
                 <span className="truncate text-xs">{livreur.user_email}</span>
+              </div>
+            )}
+            {livreur.code_identification && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Truck className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">{livreur.code_identification}</span>
               </div>
             )}
             {livreur.quartier && (
