@@ -516,23 +516,25 @@ export default function ClientExterneApp() {
         <div className="max-w-lg mx-auto space-y-4">
 
           {/* ── ONGLETS PROMO ─────────────────────── */}
-          <div className="flex bg-white rounded-2xl p-1 gap-1 shadow-sm border border-gray-100">
-            <button
-              onClick={() => setOngletActif("accueil")}
-              className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${ongletActif === "accueil" ? "bg-primary text-white shadow" : "text-gray-500 hover:text-gray-700"}`}
-            >
-              🏠 Accueil
-            </button>
-            <button
-              onClick={() => setOngletActif("promo")}
-              className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${ongletActif === "promo" ? "bg-purple-600 text-white shadow" : "text-gray-500 hover:text-gray-700"}`}
-            >
-              🎁 Code Promo
-            </button>
-          </div>
+          {aUnCodePromo && (
+            <div className="flex bg-white rounded-2xl p-1 gap-1 shadow-sm border border-gray-100">
+              <button
+                onClick={() => setOngletActif("accueil")}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${ongletActif === "accueil" ? "bg-primary text-white shadow" : "text-gray-500 hover:text-gray-700"}`}
+              >
+                🏠 Accueil
+              </button>
+              <button
+                onClick={() => setOngletActif("promo")}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${ongletActif === "promo" ? "bg-purple-600 text-white shadow" : "text-gray-500 hover:text-gray-700"}`}
+              >
+                🎁 Code Promo
+              </button>
+            </div>
+          )}
 
           {/* ── ONGLET CODE PROMO ─────────────────── */}
-          {ongletActif === "promo" && (
+          {ongletActif === "promo" && aUnCodePromo && (
             <OngletCodePromo clientProfil={clientProfil} />
           )}
 
