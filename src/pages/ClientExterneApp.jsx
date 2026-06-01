@@ -481,71 +481,59 @@ export default function ClientExterneApp() {
   const prenom = (clientProfil?.prenom || (clientProfil?.nom || "").split(" ")[0] || "Client").trim() || "Client";
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      {/* Courses actives - Floating cards */}
+    <div className="min-h-screen bg-gray-50">
+
+      {/* ── COURSES ACTIVES — bannière flottante ─────── */}
       {coursesActives.length > 0 && (
-        <div className="fixed top-4 left-4 right-4 z-50 space-y-2 animate-in slide-in-from-top duration-300">
+        <div className="fixed top-3 left-3 right-3 z-50 space-y-2">
           {coursesActives.map((course) => (
-            <Card key={course.id} className="border-l-4 border-l-primary shadow-lg cursor-pointer" onClick={() => navigate("/client/suivi", { state: { course_id: course.id } })}>
-              <div className="p-3">
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    <Badge className="bg-primary/10 text-primary text-xs">
-                      {course.statut === "recherche_livreur" ? "🔍 Recherche" :
-                       course.statut === "livreur_en_route" ? "🚀 En route" :
-                       course.statut === "colis_recupere" ? "📦 Récupéré" : "🚚 Livraison"}
-                    </Badge>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            <div
+              key={course.id}
+              className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-primary/20 overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
+              onClick={() => navigate("/client/suivi", { state: { course_id: course.id } })}
+            >
+              <div className="h-1 bg-gradient-to-r from-primary to-red-500 w-full" />
+              <div className="p-3 flex items-center gap-3">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-black text-primary">
+                    {course.statut === "recherche_livreur" ? "🔍 Recherche livreur..." :
+                     course.statut === "livreur_en_route"  ? "🚀 Livreur en route" :
+                     course.statut === "colis_recupere"    ? "📦 Colis récupéré" : "🚚 En livraison"}
+                  </p>
+                  <p className="text-[11px] text-gray-500 truncate mt-0.5">
+                    {course.livreur_nom || "Livreur assigné"} · {course.adresse_depart} → {course.adresse_arrivee}
+                  </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  {course.livreur_photo_url ? (
-                    <img src={course.livreur_photo_url} alt={course.livreur_nom} className="w-8 h-8 rounded-full object-cover border-2 border-primary" />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                      <User className="w-4 h-4 text-primary" />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-xs">
-                      {course.heure_acceptation && course.livreur_nom
-                        ? course.livreur_nom
-                        : "Recherche livreur..."}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {course.adresse_depart} → {course.adresse_arrivee}
-                    </p>
-                  </div>
-                </div>
+                <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
               </div>
-            </Card>
+            </div>
           ))}
         </div>
       )}
 
-      <div className={`px-4 py-4`} style={coursesActives.length > 0 ? { marginTop: `${coursesActives.length * 90 + 8}px` } : {}}>
+      <div className="px-4 pb-24" style={coursesActives.length > 0 ? { paddingTop: `${coursesActives.length * 76 + 16}px` } : { paddingTop: "16px" }}>
         <div className="max-w-lg mx-auto space-y-4">
 
-          {/* Barre d'onglets — visible uniquement si le client a un code promo ambassadeur */}
+          {/* ── ONGLETS PROMO ─────────────────────── */}
           {aUnCodePromo && (
-            <div className="flex bg-muted rounded-xl p-1 gap-1">
+            <div className="flex bg-white rounded-2xl p-1 gap-1 shadow-sm border border-gray-100">
               <button
                 onClick={() => setOngletActif("accueil")}
-                className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${ongletActif === "accueil" ? "bg-white shadow text-foreground" : "text-muted-foreground"}`}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${ongletActif === "accueil" ? "bg-primary text-white shadow" : "text-gray-500 hover:text-gray-700"}`}
               >
                 🏠 Accueil
               </button>
               <button
                 onClick={() => setOngletActif("promo")}
-                className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${ongletActif === "promo" ? "bg-white shadow text-purple-700" : "text-muted-foreground"}`}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${ongletActif === "promo" ? "bg-purple-600 text-white shadow" : "text-gray-500 hover:text-gray-700"}`}
               >
                 🎁 Code Promo
               </button>
             </div>
           )}
 
-          {/* Onglet Code Promo */}
+          {/* ── ONGLET CODE PROMO ─────────────────── */}
           {ongletActif === "promo" && aUnCodePromo && (
             <OngletCodePromo clientProfil={clientProfil} />
           )}
@@ -553,217 +541,195 @@ export default function ClientExterneApp() {
           {ongletActif !== "promo" && (
             <>
 
-          {/* Notifications */}
-          {notifications.length > 0 && (
-            <div className="mb-4 space-y-2">
-              {notifications.map((notif) => (
-                <Card key={notif.id} className="p-4 border-l-4 border-l-yellow-400 bg-gradient-to-r from-yellow-50 to-orange-50">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-yellow-100 flex items-center justify-center flex-shrink-0">
-                      <Package className="w-5 h-5 text-yellow-600" />
+              {/* ── NOTIFICATIONS ─────────────────── */}
+              {notifications.length > 0 && (
+                <div className="space-y-2">
+                  {notifications.map((notif) => (
+                    <div key={notif.id} className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+                        <Package className="w-4 h-4 text-amber-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-bold text-amber-900 text-sm">{notif.titre}</p>
+                        <p className="text-xs text-amber-700 mt-0.5">{notif.message}</p>
+                        {notif.course_id && (
+                          <button
+                            className="mt-2 text-xs font-bold text-amber-800 underline"
+                            onClick={() => navigate("/client/suivi")}
+                          >
+                            Voir la course →
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <p className="font-bold text-yellow-900">{notif.titre}</p>
-                      <p className="text-sm text-yellow-700 mt-1">{notif.message}</p>
-                      {notif.course_id && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="mt-2 border-yellow-300 text-yellow-800 hover:bg-yellow-100"
-                          onClick={() => navigate("/client/suivi")}
-                        >
-                          Voir la course
-                        </Button>
-                      )}
+                  ))}
+                </div>
+              )}
+
+              {/* ── HERO HEADER ───────────────────── */}
+              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-red-500 to-red-700 p-5 shadow-xl shadow-red-200">
+                {/* Cercles déco */}
+                <div className="absolute -top-6 -right-6 w-28 h-28 bg-white/10 rounded-full" />
+                <div className="absolute -bottom-8 -left-4 w-36 h-36 bg-white/5 rounded-full" />
+                <div className="relative">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-white/70 text-xs font-medium">Bonjour 👋</p>
+                      <h1 className="text-2xl font-black text-white mt-0.5">{prenom}</h1>
+                      <div className="flex items-center gap-2 mt-3 flex-wrap">
+                        <div className="flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full">
+                          <MapPin className="w-3 h-3 text-white" />
+                          <span className="text-xs text-white font-semibold">
+                            {clientProfil?.quartier || "Ouagadougou"}
+                          </span>
+                        </div>
+                        <GPSBadge profil={clientProfil} onForceSync={handleForceGPSSync} />
+                      </div>
                     </div>
+                    <button
+                      className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center hover:bg-white/30 transition-colors"
+                      onClick={() => setShowProfilModal(true)}
+                    >
+                      <User className="w-5 h-5 text-white" />
+                    </button>
                   </div>
-                </Card>
-              ))}
-            </div>
-          )}
 
-          {/* Header */}
-          <div className="bg-gradient-to-r from-primary to-red-600 rounded-3xl p-5 shadow-lg shadow-red-200">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <p className="text-white/80 text-xs mb-0.5">Bonjour 👋</p>
-                <h1 className="text-2xl font-black text-white">{prenom}</h1>
-                <div className="flex items-center gap-2 mt-2">
-                  <div className="flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full">
-                    <MapPin className="w-3 h-3 text-white" />
-                    <span className="text-xs text-white font-medium">Ouagadougou</span>
+                  {/* Stats rapides dans le header */}
+                  {coursesActives.length > 0 && (
+                    <div className="mt-4 bg-white/15 backdrop-blur-sm rounded-2xl px-4 py-2.5 flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                      <p className="text-white text-xs font-semibold">
+                        {coursesActives.length} course{coursesActives.length > 1 ? "s" : ""} en cours · appuyez ci-dessus
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ── ACTIONS PRINCIPALES ───────────── */}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-primary/20"
+                  onClick={() => navigate("/client/course/expedier", { state: { position, clientProfil } })}
+                >
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-red-600 flex items-center justify-center shadow-lg shadow-red-200 mb-3 group-hover:scale-105 transition-transform">
+                    <Package className="w-6 h-6 text-white" />
                   </div>
-                  <GPSBadge profil={clientProfil} onForceSync={handleForceGPSSync} />
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-xl"
-                onClick={() => setShowProfilModal(true)}
-              >
-                <User className="w-5 h-5" />
-              </Button>
-            </div>
-          </div>
+                  <p className="font-black text-gray-900 text-sm">Expédier</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Envoyer un colis</p>
+                  <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
+                    <ChevronRight className="w-3.5 h-3.5 text-primary" />
+                  </div>
+                </button>
 
-          {/* Actions principales */}
-          <div className="grid grid-cols-2 gap-3">
-            <Card 
-              className="group p-5 cursor-pointer hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/30 bg-gradient-to-br from-white to-primary/5"
-              onClick={() => navigate("/client/course/expedier", { state: { position, clientProfil } })}
-            >
-              <div className="text-center space-y-3">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-red-600 flex items-center justify-center mx-auto shadow-lg shadow-red-200 group-hover:scale-110 transition-transform">
-                  <Package className="w-7 h-7 text-white" />
-                </div>
-                <div>
-                  <p className="font-bold text-foreground">Expédier</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Envoyer un colis</p>
-                </div>
+                <button
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-green-200"
+                  onClick={() => navigate("/client/course/recevoir", { state: { position, clientProfil } })}
+                >
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-lg shadow-green-200 mb-3 group-hover:scale-105 transition-transform">
+                    <span className="text-2xl">📥</span>
+                  </div>
+                  <p className="font-black text-gray-900 text-sm">Recevoir</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Attendre un colis</p>
+                  <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-green-50 flex items-center justify-center">
+                    <ChevronRight className="w-3.5 h-3.5 text-green-600" />
+                  </div>
+                </button>
               </div>
-            </Card>
 
-            <Card 
-              className="group p-5 cursor-pointer hover:shadow-xl transition-all duration-300 border-2 hover:border-accent/30 bg-gradient-to-br from-white to-accent/5"
-              onClick={() => navigate("/client/course/recevoir", { state: { position, clientProfil } })}
-            >
-              <div className="text-center space-y-3">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-accent to-green-600 flex items-center justify-center mx-auto shadow-lg shadow-green-200 group-hover:scale-110 transition-transform">
-                  <span className="text-3xl">📥</span>
-                </div>
-                <div>
-                  <p className="font-bold text-foreground">Recevoir</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Recevoir un colis</p>
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          {/* Bouton carte — toujours visible si GPS actif */}
-          {position && (
-            <Card className="p-4 cursor-pointer hover:shadow-lg transition-all" onClick={() => setShowMap(true)}>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <MapPin className="w-5 h-5 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-foreground">
+              {/* ── BOUTON CARTE ──────────────────── */}
+              {position && (
+                <button
+                  className="w-full bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3 shadow-sm hover:shadow-md hover:border-primary/20 transition-all active:scale-[0.98]"
+                  onClick={() => setShowMap(true)}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+                    <MapPin className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <p className="flex-1 text-left font-semibold text-gray-800 text-sm">
                     {coursesActives.some(c => ["livreur_en_route","colis_recupere","en_livraison"].includes(c.statut))
                       ? "📍 Voir le livreur en temps réel"
                       : "🗺️ Voir la carte"}
                   </p>
-                </div>
-                <ChevronRight className="w-5 h-5 text-muted-foreground" />
-              </div>
-            </Card>
-          )}
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                </button>
+              )}
 
-          {/* Raccourcis */}
-          <Card className="p-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase mb-3">Raccourcis</p>
-            <div className="grid grid-cols-4 gap-2">
-              <Button 
-                variant="ghost" 
-                className="h-auto py-3 flex flex-col gap-1.5 hover:bg-blue-50"
-                onClick={() => navigate("/client/suivi")}
-              >
-                <Package className="w-5 h-5 text-blue-600" />
-                <span className="text-[10px] font-medium">Mes courses</span>
-              </Button>
-              <Button 
-                variant="ghost" 
-                className="h-auto py-3 flex flex-col gap-1.5 hover:bg-purple-50"
-                onClick={() => navigate("/client/suivi")}
-              >
-                <Clock className="w-5 h-5 text-purple-600" />
-                <span className="text-[10px] font-medium">Historique</span>
-              </Button>
-              <Button 
-                variant="ghost" 
-                className="h-auto py-3 flex flex-col gap-1.5 hover:bg-green-50"
-                onClick={() => {
-                  const msg = encodeURIComponent("Bonjour SILGAPP 👋\nJ'ai besoin d'aide sur SILGAPP.");
-                  const a = document.createElement("a");
-                  a.href = `whatsapp://send?phone=22667572857&text=${msg}`;
-                  a.click();
-                  setTimeout(() => { if (document.hasFocus()) window.open(`https://wa.me/22667572857?text=${msg}`, "_blank"); }, 500);
-                }}
-              >
-                <MessageCircle className="w-5 h-5 text-green-600" />
-                <span className="text-[10px] font-medium">Support</span>
-              </Button>
-              <Button 
-                variant="ghost" 
-                className="h-auto py-3 flex flex-col gap-1.5 hover:bg-orange-50"
-                onClick={() => setShowProfilModal(true)}
-              >
-                <User className="w-5 h-5 text-orange-600" />
-                <span className="text-[10px] font-medium">Mes infos</span>
-              </Button>
-            </div>
-          </Card>
-
-          {/* Bannière code promo si client a un code et n'a pas encore fait sa première course */}
-          {clientProfil?.code_promo_utilise && !clientProfil?.premiere_course_faite && (
-            <Card className="p-4 border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center flex-shrink-0">
-                  <span className="text-xl">🎁</span>
-                </div>
-                <div>
-                  <p className="font-bold text-purple-900 text-sm">Code promo actif : <span className="font-black font-mono">{clientProfil.code_promo_utilise}</span></p>
-                  <p className="text-xs text-purple-700">100 FCFA de réduction sur votre prochaine course (min. 1 000 FCFA)</p>
+              {/* ── RACCOURCIS ────────────────────── */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Accès rapide</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { icon: <Package className="w-5 h-5" />, label: "Courses",   color: "text-blue-600",   bg: "bg-blue-50",   action: () => navigate("/client/suivi") },
+                    { icon: <Clock className="w-5 h-5" />,   label: "Historique",color: "text-purple-600", bg: "bg-purple-50", action: () => navigate("/client/suivi") },
+                    { icon: <MessageCircle className="w-5 h-5" />, label: "Support", color: "text-green-600", bg: "bg-green-50", action: () => {
+                      const msg = encodeURIComponent("Bonjour SILGAPP 👋\nJ'ai besoin d'aide sur SILGAPP.");
+                      const a = document.createElement("a");
+                      a.href = `whatsapp://send?phone=22667572857&text=${msg}`;
+                      a.click();
+                      setTimeout(() => { if (document.hasFocus()) window.open(`https://wa.me/22667572857?text=${msg}`, "_blank"); }, 500);
+                    }},
+                    { icon: <User className="w-5 h-5" />,    label: "Profil",    color: "text-orange-600", bg: "bg-orange-50", action: () => setShowProfilModal(true) },
+                  ].map((item, i) => (
+                    <button
+                      key={i}
+                      onClick={item.action}
+                      className="flex flex-col items-center gap-1.5 py-3 rounded-xl hover:bg-gray-50 active:scale-95 transition-all"
+                    >
+                      <div className={`w-10 h-10 rounded-xl ${item.bg} flex items-center justify-center ${item.color}`}>
+                        {item.icon}
+                      </div>
+                      <span className="text-[10px] font-semibold text-gray-600">{item.label}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
-            </Card>
-          )}
 
-          {/* Support WhatsApp */}
-          <SupportWhatsApp />
-
-          {/* Tarification */}
-          <Card className="p-5 bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200 shadow-md">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0 shadow-sm">
-                <TrendingUp className="w-5 h-5 text-indigo-600" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-bold text-indigo-900">Tarification transparente</p>
-                <p className="text-xs text-indigo-700 mt-1.5 leading-relaxed">
-                  100 F/km — Prix calculé automatiquement selon la distance réellement parcourue.
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          {/* Avantages */}
-          <Card className="p-5 bg-gradient-to-br from-white to-gray-50 shadow-md">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-red-600 flex items-center justify-center shadow-sm">
-                <Star className="w-4 h-4 text-white" />
-              </div>
-              <p className="font-bold text-foreground text-base">Facilitez-vous la vie avec SILGAPP</p>
-            </div>
-            <div className="space-y-3">
-              {[
-                { color: "green", icon: <Zap className="w-3.5 h-3.5 text-white" />, title: "Livraison rapide", desc: "Livreurs disponibles 24/7 près de chez vous" },
-                { color: "blue", icon: <Shield className="w-3.5 h-3.5 text-white" />, title: "Service sécurisé", desc: "Livreurs vérifiés et suivis en temps réel" },
-                { color: "purple", icon: <HelpCircle className="w-3.5 h-3.5 text-white" />, title: "Support réactif", desc: "Assistance disponible à tout moment" },
-              ].map((item, i) => (
-                <div key={i} className={`flex items-start gap-3 p-3 rounded-xl bg-gradient-to-r from-${item.color}-50 to-white border border-${item.color}-100`}>
-                  <div className={`w-7 h-7 rounded-lg bg-gradient-to-br from-${item.color}-500 to-${item.color}-600 flex items-center justify-center flex-shrink-0 shadow-sm`}>
-                    {item.icon}
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-foreground">{item.title}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
+              {/* ── BANNIÈRE CODE PROMO ───────────── */}
+              {clientProfil?.code_promo_utilise && !clientProfil?.premiere_course_faite && (
+                <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl p-4 shadow-lg shadow-purple-200">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">🎁</span>
+                    <div className="flex-1">
+                      <p className="font-black text-white text-sm">Code promo actif</p>
+                      <p className="text-white/80 text-xs mt-0.5">
+                        <span className="font-black font-mono bg-white/20 px-1.5 py-0.5 rounded">{clientProfil.code_promo_utilise}</span>
+                        {" "}· −100 FCFA sur votre prochaine course
+                      </p>
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          </Card>
-          </>
+              )}
+
+              {/* ── SUPPORT + TARIF ───────────────── */}
+              <SupportWhatsApp />
+
+              <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-100 flex items-center justify-center">
+                    <TrendingUp className="w-4 h-4 text-indigo-600" />
+                  </div>
+                  <p className="font-bold text-gray-800 text-sm">Pourquoi SILGAPP ?</p>
+                </div>
+                <div className="space-y-2">
+                  {[
+                    { icon: "⚡", color: "bg-green-50 text-green-700",   title: "Livraison rapide",  desc: "Livreurs disponibles 24/7" },
+                    { icon: "🔒", color: "bg-blue-50 text-blue-700",     title: "Service sécurisé",  desc: "Livreurs vérifiés et suivis" },
+                    { icon: "💬", color: "bg-purple-50 text-purple-700", title: "Support réactif",   desc: "Aide disponible à tout moment" },
+                    { icon: "💰", color: "bg-amber-50 text-amber-700",   title: "100 F/km",          desc: "Tarif transparent et calculé au km" },
+                  ].map((item, i) => (
+                    <div key={i} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl ${item.color}`}>
+                      <span className="text-base">{item.icon}</span>
+                      <div>
+                        <p className="text-xs font-bold">{item.title}</p>
+                        <p className="text-[10px] opacity-70">{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </>
           )}
         </div>
       </div>
