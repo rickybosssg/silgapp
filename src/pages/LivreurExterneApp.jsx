@@ -13,7 +13,6 @@ import EmptyStateAttente from "@/components/livreur/EmptyStateAttente";
 import CourseEnAttenteModalExterne from "@/components/livreur/CourseEnAttenteModalExterne";
 import CourseActiveCard from "@/components/livreur/CourseActiveCard";
 import LivreurHistorique from "@/components/livreur/LivreurHistorique";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LivreurExterneOnboarding from "@/components/livreur/LivreurExterneOnboarding";
 import LivreurMesInfosModal from "@/components/livreur/LivreurMesInfosModal";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
@@ -319,10 +318,16 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   }
 
   // ─── Dashboard principal ──────────────────────────────────────────────────
+  const TABS = [
+    { id: "courses",    label: "Courses",    emoji: "🚴" },
+    { id: "historique", label: "Historique", emoji: "📋" },
+    { id: "infos",      label: "Mon profil", emoji: "👤" },
+  ];
+
   return (
     <div className="min-h-screen bg-gray-50">
 
-      {/* VENUS — toujours visible, tous les états */}
+      {/* VENUS — toujours visible */}
       <VenusFloatingButton />
 
       {/* Modal plein écran si course en attente */}
@@ -333,7 +338,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           onAccepter={handleAccepter}
           onRefuser={handleRefuser}
           onExpire={() => {
-            // Remettre le livreur disponible si pas en course active
             if (coursesActives.length === 0 && livreurProfil?.statut !== "hors_ligne") {
               saveLivreur(livreurProfil.id, { statut: "disponible" }).catch(() => null);
             }
@@ -344,14 +348,34 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         />
       )}
 
-      <div className="max-w-lg mx-auto p-4 pb-12">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
-          <TabsList className="w-full">
-            <TabsTrigger value="courses" className="flex-1 text-xs">Courses</TabsTrigger>
-            <TabsTrigger value="historique" className="flex-1 text-xs">Historique</TabsTrigger>
-            <TabsTrigger value="infos" className="flex-1 text-xs">Mes infos</TabsTrigger>
-          </TabsList>
-        </Tabs>
+      {/* ── Navigation sticky en haut ──────────────── */}
+      <div className="sticky top-0 z-30 bg-gray-50/95 backdrop-blur-sm px-4 pt-3 pb-2 border-b border-gray-100">
+        <div className="max-w-lg mx-auto flex gap-1 bg-white rounded-2xl p-1 shadow-sm border border-gray-100">
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                activeTab === tab.id
+                  ? "bg-gradient-to-br from-slate-800 to-slate-900 text-white shadow-md"
+                  : "text-gray-400 hover:text-gray-600"
+              }`}
+            >
+              <span>{tab.emoji}</span>
+              <span>{tab.label}</span>
+              {/* Badge courses actives */}
+              {tab.id === "courses" && coursesActives.length > 0 && (
+                <span className="w-4 h-4 rounded-full bg-primary text-white text-[9px] font-black flex items-center justify-center">
+                  {coursesActives.length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Contenu onglets ────────────────────────── */}
+      <div className="max-w-lg mx-auto px-4 pt-4 pb-16">
 
         {activeTab === "courses" && (
           <div className="space-y-4">
@@ -366,9 +390,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             />
 
             {isEnLigne && !livreurVisible && (
-              <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-center gap-3">
-                <span className="text-xl">📍</span>
-                <p className="text-sm text-amber-700 font-medium leading-tight">
+              <div className="rounded-2xl bg-amber-50 border border-amber-100 px-4 py-3 flex items-center gap-3">
+                <span className="text-xl flex-shrink-0">📍</span>
+                <p className="text-sm text-amber-700 font-semibold leading-tight">
                   Activez votre GPS pour être visible sur la carte
                 </p>
               </div>
@@ -380,6 +404,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               montantDüSilga={montantDüSilga}
               isExterne={true}
             />
+
             <LivreurStatutCard statut={livreurProfil.statut} livreur={livreurProfil} isExterne={true} />
 
             {coursesActives.length > 0 && (
@@ -400,6 +425,14 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             )}
 
             {coursesActives.length === 0 && isEnLigne && <EmptyStateAttente />}
+
+            {!isEnLigne && (
+              <div className="rounded-2xl bg-slate-800 text-white p-5 text-center space-y-2 shadow-lg">
+                <p className="text-2xl">😴</p>
+                <p className="font-black text-base">Vous êtes hors ligne</p>
+                <p className="text-white/60 text-xs">Appuyez sur <strong>Activer</strong> dans le header pour recevoir des courses</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -410,7 +443,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         {activeTab === "infos" && livreurProfil && (
           <LivreurMesInfosModal
             livreurProfil={livreurProfil}
-            onSave={(updated) => {
+            onSave={() => {
               queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
               toast.success("Profil mis à jour ✓");
             }}

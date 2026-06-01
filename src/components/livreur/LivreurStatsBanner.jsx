@@ -27,47 +27,47 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
   if (isExterne) {
     return (
       <div className="space-y-2">
+        {/* KPI row */}
         <div className="grid grid-cols-3 gap-2">
-          <div className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 text-center">
-            <div className="w-7 h-7 rounded-xl bg-blue-50 flex items-center justify-center mx-auto mb-1">
-              <Package className="w-3.5 h-3.5 text-blue-500" />
+          {[
+            { icon: <Package className="w-4 h-4 text-blue-500" />,   bg: "bg-blue-50",   val: coursesAujourdHui,       label: "Courses",   valClass: "text-blue-800" },
+            { icon: <CheckCircle className="w-4 h-4 text-green-500" />, bg: "bg-green-50", val: livreesToday.length,    label: "Livrées",   valClass: "text-green-800" },
+            { icon: <AlertCircle className="w-4 h-4 text-orange-500" />, bg: "bg-orange-50", val: null, label: "Dû Silga", valClass: "text-orange-700" },
+          ].map((item, i) => (
+            <div key={i} className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 text-center">
+              <div className={`w-8 h-8 rounded-xl ${item.bg} flex items-center justify-center mx-auto mb-1.5`}>
+                {item.icon}
+              </div>
+              {item.val !== null ? (
+                <p className={`text-2xl font-black ${item.valClass}`}>{item.val}</p>
+              ) : (
+                <p className={`text-xs font-black ${item.valClass} leading-tight`}>
+                  {montantDüSilga > 0 ? `${montantDüSilga.toLocaleString()}` : "0"}<span className="text-[9px] ml-0.5">F</span>
+                </p>
+              )}
+              <p className="text-[10px] text-gray-400 font-medium mt-0.5">{item.label}</p>
             </div>
-            <p className="text-xl font-bold text-gray-900">{coursesAujourdHui}</p>
-            <p className="text-[10px] text-gray-400 font-medium">Courses</p>
-          </div>
-          <div className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 text-center">
-            <div className="w-7 h-7 rounded-xl bg-green-50 flex items-center justify-center mx-auto mb-1">
-              <CheckCircle className="w-3.5 h-3.5 text-green-500" />
-            </div>
-            <p className="text-xl font-bold text-gray-900">{livreesToday.length}</p>
-            <p className="text-[10px] text-gray-400 font-medium">Livrées</p>
-          </div>
-          <div className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 text-center">
-            <div className="w-7 h-7 rounded-xl bg-amber-50 flex items-center justify-center mx-auto mb-1">
-              <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
-            </div>
-            <p className="text-sm font-bold text-orange-700 leading-tight">
-              {montantDüSilga > 0 ? `${montantDüSilga.toLocaleString()} FCFA` : "0 FCFA"}
-            </p>
-            <p className="text-[10px] text-gray-400 font-medium">💰 Commission Silga</p>
-          </div>
+          ))}
         </div>
+
+        {/* Bilan financier du jour */}
         {livreesToday.length > 0 && (
-          <div className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100">
-            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-2">Aujourd'hui</p>
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div>
-                <p className="text-sm font-bold text-gray-900">{prixTotalToday.toLocaleString()} FCFA</p>
-                <p className="text-[10px] text-gray-400">Prix total</p>
-              </div>
-              <div>
-                <p className="text-sm font-bold text-green-700">{gainToday.toLocaleString()} FCFA</p>
-                <p className="text-[10px] text-gray-400">Votre gain (70%)</p>
-              </div>
-              <div>
-                <p className="text-sm font-bold text-orange-600">{commissionToday.toLocaleString()} FCFA</p>
-                <p className="text-[10px] text-gray-400">Commission (30%)</p>
-              </div>
+          <div className="rounded-2xl overflow-hidden shadow-sm">
+            <div className="bg-slate-800 px-4 py-2 flex items-center gap-2">
+              <Banknote className="w-3.5 h-3.5 text-white/60" />
+              <p className="text-[10px] font-black text-white/60 uppercase tracking-widest">Bilan du jour</p>
+            </div>
+            <div className="bg-white border border-gray-100 grid grid-cols-3 divide-x divide-gray-100">
+              {[
+                { label: "Total client", val: prixTotalToday, color: "text-gray-800" },
+                { label: "Votre gain 70%", val: gainToday,    color: "text-green-700" },
+                { label: "Commission 30%", val: commissionToday, color: "text-orange-600" },
+              ].map((s, i) => (
+                <div key={i} className="p-3 text-center">
+                  <p className={`text-sm font-black ${s.color}`}>{s.val.toLocaleString()}<span className="text-[9px] ml-0.5 font-normal">F</span></p>
+                  <p className="text-[9px] text-gray-400 mt-0.5">{s.label}</p>
+                </div>
+              ))}
             </div>
           </div>
         )}
