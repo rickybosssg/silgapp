@@ -21,6 +21,7 @@ import CourseDetailDialog from "@/components/courses/CourseDetailDialog";
 
 import { Card } from "@/components/ui/card";
 import CodePromoPanel from "@/components/admin/CodePromoPanel";
+import DownloadStatsPanel from "@/components/admin/DownloadStatsPanel";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import StatDetailModal from "@/components/dashboard/StatDetailModal";
 import AppToggleButton from "@/components/admin/AppToggleButton";
@@ -185,6 +186,9 @@ export default function DashboardExterne() {
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
         <CodePromoPanel />
       </div>
+
+      {/* Statistiques Téléchargements */}
+      <DownloadStatsPanel />
 
       {/* Raccourci Panel Clients Externes */}
       <Card className="p-4 cursor-pointer hover:shadow-lg transition-all border-2 border-pink-200 bg-pink-50">
