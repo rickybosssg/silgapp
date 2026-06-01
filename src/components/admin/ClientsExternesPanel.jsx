@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Users, Eye, Lock, Unlock, Phone, Mail, Calendar, Activity, Truck } from "lucide-react";
+import { Search, Users, Eye, Lock, Unlock, Phone, Mail, Calendar, Activity, Truck, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
@@ -17,7 +17,7 @@ function formaterTel(tel) {
   return digits.slice(0, 2) + " " + digits.slice(2, 4) + " " + digits.slice(4, 6) + " " + digits.slice(6, 8);
 }
 
-function ClientDetailModal({ client, courses, migrationEnCours, onClose, onBloquer, onMigrer }) {
+function ClientDetailModal({ client, courses, migrationEnCours, onClose, onBloquer, onMigrer, onSupprimer }) {
   const coursesDuClient = courses.filter(c => {
     const tel = (c.client_telephone || "").replace(/\D/g, "").slice(-8);
     const clientTel = (client.telephone || "").replace(/\D/g, "").slice(-8);
@@ -116,6 +116,19 @@ function ClientDetailModal({ client, courses, migrationEnCours, onClose, onBloqu
             </Button>
             <Button variant="outline" onClick={onClose} className="flex-1">Fermer</Button>
           </div>
+          <Button
+            variant="destructive"
+            className="w-full bg-red-700 hover:bg-red-800"
+            onClick={() => {
+              if (window.confirm(`Supprimer définitivement ${client.nom} ? Cette action est irréversible.`)) {
+                onSupprimer(client);
+                onClose();
+              }
+            }}
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Supprimer définitivement ce client
+          </Button>
         </div>
       </div>
     </div>
@@ -126,6 +139,7 @@ export default function ClientsExternesPanel() {
   const [recherche, setRecherche] = useState("");
   const [clientDetail, setClientDetail] = useState(null);
   const [migrationEnCours, setMigrationEnCours] = useState(null);
+  const [suppressionEnCours, setSuppressionEnCours] = useState(null);
 
   const { data: clients = [], refetch } = useQuery({
     queryKey: ["clients-externes-panel"],
@@ -155,6 +169,14 @@ export default function ClientsExternesPanel() {
 
   const handleBloquer = async (client) => {
     await base44.entities.ClientExterne.update(client.id, { actif: client.actif === false ? true : false });
+    refetch();
+  };
+
+  const handleSupprimer = async (client) => {
+    setSuppressionEnCours(client.id);
+    await base44.entities.ClientExterne.delete(client.id);
+    toast.success(`Client ${client.nom} supprimé`);
+    setSuppressionEnCours(null);
     refetch();
   };
 
@@ -301,6 +323,19 @@ export default function ClientsExternesPanel() {
                     >
                       {client.actif === false ? <Unlock className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="h-8 px-2 bg-red-700 hover:bg-red-800"
+                      disabled={suppressionEnCours === client.id}
+                      onClick={() => {
+                        if (window.confirm(`Supprimer définitivement ${client.nom} ?`)) {
+                          handleSupprimer(client);
+                        }
+                      }}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
                   </div>
                 </div>
               </Card>
@@ -317,6 +352,7 @@ export default function ClientsExternesPanel() {
           onClose={() => setClientDetail(null)}
           onBloquer={handleBloquer}
           onMigrer={handleMigrer}
+          onSupprimer={handleSupprimer}
         />
       )}
     </div>
