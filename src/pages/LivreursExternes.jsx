@@ -90,7 +90,7 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
     <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4">
       <div className="bg-white rounded-2xl w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-primary/10 to-accent/10 p-5 flex items-start justify-between">
+        <div className="bg-gradient-to-r from-primary to-red-600 p-5 flex items-start justify-between rounded-t-2xl">
           <div className="flex items-center gap-3">
             <LivreurPhotoUploader
               photoUrl={livreur.photo_url}
@@ -101,7 +101,7 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
               size="lg"
             />
             <div>
-              <p className="font-bold text-lg text-foreground">{nomComplet}</p>
+              <p className="font-bold text-lg text-white">{nomComplet}</p>
               <div className="flex gap-1.5 mt-1 flex-wrap items-center">
                 {isBloque ? (
                   <span className="text-xs px-2 py-0.5 rounded-full border font-medium bg-red-100 text-red-700 border-red-200">Bloqué</span>
@@ -141,7 +141,7 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
               </div>
             </div>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
+          <button onClick={onClose} className="text-white/70 hover:text-white p-1">
             <XCircle className="w-6 h-6" />
           </button>
         </div>
@@ -517,16 +517,16 @@ export default function LivreursExternes() {
       {/* Statistiques */}
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
         {[
-          { label: "ON",          value: stats.on,         color: "text-green-700 bg-green-50 border-green-200" },
-          { label: "OFF",         value: stats.off,        color: "text-gray-500 bg-gray-50 border-gray-200" },
-          { label: "Libres",      value: stats.libres,     color: "text-emerald-700 bg-emerald-50 border-emerald-200" },
-          { label: "En course",   value: stats.enCourse,   color: "text-blue-700 bg-blue-50 border-blue-200" },
-          { label: "App ouverte", value: stats.appOuverte, color: "text-green-700 bg-green-50 border-green-200" },
-          { label: "App fermée",  value: stats.appFermee,  color: "text-gray-500 bg-gray-50 border-gray-200" },
+          { label: "ON",          value: stats.on,         grad: "from-green-500 to-emerald-500",   shadow: "shadow-green-100" },
+          { label: "OFF",         value: stats.off,        grad: "from-gray-400 to-gray-500",       shadow: "shadow-gray-100" },
+          { label: "Libres",      value: stats.libres,     grad: "from-emerald-500 to-teal-500",    shadow: "shadow-emerald-100" },
+          { label: "En course",   value: stats.enCourse,   grad: "from-blue-500 to-indigo-500",     shadow: "shadow-blue-100" },
+          { label: "App ouverte", value: stats.appOuverte, grad: "from-cyan-500 to-sky-500",        shadow: "shadow-cyan-100" },
+          { label: "App fermée",  value: stats.appFermee,  grad: "from-slate-400 to-slate-500",     shadow: "shadow-slate-100" },
         ].map(s => (
-          <div key={s.label} className={`border rounded-lg p-2 text-center ${s.color}`}>
-            <p className="text-lg font-bold leading-none">{s.value}</p>
-            <p className="text-xs mt-0.5">{s.label}</p>
+          <div key={s.label} className={`bg-gradient-to-br ${s.grad} rounded-2xl p-3 text-center text-white shadow-md ${s.shadow}`}>
+            <p className="text-2xl font-black leading-none">{s.value}</p>
+            <p className="text-[10px] font-semibold opacity-80 mt-0.5 uppercase tracking-wide">{s.label}</p>
           </div>
         ))}
       </div>
@@ -548,148 +548,148 @@ export default function LivreursExternes() {
 
       {/* Liste */}
       {livreursFiltres.length === 0 ? (
-      <Card className="p-10 text-center text-muted-foreground">
-      <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
-      <p className="font-semibold">Aucun livreur</p>
-      <p className="text-xs mt-1">Modifiez le filtre ou ajoutez un livreur.</p>
-      </Card>
+        <div className="text-center py-16 text-muted-foreground">
+          <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
+            <Users className="w-7 h-7 opacity-30" />
+          </div>
+          <p className="font-semibold">Aucun livreur</p>
+          <p className="text-xs mt-1 opacity-60">Modifiez le filtre ou ajoutez un livreur.</p>
+        </div>
       ) : (
-      <div className="space-y-2">
-      {livreursFiltres.map(livreur => {
-        const nomComplet = `${livreur.prenom || ""} ${livreur.nom}`.trim();
-        const vb = validationBadge(livreur.validation);
-        const isBloque = livreur.actif === false;
-        const isAdminOff = !!livreur.admin_hors_ligne;
-        const on = isON(livreur);
-        const libre = isLibre(livreur);
-        const enLigne = isEnLigne(livreur);
-        const montantDu = livreur.montant_du_silga || 0;
+        <div className="space-y-2">
+          {livreursFiltres.map(livreur => {
+            const nomComplet = `${livreur.prenom || ""} ${livreur.nom}`.trim();
+            const vb = validationBadge(livreur.validation);
+            const isBloque = livreur.actif === false;
+            const isAdminOff = !!livreur.admin_hors_ligne;
+            const on = isON(livreur);
+            const libre = isLibre(livreur);
+            const enLigne = isEnLigne(livreur);
+            const montantDu = livreur.montant_du_silga || 0;
 
-        return (
-          <Card key={livreur.id} className={`p-4 transition-all ${isBloque ? "border-red-200 bg-red-50/30" : ""}`}>
-            <div className="flex items-start gap-3">
-              <LivreurPhotoUploader
-                photoUrl={livreur.photo_url}
-                nomComplet={nomComplet}
-                canEdit={false}
-                size="md"
-              />
+            return (
+              <div
+                key={livreur.id}
+                className={`flex items-center gap-3 p-3 rounded-2xl border transition-all duration-200 hover:shadow-md cursor-pointer ${
+                  isBloque ? "bg-red-50/60 border-red-200" : "bg-white border-gray-100 hover:border-gray-200"
+                }`}
+                onClick={() => setSelectedLivreur(livreur)}
+              >
+                {/* Photo / Avatar */}
+                <div className="flex-shrink-0">
+                  <LivreurPhotoUploader
+                    photoUrl={livreur.photo_url}
+                    nomComplet={nomComplet}
+                    canEdit={false}
+                    size="md"
+                  />
+                </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                      <span className="font-bold text-foreground truncate">{nomComplet}</span>
-                      {isBloque ? (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full border font-medium bg-red-100 text-red-700 border-red-200">Bloqué</span>
-                      ) : (
-                        <>
-                          {isAdminOff && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full border font-medium inline-flex items-center gap-1 bg-red-100 text-red-700 border-red-200">
-                              <PowerOff className="w-2.5 h-2.5" />
-                              OFF Admin
-                            </span>
-                          )}
-                          {!isAdminOff && (
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium inline-flex items-center gap-1 ${on ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-500 border-gray-200"}`}>
+                <div className="flex-1 min-w-0">
+                  {/* Nom + badges statut */}
+                  <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                    <span className="font-bold text-sm text-foreground truncate">{nomComplet}</span>
+                    {isBloque ? (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-red-100 text-red-700">🔒 Bloqué</span>
+                    ) : (
+                      <>
+                        {isAdminOff && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold inline-flex items-center gap-1 bg-red-100 text-red-700">
+                            <PowerOff className="w-2.5 h-2.5" />OFF Admin
+                          </span>
+                        )}
+                        {!isAdminOff && (
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold inline-flex items-center gap-1 ${on ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                             <span className={`w-1.5 h-1.5 rounded-full inline-block ${on ? "bg-green-500" : "bg-gray-300"}`} />
-                            {on ? (livreur.statut === "en_course" ? "🟠 En course" : "🟢 ON livreur") : "⚫ OFF livreur"}
+                            {on ? (livreur.statut === "en_course" ? "🟠 En course" : "🟢 ON") : "⚫ OFF"}
                           </span>
-                          )}
-                          {on && (
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium inline-flex items-center gap-1 ${libre ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-blue-100 text-blue-700 border-blue-200"}`}>
-                              <span className={`w-1.5 h-1.5 rounded-full inline-block ${libre ? "bg-emerald-500" : "bg-blue-500"}`} />
-                              {libre ? "Libre" : "En course"}
-                            </span>
-                          )}
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1 ${enLigne ? "text-green-700" : "text-gray-400"}`}>
-                            {enLigne ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-                            {enLigne ? "App ouverte" : "App fermée"}
+                        )}
+                        {on && (
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold inline-flex items-center gap-1 ${libre ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full inline-block ${libre ? "bg-emerald-500" : "bg-blue-500"}`} />
+                            {libre ? "Libre" : "En course"}
                           </span>
-                        </>
-                      )}
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${vb.color}`}>{vb.label}</span>
-                    </div>
-
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground mb-2">
-                      {livreur.telephone && (
-                        <span className="flex items-center gap-1">
-                          <Phone className="w-3 h-3" />{livreur.telephone}
+                        )}
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold inline-flex items-center gap-1 ${enLigne ? "bg-cyan-100 text-cyan-700" : "bg-gray-100 text-gray-400"}`}>
+                          {enLigne ? <Wifi className="w-2.5 h-2.5" /> : <WifiOff className="w-2.5 h-2.5" />}
+                          {enLigne ? "App active" : "App fermée"}
                         </span>
-                      )}
-                      {livreur.quartier && (
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />{livreur.quartier}
-                        </span>
-                      )}
-                      {livreur.vehicule && (
-                        <span className="flex items-center gap-1">
-                          {vehiculeIcon(livreur.vehicule)}{livreur.vehicule}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {montantDu > 0 && (
-                        <div className="inline-flex items-center gap-1 text-[11px] text-orange-700 bg-orange-50 border border-orange-200 rounded-full px-2 py-0.5">
-                          <Banknote className="w-3 h-3" />
-                          Dû Silga: {montantDu.toLocaleString()} FCFA
-                        </div>
-                      )}
-                      {livreur.note_moyenne > 0 && (
-                        <div className="inline-flex items-center gap-1 text-[11px] text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-full px-2 py-0.5">
-                          <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                          {livreur.note_moyenne.toFixed(1)} ({livreur.nombre_avis || 0} avis)
-                        </div>
-                      )}
-                    </div>
+                      </>
+                    )}
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${vb.color}`}>{vb.label}</span>
                   </div>
 
-                  {/* Actions rapides */}
-                  <div className="flex flex-col gap-1.5">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1 text-xs h-8"
-                      onClick={() => setSelectedLivreur(livreur)}
-                    >
-                      <Eye className="w-3 h-3" />
-                      Profil
-                    </Button>
-                    {livreur.validation === "en_attente" && (
-                      <Button
-                        size="sm"
-                        className="gap-1 text-xs h-8 bg-green-600 hover:bg-green-700"
-                        onClick={() => validationMutation.mutate({ id: livreur.id, validation: "valide" })}
-                        disabled={validationMutation.isPending}
-                      >
-                        <UserCheck className="w-3 h-3" />
-                        Valider
-                      </Button>
+                  {/* Infos contact */}
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground mb-1.5">
+                    {livreur.telephone && (
+                      <span className="flex items-center gap-1"><Phone className="w-2.5 h-2.5" />{livreur.telephone}</span>
                     )}
-                    {isBloque ? (
-                      <Button
-                        size="sm"
-                        className="gap-1 text-xs h-8 bg-green-600 hover:bg-green-700"
-                        onClick={() => handleAction("debloquer", livreur)}
-                        disabled={updateMutation.isPending}
-                      >
-                        <CheckCircle2 className="w-3 h-3" />
-                        Débloquer
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        className="gap-1 text-xs h-8"
-                        onClick={() => handleAction("bloquer", livreur)}
-                        disabled={updateMutation.isPending}
-                      >
-                        <Ban className="w-3 h-3" />
-                        Bloquer
-                      </Button>
+                    {livreur.quartier && (
+                      <span className="flex items-center gap-1"><MapPin className="w-2.5 h-2.5" />{livreur.quartier}</span>
+                    )}
+                    {livreur.vehicule && (
+                      <span className="flex items-center gap-1">{vehiculeIcon(livreur.vehicule)}{livreur.vehicule}</span>
+                    )}
+                  </div>
+
+                  {/* Pills finance + note */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {montantDu > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-orange-700 bg-orange-100 rounded-full px-2 py-0.5">
+                        <Banknote className="w-2.5 h-2.5" />{montantDu.toLocaleString()} F dû
+                      </span>
+                    )}
+                    {livreur.note_moyenne > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-yellow-700 bg-yellow-100 rounded-full px-2 py-0.5">
+                        <Star className="w-2.5 h-2.5 fill-yellow-400 text-yellow-400" />
+                        {livreur.note_moyenne.toFixed(1)} ({livreur.nombre_avis || 0})
+                      </span>
+                    )}
+                    {livreur.code_identification && (
+                      <span className="text-[10px] font-mono font-semibold text-gray-500 bg-gray-100 rounded-full px-2 py-0.5">
+                        #{livreur.code_identification}
+                      </span>
                     )}
                   </div>
                 </div>
-              </Card>
+
+                {/* Actions rapides */}
+                <div className="flex flex-col gap-1.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                  {livreur.validation === "en_attente" && (
+                    <Button
+                      size="sm"
+                      className="h-7 w-7 p-0 rounded-lg bg-green-600 hover:bg-green-700"
+                      onClick={() => validationMutation.mutate({ id: livreur.id, validation: "valide" })}
+                      disabled={validationMutation.isPending}
+                      title="Valider"
+                    >
+                      <UserCheck className="w-3 h-3" />
+                    </Button>
+                  )}
+                  {isBloque ? (
+                    <Button
+                      size="sm"
+                      className="h-7 w-7 p-0 rounded-lg bg-green-600 hover:bg-green-700"
+                      onClick={() => handleAction("debloquer", livreur)}
+                      disabled={updateMutation.isPending}
+                      title="Débloquer"
+                    >
+                      <CheckCircle2 className="w-3 h-3" />
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="h-7 w-7 p-0 rounded-lg"
+                      onClick={() => handleAction("bloquer", livreur)}
+                      disabled={updateMutation.isPending}
+                      title="Bloquer"
+                    >
+                      <Ban className="w-3 h-3" />
+                    </Button>
+                  )}
+                </div>
+              </div>
             );
           })}
         </div>
