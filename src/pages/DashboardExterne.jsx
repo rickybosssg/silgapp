@@ -123,19 +123,17 @@ export default function DashboardExterne() {
     [clients]
   );
 
-  // 🔍 DIAGNOSTIC - Identifie les livreurs comptés comme "libres" et pourquoi
-  const diagnosticLivreursLibres = useMemo(() => {
+  // 🔍 DIAGNOSTIC COMPARATIF - Affiche les IDs des livreurs libres pour comparaison
+  const diagnosticComparatif = useMemo(() => {
     const tousLesLivreurs = livreurs.filter(l => l.validation === "valide" && l.actif !== false);
     const libres = tousLesLivreurs.filter(l => isLibre(l));
-    const nonLibres = tousLesLivreurs.filter(l => !isLibre(l));
+    const surCarte = tousLesLivreurs.filter(l => isEligibleCarte(l));
     
-    // Debug log pour identifier l'écart
-    console.log("🔍 DIAGNOSTIC LIVREURS LIBRES:", {
-      total: tousLesLivreurs.length,
+    // 🎯 LOG UNIFIÉ - Même format que la carte
+    console.log("🎯 BANDEAU SUPÉRIEUR (Dashboard):", {
       libres_count: libres.length,
       libres_ids: libres.map(l => l.id.slice(-8)),
-      non_libres_count: nonLibres.length,
-      raisons_non_libres: nonLibres.map(l => ({
+      details: libres.map(l => ({
         id: l.id.slice(-8),
         nom: `${l.prenom} ${l.nom}`,
         statut: l.statut,
@@ -147,18 +145,9 @@ export default function DashboardExterne() {
     
     return {
       total: tousLesLivreurs.length,
-      libres: libres,
-      nonLibres: nonLibres,
-      detail: tousLesLivreurs.map(l => ({
-        id: l.id,
-        nom: `${l.prenom} ${l.nom}`,
-        statut: l.statut,
-        isON: isON(l),
-        isLibre: isLibre(l),
-        isAppActive: isAppActive(l),
-        hasValidGPS: hasValidGPS(l),
-        last_seen: l.last_seen_at,
-      })),
+      libres,
+      surCarte,
+      nonLibres: tousLesLivreurs.filter(l => !isLibre(l)),
     };
   }, [livreurs]);
 
@@ -265,39 +254,65 @@ export default function DashboardExterne() {
         <StatCard title="Livreurs dispo" value={compteursLivreurs.libres} icon={Truck} iconBg="bg-accent" onClick={() => setStatModal({ type: "livreurs_dispo", data: livreursEnLigne.filter(l => l.statut === "disponible") })} />
       </div>
 
-      {/* Diagnostic livreurs libres */}
+      {/* 🔍 DIAGNOSTIC COMPARATIF - IDs des livreurs libres */}
       <div className="bg-card border rounded-lg p-4">
         <div className="flex items-center gap-2 mb-3">
           <Truck className="w-5 h-5 text-accent" />
-          <h2 className="font-semibold text-foreground">Diagnostic Livreurs Libres</h2>
+          <h2 className="font-semibold text-foreground">🔍 Diagnostic Unifié (Bandeau vs Carte)</h2>
         </div>
         <div className="space-y-2 text-xs">
-          <div className="flex justify-between items-center">
-            <span className="text-muted-foreground">Total livreurs (valides + actifs):</span>
-            <span className="font-bold">{diagnosticLivreursLibres.total}</span>
+          <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+            <p className="font-bold text-blue-900 mb-2">🎯 Source unique de vérité:</p>
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span>Total livreurs (valides + actifs):</span>
+                <span className="font-bold">{diagnosticComparatif.total}</span>
+              </div>
+              <div className="flex justify-between bg-emerald-50 p-2 rounded">
+                <span className="font-bold text-emerald-700">✓ Livreurs Libres (isLibre):</span>
+                <span className="font-black text-emerald-700">{diagnosticComparatif.libres.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Sur carte (isEligibleCarte):</span>
+                <span className="font-bold">{diagnosticComparatif.surCarte.length}</span>
+              </div>
+            </div>
           </div>
-          <div className="flex justify-between items-center bg-emerald-50 border border-emerald-200 p-2 rounded">
-            <span className="font-bold text-emerald-700">✓ Livreurs Libres:</span>
-            <span className="font-black text-emerald-700">{diagnosticLivreursLibres.libres.length}</span>
+
+          <div className="bg-purple-50 border border-purple-200 p-3 rounded-lg">
+            <p className="font-bold text-purple-900 mb-2">📋 IDs des livreurs libres (Bandeau):</p>
+            <div className="font-mono text-[10px] break-all">
+              {diagnosticComparatif.libres.map(l => l.id.slice(-8)).join(', ') || 'Aucun'}
+            </div>
           </div>
-          <div className="mt-3">
-            <p className="font-bold text-foreground mb-2">Détail par livreur:</p>
-            <div className="space-y-1 max-h-60 overflow-y-auto">
-              {diagnosticLivreursLibres.detail.map(l => (
-                <div key={l.id} className={`p-2 rounded border ${l.isLibre ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-200'}`}>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="font-semibold text-xs">{l.nom} ({l.id.slice(-6)})</span>
-                    {l.isLibre && <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">LIBRE</span>}
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px]">
-                    <span className={l.statut === "disponible" ? "text-green-600 font-semibold" : "text-gray-500"}>Statut: {l.statut}</span>
-                    <span className={l.isON ? "text-green-600 font-semibold" : "text-red-500"}>ON: {l.isON ? "✓" : "✗"}</span>
-                    <span className={l.isAppActive ? "text-green-600 font-semibold" : "text-red-500"}>App: {l.isAppActive ? "✓" : "✗"}</span>
-                    <span className={l.hasValidGPS ? "text-green-600 font-semibold" : "text-red-500"}>GPS: {l.hasValidGPS ? "✓" : "✗"}</span>
-                  </div>
+
+          <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg">
+            <p className="font-bold text-amber-900 mb-2">⚠️ Livreurs NON libres et pourquoi:</p>
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              {diagnosticComparatif.nonLibres.slice(0, 10).map(l => (
+                <div key={l.id} className="text-[10px]">
+                  <span className="font-semibold">{l.nom} ({l.id.slice(-8)})</span>
+                  <span className="text-gray-600 ml-2">
+                    {!isON(l) ? '❌ OFF' : ''}
+                    {l.statut !== 'disponible' ? '❌ Statut=' + l.statut : ''}
+                    {!isAppActive(l) ? '❌ App inactive' : ''}
+                    {!hasValidGPS(l) ? '❌ GPS ancien' : ''}
+                  </span>
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className="bg-green-50 border border-green-200 p-3 rounded-lg">
+            <p className="font-bold text-green-900 mb-2">✅ Critères "Libre" unifiés:</p>
+            <ul className="text-[10px] space-y-0.5 text-green-800">
+              <li>✓ ON = true (statut actif + heartbeat &lt; 10min)</li>
+              <li>✓ statut = "disponible"</li>
+              <li>✓ Application active (heartbeat &lt; 5min)</li>
+              <li>✓ GPS récent (&lt; 5min)</li>
+              <li>✓ Non suspendu (actif !== false)</li>
+              <li>✓ validation = "valide"</li>
+            </ul>
           </div>
         </div>
       </div>

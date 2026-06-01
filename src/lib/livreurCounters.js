@@ -38,20 +38,39 @@ export function isClientGPSRecent(client) {
 
 /**
  * Calcule TOUS les compteurs livreurs avec une source unique de vérité
- * @param {Array} livreurs - Liste des livreurs
+ * @param {Array} livreurs - Liste des livreurs (déjà filtrés: validation === "valide" && actif !== false)
  * @returns {Object} - Compteurs détaillés
  */
 export function calculateLivreurCounters(livreurs) {
+  const libres = livreurs.filter(l => isLibre(l));
+  const enCourse = livreurs.filter(l => isEnCourse(l));
+  
+  // 🔍 Diagnostic pour débogage
+  console.log("🎯 calculateLivreurCounters:", {
+    total: livreurs.length,
+    libres_count: libres.length,
+    libres_ids: libres.map(l => l.id.slice(-8)),
+    enCourse_count: enCourse.length,
+    details: libres.map(l => ({
+      id: l.id.slice(-8),
+      nom: `${l.prenom} ${l.nom}`,
+      statut: l.statut,
+      isON: isON(l),
+      isAppActive: isAppActive(l),
+      hasValidGPS: hasValidGPS(l),
+    })),
+  });
+  
   return {
     total: livreurs.length,
     on: livreurs.filter(l => isON(l)).length,
     off: livreurs.filter(l => !isON(l)).length,
-    libres: livreurs.filter(l => isLibre(l)).length,
-    enCourse: livreurs.filter(l => isEnCourse(l)).length,
+    libres: libres.length,
+    enCourse: enCourse.length,
     appActive: livreurs.filter(l => isAppActive(l)).length,
     noirs: livreurs.filter(l => isLivreurNoir(l)).length,
-    verts: livreurs.filter(l => isLibre(l)).length,      // alias pour libres
-    oranges: livreurs.filter(l => isEnCourse(l)).length,  // alias pour enCourse
+    verts: libres.length,      // alias pour libres
+    oranges: enCourse.length,  // alias pour enCourse
     surCarte: livreurs.length, // TOUS les livreurs enregistrés
   };
 }

@@ -15,6 +15,7 @@ import { fr } from "date-fns/locale";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import CountrySelector, { usePaysActifs } from "@/components/international/CountrySelector.jsx";
 import { calculateLivreurCounters, calculateClientCounters } from "@/lib/livreurCounters.js";
+import { isEligibleCarte } from "@/lib/dispatchRules.js";
 
 // ─── Constantes de seuils ────────────────────────────────────────────────────
 
@@ -274,7 +275,7 @@ export default function CarteLivreursExterne() {
   // ─── 🎯 COMPTEURS UNIFIÉS - Source unique de vérité ───────────────────
   // Utilise les mêmes fonctions que DashboardExterne pour garantir l'uniformité
   const compteursLivreurs = useMemo(() => 
-    calculateLivreurCounters(livreurs),
+    calculateLivreurCounters(livreurs.filter(l => l.validation === "valide" && l.actif !== false)),
     [livreurs]
   );
 
@@ -282,6 +283,31 @@ export default function CarteLivreursExterne() {
     calculateClientCounters(clients),
     [clients]
   );
+
+  // 🔍 DIAGNOSTIC - Compare les IDs des livreurs libres entre bandeau, légende et marqueurs
+  const diagnosticComparatif = useMemo(() => {
+    const livreursEligibles = livreurs.filter(l => l.validation === "valide" && l.actif !== false);
+    const libres = livreursEligibles.filter(l => isLibre(l));
+    const surCarte = livreursEligibles.filter(l => isEligibleCarte(l));
+    
+    console.log("🔍 DIAGNOSTIC COMPARATIF CARTE:", {
+      total_eligibles: livreursEligibles.length,
+      bandeau_superieur_libres: libres.length,
+      bandeau_ids: libres.map(l => l.id.slice(-8)),
+      legende_verts: libres.length,
+      legende_ids: libres.map(l => l.id.slice(-8)),
+      marqueurs_verts: libres.length,
+      marqueurs_ids: libres.map(l => l.id.slice(-8)),
+      sur_carte_total: surCarte.length,
+      sur_carte_ids: surCarte.map(l => l.id.slice(-8)),
+    });
+    
+    return {
+      libres,
+      surCarte,
+      total: livreursEligibles.length,
+    };
+  }, [livreurs]);
 
   // ─── Listes filtrées ────────────────────────────────────────────────────
   const livreursAffiches = useMemo(() => {
