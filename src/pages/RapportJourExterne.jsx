@@ -10,8 +10,8 @@ import { fr } from "date-fns/locale";
 
 export default function RapportJourExterne() {
   const { data: courses = [] } = useQuery({
-    queryKey: ["courses-externes"],
-    queryFn: () => base44.entities.Course.filter({ reseau: "externe" }, "-created_date", 300),
+    queryKey: ["courses-externes-rapport"],
+    queryFn: () => base44.entities.CourseExterne.list("-created_date", 300),
     initialData: [],
     refetchInterval: 10000,
   });
@@ -29,8 +29,8 @@ export default function RapportJourExterne() {
     return {
       totale: coursesToday.length,
       livrees: livrees.length,
-      ca: livrees.reduce((sum, c) => sum + (c.prix_reel || c.prix || 0), 0),
-      distance: livrees.reduce((sum, c) => sum + (c.distance_km || 0), 0),
+      ca: livrees.reduce((sum, c) => sum + (c.prix_final || 0), 0),
+      distance: livrees.reduce((sum, c) => sum + (c.distance_reelle_km || 0), 0),
     };
   }, [coursesToday]);
 
@@ -97,7 +97,7 @@ export default function RapportJourExterne() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-sm">{course.prix_reel?.toLocaleString() || course.prix?.toLocaleString() || "0"} FCFA</p>
+                    <p className="font-bold text-sm">{course.prix_final?.toLocaleString() || "0"} FCFA</p>
                     <p className="text-xs text-muted-foreground">
                       {course.heure_livraison ? format(new Date(course.heure_livraison), "HH:mm") : "-"}
                     </p>

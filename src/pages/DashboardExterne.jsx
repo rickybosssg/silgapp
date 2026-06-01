@@ -18,7 +18,6 @@ import CoursesEnTraitement from "@/components/dashboard/CoursesEnTraitement";
 import CoursesTerminees from "@/components/dashboard/CoursesTerminees";
 import CourseDetailDialog from "@/components/courses/CourseDetailDialog";
 
-import DispatchMonitor from "@/components/dispatch/DispatchMonitor";
 import { Card } from "@/components/ui/card";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import StatDetailModal from "@/components/dashboard/StatDetailModal";
@@ -195,8 +194,7 @@ export default function DashboardExterne() {
         </div>
       </div>
 
-      {/* Dispatch monitor */}
-      <DispatchMonitor />
+
 
       {/* Raccourci Panel Clients Externes */}
       <Card className="p-4 cursor-pointer hover:shadow-lg transition-all border-2 border-pink-200 bg-pink-50">

@@ -176,7 +176,7 @@ export default function DashboardAdminExterne() {
                   <Users className="w-5 h-5 text-accent" />
                 </div>
                 <div>
-                  <p className="font-semibold text-foreground">Gérer les livreurs</p>
+                  <p className="font-semibold text-foreground">Gérer les livreurs externes</p>
                   <p className="text-xs text-muted-foreground">Validations, blocages</p>
                 </div>
               </div>

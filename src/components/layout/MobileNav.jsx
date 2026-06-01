@@ -17,13 +17,13 @@ const navItems = [
 
 const allNavItems = [
   { path: "/", label: "Tableau de bord", icon: LayoutDashboard },
-  { path: "/nouvelle-course", label: "Nouvelle course", icon: Plus },
+  { path: "/nouvelle-course", label: "Nouvelle course", icon: Plus, reseauOnly: "interne" },
   { path: "/carte", label: "Carte en direct", icon: MapPin },
   { path: "/courses", label: "Toutes les courses", icon: Package },
   { path: "/livreurs", label: "Livreurs", icon: Truck },
   { path: "/rapport", label: "Rapport du jour", icon: BarChart3 },
   { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp },
-  { path: "/admin/externe/dus-livreurs", label: "Comptabilité", icon: Wallet },
+  { path: "/admin/externe/dus-livreurs", label: "Comptabilité", icon: Wallet, reseauOnly: "externe" },
   { path: "/admin/global", label: "Admin Global", icon: Globe, reseauOnly: "externe" },
   { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Globe, reseauOnly: "externe" },
   { path: "/notifications", label: "Notifications", icon: Bell },
@@ -137,7 +137,6 @@ export default function MobileNav({ notificationCount = 0, reseau }) {
             <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
               {allNavItems.filter(item => {
                 if (item.reseauOnly && item.reseauOnly !== reseau) return false;
-                if (reseau === "interne" && item.path === "/admin/externe/dus-livreurs") return false;
                 return true;
               }).map((item) => {
                 const isActive = location.pathname === item.path;
