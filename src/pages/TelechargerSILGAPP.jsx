@@ -55,33 +55,21 @@ export default function TelechargerSILGAPP() {
     }).catch(() => {}); // Ignore les erreurs
   }, []);
 
-  const handleDownload = () => {
-    const newCount = downloadCount + 1;
-    setDownloadCount(newCount);
-    
-    // Tracker le clic (fonction publique - ne bloque pas)
-    const country = detectCountry();
-    const platform = detectPlatform();
-    base44.functions.invoke('trackDownloadPublic', {
-      event_type: 'download_click',
-      country_code: country,
-      platform: platform,
-      referrer: 'direct'
-    }).catch(() => {}); // Ignore silencieusement
-
-    // OUVERTURE IMMÉDIATE DU LIEN GOOGLE DRIVE
-    window.open("https://drive.google.com/file/d/1CpTlE9E2EE3bnydQPsA0CarV9-taWkVO/view?usp=sharing", "_blank");
-
-    // Tracker le téléchargement effectif (après 3 secondes - ne bloque pas)
-    setTimeout(() => {
-      base44.functions.invoke('trackDownloadPublic', {
-        event_type: 'apk_download',
-        country_code: country,
-        platform: platform,
-        referrer: 'direct'
-      }).catch(() => {}); // Ignore silencieusement
-    }, 3000);
-  };
+  // Fonction pour tracker le téléchargement effectif (après 3 secondes)
+  useEffect(() => {
+    if (downloadCount > 0) {
+      const country = detectCountry();
+      const platform = detectPlatform();
+      setTimeout(() => {
+        base44.functions.invoke('trackDownloadPublic', {
+          event_type: 'apk_download',
+          country_code: country,
+          platform: platform,
+          referrer: 'direct'
+        }).catch(() => {}); // Ignore silencieusement
+      }, 3000);
+    }
+  }, [downloadCount]);
 
   const pageUrl = typeof window !== "undefined" ? window.location.href : "";
 
@@ -107,10 +95,7 @@ export default function TelechargerSILGAPP() {
               <PremiumHeader />
               
               <main className="max-w-6xl mx-auto px-6 py-16 space-y-12">
-                <DownloadCard 
-                downloadCount={downloadCount}
-                onDownload={handleDownload}
-              />
+                <DownloadCard downloadCount={downloadCount} />
                 
                 <FeatureCards />
                 

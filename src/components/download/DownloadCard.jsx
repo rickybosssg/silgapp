@@ -9,7 +9,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 
-export default function DownloadCard({ downloadCount, onDownload }) {
+export default function DownloadCard({ downloadCount }) {
   const apkUrl = "https://drive.google.com/file/d/1CpTlE9E2EE3bnydQPsA0CarV9-taWkVO/view?usp=sharing";
   const [formData, setFormData] = useState({ nom: "", telephone: "", profil: "" });
   const [leadSaved, setLeadSaved] = useState(false);
@@ -38,12 +38,26 @@ export default function DownloadCard({ downloadCount, onDownload }) {
     }
   };
 
-  const handleMainButtonClick = () => {
-    if (!leadSaved) {
-      handleSaveLead();
-    } else {
-      onDownload();
-    }
+  const trackDownloadClick = () => {
+    // Tracking non-bloquant - ne bloque jamais l'ouverture du lien
+    const country = navigator.language?.includes('BF') ? 'BF' : 
+                    navigator.language?.includes('CI') ? 'CI' : 
+                    navigator.language?.includes('TG') ? 'TG' : 
+                    navigator.language?.includes('BJ') ? 'BJ' : 
+                    navigator.language?.includes('SN') ? 'SN' : 
+                    navigator.language?.includes('ML') ? 'ML' : 
+                    navigator.language?.includes('GN') ? 'GN' : 
+                    navigator.language?.includes('NE') ? 'NE' : 'BF';
+    const platform = navigator.userAgent?.includes('Android') ? 'android' : 
+                     navigator.userAgent?.includes('iPhone') || navigator.userAgent?.includes('iPad') ? 'ios' : 'web';
+    
+    // Appel asynchrone sans await - ne bloque jamais
+    base44.functions.invoke('trackDownloadPublic', {
+      event_type: 'download_click',
+      country_code: country,
+      platform: platform,
+      referrer: 'direct'
+    }).catch(() => {}); // Ignore silencieusement toutes les erreurs
   };
 
   return (
@@ -132,23 +146,37 @@ export default function DownloadCard({ downloadCount, onDownload }) {
             </motion.div>
           )}
 
-          {/* Bouton de téléchargement */}
+          {/* Bouton de téléchargement - VRAI LIEN HTML DIRECT */}
           <div className="space-y-4">
             <motion.div
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              <Button
-                onClick={handleMainButtonClick}
-                disabled={!leadSaved && saving}
-                className="w-full h-14 sm:h-16 md:h-20 bg-gradient-to-r from-red-600 via-red-500 to-red-600 hover:from-red-500 hover:to-red-400 text-white text-base sm:text-xl font-bold shadow-2xl shadow-red-500/40 transition-all duration-300 disabled:opacity-50 rounded-xl sm:rounded-2xl"
-              >
-                <Download className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 mr-2 sm:mr-3 flex-shrink-0" />
-                <span className="truncate">
-                  {leadSaved ? "Télécharger l'APK" : "S'inscrire et télécharger"}
-                </span>
-                <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 ml-2 flex-shrink-0" />
-              </Button>
+              {leadSaved ? (
+                // Lien direct vers Google Drive (après inscription)
+                <a
+                  href={apkUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={trackDownloadClick}
+                  className="block w-full h-14 sm:h-16 md:h-20 bg-gradient-to-r from-red-600 via-red-500 to-red-600 hover:from-red-500 hover:to-red-400 text-white text-base sm:text-xl font-bold shadow-2xl shadow-red-500/40 transition-all duration-300 rounded-xl sm:rounded-2xl flex items-center justify-center"
+                >
+                  <Download className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 mr-2 sm:mr-3 flex-shrink-0" />
+                  <span className="truncate">Télécharger l'APK</span>
+                  <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 ml-2 flex-shrink-0" />
+                </a>
+              ) : (
+                // Bouton d'inscription (avant inscription)
+                <Button
+                  onClick={handleSaveLead}
+                  disabled={saving}
+                  className="w-full h-14 sm:h-16 md:h-20 bg-gradient-to-r from-red-600 via-red-500 to-red-600 hover:from-red-500 hover:to-red-400 text-white text-base sm:text-xl font-bold shadow-2xl shadow-red-500/40 transition-all duration-300 disabled:opacity-50 rounded-xl sm:rounded-2xl"
+                >
+                  <Download className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 mr-2 sm:mr-3 flex-shrink-0" />
+                  <span className="truncate">S'inscrire et télécharger</span>
+                  <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 ml-2 flex-shrink-0" />
+                </Button>
+              )}
             </motion.div>
             
             <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 text-xs sm:text-sm">
