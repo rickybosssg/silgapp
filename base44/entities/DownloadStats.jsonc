@@ -2,14 +2,9 @@
   "name": "DownloadStats",
   "type": "object",
   "properties": {
-    "event_type": {
+    "month": {
       "type": "string",
-      "enum": [
-        "page_visit",
-        "download_click",
-        "apk_download"
-      ],
-      "description": "Type d'\u00e9v\u00e9nement track\u00e9"
+      "description": "Mois au format YYYY-MM (ex: 2026-06)"
     },
     "country_code": {
       "type": "string",
@@ -26,14 +21,6 @@
       "default": "BF",
       "description": "Code pays du visiteur"
     },
-    "ip_address": {
-      "type": "string",
-      "description": "Adresse IP anonymis\u00e9e"
-    },
-    "user_agent": {
-      "type": "string",
-      "description": "User agent du navigateur"
-    },
     "platform": {
       "type": "string",
       "enum": [
@@ -42,18 +29,36 @@
         "web",
         "unknown"
       ],
+      "default": "web",
       "description": "Plateforme d\u00e9tect\u00e9e"
     },
     "referrer": {
       "type": "string",
+      "default": "direct",
       "description": "Source du trafic (facebook, whatsapp, tiktok, direct)"
     },
-    "session_id": {
+    "page_visits": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de visites sur la page"
+    },
+    "clicks": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de clics sur le bouton de t\u00e9l\u00e9chargement"
+    },
+    "downloads": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de t\u00e9l\u00e9chargements effectifs"
+    },
+    "last_download_date": {
       "type": "string",
-      "description": "ID de session unique"
+      "format": "date-time",
+      "description": "Date du dernier t\u00e9l\u00e9chargement"
     }
   },
   "required": [
-    "event_type"
+    "month"
   ]
 }

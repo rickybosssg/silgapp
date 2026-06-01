@@ -4,7 +4,13 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     // Use service role for public endpoints (no auth required)
-    const { event_type, country_code, platform, referrer } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const { event_type, country_code, platform, referrer } = body;
+    
+    // Validation
+    if (!event_type) {
+      return Response.json({ success: false, error: "event_type requis" }, { status: 400 });
+    }
 
     // Créer ou mettre à jour les stats de téléchargement
     const today = new Date();
