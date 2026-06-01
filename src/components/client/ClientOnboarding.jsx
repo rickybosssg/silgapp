@@ -3,18 +3,30 @@ import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import { MapPin, User, Check, Loader2 } from "lucide-react";
 
+// ─── Pays disponibles ─────────────────────────────────────────────────────────
+export const PAYS_LISTE = [
+  { code: "BF", nom: "Burkina Faso",   emoji: "🇧🇫", indicatif: "+226", digits: 8 },
+  { code: "CI", nom: "Côte d'Ivoire",  emoji: "🇨🇮", indicatif: "+225", digits: 10 },
+  { code: "TG", nom: "Togo",           emoji: "🇹🇬", indicatif: "+228", digits: 8 },
+  { code: "BJ", nom: "Bénin",          emoji: "🇧🇯", indicatif: "+229", digits: 8 },
+  { code: "SN", nom: "Sénégal",        emoji: "🇸🇳", indicatif: "+221", digits: 9 },
+  { code: "ML", nom: "Mali",           emoji: "🇲🇱", indicatif: "+223", digits: 8 },
+  { code: "NE", nom: "Niger",          emoji: "🇳🇪", indicatif: "+227", digits: 8 },
+  { code: "GN", nom: "Guinée",         emoji: "🇬🇳", indicatif: "+224", digits: 9 },
+];
+
 // ─── Helpers téléphone ────────────────────────────────────────────────────────
-export function normaliserTelephone(raw) {
+export function normaliserTelephone(raw, countryCode = "BF") {
   if (!raw) return "";
   const digits = raw.replace(/\D/g, "");
-  if (digits.startsWith("226") && digits.length === 11) return "+" + digits;
-  if (digits.length === 8) return "+226" + digits;
-  if (digits.length > 8) return "+" + digits.slice(-11);
-  return "";
+  const pays = PAYS_LISTE.find(p => p.code === countryCode) || PAYS_LISTE[0];
+  const indicatifDigits = pays.indicatif.replace("+", "");
+  if (digits.startsWith(indicatifDigits)) return "+" + digits;
+  return pays.indicatif + digits;
 }
 
-function formaterAffichage(raw) {
-  const digits = (raw || "").replace(/\D/g, "").slice(0, 8);
+function formaterAffichage(raw, maxDigits = 8) {
+  const digits = (raw || "").replace(/\D/g, "").slice(0, maxDigits);
   return digits.replace(/(\d{2})(?=\d)/g, "$1 ").trim();
 }
 
@@ -22,7 +34,7 @@ function formaterAffichage(raw) {
 export function profilClientComplet(p) {
   if (!p) return false;
   const tel = (p.telephone || "").replace(/\D/g, "");
-  return !!(p.nom && p.nom.trim() && p.prenom && p.prenom.trim() && tel.length >= 8);
+  return !!(p.nom && p.nom.trim() && p.prenom && p.prenom.trim() && tel.length >= 8 && p.country_code);
 }
 
 // ─── Reverse geocoding ────────────────────────────────────────────────────────
@@ -120,37 +132,39 @@ function EtapeGPS({ onSuccess, clientId }) {
 function EtapeProfil({ clientProfil, onSuccess }) {
   const [nom, setNom] = useState(clientProfil?.nom || "");
   const [prenom, setPrenom] = useState(clientProfil?.prenom || "");
+  const [countryCode, setCountryCode] = useState(clientProfil?.country_code || "");
   const [telAffiche, setTelAffiche] = useState(
     clientProfil?.telephone ? formaterAffichage(clientProfil.telephone) : ""
   );
   const [loading, setLoading] = useState(false);
 
+  const paysSelectionne = PAYS_LISTE.find(p => p.code === countryCode);
+
   const handleTelChange = (e) => {
-    const raw = e.target.value.replace(/\D/g, "").slice(0, 8);
-    setTelAffiche(formaterAffichage(raw));
+    const maxDigits = paysSelectionne?.digits || 8;
+    const raw = e.target.value.replace(/\D/g, "").slice(0, maxDigits);
+    setTelAffiche(formaterAffichage(raw, maxDigits));
   };
 
   const telDigits = telAffiche.replace(/\D/g, "");
-  const telValide = telDigits.length === 8;
-  const peutSauvegarder = nom.trim() && prenom.trim() && telValide;
+  const telValide = paysSelectionne ? telDigits.length === paysSelectionne.digits : false;
+  const peutSauvegarder = nom.trim() && prenom.trim() && telValide && countryCode;
 
   const handleSave = async () => {
     if (!peutSauvegarder) return;
-    const telNormalise = normaliserTelephone(telDigits);
+    const telNormalise = normaliserTelephone(telDigits, countryCode);
     setLoading(true);
     try {
-      // Récupérer le GPS depuis localStorage (devrait être actif à ce stade)
       let gpsData = null;
       try { gpsData = JSON.parse(localStorage.getItem("client_gps_position") || "null"); } catch (_) {}
       
-      // Utiliser update ou create selon que le profil existe
       let updated;
       const profileData = {
         nom: nom.trim(),
         prenom: prenom.trim(),
         telephone: telNormalise,
+        country_code: countryCode,
         actif: true,
-        // Persister aussi le GPS dans ClientExterne
         ...(gpsData ? { latitude: gpsData.latitude, longitude: gpsData.longitude } : {}),
       };
       
@@ -158,7 +172,6 @@ function EtapeProfil({ clientProfil, onSuccess }) {
         updated = await base44.entities.ClientExterne.update(clientProfil.id, profileData);
       } else {
         const user = await base44.auth.me();
-        // Vérifier s'il n'existe pas déjà un profil avec ce téléphone
         let existing = null;
         try {
           const found = await base44.entities.ClientExterne.filter({ telephone: telNormalise });
@@ -176,11 +189,9 @@ function EtapeProfil({ clientProfil, onSuccess }) {
           });
         }
       }
-      // Marquer en localStorage aussi
       try { localStorage.setItem("client_profil_complet", "true"); } catch (_) {}
       toast.success("Profil complété !");
 
-      // Initialisation automatique système
       base44.functions.invoke('initClientAuto', {
         device_id: navigator.userAgent.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 50),
         platform: "web",
@@ -198,8 +209,8 @@ function EtapeProfil({ clientProfil, onSuccess }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-primary/10 to-red-50 flex items-center justify-center p-6 z-50">
-      <div className="max-w-sm w-full bg-white rounded-3xl shadow-2xl p-7 space-y-5">
+    <div className="fixed inset-0 bg-gradient-to-br from-primary/10 to-red-50 flex items-center justify-center p-6 z-50 overflow-y-auto">
+      <div className="max-w-sm w-full bg-white rounded-3xl shadow-2xl p-7 space-y-5 my-4">
         <div className="text-center space-y-2">
           <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
             <User className="w-8 h-8 text-primary" />
@@ -209,6 +220,28 @@ function EtapeProfil({ clientProfil, onSuccess }) {
         </div>
 
         <div className="space-y-3">
+          {/* Pays */}
+          <div>
+            <label className="text-xs font-bold text-gray-700 mb-1 block">🌍 Pays *</label>
+            <div className="grid grid-cols-2 gap-2">
+              {PAYS_LISTE.map(pays => (
+                <button
+                  key={pays.code}
+                  type="button"
+                  onClick={() => { setCountryCode(pays.code); setTelAffiche(""); }}
+                  className={`h-11 rounded-xl border text-sm font-semibold flex items-center gap-2 px-3 transition-all ${
+                    countryCode === pays.code
+                      ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/20"
+                      : "border-gray-200 bg-white text-gray-700 hover:border-primary/40"
+                  }`}
+                >
+                  <span className="text-lg">{pays.emoji}</span>
+                  <span className="text-xs truncate">{pays.nom}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div>
             <label className="text-xs font-bold text-gray-700 mb-1 block">Nom *</label>
             <input
@@ -228,22 +261,28 @@ function EtapeProfil({ clientProfil, onSuccess }) {
             />
           </div>
           <div>
-            <label className="text-xs font-bold text-gray-700 mb-1 block">Téléphone * (8 chiffres)</label>
+            <label className="text-xs font-bold text-gray-700 mb-1 block">
+              Téléphone * {paysSelectionne ? `(${paysSelectionne.digits} chiffres)` : "(sélectionnez un pays)"}
+            </label>
             <div className="flex gap-2">
               <div className="h-12 rounded-xl border border-gray-200 bg-gray-50 px-3 flex items-center text-sm font-semibold text-gray-600 flex-shrink-0">
-                +226
+                {paysSelectionne ? `${paysSelectionne.emoji} ${paysSelectionne.indicatif}` : "🌍"}
               </div>
               <input
                 inputMode="numeric"
                 value={telAffiche}
                 onChange={handleTelChange}
-                placeholder="70 71 45 00"
-                className="flex-1 h-12 rounded-xl border border-gray-200 px-4 text-sm tracking-widest font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                placeholder={paysSelectionne ? "0".repeat(paysSelectionne.digits).replace(/(.{2})/g, "$1 ").trim() : "—"}
+                disabled={!countryCode}
+                className="flex-1 h-12 rounded-xl border border-gray-200 px-4 text-sm tracking-widest font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:bg-gray-50 disabled:text-gray-400"
               />
             </div>
             {telAffiche.length > 0 && (
               <p className={`text-xs mt-1 flex items-center gap-1 ${telValide ? "text-green-600" : "text-red-400"}`}>
-                {telValide ? <><Check className="w-3 h-3" /> {normaliserTelephone(telDigits)}</> : `${telDigits.length}/8 chiffres`}
+                {telValide
+                  ? <><Check className="w-3 h-3" /> {normaliserTelephone(telDigits, countryCode)}</>
+                  : `${telDigits.length}/${paysSelectionne?.digits || "?"} chiffres`
+                }
               </p>
             )}
           </div>
