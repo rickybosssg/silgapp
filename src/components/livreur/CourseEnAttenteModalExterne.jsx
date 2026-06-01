@@ -97,7 +97,7 @@ export default function CourseEnAttenteModalExterne({
         if (prev <= 1) {
           clearInterval(timer);
           setCourseExpiree(true);
-          onExpireRef.current?.();
+          // Ne pas appeler onExpire ici — le useEffect dédié ci-dessous gère le délai 3s
           return 0;
         }
         return prev - 1;
@@ -186,14 +186,13 @@ export default function CourseEnAttenteModalExterne({
     }
   };
 
-  // Fermeture auto après 3s
+  // Fermeture auto après 3s + remettre le livreur disponible via onExpire
   useEffect(() => {
-    if (courseDejaPrise || courseExpiree) {
-      const t = setTimeout(() => {
-        onExpireRef.current?.();
-      }, 3000);
-      return () => clearTimeout(t);
-    }
+    if (!courseDejaPrise && !courseExpiree) return;
+    const t = setTimeout(() => {
+      onExpireRef.current?.();
+    }, 3000);
+    return () => clearTimeout(t);
   }, [courseDejaPrise, courseExpiree]);
 
   // Écran "Course déjà prise"

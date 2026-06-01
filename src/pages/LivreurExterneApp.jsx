@@ -333,8 +333,13 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           onAccepter={handleAccepter}
           onRefuser={handleRefuser}
           onExpire={() => {
+            // Remettre le livreur disponible si pas en course active
+            if (coursesActives.length === 0 && livreurProfil?.statut !== "hors_ligne") {
+              saveLivreur(livreurProfil.id, { statut: "disponible" }).catch(() => null);
+            }
             queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
             queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
+            queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
           }}
         />
       )}
