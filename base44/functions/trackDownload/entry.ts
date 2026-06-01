@@ -3,14 +3,15 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
+    // Use service role for public endpoints (no auth required)
     const { event_type, country_code, platform, referrer } = await req.json();
 
     // Créer ou mettre à jour les stats de téléchargement
     const today = new Date();
     const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
     
-    // Récupérer les stats existantes
-    const existingStats = await base44.entities.DownloadStats.filter({ 
+    // Récupérer les stats existantes (service role for public access)
+    const existingStats = await base44.asServiceRole.entities.DownloadStats.filter({ 
       month: monthKey,
       country_code: country_code || 'BF'
     });
@@ -28,7 +29,7 @@ Deno.serve(async (req) => {
       }
       
       if (Object.keys(updates).length > 0) {
-        await base44.entities.DownloadStats.update(stats.id, updates);
+        await base44.asServiceRole.entities.DownloadStats.update(stats.id, updates);
       }
     } else {
       // Créer de nouvelles stats
@@ -42,7 +43,7 @@ Deno.serve(async (req) => {
         downloads: event_type === 'apk_download' ? 1 : 0,
         last_download_date: event_type === 'apk_download' ? new Date().toISOString() : null
       };
-      await base44.entities.DownloadStats.create(newStats);
+      await base44.asServiceRole.entities.DownloadStats.create(newStats);
     }
 
     return Response.json({ 

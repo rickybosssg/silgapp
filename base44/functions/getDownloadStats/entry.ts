@@ -8,8 +8,8 @@ Deno.serve(async (req) => {
     const today = new Date();
     const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
     
-    // Récupérer toutes les stats du mois
-    const allStats = await base44.entities.DownloadStats.filter({ 
+    // Récupérer toutes les stats du mois (service role for public access)
+    const allStats = await base44.asServiceRole.entities.DownloadStats.filter({ 
       month: monthKey
     });
 
