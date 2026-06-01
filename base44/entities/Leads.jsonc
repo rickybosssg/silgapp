@@ -1,0 +1,52 @@
+{
+  "name": "Leads",
+  "type": "object",
+  "properties": {
+    "nom": {
+      "type": "string",
+      "description": "Nom du prospect"
+    },
+    "telephone": {
+      "type": "string",
+      "description": "Num\u00e9ro de t\u00e9l\u00e9phone du prospect"
+    },
+    "profil": {
+      "type": "string",
+      "enum": [
+        "client",
+        "livreur"
+      ],
+      "description": "Type de profil : client ou livreur"
+    },
+    "country_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE"
+      ],
+      "default": "BF",
+      "description": "Code pays du prospect"
+    },
+    "source": {
+      "type": "string",
+      "default": "page_telechargement",
+      "description": "Source du lead"
+    },
+    "a_telecharge": {
+      "type": "boolean",
+      "default": false,
+      "description": "Le prospect a-t-il t\u00e9l\u00e9charg\u00e9 l'application"
+    }
+  },
+  "required": [
+    "nom",
+    "telephone",
+    "profil"
+  ]
+}
