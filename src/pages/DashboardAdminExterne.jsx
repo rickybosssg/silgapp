@@ -23,6 +23,9 @@ import SyncLivreurGPSPanel from "@/components/admin/SyncLivreurGPSPanel";
 import StatsPays from "@/components/international/StatsPays.jsx";
 
 export default function DashboardAdminExterne() {
+  {/* 🚨 BLOC DE TEST - SI CE TEXTE N'APPARAÎT PAS, LE FICHIER N'EST PAS CHARGÉ */}
+  console.log("🚨 DashboardAdminExterne.jsx EST CHARGÉ ET EXÉCUTÉ");
+  
   const { data: courses = [] } = useQuery({
     queryKey: ["courses-externes"],
     queryFn: () => base44.entities.CourseExterne.list("-created_date", 200),
@@ -161,6 +164,11 @@ export default function DashboardAdminExterne() {
       <div className="bg-red-600 border-4 border-yellow-400 p-6 rounded-2xl mb-6">
         <h1 className="text-3xl font-black text-white mb-4">🚨 TEST CODE PROMO PANEL VISIBLE</h1>
         <CodePromoPanel />
+      </div>
+
+      {/* ── 🚨 TEST BLOC ROUGE - À SUPPRIMER APRÈS TEST ───────────────────────────── */}
+      <div style={{background:'red',color:'white',padding:'20px',fontSize:'24px',fontWeight:'bold',border:'5px solid yellow',marginBottom:'20px'}}>
+        🚨 TEST DASHBOARD ADMIN EXTERNE - BLOC ROUGE AFFICHÉ ICI
       </div>
 
       {/* ── HERO HEADER ────────────────────────────────────────────── */}
