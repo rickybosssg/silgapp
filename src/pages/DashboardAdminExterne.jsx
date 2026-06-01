@@ -308,6 +308,12 @@ export default function DashboardAdminExterne() {
         <DiagnosticInterne />
       </div>
 
+      {/* ── CODES PROMO ──────────────────────────────────────────── */}
+      <div id="codes-promo" className="bg-white rounded-2xl border border-purple-100 p-5 shadow-sm">
+        <h2 className="font-bold text-lg text-foreground mb-4">📌 Codes Promo</h2>
+        <CodePromoPanel />
+      </div>
+
       {/* ── COURSES EN TEMPS RÉEL ────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
         <div className="flex items-center justify-between mb-4">
@@ -383,12 +389,6 @@ export default function DashboardAdminExterne() {
       {/* ── CLIENTS INSCRITS ─────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
         <ClientsExternesPanel />
-      </div>
-
-      {/* ── CODES PROMO ──────────────────────────────────────────── */}
-      <div id="codes-promo" className="bg-white rounded-2xl border border-purple-100 p-5 shadow-sm">
-        <h2 className="font-bold text-lg text-foreground mb-4">📌 Codes Promo</h2>
-        <CodePromoPanel />
       </div>
 
       {/* ── STATS PAR PAYS ───────────────────────────────────────── */}
