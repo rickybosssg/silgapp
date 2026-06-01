@@ -309,16 +309,7 @@ export default function DashboardAdminExterne() {
       </div>
 
       {/* ── CODES PROMO ──────────────────────────────────────────── */}
-      <div id="codes-promo" className="bg-white rounded-2xl border-4 border-purple-600 p-6 shadow-lg" style={{ minHeight: "300px" }}>
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-md shadow-purple-200">
-            <Tag className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h2 className="font-black text-xl text-purple-700">📌 Codes Promo & Ambassadeurs</h2>
-            <p className="text-xs text-purple-600 font-semibold">Gérez les codes de parrainage et les primes</p>
-          </div>
-        </div>
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
         <CodePromoPanel />
       </div>
 
