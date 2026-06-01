@@ -57,6 +57,11 @@ async function trouverLivreursCandidats(base44, course, rayonKm, exclusions = []
     if (!l.latitude || !l.longitude) return false;
     if (exclusions.includes(l.id)) return false;
     if (livreurIdsEnCourse.has(l.id)) return false;
+    // Exclure les livreurs mis hors ligne par l'administration
+    if (l.admin_hors_ligne === true) {
+      console.log(`[DISPATCH] 🚫 ${l.nom} exclu - mis hors ligne par l'administration`);
+      return false;
+    }
     
     // GPS récent = dernière position < 10 min
     const dt = l.derniere_position_date || l.last_seen_at;

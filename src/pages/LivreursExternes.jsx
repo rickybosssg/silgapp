@@ -12,11 +12,12 @@ import { toast } from "sonner";
 import {
   ArrowLeft, Users, UserCheck, UserX, Phone, Mail, MapPin,
   Eye, Ban, CheckCircle2, RefreshCw, Bike, Car, Truck,
-  XCircle, Banknote, Star, Wifi, WifiOff, Plus
+  XCircle, Banknote, Star, Wifi, WifiOff, Plus, Power, PowerOff
 } from "lucide-react";
 import CreateLivreurDialog from "@/components/livreurs/CreateLivreurDialog";
 import NotationLivreurPanel from "@/components/admin/NotationLivreurPanel";
 import LivreurPhotoUploader from "@/components/livreur/LivreurPhotoUploader";
+import AdminStatutLivreurPanel from "@/components/livreurs/AdminStatutLivreurPanel";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -59,6 +60,7 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
   const nomComplet = `${livreur.prenom || ""} ${livreur.nom}`.trim();
   const vb = validationBadge(livreur.validation);
   const isBloque = !livreur.actif;
+  const isAdminOff = !!livreur.admin_hors_ligne;
   const on = isON(livreur);
   const libre = isLibre(livreur);
   const enLigne = isEnLigne(livreur);
@@ -105,10 +107,18 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
                   <span className="text-xs px-2 py-0.5 rounded-full border font-medium bg-red-100 text-red-700 border-red-200">Bloqué</span>
                 ) : (
                   <>
+                    {isAdminOff && (
+                      <span className="text-xs px-2 py-0.5 rounded-full border font-medium inline-flex items-center gap-1 bg-red-100 text-red-700 border-red-200">
+                        <PowerOff className="w-3 h-3" />
+                        OFF par l'administration
+                      </span>
+                    )}
+                    {!isAdminOff && (
                     <span className={`text-xs px-2 py-0.5 rounded-full border font-medium inline-flex items-center gap-1 ${on ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-500 border-gray-200"}`}>
                       <span className={`w-1.5 h-1.5 rounded-full inline-block ${on ? "bg-green-500" : "bg-gray-300"}`} />
-                      {on ? "ON" : "OFF"}
+                      {on ? (livreur.statut === "en_course" ? "🟠 En course (livreur)" : "🟢 ON par le livreur") : "⚫ OFF par le livreur"}
                     </span>
+                    )}
                     {on && (
                       <span className={`text-xs px-2 py-0.5 rounded-full border font-medium inline-flex items-center gap-1 ${libre ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-blue-100 text-blue-700 border-blue-200"}`}>
                         <span className={`w-1.5 h-1.5 rounded-full inline-block ${libre ? "bg-emerald-500" : "bg-blue-500"}`} />
@@ -206,6 +216,17 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
                 {resteAPayerSilga.toLocaleString()} FCFA
               </span>
             </div>
+          </div>
+
+          {/* Gestion statut admin */}
+          <div>
+            <p className="text-sm font-bold text-foreground mb-2 flex items-center gap-2">
+              <Power className="w-4 h-4 text-primary" /> Statut administratif
+            </p>
+            <AdminStatutLivreurPanel
+              livreur={livreur}
+              coursesActives={courses.filter(c => !["livree", "annulee"].includes(c.statut))}
+            />
           </div>
 
           {/* Notation */}
@@ -538,6 +559,7 @@ export default function LivreursExternes() {
         const nomComplet = `${livreur.prenom || ""} ${livreur.nom}`.trim();
         const vb = validationBadge(livreur.validation);
         const isBloque = livreur.actif === false;
+        const isAdminOff = !!livreur.admin_hors_ligne;
         const on = isON(livreur);
         const libre = isLibre(livreur);
         const enLigne = isEnLigne(livreur);
@@ -560,10 +582,18 @@ export default function LivreursExternes() {
                         <span className="text-[10px] px-2 py-0.5 rounded-full border font-medium bg-red-100 text-red-700 border-red-200">Bloqué</span>
                       ) : (
                         <>
+                          {isAdminOff && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full border font-medium inline-flex items-center gap-1 bg-red-100 text-red-700 border-red-200">
+                              <PowerOff className="w-2.5 h-2.5" />
+                              OFF Admin
+                            </span>
+                          )}
+                          {!isAdminOff && (
                           <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium inline-flex items-center gap-1 ${on ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-500 border-gray-200"}`}>
                             <span className={`w-1.5 h-1.5 rounded-full inline-block ${on ? "bg-green-500" : "bg-gray-300"}`} />
-                            {on ? "ON" : "OFF"}
+                            {on ? (livreur.statut === "en_course" ? "🟠 En course" : "🟢 ON livreur") : "⚫ OFF livreur"}
                           </span>
+                          )}
                           {on && (
                             <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium inline-flex items-center gap-1 ${libre ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-blue-100 text-blue-700 border-blue-200"}`}>
                               <span className={`w-1.5 h-1.5 rounded-full inline-block ${libre ? "bg-emerald-500" : "bg-blue-500"}`} />
