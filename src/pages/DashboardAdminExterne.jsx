@@ -21,6 +21,7 @@ import HistoriqueDuJour from "@/components/admin/HistoriqueDuJour";
 import SyncClientGPSPanel from "@/components/admin/SyncClientGPSPanel";
 import SyncLivreurGPSPanel from "@/components/admin/SyncLivreurGPSPanel";
 import StatsPays from "@/components/international/StatsPays.jsx";
+import DownloadStatsWidget from "@/components/admin/DownloadStatsWidget";
 
 export default function DashboardAdminExterne() {
   {/* 🚨 BLOC DE TEST - SI CE TEXTE N'APPARAÎT PAS, LE FICHIER N'EST PAS CHARGÉ */}
@@ -217,6 +218,12 @@ export default function DashboardAdminExterne() {
           </Link>
         </div>
       )}
+
+      {/* ── WIDGET TÉLÉCHARGEMENTS ─────────────────────────────────── */}
+      <DownloadStatsWidget />
+
+      {/* ── TÉLÉCHARGEMENTS SILGAPP ───────────────────────────────── */}
+      <DownloadStatsWidget />
 
       {/* ── STATS KPI ──────────────────────────────────────────────── */}
       <div>
