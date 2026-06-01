@@ -88,7 +88,10 @@ Deno.serve(async (req) => {
       code_identification: codeIdentification
     });
 
-    console.log(`✅ Migration réussie : ${client.user_email || client.telephone} → Livreur Externe ${created.id}`);
+    // 6. Supprimer le client de la base de données clients
+    await base44.entities.ClientExterne.delete(client.id);
+
+    console.log(`✅ Migration réussie : ${client.user_email || client.telephone} → Livreur Externe ${created.id} (client supprimé)`);
 
     return Response.json({
       success: true,
