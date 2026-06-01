@@ -15,11 +15,14 @@ export default function PremiumHeader({ downloadCount }) {
         >
           <div className="flex items-center gap-4">
             <motion.div 
-              className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-2xl shadow-red-500/40"
-              whileHover={{ scale: 1.05, rotate: 5 }}
+              whileHover={{ scale: 1.08, rotate: -5 }}
               transition={{ type: "spring", stiffness: 400, damping: 10 }}
             >
-              <Zap className="w-8 h-8 text-white" />
+              <img 
+                src="https://cdn.silgapp.com/logo-silgapp-official.png"
+                alt="SILGAPP Logo" 
+                className="w-16 h-16 object-contain drop-shadow-2xl"
+              />
             </motion.div>
             <div>
               <h1 className="text-3xl font-black text-white tracking-tight">SILGAPP</h1>
