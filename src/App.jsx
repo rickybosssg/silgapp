@@ -116,35 +116,20 @@ function AppContent() {
   const [isClient, setIsClient] = useState(false);
   const [reseau, setReseau] = useState(null);
 
-  // 📱 ROUTE PUBLIQUE DE TÉLÉCHARGEMENT - ACCESSIBLE SANS AUTH (PRIORITÉ ABSOLUE)
-  const isDownloadPage = window.location.pathname === '/telecharger';
-  
-  if (isDownloadPage) {
+  // 🌍 ROUTES PUBLIQUES - ACCESSIBLES SANS AUTHENTIFICATION (PRIORITÉ ABSOLUE)
+  // Ces routes doivent être vérifiées AVANT toute logique d'authentification
+  const isPublicRoute = location.pathname === '/telecharger' || 
+                        location.pathname === '/suivi-public/:token' || 
+                        location.pathname.startsWith('/suivi-public/');
+
+  if (isPublicRoute) {
     return (
       <Suspense fallback={<LoadingScreen />}>
         <Routes>
+          {/* Route publique de téléchargement - 100% accessible */}
           <Route path="/telecharger" element={<TelechargerSILGAPP />} />
-          <Route path="*" element={<PageNotFound />} />
-        </Routes>
-      </Suspense>
-    );
-  }
-  
-  // ⚠️ ROUTES DE TEST TOUJOURS ACCESSIBLES - PRIORITÉ ABSOLUE
-  const isTestRoute = window.location.pathname.startsWith('/test-') || window.location.pathname === '/maintenance' || window.location.pathname === '/diagnostic-fcm';
-  
-  if (isTestRoute) {
-    return (
-      <Suspense fallback={<LoadingScreen />}>
-        <Routes>
-          <Route path="/test-terrain" element={<TestTerrainComplet />} />
-          <Route path="/test-diagnostics" element={<TestDiagnosticsComplet />} />
-          <Route path="/test-bout-en-bout" element={<TestBoutEnBout />} />
-          <Route path="/test-recapitulatif" element={<TestRecapitulatifPaiement />} />
-          <Route path="/test-connexion" element={<TestConnexion />} />
-          <Route path="/test-whatsapp" element={<TestWhatsAppAlertes />} />
-          <Route path="/maintenance" element={<Maintenance />} />
-          <Route path="/diagnostic-fcm" element={<DiagnosticFCM />} />
+          {/* Route publique de suivi de course */}
+          <Route path="/suivi-public/:token" element={<PublicSuiviCourse />} />
           <Route path="*" element={<PageNotFound />} />
         </Routes>
       </Suspense>
@@ -185,7 +170,6 @@ function AppContent() {
           <Route path="/client/course/expedier" element={<CourseExterneFormSync />} />
           <Route path="/client/course/recevoir" element={<CourseExterneFormSync />} />
           <Route path="/client/suivi" element={<ClientSuiviCourse />} />
-          <Route path="/suivi-public/:token" element={<PublicSuiviCourse />} />
           <Route path="/livreur/recap-course/:courseId" element={<RecapCourseLivreur />} />
           <Route path="*" element={<ClientExterneApp />} />
         </Routes>
