@@ -380,16 +380,16 @@ export default function DashboardAdminExterne() {
         </div>
       </div>
 
+      {/* ── CODES PROMO ──────────────────────────────────────────── */}
+      <div id="codes-promo" className="bg-white rounded-2xl border border-purple-100 p-5 shadow-sm">
+        <CodePromoPanel />
+      </div>
+
       {/* ── STATS PAR PAYS ───────────────────────────────────────── */}
       <StatsPays courses={courses} livreurs={livreurs} clients={clients} />
 
       {/* ── HISTORIQUE DU JOUR ───────────────────────────────────── */}
       <HistoriqueDuJour courses={courses} />
-
-      {/* ── CODES PROMO ──────────────────────────────────────────── */}
-      <div id="codes-promo" className="bg-white rounded-2xl border border-purple-100 p-5 shadow-sm">
-        <CodePromoPanel />
-      </div>
 
       {/* ── CLIENTS INSCRITS ─────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
