@@ -11,7 +11,7 @@ const VENUS_AVATAR = "https://media.base44.com/images/public/6a0ec08f3af5e1d1284
 
 const WELCOME_MESSAGE = {
   role: "assistant",
-  content: "Bonjour 👋 Je suis **VENUS**, votre assistante intelligente **SILGAPP**.\n\n❤️ *Plus qu'un service, une promesse* ❤️\n\nJe suis là pour vous aider à :\n\n✨ **Créer une course** — Expédier ou recevoir un colis\n\n🚚 **Suivre en temps réel** — Localisez votre livreur sur la carte\n\n📱 **QR codes & PIN** — Validation de récupération et livraison\n\n💰 **Prix transparent** — 100 F/km, calculé automatiquement\n\n📞 **Support** — +226 66 92 51 90\n\n**Comment puis-je vous aider aujourd'hui ?**",
+  content: "Bonjour 👋 Je suis **VENUS**, votre assistante intelligente **SILGAPP**.\n\n❤️ *Plus qu'un service, une promesse* ❤️\n\nSILGAPP est disponible dans **8 pays d'Afrique de l'Ouest** :\n🇧🇫 Burkina Faso · 🇨🇮 Côte d'Ivoire · 🇹🇬 Togo · 🇧🇯 Bénin · 🇸🇳 Sénégal · 🇲🇱 Mali · 🇬🇳 Guinée · 🇳🇪 Niger\n\nJe suis là pour vous aider à :\n\n✨ **Créer une course** — Expédier ou recevoir un colis\n\n🚚 **Suivre en temps réel** — Localisez votre livreur sur la carte\n\n📱 **QR codes & PIN** — Validation de récupération et livraison\n\n💰 **Prix adapté à votre pays** — Calculé automatiquement selon votre localisation\n\n📞 **Support** — +226 66 92 51 90\n\n**Dans quel pays êtes-vous ? Comment puis-je vous aider ?**",
 };
 
 function getStorageKey(userEmail) {
