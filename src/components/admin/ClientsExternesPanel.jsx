@@ -91,7 +91,7 @@ function ClientDetailModal({ client, courses, migrationEnCours, onClose, onBloqu
               variant="default"
               disabled={migrationEnCours === client.id}
               className="w-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600"
-              onClick={() => { onMigrer(client); }}
+              onClick={() => onMigrer(client)}
             >
               {migrationEnCours === client.id ? (
                 <>
@@ -171,16 +171,19 @@ export default function ClientsExternesPanel() {
       if (result.error) {
         if (result.error === "Déjà livreur") {
           toast.info(result.message);
+          setClientDetail(null);
         } else {
           toast.error(result.error);
         }
       } else {
         toast.success(`✅ ${result.livreur.prenom} ${result.livreur.nom} est maintenant livreur externe !`);
+        setClientDetail(null);
         refetch();
       }
     } catch (err) {
       console.error("Erreur migration:", err);
       toast.error("Erreur lors de la migration");
+      setClientDetail(null);
     } finally {
       setMigrationEnCours(null);
     }
