@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
+import ContactPicker from "@/components/client/ContactPicker";
 
 const STORAGE_KEY = "silgapp_course_draft";
 
@@ -242,13 +243,30 @@ export default function CourseStepForm({
               </div>
               <div>
                 <Label>Téléphone de l'expéditeur *</Label>
-                <Input
-                  type="tel"
-                  value={formData.expediteur_telephone}
-                  onChange={(e) => setFormData({ ...formData, expediteur_telephone: e.target.value })}
-                  placeholder="+226 XX XX XX XX"
-                  className="h-12"
-                />
+                <div className="space-y-2">
+                  <ContactPicker
+                    type="expediteur"
+                    onSelect={(contact) => {
+                      setFormData({
+                        ...formData,
+                        expediteur_nom: contact.nom || formData.expediteur_nom,
+                        expediteur_telephone: contact.telephone,
+                      });
+                    }}
+                  />
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/60 z-10 text-xs text-gray-500 font-medium">
+                      ou saisissez manuellement
+                    </div>
+                    <Input
+                      type="tel"
+                      value={formData.expediteur_telephone}
+                      onChange={(e) => setFormData({ ...formData, expediteur_telephone: e.target.value })}
+                      placeholder="+226 XX XX XX XX"
+                      className="h-12"
+                    />
+                  </div>
+                </div>
                 <p className="text-xs text-muted-foreground mt-1.5">Format : +226 XX XX XX XX</p>
               </div>
               <Button
@@ -378,16 +396,34 @@ export default function CourseStepForm({
 
               <div>
                 <Label>Téléphone du destinataire *</Label>
-                <Input
-                  type="tel"
-                  value={formData.destinataire_telephone}
-                  onChange={(e) => {
-                    setFormData({ ...formData, destinataire_telephone: e.target.value });
-                    setDestinataireFound(undefined); // reset résultat si on retape
-                  }}
-                  placeholder="+226 XX XX XX XX"
-                  className="h-12"
-                />
+                <div className="space-y-2">
+                  <ContactPicker
+                    type="destinataire"
+                    onSelect={(contact) => {
+                      setFormData({
+                        ...formData,
+                        destinataire_nom: contact.nom || formData.destinataire_nom,
+                        destinataire_telephone: contact.telephone,
+                      });
+                      setDestinataireFound(undefined); // reset résultat
+                    }}
+                  />
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/60 z-10 text-xs text-gray-500 font-medium">
+                      ou saisissez manuellement
+                    </div>
+                    <Input
+                      type="tel"
+                      value={formData.destinataire_telephone}
+                      onChange={(e) => {
+                        setFormData({ ...formData, destinataire_telephone: e.target.value });
+                        setDestinataireFound(undefined); // reset résultat si on retape
+                      }}
+                      placeholder="+226 XX XX XX XX"
+                      className="h-12"
+                    />
+                  </div>
+                </div>
                 <p className="text-xs text-muted-foreground mt-1.5">Format : +226 XX XX XX XX</p>
               </div>
 
