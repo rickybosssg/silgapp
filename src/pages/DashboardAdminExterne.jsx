@@ -222,9 +222,6 @@ export default function DashboardAdminExterne() {
       {/* ── WIDGET TÉLÉCHARGEMENTS ─────────────────────────────────── */}
       <DownloadStatsWidget />
 
-      {/* ── TÉLÉCHARGEMENTS SILGAPP ───────────────────────────────── */}
-      <DownloadStatsWidget />
-
       {/* ── STATS KPI ──────────────────────────────────────────────── */}
       <div>
         <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Vue d'ensemble</p>

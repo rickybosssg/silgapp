@@ -55,6 +55,7 @@ const TwilioSandboxMonitor = lazy(() => import('./pages/TwilioSandboxMonitor.jsx
 const DiagnosticFCM = lazy(() => import('./pages/DiagnosticFCM.jsx'));
 const TelechargerSILGAPP = lazy(() => import('./pages/TelechargerSILGAPP.jsx'));
 const StatsTelechargements = lazy(() => import('./pages/StatsTelechargements.jsx'));
+const StatsTelechargementsAdmin = lazy(() => import('./pages/StatsTelechargementsAdmin.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -215,7 +216,7 @@ function AppContent() {
               <Route path="/rapport" element={<AnimatedRoutes><RapportJour /></AnimatedRoutes>} />
               <Route path="/recapitulatif" element={<AnimatedRoutes><RecapitulatifAdmin reseau="interne" /></AnimatedRoutes>} />
               <Route path="/admin/externe" element={<AnimatedRoutes><DashboardAdminExterne /></AnimatedRoutes>} />
-              <Route path="/admin/externe/stats-telechargements" element={<AnimatedRoutes><StatsTelechargements /></AnimatedRoutes>} />
+              <Route path="/admin/externe/stats-telechargements" element={<AnimatedRoutes><StatsTelechargementsAdmin /></AnimatedRoutes>} />
               <Route path="/admin/externe/dus-livreurs" element={<AnimatedRoutes><DusLivreursExternes /></AnimatedRoutes>} />
               <Route path="/admin/externe/twilio-sandbox" element={<AnimatedRoutes><TwilioSandboxMonitor /></AnimatedRoutes>} />
               <Route path="/admin/externe/clients" element={<AnimatedRoutes><ClientsExternesPage /></AnimatedRoutes>} />
