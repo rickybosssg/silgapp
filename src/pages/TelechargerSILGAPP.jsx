@@ -33,50 +33,54 @@ export default function TelechargerSILGAPP() {
   useEffect(() => {
     setMounted(true);
     
-    // Charger les statistiques
-    base44.functions.invoke('getDownloadStats', {}).then(res => {
+    // Charger les statistiques (fonction publique)
+    base44.functions.invoke('getDownloadStatsPublic', {}).then(res => {
       if (res.data && res.data.stats) {
         setStats(res.data.stats);
         setDownloadCount(res.data.stats.month_downloads || 2847);
       }
+    }).catch(() => {
+      // En cas d'erreur, utiliser une valeur par défaut
+      setDownloadCount(2847);
     });
 
-    // Tracker la visite
+    // Tracker la visite (fonction publique - ne bloque pas)
     const country = detectCountry();
     const platform = detectPlatform();
-    base44.functions.invoke('trackDownload', {
+    base44.functions.invoke('trackDownloadPublic', {
       event_type: 'page_visit',
       country_code: country,
       platform: platform,
       referrer: 'direct'
-    });
+    }).catch(() => {}); // Ignore les erreurs
   }, []);
 
   const handleDownload = () => {
     const newCount = downloadCount + 1;
     setDownloadCount(newCount);
     
-    // Tracker le clic
+    // Tracker le clic (fonction publique - ne bloque pas)
     const country = detectCountry();
     const platform = detectPlatform();
-    base44.functions.invoke('trackDownload', {
+    base44.functions.invoke('trackDownloadPublic', {
       event_type: 'download_click',
       country_code: country,
       platform: platform,
       referrer: 'direct'
-    });
+    }).catch(() => {}); // Ignore silencieusement
 
-    // Tracker le téléchargement effectif (après ouverture)
+    // OUVERTURE IMMÉDIATE DU LIEN GOOGLE DRIVE
+    window.open("https://drive.google.com/file/d/1CpTlE9E2EE3bnydQPsA0CarV9-taWkVO/view?usp=sharing", "_blank");
+
+    // Tracker le téléchargement effectif (après 3 secondes - ne bloque pas)
     setTimeout(() => {
-      base44.functions.invoke('trackDownload', {
+      base44.functions.invoke('trackDownloadPublic', {
         event_type: 'apk_download',
         country_code: country,
         platform: platform,
         referrer: 'direct'
-      });
+      }).catch(() => {}); // Ignore silencieusement
     }, 3000);
-
-    window.open("https://drive.google.com/file/d/1CpTlE9E2EE3bnydQPsA0CarV9-taWkVO/view?usp=sharing", "_blank");
   };
 
   const pageUrl = typeof window !== "undefined" ? window.location.href : "";
