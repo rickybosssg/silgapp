@@ -73,14 +73,14 @@ function MapView({ livreurs, livreursInactifs = [], showInactifs = false, course
 
     const style = document.createElement("style");
     style.textContent = `
-      .leaflet-container { background: #1a1a2e; }
-      .leaflet-popup-content-wrapper { background: #1e293b; color: #f1f5f9; border: 1px solid #334155; border-radius: 12px; }
-      .leaflet-popup-tip { background: #1e293b; }
+      .leaflet-container { background: #e8e8e8; }
+      .leaflet-popup-content-wrapper { background: #ffffff; color: #1e293b; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+      .leaflet-popup-tip { background: #ffffff; }
       .leaflet-popup-content { margin: 10px 14px; }
-      .leaflet-control-zoom a { background: #1e293b !important; color: #94a3b8 !important; border-color: #334155 !important; }
-      .leaflet-control-zoom a:hover { background: #334155 !important; color: #f1f5f9 !important; }
-      .leaflet-bar { border: none !important; box-shadow: 0 4px 20px rgba(0,0,0,0.4) !important; }
-      .leaflet-control-attribution { background: rgba(15,23,42,0.8) !important; color: #64748b !important; }
+      .leaflet-control-zoom a { background: #ffffff !important; color: #475569 !important; border-color: #e2e8f0 !important; }
+      .leaflet-control-zoom a:hover { background: #f1f5f9 !important; color: #1e293b !important; }
+      .leaflet-bar { border: none !important; box-shadow: 0 4px 20px rgba(0,0,0,0.15) !important; }
+      .leaflet-control-attribution { background: rgba(255,255,255,0.8) !important; color: #94a3b8 !important; }
       @keyframes ping { 75%,100% { transform:scale(2); opacity:0; } }
     `;
     document.head.appendChild(style);
@@ -94,7 +94,7 @@ function MapView({ livreurs, livreursInactifs = [], showInactifs = false, course
       const map = L.map(mapRef.current, { zoomControl: false }).setView([12.3714, -1.5197], 13);
       mapInstanceRef.current = map;
 
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
         subdomains: "abcd",
         maxZoom: 20,
@@ -143,10 +143,10 @@ function MapView({ livreurs, livreursInactifs = [], showInactifs = false, course
         const minStr = minAgo === null ? "inconnue" : minAgo < 1 ? "à l'instant" : `il y a ${minAgo} min`;
         const m = L.marker([livreur.latitude, livreur.longitude], { icon })
           .bindPopup(`<div style="font-family:sans-serif;font-size:13px;">
-            <b style="color:#f1f5f9">${livreur.prenom ? livreur.prenom + " " + livreur.nom : livreur.nom}</b><br/>
-            <span style="color:#9ca3af">⚫ Inactif — non dispatchable</span><br/>
-            <span style="color:#6b7280;font-size:11px;">Dernière position : ${minStr}</span><br/>
-            ${livreur.telephone ? `<span style="color:#94a3b8">📞 ${formatTel(livreur.telephone, livreur.country_code)}</span>` : ""}
+            <b style="color:#1e293b">${livreur.prenom ? livreur.prenom + " " + livreur.nom : livreur.nom}</b><br/>
+            <span style="color:#6b7280">⚫ Inactif — non dispatchable</span><br/>
+            <span style="color:#9ca3af;font-size:11px;">Dernière position : ${minStr}</span><br/>
+            ${livreur.telephone ? `<span style="color:#475569">📞 ${formatTel(livreur.telephone, livreur.country_code)}</span>` : ""}
           </div>`)
           .addTo(map);
         m.on("click", () => onSelect && onSelect(livreur));
@@ -173,8 +173,8 @@ function MapView({ livreurs, livreursInactifs = [], showInactifs = false, course
 
       const marker = L.marker([livreur.latitude, livreur.longitude], { icon })
         .bindPopup(`<div style="font-family:sans-serif;font-size:13px;">
-          <b style="color:#f1f5f9">${livreur.prenom ? livreur.prenom + " " + livreur.nom : livreur.nom}</b><br/>
-          <span style="color:#94a3b8">${formatTel(livreur.telephone, livreur.country_code)}</span><br/>
+          <b style="color:#1e293b">${livreur.prenom ? livreur.prenom + " " + livreur.nom : livreur.nom}</b><br/>
+          <span style="color:#475569">${formatTel(livreur.telephone, livreur.country_code)}</span><br/>
           <span style="color:${color};font-weight:600">${statusLabels[livreur.statut]}</span>
           ${livreur.courses_du_jour ? `<br/><span style="color:#64748b;font-size:11px">${livreur.courses_du_jour} course(s) aujourd'hui</span>` : ""}
         </div>`)
