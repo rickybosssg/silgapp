@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Users, Eye, Lock, Unlock, Phone, Mail, Calendar, Activity, Truck, Trash2 } from "lucide-react";
+import { Search, Users, Eye, Lock, Unlock, Phone, Mail, Calendar, Activity, Truck, Trash2, Tag, Plus, ToggleLeft, ToggleRight, X } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
@@ -17,7 +17,89 @@ function formaterTel(tel) {
   return digits.slice(0, 2) + " " + digits.slice(2, 4) + " " + digits.slice(4, 6) + " " + digits.slice(6, 8);
 }
 
-function ClientDetailModal({ client, courses, migrationEnCours, onClose, onBloquer, onMigrer, onSupprimer }) {
+const PAYS_LISTE = [
+  { code: "BF", nom: "Burkina Faso", emoji: "🇧🇫" },
+  { code: "CI", nom: "Côte d'Ivoire", emoji: "🇨🇮" },
+  { code: "TG", nom: "Togo", emoji: "🇹🇬" },
+  { code: "BJ", nom: "Bénin", emoji: "🇧🇯" },
+  { code: "SN", nom: "Sénégal", emoji: "🇸🇳" },
+  { code: "ML", nom: "Mali", emoji: "🇲🇱" },
+  { code: "GN", nom: "Guinée", emoji: "🇬🇳" },
+  { code: "NE", nom: "Niger", emoji: "🇳🇪" },
+];
+
+function AttribuerCodePromoModal({ client, onClose, onDone }) {
+  const [code, setCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const countryCode = client.country_code || "BF";
+
+  const handleAttribuer = async () => {
+    if (!code.trim()) { toast.error("Code requis"); return; }
+    setLoading(true);
+    const codeFormate = code.trim().toUpperCase();
+
+    // Vérifier unicité
+    const existing = await base44.entities.CodePromo.filter({ code: codeFormate });
+    if (existing?.length > 0) { toast.error("Ce code existe déjà"); setLoading(false); return; }
+
+    // Créer le code promo lié au client
+    await base44.entities.CodePromo.create({
+      code: codeFormate,
+      proprietaire_nom: `${client.prenom || ""} ${client.nom || ""}`.trim() || client.nom,
+      proprietaire_email: client.email || null,
+      proprietaire_client_id: client.id,
+      country_code: countryCode,
+      actif: true,
+      nb_inscrits: 0,
+      nb_premieres_courses: 0,
+      total_primes_generees: 0,
+    });
+    toast.success(`Code ${codeFormate} attribué à ${client.nom} !`);
+    setLoading(false);
+    onDone();
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-lg flex items-center gap-2"><Tag className="w-5 h-5 text-purple-600" />Attribuer un code promo</h3>
+          <Button variant="ghost" size="icon" onClick={onClose}><X className="w-4 h-4" /></Button>
+        </div>
+        <p className="text-sm text-muted-foreground">Code promo pour <strong>{client.nom}</strong> ({countryCode})</p>
+        <div>
+          <label className="text-xs font-bold text-gray-700 mb-1 block">Code promo *</label>
+          <input
+            value={code}
+            onChange={e => setCode(e.target.value.toUpperCase())}
+            placeholder="ex: AISSA100"
+            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm font-mono font-bold tracking-widest placeholder:font-normal placeholder:tracking-normal"
+          />
+        </div>
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+          💡 Le client gagnera <strong>100 FCFA fixe</strong> à chaque première course d'un ami inscrit avec ce code.
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={onClose}>Annuler</Button>
+          <Button className="flex-1 bg-purple-600 hover:bg-purple-700" onClick={handleAttribuer} disabled={loading}>
+            {loading ? "En cours..." : "Attribuer"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ClientDetailModal({ client, courses, migrationEnCours, onClose, onBloquer, onMigrer, onSupprimer, onRefetch }) {
+  const [showAttribuerCode, setShowAttribuerCode] = useState(false);
+
+  const { data: codePromo } = useQuery({
+    queryKey: ["code-promo-client", client.id],
+    queryFn: () => base44.entities.CodePromo.filter({ proprietaire_client_id: client.id }),
+    select: d => d?.[0] || null,
+  });
+
   const coursesDuClient = courses.filter(c => {
     const tel = (c.client_telephone || "").replace(/\D/g, "").slice(-8);
     const clientTel = (client.telephone || "").replace(/\D/g, "").slice(-8);
@@ -25,6 +107,13 @@ function ClientDetailModal({ client, courses, migrationEnCours, onClose, onBloqu
   });
   const livrees = coursesDuClient.filter(c => c.statut === "livree").length;
   const annulees = coursesDuClient.filter(c => c.statut === "annulee").length;
+
+  const handleToggleCode = async () => {
+    if (!codePromo) return;
+    await base44.entities.CodePromo.update(codePromo.id, { actif: !codePromo.actif });
+    toast.success(codePromo.actif ? "Code désactivé" : "Code réactivé");
+    onRefetch();
+  };
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -85,6 +174,43 @@ function ClientDetailModal({ client, courses, migrationEnCours, onClose, onBloqu
           </div>
         )}
 
+        {/* Section Code Promo */}
+        <div className="border rounded-xl p-3 bg-purple-50 border-purple-200 space-y-2">
+          <p className="text-xs font-bold text-purple-800 flex items-center gap-1.5"><Tag className="w-3.5 h-3.5" />Code Promo Ambassadeur</p>
+          {codePromo ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-black font-mono text-purple-700 text-lg tracking-widest">{codePromo.code}</span>
+                <Badge className={codePromo.actif ? "bg-green-100 text-green-700 border-green-200 text-xs" : "bg-gray-100 text-gray-600 border-gray-200 text-xs"}>
+                  {codePromo.actif ? "Actif" : "Inactif"}
+                </Badge>
+              </div>
+              <div className="flex gap-3 text-xs text-purple-700">
+                <span>👥 {codePromo.nb_inscrits || 0} inscrits</span>
+                <span>🚚 {codePromo.nb_premieres_courses || 0} courses</span>
+                <span>💰 {(codePromo.total_primes_generees || 0).toLocaleString()} F</span>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full h-8 text-xs"
+                onClick={handleToggleCode}
+              >
+                {codePromo.actif ? <><ToggleRight className="w-3 h-3 mr-1 text-green-600" />Désactiver</> : <><ToggleLeft className="w-3 h-3 mr-1" />Activer</>}
+              </Button>
+            </div>
+          ) : (
+            <Button
+              size="sm"
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white gap-1.5 h-8 text-xs"
+              onClick={() => setShowAttribuerCode(true)}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              🎁 Attribuer un code promo
+            </Button>
+          )}
+        </div>
+
         <div className="space-y-2 pt-2">
           {!client.deja_livreur && (
             <Button
@@ -131,6 +257,13 @@ function ClientDetailModal({ client, courses, migrationEnCours, onClose, onBloqu
           </Button>
         </div>
       </div>
+      {showAttribuerCode && (
+        <AttribuerCodePromoModal
+          client={client}
+          onClose={() => setShowAttribuerCode(false)}
+          onDone={onRefetch}
+        />
+      )}
     </div>
   );
 }
@@ -353,6 +486,7 @@ export default function ClientsExternesPanel() {
           onBloquer={handleBloquer}
           onMigrer={handleMigrer}
           onSupprimer={handleSupprimer}
+          onRefetch={refetch}
         />
       )}
     </div>

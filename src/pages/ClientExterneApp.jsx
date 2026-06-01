@@ -16,7 +16,7 @@ import ModernMap from "@/components/client/ModernMap";
 import ProfilModal from "@/components/client/ProfilModal";
 import SupportWhatsApp from "@/components/client/SupportWhatsApp";
 import ClientOnboarding from "@/components/client/ClientOnboarding";
-import MonCodePromo from "@/components/client/MonCodePromo";
+import OngletCodePromo from "@/components/client/OngletCodePromo";
 
 function haversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -62,8 +62,10 @@ export default function ClientExterneApp() {
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
   const [showMap, setShowMap] = useState(false);
+  const [ongletActif, setOngletActif] = useState("accueil"); // accueil | promo
   const [gpsSyncing, setGpsSyncing] = useState(false);
   const [gpsActif, setGpsActif] = useState(false);
+  const [aUnCodePromo, setAUnCodePromo] = useState(false);
   const clientProfilRef = useRef(null);
   useEffect(() => { clientProfilRef.current = clientProfil; }, [clientProfil]);
 
@@ -90,6 +92,14 @@ export default function ClientExterneApp() {
   useEffect(() => {
     loadProfil();
   }, []);
+
+  // Vérifier si ce client possède un code promo ambassadeur
+  useEffect(() => {
+    if (!clientProfil?.id) return;
+    base44.entities.CodePromo.filter({ proprietaire_client_id: clientProfil.id })
+      .then(codes => setAUnCodePromo((codes?.length || 0) > 0))
+      .catch(() => {});
+  }, [clientProfil?.id]);
 
   // ─── GPS — Architecture unifiée clients = livreurs ─────────────────────────
   // ═══════════════════════════════════════════════════════════════════════════
@@ -514,8 +524,34 @@ export default function ClientExterneApp() {
         </div>
       )}
 
-      <div className={`px-4 py-4 ${coursesActives.length > 0 ? `mt-${Math.min(8 + coursesActives.length * 24, 56)}` : ""}`} style={coursesActives.length > 0 ? { marginTop: `${coursesActives.length * 90 + 8}px` } : {}}>
+      <div className={`px-4 py-4`} style={coursesActives.length > 0 ? { marginTop: `${coursesActives.length * 90 + 8}px` } : {}}>
         <div className="max-w-lg mx-auto space-y-4">
+
+          {/* Barre d'onglets — visible uniquement si le client a un code promo ambassadeur */}
+          {aUnCodePromo && (
+            <div className="flex bg-muted rounded-xl p-1 gap-1">
+              <button
+                onClick={() => setOngletActif("accueil")}
+                className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${ongletActif === "accueil" ? "bg-white shadow text-foreground" : "text-muted-foreground"}`}
+              >
+                🏠 Accueil
+              </button>
+              <button
+                onClick={() => setOngletActif("promo")}
+                className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${ongletActif === "promo" ? "bg-white shadow text-purple-700" : "text-muted-foreground"}`}
+              >
+                🎁 Code Promo
+              </button>
+            </div>
+          )}
+
+          {/* Onglet Code Promo */}
+          {ongletActif === "promo" && aUnCodePromo && (
+            <OngletCodePromo clientProfil={clientProfil} />
+          )}
+
+          {ongletActif !== "promo" && (
+            <>
 
           {/* Notifications */}
           {notifications.length > 0 && (
@@ -668,9 +704,6 @@ export default function ClientExterneApp() {
             </div>
           </Card>
 
-          {/* Mon code promo (si le client est propriétaire d'un code) */}
-          <MonCodePromo clientProfil={clientProfil} />
-
           {/* Bannière code promo si client a un code et n'a pas encore fait sa première course */}
           {clientProfil?.code_promo_utilise && !clientProfil?.premiere_course_faite && (
             <Card className="p-4 border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50">
@@ -730,6 +763,8 @@ export default function ClientExterneApp() {
               ))}
             </div>
           </Card>
+          </>
+          )}
         </div>
       </div>
 
