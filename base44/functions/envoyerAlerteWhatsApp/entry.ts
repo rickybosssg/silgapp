@@ -12,7 +12,47 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
  * - Message neutre : pas d'infos sensibles (prix, adresse, GPS, détails course)
  */
 
-const MESSAGE_WHATSAPP = `Bonjour 👋\nVous avez reçu une notification importante sur SILGAPP.\nVeuillez ouvrir l'application pour consulter les détails.`;
+function getMessageWhatsApp(type, destinataire) {
+  // Messages pour LIVREUR
+  if (destinataire === 'livreur') {
+    if (type === 'nouvelle_course' || type === 'course_proximite') {
+      return `📦 *Nouvelle course disponible !*\nOuvrez SILGAPP pour accepter ou refuser la mission.`;
+    }
+    if (type === 'course_assignee') {
+      return `✅ *Course assignée*\nUne course vous a été attribuée. Ouvrez SILGAPP pour consulter les détails.`;
+    }
+    if (type === 'course_livree' || type === 'paiement_valide') {
+      return `✅ *Livraison finalisée*\nMerci pour votre travail ! Consultez SILGAPP pour le récapitulatif.`;
+    }
+    if (type === 'course_annulee') {
+      return `❌ *Course annulée*\nLa course a été annulée. Consultez SILGAPP pour plus d'informations.`;
+    }
+    if (type === 'course_bloquee' || type === 'rappel_reponse') {
+      return `⏰ *Action requise*\nUne course attend votre réponse. Ouvrez SILGAPP rapidement.`;
+    }
+    if (type === 'batterie_faible') {
+      return `🔋 *Batterie faible signalée*\nVotre signalement a bien été reçu par l'équipe SILGAPP.`;
+    }
+    // Fallback livreur
+    return `📦 *SILGAPP – Notification*\nOuvrez l'application pour consulter les détails.`;
+  }
+
+  // Messages pour CLIENT
+  if (type === 'nouvelle_course' || type === 'course_assignee') {
+    return `🚚 *SILGAPP*\nVotre demande de livraison a été prise en compte.\nOuvrez SILGAPP pour suivre votre course en temps réel.`;
+  }
+  if (type === 'livreur_en_route') {
+    return `🛵 *Votre livreur est en route !*\nOuvrez SILGAPP pour suivre la livraison en temps réel.`;
+  }
+  if (type === 'course_livree') {
+    return `✅ *Votre livraison a été finalisée.*\nMerci d'avoir utilisé SILGAPP.`;
+  }
+  if (type === 'course_annulee') {
+    return `❌ *La course a été annulée.*\nConsultez SILGAPP pour plus d'informations.`;
+  }
+  // Fallback client
+  return `🚚 *SILGAPP – Notification*\nOuvrez l'application pour consulter les détails de votre livraison.`;
+}
 
 function normaliserTelephone(tel) {
   if (!tel) return null;
@@ -25,7 +65,7 @@ function normaliserTelephone(tel) {
 }
 
 
-async function envoyerWhatsApp(telephone, accountSid, authToken, fromNumber) {
+async function envoyerWhatsApp(telephone, accountSid, authToken, fromNumber, message) {
   const to = `whatsapp:${telephone}`;
   const from = fromNumber.startsWith('whatsapp:') ? fromNumber : `whatsapp:${fromNumber}`;
 
@@ -35,7 +75,7 @@ async function envoyerWhatsApp(telephone, accountSid, authToken, fromNumber) {
   const formData = new URLSearchParams();
   formData.append('From', from);
   formData.append('To', to);
-  formData.append('Body', MESSAGE_WHATSAPP);
+  formData.append('Body', message);
 
   const resp = await fetch(twilioUrl, {
     method: 'POST',
@@ -147,7 +187,8 @@ Deno.serve(async (req) => {
         statut: 'pending'
       });
 
-      const { ok, data, to } = await envoyerWhatsApp(telephone, accountSid, authToken, fromNumber);
+      const messageLivreur = getMessageWhatsApp(notification.type, 'livreur');
+      const { ok, data, to } = await envoyerWhatsApp(telephone, accountSid, authToken, fromNumber, messageLivreur);
 
       if (ok && data.sid) {
         await base44.asServiceRole.entities.WhatsAppAlerte.update(alerte.id, {
@@ -243,7 +284,8 @@ Deno.serve(async (req) => {
         statut: 'pending'
       });
 
-      const { ok, data, to } = await envoyerWhatsApp(telephone, accountSid, authToken, fromNumber);
+      const messageClient = getMessageWhatsApp(notification.type, 'client');
+      const { ok, data, to } = await envoyerWhatsApp(telephone, accountSid, authToken, fromNumber, messageClient);
 
       if (ok && data.sid) {
         await base44.asServiceRole.entities.WhatsAppAlerte.update(alerte.id, {
