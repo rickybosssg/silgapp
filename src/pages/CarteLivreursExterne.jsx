@@ -380,261 +380,291 @@ export default function CarteLivreursExterne() {
     { key: "carte",     label: `Sur carte (${compteursLivreurs.surCarte})` },
   ];
 
-  return (
-    <div className="p-4 space-y-4 max-w-5xl mx-auto">
+  // ─── Filtres livreurs (pour la liste) ─────────────────────────────────────
+  const FILTRES = [
+    { key: "tous",    label: "Tous",       count: compteursLivreurs.total,    dot: "bg-gray-400" },
+    { key: "verts",   label: "Libres",     count: compteursLivreurs.verts,    dot: "bg-green-500" },
+    { key: "oranges", label: "En course",  count: compteursLivreurs.oranges,  dot: "bg-orange-500" },
+    { key: "noirs",   label: "Hors ligne", count: compteursLivreurs.noirs,    dot: "bg-gray-700" },
+  ];
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3 flex-1">
+  return (
+    <div className="min-h-screen bg-gray-50">
+
+      {/* ── Hero header ──────────────────────────────────────────────────── */}
+      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4 pt-5 pb-6">
+        {/* Top row */}
+        <div className="max-w-5xl mx-auto flex items-center justify-between mb-5">
           <Link to={isGlobal ? "/admin/global" : "/"}>
-            <Button variant="outline" size="sm" className="gap-1.5">
+            <button className="flex items-center gap-1.5 text-white/60 hover:text-white text-sm font-medium transition-colors">
               <ArrowLeft className="w-4 h-4" />
               {isGlobal ? "Admin Global" : "Retour"}
-            </Button>
+            </button>
           </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Carte Dispatch — Terrain réel</h1>
-            <p className="text-sm text-muted-foreground">
-              🟢 {compteursLivreurs.surCarte} livreurs · 🔵 {compteursClients.surCarte} clients · 🔴 {coursesEnAttente.length} en attente ({coursesEnAttenteAvecGPS.length} avec GPS, {coursesEnAttenteSansGPS.length} sans GPS)
-            </p>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+            <span className="text-white/60 text-xs font-medium">Temps réel</span>
           </div>
         </div>
-        {isGlobal && paysActifs.length > 1 && (
-          <CountrySelector
-            value={effectiveCountry}
-            onChange={setSelectedCountry}
-            className="h-9 text-xs"
-          />
-        )}
-      </div>
 
-      {/* Compteurs livreurs */}
-      <div>
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Livreurs</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {[
-            { label: "⚫ Noirs",    count: compteursLivreurs.noirs,   color: "text-gray-700 bg-gray-100 border-gray-300", title: "Hors ligne ou GPS > 10 min" },
-            { label: "🟢 Verts",   count: compteursLivreurs.verts,   color: "text-green-700 bg-green-50 border-green-200", title: "Disponibles + GPS < 5 min" },
-            { label: "🟠 Oranges", count: compteursLivreurs.oranges, color: "text-orange-700 bg-orange-50 border-orange-200", title: "En mission + GPS < 10 min" },
-            { label: "📍 Total",   count: compteursLivreurs.surCarte,color: "text-purple-700 bg-purple-50 border-purple-200", title: "Tous les livreurs enregistrés" },
-          ].map(c => (
-            <div key={c.label} className={`border rounded-lg p-2 text-center ${c.color}`} title={c.title}>
-              <p className="text-lg font-bold leading-none">{c.count}</p>
-              <p className="text-xs mt-0.5 leading-tight">{c.label}</p>
+        <div className="max-w-5xl mx-auto">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-black text-white leading-tight">Carte Dispatch</h1>
+              <p className="text-white/50 text-sm mt-0.5">Terrain réel · Réseau SILGAPP externe</p>
             </div>
-          ))}
+            {isGlobal && paysActifs.length > 1 && (
+              <CountrySelector
+                value={effectiveCountry}
+                onChange={setSelectedCountry}
+                className="h-9 text-xs bg-white/10 border-white/20 text-white"
+              />
+            )}
+          </div>
+
+          {/* KPI tiles */}
+          <div className="grid grid-cols-4 gap-2 mt-5">
+            {[
+              { val: compteursLivreurs.verts,   label: "Libres",      sub: "livreurs",  dot: "bg-green-400",  glow: "shadow-green-500/20" },
+              { val: compteursLivreurs.oranges, label: "En mission",  sub: "livreurs",  dot: "bg-orange-400", glow: "shadow-orange-500/20" },
+              { val: compteursClients.bleus,    label: "Clients GPS", sub: "< 30 min",  dot: "bg-blue-400",   glow: "shadow-blue-500/20" },
+              { val: coursesEnAttente.length,   label: "En attente",  sub: `${coursesEnAttenteAvecGPS.length} avec GPS`, dot: "bg-red-400", glow: "shadow-red-500/20" },
+            ].map((item, i) => (
+              <div key={i} className={`bg-white/8 backdrop-blur-sm border border-white/10 rounded-2xl p-3 text-center shadow-lg ${item.glow}`}>
+                <div className={`w-2 h-2 rounded-full ${item.dot} mx-auto mb-2`} />
+                <p className="text-2xl font-black text-white leading-none">{item.val}</p>
+                <p className="text-[10px] font-bold text-white/70 mt-1 leading-tight">{item.label}</p>
+                <p className="text-[9px] text-white/35 mt-0.5">{item.sub}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Compteurs clients */}
-      <div>
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Clients</p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {[
-            { label: "⚫ Noirs",   count: compteursClients.noirs,  color: "text-gray-700 bg-gray-100 border-gray-300", title: "GPS > 30 min ou absent" },
-            { label: "🔵 Bleus",  count: compteursClients.bleus,  color: "text-blue-700 bg-blue-50 border-blue-200", title: "Actifs + GPS < 30 min" },
-            { label: "📍 Total",  count: compteursClients.surCarte,color: "text-purple-700 bg-purple-50 border-purple-200", title: "Tous les clients enregistrés" },
-          ].map(c => (
-            <div key={c.label} className={`border rounded-lg p-2 text-center ${c.color}`} title={c.title}>
-              <p className="text-lg font-bold leading-none">{c.count}</p>
-              <p className="text-xs mt-0.5 leading-tight">{c.label}</p>
+      <div className="max-w-5xl mx-auto px-4 py-5 space-y-5">
+
+        {/* ── Bouton carte ──────────────────────────────────────────────── */}
+        <button
+          onClick={() => setShowMap(true)}
+          className="w-full rounded-3xl overflow-hidden bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 active:scale-[0.99] transition-all shadow-xl shadow-purple-500/25 text-left"
+        >
+          <div className="px-5 py-4 flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center flex-shrink-0 shadow-inner">
+              <MapPin className="w-7 h-7 text-white" />
             </div>
-          ))}
-        </div>
-      </div>
+            <div className="flex-1">
+              <p className="font-black text-white text-base">Ouvrir la carte interactive</p>
+              <p className="text-white/65 text-xs mt-0.5">
+                {compteursLivreurs.libres} libres · {compteursLivreurs.enCourse} en mission · {coursesEnAttenteAvecGPS.length} courses GPS
+              </p>
+            </div>
+            <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
+              <ArrowLeft className="w-4 h-4 text-white rotate-180" />
+            </div>
+          </div>
+          {/* Bar de couleurs statuts */}
+          <div className="flex h-1">
+            <div className="bg-green-400 transition-all" style={{ flex: compteursLivreurs.verts + 0.01 }} />
+            <div className="bg-orange-400 transition-all" style={{ flex: compteursLivreurs.oranges + 0.01 }} />
+            <div className="bg-blue-400 transition-all" style={{ flex: compteursClients.bleus + 0.01 }} />
+            <div className="bg-red-400 transition-all" style={{ flex: coursesEnAttente.length + 0.01 }} />
+          </div>
+        </button>
 
-      {/* Légende carte */}
-      <Card className="p-4 bg-slate-50 border-slate-200">
-        <p className="text-xs font-semibold text-slate-700 mb-2">Légende carte — Réseau SILGAPP complet</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs text-slate-600">
-          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-gray-800 flex-shrink-0" /><b>⚫ Noir</b> — Utilisateur enregistré, hors ligne ou GPS expiré</span>
-          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" /><b>🟢 Vert</b> — Livreur libre + GPS &lt; {GPS_SEUIL_MIN} min + app active</span>
-          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-orange-500 flex-shrink-0" /><b>🟠 Orange</b> — Livreur en course + GPS &lt; {GPS_SEUIL_MIN} min</span>
-          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" /><b>🔵 Bleu</b> — Client actif + GPS &lt; {GPS_CLIENT_SEUIL_MIN} min</span>
-          <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-red-600 flex-shrink-0" /><b>🔴 Rouge</b> — Course en attente (sans livreur)</span>
+        {/* ── Légende compacte ──────────────────────────────────────────── */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2.5">Légende couleurs</p>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            {[
+              { dot: "bg-gray-800",   label: "Hors ligne" },
+              { dot: "bg-green-500",  label: "Libre (< 5min)" },
+              { dot: "bg-orange-500", label: "En course" },
+              { dot: "bg-blue-500",   label: "Client actif" },
+              { dot: "bg-red-600",    label: "Course attente" },
+            ].map((l, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <span className={`w-3 h-3 rounded-full flex-shrink-0 ${l.dot}`} />
+                <span className="text-xs text-gray-600">{l.label}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2.5 pt-2.5 border-t border-gray-100 flex gap-4 text-xs">
+            <span className="flex items-center gap-1.5 text-gray-500">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0" />
+              Avec GPS : <strong className="text-gray-800 ml-0.5">{coursesEnAttenteAvecGPS.length}</strong>
+            </span>
+            <span className="flex items-center gap-1.5 text-gray-500">
+              <span className="w-2.5 h-2.5 rounded-full bg-gray-300 flex-shrink-0" />
+              Sans GPS : <strong className="text-gray-800 ml-0.5">{coursesEnAttenteSansGPS.length}</strong>
+            </span>
+          </div>
         </div>
-        <div className="mt-3 pt-3 border-t border-slate-200">
-          <p className="text-xs font-semibold text-slate-700 mb-2">📊 Synthèse courses en attente</p>
-          <div className="grid grid-cols-2 gap-2 text-xs">
+
+        {/* ── Liste livreurs ────────────────────────────────────────────── */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          {/* Header liste */}
+          <div className="px-4 pt-4 pb-3 border-b border-gray-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-red-600 flex-shrink-0" />
-              <span className="text-slate-600">Avec GPS : <b className="text-slate-900">{coursesEnAttenteAvecGPS.length}</b> (affichées sur la carte)</span>
+              <div className="w-8 h-8 rounded-xl bg-slate-800 flex items-center justify-center">
+                <Truck className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <p className="font-bold text-sm text-gray-900">Livreurs</p>
+                <p className="text-[10px] text-gray-400">{livreursAffiches.length} affiché{livreursAffiches.length > 1 ? "s" : ""} / {compteursLivreurs.total} total</p>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-gray-400 flex-shrink-0" />
-              <span className="text-slate-600">Sans GPS : <b className="text-slate-900">{coursesEnAttenteSansGPS.length}</b> (en attente de localisation)</span>
+          </div>
+
+          {/* Filtres pills */}
+          <div className="px-4 py-2.5 flex gap-1.5 flex-wrap border-b border-gray-100">
+            {FILTRES.map(f => (
+              <button
+                key={f.key}
+                onClick={() => setFiltreLivreur(f.key)}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${
+                  filtreLivreur === f.key
+                    ? "bg-slate-800 text-white shadow-sm"
+                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${f.dot}`} />
+                {f.label} <span className="opacity-70">({f.count})</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Items */}
+          {livreursAffiches.length === 0 ? (
+            <div className="py-12 text-center">
+              <Truck className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+              <p className="text-sm text-gray-400">Aucun livreur dans cette catégorie</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {livreursAffiches.map(livreur => {
+                const estNoir   = isLivreurNoir(livreur);
+                const estVert   = isLibre(livreur);
+                const estOrange = isEnCourse(livreur);
+                return (
+                  <div key={livreur.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
+                    {/* Dot statut */}
+                    <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${estVert ? "bg-green-500" : estOrange ? "bg-orange-500" : "bg-gray-400"}`} />
+
+                    {/* Avatar */}
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-black ${
+                      estVert ? "bg-green-100 text-green-700" : estOrange ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-500"
+                    }`}>
+                      {(livreur.prenom || livreur.nom || "?").charAt(0).toUpperCase()}
+                    </div>
+
+                    {/* Infos */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-sm text-gray-900 truncate">{livreur.prenom} {livreur.nom}</p>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                          estVert   ? "bg-green-100 text-green-700" :
+                          estOrange ? "bg-orange-100 text-orange-700" :
+                          "bg-gray-100 text-gray-500"
+                        }`}>
+                          {estVert ? "Libre" : estOrange ? "En mission" : "Hors ligne"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5 text-[11px] text-gray-400">
+                        <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{getZone(livreur)}</span>
+                        {getLastGPS(livreur) && (
+                          <span className={`flex items-center gap-1 ${hasValidGPS(livreur) ? "text-teal-500" : "text-red-400"}`}>
+                            <Clock className="w-3 h-3" />{getLastGPS(livreur)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Téléphone */}
+                    <a href={`tel:${livreur.telephone}`} className="text-xs text-primary font-medium hover:underline flex-shrink-0">
+                      {formatTel(livreur.telephone, livreur.country_code)}
+                    </a>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ── Liste clients ─────────────────────────────────────────────── */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-4 pt-4 pb-3 border-b border-gray-100 flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center">
+              <Users className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <p className="font-bold text-sm text-gray-900">Clients</p>
+              <p className="text-[10px] text-gray-400">{compteursClients.bleus} avec GPS récent · {compteursClients.total} total</p>
             </div>
           </div>
-        </div>
-      </Card>
 
-      {/* Bouton carte */}
-      <Card className="p-4 cursor-pointer hover:shadow-lg transition-all border-2 border-purple-200 bg-purple-50" onClick={() => setShowMap(true)}>
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-purple-600 flex items-center justify-center">
-            <MapPin className="w-6 h-6 text-white" />
-          </div>
-          <div className="flex-1">
-            <p className="font-bold text-purple-900">🗺️ Ouvrir la carte dispatch temps réel</p>
-            <p className="text-xs text-purple-700">
-              🟢 {compteursLivreurs.libres} libres · 🟠 {compteursLivreurs.enCourse} en course · 🔵 {compteursClients.surCarte} clients · 🔴 {coursesEnAttenteAvecGPS.length}/{coursesEnAttente.length} courses (avec GPS/total)
-            </p>
-          </div>
-        </div>
-      </Card>
-
-      {/* Filtres livreurs */}
-      <div>
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Filtrer les livreurs</p>
-        <div className="flex gap-2 flex-wrap">
-          <Button
-            size="sm"
-            variant={filtreLivreur === "tous" ? "default" : "outline"}
-            onClick={() => setFiltreLivreur("tous")}
-            className="text-xs"
-          >
-            Tous ({compteursLivreurs.total})
-          </Button>
-          <Button
-            size="sm"
-            variant={filtreLivreur === "noirs" ? "default" : "outline"}
-            onClick={() => setFiltreLivreur("noirs")}
-            className="text-xs"
-          >
-            ⚫ Noirs ({compteursLivreurs.noirs})
-          </Button>
-          <Button
-            size="sm"
-            variant={filtreLivreur === "verts" ? "default" : "outline"}
-            onClick={() => setFiltreLivreur("verts")}
-            className="text-xs"
-          >
-            🟢 Verts ({compteursLivreurs.verts})
-          </Button>
-          <Button
-            size="sm"
-            variant={filtreLivreur === "oranges" ? "default" : "outline"}
-            onClick={() => setFiltreLivreur("oranges")}
-            className="text-xs"
-          >
-            🟠 Oranges ({compteursLivreurs.oranges})
-          </Button>
+          {clientsSurCarte.length === 0 ? (
+            <div className="py-12 text-center">
+              <MapPin className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+              <p className="text-sm text-gray-400">Aucun client enregistré</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {clientsSurCarte.map(client => {
+                const gpsRecent = isClientGPSRecent(client);
+                return (
+                  <div key={client.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
+                    <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${gpsRecent ? "bg-blue-500" : "bg-gray-400"}`} />
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-black ${
+                      gpsRecent ? "bg-blue-50 text-blue-700" : "bg-gray-100 text-gray-500"
+                    }`}>
+                      {(client.prenom || client.nom || "?").charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-sm text-gray-900 truncate">{client.prenom} {client.nom}</p>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                          gpsRecent ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"
+                        }`}>
+                          {gpsRecent ? "GPS récent" : "GPS ancien"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5 text-[11px] text-gray-400">
+                        <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{getZone(client)}</span>
+                        {getLastGPS(client) && (
+                          <span className={`flex items-center gap-1 ${gpsRecent ? "text-teal-500" : "text-gray-400"}`}>
+                            <Clock className="w-3 h-3" />{getLastGPS(client)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <a href={`tel:${client.telephone}`} className="text-xs text-primary font-medium hover:underline flex-shrink-0">
+                      {formatTel(client.telephone, client.country_code)}
+                    </a>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Liste livreurs */}
-      <Card className="p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <Truck className="w-5 h-5 text-accent" />
-          <h2 className="font-semibold">Livreurs ({livreursAffiches.length})</h2>
-        </div>
-        {livreursAffiches.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Truck className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p>Aucun livreur dans cette catégorie</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {livreursAffiches.map(livreur => {
-              const estNoir = isLivreurNoir(livreur);
-              const estVert = isLibre(livreur);
-              const estOrange = isEnCourse(livreur);
-              const couleurBorder = estNoir ? "border-gray-400" : (estVert ? "border-green-200 bg-green-50/30" : (estOrange ? "border-orange-200 bg-orange-50/30" : "border-gray-200"));
-              return (
-                <div key={livreur.id} className={`flex items-start justify-between p-3 border rounded-lg ${couleurBorder}`}>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-semibold text-sm">{livreur.prenom} {livreur.nom}</p>
-                      {estNoir && <span className="text-xs text-gray-500 font-medium">⚫ Hors ligne</span>}
-                      {estVert && <span className="text-xs text-green-600 font-medium">🟢 Libre</span>}
-                      {estOrange && <span className="text-xs text-orange-600 font-medium">🟠 En course</span>}
-                    </div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mb-1.5">
-                      {!estNoir && <ONBadge livreur={livreur} />}
-                      {!estNoir && <StatutBadge livreur={livreur} />}
-                      {!estNoir && <AppBadge entity={livreur} />}
-                    </div>
-                    <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{getZone(livreur)}</span>
-                      {getLastGPS(livreur) && (
-                        <span className={`flex items-center gap-1 ${hasValidGPS(livreur) ? "text-teal-600" : "text-red-400"}`}>
-                          <Clock className="w-3 h-3" />{getLastGPS(livreur)}
-                        </span>
-                      )}
-                      {!estNoir && <GPSHealthBadge entity={livreur} compact />}
-                    </div>
-                  </div>
-                  <a href={`tel:${livreur.telephone}`} className="text-sm text-primary hover:underline ml-3 flex-shrink-0">
-                    {formatTel(livreur.telephone, livreur.country_code)}
-                  </a>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </Card>
-
-      {/* Liste clients */}
-      <Card className="p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <Users className="w-5 h-5 text-blue-500" />
-          <h2 className="font-semibold">Clients ({compteursClients.surCarte} sur carte)</h2>
-        </div>
-        {clientsSurCarte.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <MapPin className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p>Aucun client avec GPS</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {clientsSurCarte.map(client => {
-              const gpsRecent = isClientGPSRecent(client);
-              return (
-                <div key={client.id} className={`flex items-center justify-between p-3 border rounded-lg ${gpsRecent ? "border-blue-200 bg-blue-50/30" : "border-gray-200 bg-gray-50/30"}`}>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-semibold text-sm">{client.prenom} {client.nom}</p>
-                      {gpsRecent ? (
-                        <span className="text-xs text-blue-600 font-medium">🔵 GPS récent</span>
-                      ) : (
-                        <span className="text-xs text-gray-500 font-medium">⚫ GPS ancien</span>
-                      )}
-                    </div>
-                    <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{getZone(client)}</span>
-                      {getLastGPS(client) && (
-                        <span className={`flex items-center gap-1 ${gpsRecent ? "text-teal-600" : "text-gray-400"}`}>
-                          <Clock className="w-3 h-3" />{getLastGPS(client)}
-                        </span>
-                      )}
-                      <AppBadge entity={client} />
-                      {gpsRecent && <GPSHealthBadge entity={client} compact />}
-                    </div>
-                  </div>
-                  <a href={`tel:${client.telephone}`} className="text-sm text-primary hover:underline ml-3 flex-shrink-0">
-                    {formatTel(client.telephone, client.country_code)}
-                  </a>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </Card>
-
-      {/* Modale carte interactive */}
+      {/* ── Modale carte interactive ─────────────────────────────────────── */}
       {showMap && (
         <div className="fixed inset-0 z-50 bg-background flex flex-col">
-          <div className="flex flex-col gap-0 border-b bg-card flex-shrink-0">
+          <div className="flex-shrink-0 border-b bg-slate-900">
             <div className="flex items-center justify-between px-4 pt-3 pb-2">
-              <h2 className="text-base font-bold text-foreground">
-                🗺️ Carte Dispatch — Terrain temps réel
-              </h2>
-              <Button variant="ghost" size="icon" onClick={() => { setShowMap(false); setSelectedMarker(null); }}>
-                <X className="w-5 h-5" />
-              </Button>
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                <h2 className="text-base font-black text-white">Carte Dispatch — Temps réel</h2>
+              </div>
+              <button
+                onClick={() => { setShowMap(false); setSelectedMarker(null); }}
+                className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4 text-white" />
+              </button>
             </div>
-            <div className="px-4 pb-3 flex items-center gap-3">
-            <div className="flex-1">
+            <div className="px-4 pb-3">
               <NetworkHealthBanner
                 libres={compteursLivreurs.verts}
                 enCourse={compteursLivreurs.oranges}
@@ -643,7 +673,6 @@ export default function CarteLivreursExterne() {
                 enAttente={coursesEnAttente.length}
               />
             </div>
-          </div>
           </div>
           <div className="flex flex-1 min-h-0">
             <div className="flex-1 min-w-0">
