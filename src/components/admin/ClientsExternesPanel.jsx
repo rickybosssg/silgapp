@@ -17,7 +17,7 @@ function formaterTel(tel) {
   return digits.slice(0, 2) + " " + digits.slice(2, 4) + " " + digits.slice(4, 6) + " " + digits.slice(6, 8);
 }
 
-function ClientDetailModal({ client, courses, onClose, onBloquer, onMigrer }) {
+function ClientDetailModal({ client, courses, migrationEnCours, onClose, onBloquer, onMigrer }) {
   const coursesDuClient = courses.filter(c => {
     const tel = (c.client_telephone || "").replace(/\D/g, "").slice(-8);
     const clientTel = (client.telephone || "").replace(/\D/g, "").slice(-8);
@@ -89,11 +89,21 @@ function ClientDetailModal({ client, courses, onClose, onBloquer, onMigrer }) {
           {!client.deja_livreur && (
             <Button
               variant="default"
+              disabled={migrationEnCours === client.id}
               className="w-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600"
-              onClick={() => { onMigrer(client); onClose(); }}
+              onClick={() => { onMigrer(client); }}
             >
-              <Truck className="w-4 h-4 mr-2" />
-              🚚 Migrer vers Livreur Externe
+              {migrationEnCours === client.id ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  Migration en cours...
+                </>
+              ) : (
+                <>
+                  <Truck className="w-4 h-4 mr-2" />
+                  🚚 Migrer vers Livreur Externe
+                </>
+              )}
             </Button>
           )}
           <div className="flex gap-2">
@@ -301,6 +311,7 @@ export default function ClientsExternesPanel() {
         <ClientDetailModal
           client={clientDetail}
           courses={courses}
+          migrationEnCours={migrationEnCours}
           onClose={() => setClientDetail(null)}
           onBloquer={handleBloquer}
           onMigrer={handleMigrer}
