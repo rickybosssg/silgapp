@@ -21,10 +21,9 @@ import HistoriqueDuJour from "@/components/admin/HistoriqueDuJour";
 import SyncClientGPSPanel from "@/components/admin/SyncClientGPSPanel";
 import SyncLivreurGPSPanel from "@/components/admin/SyncLivreurGPSPanel";
 import StatsPays from "@/components/international/StatsPays.jsx";
-import DownloadStatsWidget from "@/components/admin/DownloadStatsWidget";
+import DownloadStatsPanel from "@/components/admin/DownloadStatsPanel";
 
 export default function DashboardAdminExterne() {
-  {/* 🚨 BLOC DE TEST - SI CE TEXTE N'APPARAÎT PAS, LE FICHIER N'EST PAS CHARGÉ */}
   console.log("🚨 DashboardAdminExterne.jsx EST CHARGÉ ET EXÉCUTÉ");
   
   const { data: courses = [] } = useQuery({
@@ -169,8 +168,6 @@ export default function DashboardAdminExterne() {
   return (
     <div className="px-4 py-4 lg:p-6 space-y-6 max-w-7xl mx-auto">
 
-
-
       {/* ── HERO HEADER ────────────────────────────────────────────── */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary via-red-600 to-rose-600 p-5 sm:p-6 shadow-xl shadow-red-200">
         <div className="absolute inset-0 opacity-10">
@@ -219,8 +216,8 @@ export default function DashboardAdminExterne() {
         </div>
       )}
 
-      {/* ── WIDGET TÉLÉCHARGEMENTS ─────────────────────────────────── */}
-      <DownloadStatsWidget />
+      {/* ── STATISTIQUES TÉLÉCHARGEMENTS ───────────────────────────── */}
+      <DownloadStatsPanel />
 
       {/* ── STATS KPI ──────────────────────────────────────────────── */}
       <div>
