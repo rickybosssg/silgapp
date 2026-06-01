@@ -380,6 +380,11 @@ export default function DashboardAdminExterne() {
         </div>
       </div>
 
+      {/* ── CLIENTS INSCRITS ─────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+        <ClientsExternesPanel />
+      </div>
+
       {/* ── CODES PROMO ──────────────────────────────────────────── */}
       <div id="codes-promo" className="bg-white rounded-2xl border border-purple-100 p-5 shadow-sm">
         <CodePromoPanel />
@@ -390,11 +395,6 @@ export default function DashboardAdminExterne() {
 
       {/* ── HISTORIQUE DU JOUR ───────────────────────────────────── */}
       <HistoriqueDuJour courses={courses} />
-
-      {/* ── CLIENTS INSCRITS ─────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-        <ClientsExternesPanel />
-      </div>
 
       {/* ── SYNCHRONISATION GPS ──────────────────────────────────── */}
       <div className="grid gap-4">
