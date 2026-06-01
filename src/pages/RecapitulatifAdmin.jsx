@@ -11,6 +11,7 @@ import LivreurPerformanceCard from "@/components/livreurs/LivreurPerformanceCard
 import LivreurDetailDialog from "@/components/livreurs/LivreurDetailDialog";
 import { toast } from "sonner";
 import { useSilgappAuth } from "@/lib/silgappAuth";
+import ReseauInternePremiumCard from "@/components/recap/ReseauInternePremiumCard";
 
 const periodFilters = [
   { value: "today", label: "Aujourd'hui" },
@@ -192,16 +193,12 @@ export default function RecapitulatifAdmin({ reseau }) {
         </TabsList>
       </Tabs>
 
-      {/* Cartes résumé séparées — affichées côte à côte si pas de réseau forcé */}
+      {/* Cartes résumé */}
       {!reseau ? (
         <div className="space-y-4">
-          <ReseauCard
-            title="SILGAPP Interne"
-            icon={Building2}
-            color="border-blue-200 bg-blue-50/40"
+          <ReseauInternePremiumCard
             livreurs={livreursInternes}
             coursesLivrees={coursesInterneLivrees}
-            isExterne={false}
           />
           <ReseauCard
             title="SILGAPP Externe"
@@ -213,13 +210,9 @@ export default function RecapitulatifAdmin({ reseau }) {
           />
         </div>
       ) : reseau === "interne" ? (
-        <ReseauCard
-          title="SILGAPP Interne"
-          icon={Building2}
-          color="border-blue-200 bg-blue-50/40"
+        <ReseauInternePremiumCard
           livreurs={livreursInternes}
           coursesLivrees={coursesInterneLivrees}
-          isExterne={false}
         />
       ) : (
         <ReseauCard
