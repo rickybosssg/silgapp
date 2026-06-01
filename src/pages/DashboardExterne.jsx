@@ -199,19 +199,10 @@ export default function DashboardExterne() {
 
 
 
-      {/* 🚨 TEST RENDU DASHBOARD ACTIF */}
-      <div className="bg-red-600 border-4 border-yellow-400 p-6 rounded-2xl mb-4">
-        <h1 className="text-3xl font-black text-white mb-2">🚨 TEST RENDU DASHBOARD ACTIF</h1>
-        <p className="text-white text-sm">DashboardExterne.jsx est le fichier chargé</p>
-        <p className="text-white text-xs mt-2">Route: / (réseau externe)</p>
+      {/* Codes Promo */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+        <CodePromoPanel />
       </div>
-
-      {/* ✅ TEST CODE PROMO PANEL MONTÉ */}
-      <div style={{ background: 'green', color: 'white', padding: '20px', marginBottom: '20px', borderRadius: '12px' }}>
-        <h2 className="text-2xl font-bold mb-2">✅ CODE PROMO PANEL MONTÉ</h2>
-        <p>CodePromoPanel component rendering test</p>
-      </div>
-      <CodePromoPanel />
 
       {/* Raccourci Panel Clients Externes */}
       <Card className="p-4 cursor-pointer hover:shadow-lg transition-all border-2 border-pink-200 bg-pink-50">
