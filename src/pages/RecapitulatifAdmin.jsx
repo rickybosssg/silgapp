@@ -156,9 +156,10 @@ export default function RecapitulatifAdmin({ reseau }) {
         montant_paye: montant,
         heure_paiement: new Date().toISOString(),
         admin_paiement: currentUser?.full_name || currentUser?.email || "admin",
+        montant_du_silga: 0, // Remise à zéro du compteur
       },
     });
-    toast.success(`Paiement de ${montant.toLocaleString()} FCFA validé ✅`);
+    toast.success(`Paiement de ${montant.toLocaleString()} FCFA validé ✅ — Compteur remis à zéro`);
   };
 
   // Livreurs et courses selon l'onglet actif
