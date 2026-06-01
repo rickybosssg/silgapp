@@ -2,9 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link, useNavigate } from "react-router-dom";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Globe, ArrowRight, ToggleLeft, ToggleRight, Users, Package,
   Truck, TrendingUp, Plus, Settings, LayoutDashboard, Edit, ShieldCheck
@@ -113,134 +111,146 @@ export default function AdminGlobal() {
   }, [pays, courses, livreurs, clients, admins]);
 
   return (
-    <div className="p-4 lg:p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-            <Globe className="w-5 h-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-foreground">Admin Global SILGAPP</h1>
-            <p className="text-xs text-muted-foreground">Supervision de toutes les opérations multi-pays</p>
-          </div>
+    <div className="p-4 lg:p-6 space-y-5 max-w-7xl mx-auto">
+
+      {/* ── HERO HEADER ──────────────────────────────── */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-800 via-slate-700 to-slate-900 p-5 shadow-xl">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute -top-8 -right-8 w-40 h-40 bg-white rounded-full" />
+          <div className="absolute -bottom-12 -left-6 w-56 h-56 bg-white rounded-full" />
         </div>
-        <Link to="/admin/gestion-pays">
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <Settings className="w-4 h-4" />
-            Configurer les pays
-          </Button>
-        </Link>
+        <div className="relative flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-2xl">🌍</div>
+            <div>
+              <h1 className="text-xl font-black text-white tracking-tight">Admin Global SILGAPP</h1>
+              <p className="text-white/60 text-xs mt-0.5">Supervision de toutes les opérations multi-pays</p>
+            </div>
+          </div>
+          <Link to="/admin/gestion-pays">
+            <Button variant="ghost" size="sm" className="gap-1.5 text-white hover:bg-white/20 border border-white/30">
+              <Settings className="w-4 h-4" />
+              <span className="hidden sm:inline">Configurer</span>
+            </Button>
+          </Link>
+        </div>
       </div>
 
-      {/* Stats globales */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+      {/* ── KPI GLOBAUX ──────────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
         {[
-          { label: "Pays actifs", value: globalStats.paysActifs, color: "bg-emerald-500", icon: Globe },
-          { label: "Clients", value: globalStats.totalClients, color: "bg-purple-500", icon: Users },
-          { label: "Livreurs", value: globalStats.totalLivreurs, color: "bg-blue-500", icon: Truck },
-          { label: "Livreurs actifs", value: globalStats.livreursActifs, color: "bg-accent", icon: Truck },
-          { label: "Courses auj.", value: globalStats.coursesToday, color: "bg-indigo-500", icon: Package },
-          { label: "Livrées auj.", value: globalStats.livreesToday, color: "bg-emerald-600", icon: Package },
-          { label: "CA du jour", value: `${globalStats.caToday.toLocaleString()} FCFA`, color: "bg-yellow-500", icon: TrendingUp },
+          { label: "Pays actifs",     value: globalStats.paysActifs,                        grad: "from-emerald-500 to-teal-500",    icon: "🌍" },
+          { label: "Clients",         value: globalStats.totalClients,                       grad: "from-violet-500 to-purple-600",   icon: "👥" },
+          { label: "Livreurs",        value: globalStats.totalLivreurs,                      grad: "from-blue-500 to-indigo-600",     icon: "🛵" },
+          { label: "Actifs",          value: globalStats.livreursActifs,                     grad: "from-cyan-500 to-sky-500",        icon: "✅" },
+          { label: "Courses auj.",    value: globalStats.coursesToday,                       grad: "from-orange-500 to-amber-500",    icon: "📦" },
+          { label: "Livrées auj.",    value: globalStats.livreesToday,                       grad: "from-green-500 to-emerald-500",   icon: "🚀" },
+          { label: "CA du jour",      value: `${globalStats.caToday.toLocaleString()}`,      grad: "from-primary to-red-600",         icon: "💰" },
         ].map(s => (
-          <Card key={s.label} className="p-3 flex items-center gap-2.5">
-            <div className={`w-8 h-8 rounded-lg ${s.color} flex items-center justify-center flex-shrink-0`}>
-              <s.icon className="w-4 h-4 text-white" />
+          <div key={s.label} className={`bg-gradient-to-br ${s.grad} rounded-2xl p-3 text-white shadow-md`}>
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-[9px] font-semibold opacity-80 uppercase tracking-wide leading-tight">{s.label}</p>
+              <span className="text-sm">{s.icon}</span>
             </div>
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground truncate">{s.label}</p>
-              <p className="font-bold text-foreground text-sm truncate">{s.value}</p>
-            </div>
-          </Card>
+            <p className="text-xl font-black leading-none truncate">{s.value}</p>
+          </div>
         ))}
       </div>
 
-      {/* Tableau des pays */}
-      <div>
-        <h2 className="text-base font-semibold text-foreground mb-3 flex items-center gap-2">
-          <Globe className="w-4 h-4 text-primary" />
-          Tableau de bord par pays
-        </h2>
+      {/* ── TABLEAU PAR PAYS ─────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center shadow-sm">
+            <Globe className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <p className="font-bold text-foreground">Tableau de bord par pays</p>
+            <p className="text-xs text-muted-foreground">{statsByPays.length} pays configurés</p>
+          </div>
+        </div>
+
         <div className="space-y-3">
           {statsByPays.map(({ code, paysInfo, total, livrees, enCours, ca, livreurs: lv, clients: cl, adminsCount, actif, paysId, devise }) => (
-            <Card
+            <div
               key={code}
-              className={`p-4 transition-all border-2 ${actif ? "border-green-200 bg-green-50/20" : "border-border opacity-70"}`}
+              className={`rounded-2xl border p-4 transition-all ${actif ? "border-green-100 bg-green-50/30" : "border-gray-100 bg-gray-50/50 opacity-70"}`}
             >
               <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                 {/* Info pays */}
-                <div className="flex items-center gap-3 flex-1">
-                  <span className="text-2xl">{paysInfo?.emoji_flag || "🌍"}</span>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-foreground">{paysInfo?.nom || code}</span>
-                      <span className="text-xs text-muted-foreground">{code}</span>
-                      {actif ? (
-                        <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px]">✅ Actif</Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-[10px] text-muted-foreground">Inactif</Badge>
-                      )}
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 shadow-sm ${actif ? "bg-green-100" : "bg-gray-100"}`}>
+                    {paysInfo?.emoji_flag || "🌍"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <span className="font-black text-foreground">{paysInfo?.nom || code}</span>
+                      <span className="text-[10px] font-bold text-muted-foreground bg-gray-100 px-1.5 py-0.5 rounded">{code}</span>
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${actif ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                        {actif ? "● Actif" : "○ Inactif"}
+                      </span>
                       {adminsCount > 0 && (
-                        <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-[10px]">
-                          <ShieldCheck className="w-2.5 h-2.5 mr-0.5" />
-                          {adminsCount} admin{adminsCount > 1 ? "s" : ""}
-                        </Badge>
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 flex items-center gap-1">
+                          <ShieldCheck className="w-2.5 h-2.5" />{adminsCount} admin{adminsCount > 1 ? "s" : ""}
+                        </span>
                       )}
                     </div>
-                    {/* Mini stats */}
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs text-muted-foreground">
-                      <span>📦 {total} courses</span>
-                      <span>✅ {livrees} livrées</span>
-                      <span>🔄 {enCours} en cours</span>
-                      <span>🛵 {lv} livreurs</span>
-                      <span>👤 {cl} clients</span>
-                      <span className="font-medium text-foreground">💰 {ca.toLocaleString()} {devise}</span>
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 mt-2">
+                      {[
+                        { label: "Courses", value: total,           bg: "bg-gray-100",    text: "text-gray-700" },
+                        { label: "Livrées", value: livrees,         bg: "bg-green-100",   text: "text-green-700" },
+                        { label: "En cours",value: enCours,         bg: "bg-blue-100",    text: "text-blue-700" },
+                        { label: "Livreurs",value: lv,              bg: "bg-orange-100",  text: "text-orange-700" },
+                        { label: "Clients", value: cl,              bg: "bg-violet-100",  text: "text-violet-700" },
+                        { label: `CA (${devise})`, value: ca.toLocaleString(), bg: "bg-amber-100", text: "text-amber-700" },
+                      ].map(m => (
+                        <div key={m.label} className={`${m.bg} rounded-xl p-1.5 text-center`}>
+                          <p className={`font-black text-sm ${m.text}`}>{m.value}</p>
+                          <p className="text-[9px] text-gray-500 mt-0.5">{m.label}</p>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-                  {/* Créer admin pays */}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1.5 text-xs h-8"
-                    onClick={() => setShowCreateAdmin({ code, nom: paysInfo?.nom || code, emoji: paysInfo?.emoji_flag || "🌍" })}
-                  >
-                    <Plus className="w-3 h-3" />
-                    Admin pays
-                  </Button>
-
-                  {/* Ouvrir dashboard pays */}
-                  <Button
-                    size="sm"
-                    className="gap-1.5 text-xs h-8 bg-primary"
-                    onClick={() => navigate(`/admin/pays/${code}`)}
-                    disabled={!actif}
-                  >
-                    <LayoutDashboard className="w-3 h-3" />
-                    Dashboard
-                    <ArrowRight className="w-3 h-3" />
-                  </Button>
-
-                  {/* Toggle actif/inactif */}
+                <div className="flex items-center gap-2 flex-shrink-0 flex-wrap sm:flex-col sm:items-end">
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5 text-xs rounded-xl border-gray-200"
+                      onClick={() => setShowCreateAdmin({ code, nom: paysInfo?.nom || code, emoji: paysInfo?.emoji_flag || "🌍" })}
+                    >
+                      <Plus className="w-3 h-3" />
+                      Admin
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="gap-1.5 text-xs rounded-xl bg-gradient-to-r from-slate-700 to-slate-900"
+                      onClick={() => navigate(`/admin/pays/${code}`)}
+                      disabled={!actif}
+                    >
+                      <LayoutDashboard className="w-3 h-3" />
+                      Dashboard
+                      <ArrowRight className="w-3 h-3" />
+                    </Button>
+                  </div>
                   {paysId && (
                     <button
                       onClick={() => toggleMutation.mutate({ id: paysId, actif: !actif })}
                       disabled={toggleMutation.isPending}
                       title={actif ? "Désactiver ce pays" : "Activer ce pays"}
+                      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border transition-all hover:opacity-80"
                     >
                       {actif
-                        ? <ToggleRight className="w-8 h-8 text-green-500" />
-                        : <ToggleLeft className="w-8 h-8 text-gray-400" />
+                        ? <><ToggleRight className="w-4 h-4 text-green-500" /><span className="text-green-600">Désactiver</span></>
+                        : <><ToggleLeft className="w-4 h-4 text-gray-400" /><span className="text-gray-500">Activer</span></>
                       }
                     </button>
                   )}
                 </div>
               </div>
-            </Card>
+            </div>
           ))}
         </div>
       </div>
