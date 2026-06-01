@@ -45,14 +45,14 @@ export default function LivreurPerformanceTable() {
   const [showDetail, setShowDetail] = useState(false);
 
   const { data: livreurs = [] } = useQuery({
-    queryKey: ["livreurs"],
-    queryFn: () => base44.entities.Livreur.list(),
+    queryKey: ["livreurs-internes"],
+    queryFn: () => base44.entities.Livreur.filter({ type_livreur: "interne" }),
     initialData: [],
   });
 
   const { data: courses = [] } = useQuery({
-    queryKey: ["courses-all"],
-    queryFn: () => base44.entities.Course.list("-created_date", 1000),
+    queryKey: ["courses-internes-all"],
+    queryFn: () => base44.entities.Course.filter({ reseau: "interne" }, "-created_date", 1000),
     initialData: [],
   });
 
