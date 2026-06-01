@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Plus, MapPin, Package, Truck, Clock, CheckCircle2, XCircle, TrendingUp, ArrowLeft, Globe, Users } from "lucide-react";
+import { Plus, MapPin, Package, Truck, Clock, CheckCircle2, XCircle, TrendingUp, ArrowLeft, Globe, Users, LayoutDashboard } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
 import StatCard from "@/components/dashboard/StatCard";
@@ -199,6 +199,26 @@ export default function DashboardExterne() {
       {/* Alertes batterie + dispatch monitor */}
       <BatterieAlertesPanel currentUser={null} />
       <DispatchMonitor />
+
+      {/* Raccourci Panel Clients Externes */}
+      <Card className="p-4 cursor-pointer hover:shadow-lg transition-all border-2 border-pink-200 bg-pink-50">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-pink-600 flex items-center justify-center">
+            <LayoutDashboard className="w-6 h-6 text-white" />
+          </div>
+          <div className="flex-1">
+            <p className="font-bold text-pink-900">📋 Panel Clients Externes</p>
+            <p className="text-xs text-pink-700">
+              Gérer les clients, migrer vers livreurs, et suivre les inscriptions
+            </p>
+          </div>
+          <Link to="/admin/externe/clients">
+            <Button size="sm" className="bg-pink-600 hover:bg-pink-700 text-white">
+              Ouvrir
+            </Button>
+          </Link>
+        </div>
+      </Card>
 
       {/* Stats principales */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">

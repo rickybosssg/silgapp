@@ -39,6 +39,7 @@ const CourseExterneFormSync = lazy(() => import('./pages/CourseExterneFormSync.j
 const ClientSuiviCourse = lazy(() => import('./pages/ClientSuiviCourse.jsx'));
 const DashboardAdminExterne = lazy(() => import('./pages/DashboardAdminExterne.jsx'));
 const DusLivreursExternes = lazy(() => import('./pages/DusLivreursExternes.jsx'));
+const ClientsExternesPage = lazy(() => import('./pages/ClientsExternesPage.jsx'));
 const PublicSuiviCourse = lazy(() => import('./pages/PublicSuiviCourse.jsx'));
 const GestionPays = lazy(() => import('./pages/GestionPays.jsx'));
 const AdminGlobal = lazy(() => import('./pages/AdminGlobal.jsx'));
@@ -217,6 +218,7 @@ function AppContent() {
               <Route path="/admin/externe" element={<AnimatedRoutes><DashboardAdminExterne /></AnimatedRoutes>} />
               <Route path="/admin/externe/dus-livreurs" element={<AnimatedRoutes><DusLivreursExternes /></AnimatedRoutes>} />
               <Route path="/admin/externe/twilio-sandbox" element={<AnimatedRoutes><TwilioSandboxMonitor /></AnimatedRoutes>} />
+              <Route path="/admin/externe/clients" element={<AnimatedRoutes><ClientsExternesPage /></AnimatedRoutes>} />
             </>
           ) : (
             <>
