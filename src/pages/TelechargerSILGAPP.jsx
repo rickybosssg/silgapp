@@ -5,22 +5,77 @@ import DownloadCard from "@/components/download/DownloadCard";
 import FeatureCards from "@/components/download/FeatureCards";
 import InstallationSection from "@/components/download/InstallationSection";
 import SecurityAndSupport from "@/components/download/SecurityAndSupport";
+import { base44 } from "@/api/base44Client";
 
 export default function TelechargerSILGAPP() {
   const [downloadCount, setDownloadCount] = useState(0);
   const [mounted, setMounted] = useState(false);
+  const [stats, setStats] = useState(null);
+
+  // Détecter le pays et la plateforme
+  const detectCountry = () => {
+    const lang = navigator.language || 'fr-FR';
+    const countryMap = {
+      'fr-BF': 'BF', 'fr-CI': 'CI', 'fr-TG': 'TG', 'fr-BJ': 'BJ',
+      'fr-SN': 'SN', 'fr-ML': 'ML', 'fr-GN': 'GN', 'fr-NE': 'NE',
+      'fr': 'BF'
+    };
+    return countryMap[lang] || 'BF';
+  };
+
+  const detectPlatform = () => {
+    const ua = navigator.userAgent;
+    if (ua.includes('Android')) return 'android';
+    if (ua.includes('iPhone') || ua.includes('iPad')) return 'ios';
+    return 'web';
+  };
 
   useEffect(() => {
     setMounted(true);
-    const stored = localStorage.getItem("silgapp_download_count");
-    const count = stored ? parseInt(stored) : 2847;
-    setDownloadCount(count);
+    
+    // Charger les statistiques
+    base44.functions.invoke('getDownloadStats', {}).then(res => {
+      if (res.data && res.data.stats) {
+        setStats(res.data.stats);
+        setDownloadCount(res.data.stats.month_downloads || 2847);
+      }
+    });
+
+    // Tracker la visite
+    const country = detectCountry();
+    const platform = detectPlatform();
+    base44.functions.invoke('trackDownload', {
+      event_type: 'page_visit',
+      country_code: country,
+      platform: platform,
+      referrer: 'direct'
+    });
   }, []);
 
   const handleDownload = () => {
     const newCount = downloadCount + 1;
     setDownloadCount(newCount);
-    localStorage.setItem("silgapp_download_count", newCount.toString());
+    
+    // Tracker le clic
+    const country = detectCountry();
+    const platform = detectPlatform();
+    base44.functions.invoke('trackDownload', {
+      event_type: 'download_click',
+      country_code: country,
+      platform: platform,
+      referrer: 'direct'
+    });
+
+    // Tracker le téléchargement effectif (après ouverture)
+    setTimeout(() => {
+      base44.functions.invoke('trackDownload', {
+        event_type: 'apk_download',
+        country_code: country,
+        platform: platform,
+        referrer: 'direct'
+      });
+    }, 3000);
+
     window.open("https://drive.google.com/file/d/1CpTlE9E2EE3bnydQPsA0CarV9-taWkVO/view?usp=sharing", "_blank");
   };
 
@@ -49,9 +104,9 @@ export default function TelechargerSILGAPP() {
               
               <main className="max-w-6xl mx-auto px-6 py-16 space-y-12">
                 <DownloadCard 
-                  downloadCount={downloadCount}
-                  onDownload={handleDownload}
-                />
+                downloadCount={downloadCount}
+                onDownload={handleDownload}
+              />
                 
                 <FeatureCards />
                 

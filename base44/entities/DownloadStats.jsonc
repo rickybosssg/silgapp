@@ -1,0 +1,59 @@
+{
+  "name": "DownloadStats",
+  "type": "object",
+  "properties": {
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "page_visit",
+        "download_click",
+        "apk_download"
+      ],
+      "description": "Type d'\u00e9v\u00e9nement track\u00e9"
+    },
+    "country_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE"
+      ],
+      "default": "BF",
+      "description": "Code pays du visiteur"
+    },
+    "ip_address": {
+      "type": "string",
+      "description": "Adresse IP anonymis\u00e9e"
+    },
+    "user_agent": {
+      "type": "string",
+      "description": "User agent du navigateur"
+    },
+    "platform": {
+      "type": "string",
+      "enum": [
+        "android",
+        "ios",
+        "web",
+        "unknown"
+      ],
+      "description": "Plateforme d\u00e9tect\u00e9e"
+    },
+    "referrer": {
+      "type": "string",
+      "description": "Source du trafic (facebook, whatsapp, tiktok, direct)"
+    },
+    "session_id": {
+      "type": "string",
+      "description": "ID de session unique"
+    }
+  },
+  "required": [
+    "event_type"
+  ]
+}

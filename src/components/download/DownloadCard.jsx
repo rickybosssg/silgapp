@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Download, CheckCircle, ExternalLink } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
-export default function DownloadCard({ apkUrl, onDownload }) {
+export default function DownloadCard({ downloadCount, onDownload }) {
+  const apkUrl = "https://drive.google.com/file/d/1CpTlE9E2EE3bnydQPsA0CarV9-taWkVO/view?usp=sharing";
   return (
     <motion.div
       initial={{ opacity: 0, y: 40 }}
@@ -31,7 +32,7 @@ export default function DownloadCard({ apkUrl, onDownload }) {
               </Button>
             </motion.div>
             
-            <div className="flex items-center justify-center gap-6 text-sm">
+            <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
               <span className="flex items-center gap-2 text-white/70">
                 <CheckCircle className="w-5 h-5 text-green-400" />
                 <span className="font-medium">Gratuit</span>
@@ -43,6 +44,10 @@ export default function DownloadCard({ apkUrl, onDownload }) {
               <span className="flex items-center gap-2 text-white/70">
                 <CheckCircle className="w-5 h-5 text-green-400" />
                 <span className="font-medium">28.5 MB</span>
+              </span>
+              <span className="flex items-center gap-2 px-3 py-1 bg-red-500/20 border border-red-500/30 rounded-full text-red-400 font-bold">
+                <Download className="w-4 h-4" />
+                {downloadCount.toLocaleString()} téléchargements ce mois
               </span>
             </div>
           </div>
