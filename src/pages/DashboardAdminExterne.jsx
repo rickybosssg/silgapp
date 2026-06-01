@@ -387,6 +387,7 @@ export default function DashboardAdminExterne() {
 
       {/* ── CODES PROMO ──────────────────────────────────────────── */}
       <div id="codes-promo" className="bg-white rounded-2xl border border-purple-100 p-5 shadow-sm">
+        <h2 className="font-bold text-lg text-foreground mb-4">📌 Codes Promo</h2>
         <CodePromoPanel />
       </div>
 
