@@ -14,6 +14,7 @@ import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import CountrySelector, { usePaysActifs } from "@/components/international/CountrySelector.jsx";
+import { calculateLivreurCounters, calculateClientCounters } from "@/lib/livreurCounters.js";
 
 // ─── Constantes de seuils ────────────────────────────────────────────────────
 
@@ -217,43 +218,20 @@ export default function CarteLivreursExterne() {
   // Abonnement temps réel pour mise à jour IMMÉDIATE des courses
   useEffect(() => {
     const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
-      console.log("[CarteLivreursExterne] Realtime course event:", {
-        type: event.type,
-        course_id: event.id?.substr(-8),
-        statut: event.data?.statut,
-        livreur_id: event.data?.livreur_id
-      });
-      // Rafraîchissement immédiat pour tout événement (create, update, delete)
       refetch();
     });
     return () => unsubscribe();
   }, [refetch]);
   
   // Filtrage strict : courses VRAIMENT en attente (statuts initiaux uniquement)
-  // Statuts "en attente" : nouvelle, recherche_livreur (EXCLURE: livree, annulee, livreur_en_route, colis_recupere, en_livraison)
-  // IMPORTANT: Une course peut avoir livreur_id défini mais être encore "en attente" si dispatch_status = "propose" (livreur n'a pas encore accepté)
   const coursesEnAttente = useMemo(() => {
-    // Statuts de fin de course à exclure absolument
     const statutsFin = ["livree", "terminee", "completed", "annulee", "livreur_en_route", "colis_recupere", "en_livraison"];
     
-    const filtered = toutesCoursesExternes.filter(c =>
+    return toutesCoursesExternes.filter(c =>
       (c.statut === "nouvelle" || c.statut === "recherche_livreur") &&
-      // Soit pas de livreur, soit livreur proposé mais pas encore accepté (dispatch_status = "propose")
       (!c.livreur_id || c.dispatch_status === "propose") &&
-      // EXCLURE les courses terminées
       !statutsFin.includes(c.statut)
     );
-    console.log("[CarteLivreursExterne] coursesEnAttente AUDIT:", {
-      total: toutesCoursesExternes.length,
-      en_attente: filtered.length,
-      details: filtered.map(c => ({ 
-        id: c.id.substr(-8), 
-        statut: c.statut, 
-        livreur_id: c.livreur_id || "AUCUN",
-        dispatch_status: c.dispatch_status
-      }))
-    });
-    return filtered;
   }, [toutesCoursesExternes]);
 
   // Courses en attente AVEC GPS (affichables sur la carte)
@@ -286,42 +264,24 @@ export default function CarteLivreursExterne() {
     ).length;
     
     if (marqueursCourses !== coursesEnAttenteAvecGPS.length) {
-      console.warn(`[CarteLivreursExterne] ⚠️ Incohérence courses: ${marqueursCourses} marqueurs vs ${coursesEnAttenteAvecGPS.length} compteur`);
+      console.warn(`⚠️ Incohérence courses: ${marqueursCourses} marqueurs vs ${coursesEnAttenteAvecGPS.length} compteur`);
     }
     if (marqueursLivreursEnCourse !== livreursEnCourse) {
-      console.warn(`[CarteLivreursExterne] ⚠️ Incohérence livreurs en course: ${marqueursLivreursEnCourse} marqueurs vs ${livreursEnCourse} compteur`);
+      console.warn(`⚠️ Incohérence livreurs en course: ${marqueursLivreursEnCourse} marqueurs vs ${livreursEnCourse} compteur`);
     }
-    
-    console.log("[CarteLivreursExterne] ✅ Cohérence vérifiée:", {
-      courses_marqueurs: marqueursCourses,
-      courses_compteur: coursesEnAttenteAvecGPS.length,
-      livreurs_en_course_marqueurs: marqueursLivreursEnCourse,
-      livreurs_en_course_compteur: livreursEnCourse
-    });
   }, [coursesEnAttenteAvecGPS, livreurs]);
 
-  // ─── Compteurs livreurs (règles unifiées) ───────────────────────────────
-  const compteursLivreurs = useMemo(() => ({
-    total:       livreurs.length,
-    noirs:       livreurs.filter(l => isLivreurNoir(l)).length,
-    verts:       livreurs.filter(l => isLibre(l)).length,
-    oranges:     livreurs.filter(l => isEnCourse(l)).length,
-    surCarte:    livreurs.length, // TOUS les livreurs enregistrés
-    on:          livreurs.filter(l => isON(l)).length,
-    off:         livreurs.filter(l => !isON(l)).length,
-    libres:      livreurs.filter(l => isLibre(l)).length,
-    enCourse:    livreurs.filter(l => isEnCourse(l)).length,
-    appActive:   livreurs.filter(l => isAppActive(l)).length,
-  }), [livreurs]);
+  // ─── 🎯 COMPTEURS UNIFIÉS - Source unique de vérité ───────────────────
+  // Utilise les mêmes fonctions que DashboardExterne pour garantir l'uniformité
+  const compteursLivreurs = useMemo(() => 
+    calculateLivreurCounters(livreurs),
+    [livreurs]
+  );
 
-  // ─── Compteurs clients (règles unifiées) ────────────────────────────────
-  const compteursClients = useMemo(() => ({
-    total:          clients.length,
-    noirs:          clients.filter(c => isClientNoir(c)).length,
-    bleus:          clients.filter(c => !isClientNoir(c)).length, // GPS < 30 min
-    gpsRecents:     clients.filter(c => isClientGPSRecent(c)).length, // GPS < 30 min (alias)
-    surCarte:       clients.length, // TOUS les clients enregistrés
-  }), [clients]);
+  const compteursClients = useMemo(() => 
+    calculateClientCounters(clients),
+    [clients]
+  );
 
   // ─── Listes filtrées ────────────────────────────────────────────────────
   const livreursAffiches = useMemo(() => {
@@ -354,13 +314,6 @@ export default function CarteLivreursExterne() {
 
   // Centre de la carte : pays sélectionné > premier livreur éligible > Ouagadougou (BF)
   const centerPosition = useMemo(() => {
-    console.log("[CarteLivreursExterne] centerPosition:", {
-      paysData: !!paysData,
-      lat: paysData?.latitude_centre,
-      lng: paysData?.longitude_centre,
-      livreurs: livreursSurCarte.length
-    });
-    
     if (paysData?.latitude_centre) {
       return { latitude: paysData.latitude_centre, longitude: paysData.longitude_centre, zoom: rayonToZoom(paysData.rayon_km) };
     }
