@@ -159,31 +159,30 @@ export default function ClientsExternesPanel() {
   };
 
   const handleMigrer = async (client) => {
-    if (!client.user_email) {
-      toast.error("Client sans email - migration impossible");
-      return;
-    }
-    
     setMigrationEnCours(client.id);
     try {
       const result = await base44.functions.invoke("migrerClientVersLivreur", { client_id: client.id });
       
+      console.log("Résultat migration:", result);
+      
       if (result.error) {
         if (result.error === "Déjà livreur") {
-          toast.info(result.message);
+          toast.info(result.message || "Ce client est déjà un livreur");
           setClientDetail(null);
+          refetch();
         } else {
-          toast.error(result.error);
+          toast.error(result.error || "Erreur inconnue");
         }
-      } else {
-        toast.success(`✅ ${result.livreur.prenom} ${result.livreur.nom} est maintenant livreur externe !`);
+      } else if (result.success) {
+        toast.success(`✅ ${result.livreur?.prenom || ''} ${result.livreur?.nom || ''} est maintenant livreur externe !`);
         setClientDetail(null);
         refetch();
+      } else {
+        toast.error("Erreur inattendue");
       }
     } catch (err) {
       console.error("Erreur migration:", err);
-      toast.error("Erreur lors de la migration");
-      setClientDetail(null);
+      toast.error(err.message || "Erreur lors de la migration");
     } finally {
       setMigrationEnCours(null);
     }

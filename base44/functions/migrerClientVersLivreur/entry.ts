@@ -43,6 +43,8 @@ Deno.serve(async (req) => {
       });
       
       if (livreursExistants.length > 0) {
+        // Supprimer le client quand même car il est déjà livreur
+        await base44.entities.ClientExterne.delete(client.id);
         return Response.json({ 
           error: 'Déjà livreur',
           message: 'Cet utilisateur est déjà enregistré comme livreur externe.',
