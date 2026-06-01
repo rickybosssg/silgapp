@@ -1,6 +1,7 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import BatterieFaibleButton from "./BatterieFaibleButton";
+import CoursePersonnelleButton from "./CoursePersonnelleButton";
 
 export default function LivreurStatutCard({ statut, livreur, isExterne = false }) {
   const isDisponible = statut === "disponible";
@@ -74,10 +75,11 @@ export default function LivreurStatutCard({ statut, livreur, isExterne = false }
         )}
       </div>
 
-      {/* Bouton batterie faible - uniquement pour livreurs internes */}
+      {/* Boutons action - uniquement pour livreurs internes */}
       {!isExterne && (isDisponible || isEnCourse) && livreur && (
-        <div className="pt-1">
+        <div className="pt-1 flex flex-wrap gap-2">
           <BatterieFaibleButton livreur={livreur} />
+          {isDisponible && <CoursePersonnelleButton livreur={livreur} />}
         </div>
       )}
     </div>
