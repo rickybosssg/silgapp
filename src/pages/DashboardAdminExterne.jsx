@@ -155,6 +155,14 @@ export default function DashboardAdminExterne() {
       grad: "from-pink-500 to-rose-500",
       shadow: "shadow-pink-100",
     },
+    {
+      to: "/admin/externe/stats-telechargements",
+      label: "Stats téléchargements",
+      sub: "Visites & analytics",
+      icon: Download,
+      grad: "from-red-500 to-orange-500",
+      shadow: "shadow-red-100",
+    },
   ];
 
   return (
