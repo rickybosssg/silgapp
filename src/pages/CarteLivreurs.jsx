@@ -280,157 +280,172 @@ export default function CarteLivreurs() {
   ];
 
   return (
-    <div className="p-4 space-y-4 max-w-4xl mx-auto">
+    <div className="p-4 space-y-5 max-w-4xl mx-auto">
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-2">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Carte — Livreurs Internes</h1>
-          <p className="text-sm text-muted-foreground">
-            {validLivreurs.length} livreurs validés • {livreursAvecGPS.length} avec GPS
-          </p>
+      {/* ── HERO HEADER ─────────────────────────────────────────── */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-800 via-slate-700 to-slate-900 p-5 shadow-xl">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute -top-8 -right-8 w-40 h-40 bg-white rounded-full" />
+          <div className="absolute -bottom-12 -left-6 w-56 h-56 bg-white rounded-full" />
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-1.5">
-          <RefreshCw className={cn("w-4 h-4", isFetching && "animate-spin")} />
-          Actualiser
-        </Button>
+        <div className="relative flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-2xl">🗺️</div>
+            <div>
+              <h1 className="text-xl font-black text-white tracking-tight">Carte — Livreurs Internes</h1>
+              <p className="text-white/60 text-xs mt-0.5">
+                {validLivreurs.length} validés · {livreursAvecGPS.length} avec GPS · {actives.length} course{actives.length > 1 ? "s" : ""} active{actives.length > 1 ? "s" : ""}
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => refetch()}
+            className="text-white/70 hover:text-white hover:bg-white/10 border border-white/20 rounded-xl gap-1.5"
+          >
+            <RefreshCw className={cn("w-4 h-4", isFetching && "animate-spin")} />
+            <span className="hidden sm:inline">Actualiser</span>
+          </Button>
+        </div>
       </div>
 
-      {/* Compteurs */}
-      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+      {/* ── COMPTEURS ───────────────────────────────────────────── */}
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5">
         {[
-          { label: "ON",        count: compteurs.on,       color: "text-green-700 bg-green-50 border-green-200" },
-          { label: "OFF",       count: compteurs.off,      color: "text-gray-500 bg-gray-50 border-gray-200" },
-          { label: "Libres",    count: compteurs.libres,   color: "text-emerald-700 bg-emerald-50 border-emerald-200" },
-          { label: "En course", count: compteurs.enCourse, color: "text-blue-700 bg-blue-50 border-blue-200" },
-          { label: "App ouverte", count: compteurs.enLigne, color: "text-sky-700 bg-sky-50 border-sky-200" },
+          { label: "ON",          count: compteurs.on,       grad: "from-green-500 to-emerald-500",  shadow: "shadow-green-100" },
+          { label: "OFF",         count: compteurs.off,      grad: "from-gray-400 to-gray-500",      shadow: "shadow-gray-100" },
+          { label: "Libres",      count: compteurs.libres,   grad: "from-emerald-500 to-teal-500",   shadow: "shadow-emerald-100" },
+          { label: "En course",   count: compteurs.enCourse, grad: "from-blue-500 to-indigo-500",    shadow: "shadow-blue-100" },
+          { label: "App ouverte", count: compteurs.enLigne,  grad: "from-cyan-500 to-sky-500",       shadow: "shadow-cyan-100" },
         ].map(c => (
-          <div key={c.label} className={`border rounded-lg p-2 text-center ${c.color}`}>
-            <p className="text-lg font-bold leading-none">{c.count}</p>
-            <p className="text-xs mt-0.5">{c.label}</p>
+          <div key={c.label} className={`bg-gradient-to-br ${c.grad} rounded-2xl p-3 text-center text-white shadow-md ${c.shadow}`}>
+            <p className="text-2xl font-black leading-none">{c.count}</p>
+            <p className="text-[10px] font-semibold opacity-80 mt-0.5 uppercase tracking-wide">{c.label}</p>
           </div>
         ))}
       </div>
 
-      {/* Légende */}
-      <Card className="p-4 bg-slate-50 border-slate-200">
-        <p className="text-xs font-semibold text-slate-700 mb-2">Légende</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-xs text-slate-600">
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500" /><b>ON</b> = accepte les nouvelles courses</span>
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-300" /><b>OFF</b> = n'accepte plus de nouvelles courses</span>
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" /><b>Libre</b> = peut recevoir une course</span>
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400" /><b>En course</b> = mission en cours</span>
-          <span className="flex items-center gap-1.5"><Wifi className="w-3 h-3 text-green-600" /><b>Application ouverte</b> = présent dans l'application</span>
-          <span className="flex items-center gap-1.5"><WifiOff className="w-3 h-3 text-gray-400" /><b>Application fermée</b> = absent de l'application</span>
+      {/* ── BOUTON CARTE INTERACTIVE ────────────────────────────── */}
+      <div
+        className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-lg transition-all duration-200 cursor-pointer group"
+        onClick={() => setShowMap(true)}
+      >
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center text-2xl shadow-md flex-shrink-0">
+          🗺️
         </div>
-      </Card>
+        <div className="flex-1">
+          <p className="font-bold text-foreground">Ouvrir la carte interactive</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{livreursAvecGPS.length} livreurs localisés · {actives.length} courses actives visibles</p>
+        </div>
+        <div className="w-9 h-9 rounded-xl bg-slate-100 group-hover:bg-slate-200 flex items-center justify-center transition-colors">
+          <MapPin className="w-4 h-4 text-slate-600" />
+        </div>
+      </div>
 
-      {/* Filtres */}
+      {/* ── LÉGENDE ─────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-4">
+        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Légende</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-xs text-slate-600">
+          <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0" /><b>ON</b> — accepte les nouvelles courses</span>
+          <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-gray-300 flex-shrink-0" /><b>OFF</b> — n'accepte plus de nouvelles courses</span>
+          <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0" /><b>Libre</b> — peut recevoir une course</span>
+          <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0" /><b>En course</b> — mission en cours</span>
+          <span className="flex items-center gap-2"><Wifi className="w-3 h-3 text-green-600 flex-shrink-0" /><b>App ouverte</b> — présent dans l'application</span>
+          <span className="flex items-center gap-2"><WifiOff className="w-3 h-3 text-gray-400 flex-shrink-0" /><b>App fermée</b> — absent de l'application</span>
+        </div>
+      </div>
+
+      {/* ── FILTRES ─────────────────────────────────────────────── */}
       <div className="flex gap-2 flex-wrap">
         {filtresBtns.map(f => (
-          <Button
+          <button
             key={f.key}
-            size="sm"
-            variant={filtre === f.key ? "default" : "outline"}
             onClick={() => setFiltre(f.key)}
-            className="text-xs"
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+              filtre === f.key
+                ? "bg-slate-800 text-white border-slate-800"
+                : "bg-white text-slate-600 border-gray-200 hover:border-slate-400 hover:text-slate-800"
+            }`}
           >
             {f.label}
-          </Button>
+          </button>
         ))}
       </div>
 
-      {/* Bouton carte interactive */}
-      <Card className="p-4 cursor-pointer hover:shadow-lg transition-all" onClick={() => setShowMap(true)}>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <MapPin className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1">
-            <p className="font-semibold text-foreground">🗺️ Voir la carte interactive</p>
-            <p className="text-xs text-muted-foreground">{livreursAvecGPS.length} livreurs avec GPS • {actives.length} courses actives</p>
-          </div>
-        </div>
-      </Card>
-
-      {/* Liste des livreurs */}
-      <Card className="p-6">
+      {/* ── LISTE DES LIVREURS ──────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5">
         <div className="flex items-center gap-3 mb-4">
-          <Truck className="w-5 h-5 text-primary" />
-          <h2 className="font-semibold">Livreurs internes ({livreursAffiches.length})</h2>
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center shadow-sm">
+            <Truck className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <p className="font-bold text-foreground">Livreurs internes</p>
+            <p className="text-xs text-muted-foreground">{livreursAffiches.length} affiché{livreursAffiches.length > 1 ? "s" : ""}</p>
+          </div>
         </div>
 
         {livreursAffiches.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Truck className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p>Aucun livreur dans cette catégorie</p>
+          <div className="text-center py-12 text-muted-foreground">
+            <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3 text-2xl">🛵</div>
+            <p className="font-semibold text-sm">Aucun livreur dans cette catégorie</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {livreursAffiches.map(livreur => {
               const lastGPS = getLastGPS(livreur);
               const online = isEnLigne(livreur);
+              const on = isON(livreur);
               return (
-                <div key={livreur.id} className="flex items-start justify-between p-3 border border-gray-200 rounded-lg">
-                  <div className="flex items-start gap-3 flex-1 min-w-0">
-                    {livreur.photo_url ? (
-                      <img src={livreur.photo_url} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 text-xl">🛵</div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm mb-1">
-                        {livreur.prenom ? `${livreur.prenom} ${livreur.nom}` : livreur.nom}
-                      </p>
-                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mb-1">
-                        {/* Badge ON/OFF */}
-                        {isON(livreur) ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700">
-                            <span className="w-2 h-2 rounded-full bg-green-500" />ON
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400">
-                            <span className="w-2 h-2 rounded-full bg-gray-300" />OFF
-                          </span>
-                        )}
-                        {/* Badge statut */}
-                        {livreur.statut === "disponible" && (
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500" />Libre
-                          </span>
-                        )}
-                        {livreur.statut === "en_course" && (
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700">
-                            <span className="w-2 h-2 rounded-full bg-blue-500" />En course
-                          </span>
-                        )}
-                        {/* Badge app */}
-                        {online ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700">
-                            <Wifi className="w-3 h-3" />Application ouverte
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-xs text-gray-400">
-                            <WifiOff className="w-3 h-3" />Application fermée
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                        {livreur.quartier && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{livreur.quartier}</span>}
-                        {lastGPS && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />Dernier GPS : {lastGPS}</span>}
-                        {livreur.courses_du_jour > 0 && <span>🛵 {livreur.courses_du_jour} course(s) aujourd'hui</span>}
-                      </div>
+                <div key={livreur.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all">
+                  {livreur.photo_url ? (
+                    <img src={livreur.photo_url} alt="" className="w-11 h-11 rounded-xl object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-11 h-11 rounded-xl bg-slate-200 flex items-center justify-center flex-shrink-0 text-xl">🛵</div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm text-foreground mb-1">
+                      {livreur.prenom ? `${livreur.prenom} ${livreur.nom}` : livreur.nom}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 mb-1">
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${on ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${on ? "bg-green-500" : "bg-gray-300"}`} />
+                        {on ? "ON" : "OFF"}
+                      </span>
+                      {livreur.statut === "disponible" && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Libre
+                        </span>
+                      )}
+                      {livreur.statut === "en_course" && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />En course
+                        </span>
+                      )}
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${online ? "bg-cyan-100 text-cyan-700" : "bg-gray-100 text-gray-400"}`}>
+                        {online ? <Wifi className="w-2.5 h-2.5" /> : <WifiOff className="w-2.5 h-2.5" />}
+                        {online ? "App active" : "App fermée"}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
+                      {livreur.quartier && <span className="flex items-center gap-1"><MapPin className="w-2.5 h-2.5" />{livreur.quartier}</span>}
+                      {lastGPS && <span className="flex items-center gap-1"><Clock className="w-2.5 h-2.5" />{lastGPS}</span>}
+                      {livreur.courses_du_jour > 0 && <span>🛵 {livreur.courses_du_jour} course(s) aujourd'hui</span>}
                     </div>
                   </div>
-                  <a href={`tel:${livreur.telephone}`} className="text-sm text-primary hover:underline ml-3 flex-shrink-0">
-                    {formatTel(livreur.telephone, livreur.country_code)}
+                  <a
+                    href={`tel:${livreur.telephone}`}
+                    className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-xl transition-colors"
+                  >
+                    <Phone className="w-3 h-3" />
+                    <span className="hidden sm:inline">{formatTel(livreur.telephone, livreur.country_code)}</span>
                   </a>
                 </div>
               );
             })}
           </div>
         )}
-      </Card>
+      </div>
 
       {/* Modale carte interactive full-screen */}
       {showMap && (
