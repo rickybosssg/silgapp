@@ -53,6 +53,7 @@ const TestConnexion = lazy(() => import('./pages/TestConnexion.jsx'));
 const TestWhatsAppAlertes = lazy(() => import('./pages/TestWhatsAppAlertes.jsx'));
 const TwilioSandboxMonitor = lazy(() => import('./pages/TwilioSandboxMonitor.jsx'));
 const DiagnosticFCM = lazy(() => import('./pages/DiagnosticFCM.jsx'));
+const TelechargerSILGAPP = lazy(() => import('./pages/TelechargerSILGAPP.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -118,6 +119,20 @@ function AppContent() {
   // ⚠️ ROUTES DE TEST TOUJOURS ACCESSIBLES - PRIORITÉ ABSOLUE
   // Ces routes doivent fonctionner même sans auth/réseau/rôle
   const isTestRoute = window.location.pathname.startsWith('/test-') || window.location.pathname === '/maintenance' || window.location.pathname === '/diagnostic-fcm';
+  
+  // 📱 ROUTE PUBLIQUE DE TÉLÉCHARGEMENT - ACCESSIBLE SANS AUTH
+  const isDownloadPage = window.location.pathname === '/telecharger';
+  
+  if (isDownloadPage) {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <Routes>
+          <Route path="/telecharger" element={<TelechargerSILGAPP />} />
+          <Route path="*" element={<PageNotFound />} />
+        </Routes>
+      </Suspense>
+    );
+  }
   
   if (isTestRoute) {
     return (
