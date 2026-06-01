@@ -116,11 +116,7 @@ function AppContent() {
   const [isClient, setIsClient] = useState(false);
   const [reseau, setReseau] = useState(null);
 
-  // ⚠️ ROUTES DE TEST TOUJOURS ACCESSIBLES - PRIORITÉ ABSOLUE
-  // Ces routes doivent fonctionner même sans auth/réseau/rôle
-  const isTestRoute = window.location.pathname.startsWith('/test-') || window.location.pathname === '/maintenance' || window.location.pathname === '/diagnostic-fcm';
-  
-  // 📱 ROUTE PUBLIQUE DE TÉLÉCHARGEMENT - ACCESSIBLE SANS AUTH
+  // 📱 ROUTE PUBLIQUE DE TÉLÉCHARGEMENT - ACCESSIBLE SANS AUTH (PRIORITÉ ABSOLUE)
   const isDownloadPage = window.location.pathname === '/telecharger';
   
   if (isDownloadPage) {
@@ -133,6 +129,9 @@ function AppContent() {
       </Suspense>
     );
   }
+  
+  // ⚠️ ROUTES DE TEST TOUJOURS ACCESSIBLES - PRIORITÉ ABSOLUE
+  const isTestRoute = window.location.pathname.startsWith('/test-') || window.location.pathname === '/maintenance' || window.location.pathname === '/diagnostic-fcm';
   
   if (isTestRoute) {
     return (
