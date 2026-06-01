@@ -67,6 +67,19 @@
       "type": "string",
       "format": "date-time",
       "description": "Derni\u00e8re activit\u00e9 dans l'application (heartbeat)"
+    },
+    "code_promo_utilise": {
+      "type": "string",
+      "description": "Code promo saisi \u00e0 l'inscription (usage unique)"
+    },
+    "code_promo_id": {
+      "type": "string",
+      "description": "ID du CodePromo utilis\u00e9"
+    },
+    "premiere_course_faite": {
+      "type": "boolean",
+      "default": false,
+      "description": "Le client a d\u00e9j\u00e0 effectu\u00e9 sa premi\u00e8re course (plus de r\u00e9duction possible)"
     }
   },
   "required": [

@@ -1,0 +1,62 @@
+{
+  "name": "CodePromo",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string",
+      "description": "Code promo unique (ex: AISSA100)"
+    },
+    "proprietaire_nom": {
+      "type": "string",
+      "description": "Nom de l'utilisateur propri\u00e9taire du code"
+    },
+    "proprietaire_email": {
+      "type": "string",
+      "description": "Email du propri\u00e9taire du code promo"
+    },
+    "proprietaire_client_id": {
+      "type": "string",
+      "description": "ID ClientExterne du propri\u00e9taire"
+    },
+    "country_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE"
+      ],
+      "default": "BF",
+      "description": "Pays du code promo"
+    },
+    "actif": {
+      "type": "boolean",
+      "default": true,
+      "description": "Code promo actif ou d\u00e9sactiv\u00e9"
+    },
+    "nb_inscrits": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de clients ayant utilis\u00e9 ce code \u00e0 l'inscription"
+    },
+    "nb_premieres_courses": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de premi\u00e8res courses valid\u00e9es avec ce code"
+    },
+    "total_primes_generees": {
+      "type": "number",
+      "default": 0,
+      "description": "Total des primes de 100 FCFA g\u00e9n\u00e9r\u00e9es"
+    }
+  },
+  "required": [
+    "code",
+    "proprietaire_nom",
+    "country_code"
+  ]
+}

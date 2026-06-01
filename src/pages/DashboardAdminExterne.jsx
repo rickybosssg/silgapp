@@ -12,6 +12,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 import ClientsExternesPanel from "@/components/admin/ClientsExternesPanel";
+import CodePromoPanel from "@/components/admin/CodePromoPanel";
 import HistoriqueDuJour from "@/components/admin/HistoriqueDuJour";
 import SyncClientGPSPanel from "@/components/admin/SyncClientGPSPanel";
 import SyncLivreurGPSPanel from "@/components/admin/SyncLivreurGPSPanel";
@@ -320,6 +321,11 @@ export default function DashboardAdminExterne() {
 
       {/* Historique du jour */}
       <HistoriqueDuJour courses={courses} />
+
+      {/* Section Codes Promo */}
+      <Card className="p-4 border-purple-200">
+        <CodePromoPanel />
+      </Card>
 
       {/* Section Clients inscrits */}
       <Card className="p-4">

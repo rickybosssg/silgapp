@@ -16,6 +16,7 @@ import ModernMap from "@/components/client/ModernMap";
 import ProfilModal from "@/components/client/ProfilModal";
 import SupportWhatsApp from "@/components/client/SupportWhatsApp";
 import ClientOnboarding from "@/components/client/ClientOnboarding";
+import MonCodePromo from "@/components/client/MonCodePromo";
 
 function haversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -666,6 +667,24 @@ export default function ClientExterneApp() {
               </Button>
             </div>
           </Card>
+
+          {/* Mon code promo (si le client est propriétaire d'un code) */}
+          <MonCodePromo clientProfil={clientProfil} />
+
+          {/* Bannière code promo si client a un code et n'a pas encore fait sa première course */}
+          {clientProfil?.code_promo_utilise && !clientProfil?.premiere_course_faite && (
+            <Card className="p-4 border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center flex-shrink-0">
+                  <span className="text-xl">🎁</span>
+                </div>
+                <div>
+                  <p className="font-bold text-purple-900 text-sm">Code promo actif : <span className="font-black font-mono">{clientProfil.code_promo_utilise}</span></p>
+                  <p className="text-xs text-purple-700">100 FCFA de réduction sur votre prochaine course (min. 1 000 FCFA)</p>
+                </div>
+              </div>
+            </Card>
+          )}
 
           {/* Support WhatsApp */}
           <SupportWhatsApp />

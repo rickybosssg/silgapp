@@ -136,7 +136,28 @@ function EtapeProfil({ clientProfil, onSuccess }) {
   const [telAffiche, setTelAffiche] = useState(
     clientProfil?.telephone ? formaterAffichage(clientProfil.telephone) : ""
   );
+  const [codePromo, setCodePromo] = useState("");
+  const [codePromoStatut, setCodePromoStatut] = useState(null); // null | "valide" | "invalide"
+  const [codePromoData, setCodePromoData] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  // Vérifier le code promo en temps réel
+  const verifierCodePromo = async (code) => {
+    if (!code || code.length < 3) { setCodePromoStatut(null); setCodePromoData(null); return; }
+    try {
+      const results = await base44.entities.CodePromo.filter({ code: code.toUpperCase() });
+      const found = results?.find(c => c.actif);
+      if (found) {
+        setCodePromoStatut("valide");
+        setCodePromoData(found);
+      } else {
+        setCodePromoStatut("invalide");
+        setCodePromoData(null);
+      }
+    } catch {
+      setCodePromoStatut(null);
+    }
+  };
 
   const paysSelectionne = PAYS_LISTE.find(p => p.code === countryCode);
 
@@ -157,6 +178,16 @@ function EtapeProfil({ clientProfil, onSuccess }) {
     try {
       let gpsData = null;
       try { gpsData = JSON.parse(localStorage.getItem("client_gps_position") || "null"); } catch (_) {}
+
+      // Vérifier cohérence pays / indicatif téléphonique
+      if (telDigits.length > 0 && paysSelectionne) {
+        const indicatifDigits = paysSelectionne.indicatif.replace("+", "");
+        if (telDigits.startsWith(indicatifDigits) && !telDigits.replace(indicatifDigits, "").length) {
+          toast.error(`L'indicatif ${paysSelectionne.indicatif} ne correspond pas au pays sélectionné`);
+          setLoading(false);
+          return;
+        }
+      }
       
       let updated;
       const profileData = {
@@ -166,6 +197,10 @@ function EtapeProfil({ clientProfil, onSuccess }) {
         country_code: countryCode,
         actif: true,
         ...(gpsData ? { latitude: gpsData.latitude, longitude: gpsData.longitude } : {}),
+        ...(codePromoStatut === "valide" && codePromoData ? {
+          code_promo_utilise: codePromoData.code,
+          code_promo_id: codePromoData.id,
+        } : {}),
       };
       
       if (clientProfil?.id) {
@@ -189,8 +224,16 @@ function EtapeProfil({ clientProfil, onSuccess }) {
           });
         }
       }
+
+      // Incrémenter le compteur inscrits du code promo
+      if (codePromoStatut === "valide" && codePromoData) {
+        base44.entities.CodePromo.update(codePromoData.id, {
+          nb_inscrits: (codePromoData.nb_inscrits || 0) + 1,
+        }).catch(() => {});
+      }
+
       try { localStorage.setItem("client_profil_complet", "true"); } catch (_) {}
-      toast.success("Profil complété !");
+      toast.success(codePromoStatut === "valide" ? "Profil complété ! Code promo appliqué 🎉" : "Profil complété !");
 
       base44.functions.invoke('initClientAuto', {
         device_id: navigator.userAgent.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 50),
@@ -286,6 +329,38 @@ function EtapeProfil({ clientProfil, onSuccess }) {
               </p>
             )}
           </div>
+
+          {/* Champ code promo */}
+          {!clientProfil?.code_promo_utilise && (
+            <div>
+              <label className="text-xs font-bold text-gray-700 mb-1 block">🎁 Code promo (optionnel)</label>
+              <input
+                value={codePromo}
+                onChange={e => {
+                  const val = e.target.value.toUpperCase();
+                  setCodePromo(val);
+                  verifierCodePromo(val);
+                }}
+                placeholder="ex: AISSA100"
+                className={`w-full h-12 rounded-xl border px-4 text-sm font-mono font-bold tracking-widest focus:outline-none focus:ring-2 transition-all ${
+                  codePromoStatut === "valide" ? "border-green-400 bg-green-50 text-green-700 focus:ring-green-200" :
+                  codePromoStatut === "invalide" ? "border-red-300 bg-red-50 focus:ring-red-200" :
+                  "border-gray-200 focus:ring-primary/30 focus:border-primary"
+                }`}
+              />
+              {codePromoStatut === "valide" && codePromoData && (
+                <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                  <Check className="w-3 h-3" /> Code valide ! Bénéficiez de <strong>10% de réduction</strong> (100 FCFA) sur votre première course.
+                </p>
+              )}
+              {codePromoStatut === "invalide" && (
+                <p className="text-xs text-red-500 mt-1">❌ Code promo invalide ou désactivé</p>
+              )}
+              {!codePromoStatut && (
+                <p className="text-xs text-gray-400 mt-1">Bénéficiez de 10% de réduction sur votre première course !</p>
+              )}
+            </div>
+          )}
         </div>
 
         <button
