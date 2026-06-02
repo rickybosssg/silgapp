@@ -26,6 +26,7 @@ import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import StatDetailModal from "@/components/dashboard/StatDetailModal";
 import AppToggleButton from "@/components/admin/AppToggleButton";
 
+// v2
 export default function DashboardExterne() {
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [statModal, setStatModal] = useState(null);
