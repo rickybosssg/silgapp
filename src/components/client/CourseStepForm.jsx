@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
-import ContactsRecents, { sauvegarderContactRecent } from "@/components/client/ContactsRecents";
+import CarnetAdresses from "@/components/client/CarnetAdresses";
 
 const STORAGE_KEY = "silgapp_course_draft";
 
@@ -59,7 +59,8 @@ export default function CourseStepForm({
   onNext, 
   onBack,
   onAnnuler,
-  isLoading 
+  isLoading,
+  clientId,
 }) {
   const [expediteurFound, setExpediteurFound] = useState(null);
   const [destinataireFound, setDestinataireFound] = useState(null);
@@ -350,12 +351,12 @@ export default function CourseStepForm({
                   type="tel"
                   value={formData.expediteur_telephone}
                   onChange={(e) => setFormData({ ...formData, expediteur_telephone: e.target.value })}
-                  onBlur={() => sauvegarderContactRecent(formData.expediteur_nom, formData.expediteur_telephone, "expediteur")}
                   placeholder="+226 XX XX XX XX"
                   className="h-14 rounded-2xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-400 px-4 text-base"
                 />
                 <p className="text-xs text-gray-400 pl-1">Format : +226 XX XX XX XX</p>
-                <ContactsRecents
+                <CarnetAdresses
+                  clientId={clientId}
                   type="expediteur"
                   onSelect={(contact) => {
                     setFormData({
@@ -485,12 +486,12 @@ export default function CourseStepForm({
                     setFormData({ ...formData, destinataire_telephone: e.target.value });
                     setDestinataireFound(undefined);
                   }}
-                  onBlur={() => sauvegarderContactRecent(formData.destinataire_nom, formData.destinataire_telephone, "destinataire")}
                   placeholder="+226 XX XX XX XX"
                   className="h-14 rounded-2xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-400 px-4 text-base"
                 />
                 <p className="text-xs text-gray-400 pl-1">Format : +226 XX XX XX XX</p>
-                <ContactsRecents
+                <CarnetAdresses
+                  clientId={clientId}
                   type="destinataire"
                   onSelect={(contact) => {
                     setFormData({

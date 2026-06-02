@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import CourseStepForm from "@/components/client/CourseStepForm";
-import { sauvegarderContactRecent } from "@/components/client/ContactsRecents";
+import { sauvegarderContactDB } from "@/components/client/CarnetAdresses";
 import LivreurRechercheAnimation from "@/components/client/LivreurRechercheAnimation";
 
 // Haversine
@@ -290,11 +290,13 @@ export default function CourseExterneFormSync() {
       setCourseCreated(true);
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(STEP_KEY);
-      // Sauvegarde silencieuse des contacts
+      // Sauvegarde contacts en base de données
+      const cid = clientProfil?.id;
+      const ctel = clientProfil?.telephone;
       if (formData.type_course === "expedier") {
-        sauvegarderContactRecent(formData.destinataire_nom, formData.destinataire_telephone, "destinataire").catch(() => {});
+        sauvegarderContactDB(cid, ctel, formData.destinataire_nom, formData.destinataire_telephone, "destinataire").catch(() => {});
       } else {
-        sauvegarderContactRecent(formData.expediteur_nom, formData.expediteur_telephone, "expediteur").catch(() => {});
+        sauvegarderContactDB(cid, ctel, formData.expediteur_nom, formData.expediteur_telephone, "expediteur").catch(() => {});
       }
     },
     onError: (err) => toast.error("Erreur : " + err.message),
@@ -476,6 +478,7 @@ export default function CourseExterneFormSync() {
               onBack={handleBack}
               onAnnuler={handleAnnuler}
               isLoading={createMutation.isPending}
+              clientId={clientProfil?.id}
             />
           </form>
         </Card>
