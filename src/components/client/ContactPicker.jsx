@@ -98,58 +98,74 @@ export default function ContactPicker({ type = "destinataire", onSelect }) {
     return phone;
   };
 
-  // ─── Chargement contacts depuis le téléphone ─────────────────────────────
-  const loadPhoneContacts = async () => {
+  // ─── Accès direct contacts via Contact Picker API (doit être appelé depuis un clic direct) ──
+  // IMPORTANT : navigator.contacts.select() DOIT être dans le handler du clic utilisateur direct.
+  // Ne jamais l'appeler dans une fonction async intermédiaire - ça casse le user gesture requirement.
+  const openNativeContactPicker = async () => {
+    const platform = detectPlatform();
     setLoading(true);
     setPermissionDenied(false);
-    const platform = detectPlatform();
-    console.log("[ContactPicker] Platform info:", platform);
+    let lastError = null;
 
-    // ── Méthode 1 : Contact Picker API Web (Chrome Android ≥ 80, Capacitor WebView) ──
-    if (platform.hasContactPickerAPI) {
+    // ── Méthode 1 : Contact Picker API Web (navigator.contacts) ──────────────
+    // Fonctionne dans Chrome Android 80+ et WebView Android Capacitor
+    if (navigator.contacts && typeof navigator.contacts.select === "function") {
       try {
-        console.log("[ContactPicker] Using Contact Picker API (navigator.contacts)");
-        const props = ["name", "tel"];
-        const contacts = await navigator.contacts.select(props, { multiple: true });
-        const formatted = contacts
+        console.log("[ContactPicker] Trying navigator.contacts.select...");
+        const selected = await navigator.contacts.select(["name", "tel"], { multiple: true });
+        console.log("[ContactPicker] Raw result:", JSON.stringify(selected));
+        const formatted = (selected || [])
           .filter(c => c.tel && c.tel.length > 0)
           .map(c => ({
-            nom: c.name?.[0] || "Contact",
-            telephone: c.tel[0]?.replace(/\s/g, "") || "",
+            nom: (c.name && c.name[0]) || "Contact",
+            telephone: (c.tel[0] || "").replace(/\s|-/g, ""),
           }))
           .filter(c => c.telephone);
-
         setDiagInfo({ ...platform, method: "ContactPickerAPI", count: formatted.length, error: null });
-        setPhoneContacts(formatted);
         if (formatted.length > 0) {
-          toast.success(`${formatted.length} contact${formatted.length > 1 ? "s" : ""} importé${formatted.length > 1 ? "s" : ""}`);
+          setPhoneContacts(formatted);
+          toast.success(`${formatted.length} contact${formatted.length > 1 ? "s" : ""} chargé${formatted.length > 1 ? "s" : ""}`);
         } else {
           toast.info("Aucun contact sélectionné");
         }
         setLoading(false);
         return;
       } catch (err) {
-        console.warn("[ContactPicker] Contact Picker API failed:", err.message);
-        setDiagInfo({ ...platform, method: "ContactPickerAPI", count: 0, error: err.message });
-        if (err.name === "SecurityError" || err.message?.includes("permission")) {
+        lastError = err;
+        console.warn("[ContactPicker] navigator.contacts.select error:", err.name, err.message);
+        setDiagInfo({ ...platform, method: "ContactPickerAPI_FAILED", count: 0, error: `${err.name}: ${err.message}` });
+        // InvalidStateError = appelé hors user gesture → afficher diagnostic
+        if (err.name === "InvalidStateError") {
+          setShowDiag(true);
+          toast.error("Erreur: doit être appelé depuis un bouton direct (InvalidStateError)");
+          setLoading(false);
+          return;
+        }
+        if (err.name === "SecurityError" || err.message?.toLowerCase().includes("permission")) {
           setPermissionDenied(true);
           toast.error("Permission refusée pour les contacts");
           setLoading(false);
           return;
         }
-        // Continuer vers méthode suivante
+        // NotAllowedError sur certains Android = permission refusée
+        if (err.name === "NotAllowedError") {
+          setPermissionDenied(true);
+          toast.error("Accès aux contacts refusé par Android");
+          setLoading(false);
+          return;
+        }
+        // Sinon, continuer vers méthode 2
       }
     }
 
-    // ── Méthode 2 : Plugin Capacitor Contacts (@capacitor-community/contacts) ──
+    // ── Méthode 2 : Plugin Capacitor Contacts ────────────────────────────────
     const ContactsPlugin = window.Capacitor?.Plugins?.Contacts || window.CapacitorContacts;
     if (ContactsPlugin) {
       try {
-        console.log("[ContactPicker] Using Capacitor Contacts plugin");
-        // Demander permission
+        console.log("[ContactPicker] Trying Capacitor Contacts plugin...");
         try {
           const perm = await ContactsPlugin.requestPermissions();
-          console.log("[ContactPicker] Permission result:", perm);
+          console.log("[ContactPicker] Permission:", perm);
           if (perm?.contacts === "denied" || perm?.readContacts === "denied") {
             setPermissionDenied(true);
             setDiagInfo({ ...platform, method: "CapacitorContacts", count: 0, error: "Permission denied" });
@@ -158,19 +174,17 @@ export default function ContactPicker({ type = "destinataire", onSelect }) {
             return;
           }
         } catch (permErr) {
-          console.warn("[ContactPicker] Permission request error:", permErr.message);
+          console.warn("[ContactPicker] Permission error:", permErr.message);
         }
-
         const result = await ContactsPlugin.getContacts({ projection: { name: true, phones: true } });
         const formatted = (result?.contacts || [])
-          .filter(c => c.phones && c.phones.length > 0)
+          .filter(c => c.phones?.length > 0)
           .map(c => ({
             nom: c.name?.display || c.name?.given || c.name?.family || "Contact",
-            telephone: c.phones[0]?.number?.replace(/\s/g, "") || "",
+            telephone: (c.phones[0]?.number || "").replace(/\s|-/g, ""),
           }))
           .filter(c => c.telephone)
           .slice(0, 300);
-
         setDiagInfo({ ...platform, method: "CapacitorContacts", count: formatted.length, error: null });
         setPhoneContacts(formatted);
         if (formatted.length > 0) toast.success(`${formatted.length} contacts chargés`);
@@ -178,42 +192,49 @@ export default function ContactPicker({ type = "destinataire", onSelect }) {
         setLoading(false);
         return;
       } catch (err) {
-        console.error("[ContactPicker] Capacitor Contacts error:", err.message);
-        setDiagInfo({ ...platform, method: "CapacitorContacts", count: 0, error: err.message });
+        lastError = err;
+        console.error("[ContactPicker] Capacitor plugin error:", err.message);
+        setDiagInfo({ ...platform, method: "CapacitorContacts_FAILED", count: 0, error: err.message });
       }
     }
 
-    // ── Méthode 3 : window.contacts (Cordova/ancienne API) ──
-    if (window.contacts && window.contacts.getContacts) {
+    // ── Méthode 3 : window.contacts (Cordova legacy) ─────────────────────────
+    if (window.contacts?.getContacts) {
       try {
-        console.log("[ContactPicker] Using window.contacts (Cordova)");
-        const result = await window.contacts.getContacts({ fields: ["name", "phone"], limit: 300 });
-        const formatted = (result.contacts || [])
-          .filter(c => c.phone && c.phone.length > 0)
+        console.log("[ContactPicker] Trying window.contacts (Cordova)...");
+        const result = await new Promise((resolve, reject) => {
+          window.contacts.getContacts(resolve, reject, { filter: "", multiple: true, fields: ["name", "phoneNumbers"] });
+        });
+        const formatted = (result || [])
+          .filter(c => c.phoneNumbers?.length > 0)
           .map(c => ({
-            nom: c.name || "Contact",
-            telephone: c.phone?.[0] || "",
+            nom: c.name?.formatted || c.name?.displayName || "Contact",
+            telephone: (c.phoneNumbers[0]?.value || "").replace(/\s|-/g, ""),
           }))
           .filter(c => c.telephone);
         setDiagInfo({ ...platform, method: "CordovaContacts", count: formatted.length, error: null });
         setPhoneContacts(formatted);
-        if (formatted.length > 0) toast.success(`${formatted.length} contacts importés`);
+        if (formatted.length > 0) toast.success(`${formatted.length} contacts`);
         setLoading(false);
         return;
       } catch (err) {
-        console.error("[ContactPicker] window.contacts error:", err.message);
-        setDiagInfo({ ...platform, method: "CordovaContacts", count: 0, error: err.message });
+        lastError = err;
+        console.error("[ContactPicker] window.contacts error:", err);
+        setDiagInfo({ ...platform, method: "CordovaContacts_FAILED", count: 0, error: String(err) });
       }
     }
 
-    // ── Aucune méthode disponible ──
-    const finalDiag = { ...platform, method: "none", count: 0, error: "Aucune API disponible" };
-    setDiagInfo(finalDiag);
-    setShowDiag(true); // Afficher le diagnostic automatiquement
-    console.error("[ContactPicker] No contact API available:", finalDiag);
-    toast.error("Impossible d'accéder aux contacts sur cet appareil");
+    // ── Aucune méthode disponible ─────────────────────────────────────────────
+    const errMsg = lastError ? `${lastError.name}: ${lastError.message}` : "Aucune API contacts disponible sur cet appareil";
+    setDiagInfo({ ...platform, method: "none", count: 0, error: errMsg });
+    setShowDiag(true);
+    console.error("[ContactPicker] All methods failed:", errMsg);
+    toast.error("Impossible d'accéder aux contacts");
     setLoading(false);
   };
+
+  // Alias pour compatibilité avec les appels existants dans le JSX
+  const loadPhoneContacts = openNativeContactPicker;
 
   const handleSelectContact = async (contact, fromPhone = false) => {
     await saveFrequentContact({ nom: contact.nom, telephone: contact.telephone });
@@ -318,7 +339,6 @@ export default function ContactPicker({ type = "destinataire", onSelect }) {
                 <TabsTrigger
                   value="phone"
                   className="data-[state=active]:bg-purple-600 data-[state=active]:text-white data-[state=active]:shadow-none rounded-none font-semibold gap-2"
-                  onClick={() => { if (phoneContacts.length === 0) loadPhoneContacts(); }}
                 >
                   <Smartphone className="w-4 h-4" />
                   Téléphone
@@ -418,7 +438,7 @@ export default function ContactPicker({ type = "destinataire", onSelect }) {
                         </div>
                         <button
                           type="button"
-                          onClick={loadPhoneContacts}
+                          onClick={openNativeContactPicker}
                           className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-2xl font-bold shadow-lg shadow-purple-200 active:scale-[0.98] transition-all flex items-center gap-2"
                         >
                           <Smartphone className="w-5 h-5" />
