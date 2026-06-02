@@ -8,12 +8,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { 
   ArrowLeft, ArrowRight, MapPin, Navigation, Package, 
-  User, FileText, CheckCircle, Smartphone, Truck, AlertCircle,
-  Loader2, Search, XCircle, Send, Inbox, Sparkles
+  User, FileText, CheckCircle, Truck, AlertCircle,
+  Loader2, Search, Send, Inbox, Sparkles
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
-import ContactPicker from "@/components/client/ContactPicker";
+import ContactsRecents, { sauvegarderContactRecent } from "@/components/client/ContactsRecents";
 
 const STORAGE_KEY = "silgapp_course_draft";
 
@@ -48,27 +48,7 @@ function PremiumInput({ label, required, hint, children, ...props }) {
   );
 }
 
-// ─── Card de contact sélectionné ──────────────────────────────────────────────
-function SelectedContactCard({ nom, telephone, onClear }) {
-  return (
-    <div className="flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-r from-purple-50 to-purple-100 border-2 border-purple-200">
-      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center flex-shrink-0 shadow-md">
-        <span className="text-white font-bold text-lg">{(nom || "?").charAt(0).toUpperCase()}</span>
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-bold text-gray-900 truncate">{nom || "Contact"}</p>
-        <p className="text-sm text-purple-700 font-medium">{telephone}</p>
-      </div>
-      <button
-        type="button"
-        onClick={onClear}
-        className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-red-500 hover:border-red-200 transition-colors"
-      >
-        <XCircle className="w-4 h-4" />
-      </button>
-    </div>
-  );
-}
+
 
 export default function CourseStepForm({ 
   step, 
@@ -366,7 +346,16 @@ export default function CourseStepForm({
                 <Label className="text-sm font-semibold text-gray-700">
                   Téléphone de l'expéditeur <span className="text-red-500">*</span>
                 </Label>
-                <ContactPicker
+                <Input
+                  type="tel"
+                  value={formData.expediteur_telephone}
+                  onChange={(e) => setFormData({ ...formData, expediteur_telephone: e.target.value })}
+                  onBlur={() => sauvegarderContactRecent(formData.expediteur_nom, formData.expediteur_telephone, "expediteur")}
+                  placeholder="+226 XX XX XX XX"
+                  className="h-14 rounded-2xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-400 px-4 text-base"
+                />
+                <p className="text-xs text-gray-400 pl-1">Format : +226 XX XX XX XX</p>
+                <ContactsRecents
                   type="expediteur"
                   onSelect={(contact) => {
                     setFormData({
@@ -376,28 +365,6 @@ export default function CourseStepForm({
                     });
                   }}
                 />
-                {formData.expediteur_nom && formData.expediteur_telephone && (
-                  <SelectedContactCard
-                    nom={formData.expediteur_nom}
-                    telephone={formData.expediteur_telephone}
-                    onClear={() => setFormData({ ...formData, expediteur_nom: "", expediteur_telephone: "" })}
-                  />
-                )}
-                <div className="relative">
-                  <div className="absolute inset-x-0 -top-1.5 flex items-center justify-center">
-                    <span className="bg-white px-3 text-xs text-gray-400 font-medium">ou saisissez manuellement</span>
-                  </div>
-                  <div className="border-t border-gray-200 pt-4">
-                    <Input
-                      type="tel"
-                      value={formData.expediteur_telephone}
-                      onChange={(e) => setFormData({ ...formData, expediteur_telephone: e.target.value })}
-                      placeholder="+226 XX XX XX XX"
-                      className="h-14 rounded-2xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-400 px-4 text-base"
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-gray-400 pl-1">Format : +226 XX XX XX XX</p>
               </div>
 
               <button
@@ -511,7 +478,19 @@ export default function CourseStepForm({
                 <Label className="text-sm font-semibold text-gray-700">
                   Téléphone du destinataire <span className="text-red-500">*</span>
                 </Label>
-                <ContactPicker
+                <Input
+                  type="tel"
+                  value={formData.destinataire_telephone}
+                  onChange={(e) => {
+                    setFormData({ ...formData, destinataire_telephone: e.target.value });
+                    setDestinataireFound(undefined);
+                  }}
+                  onBlur={() => sauvegarderContactRecent(formData.destinataire_nom, formData.destinataire_telephone, "destinataire")}
+                  placeholder="+226 XX XX XX XX"
+                  className="h-14 rounded-2xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-400 px-4 text-base"
+                />
+                <p className="text-xs text-gray-400 pl-1">Format : +226 XX XX XX XX</p>
+                <ContactsRecents
                   type="destinataire"
                   onSelect={(contact) => {
                     setFormData({
@@ -522,31 +501,6 @@ export default function CourseStepForm({
                     setDestinataireFound(undefined);
                   }}
                 />
-                {formData.destinataire_nom && formData.destinataire_telephone && (
-                  <SelectedContactCard
-                    nom={formData.destinataire_nom}
-                    telephone={formData.destinataire_telephone}
-                    onClear={() => setFormData({ ...formData, destinataire_nom: "", destinataire_telephone: "" })}
-                  />
-                )}
-                <div className="relative">
-                  <div className="absolute inset-x-0 -top-1.5 flex items-center justify-center">
-                    <span className="bg-white px-3 text-xs text-gray-400 font-medium">ou saisissez manuellement</span>
-                  </div>
-                  <div className="border-t border-gray-200 pt-4">
-                    <Input
-                      type="tel"
-                      value={formData.destinataire_telephone}
-                      onChange={(e) => {
-                        setFormData({ ...formData, destinataire_telephone: e.target.value });
-                        setDestinataireFound(undefined);
-                      }}
-                      placeholder="+226 XX XX XX XX"
-                      className="h-14 rounded-2xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-400 px-4 text-base"
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-gray-400 pl-1">Format : +226 XX XX XX XX</p>
               </div>
 
               <button

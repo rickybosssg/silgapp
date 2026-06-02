@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import CourseStepForm from "@/components/client/CourseStepForm";
+import { sauvegarderContactRecent } from "@/components/client/ContactsRecents";
 import LivreurRechercheAnimation from "@/components/client/LivreurRechercheAnimation";
 
 // Haversine
@@ -289,6 +290,12 @@ export default function CourseExterneFormSync() {
       setCourseCreated(true);
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(STEP_KEY);
+      // Sauvegarde silencieuse des contacts
+      if (formData.type_course === "expedier") {
+        sauvegarderContactRecent(formData.destinataire_nom, formData.destinataire_telephone, "destinataire").catch(() => {});
+      } else {
+        sauvegarderContactRecent(formData.expediteur_nom, formData.expediteur_telephone, "expediteur").catch(() => {});
+      }
     },
     onError: (err) => toast.error("Erreur : " + err.message),
   });
