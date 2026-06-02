@@ -14,11 +14,9 @@ import LivreursEnLigne from "@/components/dashboard/LivreursEnLigne";
 import ClientsEnLigne from "@/components/dashboard/ClientsEnLigne";
 import { isON, isLibre, isEnCourse, isAppActive, hasValidGPS, isEligibleCarte, isClientEligibleCarte, hasGPS } from "@/lib/dispatchRules.js";
 import { calculateLivreurCounters, calculateClientCounters } from "@/lib/livreurCounters.js";
-
 import CoursesEnTraitement from "@/components/dashboard/CoursesEnTraitement";
 import CoursesTerminees from "@/components/dashboard/CoursesTerminees";
 import CourseDetailDialog from "@/components/courses/CourseDetailDialog";
-
 import { Card } from "@/components/ui/card";
 import CodePromoPanel from "@/components/admin/CodePromoPanel";
 import DownloadStatsPanel from "@/components/admin/DownloadStatsPanel";
@@ -31,7 +29,6 @@ export default function DashboardExterne() {
   const [statModal, setStatModal] = useState(null);
   const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
   const paysActifs = usePaysActifs();
-  // Admin pays → filtrage forcé sur son pays. Admin global → utilise selectedCountry ou seul pays actif
   const defaultCountry = paysActifs.length === 1 ? paysActifs[0].code : null;
   const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || defaultCountry);
 
@@ -66,13 +63,11 @@ export default function DashboardExterne() {
     refetchInterval: 10000,
   });
 
-  // Filtrage par pays
   const coursesFiltrees = useMemo(
     () => effectiveCountry ? courses.filter(c => (c.country_code || "BF") === effectiveCountry) : courses,
     [courses, effectiveCountry]
   );
 
-  // Courses du jour OU encore actives
   const todayCourses = useMemo(
     () => coursesFiltrees.filter(c =>
       isToday(new Date(c.created_date)) || !["livree", "annulee"].includes(c.statut)
@@ -93,7 +88,6 @@ export default function DashboardExterne() {
     [coursesFiltrees]
   );
 
-  // Règles unifiées avec la carte interactive
   const livreursEnLigne = useMemo(
     () => livreurs.filter(l => isON(l) && l.validation === "valide" && l.actif !== false),
     [livreurs]
@@ -104,13 +98,12 @@ export default function DashboardExterne() {
     [clients]
   );
 
-  // 🎯 COMPTEURS UNIFIÉS - Source unique de vérité (utilisé partout: dashboard, carte, légende)
-  const compteursLivreurs = useMemo(() => 
+  const compteursLivreurs = useMemo(() =>
     calculateLivreurCounters(livreurs.filter(l => l.validation === "valide" && l.actif !== false)),
     [livreurs]
   );
 
-  const compteursClients = useMemo(() => 
+  const compteursClients = useMemo(() =>
     calculateClientCounters(clients),
     [clients]
   );
@@ -129,7 +122,7 @@ export default function DashboardExterne() {
 
   return (
     <div className="px-4 py-4 lg:p-6 space-y-4 lg:space-y-5 max-w-7xl mx-auto">
-      {/* Header avec retour */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3 flex-1">
           <Link to="/">
@@ -180,8 +173,6 @@ export default function DashboardExterne() {
         </div>
       </div>
 
-
-
       {/* Codes Promo */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
         <CodePromoPanel />
@@ -221,11 +212,7 @@ export default function DashboardExterne() {
         <StatCard title="Livreurs dispo" value={compteursLivreurs.libres} icon={Truck} iconBg="bg-accent" onClick={() => setStatModal({ type: "livreurs_dispo", data: livreursEnLigne.filter(l => l.statut === "disponible") })} />
       </div>
 
-
-
-
-
-      {/* Clients en ligne (avec GPS) */}
+      {/* Clients en ligne */}
       <ClientsEnLigne clients={clientsEnLigne} />
 
       {/* Livreurs en ligne */}
