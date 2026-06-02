@@ -7,6 +7,7 @@ import {
 import { toast } from "sonner";
 import { Preferences } from "@capacitor/preferences";
 import { Capacitor } from "@capacitor/core";
+import { Contacts } from "@capacitor-community/contacts";
 
 const FREQUENT_CONTACTS_KEY = "silgapp_frequent_contacts";
 
@@ -158,44 +159,39 @@ export default function ContactPicker({ type = "destinataire", onSelect }) {
       }
     }
 
-    // ── Méthode 2 : Plugin Capacitor Contacts ────────────────────────────────
-    const ContactsPlugin = window.Capacitor?.Plugins?.Contacts || window.CapacitorContacts;
-    if (ContactsPlugin) {
-      try {
-        console.log("[ContactPicker] Trying Capacitor Contacts plugin...");
-        try {
-          const perm = await ContactsPlugin.requestPermissions();
-          console.log("[ContactPicker] Permission:", perm);
-          if (perm?.contacts === "denied" || perm?.readContacts === "denied") {
-            setPermissionDenied(true);
-            setDiagInfo({ ...platform, method: "CapacitorContacts", count: 0, error: "Permission denied" });
-            toast.error("Permission contacts refusée");
-            setLoading(false);
-            return;
-          }
-        } catch (permErr) {
-          console.warn("[ContactPicker] Permission error:", permErr.message);
-        }
-        const result = await ContactsPlugin.getContacts({ projection: { name: true, phones: true } });
-        const formatted = (result?.contacts || [])
-          .filter(c => c.phones?.length > 0)
-          .map(c => ({
-            nom: c.name?.display || c.name?.given || c.name?.family || "Contact",
-            telephone: (c.phones[0]?.number || "").replace(/\s|-/g, ""),
-          }))
-          .filter(c => c.telephone)
-          .slice(0, 300);
-        setDiagInfo({ ...platform, method: "CapacitorContacts", count: formatted.length, error: null });
-        setPhoneContacts(formatted);
-        if (formatted.length > 0) toast.success(`${formatted.length} contacts chargés`);
-        else toast.info("Aucun contact trouvé");
+    // ── Méthode 2 : Plugin @capacitor-community/contacts (import statique) ──────
+    try {
+      console.log("[ContactPicker] Trying @capacitor-community/contacts...");
+      const perm = await Contacts.requestPermissions();
+      console.log("[ContactPicker] Permission result:", perm);
+      if (perm?.contacts === "denied") {
+        setPermissionDenied(true);
+        setDiagInfo({ ...platform, method: "CapacitorContacts", count: 0, error: "Permission denied" });
+        toast.error("Permission contacts refusée");
         setLoading(false);
         return;
-      } catch (err) {
-        lastError = err;
-        console.error("[ContactPicker] Capacitor plugin error:", err.message);
-        setDiagInfo({ ...platform, method: "CapacitorContacts_FAILED", count: 0, error: err.message });
       }
+      const result = await Contacts.getContacts({
+        projection: { name: true, phones: true }
+      });
+      const formatted = (result?.contacts || [])
+        .filter(c => c.phones?.length > 0)
+        .map(c => ({
+          nom: c.name?.display || c.name?.given || c.name?.family || "Contact",
+          telephone: (c.phones[0]?.number || "").replace(/\s|-|\(|\)/g, ""),
+        }))
+        .filter(c => c.telephone)
+        .slice(0, 500);
+      setDiagInfo({ ...platform, method: "CapacitorContacts", count: formatted.length, error: null });
+      setPhoneContacts(formatted);
+      if (formatted.length > 0) toast.success(`${formatted.length} contacts chargés`);
+      else toast.info("Aucun contact trouvé");
+      setLoading(false);
+      return;
+    } catch (err) {
+      lastError = err;
+      console.error("[ContactPicker] @capacitor-community/contacts error:", err.name, err.message);
+      setDiagInfo({ ...platform, method: "CapacitorContacts_FAILED", count: 0, error: `${err.name}: ${err.message}` });
     }
 
     // ── Méthode 3 : window.contacts (Cordova legacy) ─────────────────────────
