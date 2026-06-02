@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
-import { MapPin, Truck, Wifi, WifiOff, X, Clock, Users } from "lucide-react";
+import { MapPin, Truck, Wifi, WifiOff, X, Clock, Users, Flame } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
@@ -16,6 +16,7 @@ import { useAdminContext } from "@/hooks/useAdminContext.js";
 import CountrySelector, { usePaysActifs } from "@/components/international/CountrySelector.jsx";
 import { calculateLivreurCounters, calculateClientCounters } from "@/lib/livreurCounters.js";
 import { isEligibleCarte } from "@/lib/dispatchRules.js";
+import ZonesChaudesWidget from "@/components/carte/ZonesChaudes";
 
 // ─── Constantes de seuils ────────────────────────────────────────────────────
 
@@ -169,6 +170,7 @@ export default function CarteLivreursExterne() {
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [heatmapMode, setHeatmapMode] = useState("off"); // "off" | "demande" | "couverture" | "opportunite"
   const [showHeatmapHint, setShowHeatmapHint] = useState(true);
+  const [zonesChaudesData, setZonesChaudesData] = useState([]);
   const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
   const paysActifs = usePaysActifs();
   const defaultCountry = paysActifs.length === 1 ? paysActifs[0].code : null;
@@ -479,6 +481,13 @@ export default function CarteLivreursExterne() {
           </div>
         </div>
 
+        {/* ── Zones chaudes ──────────────────────────────────────────────── */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+          <ZonesChaudesWidget
+            onDataLoaded={(data) => setZonesChaudesData(data?.toutes_zones_actives || [])}
+          />
+        </div>
+
         {/* ── Liste livreurs ────────────────────────────────────────────── */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           {/* Header liste */}
@@ -664,6 +673,7 @@ export default function CarteLivreursExterne() {
                 heatmapMode={heatmapMode}
                 countryCode={effectiveCountry}
                 onCountryChange={isGlobal ? setSelectedCountry : undefined}
+                zonesChaudesData={zonesChaudesData}
               />
             </div>
             {selectedMarker && (

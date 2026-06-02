@@ -8,7 +8,7 @@ import {
   Users, Package, DollarSign, TrendingUp, ArrowLeft, Truck,
   AlertCircle, AlertTriangle, Eye, MapPin, CreditCard, Download,
   Save, ExternalLink, Bug, Search, CheckCircle2, XCircle,
-  Loader2, MessageCircle, Tag, Globe, Zap, ChevronRight, Bell
+  Loader2, MessageCircle, Tag, Globe, Zap, ChevronRight, Bell, Flame
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +23,7 @@ import SyncLivreurGPSPanel from "@/components/admin/SyncLivreurGPSPanel";
 import StatsPays from "@/components/international/StatsPays.jsx";
 import DownloadStatsPanel from "@/components/admin/DownloadStatsPanel";
 import AlertesLivreursPanel from "@/components/admin/AlertesLivreursPanel";
+import ZonesChaudesWidget from "@/components/carte/ZonesChaudes";
 
 export default function DashboardAdminExterne() {
   console.log("🚨 DashboardAdminExterne.jsx EST CHARGÉ ET EXÉCUTÉ");
@@ -139,6 +140,14 @@ export default function DashboardAdminExterne() {
       icon: MessageCircle,
       grad: "from-green-500 to-emerald-600",
       shadow: "shadow-green-100",
+    },
+    {
+      scroll: "zones-chaudes",
+      label: "Zones chaudes",
+      sub: "Demande & positionnement",
+      icon: Flame,
+      grad: "from-orange-500 to-red-500",
+      shadow: "shadow-orange-100",
     },
     {
       scroll: "alertes-livreurs",
@@ -329,6 +338,11 @@ export default function DashboardAdminExterne() {
           </div>
         </div>
         <DiagnosticInterne />
+      </div>
+
+      {/* ── ZONES CHAUDES ────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm" id="zones-chaudes">
+        <ZonesChaudesWidget />
       </div>
 
       {/* ── ALERTES LIVREURS ─────────────────────────────────────── */}

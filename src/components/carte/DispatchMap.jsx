@@ -4,6 +4,7 @@ import HeatmapLayer from "./HeatmapLayer";
 import HeatmapControls from "./HeatmapControls";
 import HeatmapLegend from "./HeatmapLegend";
 import CountrySelector from "@/components/international/CountrySelector";
+import { useZonesChaudesHalos } from "./ZonesChaudes";
 
 /**
  * DispatchMap — Carte dédiée au dispatch temps réel
@@ -444,6 +445,7 @@ export default function DispatchMap({
   heatmapMode = "off", // "off" | "demande" | "couverture" | "opportunite"
   countryCode = "",
   onCountryChange,
+  zonesChaudesData = [], // zones pour les halos colorés
 }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -534,6 +536,9 @@ export default function DispatchMap({
       markersRef.current = [];
     };
   }, [position?.latitude, position?.longitude]);
+
+  // Halos zones chaudes
+  useZonesChaudesHalos(mapInstanceRef.current, mapLoaded, zonesChaudesData);
 
   // Heatmap layer - géré directement par le composant HeatmapLayer
   // Pas besoin d'effet séparé, le composant HeatmapLayer gère son propre cycle de vie
