@@ -16,6 +16,7 @@ import LivreurHistorique from "@/components/livreur/LivreurHistorique";
 import LivreurExterneOnboarding from "@/components/livreur/LivreurExterneOnboarding";
 import LivreurMesInfosModal from "@/components/livreur/LivreurMesInfosModal";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
+import AlertesLivreurModal from "@/components/livreur/AlertesLivreurModal";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -326,6 +327,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <AlertesLivreurModal
+        livreurId={livreurProfil?.id}
+        livreurNom={`${livreurProfil?.prenom || ""} ${livreurProfil?.nom || ""}`.trim()}
+        livreurReseau="externe"
+      />
 
       {/* VENUS — toujours visible */}
       <VenusFloatingButton />

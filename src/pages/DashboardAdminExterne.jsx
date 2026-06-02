@@ -8,7 +8,7 @@ import {
   Users, Package, DollarSign, TrendingUp, ArrowLeft, Truck,
   AlertCircle, AlertTriangle, Eye, MapPin, CreditCard, Download,
   Save, ExternalLink, Bug, Search, CheckCircle2, XCircle,
-  Loader2, MessageCircle, Tag, Globe, Zap, ChevronRight
+  Loader2, MessageCircle, Tag, Globe, Zap, ChevronRight, Bell
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +22,7 @@ import SyncClientGPSPanel from "@/components/admin/SyncClientGPSPanel";
 import SyncLivreurGPSPanel from "@/components/admin/SyncLivreurGPSPanel";
 import StatsPays from "@/components/international/StatsPays.jsx";
 import DownloadStatsPanel from "@/components/admin/DownloadStatsPanel";
+import AlertesLivreursPanel from "@/components/admin/AlertesLivreursPanel";
 
 export default function DashboardAdminExterne() {
   console.log("🚨 DashboardAdminExterne.jsx EST CHARGÉ ET EXÉCUTÉ");
@@ -138,6 +139,14 @@ export default function DashboardAdminExterne() {
       icon: MessageCircle,
       grad: "from-green-500 to-emerald-600",
       shadow: "shadow-green-100",
+    },
+    {
+      scroll: "alertes-livreurs",
+      label: "Alertes livreurs",
+      sub: "Communication & accusés",
+      icon: Bell,
+      grad: "from-slate-700 to-slate-900",
+      shadow: "shadow-slate-100",
     },
     {
       scroll: "codes-promo",
@@ -320,6 +329,11 @@ export default function DashboardAdminExterne() {
           </div>
         </div>
         <DiagnosticInterne />
+      </div>
+
+      {/* ── ALERTES LIVREURS ─────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm" id="alertes-livreurs">
+        <AlertesLivreursPanel />
       </div>
 
       {/* ── CODES PROMO ──────────────────────────────────────────── */}
