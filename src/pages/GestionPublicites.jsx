@@ -19,8 +19,6 @@ import { fr } from "date-fns/locale";
 const CIBLES = [
   { value: "tous",              label: "Tous les utilisateurs", color: "bg-purple-100 text-purple-700" },
   { value: "clients",           label: "Clients uniquement",   color: "bg-blue-100 text-blue-700" },
-  { value: "livreurs",          label: "Livreurs (tous)",      color: "bg-orange-100 text-orange-700" },
-  { value: "livreurs_internes", label: "Livreurs internes",    color: "bg-cyan-100 text-cyan-700" },
   { value: "livreurs_externes", label: "Livreurs externes",    color: "bg-green-100 text-green-700" },
 ];
 
