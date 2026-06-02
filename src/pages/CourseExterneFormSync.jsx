@@ -38,6 +38,7 @@ export default function CourseExterneFormSync() {
   const [currentStep, setCurrentStep] = useState(isNaN(savedStep) ? 0 : savedStep);
   const [courseCreated, setCourseCreated] = useState(false);
   const [createdCourse, setCreatedCourse] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false); // verrou anti-double-clic
 
   // Lire brouillon (données pures, sans fonctions)
   const getDraftFromStorage = () => {
@@ -183,34 +184,26 @@ export default function CourseExterneFormSync() {
     mutationFn: async (data) => {
       let finalData = { ...data };
 
-      // ─── ANTI-DOUBLON : Vérifier si une course similaire existe déjà ───
-      // Critères : même client, même type, même adresse départ, créée < 5 min
+      // ─── ANTI-DOUBLON RENFORCÉ ────────────────────────────────────────────
+      // Critères larges : même client + même type, créée < 3 min (peu importe l'adresse)
       const now = Date.now();
-      const fiveMinutesAgo = new Date(now - 5 * 60 * 1000).toISOString();
-      
       try {
-        const coursesRecentes = await base44.entities.CourseExterne.filter({
-          client_telephone: finalData.client_telephone,
-          type_course: finalData.type_course,
-          adresse_depart: finalData.adresse_depart,
+        const coursesRecentes = await base44.entities.CourseExterne.filter(
+          { client_telephone: finalData.client_telephone, type_course: finalData.type_course },
+          "-created_date",
+          5
+        );
+        const doublon = (coursesRecentes || []).find(course => {
+          const age = now - new Date(course.created_date).getTime();
+          return age < 3 * 60 * 1000 && !["livree", "annulee"].includes(course.statut);
         });
-        
-        // Vérifier si une course a été créée dans les 5 dernières minutes
-        const doublon = coursesRecentes?.find(course => {
-          const courseDate = new Date(course.created_date);
-          const timeDiff = now - courseDate.getTime();
-          return timeDiff < 5 * 60 * 1000; // 5 minutes
-        });
-        
         if (doublon) {
-          const minutesAgo = Math.round((now - new Date(doublon.created_date).getTime()) / 60000);
-          throw new Error(`Une course similaire a déjà été créée il y a ${minutesAgo} minute(s). ID: ${doublon.id?.slice(-6)}`);
+          const secs = Math.round((now - new Date(doublon.created_date).getTime()) / 1000);
+          throw new Error(`Course déjà créée il y a ${secs}s. Patientez avant de réessayer.`);
         }
       } catch (err) {
-        if (err.message?.includes('Une course similaire')) {
-          throw err; // Rejeter l'erreur anti-doublon
-        }
-        // Ignorer les autres erreurs de vérification
+        if (err.message?.includes('Course déjà créée')) throw err;
+        // Ignorer les autres erreurs réseau (ne pas bloquer la création)
       }
 
       // Lookup destinataire (pour "expedier") — lie si inscrit
@@ -288,6 +281,7 @@ export default function CourseExterneFormSync() {
       toast.success("Course créée ! Recherche d'un livreur en cours...");
       setCreatedCourse(response);
       setCourseCreated(true);
+      setIsSubmitting(false);
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(STEP_KEY);
       // Sauvegarde contacts en base de données
@@ -299,11 +293,18 @@ export default function CourseExterneFormSync() {
         sauvegarderContactDB(cid, ctel, formData.expediteur_nom, formData.expediteur_telephone, "expediteur").catch(() => {});
       }
     },
-    onError: (err) => toast.error("Erreur : " + err.message),
+    onError: (err) => {
+      toast.error("Erreur : " + err.message);
+      setIsSubmitting(false);
+    },
   });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // ─── Verrou anti-double-soumission (double-clic, re-render) ─────────────
+    if (isSubmitting || createMutation.isPending) return;
+    setIsSubmitting(true);
 
     // ─── Validation des champs obligatoires ───────────────────────────────────
     const isExpedie = formData.type_course === "expedier";
@@ -324,6 +325,7 @@ export default function CourseExterneFormSync() {
     if (missingFields.length > 0) {
       console.warn("[CourseForm] Champs manquants :", missingFields);
       toast.error(`Champs manquants : ${missingFields.join(", ")}`);
+      setIsSubmitting(false);
       return;
     }
 
@@ -400,6 +402,7 @@ export default function CourseExterneFormSync() {
         const errMsg = validationRes.data.errors?.[0] || "Incohérence détectée dans les rôles";
         console.warn("[CourseForm] Validation rôles échouée :", errMsg);
         toast.error(errMsg);
+        setIsSubmitting(false);
         return;
       }
     } catch (err) {
@@ -477,7 +480,7 @@ export default function CourseExterneFormSync() {
               onNext={handleNext}
               onBack={handleBack}
               onAnnuler={handleAnnuler}
-              isLoading={createMutation.isPending}
+              isLoading={createMutation.isPending || isSubmitting}
               clientId={clientProfil?.id}
             />
           </form>
