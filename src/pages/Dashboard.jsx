@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Plus, MapPin, Package, Truck, Clock, CheckCircle2, XCircle, AlertTriangle, TrendingUp, Users, Megaphone } from "lucide-react";
+import { Plus, MapPin, Package, Truck, Clock, CheckCircle2, XCircle, AlertTriangle, TrendingUp, Users } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
 import StatCard from "@/components/dashboard/StatCard";
@@ -141,13 +141,7 @@ export default function Dashboard() {
               <span className="sm:hidden">Externe</span>
             </Button>
           </Link>
-          <Link to="/admin/publicites" className="flex-1 sm:flex-none">
-            <Button variant="outline" size="sm" className="w-full sm:w-auto gap-1.5 bg-gradient-to-r from-violet-500 to-indigo-600 text-white border-0 hover:opacity-90">
-              <Megaphone className="w-4 h-4" />
-              <span className="hidden sm:inline">Publicités</span>
-              <span className="sm:hidden">Pubs</span>
-            </Button>
-          </Link>
+
         </div>
       </div>
 
