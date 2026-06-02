@@ -75,22 +75,33 @@ export default function LiveCounterBadge({ type = "livreurs", className = "" }) 
     ? "Nombre de livreurs actuellement prêts à recevoir une course"
     : "Nombre de clients actuellement actifs sur SILGAPP";
 
+  // Couleur dynamique selon disponibilité (uniquement pour les livreurs)
+  const getColorStyle = () => {
+    if (type !== "livreurs") return { bg: "rgba(255,255,255,1)", text: "#111", glow: "rgba(0,0,0,0.18)" };
+    if (count >= 5) return { bg: "rgba(220,252,231,1)", text: "#15803d", glow: "rgba(34,197,94,0.35)" };
+    if (count >= 2) return { bg: "rgba(255,237,213,1)", text: "#c2410c", glow: "rgba(249,115,22,0.35)" };
+    return { bg: "rgba(254,226,226,1)", text: "#b91c1c", glow: "rgba(239,68,68,0.4)" };
+  };
+
+  const color = getColorStyle();
+
   return (
     <div
       title={tooltip}
-      className={`relative flex items-center gap-1.5 bg-white rounded-full px-3 py-1.5 shadow-lg shadow-black/20 border border-white/60 select-none ${className}`}
+      className={`relative flex items-center gap-1.5 rounded-full px-3 py-1.5 border border-white/60 select-none ${className}`}
       style={{
-        transition: "transform 0.3s ease, box-shadow 0.3s ease",
+        backgroundColor: color.bg,
+        transition: "transform 0.3s ease, box-shadow 0.3s ease, background-color 0.6s ease",
         transform: pulse ? "scale(1.06)" : "scale(1)",
         boxShadow: pulse
-          ? "0 4px 20px rgba(0,0,0,0.25), 0 0 0 3px rgba(255,255,255,0.4)"
-          : "0 4px 12px rgba(0,0,0,0.18)",
+          ? `0 4px 20px ${color.glow}, 0 0 0 3px rgba(255,255,255,0.4)`
+          : `0 4px 12px ${color.glow}`,
       }}
     >
       <span className="text-sm leading-none">{emoji}</span>
       <span
-        className="text-sm font-black text-gray-900 tabular-nums leading-none"
-        style={{ transition: "opacity 0.2s ease" }}
+        className="text-sm font-black tabular-nums leading-none"
+        style={{ color: color.text, transition: "color 0.6s ease, opacity 0.2s ease" }}
       >
         {count}
       </span>
