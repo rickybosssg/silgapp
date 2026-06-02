@@ -303,20 +303,42 @@ export default function CourseExterneFormSync() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // ─── Validation des champs obligatoires ───────────────────────────────────
+    const isExpedie = formData.type_course === "expedier";
+    const isRecevoir = formData.type_course === "recevoir";
+    const missingFields = [];
+
+    if (!formData.type_course) missingFields.push("type de course");
+    if (!formData.adresse_depart && !formData.recuperationGPS) missingFields.push("adresse de récupération");
+    if (isExpedie) {
+      if (!formData.destinataire_telephone) missingFields.push("téléphone du destinataire");
+      if (!formData.destination_inconnue && !formData.adresse_arrivee && !formData.livraisonGPS) missingFields.push("adresse de livraison");
+    }
+    if (isRecevoir) {
+      if (!formData.expediteur_telephone) missingFields.push("téléphone de l'expéditeur");
+    }
+    if (!formData.type_colis) missingFields.push("type de colis");
+
+    if (missingFields.length > 0) {
+      console.warn("[CourseForm] Champs manquants :", missingFields);
+      toast.error(`Champs manquants : ${missingFields.join(", ")}`);
+      return;
+    }
+
     // Récupérer l'utilisateur connecté
     const user = await base44.auth.me();
 
     let expediteurNom, expediteurTel, expediteurClientId, expediteurPhoneNormalized;
     let destinataireNom, destinataireTel, destinataireClientId, destinatairePhoneNormalized;
 
-    if (formData.type_course === "expedier") {
+    if (isExpedie) {
       expediteurNom = formData.client_nom;
       expediteurTel = formData.client_telephone;
       expediteurClientId = clientProfil?.id || null;
       expediteurPhoneNormalized = formData.client_telephone.replace(/\D/g, "").replace(/^226/, "");
       destinataireNom = formData.destinataire_nom;
       destinataireTel = formData.destinataire_telephone;
-      destinataireClientId = null;
+      destinataireClientId = formData.destinataire_client_id || null;
       destinatairePhoneNormalized = formData.destinataire_telephone.replace(/\D/g, "").replace(/^226/, "");
     } else {
       destinataireNom = formData.client_nom;
@@ -325,9 +347,17 @@ export default function CourseExterneFormSync() {
       destinatairePhoneNormalized = formData.client_telephone.replace(/\D/g, "").replace(/^226/, "");
       expediteurNom = formData.expediteur_nom;
       expediteurTel = formData.expediteur_telephone;
-      expediteurClientId = null;
+      expediteurClientId = formData.expediteur_client_id || null;
       expediteurPhoneNormalized = formData.expediteur_telephone.replace(/\D/g, "").replace(/^226/, "");
     }
+
+    console.log("[CourseForm] Soumission :", {
+      type_course: formData.type_course,
+      expediteurClientId,
+      destinataireClientId,
+      destinataireTel,
+      expediteurTel,
+    });
 
     // Calcul prix — sécurisé : uniquement si les 4 coordonnées GPS sont valides
     let prixEstime = 0;
@@ -340,25 +370,23 @@ export default function CourseExterneFormSync() {
         formData.gps_depart_lat, formData.gps_depart_lng,
         formData.gps_arrivee_lat, formData.gps_arrivee_lng
       );
-      // Minimum 0.1 km = 10F pour éviter prix_estimate = 0
       prixEstime = Math.max(Math.round(distance * 100), 10);
     }
 
     // Pour "recevoir" : la destination = position du client destinataire (jamais inconnue)
-    const isRecevoir = formData.type_course === "recevoir";
     const adresseArrivee = isRecevoir
       ? (formData.adresse_arrivee || (formData.livraisonGPS ? "Position GPS client" : clientProfil?.quartier || "Chez le destinataire"))
       : (formData.destination_inconnue ? "Destination à définir" : formData.adresse_arrivee);
 
-    const gpsArriveLat = isRecevoir 
-      ? (formData.gps_arrivee_lat || clientGpsLat)  // Toujours GPS pour recevoir
+    const gpsArriveLat = isRecevoir
+      ? (formData.gps_arrivee_lat || clientGpsLat)
       : (formData.destination_inconnue ? null : formData.gps_arrivee_lat);
-    const gpsArriveLng = isRecevoir 
-      ? (formData.gps_arrivee_lng || clientGpsLng)  // Toujours GPS pour recevoir
+    const gpsArriveLng = isRecevoir
+      ? (formData.gps_arrivee_lng || clientGpsLng)
       : (formData.destination_inconnue ? null : formData.gps_arrivee_lng);
     const destInconnue = isRecevoir ? false : (formData.destination_inconnue || false);
 
-    // Validation backend des rôles avant création
+    // Validation des rôles — ne bloque PAS si le destinataire est hors SILGAPP
     try {
       const validationRes = await base44.functions.invoke('validateCourseRoles', {
         type_course: formData.type_course,
@@ -366,15 +394,15 @@ export default function CourseExterneFormSync() {
         destinataire_client_id: destinataireClientId,
         created_by_id: user?.id
       });
-      
-      if (!validationRes.data.valid) {
-        toast.error(validationRes.data.errors?.[0] || "Incohérence détectée dans les rôles");
+      if (validationRes.data?.valid === false) {
+        const errMsg = validationRes.data.errors?.[0] || "Incohérence détectée dans les rôles";
+        console.warn("[CourseForm] Validation rôles échouée :", errMsg);
+        toast.error(errMsg);
         return;
       }
     } catch (err) {
-      console.error("Erreur validation:", err);
-      toast.error("Erreur de validation des rôles");
-      return;
+      // En cas d'erreur réseau ou serveur, on continue quand même — ne pas bloquer la création
+      console.warn("[CourseForm] validateCourseRoles indisponible, on continue :", err.message);
     }
 
     createMutation.mutate({

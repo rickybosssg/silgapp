@@ -34,10 +34,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Règle 3 : Vérifier qu'au moins un des deux clients existe
-    if (!expediteur_client_id && !destinataire_client_id) {
-      errors.push("Au moins un client (expéditeur ou destinataire) doit être renseigné");
-    }
+    // Règle 3 supprimée : le destinataire ou l'expéditeur peut ne pas être dans SILGAPP.
+    // La course doit pouvoir être créée avec uniquement nom + téléphone, sans compte lié.
 
     if (errors.length > 0) {
       return Response.json({ 
