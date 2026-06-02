@@ -17,6 +17,8 @@ import LivreurExterneOnboarding from "@/components/livreur/LivreurExterneOnboard
 import LivreurMesInfosModal from "@/components/livreur/LivreurMesInfosModal";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import AlertesLivreurModal from "@/components/livreur/AlertesLivreurModal";
+import PubliciteCarousel from "@/components/publicite/PubliciteCarousel";
+import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -336,6 +338,13 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       {/* VENUS — toujours visible */}
       <VenusFloatingButton />
 
+      {/* ── PUBLICITÉ PLEIN ÉCRAN LIVREUR ── */}
+      <PubliciteFullscreen
+        cible={livreurProfil?.type_livreur === "interne" ? "livreurs_internes" : "livreurs_externes"}
+        userId={livreurProfil?.id}
+        userType="livreur"
+      />
+
       {/* Modal plein écran si course en attente */}
       {courseEnAttente && (
         <CourseEnAttenteModalExterne
@@ -385,6 +394,13 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
         {activeTab === "courses" && (
           <div className="space-y-4">
+            {/* ── PUBLICITÉS CARROUSEL LIVREUR ── */}
+            <PubliciteCarousel
+              cible={livreurProfil?.type_livreur === "interne" ? "livreurs_internes" : "livreurs_externes"}
+              userId={livreurProfil?.id}
+              userType="livreur"
+            />
+
             <LivreurHeader
               livreur={livreurProfil}
               isEnLigne={isEnLigne}

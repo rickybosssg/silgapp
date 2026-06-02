@@ -8,7 +8,7 @@ import {
   Users, Package, DollarSign, TrendingUp, ArrowLeft, Truck,
   AlertCircle, AlertTriangle, Eye, MapPin, CreditCard, Download,
   Save, ExternalLink, Bug, Search, CheckCircle2, XCircle,
-  Loader2, MessageCircle, Tag, Globe, Zap, ChevronRight, Bell, Flame
+  Loader2, MessageCircle, Tag, Globe, Zap, ChevronRight, Bell, Flame, Megaphone
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -180,6 +180,14 @@ export default function DashboardAdminExterne() {
       icon: Download,
       grad: "from-red-500 to-orange-500",
       shadow: "shadow-red-100",
+    },
+    {
+      to: "/admin/publicites",
+      label: "Publicités",
+      sub: "Réseau publicitaire SILGAPP",
+      icon: Megaphone,
+      grad: "from-violet-500 to-indigo-600",
+      shadow: "shadow-violet-100",
     },
   ];
 

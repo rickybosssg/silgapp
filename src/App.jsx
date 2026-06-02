@@ -56,6 +56,7 @@ const DiagnosticFCM = lazy(() => import('./pages/DiagnosticFCM.jsx'));
 const TelechargerSILGAPP = lazy(() => import('./pages/TelechargerSILGAPP.jsx'));
 const StatsTelechargements = lazy(() => import('./pages/StatsTelechargements.jsx'));
 const StatsTelechargementsAdmin = lazy(() => import('./pages/StatsTelechargementsAdmin.jsx'));
+const GestionPublicites = lazy(() => import('./pages/GestionPublicites.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -236,6 +237,7 @@ function AppContent() {
               <Route path="/admin/global" element={<AnimatedRoutes><AdminGlobal /></AnimatedRoutes>} />
               <Route path="/admin/pays/:code" element={<AnimatedRoutes><DashboardPays /></AnimatedRoutes>} />
               <Route path="/admin/pays/:code/carte" element={<AnimatedRoutes><CarteLivreursExterne /></AnimatedRoutes>} />
+              <Route path="/admin/publicites" element={<AnimatedRoutes><GestionPublicites /></AnimatedRoutes>} />
             </>
           )}
           <Route path="/notifications" element={<AnimatedRoutes><Notifications /></AnimatedRoutes>} />

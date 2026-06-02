@@ -1,0 +1,42 @@
+{
+  "name": "PubliciteVue",
+  "type": "object",
+  "properties": {
+    "publicite_id": {
+      "type": "string",
+      "description": "ID de la Publicite vue"
+    },
+    "user_type": {
+      "type": "string",
+      "enum": [
+        "client",
+        "livreur"
+      ],
+      "description": "Type d'utilisateur"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "ID du client ou livreur"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "affichage",
+        "clic",
+        "vue_video",
+        "accuse_lecture"
+      ],
+      "description": "Type d'action enregistr\u00e9e"
+    },
+    "vue_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date et heure de l'action"
+    }
+  },
+  "required": [
+    "publicite_id",
+    "user_type",
+    "action"
+  ]
+}

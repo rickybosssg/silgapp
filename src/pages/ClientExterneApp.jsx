@@ -18,6 +18,8 @@ import ProfilModal from "@/components/client/ProfilModal";
 import SupportWhatsApp from "@/components/client/SupportWhatsApp";
 import ClientOnboarding from "@/components/client/ClientOnboarding";
 import OngletCodePromo from "@/components/client/OngletCodePromo";
+import PubliciteCarousel from "@/components/publicite/PubliciteCarousel";
+import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
 
 function haversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -567,6 +569,9 @@ export default function ClientExterneApp() {
                 </div>
               )}
 
+              {/* ── PUBLICITÉS CARROUSEL ──────────── */}
+              <PubliciteCarousel cible="clients" userId={clientProfil?.id} userType="client" />
+
               {/* ── HERO HEADER ───────────────────── */}
               <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-red-500 to-red-700 p-5 shadow-xl shadow-red-200">
                 {/* Cercles déco */}
@@ -770,6 +775,9 @@ export default function ClientExterneApp() {
       )}
 
       <VenusFloatingButton />
+
+      {/* ── PUBLICITÉ PLEIN ÉCRAN ── */}
+      <PubliciteFullscreen cible="clients" userId={clientProfil?.id} userType="client" />
     </div>
   );
 }

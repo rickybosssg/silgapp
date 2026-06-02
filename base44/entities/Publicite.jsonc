@@ -1,0 +1,125 @@
+{
+  "name": "Publicite",
+  "type": "object",
+  "properties": {
+    "titre": {
+      "type": "string",
+      "description": "Titre de la publicit\u00e9"
+    },
+    "description": {
+      "type": "string",
+      "description": "Texte descriptif de la publicit\u00e9"
+    },
+    "type_media": {
+      "type": "string",
+      "enum": [
+        "image",
+        "video",
+        "texte"
+      ],
+      "default": "image",
+      "description": "Type de m\u00e9dia : image, vid\u00e9o ou texte seul"
+    },
+    "media_url": {
+      "type": "string",
+      "description": "URL de l'image ou de la vid\u00e9o publicitaire"
+    },
+    "lien_whatsapp": {
+      "type": "string",
+      "description": "Num\u00e9ro WhatsApp pour action (ex: +22670000000)"
+    },
+    "lien_telephone": {
+      "type": "string",
+      "description": "Num\u00e9ro de t\u00e9l\u00e9phone pour appel direct"
+    },
+    "lien_url": {
+      "type": "string",
+      "description": "URL externe (site web, etc.)"
+    },
+    "cible": {
+      "type": "string",
+      "enum": [
+        "tous",
+        "clients",
+        "livreurs",
+        "livreurs_internes",
+        "livreurs_externes"
+      ],
+      "default": "tous",
+      "description": "Cible de la publicit\u00e9"
+    },
+    "format": {
+      "type": "string",
+      "enum": [
+        "carrousel",
+        "plein_ecran"
+      ],
+      "default": "carrousel",
+      "description": "Format d'affichage"
+    },
+    "actif": {
+      "type": "boolean",
+      "default": true,
+      "description": "Publicit\u00e9 active ou d\u00e9sactiv\u00e9e"
+    },
+    "date_debut": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de d\u00e9but de diffusion"
+    },
+    "date_fin": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de fin de diffusion (archivage automatique)"
+    },
+    "ordre": {
+      "type": "number",
+      "default": 0,
+      "description": "Ordre d'affichage dans le carrousel"
+    },
+    "nb_affichages": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre total d'affichages"
+    },
+    "nb_clics": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre total de clics"
+    },
+    "nb_vues_video": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de vues vid\u00e9o compl\u00e8tes"
+    },
+    "couleur_fond": {
+      "type": "string",
+      "default": "#1a1a2e",
+      "description": "Couleur de fond si pas d'image (hex)"
+    },
+    "couleur_texte": {
+      "type": "string",
+      "default": "#ffffff",
+      "description": "Couleur du texte (hex)"
+    },
+    "ciblage_quartiers": {
+      "type": "string",
+      "description": "JSON \u2014 liste de quartiers cibl\u00e9s (architecture future)"
+    },
+    "ciblage_heures": {
+      "type": "string",
+      "description": "JSON \u2014 plages horaires cibl\u00e9es ex: [{start:8,end:12}] (architecture future)"
+    },
+    "annonceur_nom": {
+      "type": "string",
+      "description": "Nom de l'annonceur"
+    },
+    "annonceur_contact": {
+      "type": "string",
+      "description": "Contact de l'annonceur"
+    }
+  },
+  "required": [
+    "titre"
+  ]
+}
