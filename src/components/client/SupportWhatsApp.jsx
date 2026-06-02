@@ -1,32 +1,76 @@
 import React from "react";
 
 const SUPPORT_NUMBER = "22666925190";
-const SUPPORT_MSG = "Bonjour SILGAPP 👋\nJ'ai besoin d'aide sur SILGAPP.";
+const SUPPORT_MSG = "Bonjour, j'ai besoin d'assistance concernant SILGAPP.";
 
 export function openWhatsAppNative(phone, message = "") {
+  console.log("[WhatsApp] Tentative d'ouverture du support...");
+  
   let num = phone?.replace(/\D/g, "") || "";
   if (num.startsWith("0") && num.length <= 9) num = "226" + num.slice(1);
   if (num.length === 8) num = "226" + num;
 
   const encoded = encodeURIComponent(message);
-  // Deep link natif — ouvre WhatsApp directement sans passer par le navigateur
-  const deepLink = `whatsapp://send?phone=${num}&text=${encoded}`;
-  const fallback = `https://wa.me/${num}?text=${encoded}`;
+  const waLink = `https://wa.me/${num}?text=${encoded}`;
+  
+  console.log("[WhatsApp] Lien:", waLink);
 
-  const a = document.createElement("a");
-  a.href = deepLink;
-  a.click();
+  // Détection de la plateforme
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const hasWhatsApp = document.hidden === false;
 
-  // Fallback : si WhatsApp n'est pas installé, ouvrir wa.me après 500ms
-  setTimeout(() => {
-    if (document.hasFocus()) {
-      window.open(fallback, "_blank", "noopener,noreferrer");
+  // Stratégie selon la plateforme
+  if (isMobile) {
+    // Mobile : essayer deep link d'abord
+    const deepLink = `whatsapp://send?phone=${num}&text=${encoded}`;
+    
+    // Créer un lien caché pour tester si WhatsApp est installé
+    const a = document.createElement("a");
+    a.href = deepLink;
+    a.target = "_blank";
+    
+    // Gestionnaire pour détecter si le deep link échoue
+    let fallbackTriggered = false;
+    
+    const triggerFallback = () => {
+      if (fallbackTriggered) return;
+      fallbackTriggered = true;
+      console.log("[WhatsApp] Deep link échoué → ouverture wa.me");
+      window.open(waLink, "_blank", "noopener,noreferrer");
+    };
+
+    // Timeout de secours
+    const timeoutId = setTimeout(triggerFallback, 2000);
+
+    // Essayer d'ouvrir WhatsApp
+    try {
+      console.log("[WhatsApp] Ouverture deep link...");
+      a.click();
+      
+      // Si la page reste active après 2.5s, WhatsApp n'est pas installé
+      setTimeout(() => {
+        if (document.hasFocus() && !document.hidden) {
+          console.log("[WhatsApp] Page toujours active → WhatsApp non installé");
+          triggerFallback();
+        }
+        clearTimeout(timeoutId);
+      }, 2500);
+    } catch (err) {
+      console.error("[WhatsApp] Erreur deep link:", err);
+      triggerFallback();
     }
-  }, 500);
+  } else {
+    // Desktop : ouvrir WhatsApp Web directement
+    console.log("[WhatsApp] Desktop → WhatsApp Web");
+    window.open(waLink, "_blank", "noopener,noreferrer");
+  }
 }
 
 export default function SupportWhatsApp({ compact = false }) {
-  const handleClick = () => {
+  const handleClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("[WhatsApp] Bouton cliqué");
     openWhatsAppNative(SUPPORT_NUMBER, SUPPORT_MSG);
   };
 
