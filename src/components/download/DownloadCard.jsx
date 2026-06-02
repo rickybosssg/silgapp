@@ -4,13 +4,14 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Download, CheckCircle, ExternalLink, User, Phone, Users } from "lucide-react";
+import { Download, CheckCircle, ExternalLink, User, Phone, Users, MessageCircle, RefreshCcw } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 
 export default function DownloadCard({ downloadCount }) {
   const apkUrl = "https://drive.google.com/file/d/1CpTlE9E2EE3bnydQPsA0CarV9-taWkVO/view?usp=sharing";
+  const apkUrlDirect = "https://drive.google.com/uc?export=download&id=1CpTlE9E2EE3bnydQPsA0CarV9-taWkVO";
   const [formData, setFormData] = useState({ nom: "", telephone: "", profil: "" });
   const [leadSaved, setLeadSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -146,27 +147,92 @@ export default function DownloadCard({ downloadCount }) {
             </motion.div>
           )}
 
-          {/* Bouton de téléchargement - VRAI LIEN HTML DIRECT */}
+          {/* Boutons de téléchargement - MULTIPLES OPTIONS */}
           <div className="space-y-4">
-            <motion.div
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              {leadSaved ? (
-                // Lien direct vers Google Drive (après inscription)
-                <a
-                  href={apkUrl}
+            {leadSaved ? (
+              <>
+                {/* Bouton principal */}
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <a
+                    href={apkUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={trackDownloadClick}
+                    className="block w-full h-14 sm:h-16 md:h-20 bg-gradient-to-r from-red-600 via-red-500 to-red-600 hover:from-red-500 hover:to-red-400 text-white text-base sm:text-xl font-bold shadow-2xl shadow-red-500/40 transition-all duration-300 rounded-xl sm:rounded-2xl flex items-center justify-center"
+                  >
+                    <Download className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 mr-2 sm:mr-3 flex-shrink-0" />
+                    <span className="truncate">📲 Télécharger SILGAPP</span>
+                    <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 ml-2 flex-shrink-0" />
+                  </a>
+                </motion.div>
+
+                {/* Bouton alternatif */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  <a
+                    href={apkUrlDirect}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={trackDownloadClick}
+                    className="block w-full h-12 sm:h-14 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-white text-sm sm:text-base font-semibold shadow-lg shadow-orange-500/30 transition-all duration-300 rounded-xl flex items-center justify-center gap-2"
+                  >
+                    <RefreshCcw className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                    <span className="truncate">🔁 Si le téléchargement ne démarre pas, cliquez ici</span>
+                  </a>
+                </motion.div>
+
+                {/* Aide visible */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.5 }}
+                  className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl sm:rounded-2xl"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                      <MessageCircle className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs sm:text-sm text-blue-200 font-medium mb-2">
+                        💡 Si le téléchargement ne fonctionne pas :
+                      </p>
+                      <ul className="text-[10px] sm:text-xs text-blue-300/80 space-y-1">
+                        <li>• Essayez d'ouvrir le lien avec <strong>Chrome</strong></li>
+                        <li>• Autorisez les téléchargements de sources inconnues</li>
+                        <li>• Contactez le support WhatsApp si le problème persiste</li>
+                      </ul>
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Bouton WhatsApp Support */}
+                <motion.a
+                  href="https://wa.me/22666925190"
                   target="_blank"
                   rel="noopener noreferrer"
-                  onClick={trackDownloadClick}
-                  className="block w-full h-14 sm:h-16 md:h-20 bg-gradient-to-r from-red-600 via-red-500 to-red-600 hover:from-red-500 hover:to-red-400 text-white text-base sm:text-xl font-bold shadow-2xl shadow-red-500/40 transition-all duration-300 rounded-xl sm:rounded-2xl flex items-center justify-center"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6 }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="flex items-center justify-center gap-3 w-full p-4 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white rounded-xl font-semibold text-sm shadow-lg shadow-green-500/30 transition-all duration-300"
                 >
-                  <Download className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 mr-2 sm:mr-3 flex-shrink-0" />
-                  <span className="truncate">Télécharger l'APK</span>
-                  <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 ml-2 flex-shrink-0" />
-                </a>
-              ) : (
-                // Bouton d'inscription (avant inscription)
+                  <MessageCircle className="w-5 h-5 flex-shrink-0" />
+                  <span className="truncate">Support WhatsApp : +226 66 92 51 90</span>
+                </motion.a>
+              </>
+            ) : (
+              // Bouton d'inscription (avant inscription)
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
                 <Button
                   onClick={handleSaveLead}
                   disabled={saving}
@@ -176,8 +242,8 @@ export default function DownloadCard({ downloadCount }) {
                   <span className="truncate">S'inscrire et télécharger</span>
                   <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 ml-2 flex-shrink-0" />
                 </Button>
-              )}
-            </motion.div>
+              </motion.div>
+            )}
             
             <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 text-xs sm:text-sm">
               <span className="flex items-center gap-1.5 sm:gap-2 text-white/70">
