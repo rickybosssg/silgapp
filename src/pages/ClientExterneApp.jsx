@@ -12,6 +12,7 @@ import {
   Shield, Zap, Star, Loader2, ArrowLeft, RefreshCw
 } from "lucide-react";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
+import LiveCounterBadge from "@/components/ui/LiveCounterBadge";
 import ModernMap from "@/components/client/ModernMap";
 import ProfilModal from "@/components/client/ProfilModal";
 import SupportWhatsApp from "@/components/client/SupportWhatsApp";
@@ -584,6 +585,7 @@ export default function ClientExterneApp() {
                           </span>
                         </div>
                         <GPSBadge profil={clientProfil} onForceSync={handleForceGPSSync} />
+                        <LiveCounterBadge type="livreurs" />
                       </div>
                     </div>
                     <button

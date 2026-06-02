@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { LogOut, Wifi, WifiOff, MapPin, MapPinOff, Power, Navigation } from "lucide-react";
 import { cn } from "@/lib/utils";
+import LiveCounterBadge from "@/components/ui/LiveCounterBadge";
 
 function useClock() {
   const [time, setTime] = useState(new Date());
@@ -143,6 +144,11 @@ export default function LivreurHeader({
                 {livreur.quartier || `${livreur.latitude?.toFixed(3)}, ${livreur.longitude?.toFixed(3)}`}
               </p>
             )}
+
+            {/* Badge clients actifs */}
+            <div className="mt-2">
+              <LiveCounterBadge type="clients" />
+            </div>
 
             {/* Badges statuts */}
             <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
