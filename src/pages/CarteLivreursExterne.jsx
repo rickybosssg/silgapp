@@ -193,7 +193,7 @@ export default function CarteLivreursExterne() {
     ? { country_code: effectiveCountry }
     : {};
 
-  const { data: livreurs = [] } = useQuery({
+  const { data: livreurs = [], refetch: refetchLivreurs } = useQuery({
     queryKey: ["livreurs-externes-carte", effectiveCountry],
     queryFn: () => base44.entities.Livreur.filter(livreurFilter),
     initialData: [],
@@ -218,13 +218,13 @@ export default function CarteLivreursExterne() {
     refetchInterval: 15000,
   });
 
-  // Abonnement temps réel pour mise à jour IMMÉDIATE des courses
+  // Abonnement temps réel IMMÉDIAT : courses ET livreurs
   useEffect(() => {
-    const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
-      refetch();
-    });
-    return () => unsubscribe();
-  }, [refetch]);
+    const unsubCourses = base44.entities.CourseExterne.subscribe(() => { refetch(); });
+    // Quand un livreur change de statut (ex: annulation → disponible), rafraîchir immédiatement
+    const unsubLivreurs = base44.entities.Livreur.subscribe(() => { refetchLivreurs(); });
+    return () => { unsubCourses(); unsubLivreurs(); };
+  }, [refetch, refetchLivreurs]);
   
   // Filtrage strict : courses VRAIMENT en attente (statuts initiaux uniquement)
   const coursesEnAttente = useMemo(() => {
@@ -274,52 +274,94 @@ export default function CarteLivreursExterne() {
     }
   }, [coursesEnAttenteAvecGPS, livreurs]);
 
+  // ─── Courses VRAIMENT actives (pour croiser avec les livreurs) ────────────
+  const coursesVraimentActives = useMemo(() => {
+    const statutsActifs = ["livreur_en_route", "colis_recupere", "en_livraison", "recherche_livreur", "nouvelle"];
+    const actives = toutesCoursesExternes.filter(c =>
+      statutsActifs.includes(c.statut) && c.livreur_id
+    );
+    console.log("🔴 DIAGNOSTIC courses actives:", {
+      total_chargees: toutesCoursesExternes.length,
+      vraiment_actives: actives.length,
+      ids_livreurs: actives.map(c => c.livreur_id?.slice(-8)),
+      statuts: actives.map(c => ({ id: c.id.slice(-8), statut: c.statut, livreur: c.livreur_nom })),
+    });
+    return actives;
+  }, [toutesCoursesExternes]);
+
+  // IDs des livreurs ayant une course réellement active en DB
+  const livreurIdsEnCourseReelle = useMemo(() =>
+    new Set(coursesVraimentActives.map(c => c.livreur_id)),
+    [coursesVraimentActives]
+  );
+
   // ─── 🎯 COMPTEURS UNIFIÉS - Source unique de vérité ───────────────────
   // Utilise les mêmes fonctions que DashboardExterne pour garantir l'uniformité
-  const compteursLivreurs = useMemo(() => 
-    calculateLivreurCounters(livreurs.filter(l => l.validation === "valide" && l.actif !== false)),
-    [livreurs]
-  );
+  const compteursLivreurs = useMemo(() => {
+    const eligibles = livreurs.filter(l => l.validation === "valide" && l.actif !== false);
+    const base = calculateLivreurCounters(eligibles);
+
+    // Recalcul strict de "en course" : statut DB en_course ET course active existante
+    const vraisEnCourse = eligibles.filter(l =>
+      l.statut === "en_course" && livreurIdsEnCourseReelle.has(l.id)
+    );
+    console.log("🟠 DIAGNOSTIC livreurs en course:", {
+      par_statut_db: eligibles.filter(l => l.statut === "en_course").length,
+      avec_course_active: vraisEnCourse.length,
+      ids: vraisEnCourse.map(l => l.id.slice(-8)),
+      noms: vraisEnCourse.map(l => `${l.prenom} ${l.nom}`),
+      livreurs_statut_en_course_sans_course: eligibles
+        .filter(l => l.statut === "en_course" && !livreurIdsEnCourseReelle.has(l.id))
+        .map(l => ({ id: l.id.slice(-8), nom: `${l.prenom} ${l.nom}` })),
+    });
+
+    return {
+      ...base,
+      enCourse: vraisEnCourse.length,
+      oranges: vraisEnCourse.length,
+    };
+  }, [livreurs, livreurIdsEnCourseReelle]);
 
   const compteursClients = useMemo(() => 
     calculateClientCounters(clients),
     [clients]
   );
 
-  // 🔍 DIAGNOSTIC - Compare les IDs des livreurs libres entre bandeau, légende et marqueurs
-  const diagnosticComparatif = useMemo(() => {
-    const livreursEligibles = livreurs.filter(l => l.validation === "valide" && l.actif !== false);
-    const libres = livreursEligibles.filter(l => isLibre(l));
-    const surCarte = livreursEligibles.filter(l => isEligibleCarte(l));
-    
-    console.log("🔍 DIAGNOSTIC COMPARATIF CARTE:", {
-      total_eligibles: livreursEligibles.length,
-      bandeau_superieur_libres: libres.length,
-      bandeau_ids: libres.map(l => l.id.slice(-8)),
-      legende_verts: libres.length,
-      legende_ids: libres.map(l => l.id.slice(-8)),
-      marqueurs_verts: libres.length,
-      marqueurs_ids: libres.map(l => l.id.slice(-8)),
-      sur_carte_total: surCarte.length,
-      sur_carte_ids: surCarte.map(l => l.id.slice(-8)),
+  // 🔍 DIAGNOSTIC - Résumé de cohérence complet
+  useEffect(() => {
+    const eligibles = livreurs.filter(l => l.validation === "valide" && l.actif !== false);
+    const libres = eligibles.filter(l => isLibre(l));
+    const enCourseDB = eligibles.filter(l => l.statut === "en_course");
+    const enCourseReelle = enCourseDB.filter(l => livreurIdsEnCourseReelle.has(l.id));
+    const enCourseFantomes = enCourseDB.filter(l => !livreurIdsEnCourseReelle.has(l.id));
+
+    console.log("🔍 DIAGNOSTIC CARTE COMPLET:", {
+      total_livreurs: eligibles.length,
+      libres: libres.length,
+      libres_ids: libres.map(l => l.id.slice(-8)),
+      en_course_statut_db: enCourseDB.length,
+      en_course_avec_course_active: enCourseReelle.length,
+      en_course_fantomes: enCourseFantomes.length,
+      fantomes_detail: enCourseFantomes.map(l => ({
+        id: l.id.slice(-8),
+        nom: `${l.prenom} ${l.nom}`,
+        statut: l.statut,
+        last_seen: l.last_seen_at,
+      })),
+      courses_actives_en_db: coursesVraimentActives.length,
     });
-    
-    return {
-      libres,
-      surCarte,
-      total: livreursEligibles.length,
-    };
-  }, [livreurs]);
+  }, [livreurs, coursesVraimentActives, livreurIdsEnCourseReelle]);
 
   // ─── Listes filtrées ────────────────────────────────────────────────────
   const livreursAffiches = useMemo(() => {
     switch (filtreLivreur) {
       case "noirs":     return livreurs.filter(l => isLivreurNoir(l));
       case "verts":     return livreurs.filter(l => isLibre(l));
-      case "oranges":   return livreurs.filter(l => isEnCourse(l));
+      // En course = statut en_course ET course active confirmée en DB
+      case "oranges":   return livreurs.filter(l => l.statut === "en_course" && livreurIdsEnCourseReelle.has(l.id));
       default:          return livreurs;
     }
-  }, [livreurs, filtreLivreur]);
+  }, [livreurs, filtreLivreur, livreurIdsEnCourseReelle]);
 
   // ─── Marqueurs carte — TOUS les utilisateurs enregistrés ────────────
   // Livreurs sur carte : TOUS les livreurs (couleur selon état)
@@ -532,7 +574,8 @@ export default function CarteLivreursExterne() {
               {livreursAffiches.map(livreur => {
                 const estNoir   = isLivreurNoir(livreur);
                 const estVert   = isLibre(livreur);
-                const estOrange = isEnCourse(livreur);
+                // "En mission" seulement si statut en_course ET course active confirmée
+                const estOrange = livreur.statut === "en_course" && livreurIdsEnCourseReelle.has(livreur.id);
                 return (
                   <div key={livreur.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
                     {/* Dot statut */}

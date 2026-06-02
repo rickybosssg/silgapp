@@ -84,14 +84,19 @@ Deno.serve(async (req) => {
 
           console.log(`[ANNULATION] Statut actuel du livreur: ${livreur.statut}`);
 
-          // ⚠️ CRITIQUE: Remettre le livreur en statut 'disponible'
-          // Cela retire immédiatement le badge "En course" et rend le livreur éligible aux nouvelles courses
+          // ⚠️ CRITIQUE: Remettre le livreur en statut approprié
+          // Si heartbeat récent (< 10 min) → disponible, sinon → hors_ligne
+          const heartbeatAge = livreur.last_seen_at
+            ? (Date.now() - new Date(livreur.last_seen_at).getTime()) / 60000
+            : 999;
+          const nouveauStatut = heartbeatAge < 10 ? 'disponible' : 'hors_ligne';
+
           await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
-            statut: 'disponible'
+            statut: nouveauStatut
           });
 
           livreurLibere = true;
-          console.log(`[ANNULATION] ✅ Livreur ${livreurDetails.nom} libéré (statut → disponible)`);
+          console.log(`[ANNULATION] ✅ Livreur ${livreurDetails.nom} libéré (statut → ${nouveauStatut}, heartbeat_age: ${Math.round(heartbeatAge)}min)`);
 
           // Nettoyer toutes les références de mission sur le livreur
           // (au cas où il y aurait d'autres champs custom)
