@@ -435,12 +435,17 @@ export default function ClientExterneApp() {
   const loadLivreursProches = async (pos) => {
     try {
       if (!pos) return;
-      const livreurs = await base44.entities.Livreur.filter({
+      // Filtrer par pays du client
+      const filter = {
         type_livreur: "externe",
         statut: "disponible",
         actif: true,
         validation: "valide"
-      });
+      };
+      if (clientProfil?.country_code) {
+        filter.country_code = clientProfil.country_code;
+      }
+      const livreurs = await base44.entities.Livreur.filter(filter);
       const proches = livreurs.filter(l => {
         if (!l.latitude || !l.longitude) return false;
         return haversineDistance(pos.latitude, pos.longitude, l.latitude, l.longitude) <= 5;

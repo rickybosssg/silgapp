@@ -48,6 +48,10 @@
       "default": "tous",
       "description": "Cible de la publicit\u00e9"
     },
+    "pays_cibles": {
+      "type": "string",
+      "description": "JSON \u2014 liste des codes pays cibl\u00e9s ex: [\"BF\", \"CI\", \"SN\"] ou \"tous\" pour tous les pays"
+    },
     "format": {
       "type": "string",
       "enum": [

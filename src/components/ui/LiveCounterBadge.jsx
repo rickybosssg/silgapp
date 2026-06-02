@@ -5,22 +5,47 @@ import { base44 } from "@/api/base44Client";
  * Badge circulaire premium affichant un compteur temps réel.
  * - type="livreurs" : compte les livreurs disponibles (pour clients)
  * - type="clients"  : compte les clients actifs (pour livreurs)
+ * Filtre par pays de l'utilisateur connecté.
  */
 export default function LiveCounterBadge({ type = "livreurs", className = "" }) {
+  const [userCountry, setUserCountry] = useState(null);
   const [count, setCount] = useState(null);
   const [pulse, setPulse] = useState(false);
   const prevCount = useRef(null);
 
+  // Déterminer le pays de l'utilisateur
+  useEffect(() => {
+    const detectCountry = async () => {
+      try {
+        const user = await base44.auth.me();
+        if (!user) return;
+        // Chercher le pays dans ClientExterne ou Livreur
+        const clients = await base44.entities.ClientExterne.filter({ user_email: user.email });
+        if (clients?.[0]?.country_code) {
+          setUserCountry(clients[0].country_code);
+          return;
+        }
+        const livreurs = await base44.entities.Livreur.filter({ user_email: user.email });
+        if (livreurs?.[0]?.country_code) {
+          setUserCountry(livreurs[0].country_code);
+        }
+      } catch (_) {}
+    };
+    detectCountry();
+  }, []);
+
   const fetchCount = async () => {
     try {
+      const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
       if (type === "livreurs") {
-        const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-        const livreurs = await base44.entities.Livreur.filter({
+        const filter = {
           statut: "disponible",
           actif: true,
           validation: "valide",
           app_active: true,
-        });
+        };
+        if (userCountry) filter.country_code = userCountry;
+        const livreurs = await base44.entities.Livreur.filter(filter);
         // Filtrer : GPS actif + connectés récemment
         const actifs = (livreurs || []).filter(l =>
           l.latitude && l.longitude &&
@@ -29,11 +54,12 @@ export default function LiveCounterBadge({ type = "livreurs", className = "" }) 
         setCount(actifs.length);
       } else {
         // clients actifs
-        const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-        const clients = await base44.entities.ClientExterne.filter({
+        const filter = {
           app_active: true,
           actif: true,
-        });
+        };
+        if (userCountry) filter.country_code = userCountry;
+        const clients = await base44.entities.ClientExterne.filter(filter);
         const actifs = (clients || []).filter(c =>
           c.last_seen_at && c.last_seen_at >= cutoff
         );

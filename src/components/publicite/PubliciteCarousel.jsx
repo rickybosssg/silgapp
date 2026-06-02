@@ -32,10 +32,22 @@ export default function PubliciteCarousel({ cible = "clients", userId = null, us
     try {
       const now = new Date().toISOString();
       const all = await base44.entities.Publicite.filter({ actif: true, format: "carrousel" });
+      const userCountry = userId ? await getUserCountry(userType, userId) : null;
       const filtered = (all || []).filter(p => {
         // Vérifier ciblage
         const cibles = ["tous", cible];
         if (!cibles.includes(p.cible)) return false;
+        // Vérifier pays
+        if (p.pays_cibles && p.pays_cibles !== "tous") {
+          try {
+            const paysList = JSON.parse(p.pays_cibles);
+            if (!Array.isArray(paysList) || (userCountry && !paysList.includes(userCountry))) {
+              return false;
+            }
+          } catch (e) {
+            // Si JSON invalide, on considère "tous"
+          }
+        }
         // Vérifier dates
         if (p.date_debut && p.date_debut > now) return false;
         if (p.date_fin && p.date_fin < now) return false;
@@ -44,7 +56,20 @@ export default function PubliciteCarousel({ cible = "clients", userId = null, us
       setPubs(filtered);
     } catch (_) {}
     setLoaded(true);
-  }, [cible]);
+  }, [cible, userId, userType]);
+
+  async function getUserCountry(userType, userId) {
+    try {
+      if (userType === "client") {
+        const clients = await base44.entities.ClientExterne.filter({ id: userId });
+        return clients?.[0]?.country_code || null;
+      } else if (userType === "livreur") {
+        const livreurs = await base44.entities.Livreur.filter({ id: userId });
+        return livreurs?.[0]?.country_code || null;
+      }
+    } catch (_) {}
+    return null;
+  }
 
   useEffect(() => {
     fetchPubs();
