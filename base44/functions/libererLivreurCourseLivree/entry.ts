@@ -50,13 +50,18 @@ Deno.serve(async (req) => {
     // Si la course a un livreur assigné
     if (course.livreur_id) {
       console.log(`[libererLivreurCourseLivree] Course ${course_id} ${course.statut}, livreur: ${course.livreur_nom}`);
-      
-      // Réinitialiser le statut du livreur à "disponible"
-      await base44.entities.Livreur.update(course.livreur_id, {
-        statut: 'disponible',
-      });
 
-      console.log(`[libererLivreurCourseLivree] Livreur ${course.livreur_nom} remis à "disponible"`);
+      // Récupérer le livreur pour vérifier le heartbeat
+      const livreur = await base44.entities.Livreur.get(course.livreur_id).catch(() => null);
+      const heartbeatAge = livreur?.last_seen_at
+        ? (Date.now() - new Date(livreur.last_seen_at).getTime()) / 60000
+        : 999;
+      // Heartbeat récent (< 10 min) → disponible, sinon → hors_ligne
+      const nouveauStatut = heartbeatAge < 10 ? 'disponible' : 'hors_ligne';
+      
+      await base44.entities.Livreur.update(course.livreur_id, { statut: nouveauStatut });
+
+      console.log(`[libererLivreurCourseLivree] Livreur ${course.livreur_nom} remis à "${nouveauStatut}" (heartbeat: ${Math.round(heartbeatAge)}min)`);
       
       return Response.json({ 
         success: true, 

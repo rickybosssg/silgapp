@@ -274,17 +274,28 @@ export default function CarteLivreursExterne() {
     }
   }, [coursesEnAttenteAvecGPS, livreurs]);
 
-  // ─── Courses VRAIMENT actives (pour croiser avec les livreurs) ────────────
+  // ─── Courses VRAIMENT actives (croisement strict avec livreurs) ─────────
+  // Règle : statut actif de livraison EN COURS + livreur_id présent
+  // EXCLU : annulee, livree (qui peuvent conserver livreur_id pour l'historique)
   const coursesVraimentActives = useMemo(() => {
-    const statutsActifs = ["livreur_en_route", "colis_recupere", "en_livraison", "recherche_livreur", "nouvelle"];
+    // Seuls ces statuts signifient qu'un livreur est réellement occupé
+    const STATUTS_LIVREUR_OCCUPE = ["livreur_en_route", "colis_recupere", "en_livraison"];
+    const STATUTS_TERMINAUX = ["annulee", "livree", "terminee", "completed"];
+
     const actives = toutesCoursesExternes.filter(c =>
-      statutsActifs.includes(c.statut) && c.livreur_id
+      STATUTS_LIVREUR_OCCUPE.includes(c.statut) &&
+      !STATUTS_TERMINAUX.includes(c.statut) &&
+      c.livreur_id
     );
-    console.log("🔴 DIAGNOSTIC courses actives:", {
+
+    console.log("🔴 DIAGNOSTIC courses actives (livreur occupé):", {
       total_chargees: toutesCoursesExternes.length,
+      statuts_repartition: toutesCoursesExternes.reduce((acc, c) => {
+        acc[c.statut] = (acc[c.statut] || 0) + 1;
+        return acc;
+      }, {}),
       vraiment_actives: actives.length,
-      ids_livreurs: actives.map(c => c.livreur_id?.slice(-8)),
-      statuts: actives.map(c => ({ id: c.id.slice(-8), statut: c.statut, livreur: c.livreur_nom })),
+      detail: actives.map(c => ({ statut: c.statut, livreur: c.livreur_nom, id: c.id.slice(-8) })),
     });
     return actives;
   }, [toutesCoursesExternes]);
