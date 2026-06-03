@@ -106,16 +106,27 @@ Deno.serve(async (req) => {
       };
 
       // ── Calcul prix final ──────────────────────────────────────────────────
-      // Règle métier : distance = GPS récupération → GPS livraison UNIQUEMENT
-      // Le fallback minimum ne s'active qu'en cas d'absence totale de GPS.
+      // Règle métier SILGAPP : prix basé sur distance GPS expéditeur → destinataire
+      // (gps_depart → gps_arrivee de la course), jamais sur la distance livreur.
+      // Distance réelle parcourue = GPS récupération → GPS livraison (pour stats).
       const latRecup = course.latitude_recuperation;
       const lngRecup = course.longitude_recuperation;
-      const latLivr = latitude; // GPS du livreur au moment du scan de livraison
+      const latLivr = latitude;
       const lngLivr = longitude;
 
-      if (latRecup && lngRecup && latLivr && lngLivr) {
-        // Cas normal : distance récupération → livraison
-        const dist = haversine(latRecup, lngRecup, latLivr, lngLivr);
+      // Distance réelle livreur (pour stats uniquement)
+      const distReelle = (latRecup && lngRecup && latLivr && lngLivr)
+        ? haversine(latRecup, lngRecup, latLivr, lngLivr)
+        : null;
+
+      // Distance tarifaire = GPS départ course → GPS arrivée course (expéditeur → destinataire)
+      const latDepart = course.gps_depart_lat;
+      const lngDepart = course.gps_depart_lng;
+      const latArrivee = course.gps_arrivee_lat;
+      const lngArrivee = course.gps_arrivee_lng;
+
+      if (latDepart && lngDepart && latArrivee && lngArrivee) {
+        const dist = haversine(latDepart, lngDepart, latArrivee, lngArrivee);
         const distArrondie = Math.max(Number(dist) || 0, 0.01);
 
         // Récupérer le tarif du pays depuis la DB
@@ -139,20 +150,20 @@ Deno.serve(async (req) => {
 
         const commission = Math.round(prixFinal * (commissionPct / 100));
         const montantLivreur = prixFinal - commission;
-        updateData.distance_reelle_km = distArrondie;
+        // distance_reelle_km = trajet réel livreur (stats), ou distance course si pas de GPS récup
+        updateData.distance_reelle_km = distReelle != null ? Math.max(Number(distReelle) || 0, 0.01) : distArrondie;
         updateData.prix_final = prixFinal;
         updateData.commission_silga = commission;
         updateData.montant_livreur = montantLivreur;
-        updateData.gps_arrivee_lat = latitude;
-        updateData.gps_arrivee_lng = longitude;
         updateData.latitude_arrivee_livraison = latitude;
         updateData.longitude_arrivee_livraison = longitude;
       } else {
-        // GPS récupération manquant → bloquer la livraison
-        return Response.json({
-          success: false,
-          error: 'GPS de récupération manquant — impossible de calculer la distance réelle. Contactez l\'admin.'
-        });
+        // GPS course (départ/arrivée) manquants → appliquer le minimum SILGAPP
+        const PRIX_MINIMUM_GLOBAL = 1000;
+        updateData.prix_final = PRIX_MINIMUM_GLOBAL;
+        updateData.commission_silga = Math.round(PRIX_MINIMUM_GLOBAL * 0.3);
+        updateData.montant_livreur = PRIX_MINIMUM_GLOBAL - Math.round(PRIX_MINIMUM_GLOBAL * 0.3);
+        if (distReelle != null) updateData.distance_reelle_km = Math.max(Number(distReelle) || 0, 0.01);
       }
 
       await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
