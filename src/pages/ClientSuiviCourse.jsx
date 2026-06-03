@@ -47,6 +47,7 @@ export default function ClientSuiviCourse() {
   const [userId, setUserId] = useState(null);
   const [showRating, setShowRating] = useState(false);
   const [showAnnulerDialog, setShowAnnulerDialog] = useState(false);
+  const [ratingShownForCourse, setRatingShownForCourse] = useState(null);
   // Pré-sélectionner la course depuis la navigation (bouton "Voir la course")
   const [selectedCourseId, setSelectedCourseId] = useState(
     location.state?.course_id || null
@@ -143,6 +144,29 @@ export default function ClientSuiviCourse() {
   // Course sélectionnée : celle choisie ou la première active ou la dernière
   const maCourse = (selectedCourseId ? courses.find(c => c.id === selectedCourseId) : null)
     || coursesActives[0] || courses[0] || null;
+
+  // Auto-affichage notation quand course passe en "livree"
+  useEffect(() => {
+    if (!maCourse || !userId) return;
+    if (maCourse.statut !== "livree") return;
+    if (maCourse.note_livreur) return; // déjà noté
+    if (ratingShownForCourse === maCourse.id) return; // déjà déclenché
+
+    // Déterminer si l'utilisateur est l'expéditeur/client principal
+    const isPrincipal =
+      (maCourse.type_course === "expedier" && (maCourse.expediteur_client_id === clientProfilId || maCourse.created_by_id === userId)) ||
+      (maCourse.type_course === "recevoir" && (maCourse.destinataire_client_id === clientProfilId || maCourse.created_by_id === userId)) ||
+      maCourse.created_by_id === userId; // fallback: créateur = client principal
+
+    if (isPrincipal) {
+      // Délai court pour laisser le temps à l'UI de s'afficher
+      const timer = setTimeout(() => {
+        setShowRating(true);
+        setRatingShownForCourse(maCourse.id);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [maCourse?.id, maCourse?.statut, maCourse?.note_livreur, userId, clientProfilId, ratingShownForCourse]);
 
   const handleRated = () => {
     setShowRating(false);
@@ -520,7 +544,8 @@ export default function ClientSuiviCourse() {
           // "recevoir" → destinataire est le client principal (note officielle)
           const isClientPrincipal =
             (maCourse.type_course === "expedier" && (maCourse.expediteur_client_id === clientProfilId || maCourse.created_by_id === userId)) ||
-            (maCourse.type_course === "recevoir" && (maCourse.destinataire_client_id === clientProfilId || maCourse.created_by_id === userId));
+            (maCourse.type_course === "recevoir" && (maCourse.destinataire_client_id === clientProfilId || maCourse.created_by_id === userId)) ||
+            maCourse.created_by_id === userId; // fallback: créateur toujours client principal
 
           const isExpediteur = isClientPrincipal; // Note officielle = client principal
           const isDestinataire = !isClientPrincipal; // Feedback simple = autre partie
