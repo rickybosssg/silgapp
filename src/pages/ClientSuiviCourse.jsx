@@ -375,39 +375,65 @@ export default function ClientSuiviCourse() {
             // Tarif km du pays de la course (fallback 100)
             const countryData = countries.find(c => c.code === maCourse.country_code);
             const tarifKm = countryData?.prix_par_km || 100;
-
-            // Calcul distance ETA : expéditeur → destinataire (GPS de la course)
-            const distEta = haversineKm(maCourse.gps_depart_lat, maCourse.gps_depart_lng, maCourse.gps_arrivee_lat, maCourse.gps_arrivee_lng);
-            // Distance réelle (après livraison) : scan récupération → scan livraison
-            const distReelle = maCourse.distance_reelle_km
-              || haversineKm(maCourse.latitude_recuperation, maCourse.longitude_recuperation, maCourse.latitude_livraison, maCourse.longitude_livraison);
-
-            const distEst = distReelle || distEta;
-
-            // Prix : final si livré, sinon approximatif = distance ETA × tarif_km
-            // Règle obligatoire : minimum global SILGAPP = 1 000 FCFA
             const PRIX_MIN = 1000;
-            const isFinal = !!maCourse.prix_final;
-            const prixBrut = isFinal
-              ? maCourse.prix_final
-              : (distEta ? Math.round(distEta * tarifKm) : maCourse.prix_estimate || 0);
-            const prix = prixBrut > 0 ? Math.max(prixBrut, PRIX_MIN) : 0;
 
-            const dureeMs = maCourse.heure_livraison && maCourse.heure_recuperation
+            // === DISTANCE AFFICHÉE (livreur → cible en temps réel) ===
+            const livreurLat = maCourse._livreur?.latitude;
+            const livreurLng = maCourse._livreur?.longitude;
+            const colisRecupere = ["colis_recupere", "en_livraison"].includes(maCourse.statut);
+            const isLivree = maCourse.statut === "livree";
+
+            // Cible livreur : vers expéditeur (récupération) ou vers destinataire (livraison)
+            const cibleLat = colisRecupere ? maCourse.gps_arrivee_lat : maCourse.gps_depart_lat;
+            const cibleLng = colisRecupere ? maCourse.gps_arrivee_lng : maCourse.gps_depart_lng;
+
+            // Distance affichée = livreur → cible (temps réel) si disponible, sinon distance réelle post-livraison
+            const distLivreurCible = livreurLat && livreurLng && cibleLat && cibleLng
+              ? haversineKm(livreurLat, livreurLng, cibleLat, cibleLng)
+              : null;
+            const distReelle = isLivree
+              ? (maCourse.distance_reelle_km || haversineKm(maCourse.latitude_recuperation, maCourse.longitude_recuperation, maCourse.latitude_livraison, maCourse.longitude_livraison))
+              : null;
+            const distAffichee = isLivree ? distReelle : distLivreurCible;
+
+            // === DURÉE (ETA livreur → cible en temps réel) ===
+            const dureeMs = isLivree && maCourse.heure_livraison && maCourse.heure_recuperation
               ? new Date(maCourse.heure_livraison) - new Date(maCourse.heure_recuperation)
-              : maCourse.heure_livraison && maCourse.heure_acceptation
+              : isLivree && maCourse.heure_livraison && maCourse.heure_acceptation
                 ? new Date(maCourse.heure_livraison) - new Date(maCourse.heure_acceptation)
                 : null;
-            const temps = dureeMs ? Math.round(dureeMs / 60000) : distEst ? Math.round((distEst / 25) * 60) : 0;
+            const dureeReelle = dureeMs ? Math.round(dureeMs / 60000) : null;
+            // ETA temps réel : distance livreur → cible ÷ vitesse (25 km/h)
+            const etaTempsReel = distLivreurCible != null ? Math.max(1, Math.round((distLivreurCible / 25) * 60)) : null;
+            const temps = isLivree ? dureeReelle : etaTempsReel;
+
+            // === PRIX : TOUJOURS basé sur expéditeur → destinataire (règle SILGAPP) ===
+            const isFinal = isLivree && maCourse.prix_final > 0;
+            if (isFinal) {
+              // Prix officiel déjà calculé et stocké
+              var prix = Math.max(maCourse.prix_final, PRIX_MIN);
+            } else {
+              // Prix approx = distance GPS départ course → arrivée course × tarif_km
+              const distCourse = haversineKm(maCourse.gps_depart_lat, maCourse.gps_depart_lng, maCourse.gps_arrivee_lat, maCourse.gps_arrivee_lng);
+              const prixBrut = distCourse ? Math.round(distCourse * tarifKm) : (maCourse.prix_estimate || 0);
+              var prix = prixBrut > 0 ? Math.max(prixBrut, PRIX_MIN) : 0;
+            }
+
             return (
               <div className={`grid grid-cols-3 gap-3 pt-3 mt-1 border-t ${isFinal ? "border-green-200" : "border-gray-200"}`}>
                 <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-3 text-center shadow-lg">
-                  <span className="text-2xl font-black text-white block">{distEst ? Number(distEst).toFixed(1) : "—"}</span>
-                  <span className="text-[10px] font-bold text-blue-100 uppercase tracking-wide">Distance (km)</span>
+                  <span className="text-2xl font-black text-white block">
+                    {distAffichee != null ? Number(distAffichee).toFixed(1) : "—"}
+                  </span>
+                  <span className="text-[10px] font-bold text-blue-100 uppercase tracking-wide">
+                    {isLivree ? "Distance (km)" : colisRecupere ? "→ Livraison" : "→ Récup."}
+                  </span>
                 </div>
                 <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-3 text-center shadow-lg">
-                  <span className="text-2xl font-black text-white block">{temps || "—"}</span>
-                  <span className="text-[10px] font-bold text-blue-100 uppercase tracking-wide">Durée (min)</span>
+                  <span className="text-2xl font-black text-white block">{temps != null ? temps : "—"}</span>
+                  <span className="text-[10px] font-bold text-blue-100 uppercase tracking-wide">
+                    {isLivree ? "Durée (min)" : "ETA (min)"}
+                  </span>
                 </div>
                 <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-3 text-center shadow-lg">
                   <span className="text-2xl font-black text-white block">{prix > 0 ? prix.toLocaleString() : "—"}</span>

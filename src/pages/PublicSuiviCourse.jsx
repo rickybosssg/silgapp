@@ -185,6 +185,38 @@ export default function PublicSuiviCourse({ token }) {
 
   const isDelivered = course.statut === "livree";
 
+  // === Cartes ETA dynamiques ===
+  function haversineKm(lat1, lon1, lat2, lon2) {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  const PRIX_MIN = 1000;
+  const colisRecupere = ["colis_recupere", "en_livraison"].includes(course.statut);
+  const cibleLat = colisRecupere ? course.gps_arrivee_lat : course.gps_depart_lat;
+  const cibleLng = colisRecupere ? course.gps_arrivee_lng : course.gps_depart_lng;
+  const distLivreurCible = livreurPos && cibleLat && cibleLng
+    ? haversineKm(livreurPos.lat, livreurPos.lng, cibleLat, cibleLng) : null;
+  const distReelle = isDelivered
+    ? (course.distance_reelle_km || haversineKm(course.latitude_recuperation, course.longitude_recuperation, course.latitude_livraison, course.longitude_livraison))
+    : null;
+  const distAffichee = isDelivered ? distReelle : distLivreurCible;
+  const etaMin = distLivreurCible != null ? Math.max(1, Math.round((distLivreurCible / 25) * 60)) : null;
+  const dureeMs = isDelivered && course.heure_livraison && course.heure_recuperation
+    ? new Date(course.heure_livraison) - new Date(course.heure_recuperation)
+    : isDelivered && course.heure_livraison && course.heure_acceptation
+      ? new Date(course.heure_livraison) - new Date(course.heure_acceptation) : null;
+  const dureeMin = dureeMs ? Math.round(dureeMs / 60000) : etaMin;
+  const distCourse = haversineKm(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng);
+  const isFinalPrix = isDelivered && course.prix_final > 0;
+  const prixBrut = isFinalPrix ? course.prix_final : (distCourse ? Math.round(distCourse * 100) : (course.prix_estimate || 0));
+  const prixAffiche = prixBrut > 0 ? Math.max(prixBrut, PRIX_MIN) : 0;
+  const showEtaCards = ["livreur_en_route", "colis_recupere", "en_livraison", "livree"].includes(course.statut);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white py-8 px-4">
       <div className="max-w-2xl mx-auto space-y-6">
@@ -241,6 +273,34 @@ export default function PublicSuiviCourse({ token }) {
             })}
           </div>
         </Card>
+
+        {/* Cartes ETA dynamiques */}
+        {showEtaCards && (
+          <Card className="p-4">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-3 text-center shadow-lg">
+                <span className="text-2xl font-black text-white block">
+                  {distAffichee != null ? Number(distAffichee).toFixed(1) : "—"}
+                </span>
+                <span className="text-[10px] font-bold text-blue-100 uppercase tracking-wide">
+                  {isDelivered ? "Distance (km)" : colisRecupere ? "→ Livraison" : "→ Récup."}
+                </span>
+              </div>
+              <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-3 text-center shadow-lg">
+                <span className="text-2xl font-black text-white block">{dureeMin != null ? dureeMin : "—"}</span>
+                <span className="text-[10px] font-bold text-blue-100 uppercase tracking-wide">
+                  {isDelivered ? "Durée (min)" : "ETA (min)"}
+                </span>
+              </div>
+              <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-3 text-center shadow-lg">
+                <span className="text-2xl font-black text-white block">{prixAffiche > 0 ? prixAffiche.toLocaleString() : "—"}</span>
+                <span className="text-[10px] font-bold text-blue-100 uppercase tracking-wide">
+                  {isFinalPrix ? "Prix final" : "Prix approx."}
+                </span>
+              </div>
+            </div>
+          </Card>
+        )}
 
         {/* Info livreur */}
         {course.livreur_nom && (
