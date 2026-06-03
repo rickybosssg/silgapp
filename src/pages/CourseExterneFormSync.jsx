@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
@@ -180,9 +180,21 @@ export default function CourseExterneFormSync() {
     },
   };
 
+  const queryClient = useQueryClient();
   const createMutation = useMutation({
     mutationFn: async (data) => {
       let finalData = { ...data };
+
+      // ─── OPTIMISTIC UI: Créer un brouillon temporaire pour affichage immédiat ──
+      const tempId = `temp_${Date.now()}`;
+      const tempCourse = {
+        ...data,
+        id: tempId,
+        statut: 'recherche_livreur',
+        dispatch_status: 'en_attente',
+        created_date: new Date().toISOString(),
+      };
+      queryClient.setQueryData(['courses-externes-client'], (old) => [...(old || []), tempCourse]);
 
       // ─── ANTI-DOUBLON RENFORCÉ ────────────────────────────────────────────
       // Critères larges : même client + même type, créée < 3 min (peu importe l'adresse)
@@ -199,6 +211,8 @@ export default function CourseExterneFormSync() {
         });
         if (doublon) {
           const secs = Math.round((now - new Date(doublon.created_date).getTime()) / 1000);
+          // Retirer le brouillon temporaire en cas d'erreur
+          queryClient.setQueryData(['courses-externes-client'], (old) => (old || []).filter(c => c.id !== tempId));
           throw new Error(`Course déjà créée il y a ${secs}s. Patientez avant de réessayer.`);
         }
       } catch (err) {
@@ -278,6 +292,10 @@ export default function CourseExterneFormSync() {
       return course;
     },
     onSuccess: (response) => {
+      // OPTIMISTIC UI: Remplacer le brouillon temporaire par la vraie course
+      queryClient.setQueryData(['courses-externes-client'], (old) => 
+        (old || []).filter(c => c.id !== `temp_${Date.now()}`).concat(response)
+      );
       toast.success("Course créée ! Recherche d'un livreur en cours...");
       setCreatedCourse(response);
       setCourseCreated(true);
@@ -294,6 +312,8 @@ export default function CourseExterneFormSync() {
       }
     },
     onError: (err) => {
+      // OPTIMISTIC UI: Retirer le brouillon en cas d'erreur
+      queryClient.setQueryData(['courses-externes-client'], (old) => (old || []).filter(c => !c.id?.startsWith('temp_')));
       toast.error("Erreur : " + err.message);
       setIsSubmitting(false);
     },

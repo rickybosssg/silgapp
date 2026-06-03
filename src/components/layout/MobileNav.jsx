@@ -30,17 +30,26 @@ const allNavItems = [
   { path: "/maintenance", label: "Maintenance", icon: Shield },
 ];
 
-// Store scroll positions per route
-const scrollPositions = new Map();
+// Store scroll positions and state per route using sessionStorage for persistence
+const SCROLL_STORAGE_KEY = 'silgapp_scroll_';
+const STATE_STORAGE_KEY = 'silgapp_state_';
+
+function saveScrollPosition(pathname, position) {
+  try { sessionStorage.setItem(SCROLL_STORAGE_KEY + pathname, String(position)); } catch (_) {}
+}
+
+function restoreScrollPosition(pathname) {
+  try {
+    const saved = sessionStorage.getItem(SCROLL_STORAGE_KEY + pathname);
+    return saved !== null ? Number(saved) : 0;
+  } catch (_) { return 0; }
+}
 
 export default function MobileNav({ notificationCount = 0, reseau }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   useEffect(() => { base44.auth.me().then(setUser).catch(() => null); }, []);
-  
-  // Status bar will be handled by native app when @capacitor/status-bar is installed
-  // TODO: Install @capacitor/status-bar package to enable dynamic status bar coloring
   
   // Hardware back button for Android
   useEffect(() => {
@@ -54,23 +63,23 @@ export default function MobileNav({ notificationCount = 0, reseau }) {
     return () => document.removeEventListener('backbutton', handleBackButton);
   }, [navigate, location]);
   
-  // Save scroll position before navigation
+  // Save scroll position before unmount/route change
   useEffect(() => {
-    const savePosition = () => {
-      scrollPositions.set(location.pathname, window.scrollY);
-    };
+    const savePosition = () => saveScrollPosition(location.pathname, window.scrollY);
     window.addEventListener('beforeunload', savePosition);
-    return () => window.removeEventListener('beforeunload', savePosition);
+    return () => {
+      savePosition();
+      window.removeEventListener('beforeunload', savePosition);
+    };
   }, [location.pathname]);
   
-  // Restore scroll position on route change
+  // Restore scroll position on route change with slight delay for content render
   useEffect(() => {
-    const savedY = scrollPositions.get(location.pathname);
-    if (savedY !== undefined) {
+    const savedY = restoreScrollPosition(location.pathname);
+    const timer = setTimeout(() => {
       window.scrollTo({ top: savedY, behavior: 'auto' });
-    } else {
-      window.scrollTo({ top: 0, behavior: 'auto' });
-    }
+    }, 100);
+    return () => clearTimeout(timer);
   }, [location.pathname]);
   const logout = () => {
     ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
@@ -190,11 +199,11 @@ export default function MobileNav({ notificationCount = 0, reseau }) {
               <button
                 key={item.path}
                 onClick={() => {
-                  // Save current scroll position
-                  scrollPositions.set(location.pathname, window.scrollY);
-                  
+                  // Save current scroll position before navigation
+                  saveScrollPosition(location.pathname, window.scrollY);
+
                   if (isActive) {
-                    // Reset to root of this tab with smooth scroll
+                    // Smooth scroll to top when tapping active tab
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   } else {
                     navigate(item.path);

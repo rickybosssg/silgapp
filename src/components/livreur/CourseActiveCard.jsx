@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import LivraisonResume from "./LivraisonResume";
 import QRScannerModal from "./QRScannerModal";
 import NavigationGPS from "./NavigationGPS";
@@ -103,6 +104,7 @@ function ProgressBar({ statut }) {
 
 export default function CourseActiveCard({ course, onColisRecupere, onColisLivre, onClientAnnule, onMettrePause, isPending, isExterne = false, livreurLat, livreurLng }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [prixReel, setPrixReel] = useState("");
   const [showPrixModal, setShowPrixModal] = useState(false);
   const [remarque, setRemarque] = useState("");
@@ -114,6 +116,14 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const [optimisticStatut, setOptimisticStatut] = useState(null);
 
   const effectiveStatut = optimisticStatut || course.statut;
+
+  // OPTIMISTIC UI helper for status updates
+  const updateOptimisticStatut = (newStatut, courseData = {}) => {
+    setOptimisticStatut(newStatut);
+    queryClient.setQueryData(['mes-courses-externes'], (old) => 
+      (old || []).map(c => c.id === course.id ? { ...c, statut: newStatut, ...courseData } : c)
+    );
+  };
   const colisRecupere = effectiveStatut === "colis_recupere" || effectiveStatut === "en_livraison";
   const colisLivre = course.statut === "livree";
 
@@ -145,8 +155,11 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   // Handler succès scan QR pickup (externe) — GPS déjà validé côté QRScannerModal
   const handleQRPickupSuccess = (courseData) => {
     setShowQRScanner(null);
-    setOptimisticStatut("colis_recupere");
-    // Le GPS a déjà été capturé et validé par validateQRCode — pas de nouveau GPS requis ici
+    // OPTIMISTIC UI: Update cache immediately
+    updateOptimisticStatut("colis_recupere", { 
+      heure_recuperation: new Date().toISOString(),
+      ...courseData 
+    });
     onColisRecupere({ ...course, ...courseData });
     toast.success("Colis récupéré avec succès ! 📦");
   };
@@ -155,10 +168,12 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   // → Redirection immédiate vers la page récapitulatif dédiée
   const handleQRDeliverySuccess = (courseData) => {
     setShowQRScanner(null);
-    setOptimisticStatut("livree");
-    // Notifier le parent (invalidations + statut disponible)
+    // OPTIMISTIC UI: Update cache immediately
+    updateOptimisticStatut("livree", {
+      heure_livraison: new Date().toISOString(),
+      ...courseData
+    });
     onColisLivre(course, null);
-    // Rediriger vers la page dédiée
     const courseId = courseData?.id || course.id;
     navigate(`/livreur/recap-course/${courseId}`);
   };
@@ -490,7 +505,11 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   /* ── INTERNE : bouton classique ── */
                   <button
                     className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                    onClick={() => { setOptimisticStatut("colis_recupere"); onColisRecupere(course); }}
+                    onClick={() => {
+                      // OPTIMISTIC UI: Update cache immediately
+                      updateOptimisticStatut("colis_recupere", { heure_recuperation: new Date().toISOString() });
+                      onColisRecupere(course);
+                    }}
                     disabled={isPending}
                   >
                     <Package className="w-6 h-6" />
