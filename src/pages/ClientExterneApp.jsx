@@ -6,6 +6,9 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
+import { useQueryClient } from "@tanstack/react-query";
 import { 
   MapPin, Navigation, Phone, MessageCircle, User, Package, 
   Clock, HelpCircle, ChevronRight, TrendingUp, 
@@ -72,8 +75,18 @@ export default function ClientExterneApp() {
   const [aUnCodePromo, setAUnCodePromo] = useState(false);
   const [courseANoter, setCourseANoter] = useState(null);
   const [notationShownFor, setNotationShownFor] = useState(null);
+  const queryClient = useQueryClient();
   const clientProfilRef = useRef(null);
   useEffect(() => { clientProfilRef.current = clientProfil; }, [clientProfil]);
+
+  // Pull-to-refresh
+  const { pulling, refreshing } = usePullToRefresh(async () => {
+    await loadProfil();
+    if (position && clientProfil) {
+      await checkStatus(position, clientProfil);
+    }
+    await queryClient.invalidateQueries({ queryKey: ["livreurs"] });
+  });
 
   // Charger localStorage au montage (pas avant le rendu)
   useEffect(() => {
@@ -519,6 +532,7 @@ export default function ClientExterneApp() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PullToRefreshIndicator pulling={pulling} refreshing={refreshing} />
 
       {/* ── COURSES ACTIVES — bannière flottante ─────── */}
       {coursesActives.length > 0 && (

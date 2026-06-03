@@ -203,8 +203,9 @@ export default function MobileNav({ notificationCount = 0, reseau }) {
                   saveScrollPosition(location.pathname, window.scrollY);
 
                   if (isActive) {
-                    // Smooth scroll to top when tapping active tab
-                    window.scrollTo({ top: 0, behavior: "smooth" });
+                    // Reset to root route of this tab, then scroll to top
+                    navigate(item.path, { replace: true });
+                    setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 50);
                   } else {
                     navigate(item.path);
                   }

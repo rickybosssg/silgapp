@@ -4,6 +4,8 @@ import { base44 } from "@/api/base44Client";
 import { Truck } from "lucide-react";
 import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 
 import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
 import LivreurHeader from "@/components/livreur/LivreurHeader";
@@ -39,6 +41,12 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [gpsActif, setGpsActif] = useState(false);
   const [onboardingTermine, setOnboardingTermine] = useState(false);
   const [showMesInfos, setShowMesInfos] = useState(false);
+
+  // Pull-to-refresh
+  const { pulling, refreshing } = usePullToRefresh(async () => {
+    await queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+    await queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+  });
 
 
   // ─── Profil livreur ───────────────────────────────────────────────────────
@@ -329,6 +337,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PullToRefreshIndicator pulling={pulling} refreshing={refreshing} />
       <AlertesLivreurModal
         livreurId={livreurProfil?.id}
         livreurNom={`${livreurProfil?.prenom || ""} ${livreurProfil?.nom || ""}`.trim()}

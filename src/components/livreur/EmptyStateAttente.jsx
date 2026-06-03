@@ -12,7 +12,7 @@ export default function EmptyStateAttente() {
   const msg = messages[Math.floor(Date.now() / 30000) % messages.length];
 
   return (
-    <div className="rounded-3xl overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-white/10 shadow-2xl relative">
+    <div className="rounded-3xl overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border border-white/10 shadow-2xl relative">
       {/* Halo décoratif */}
       <div className="absolute top-0 right-0 w-48 h-48 bg-green-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-32 h-32 bg-blue-500/8 rounded-full blur-2xl pointer-events-none" />
