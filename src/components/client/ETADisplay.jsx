@@ -29,16 +29,54 @@ function computeETA(distKm) {
  *   statut: statut de la course
  */
 export default function ETADisplay({ livreurLat, livreurLng, targetLat, targetLng, livreurNom, phase, statut }) {
-  if (!livreurLat || !livreurLng) return null;
-  if (!targetLat || !targetLng) return null;
+  const isRecup = phase === "vers_recuperation";
+  const prenom = livreurNom?.split(" ")[0] || "Le livreur";
+
+  // Afficher même sans GPS (message générique)
+  if (!livreurLat || !livreurLng || !targetLat || !targetLng) {
+    return (
+      <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3">
+        <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+          <Clock className="w-5 h-5 text-blue-600 animate-pulse" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-blue-900 leading-tight">
+            {isRecup ? `${prenom} est en route pour la récupération` : `${prenom} est en route pour la livraison`}
+          </p>
+          <div className="flex items-center gap-3 mt-1">
+            <span className="flex items-center gap-1 text-xs text-blue-600">
+              <MapPin className="w-3 h-3" />
+              {isRecup ? "Vers récupération" : "Vers livraison"}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const dist = haversine(livreurLat, livreurLng, targetLat, targetLng);
   const eta = computeETA(dist);
 
-  if (dist === null || eta === null) return null;
-
-  const isRecup = phase === "vers_recuperation";
-  const prenom = livreurNom?.split(" ")[0] || "Le livreur";
+  if (dist === null || eta === null) {
+    return (
+      <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3">
+        <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+          <Clock className="w-5 h-5 text-blue-600 animate-pulse" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-blue-900 leading-tight">
+            {isRecup ? `${prenom} est en route pour la récupération` : `${prenom} est en route pour la livraison`}
+          </p>
+          <div className="flex items-center gap-3 mt-1">
+            <span className="flex items-center gap-1 text-xs text-blue-600">
+              <MapPin className="w-3 h-3" />
+              {isRecup ? "Vers récupération" : "Vers livraison"}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   let message = "";
   if (isRecup) {
@@ -57,7 +95,7 @@ export default function ETADisplay({ livreurLat, livreurLng, targetLat, targetLn
         <div className="flex items-center gap-3 mt-1">
           <span className="flex items-center gap-1 text-xs text-blue-600">
             <Ruler className="w-3 h-3" />
-            {dist < 1 ? `${Math.max(1, Math.round(dist * 1000))} m` : `${dist.toFixed(1)} km`}
+            {dist < 0.1 ? `${Math.round(dist * 1000)} m` : dist < 1 ? `${Math.round(dist * 1000)} m` : `${dist.toFixed(1)} km`}
           </span>
           <span className="flex items-center gap-1 text-xs text-blue-600">
             <MapPin className="w-3 h-3" />

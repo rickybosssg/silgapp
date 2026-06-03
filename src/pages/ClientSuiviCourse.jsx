@@ -408,15 +408,22 @@ export default function ClientSuiviCourse() {
             const temps = isLivree ? dureeReelle : etaTempsReel;
 
             // === PRIX : TOUJOURS basé sur expéditeur → destinataire (règle SILGAPP) ===
+            // Distance tarifaire = GPS départ course → GPS arrivée course
+            const distCourse = haversineKm(maCourse.gps_depart_lat, maCourse.gps_depart_lng, maCourse.gps_arrivee_lat, maCourse.gps_arrivee_lng);
             const isFinal = isLivree && maCourse.prix_final > 0;
+            let prix = 0;
             if (isFinal) {
-              // Prix officiel déjà calculé et stocké
-              var prix = Math.max(maCourse.prix_final, PRIX_MIN);
-            } else {
-              // Prix approx = distance GPS départ course → arrivée course × tarif_km
-              const distCourse = haversineKm(maCourse.gps_depart_lat, maCourse.gps_depart_lng, maCourse.gps_arrivee_lat, maCourse.gps_arrivee_lng);
-              const prixBrut = distCourse ? Math.round(distCourse * tarifKm) : (maCourse.prix_estimate || 0);
-              var prix = prixBrut > 0 ? Math.max(prixBrut, PRIX_MIN) : 0;
+              // Prix officiel déjà calculé et stocké — appliquer minimum 1000 F
+              prix = Math.max(maCourse.prix_final, PRIX_MIN);
+            } else if (distCourse && distCourse > 0) {
+              // Règle SILGAPP : ≤10km = 1000 F, >10km = distance × 100 F
+              if (distCourse <= 10) {
+                prix = PRIX_MIN; // 1000 F pour ≤10km
+              } else {
+                prix = Math.max(Math.round(distCourse * tarifKm), PRIX_MIN); // >10km = distance × tarif_km
+              }
+            } else if (maCourse.prix_estimate > 0) {
+              prix = Math.max(maCourse.prix_estimate, PRIX_MIN);
             }
 
             return (

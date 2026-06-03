@@ -125,6 +125,10 @@ Deno.serve(async (req) => {
       const latArrivee = course.gps_arrivee_lat;
       const lngArrivee = course.gps_arrivee_lng;
 
+      const distTarifaire = (latDepart && lngDepart && latArrivee && lngArrivee)
+        ? haversine(latDepart, lngDepart, latArrivee, lngArrivee)
+        : null;
+
       if (latDepart && lngDepart && latArrivee && lngArrivee) {
         const dist = haversine(latDepart, lngDepart, latArrivee, lngArrivee);
         const distArrondie = Math.max(Number(dist) || 0, 0.01);
@@ -143,9 +147,13 @@ Deno.serve(async (req) => {
           }
         } catch (_) {}
 
-        // Règle obligatoire : minimum global SILGAPP = 1 000 FCFA
+        // Règle SILGAPP : ≤10km = 1000 F minimum, >10km = distance × 100 F (minimum 1000 F)
         const PRIX_MINIMUM_GLOBAL = 1000;
-        const prixBrut = distArrondie * prixParKm;
+        let prixBrut = distArrondie * prixParKm;
+        // Si distance ≤ 10km, appliquer le minimum de 1000 F
+        if (distArrondie <= 10) {
+          prixBrut = Math.max(prixBrut, PRIX_MINIMUM_GLOBAL);
+        }
         const prixFinal = Math.max(Math.round(prixBrut), prixMinimumPays, PRIX_MINIMUM_GLOBAL);
 
         const commission = Math.round(prixFinal * (commissionPct / 100));
