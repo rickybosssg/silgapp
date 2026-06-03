@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { Bike, Wifi } from "lucide-react";
+import { Bike, Users, Wifi } from "lucide-react";
 
 /**
  * Badge premium affichant les livreurs disponibles en temps réel.
@@ -101,7 +101,10 @@ export default function LiveCounterBadge({ type = "livreurs", className = "" }) 
     >
       {/* Icône scooter/livreur */}
       <div className="relative">
-        <Bike className="w-5 h-5" style={{ color: isZero ? "#b91c1c" : "#059669" }} />
+        {type === "clients"
+          ? <Users className="w-5 h-5" style={{ color: isZero ? "#b91c1c" : "#059669" }} />
+          : <Bike className="w-5 h-5" style={{ color: isZero ? "#b91c1c" : "#059669" }} />
+        }
         {/* Pastille verte animée "temps réel" */}
         <div
           className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white"
@@ -124,7 +127,9 @@ export default function LiveCounterBadge({ type = "livreurs", className = "" }) 
           className="text-xs font-medium leading-none"
           style={{ color: isZero ? "#b91c1c" : "#374151" }}
         >
-          {isZero ? "Aucun livreur disponible" : count === 1 ? "livreur disponible" : "livreurs disponibles"}
+          {type === "clients"
+            ? (isZero ? "Aucun client en ligne" : count === 1 ? "client en ligne" : "clients en ligne")
+            : (isZero ? "Aucun livreur disponible" : count === 1 ? "livreur disponible" : "livreurs disponibles")}
         </span>
       </div>
 
