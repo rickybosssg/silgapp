@@ -40,10 +40,11 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Course introuvable' }, { status: 404 });
     }
 
-    if (!course.latitude_recuperation || !course.longitude_recuperation ||
-        !course.latitude_livraison || !course.longitude_livraison) {
+    // Distance tarifaire = GPS départ course → GPS arrivée course (expéditeur → destinataire)
+    if (!course.gps_depart_lat || !course.gps_depart_lng ||
+        !course.gps_arrivee_lat || !course.gps_arrivee_lng) {
       return Response.json({
-        error: 'Positions GPS de récupération ou livraison manquantes'
+        error: 'Positions GPS départ/arrivée de la course manquantes'
       }, { status: 400 });
     }
 
@@ -67,10 +68,10 @@ Deno.serve(async (req) => {
       // Fallback silencieux sur le tarif statique
     }
 
-    // Calculer la distance réelle
+    // Calculer la distance tarifaire (expéditeur → destinataire)
     const distanceReelle = calculerDistance(
-      course.latitude_recuperation, course.longitude_recuperation,
-      course.latitude_livraison, course.longitude_livraison
+      course.gps_depart_lat, course.gps_depart_lng,
+      course.gps_arrivee_lat, course.gps_arrivee_lng
     );
 
     // Calculer le prix final selon les tarifs du pays
