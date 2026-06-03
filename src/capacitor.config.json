@@ -1,6 +1,6 @@
 {
-  "appId": "com.silgapp2.app",
-  "appName": "SILGAPP 2",
+  "appId": "com.silgapp.app",
+  "appName": "SILGAPP",
   "webDir": "dist",
   "server": {
     "url": "https://silga-dispatch-go.base44.app",
@@ -9,11 +9,26 @@
   "android": {
     "allowMixedContent": false,
     "captureInput": true,
-    "webContentsDebuggingEnabled": true
+    "webContentsDebuggingEnabled": false,
+    "backgroundColor": "#ffffff",
+    "buildOptions": {
+      "keystorePath": "release-key.keystore",
+      "keystorePassword": "silgapp2024",
+      "keystoreAlias": "silgapp",
+      "keystoreAliasPassword": "silgapp2024",
+      "releaseType": "AAB"
+    }
   },
   "plugins": {
     "PushNotifications": {
       "presentationOptions": ["badge", "sound", "alert"]
+    },
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "launchAutoHide": true,
+      "backgroundColor": "#ffffff",
+      "androidSplashResourceName": "splash",
+      "showSpinner": false
     }
   }
 }
