@@ -74,8 +74,10 @@ Deno.serve(async (req) => {
     );
 
     // Calculer le prix final selon les tarifs du pays
+    // Règle : prix minimum global SILGAPP = 1 000 F CFA (s'applique dans tous les pays FCFA)
+    const PRIX_MINIMUM_GLOBAL = tarif.devise === "FCFA" ? 1000 : tarif.prix_minimum;
     const prixBrut = distanceReelle * tarif.prix_par_km;
-    const prixFinal = Math.max(Math.round(prixBrut), tarif.prix_minimum);
+    const prixFinal = Math.max(Math.round(prixBrut), tarif.prix_minimum, PRIX_MINIMUM_GLOBAL);
 
     // Commission Silga et montant livreur
     const commissionRate = (tarif.commission_pct || 30) / 100;
