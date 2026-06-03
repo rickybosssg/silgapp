@@ -57,6 +57,7 @@ const TelechargerSILGAPP = lazy(() => import('./pages/TelechargerSILGAPP.jsx'));
 const StatsTelechargements = lazy(() => import('./pages/StatsTelechargements.jsx'));
 const StatsTelechargementsAdmin = lazy(() => import('./pages/StatsTelechargementsAdmin.jsx'));
 const GestionPublicites = lazy(() => import('./pages/GestionPublicites.jsx'));
+const PolitiqueConfidentialite = lazy(() => import('./pages/PolitiqueConfidentialite.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -122,6 +123,7 @@ function AppContent() {
   // 🌍 ROUTES PUBLIQUES - ACCESSIBLES SANS AUTHENTIFICATION (PRIORITÉ ABSOLUE)
   // Ces routes doivent être vérifiées AVANT toute logique d'authentification
   const isPublicRoute = location.pathname === '/telecharger' || 
+                        location.pathname === '/privacy-policy' ||
                         location.pathname === '/suivi-public/:token' || 
                         location.pathname.startsWith('/suivi-public/');
 
@@ -133,6 +135,8 @@ function AppContent() {
           <Route path="/telecharger" element={<TelechargerSILGAPP />} />
           {/* Route publique de suivi de course */}
           <Route path="/suivi-public/:token" element={<PublicSuiviCourse />} />
+          {/* Politique de confidentialité — requise Google Play */}
+          <Route path="/privacy-policy" element={<PolitiqueConfidentialite />} />
           <Route path="*" element={<PageNotFound />} />
         </Routes>
       </Suspense>
