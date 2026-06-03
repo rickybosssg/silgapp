@@ -11,6 +11,7 @@ import {
   Clock, HelpCircle, ChevronRight, TrendingUp, 
   Shield, Zap, Star, Loader2, ArrowLeft, RefreshCw
 } from "lucide-react";
+import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import LiveCounterBadge from "@/components/ui/LiveCounterBadge";
 import ModernMap from "@/components/client/ModernMap";
@@ -69,6 +70,8 @@ export default function ClientExterneApp() {
   const [gpsSyncing, setGpsSyncing] = useState(false);
   const [gpsActif, setGpsActif] = useState(false);
   const [aUnCodePromo, setAUnCodePromo] = useState(false);
+  const [courseANoter, setCourseANoter] = useState(null);
+  const [notationShownFor, setNotationShownFor] = useState(null);
   const clientProfilRef = useRef(null);
   useEffect(() => { clientProfilRef.current = clientProfil; }, [clientProfil]);
 
@@ -95,6 +98,32 @@ export default function ClientExterneApp() {
   useEffect(() => {
     loadProfil();
   }, []);
+
+  // Détecter les courses livrées sans notation → afficher le dialog depuis le dashboard
+  useEffect(() => {
+    if (!clientProfil?.id) return;
+    const checkCourseNotation = async () => {
+      try {
+        const user = await base44.auth.me();
+        const courses = await base44.entities.CourseExterne.filter(
+          { created_by_id: user.id, statut: "livree" }, "-updated_date", 10
+        );
+        const sanNote = (courses || []).find(c =>
+          !c.note_livreur &&
+          c.livreur_id &&
+          notationShownFor !== c.id
+        );
+        if (sanNote) {
+          setCourseANoter(sanNote);
+          setNotationShownFor(sanNote.id);
+        }
+      } catch (_) {}
+    };
+    // Vérifier au montage et toutes les 10s
+    checkCourseNotation();
+    const iv = setInterval(checkCourseNotation, 10000);
+    return () => clearInterval(iv);
+  }, [clientProfil?.id, notationShownFor]);
 
   // Vérifier si ce client possède un code promo ambassadeur
   useEffect(() => {
@@ -780,6 +809,15 @@ export default function ClientExterneApp() {
       )}
 
       <VenusFloatingButton />
+
+      {/* ── NOTATION LIVREUR — déclenchée depuis le dashboard ── */}
+      {courseANoter && (
+        <LivreurRatingDialog
+          course={courseANoter}
+          onClose={() => setCourseANoter(null)}
+          onRated={() => setCourseANoter(null)}
+        />
+      )}
 
       {/* ── PUBLICITÉ PLEIN ÉCRAN ── */}
       <PubliciteFullscreen cible="clients" userId={clientProfil?.id} userType="client" />
