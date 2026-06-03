@@ -318,11 +318,17 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               </a>
               <button onClick={() => {
                 let num = (course.client_telephone || "").replace(/\D/g, "");
-                if (num.startsWith("226") && num.length === 11) { /* ok */ }
+                // Normalisation : forcer le préfixe 226 (Burkina Faso)
+                if (num.startsWith("226") && num.length >= 11) { /* ok */ }
                 else if (num.startsWith("0") && num.length === 9) num = "226" + num.slice(1);
                 else if (num.length === 8) num = "226" + num;
-                const msg = encodeURIComponent("Bonjour, je suis votre livreur SILGAPP. Je vous contacte au sujet de votre course.");
-                window.open(`https://wa.me/${num}?text=${msg}`, "_blank", "noopener,noreferrer");
+                const msg = encodeURIComponent("Bonjour, je suis votre livreur SILGAPP. Je vous contacte au sujet de votre livraison.");
+                const lien = `https://wa.me/${num}?text=${msg}`;
+                // APK Android / WebView : window.open peut être bloqué → fallback window.location.href
+                const popup = window.open(lien, "_blank", "noopener,noreferrer");
+                if (!popup || popup.closed || typeof popup.closed === "undefined") {
+                  window.location.href = lien;
+                }
               }}>
                 <div className="w-11 h-11 rounded-2xl bg-green-50 border border-green-100 flex items-center justify-center">
                   <svg viewBox="0 0 24 24" className="w-5 h-5 fill-green-600" xmlns="http://www.w3.org/2000/svg">
