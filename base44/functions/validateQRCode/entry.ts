@@ -116,10 +116,28 @@ Deno.serve(async (req) => {
       if (latRecup && lngRecup && latLivr && lngLivr) {
         // Cas normal : distance récupération → livraison
         const dist = haversine(latRecup, lngRecup, latLivr, lngLivr);
-        // Arrondir à 1 décimale pour éviter les effets de bord (ex: 0.0015 → 0.0 → prix=0)
-        const distArrondie = Math.max(Number(dist) || 0, 0.1); // Minimum 0.1 km = 10F
-        const prixFinal = Math.round(distArrondie * 100);
-        const commission = Math.round(prixFinal * 0.3);
+        const distArrondie = Math.max(Number(dist) || 0, 0.01);
+
+        // Récupérer le tarif du pays depuis la DB
+        const countryCode = course.country_code || "BF";
+        let prixParKm = 100;
+        let prixMinimumPays = 500;
+        let commissionPct = 30;
+        try {
+          const countriesDB = await base44.asServiceRole.entities.Country.filter({ code: countryCode, actif: true });
+          if (countriesDB?.[0]) {
+            prixParKm    = countriesDB[0].prix_par_km    || 100;
+            prixMinimumPays = countriesDB[0].prix_minimum || 500;
+            commissionPct   = countriesDB[0].commission_pct || 30;
+          }
+        } catch (_) {}
+
+        // Règle obligatoire : minimum global SILGAPP = 1 000 FCFA
+        const PRIX_MINIMUM_GLOBAL = 1000;
+        const prixBrut = distArrondie * prixParKm;
+        const prixFinal = Math.max(Math.round(prixBrut), prixMinimumPays, PRIX_MINIMUM_GLOBAL);
+
+        const commission = Math.round(prixFinal * (commissionPct / 100));
         const montantLivreur = prixFinal - commission;
         updateData.distance_reelle_km = distArrondie;
         updateData.prix_final = prixFinal;

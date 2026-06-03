@@ -385,10 +385,13 @@ export default function ClientSuiviCourse() {
             const distEst = distReelle || distEta;
 
             // Prix : final si livré, sinon approximatif = distance ETA × tarif_km
+            // Règle obligatoire : minimum global SILGAPP = 1 000 FCFA
+            const PRIX_MIN = 1000;
             const isFinal = !!maCourse.prix_final;
-            const prix = isFinal
+            const prixBrut = isFinal
               ? maCourse.prix_final
               : (distEta ? Math.round(distEta * tarifKm) : maCourse.prix_estimate || 0);
+            const prix = prixBrut > 0 ? Math.max(prixBrut, PRIX_MIN) : 0;
 
             const dureeMs = maCourse.heure_livraison && maCourse.heure_recuperation
               ? new Date(maCourse.heure_livraison) - new Date(maCourse.heure_recuperation)
@@ -566,7 +569,9 @@ export default function ClientSuiviCourse() {
                     const distFinal = maCourse.distance_reelle_km
                       || haversineKm(maCourse.latitude_recuperation, maCourse.longitude_recuperation, maCourse.latitude_livraison, maCourse.longitude_livraison)
                       || null;
-                    const prixFinal = maCourse.prix_final > 0 ? maCourse.prix_final : (distFinal > 0 ? Math.round(distFinal * tarifKmFinal) : null);
+                    // Règle obligatoire : minimum global SILGAPP = 1 000 FCFA
+                    const prixBrutFinal = maCourse.prix_final > 0 ? maCourse.prix_final : (distFinal > 0 ? Math.round(distFinal * tarifKmFinal) : null);
+                    const prixFinal = prixBrutFinal > 0 ? Math.max(prixBrutFinal, 1000) : null;
                     const dureeMs = maCourse.heure_livraison && maCourse.heure_recuperation
                       ? new Date(maCourse.heure_livraison) - new Date(maCourse.heure_recuperation)
                       : maCourse.heure_livraison && maCourse.heure_acceptation
