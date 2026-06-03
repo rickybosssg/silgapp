@@ -129,9 +129,11 @@ export default function RecapCourseLivreur() {
   const donneesEnCours = !course.prix_final || !course.distance_reelle_km;
 
   const dist = Number(course.distance_reelle_km || 0);
-  const prixFinal = Number(course.prix_final || Math.round(dist * 100));
-  const gainLivreur = Number(course.montant_livreur || Math.round(prixFinal * 0.7));
-  const commissionSilga = Number(course.commission_silga || Math.round(prixFinal * 0.3));
+  // Règle prix minimum SILGAPP : 1 000 F — appliqué AVANT tout calcul de commission
+  const prixBrut = course.prix_final ? Number(course.prix_final) : Math.round(dist * 100);
+  const prixFinal = Math.max(1000, prixBrut);
+  const gainLivreur = Number(course.montant_livreur) > 0 ? Number(course.montant_livreur) : Math.round(prixFinal * 0.7);
+  const commissionSilga = Number(course.commission_silga) > 0 ? Number(course.commission_silga) : Math.round(prixFinal * 0.3);
   const duree = dureeMinutes(course.heure_recuperation, course.heure_livraison);
 
   return (
@@ -166,7 +168,10 @@ export default function RecapCourseLivreur() {
           </div>
 
           <div className="text-gray-500 text-sm">
-            Calcul : {dist.toFixed(2)} km × 100 F
+            {prixBrut < 1000
+              ? <span className="text-amber-400 font-semibold">Prix minimum SILGAPP appliqué</span>
+              : `Calcul : ${dist.toFixed(2)} km × 100 F`
+            }
           </div>
 
           <div className="border-t border-gray-700 pt-3">

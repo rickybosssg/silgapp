@@ -550,7 +550,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
           {colisLivre && (() => {
             const dist = Number(course.distance_reelle_km) > 0 ? Number(course.distance_reelle_km) : null;
-            const prix = Number(course.prix_final) > 0 ? Number(course.prix_final) : (dist ? Math.round(dist * 100) : null);
+            // Règle prix minimum SILGAPP : 1 000 F — appliqué avant tout calcul de commission
+            const prixBrut = Number(course.prix_final) > 0 ? Number(course.prix_final) : (dist ? Math.round(dist * 100) : 0);
+            const prix = Math.max(1000, prixBrut) || null;
             const gain = Number(course.montant_livreur) > 0 ? Number(course.montant_livreur) : (prix ? Math.round(prix * 0.7) : null);
             const commission = Number(course.commission_silga) > 0 ? Number(course.commission_silga) : (prix ? Math.round(prix * 0.3) : null);
             return (
