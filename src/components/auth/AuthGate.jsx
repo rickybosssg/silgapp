@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { base44, detectedToken } from "@/api/base44Client";
+import { base44, detectedToken, reinitClientWithStoredToken } from "@/api/base44Client";
 import { Truck } from "lucide-react";
 import AppMaintenanceGate from "@/components/admin/AppMaintenanceGate";
 
@@ -23,13 +23,16 @@ export default function AuthGate({ children, onLivreur, onClient }) {
     let mounted = true;
 
     async function check() {
-      // Si le SDK n'a pas de token mais localStorage en a un → reload propre
+      // Si le SDK n'a pas de token mais localStorage en a un →
+      // réinitialiser le client SANS reload (évite la boucle APK Android)
       if (!detectedToken) {
-        const storedToken = localStorage.getItem('base44_access_token') || localStorage.getItem('access_token');
-        if (storedToken && storedToken.length > 10) {
-          window.location.reload();
+        const freshToken = reinitClientWithStoredToken();
+        if (!freshToken) {
+          // Vraiment pas de token nulle part → login
+          setState("unauthenticated");
           return;
         }
+        console.log('[AuthGate] Token récupéré depuis localStorage sans reload');
       }
 
       const isAuth = await base44.auth.isAuthenticated();

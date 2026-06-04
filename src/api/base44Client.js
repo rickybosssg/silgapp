@@ -29,7 +29,7 @@ const getToken = () => {
       }
     } catch(e) {}
   }
-  // Fallback : lire depuis URL actuelle (si main.jsx n'a pas encore nettoyé)
+  // Fallback : lire depuis URL actuelle
   try {
     const urlParams = new URLSearchParams(window.location.search);
     const t = urlParams.get('access_token');
@@ -69,14 +69,44 @@ try {
 const serverUrl = cap ? APP_PUBLIC_URL : '';
 const appBaseUrl = APP_PUBLIC_URL;
 
-export const base44 = createClient({
+const clientConfig = {
   appId: getAppId(),
-  token,
   functionsVersion: getFunctionsVersion(),
   serverUrl,
   requiresAuth: false,
   appBaseUrl,
+};
+
+export const base44 = createClient({
+  ...clientConfig,
+  token,
 });
 
 // Exposer le token détecté pour diagnostic
 export const detectedToken = token;
+
+/**
+ * Réinitialise le client Base44 avec le token présent dans localStorage.
+ * Utilisé par AuthGate pour éviter un window.location.reload() après login.
+ * Retourne le token trouvé, ou null si aucun token disponible.
+ */
+export const reinitClientWithStoredToken = () => {
+  const freshToken = getToken();
+  console.log('[base44Client] reinitClientWithStoredToken — token:', freshToken ? 'trouvé' : 'absent');
+  if (freshToken) {
+    try {
+      // Le SDK Base44 expose setToken() pour mettre à jour le token sans recréer le client
+      if (typeof base44.auth?.setToken === 'function') {
+        base44.auth.setToken(freshToken);
+        console.log('[base44Client] setToken() appelé avec succès');
+      } else {
+        // Fallback : écrire directement sur l'objet interne si setToken n'existe pas
+        base44._token = freshToken;
+        console.log('[base44Client] _token mis à jour directement');
+      }
+    } catch(e) {
+      console.error('[base44Client] Erreur reinit:', e);
+    }
+  }
+  return freshToken;
+};
