@@ -265,6 +265,7 @@ function AppWithProviders() {
   return (
     <QueryClientProvider client={queryClientInstance}>
       <App />
+      <Toaster />
     </QueryClientProvider>
   );
 }
