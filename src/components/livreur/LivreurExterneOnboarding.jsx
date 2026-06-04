@@ -78,17 +78,10 @@ function EcranGPS({ livreurId, onGpsOk }) {
       },
       () => {
         setLoading(false);
-        toast.error("Permission GPS refusée");
+        toast.error("Permission GPS refusée – obligatoire pour utiliser l'application");
       },
       { enableHighAccuracy: true, timeout: 15000 }
     );
-  };
-
-  const handleSansGPS = () => {
-    // Marquer GPS comme "tenté" pour ne pas rebloquer à chaque connexion
-    try { localStorage.setItem(GPS_KEY(livreurId), "true"); } catch (_) {}
-    toast("⚠️ GPS non activé — vous ne serez pas visible sur la carte");
-    onGpsOk(null);
   };
 
   return (
@@ -98,14 +91,14 @@ function EcranGPS({ livreurId, onGpsOk }) {
           <span className="text-5xl">📍</span>
         </div>
         <div>
-          <p className="text-2xl font-black text-white mb-2">Activer le GPS</p>
+          <p className="text-2xl font-black text-white mb-2">GPS Obligatoire</p>
           <p className="text-sm text-gray-400 leading-relaxed">
             Activez votre GPS pour recevoir des courses et être visible sur la carte.
           </p>
         </div>
         <div className="bg-amber-950/50 border border-amber-700 rounded-2xl p-4">
           <p className="text-xs text-amber-400 leading-relaxed">
-            ⚠️ Sans GPS, vous ne serez pas visible sur la carte et ne pourrez pas recevoir de courses.
+            ⚠️ Sans GPS, vous ne pourrez pas recevoir de courses.
           </p>
         </div>
         <button
@@ -116,13 +109,6 @@ function EcranGPS({ livreurId, onGpsOk }) {
           {loading ? (
             <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Activation...</>
           ) : "📍 Activer le GPS"}
-        </button>
-        <button
-          onClick={handleSansGPS}
-          disabled={loading}
-          className="w-full h-10 rounded-2xl border border-zinc-700 text-gray-400 text-sm font-semibold active:scale-95 transition-all disabled:opacity-40"
-        >
-          Continuer sans GPS →
         </button>
         <p className="text-xs text-gray-600">Appuyez sur "Autoriser" lorsque l'appareil vous le demande</p>
       </div>
