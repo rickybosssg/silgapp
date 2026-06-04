@@ -2,10 +2,6 @@
   "appId": "com.silgapp.app",
   "appName": "SILGAPP",
   "webDir": "dist",
-  "server": {
-    "url": "https://silga-dispatch-go.base44.app",
-    "cleartext": false
-  },
   "android": {
     "allowMixedContent": false,
     "captureInput": true,
