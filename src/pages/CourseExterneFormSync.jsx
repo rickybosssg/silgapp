@@ -89,21 +89,21 @@ export default function CourseExterneFormSync() {
 
   const [formData, setFormData] = useState(initialData);
 
-  // Pré-remplir depuis profil si pas de brouillon
+  // Pré-remplir depuis profil si pas de brouillon — UNE SEULE FOIS au mount
   useEffect(() => {
     if (clientProfil && !draft) {
       setFormData((prev) => ({
         ...prev,
         client_nom: clientProfil.nom || "",
         client_telephone: clientProfil.telephone || "",
-        // Pour "recevoir" : arrivée auto = position client si dispo (jamais inconnue)
         gps_arrivee_lat: prev.type_course === "recevoir" ? (clientGpsLat || prev.gps_arrivee_lat) : prev.gps_arrivee_lat,
         gps_arrivee_lng: prev.type_course === "recevoir" ? (clientGpsLng || prev.gps_arrivee_lng) : prev.gps_arrivee_lng,
         adresse_arrivee: prev.type_course === "recevoir" ? (clientAdresse || prev.adresse_arrivee || "Position GPS client") : prev.adresse_arrivee,
         livraisonGPS: prev.type_course === "recevoir" && !!clientGpsLat ? true : prev.livraisonGPS,
       }));
     }
-  }, [clientProfil]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // ✅ Exécuté UNE fois au mount uniquement
 
   // Sauvegarder l'étape dans localStorage
   useEffect(() => {

@@ -68,31 +68,19 @@ export default function CourseStepForm({
   const progress = ((step + 1) / totalSteps) * 100;
 
   // Auto-activer GPS expéditeur si disponible (flux "recevoir")
-  // Utilise des refs pour éviter la boucle infinie : formData.recuperationGPS changerait
-  // formData → re-déclencherait l'effet → boucle React #185
-  const recuperationGPSRef = useRef(formData.recuperationGPS);
-  useEffect(() => { recuperationGPSRef.current = formData.recuperationGPS; }, [formData.recuperationGPS]);
+  // IMPORTANT : désactivé pour éviter boucle React #185
+  // La logique est maintenant gérée directement dans le UI (bouton toggle étape 2)
 
-  useEffect(() => {
-    const isRecevoir = formData.type_course === "recevoir";
-    const gpsDispo = !!(formData.expediteur_gps_lat && formData.expediteur_gps_lng && formData.expediteur_gps_available);
-    if (isRecevoir && gpsDispo && !recuperationGPSRef.current) {
-      setFormData(prev => ({
-        ...prev,
-        recuperationGPS: true,
-        adresse_depart: prev.adresse_depart && prev.adresse_depart !== "" ? prev.adresse_depart : "Position GPS de l'expéditeur",
-      }));
-    }
-  }, [formData.expediteur_gps_lat, formData.expediteur_gps_lng, formData.expediteur_gps_available, formData.type_course]);
-
-  // Sauvegarder le brouillon
+  // Sauvegarder le brouillon — uniquement si changement significatif
+  // Utilise JSON.stringify pour éviter les boucles sur des changements de référence mineurs
+  const formDataStr = JSON.stringify(formData);
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
+      localStorage.setItem(STORAGE_KEY, formDataStr);
     } catch (err) {
       console.error("Erreur sauvegarde brouillon:", err);
     }
-  }, [formData]);
+  }, [formDataStr]); // ✅ Stable : dépend de la string, pas de l'objet
 
   // ─── Vérification expéditeur ───────────────────────────────────────────────
   const verifyExpediteur = async () => {
