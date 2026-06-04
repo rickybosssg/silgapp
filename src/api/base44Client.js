@@ -1,13 +1,12 @@
 import { createClient } from '@base44/sdk';
 import { APP_PUBLIC_URL, BASE44_APP_ID } from '@/lib/app-params';
 
-// Sur Capacitor, écouter les deep links entrants (retour OAuth après login)
-// Base44 redirige vers https://silga-dispatch-go.base44.app/?access_token=XXX
-// Le plugin @capacitor/app intercepte cette URL et la passe ici
-(async () => {
-  try {
-    if (typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.()) {
-      const { App } = await import('@capacitor/app');
+// Deep link listener — installé APRÈS le chargement du DOM pour éviter
+// toute race condition avec React sur Android WebView (cause React #185)
+if (typeof window !== 'undefined') {
+  window.addEventListener('DOMContentLoaded', () => {
+    if (!window.Capacitor?.isNativePlatform?.()) return;
+    import('@capacitor/app').then(({ App }) => {
       App.addListener('appUrlOpen', (data) => {
         console.log('[DeepLink] URL reçue:', data.url);
         try {
@@ -17,7 +16,6 @@ import { APP_PUBLIC_URL, BASE44_APP_ID } from '@/lib/app-params';
             console.log('[DeepLink] Token capturé, stockage...');
             localStorage.setItem('base44_access_token', token);
             localStorage.setItem('access_token', token);
-            // Recharger l'app pour que createClient() récupère le token
             window.location.href = '/';
           }
         } catch (e) {
@@ -25,11 +23,11 @@ import { APP_PUBLIC_URL, BASE44_APP_ID } from '@/lib/app-params';
         }
       });
       console.log('[DeepLink] Listener appUrlOpen installé');
-    }
-  } catch (e) {
-    console.warn('[DeepLink] Impossible d\'installer le listener:', e);
-  }
-})();
+    }).catch((e) => {
+      console.warn('[DeepLink] Impossible d\'installer le listener:', e);
+    });
+  });
+}
 
 // Lire les paramètres nécessaires sans importer appParams (singleton problématique)
 const getAppId = () => {
