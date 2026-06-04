@@ -236,5 +236,15 @@ export default function AuthGate({ children, onLivreur, onClient }) {
   }
 
   // Livreur → rendu géré par App.jsx via onLivreur (le gate est dans LivreurApp/LivreurExterneApp)
-  return null;
+  // Retourner un écran de chargement au lieu de null pour éviter React error #185
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-background">
+      <div className="text-center space-y-4">
+        <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+          <Truck className="w-8 h-8 text-primary animate-pulse" />
+        </div>
+        <p className="text-sm text-muted-foreground">Chargement...</p>
+      </div>
+    </div>
+  );
 }
