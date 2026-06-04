@@ -25,6 +25,7 @@ function haversine(lat1, lon1, lat2, lon2) {
 function ETABadge({ course, colisRecupere }) {
   const [livreurPos, setLivreurPos] = useState(null);
 
+  // ✅ CORRECTION : watchPosition créé UNE SEULE FOIS au mount
   useEffect(() => {
     if (!navigator.geolocation) return;
     const id = navigator.geolocation.watchPosition(
@@ -32,8 +33,12 @@ function ETABadge({ course, colisRecupere }) {
       null,
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
     );
-    return () => navigator.geolocation.clearWatch(id);
-  }, []);
+    console.log(`[ETABadge] Watch GPS démarré pour course ${course.id}`);
+    return () => {
+      navigator.geolocation.clearWatch(id);
+      console.log(`[ETABadge] Watch GPS nettoyé pour course ${course.id}`);
+    };
+  }, [course.id]); // ✅ Dépend de course.id uniquement
 
   // Cible : vers la récupération si colis pas encore pris, sinon vers la livraison
   // Si destination inconnue → pas de cible GPS pour la livraison
@@ -473,6 +478,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             !colisRecupere ? (
               (course.gps_depart_lat && course.gps_depart_lng) && (
                 <NavigationGPS
+                  key={`nav-recup-${course.id}`}
                   phase="recuperation"
                   destLat={course.gps_depart_lat}
                   destLng={course.gps_depart_lng}
@@ -482,6 +488,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               )
             ) : (
               <NavigationGPS
+                key={`nav-livraison-${course.id}`}
                 phase="livraison"
                 destLat={course.gps_arrivee_lat}
                 destLng={course.gps_arrivee_lng}

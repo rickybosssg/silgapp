@@ -32,8 +32,12 @@ export default function ETADisplay({ livreurLat, livreurLng, targetLat, targetLn
   const isRecup = phase === "vers_recuperation";
   const prenom = livreurNom?.split(" ")[0] || "Le livreur";
 
+  // ✅ Logging pour debugging
+  console.log(`[ETADisplay] phase=${phase}, livreurLat=${livreurLat}, targetLat=${targetLat}`);
+
   // Afficher même sans GPS (message générique)
   if (!livreurLat || !livreurLng || !targetLat || !targetLng) {
+    console.log(`[ETADisplay] GPS manquant — affichage message générique`);
     return (
       <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3">
         <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
@@ -56,6 +60,8 @@ export default function ETADisplay({ livreurLat, livreurLng, targetLat, targetLn
 
   const dist = haversine(livreurLat, livreurLng, targetLat, targetLng);
   const eta = computeETA(dist);
+
+  console.log(`[ETADisplay] dist=${dist?.toFixed(2)}km, eta=${eta}min`);
 
   if (dist === null || eta === null) {
     return (
