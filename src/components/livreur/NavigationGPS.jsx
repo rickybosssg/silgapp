@@ -62,20 +62,25 @@ function dureeDepuis(isoDate) {
 function useDestinataireLive(telephone, enabled = true) {
   const [state, setState] = useState({ client: null, gps: null, connecte: false, gpsActif: false, lastUpdate: null, loading: true });
 
-  const fetchGps = async () => {
-    if (!telephone || !enabled) return;
-    const norm = normalizePhone(telephone);
-    const local = norm.startsWith("226") ? norm.slice(3) : norm;
+  // useRef pour stabiliser fetchGps et éviter recreations en boucle
+  const telephoneRef = useRef(telephone);
+  const enabledRef = useRef(enabled);
+  useEffect(() => { telephoneRef.current = telephone; }, [telephone]);
+  useEffect(() => { enabledRef.current = enabled; }, [enabled]);
 
-    // Essais successifs avec différents formats
-    const queries = [norm, local, telephone];
+  const fetchGps = useRef(async () => {
+    const tel = telephoneRef.current;
+    const en = enabledRef.current;
+    if (!tel || !en) return;
+    const norm = normalizePhone(tel);
+    const local = norm.startsWith("226") ? norm.slice(3) : norm;
+    const queries = [norm, local, tel];
     for (const q of queries) {
       try {
         const res = await base44.entities.ClientExterne.filter({ telephone: q });
         if (res?.length > 0) {
           const client = res[0];
           const gpsActif = !!(client.latitude && client.longitude);
-          // "connecté" = compte actif + GPS récent (< 5 min)
           const lastSeen = client.updated_date || client.created_date;
           const ageSec = lastSeen ? (Date.now() - new Date(lastSeen).getTime()) / 1000 : Infinity;
           const connecte = client.actif !== false && ageSec < 300;
@@ -92,15 +97,17 @@ function useDestinataireLive(telephone, enabled = true) {
       } catch (_) {}
     }
     setState(prev => ({ ...prev, loading: false }));
-  };
+  }).current;
 
   useEffect(() => {
-    if (!enabled || !telephone) return;
+    if (!enabled || !telephone) {
+      setState(prev => ({ ...prev, loading: false }));
+      return;
+    }
     fetchGps();
-    // Rafraîchir toutes les 5s pour le suivi temps réel
     const interval = setInterval(fetchGps, 5000);
     return () => clearInterval(interval);
-  }, [telephone, enabled]);
+  }, [telephone, enabled]); // stable car fetchGps est une ref
 
   return { ...state, refetch: fetchGps };
 }

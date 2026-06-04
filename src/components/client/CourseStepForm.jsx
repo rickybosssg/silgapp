@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,10 +68,15 @@ export default function CourseStepForm({
   const progress = ((step + 1) / totalSteps) * 100;
 
   // Auto-activer GPS expéditeur si disponible (flux "recevoir")
+  // Utilise des refs pour éviter la boucle infinie : formData.recuperationGPS changerait
+  // formData → re-déclencherait l'effet → boucle React #185
+  const recuperationGPSRef = useRef(formData.recuperationGPS);
+  useEffect(() => { recuperationGPSRef.current = formData.recuperationGPS; }, [formData.recuperationGPS]);
+
   useEffect(() => {
     const isRecevoir = formData.type_course === "recevoir";
     const gpsDispo = !!(formData.expediteur_gps_lat && formData.expediteur_gps_lng && formData.expediteur_gps_available);
-    if (isRecevoir && gpsDispo && !formData.recuperationGPS) {
+    if (isRecevoir && gpsDispo && !recuperationGPSRef.current) {
       setFormData(prev => ({
         ...prev,
         recuperationGPS: true,
