@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Truck } from "lucide-react";
@@ -42,11 +42,12 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [onboardingTermine, setOnboardingTermine] = useState(false);
   const [showMesInfos, setShowMesInfos] = useState(false);
 
-  // Pull-to-refresh
-  const { pulling, refreshing } = usePullToRefresh(async () => {
+  // Pull-to-refresh — mémoïsé pour éviter boucle infinie (deps de usePullToRefresh)
+  const handlePullRefresh = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
     await queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-  });
+  }, [queryClient]);
+  const { pulling, refreshing } = usePullToRefresh(handlePullRefresh);
 
 
   // ─── Profil livreur ───────────────────────────────────────────────────────
