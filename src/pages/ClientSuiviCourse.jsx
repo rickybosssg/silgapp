@@ -408,19 +408,22 @@ export default function ClientSuiviCourse() {
             const temps = isLivree ? dureeReelle : etaTempsReel;
 
             // === PRIX : TOUJOURS basé sur expéditeur → destinataire (règle SILGAPP) ===
-            // Distance tarifaire = GPS départ course → GPS arrivée course
-            const distCourse = haversineKm(maCourse.gps_depart_lat, maCourse.gps_depart_lng, maCourse.gps_arrivee_lat, maCourse.gps_arrivee_lng);
+            // Guard : si destination_inconnue, les GPS arrivée sont null → pas de calcul de distance
+            const hasArriveCoords = !maCourse.destination_inconnue
+              && maCourse.gps_arrivee_lat != null && maCourse.gps_arrivee_lng != null
+              && !isNaN(maCourse.gps_arrivee_lat) && !isNaN(maCourse.gps_arrivee_lng);
+            const distCourse = hasArriveCoords
+              ? haversineKm(maCourse.gps_depart_lat, maCourse.gps_depart_lng, maCourse.gps_arrivee_lat, maCourse.gps_arrivee_lng)
+              : null;
             const isFinal = isLivree && maCourse.prix_final > 0;
             let prix = 0;
             if (isFinal) {
-              // Prix officiel déjà calculé et stocké — appliquer minimum 1000 F
               prix = Math.max(maCourse.prix_final, PRIX_MIN);
-            } else if (distCourse && distCourse > 0) {
-              // Règle SILGAPP : ≤10km = 1000 F, >10km = distance × 100 F
+            } else if (distCourse != null && distCourse > 0) {
               if (distCourse <= 10) {
-                prix = PRIX_MIN; // 1000 F pour ≤10km
+                prix = PRIX_MIN;
               } else {
-                prix = Math.max(Math.round(distCourse * tarifKm), PRIX_MIN); // >10km = distance × tarif_km
+                prix = Math.max(Math.round(distCourse * tarifKm), PRIX_MIN);
               }
             } else if (maCourse.prix_estimate > 0) {
               prix = Math.max(maCourse.prix_estimate, PRIX_MIN);
@@ -599,11 +602,15 @@ export default function ClientSuiviCourse() {
                   {(() => {
                     const countryDataFinal = countries.find(c => c.code === maCourse.country_code);
                     const tarifKmFinal = countryDataFinal?.prix_par_km || 100;
-                    const distFinal = maCourse.distance_reelle_km
-                      || haversineKm(maCourse.latitude_recuperation, maCourse.longitude_recuperation, maCourse.latitude_livraison, maCourse.longitude_livraison)
-                      || null;
+                    // Guard : éviter NaN si coordonnées GPS nulles (ex: destination_inconnue)
+                    const haversineOrNull = (a, b, c, d) =>
+                      (a != null && b != null && c != null && d != null && !isNaN(a) && !isNaN(b) && !isNaN(c) && !isNaN(d))
+                        ? haversineKm(a, b, c, d) : null;
+                    const distFinal = maCourse.distance_reelle_km > 0
+                      ? maCourse.distance_reelle_km
+                      : haversineOrNull(maCourse.latitude_recuperation, maCourse.longitude_recuperation, maCourse.latitude_livraison, maCourse.longitude_livraison);
                     // Règle obligatoire : minimum global SILGAPP = 1 000 FCFA
-                    const prixBrutFinal = maCourse.prix_final > 0 ? maCourse.prix_final : (distFinal > 0 ? Math.round(distFinal * tarifKmFinal) : null);
+                    const prixBrutFinal = maCourse.prix_final > 0 ? maCourse.prix_final : (distFinal != null && distFinal > 0 ? Math.round(distFinal * tarifKmFinal) : null);
                     const prixFinal = prixBrutFinal > 0 ? Math.max(prixBrutFinal, 1000) : null;
                     const dureeMs = maCourse.heure_livraison && maCourse.heure_recuperation
                       ? new Date(maCourse.heure_livraison) - new Date(maCourse.heure_recuperation)
