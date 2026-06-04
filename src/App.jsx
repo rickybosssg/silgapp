@@ -3,7 +3,6 @@ import SplashScreen from './components/SplashScreen';
 import { Toaster } from '@/components/ui/toaster';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
 import { queryClientInstance } from '@/lib/query-client';
 import PageNotFound from './lib/PageNotFound';
 import AuthGate from './components/auth/AuthGate.jsx';
@@ -59,34 +58,17 @@ const StatsTelechargementsAdmin = lazy(() => import('./pages/StatsTelechargement
 const GestionPublicites = lazy(() => import('./pages/GestionPublicites.jsx'));
 const PolitiqueConfidentialite = lazy(() => import('./pages/PolitiqueConfidentialite.jsx'));
 
-function AnimatedRoutes({ children }) {
-  // Variables définies DANS la fonction pour éviter init issues
-  const location = useLocation();
-  const pageVariants = {
-    initial: { opacity: 0, x: 24 },
-    animate: { opacity: 1, x: 0 },
-    exit: { opacity: 0, x: -24 },
-  };
-  const pageTransition = { duration: 0.22, ease: "easeInOut" };
-  return (
-    <AnimatePresence mode="wait" initial={false}>
-      <motion.div
-        key={location.pathname}
-        variants={pageVariants}
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        transition={pageTransition}
-        style={{ width: "100%", minHeight: "100%" }}
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
-  );
-}
+// AnimatedRoutes supprimé — useLocation() dans un composant imbriqué cause React #185 sur Android
 
 function AppContent() {
-  // Hook to apply system theme preference
+  // TOUS LES HOOKS EN PREMIER — avant tout return conditionnel (règle React #185)
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [livreurProfil, setLivreurProfil] = useState(null);
+  const [isClient, setIsClient] = useState(false);
+  const [reseau, setReseau] = useState(null);
+
+  // Thème système
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const applyTheme = (e) => {
@@ -100,10 +82,8 @@ function AppContent() {
     mediaQuery.addEventListener('change', applyTheme);
     return () => mediaQuery.removeEventListener('change', applyTheme);
   }, []);
-  
-  // Hook for Android hardware back button
-  const navigate = useNavigate();
-  const location = useLocation();
+
+  // Bouton retour Android
   useEffect(() => {
     const handleBackButton = (e) => {
       e.preventDefault();
@@ -111,20 +91,13 @@ function AppContent() {
         navigate(-1);
       }
     };
-    
     document.addEventListener('backbutton', handleBackButton, false);
     return () => document.removeEventListener('backbutton', handleBackButton);
   }, [navigate, location]);
-  
-  const [livreurProfil, setLivreurProfil] = useState(null);
-  const [isClient, setIsClient] = useState(false);
-  const [reseau, setReseau] = useState(null);
 
   // 🌍 ROUTES PUBLIQUES - ACCESSIBLES SANS AUTHENTIFICATION (PRIORITÉ ABSOLUE)
-  // Ces routes doivent être vérifiées AVANT toute logique d'authentification
-  const isPublicRoute = location.pathname === '/telecharger' || 
+  const isPublicRoute = location.pathname === '/telecharger' ||
                         location.pathname === '/privacy-policy' ||
-                        location.pathname === '/suivi-public/:token' || 
                         location.pathname.startsWith('/suivi-public/');
 
   if (isPublicRoute) {
@@ -213,39 +186,39 @@ function AppContent() {
         <Route element={<AppLayout reseau={reseau} />}>
           {reseau === "interne" ? (
             <>
-              <Route path="/" element={<AnimatedRoutes><Dashboard /></AnimatedRoutes>} />
-              <Route path="/nouvelle-course" element={<AnimatedRoutes><NouvelleCourse /></AnimatedRoutes>} />
-              <Route path="/carte" element={<AnimatedRoutes><CarteLivreurs /></AnimatedRoutes>} />
-              <Route path="/courses" element={<AnimatedRoutes><ToutesCourses /></AnimatedRoutes>} />
-              <Route path="/livreurs" element={<AnimatedRoutes><Livreurs /></AnimatedRoutes>} />
-              <Route path="/rapport" element={<AnimatedRoutes><RapportJour /></AnimatedRoutes>} />
-              <Route path="/recapitulatif" element={<AnimatedRoutes><RecapitulatifAdmin reseau="interne" /></AnimatedRoutes>} />
-              <Route path="/admin/externe" element={<AnimatedRoutes><DashboardAdminExterne /></AnimatedRoutes>} />
-              <Route path="/admin/externe/stats-telechargements" element={<AnimatedRoutes><StatsTelechargementsAdmin /></AnimatedRoutes>} />
-              <Route path="/admin/externe/dus-livreurs" element={<AnimatedRoutes><DusLivreursExternes /></AnimatedRoutes>} />
-              <Route path="/admin/externe/twilio-sandbox" element={<AnimatedRoutes><TwilioSandboxMonitor /></AnimatedRoutes>} />
-              <Route path="/admin/externe/clients" element={<AnimatedRoutes><ClientsExternesPage /></AnimatedRoutes>} />
-              <Route path="/admin/publicites" element={<AnimatedRoutes><GestionPublicites /></AnimatedRoutes>} />
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/nouvelle-course" element={<NouvelleCourse />} />
+              <Route path="/carte" element={<CarteLivreurs />} />
+              <Route path="/courses" element={<ToutesCourses />} />
+              <Route path="/livreurs" element={<Livreurs />} />
+              <Route path="/rapport" element={<RapportJour />} />
+              <Route path="/recapitulatif" element={<RecapitulatifAdmin reseau="interne" />} />
+              <Route path="/admin/externe" element={<DashboardAdminExterne />} />
+              <Route path="/admin/externe/stats-telechargements" element={<StatsTelechargementsAdmin />} />
+              <Route path="/admin/externe/dus-livreurs" element={<DusLivreursExternes />} />
+              <Route path="/admin/externe/twilio-sandbox" element={<TwilioSandboxMonitor />} />
+              <Route path="/admin/externe/clients" element={<ClientsExternesPage />} />
+              <Route path="/admin/publicites" element={<GestionPublicites />} />
             </>
           ) : (
             <>
-              <Route path="/" element={<AnimatedRoutes><DashboardExterne /></AnimatedRoutes>} />
-              <Route path="/carte" element={<AnimatedRoutes><CarteLivreursExterne /></AnimatedRoutes>} />
-              <Route path="/courses" element={<AnimatedRoutes><ToutesCoursesExternes /></AnimatedRoutes>} />
-              <Route path="/livreurs" element={<AnimatedRoutes><LivreursExternes /></AnimatedRoutes>} />
-              <Route path="/rapport" element={<AnimatedRoutes><RapportJourExterne /></AnimatedRoutes>} />
-              <Route path="/recapitulatif" element={<AnimatedRoutes><RecapitulatifAdmin reseau="externe" /></AnimatedRoutes>} />
-              <Route path="/admin/externe/dus-livreurs" element={<AnimatedRoutes><DusLivreursExternes /></AnimatedRoutes>} />
-              <Route path="/admin/externe/clients" element={<AnimatedRoutes><ClientsExternesPage /></AnimatedRoutes>} />
-              <Route path="/admin/externe/stats-telechargements" element={<AnimatedRoutes><StatsTelechargementsAdmin /></AnimatedRoutes>} />
-              <Route path="/admin/gestion-pays" element={<AnimatedRoutes><GestionPays /></AnimatedRoutes>} />
-              <Route path="/admin/global" element={<AnimatedRoutes><AdminGlobal /></AnimatedRoutes>} />
-              <Route path="/admin/pays/:code" element={<AnimatedRoutes><DashboardPays /></AnimatedRoutes>} />
-              <Route path="/admin/pays/:code/carte" element={<AnimatedRoutes><CarteLivreursExterne /></AnimatedRoutes>} />
-              <Route path="/admin/publicites" element={<AnimatedRoutes><GestionPublicites /></AnimatedRoutes>} />
+              <Route path="/" element={<DashboardExterne />} />
+              <Route path="/carte" element={<CarteLivreursExterne />} />
+              <Route path="/courses" element={<ToutesCoursesExternes />} />
+              <Route path="/livreurs" element={<LivreursExternes />} />
+              <Route path="/rapport" element={<RapportJourExterne />} />
+              <Route path="/recapitulatif" element={<RecapitulatifAdmin reseau="externe" />} />
+              <Route path="/admin/externe/dus-livreurs" element={<DusLivreursExternes />} />
+              <Route path="/admin/externe/clients" element={<ClientsExternesPage />} />
+              <Route path="/admin/externe/stats-telechargements" element={<StatsTelechargementsAdmin />} />
+              <Route path="/admin/gestion-pays" element={<GestionPays />} />
+              <Route path="/admin/global" element={<AdminGlobal />} />
+              <Route path="/admin/pays/:code" element={<DashboardPays />} />
+              <Route path="/admin/pays/:code/carte" element={<CarteLivreursExterne />} />
+              <Route path="/admin/publicites" element={<GestionPublicites />} />
             </>
           )}
-          <Route path="/notifications" element={<AnimatedRoutes><Notifications /></AnimatedRoutes>} />
+          <Route path="/notifications" element={<Notifications />} />
         </Route>
         <Route path="*" element={<PageNotFound />} />
       </Routes>
