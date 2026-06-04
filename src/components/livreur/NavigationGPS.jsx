@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Navigation, MapPin, Clock, Ruler, Eye, WifiOff, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { base44 } from "@/api/base44Client";
@@ -135,21 +135,37 @@ export default function NavigationGPS({
     useDestinataireLive(isLivraison ? destinataireTelephone : null, isLivraison);
 
   // Destination effective : GPS destinataire si disponible (PRIORITÉ ABSOLUE), sinon coordonnées fixes
-  const effectiveLat = (isLivraison && destGps?.lat) ? destGps.lat : destLat;
-  const effectiveLng = (isLivraison && destGps?.lng) ? destGps.lng : destLng;
+  // useMemo pour stabiliser les références et éviter les re-renders infinis
+  const effectiveLat = useMemo(
+    () => (isLivraison && destGps?.lat) ? destGps.lat : (destLat || null),
+    [isLivraison, destGps?.lat, destLat]
+  );
+  const effectiveLng = useMemo(
+    () => (isLivraison && destGps?.lng) ? destGps.lng : (destLng || null),
+    [isLivraison, destGps?.lng, destLng]
+  );
   const usesLiveGps = isLivraison && !!(destGps?.lat && destGps?.lng);
 
   // CRITICAL : canNavigate doit être vrai si le GPS du destinataire existe, même si destinationInconnue=true
   const canNavigate = !!(effectiveLat && effectiveLng);
 
-  // Suivi GPS livreur (watchPosition)
+  // Ref pour éviter re-création du watchPosition à chaque render
+  const effectiveLatRef = useRef(effectiveLat);
+  const effectiveLngRef = useRef(effectiveLng);
+  useEffect(() => { effectiveLatRef.current = effectiveLat; }, [effectiveLat]);
+  useEffect(() => { effectiveLngRef.current = effectiveLng; }, [effectiveLng]);
+
+  // Suivi GPS livreur (watchPosition) — créé UNE SEULE FOIS, lit les coords via ref
   useEffect(() => {
     if (!navigator.geolocation) return;
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
         const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLivreurPos(p);
-        const d = haversine(p.lat, p.lng, effectiveLat, effectiveLng);
+        const lat = effectiveLatRef.current;
+        const lng = effectiveLngRef.current;
+        if (!lat || !lng) return; // Destination inconnue → pas de calcul
+        const d = haversine(p.lat, p.lng, lat, lng);
         if (d !== null) {
           setDist(d);
           setEta(computeETA(d));
@@ -159,7 +175,7 @@ export default function NavigationGPS({
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
     );
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [effectiveLat, effectiveLng]);
+  }, []); // Intentionnellement vide — les coords sont lues via ref
 
   const isRecup = phase === "recuperation";
 

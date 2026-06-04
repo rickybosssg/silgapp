@@ -36,8 +36,13 @@ function ETABadge({ course, colisRecupere }) {
   }, []);
 
   // Cible : vers la récupération si colis pas encore pris, sinon vers la livraison
-  const targetLat = colisRecupere ? (course.gps_arrivee_lat || course.latitude_arrivee_livraison) : course.gps_depart_lat;
-  const targetLng = colisRecupere ? (course.gps_arrivee_lng || course.longitude_arrivee_livraison) : course.gps_depart_lng;
+  // Si destination inconnue → pas de cible GPS pour la livraison
+  const targetLat = colisRecupere
+    ? (course.destination_inconnue ? null : (course.gps_arrivee_lat || course.latitude_arrivee_livraison))
+    : course.gps_depart_lat;
+  const targetLng = colisRecupere
+    ? (course.destination_inconnue ? null : (course.gps_arrivee_lng || course.longitude_arrivee_livraison))
+    : course.gps_depart_lng;
 
   if (!livreurPos || !targetLat || !targetLng) return null;
 
