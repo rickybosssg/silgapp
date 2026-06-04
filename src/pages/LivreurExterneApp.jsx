@@ -58,7 +58,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     enabled: !!initialProfil?.id,
     refetchInterval: 2000,
     staleTime: 0,
-    cacheTime: 0,
+    gcTime: 0,
   });
 
   // Heartbeat automatique
@@ -99,7 +99,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     initialData: [],
     refetchInterval: 1000,
     staleTime: 0,
-    cacheTime: 0,
+    gcTime: 0,
   });
 
   // ─── Course en attente de réponse ─────────────────────────────────────────
