@@ -1,7 +1,28 @@
 import React, { useState, useEffect } from "react";
 import { base44, detectedToken, reinitClientWithStoredToken } from "@/api/base44Client";
+import { APP_PUBLIC_URL } from "@/lib/app-params";
 import { Truck } from "lucide-react";
 import AppMaintenanceGate from "@/components/admin/AppMaintenanceGate";
+
+// Ouvre le login — sur Capacitor, utilise le navigateur système pour éviter
+// que la WebView principale reçoive le redirect et casse le localStorage local
+const openLogin = async () => {
+  const isCapacitor = !!(window.Capacitor?.isNativePlatform?.());
+  if (isCapacitor) {
+    try {
+      const { Browser } = await import('@capacitor/browser');
+      // Construire l'URL de login avec la redirect_uri correcte
+      const loginUrl = `https://app.base44.com/login?app_id=${import.meta.env.VITE_BASE44_APP_ID || '6a0ec08f3af5e1d1284254c1'}&redirect_uri=${encodeURIComponent(APP_PUBLIC_URL)}`;
+      console.log('[AuthGate] Ouverture login Capacitor Browser:', loginUrl);
+      await Browser.open({ url: loginUrl, windowName: '_blank' });
+      return;
+    } catch (e) {
+      console.warn('[AuthGate] Capacitor Browser indisponible, fallback:', e);
+    }
+  }
+  // Web standard
+  base44.auth.redirectToLogin();
+};
 
 /**
  * AuthGate — routage post-connexion Base44
@@ -154,7 +175,7 @@ export default function AuthGate({ children, onLivreur, onClient }) {
   }
 
   if (state === "unauthenticated") {
-    base44.auth.redirectToLogin();
+    openLogin();
     return null;
   }
 

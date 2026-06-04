@@ -1,6 +1,36 @@
 import { createClient } from '@base44/sdk';
 import { APP_PUBLIC_URL, BASE44_APP_ID } from '@/lib/app-params';
 
+// Sur Capacitor, écouter les deep links entrants (retour OAuth après login)
+// Base44 redirige vers https://silga-dispatch-go.base44.app/?access_token=XXX
+// Le plugin @capacitor/app intercepte cette URL et la passe ici
+(async () => {
+  try {
+    if (typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.()) {
+      const { App } = await import('@capacitor/app');
+      App.addListener('appUrlOpen', (data) => {
+        console.log('[DeepLink] URL reçue:', data.url);
+        try {
+          const url = new URL(data.url);
+          const token = url.searchParams.get('access_token');
+          if (token && token.length > 10 && token !== 'null') {
+            console.log('[DeepLink] Token capturé, stockage...');
+            localStorage.setItem('base44_access_token', token);
+            localStorage.setItem('access_token', token);
+            // Recharger l'app pour que createClient() récupère le token
+            window.location.href = '/';
+          }
+        } catch (e) {
+          console.error('[DeepLink] Erreur parsing URL:', e);
+        }
+      });
+      console.log('[DeepLink] Listener appUrlOpen installé');
+    }
+  } catch (e) {
+    console.warn('[DeepLink] Impossible d\'installer le listener:', e);
+  }
+})();
+
 // Lire les paramètres nécessaires sans importer appParams (singleton problématique)
 const getAppId = () => {
   try {

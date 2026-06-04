@@ -2,6 +2,12 @@
   "appId": "com.silgapp.app",
   "appName": "SILGAPP",
   "webDir": "dist",
+  "server": {
+    "allowNavigation": [
+      "silga-dispatch-go.base44.app",
+      "app.base44.com"
+    ]
+  },
   "android": {
     "allowMixedContent": false,
     "captureInput": true,
