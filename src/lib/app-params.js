@@ -81,10 +81,9 @@ const getAppParams = () => {
 		}
 	}
 
-	// Dans Capacitor, TOUJOURS utiliser l'URL publique comme fromUrl (redirect_uri OAuth)
-	// file:// n'est pas une redirect_uri valide pour Base44 OAuth → le token reviendrait sur le mauvais domaine
+	// Dans Capacitor, ne jamais utiliser localhost comme fromUrl — utiliser l'URL publique de l'app
 	const safeHref = isCapacitor
-		? APP_PUBLIC_URL
+		? (typeof window !== 'undefined' ? window.location.href : APP_PUBLIC_URL)
 		: (typeof window !== 'undefined' ? window.location.href : '/');
 
 	// Ne jamais laisser appBaseUrl à null — le SDK Base44 l'utilise pour les appels API

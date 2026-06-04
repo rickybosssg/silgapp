@@ -3,20 +3,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Truck } from "lucide-react";
 import { toast } from "sonner";
+
+/**
+ * Calcule la distance entre 2 points GPS (formule Haversine)
+ */
 import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
-import LivreurHeader from "@/components/livreur/LivreurHeader";
-import LivreurStatsBanner from "@/components/livreur/LivreurStatsBanner";
-import LivreurStatutCard from "@/components/livreur/LivreurStatutCard";
-import EmptyStateAttente from "@/components/livreur/EmptyStateAttente";
-import CourseEnAttenteModal from "@/components/livreur/CourseEnAttenteModal";
-import CourseActiveCard from "@/components/livreur/CourseActiveCard";
-import LivreurHistorique from "@/components/livreur/LivreurHistorique";
-import CoursesEnPauseTab from "@/components/livreur/CoursesEnPauseTab";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { usePullToRefresh } from "@/hooks/usePullToRefresh";
-import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
-import VenusFloatingButton from "@/components/client/VenusFloatingButton";
-import AlertesLivreurModal from "@/components/livreur/AlertesLivreurModal";
 
 function calculerDistance(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -30,6 +21,19 @@ function calculerDistance(lat1, lon1, lat2, lon2) {
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
+import LivreurHeader from "@/components/livreur/LivreurHeader";
+import LivreurStatsBanner from "@/components/livreur/LivreurStatsBanner";
+import LivreurStatutCard from "@/components/livreur/LivreurStatutCard";
+import EmptyStateAttente from "@/components/livreur/EmptyStateAttente";
+import CourseEnAttenteModal from "@/components/livreur/CourseEnAttenteModal";
+import CourseActiveCard from "@/components/livreur/CourseActiveCard";
+import LivreurHistorique from "@/components/livreur/LivreurHistorique";
+import CoursesEnPauseTab from "@/components/livreur/CoursesEnPauseTab";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
+import VenusFloatingButton from "@/components/client/VenusFloatingButton";
+import AlertesLivreurModal from "@/components/livreur/AlertesLivreurModal";
 
 const saveLivreur = (id, data) => base44.functions.invoke('updateLivreur', { id, data });
 

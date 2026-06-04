@@ -1,34 +1,6 @@
 import { createClient } from '@base44/sdk';
 import { APP_PUBLIC_URL, BASE44_APP_ID } from '@/lib/app-params';
 
-// Deep link listener — installé APRÈS le chargement du DOM pour éviter
-// toute race condition avec React sur Android WebView (cause React #185)
-if (typeof window !== 'undefined') {
-  window.addEventListener('DOMContentLoaded', () => {
-    if (!window.Capacitor?.isNativePlatform?.()) return;
-    import('@capacitor/app').then(({ App }) => {
-      App.addListener('appUrlOpen', (data) => {
-        console.log('[DeepLink] URL reçue:', data.url);
-        try {
-          const url = new URL(data.url);
-          const token = url.searchParams.get('access_token');
-          if (token && token.length > 10 && token !== 'null') {
-            console.log('[DeepLink] Token capturé, stockage...');
-            localStorage.setItem('base44_access_token', token);
-            localStorage.setItem('access_token', token);
-            window.location.href = '/';
-          }
-        } catch (e) {
-          console.error('[DeepLink] Erreur parsing URL:', e);
-        }
-      });
-      console.log('[DeepLink] Listener appUrlOpen installé');
-    }).catch((e) => {
-      console.warn('[DeepLink] Impossible d\'installer le listener:', e);
-    });
-  });
-}
-
 // Lire les paramètres nécessaires sans importer appParams (singleton problématique)
 const getAppId = () => {
   try {
@@ -57,7 +29,7 @@ const getToken = () => {
       }
     } catch(e) {}
   }
-  // Fallback : lire depuis URL actuelle
+  // Fallback : lire depuis URL actuelle (si main.jsx n'a pas encore nettoyé)
   try {
     const urlParams = new URLSearchParams(window.location.search);
     const t = urlParams.get('access_token');
@@ -97,44 +69,14 @@ try {
 const serverUrl = cap ? APP_PUBLIC_URL : '';
 const appBaseUrl = APP_PUBLIC_URL;
 
-const clientConfig = {
+export const base44 = createClient({
   appId: getAppId(),
+  token,
   functionsVersion: getFunctionsVersion(),
   serverUrl,
   requiresAuth: false,
   appBaseUrl,
-};
-
-export const base44 = createClient({
-  ...clientConfig,
-  token,
 });
 
 // Exposer le token détecté pour diagnostic
 export const detectedToken = token;
-
-/**
- * Réinitialise le client Base44 avec le token présent dans localStorage.
- * Utilisé par AuthGate pour éviter un window.location.reload() après login.
- * Retourne le token trouvé, ou null si aucun token disponible.
- */
-export const reinitClientWithStoredToken = () => {
-  const freshToken = getToken();
-  console.log('[base44Client] reinitClientWithStoredToken — token:', freshToken ? 'trouvé' : 'absent');
-  if (freshToken) {
-    try {
-      // Le SDK Base44 expose setToken() pour mettre à jour le token sans recréer le client
-      if (typeof base44.auth?.setToken === 'function') {
-        base44.auth.setToken(freshToken);
-        console.log('[base44Client] setToken() appelé avec succès');
-      } else {
-        // Fallback : écrire directement sur l'objet interne si setToken n'existe pas
-        base44._token = freshToken;
-        console.log('[base44Client] _token mis à jour directement');
-      }
-    } catch(e) {
-      console.error('[base44Client] Erreur reinit:', e);
-    }
-  }
-  return freshToken;
-};

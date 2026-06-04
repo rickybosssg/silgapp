@@ -1,28 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { base44, detectedToken, reinitClientWithStoredToken } from "@/api/base44Client";
-import { APP_PUBLIC_URL } from "@/lib/app-params";
+import { base44, detectedToken } from "@/api/base44Client";
 import { Truck } from "lucide-react";
 import AppMaintenanceGate from "@/components/admin/AppMaintenanceGate";
-
-// Ouvre le login — sur Capacitor, utilise le navigateur système pour éviter
-// que la WebView principale reçoive le redirect et casse le localStorage local
-const openLogin = async () => {
-  const isCapacitor = !!(window.Capacitor?.isNativePlatform?.());
-  if (isCapacitor) {
-    try {
-      const { Browser } = await import('@capacitor/browser');
-      // Construire l'URL de login avec la redirect_uri correcte
-      const loginUrl = `https://app.base44.com/login?app_id=${import.meta.env.VITE_BASE44_APP_ID || '6a0ec08f3af5e1d1284254c1'}&redirect_uri=${encodeURIComponent(APP_PUBLIC_URL)}`;
-      console.log('[AuthGate] Ouverture login Capacitor Browser:', loginUrl);
-      await Browser.open({ url: loginUrl, windowName: '_blank' });
-      return;
-    } catch (e) {
-      console.warn('[AuthGate] Capacitor Browser indisponible, fallback:', e);
-    }
-  }
-  // Web standard
-  base44.auth.redirectToLogin();
-};
 
 /**
  * AuthGate — routage post-connexion Base44
@@ -44,16 +23,13 @@ export default function AuthGate({ children, onLivreur, onClient }) {
     let mounted = true;
 
     async function check() {
-      // Si le SDK n'a pas de token mais localStorage en a un →
-      // réinitialiser le client SANS reload (évite la boucle APK Android)
+      // Si le SDK n'a pas de token mais localStorage en a un → reload propre
       if (!detectedToken) {
-        const freshToken = reinitClientWithStoredToken();
-        if (!freshToken) {
-          // Vraiment pas de token nulle part → login
-          setState("unauthenticated");
+        const storedToken = localStorage.getItem('base44_access_token') || localStorage.getItem('access_token');
+        if (storedToken && storedToken.length > 10) {
+          window.location.reload();
           return;
         }
-        console.log('[AuthGate] Token récupéré depuis localStorage sans reload');
       }
 
       const isAuth = await base44.auth.isAuthenticated();
@@ -175,7 +151,7 @@ export default function AuthGate({ children, onLivreur, onClient }) {
   }
 
   if (state === "unauthenticated") {
-    openLogin();
+    base44.auth.redirectToLogin();
     return null;
   }
 
