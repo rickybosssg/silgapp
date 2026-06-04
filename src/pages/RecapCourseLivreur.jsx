@@ -104,7 +104,8 @@ export default function RecapCourseLivreur() {
   }
 
   // ── Données manquantes GPS ──────────────────────────────────────────────
-  const gpsManquant = !course.latitude_recuperation || !course.latitude_livraison;
+  // Pour destination_inconnue=true, latitude_livraison peut être null → ne pas bloquer
+  const gpsManquant = !course.destination_inconnue && (!course.latitude_recuperation || !course.latitude_livraison);
   if (gpsManquant) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-gray-50 p-6">
