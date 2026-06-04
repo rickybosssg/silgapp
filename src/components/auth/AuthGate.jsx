@@ -95,20 +95,7 @@ export default function AuthGate({ children, onLivreur, onClient }) {
         }
 
         // Compte valide → router vers l'app livreur
-        // Sur navigateur web : pré-remplir les clés GPS si absentes pour bypasser l'écran GPS obligatoire
-        // (Sur APK, le GPS est accessible — sur navigateur sans permission, on simule une position connue)
-        const gpsKey = `livreur_gps_active_${livreur.id}`;
-        const gpsPosKey = `livreur_gps_pos_${livreur.id}`;
-        if (!localStorage.getItem(gpsKey)) {
-          // Utiliser la dernière position connue du livreur si disponible, sinon une position par défaut
-          const fallbackPos = (livreur.latitude && livreur.longitude)
-            ? { lat: livreur.latitude, lng: livreur.longitude }
-            : { lat: 12.3569, lng: -1.5352 }; // Ouagadougou centre
-          try {
-            localStorage.setItem(gpsKey, "true");
-            localStorage.setItem(gpsPosKey, JSON.stringify(fallbackPos));
-          } catch (_) {}
-        }
+        // L'obligation GPS est gérée par LivreurExterneOnboarding (écran GPS obligatoire)
         onLivreur?.(livreur);
         if (!mounted) return;
         setState("livreur");
