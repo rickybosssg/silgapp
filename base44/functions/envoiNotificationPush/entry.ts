@@ -189,9 +189,16 @@ Deno.serve(async (req) => {
       },
       android: {
         priority: 'HIGH',
+        ttl: '86400s',
         notification: {
           click_action: APP_NOTIFICATIONS_URL,
           channel_id: ANDROID_CHANNEL_ID,
+          sound: 'default',
+          vibrate_timings: ['0s', '0.2s', '0.1s', '0.2s', '0.1s', '0.4s'],
+          default_sound: true,
+          default_vibrate_timings: false,
+          notification_priority: 'PRIORITY_HIGH',
+          visibility: 'PUBLIC',
         },
       },
       webpush: {

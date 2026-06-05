@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 /**
  * Déclenché par automation quand une CourseExterne est créée/mise à jour.
@@ -91,19 +91,50 @@ Deno.serve(async (req) => {
       return Response.json({ error: "Course non trouvée" }, { status: 404 });
     }
 
-    // Helper : résoudre un client par id OU par téléphone
+    // Indicatifs SILGAPP multi-pays
+    const COUNTRY_DIALCODES = [
+      { code: "226", len: 8 },  // BF
+      { code: "225", len: 10 }, // CI
+      { code: "228", len: 8 },  // TG
+      { code: "229", len: 8 },  // BJ
+      { code: "221", len: 9 },  // SN
+      { code: "223", len: 8 },  // ML
+      { code: "224", len: 9 },  // GN
+      { code: "227", len: 8 },  // NE
+    ];
+
+    // Génère toutes les variantes d'un numéro (tous pays)
+    function phoneVariants(num) {
+      const n = (num || "").replace(/\D/g, "");
+      if (!n) return [n];
+      const variants = new Set([n]);
+      for (const { code, len } of COUNTRY_DIALCODES) {
+        if (n.startsWith(code) && n.length === code.length + len) {
+          variants.add(n.slice(code.length));
+        }
+        if (n.length === len && !n.startsWith("0")) {
+          variants.add(code + n);
+        }
+        if (n.startsWith("0") && n.length === len + 1) {
+          variants.add(n.slice(1));
+          variants.add(code + n.slice(1));
+        }
+      }
+      return [...variants];
+    }
+
+    // Helper : résoudre un client par id OU par téléphone (multi-pays)
     const resolveClient = async (clientId, telephone) => {
       if (clientId) {
         try { return await base44.asServiceRole.entities.ClientExterne.get(clientId); } catch (_) {}
       }
       if (telephone) {
-        const tel = telephone.replace(/\D/g, "");
-        const telNorm = tel.startsWith("226") && tel.length === 11 ? "+" + tel : tel.length === 8 ? "+226" + tel : null;
-        if (telNorm) {
-          try {
-            const found = await base44.asServiceRole.entities.ClientExterne.filter({ telephone: telNorm });
-            if (found?.length > 0) return found[0];
-          } catch (_) {}
+        const variants = phoneVariants(telephone);
+        const results = await Promise.all(
+          variants.map(v => base44.asServiceRole.entities.ClientExterne.filter({ telephone: v }).catch(() => []))
+        );
+        for (const res of results) {
+          if (res?.length > 0) return res[0];
         }
       }
       return null;
@@ -143,6 +174,21 @@ Deno.serve(async (req) => {
       });
 
       console.log(`[notifyClientSync] ✅ Notif créée pour ${userEmail}: "${content.titre}"`);
+
+      // Envoi push FCM natif (son + vibration Android)
+      try {
+        await base44.functions.invoke("envoiNotificationPush", {
+          destinataire_email: userEmail,
+          titre: content.titre,
+          message: content.message,
+          type: content.type,
+          course_id: course.id,
+        });
+        console.log(`[notifyClientSync] 📲 Push FCM envoyé à ${userEmail}`);
+      } catch (pushErr) {
+        console.warn(`[notifyClientSync] ⚠️ Push FCM échoué (non bloquant): ${pushErr.message}`);
+      }
+
       return notif;
     };
 

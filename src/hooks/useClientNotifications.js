@@ -46,6 +46,8 @@ export function useClientNotifications(userEmail, onNotification) {
     registerPushToken(null, { email: userEmail }).catch(() => null);
 
     // S'abonner aux notifications temps réel
+    // Note : subscribeToNotifications appelle déjà showLocalNotification en interne
+    // → on gère uniquement le toast ici pour éviter le double déclenchement
     const unsub = subscribeToNotifications((notif) => {
       const isImportant = CLIENT_IMPORTANT_TYPES.includes(notif.type);
       const label = TYPE_LABELS[notif.type] || notif.titre;
@@ -59,12 +61,6 @@ export function useClientNotifications(userEmail, onNotification) {
       } else {
         toast.info(notif.titre, { description: notif.message, duration: 4000 });
       }
-
-      // showLocalNotification gère déjà le son + vibration pour les types importants
-      showLocalNotification(notif.titre, notif.message, {
-        tag: `silgapp-client-${notif.id}`,
-        data: { type: notif.type, course_id: notif.course_id },
-      });
 
       if (onNotification) onNotification(notif);
     }, userEmail);
