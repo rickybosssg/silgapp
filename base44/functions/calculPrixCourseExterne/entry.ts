@@ -40,9 +40,10 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Course introuvable' }, { status: 404 });
     }
 
-    // Distance tarifaire = GPS départ course → GPS arrivée course (expéditeur → destinataire)
-    if (!course.gps_depart_lat || !course.gps_depart_lng ||
-        !course.gps_arrivee_lat || !course.gps_arrivee_lng) {
+    // Vérification minimale : au moins une source de coordonnées de départ ET d'arrivée
+    const hasDepart = course.latitude_recuperation || course.gps_depart_lat;
+    const hasArrivee = course.latitude_livraison || course.latitude_arrivee_livraison || course.gps_arrivee_lat;
+    if (!hasDepart || !hasArrivee) {
       return Response.json({
         error: 'Positions GPS départ/arrivée de la course manquantes'
       }, { status: 400 });
@@ -68,11 +69,21 @@ Deno.serve(async (req) => {
       // Fallback silencieux sur le tarif statique
     }
 
-    // Calculer la distance tarifaire (expéditeur → destinataire)
-    const distanceReelle = calculerDistance(
-      course.gps_depart_lat, course.gps_depart_lng,
-      course.gps_arrivee_lat, course.gps_arrivee_lng
-    );
+    // Calculer la distance tarifaire avec les positions GPS réelles si disponibles
+    // Priorité : GPS réel récupération → GPS réel livraison (positions au moment du scan)
+    // Fallback : coordonnées fixes enregistrées à la création de la course
+    const lat1 = course.latitude_recuperation || course.gps_depart_lat;
+    const lng1 = course.longitude_recuperation || course.gps_depart_lng;
+    const lat2 = course.latitude_livraison || course.latitude_arrivee_livraison || course.gps_arrivee_lat;
+    const lng2 = course.longitude_livraison || course.longitude_arrivee_livraison || course.gps_arrivee_lng;
+
+    if (!lat1 || !lng1 || !lat2 || !lng2) {
+      return Response.json({
+        error: 'Positions GPS récupération/livraison manquantes'
+      }, { status: 400 });
+    }
+
+    const distanceReelle = calculerDistance(lat1, lng1, lat2, lng2);
 
     // Calculer le prix final selon les tarifs du pays
     // Règle : prix minimum global SILGAPP = 1 000 F CFA (s'applique dans tous les pays FCFA)
