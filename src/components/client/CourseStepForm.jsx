@@ -522,7 +522,6 @@ export default function CourseStepForm({
 
         // "recevoir" : Adresse de récupération
         const gpsDispo = !!(formData.expediteur_gps_lat && formData.expediteur_gps_lng && formData.expediteur_gps_available);
-        const destinationInconnueR = formData.destination_inconnue || false;
         return (
           <div className="space-y-5">
             <div className="text-center">
@@ -565,46 +564,15 @@ export default function CourseStepForm({
               </div>
             </button>
 
-            <button
-              type="button"
-              onClick={() => setFormData({
-                ...formData, destination_inconnue: !destinationInconnueR,
-                adresse_depart: !destinationInconnueR ? "" : formData.adresse_depart,
-                gps_depart_lat: !destinationInconnueR ? null : formData.gps_depart_lat,
-                gps_depart_lng: !destinationInconnueR ? null : formData.gps_depart_lng,
-                recuperationGPS: !destinationInconnueR ? false : formData.recuperationGPS
-              })}
-              className={`w-full p-4 rounded-2xl border-2 text-left transition-all ${
-                destinationInconnueR
-                  ? "border-blue-300 bg-blue-50"
-                  : "border-gray-200 bg-white hover:border-blue-300"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Checkbox checked={destinationInconnueR} className="pointer-events-none border-blue-400 data-[state=checked]:bg-blue-600" />
-                <p className="font-semibold text-gray-800">Lieu de récupération inconnu pour le moment</p>
-              </div>
-            </button>
-
-            {!destinationInconnueR && !(gpsDispo && formData.recuperationGPS) && (
+            {!(gpsDispo && formData.recuperationGPS) && (
               <PremiumInput
                 label="Adresse de récupération"
-                required
+                required={false}
                 value={formData.adresse_depart}
                 onChange={(e) => setFormData({ ...formData, adresse_depart: e.target.value })}
-                placeholder="Quartier, rue, point de repère..."
+                placeholder="Quartier, rue, point de repère... (optionnel)"
                 autoFocus
               />
-            )}
-
-            {destinationInconnueR && (
-              <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-200">
-                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-bold text-amber-900">Lieu défini plus tard</p>
-                  <p className="text-xs text-amber-700 mt-1">L'expéditeur pourra envoyer sa position au livreur.</p>
-                </div>
-              </div>
             )}
           </div>
         );
@@ -613,7 +581,6 @@ export default function CourseStepForm({
       // ─── ÉTAPE 3 ───────────────────────────────────────────────────────────
       case 3: {
         if (isExpedie) {
-          const destinationInconnue = formData.destination_inconnue || false;
           const gpsDestDispo = !!(formData.gps_arrivee_lat && formData.gps_arrivee_lng && formData.livraisonGPS);
           return (
             <div className="space-y-5">
@@ -623,7 +590,7 @@ export default function CourseStepForm({
                 <p className="text-sm text-gray-500 mt-1.5">Adresse ou quartier d'arrivée</p>
               </div>
 
-              {gpsDestDispo && (
+              {gpsDestDispo ? (
                 <div className="flex items-center gap-4 p-5 rounded-3xl bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 shadow-sm">
                   <div className="w-12 h-12 rounded-2xl bg-green-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-green-200">
                     <CheckCircle className="w-6 h-6 text-white" />
@@ -640,51 +607,16 @@ export default function CourseStepForm({
                     Changer
                   </button>
                 </div>
-              )}
-
-              {!gpsDestDispo && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({
-                      ...formData, destination_inconnue: !destinationInconnue,
-                      adresse_arrivee: !destinationInconnue ? "" : formData.adresse_arrivee,
-                      gps_arrivee_lat: !destinationInconnue ? null : formData.gps_arrivee_lat,
-                      gps_arrivee_lng: !destinationInconnue ? null : formData.gps_arrivee_lng,
-                      livraisonGPS: !destinationInconnue ? false : formData.livraisonGPS
-                    })}
-                    className={`w-full p-4 rounded-2xl border-2 text-left transition-all ${
-                      destinationInconnue ? "border-blue-300 bg-blue-50" : "border-gray-200 bg-white hover:border-blue-300"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Checkbox checked={destinationInconnue} className="pointer-events-none border-blue-400 data-[state=checked]:bg-blue-600" />
-                      <p className="font-semibold text-gray-800">Destination inconnue pour le moment</p>
-                    </div>
-                  </button>
-
-                  {!destinationInconnue && (
-                    <PremiumInput
-                      label="Adresse de livraison"
-                      required
-                      hint="Indiquez le quartier, la rue ou un point de repère connu."
-                      value={formData.adresse_arrivee}
-                      onChange={(e) => setFormData({ ...formData, adresse_arrivee: e.target.value })}
-                      placeholder="Quartier, rue, point de repère..."
-                      autoFocus
-                    />
-                  )}
-
-                  {destinationInconnue && (
-                    <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-200">
-                      <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-bold text-amber-900">Destination à définir plus tard</p>
-                        <p className="text-xs text-amber-700 mt-1">Le destinataire pourra envoyer sa position plus tard.</p>
-                      </div>
-                    </div>
-                  )}
-                </>
+              ) : (
+                <PremiumInput
+                  label="Adresse de livraison"
+                  required={false}
+                  hint="Indiquez le quartier, la rue ou un point de repère connu."
+                  value={formData.adresse_arrivee}
+                  onChange={(e) => setFormData({ ...formData, adresse_arrivee: e.target.value })}
+                  placeholder="Quartier, rue, point de repère... (optionnel)"
+                  autoFocus
+                />
               )}
             </div>
           );
@@ -782,7 +714,7 @@ export default function CourseStepForm({
     const rows = [
       { icon: <Truck className="w-4 h-4 text-primary" />, bg: "bg-red-50", border: "border-red-100", label: "Type", value: formData.type_course === "expedier" ? "Expédition" : "Réception" },
       { icon: <MapPin className="w-4 h-4 text-red-600" />, bg: "bg-red-50", border: "border-red-100", label: "Récupération", value: formData.adresse_depart || (formData.recuperationGPS ? "📍 Position GPS" : "—") },
-      { icon: <MapPin className="w-4 h-4 text-green-600" />, bg: "bg-green-50", border: "border-green-100", label: "Livraison", value: formData.destination_inconnue ? "📍 À définir" : formData.adresse_arrivee || "—" },
+      { icon: <MapPin className="w-4 h-4 text-green-600" />, bg: "bg-green-50", border: "border-green-100", label: "Livraison", value: formData.adresse_arrivee || "—" },
       { icon: <User className="w-4 h-4 text-blue-600" />, bg: "bg-blue-50", border: "border-blue-100", label: "Contact", value: formData.type_course === "expedier" ? `${formData.destinataire_nom || "Destinataire"} • ${formData.destinataire_telephone}` : `${formData.expediteur_nom || "Expéditeur"} • ${formData.expediteur_telephone}` },
       { icon: <Package className="w-4 h-4 text-purple-600" />, bg: "bg-purple-50", border: "border-purple-100", label: "Colis", value: formData.type_colis?.replace(/_/g, " ") || "—" },
     ];
@@ -832,10 +764,10 @@ export default function CourseStepForm({
     }
     if (step === 2) {
       if (isExpedie) return !formData.destinataire_telephone;
-      if (isRecevoir) return !formData.destination_inconnue && !formData.adresse_depart && !formData.recuperationGPS;
+      // "recevoir" : adresse de récupération optionnelle — toujours continuer
     }
     if (step === 3) {
-      if (isExpedie) return !formData.destination_inconnue && !formData.adresse_arrivee && !formData.livraisonGPS;
+      // "expedier" : adresse de livraison optionnelle — toujours continuer
       if (isRecevoir) return !formData.type_colis;
     }
     if (step === 4) {

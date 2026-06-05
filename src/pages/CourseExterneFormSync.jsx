@@ -345,10 +345,9 @@ export default function CourseExterneFormSync() {
     const missingFields = [];
 
     if (!formData.type_course) missingFields.push("type de course");
-    if (!formData.adresse_depart && !formData.recuperationGPS) missingFields.push("adresse de récupération");
+    // adresse_depart et adresse_arrivee sont optionnelles
     if (isExpedie) {
       if (!formData.destinataire_telephone) missingFields.push("téléphone du destinataire");
-      if (!formData.destination_inconnue && !formData.adresse_arrivee && !formData.livraisonGPS) missingFields.push("adresse de livraison");
     }
     if (isRecevoir) {
       if (!formData.expediteur_telephone) missingFields.push("téléphone de l'expéditeur");
@@ -399,7 +398,6 @@ export default function CourseExterneFormSync() {
     // Calcul prix — sécurisé : uniquement si les 4 coordonnées GPS sont valides
     let prixEstime = 0;
     if (
-      !formData.destination_inconnue &&
       formData.gps_depart_lat && formData.gps_depart_lng &&
       formData.gps_arrivee_lat && formData.gps_arrivee_lng
     ) {
@@ -414,15 +412,15 @@ export default function CourseExterneFormSync() {
     // Pour "recevoir" : la destination = position du client destinataire (jamais inconnue)
     const adresseArrivee = isRecevoir
       ? (formData.adresse_arrivee || (formData.livraisonGPS ? "Position GPS client" : clientProfil?.quartier || "Chez le destinataire"))
-      : (formData.destination_inconnue ? "Destination à définir" : formData.adresse_arrivee);
+      : (formData.adresse_arrivee || "");
 
     const gpsArriveLat = isRecevoir
       ? (formData.gps_arrivee_lat || clientGpsLat)
-      : (formData.destination_inconnue ? null : formData.gps_arrivee_lat);
+      : (formData.gps_arrivee_lat || null);
     const gpsArriveLng = isRecevoir
       ? (formData.gps_arrivee_lng || clientGpsLng)
-      : (formData.destination_inconnue ? null : formData.gps_arrivee_lng);
-    const destInconnue = isRecevoir ? false : (formData.destination_inconnue || false);
+      : (formData.gps_arrivee_lng || null);
+    const destInconnue = false; // supprimé — les adresses sont simplement optionnelles
 
     // Validation des rôles — ne bloque PAS si le destinataire est hors SILGAPP
     try {
