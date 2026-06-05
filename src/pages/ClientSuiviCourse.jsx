@@ -33,6 +33,8 @@ import DestinataireReactionButton from "@/components/client/DestinataireReaction
 import QRCodeDisplay from "@/components/client/QRCodeDisplay";
 import AnnulerCourseDialog from "@/components/client/AnnulerCourseDialog";
 import ETADisplay from "@/components/client/ETADisplay";
+import HistoriqueCoursesClient from "@/components/client/HistoriqueCoursesClient";
+import FraisAnnulationBannerClient from "@/components/client/FraisAnnulationBannerClient";
 
 function buildWhatsAppMessage(course) {
   const trackingUrl = course.tracking_token
@@ -48,6 +50,7 @@ export default function ClientSuiviCourse() {
   const [showRating, setShowRating] = useState(false);
   const [showAnnulerDialog, setShowAnnulerDialog] = useState(false);
   const [ratingShownForCourse, setRatingShownForCourse] = useState(null);
+  const [onglet, setOnglet] = useState("actives"); // "actives" | "historique"
   // Pré-sélectionner la course depuis la navigation (bouton "Voir la course")
   const [selectedCourseId, setSelectedCourseId] = useState(
     location.state?.course_id || null
@@ -82,6 +85,16 @@ export default function ClientSuiviCourse() {
     queryKey: ["countries-tarifs"],
     queryFn: () => base44.entities.Country.list(),
     staleTime: 60000,
+  });
+
+  // Frais d'annulation impayés pour ce client
+  const { data: fraisImpayes = [] } = useQuery({
+    queryKey: ["frais-annulation-client", clientProfilId],
+    queryFn: () => clientProfilId
+      ? base44.entities.FraisAnnulation.filter({ client_id: clientProfilId, statut_paiement: "impaye" })
+      : [],
+    enabled: !!clientProfilId,
+    refetchInterval: 30000,
   });
 
   const { data: courses = [], refetch, isLoading } = useQuery({
@@ -139,8 +152,9 @@ export default function ClientSuiviCourse() {
     cacheTime: 0, // Pas de cache
   });
 
-  // Toutes les courses actives
+  // Toutes les courses actives / terminées
   const coursesActives = courses.filter(c => !["livree", "annulee"].includes(c.statut));
+  const coursesHistorique = courses.filter(c => ["livree", "annulee"].includes(c.statut));
   // Course sélectionnée : celle choisie ou la première active ou la dernière
   const maCourse = (selectedCourseId ? courses.find(c => c.id === selectedCourseId) : null)
     || coursesActives[0] || courses[0] || null;
@@ -185,18 +199,9 @@ export default function ClientSuiviCourse() {
     );
   }
 
-  if (!maCourse) {
-    return (
-      <div className="fixed inset-0 bg-white flex items-center justify-center">
-        <div
-          className="text-[22vw] leading-none select-none"
-          style={{ animation: "pulse 2s ease-in-out infinite" }}
-        >
-          😊
-        </div>
-        <style>{`@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}`}</style>
-      </div>
-    );
+  // Si pas de course active mais historique disponible → basculer sur historique
+  if (!maCourse && coursesHistorique.length > 0 && onglet === "actives") {
+    setOnglet("historique");
   }
 
   // Helper : détermine si l'utilisateur est l'expéditeur (client principal) ou le destinataire
@@ -232,7 +237,7 @@ export default function ClientSuiviCourse() {
       <div className="max-w-lg mx-auto space-y-4">
 
         {/* Bouton retour — sticky, gros, accessible au pouce */}
-        <div className="sticky top-0 z-20 pt-2 pb-1">
+        <div className="sticky top-0 z-20 pt-2 pb-1 space-y-2">
           <button
             onClick={() => navigate("/")}
             className="flex items-center gap-3 w-full bg-white border border-gray-200 shadow-md rounded-2xl px-5 h-14 text-base font-bold text-gray-800 active:scale-[0.98] transition-all"
@@ -240,7 +245,72 @@ export default function ClientSuiviCourse() {
             <ArrowLeft className="w-6 h-6 text-primary flex-shrink-0" />
             <span>← Retour au dashboard</span>
           </button>
+
+          {/* Onglets Actives / Historique */}
+          <div className="flex bg-white rounded-2xl p-1 gap-1 shadow-sm border border-gray-100">
+            <button
+              onClick={() => setOnglet("actives")}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-1.5 ${
+                onglet === "actives" ? "bg-primary text-white shadow" : "text-gray-500"
+              }`}
+            >
+              🚚 Actives
+              {coursesActives.length > 0 && (
+                <span className={`text-xs px-1.5 py-0.5 rounded-full font-black ${onglet === "actives" ? "bg-white/30" : "bg-primary/10 text-primary"}`}>
+                  {coursesActives.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setOnglet("historique")}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-1.5 ${
+                onglet === "historique" ? "bg-gray-800 text-white shadow" : "text-gray-500"
+              }`}
+            >
+              📋 Historique
+              {coursesHistorique.length > 0 && (
+                <span className={`text-xs px-1.5 py-0.5 rounded-full font-black ${onglet === "historique" ? "bg-white/30" : "bg-gray-100 text-gray-600"}`}>
+                  {coursesHistorique.length}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
+
+        {/* Bannière frais d'annulation impayés */}
+        {fraisImpayes.length > 0 && (
+          <FraisAnnulationBannerClient fraisImpayes={fraisImpayes} />
+        )}
+
+        {/* ── ONGLET HISTORIQUE ── */}
+        {onglet === "historique" && (
+          <HistoriqueCoursesClient
+            courses={coursesHistorique}
+            fraisAnnulation={fraisImpayes}
+            onSelectCourse={(id) => {
+              setSelectedCourseId(id);
+              setOnglet("actives");
+            }}
+          />
+        )}
+
+        {/* ── PAS DE COURSE ACTIVE ── */}
+        {onglet === "actives" && !maCourse && (
+          <div className="py-12 text-center space-y-3">
+            <div className="text-6xl">😊</div>
+            <p className="text-sm font-medium text-gray-500">Aucune course active en ce moment</p>
+            <button
+              onClick={() => navigate("/")}
+              className="text-primary text-sm font-bold underline"
+            >
+              Créer une nouvelle course
+            </button>
+          </div>
+        )}
+
+        {/* ── ONGLET ACTIVES ── */}
+        {onglet === "actives" && maCourse && (
+          <>
 
         {/* Sélecteur de course si plusieurs actives */}
         {coursesActives.length > 1 && (
@@ -718,6 +788,7 @@ export default function ClientSuiviCourse() {
           onSuccess={() => navigate("/")}
           clientId={clientProfilId}
         />
+        </>
       </div>
     </div>
   );
