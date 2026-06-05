@@ -113,7 +113,7 @@ export default function LivreurRechercheAnimation({ course }) {
               </div>
               <div className="flex-1">
                 <p className="text-xs text-muted-foreground uppercase font-semibold">Tarif</p>
-                <p className="font-bold text-primary text-sm">Calculé à la livraison (100 F/km)</p>
+                <p className="font-bold text-primary text-sm">Calculé à la livraison selon le tarif local</p>
               </div>
             </div>
           </div>

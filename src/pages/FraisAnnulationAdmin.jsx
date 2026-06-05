@@ -79,12 +79,12 @@ export default function FraisAnnulationAdmin() {
       <div className="grid grid-cols-2 gap-3">
         <div className="p-4 rounded-2xl bg-orange-50 border border-orange-200">
           <p className="text-xs font-semibold text-orange-600 uppercase tracking-wide">Impayés</p>
-          <p className="text-2xl font-black text-orange-700 mt-1">{totalImpaye.toLocaleString()} FCFA</p>
+          <p className="text-2xl font-black text-orange-700 mt-1">{totalImpaye.toLocaleString()} F</p>
           <p className="text-xs text-orange-500">{frais.filter(f => f.statut_paiement === "impaye").length} dossier(s)</p>
         </div>
         <div className="p-4 rounded-2xl bg-green-50 border border-green-200">
           <p className="text-xs font-semibold text-green-600 uppercase tracking-wide">Payés</p>
-          <p className="text-2xl font-black text-green-700 mt-1">{totalPaye.toLocaleString()} FCFA</p>
+          <p className="text-2xl font-black text-green-700 mt-1">{totalPaye.toLocaleString()} F</p>
           <p className="text-xs text-green-500">{frais.filter(f => f.statut_paiement === "paye").length} dossier(s)</p>
         </div>
       </div>
@@ -154,7 +154,7 @@ function FraisCard({ frais, onPayer, onBloquer, payerLoading, bloquerLoading }) 
                 ? <><CheckCircle className="w-3 h-3 mr-1 inline" />Payé</>
                 : <><Clock className="w-3 h-3 mr-1 inline" />Impayé</>}
             </Badge>
-            <span className="text-lg font-black text-gray-900">{frais.montant || 250} FCFA</span>
+            <span className="text-lg font-black text-gray-900">{frais.montant || 250} F</span>
             {clientBloque && (
               <Badge className="bg-red-100 text-red-800 border border-red-200">
                 <Ban className="w-3 h-3 mr-1 inline" />Client bloqué
