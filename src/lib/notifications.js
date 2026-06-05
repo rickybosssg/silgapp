@@ -148,6 +148,43 @@ export async function requestNotificationPermission() {
   return { granted: permission === "granted" };
 }
 
+// Types de notifications importants → déclenchent son + vibration
+const IMPORTANT_TYPES = [
+  "nouvelle_course", "course_assignee", "course_acceptee",
+  "colis_recupere", "en_livraison", "course_livree",
+  "course_bloquee", "course_annulee", "rappel_reponse",
+  "course_proximite",
+];
+
+function isImportant(options) {
+  const t = options?.data?.type;
+  return !t || IMPORTANT_TYPES.includes(t);
+}
+
+// Vibration + son Web Audio API (fonctionne dans WebView/APK)
+function triggerSoundAndVibration(important = true) {
+  // Vibration (fonctionne sur Android WebView et APK)
+  if (typeof navigator !== "undefined" && navigator.vibrate) {
+    navigator.vibrate(important ? [200, 100, 200, 100, 400] : [100]);
+  }
+  // Son via Web Audio API — un bip simple audible même dans l'APK
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(880, ctx.currentTime);
+    gainNode.gain.setValueAtTime(0.6, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.6);
+  } catch (_) {}
+}
+
 export function showLocalNotification(titre, message, options = {}) {
   const env = detectEnvironment();
 
@@ -174,12 +211,27 @@ export function showLocalNotification(titre, message, options = {}) {
     notification.close();
   };
 
+  // Son + vibration pour toutes les notifications importantes
+  if (isImportant(options)) {
+    triggerSoundAndVibration(true);
+  }
+
   return notification;
 }
 
 async function showNativeNotification(titre, message, options = {}) {
   const LocalNotifications = await getCapacitorPlugin("LocalNotifications", "@capacitor/local-notifications");
   if (!LocalNotifications) return;
+
+  // Vibration native Capacitor
+  if (isImportant(options)) {
+    const Haptics = await getCapacitorPlugin("Haptics", "@capacitor/haptics");
+    if (Haptics) {
+      Haptics.vibrate?.({ duration: 500 }).catch(() => null);
+    } else if (typeof navigator !== "undefined" && navigator.vibrate) {
+      navigator.vibrate([200, 100, 200, 100, 400]);
+    }
+  }
 
   try {
     await LocalNotifications.createChannel?.({
@@ -200,6 +252,7 @@ async function showNativeNotification(titre, message, options = {}) {
         channelId: ANDROID_CHANNEL_ID,
         iconColor: "#dc2626",
         sound: options.sound || "default",
+        vibrate: isImportant(options) ? [200, 100, 200, 100, 400] : [100],
         data: options.data || {},
       }],
     });

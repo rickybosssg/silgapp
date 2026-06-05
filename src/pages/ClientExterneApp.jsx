@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { useClientNotifications } from "@/hooks/useClientNotifications";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import { useQueryClient } from "@tanstack/react-query";
 import { 
@@ -99,6 +100,14 @@ export default function ClientExterneApp() {
       console.error("Erreur lecture localStorage:", e);
     }
   }, []);
+
+  // Notifications push client — son + vibration pour expéditeurs et destinataires
+  useClientNotifications(clientProfil?.user_email, (notif) => {
+    // Recharger les courses si notification liée à une course
+    if (notif.course_id && clientProfil && position) {
+      checkStatus(position, clientProfil);
+    }
+  });
 
   // Heartbeat automatique — sync toutes les 30s + événements lifecycle
   // Activé dès que le profil est chargé (même sans GPS pour anciens utilisateurs)

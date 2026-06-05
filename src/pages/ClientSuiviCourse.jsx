@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useClientNotifications } from "@/hooks/useClientNotifications";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -57,9 +58,19 @@ export default function ClientSuiviCourse() {
   );
   const [userEmail, setUserEmail] = useState(null);
 
+  const queryClient = useQueryClient();
+
   useEffect(() => {
     base44.auth.me().then(u => setUserEmail(u?.email)).catch(() => null);
   }, []);
+
+  // Notifications push avec son + vibration pour suivi de course
+  useClientNotifications(userEmail, (notif) => {
+    // Rafraîchir les courses dès qu'une notification arrive
+    if (notif.course_id) {
+      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+    }
+  });
 
   // Récupérer l'ID user pour filtrer correctement
   useEffect(() => {
