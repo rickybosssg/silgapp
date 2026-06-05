@@ -2,53 +2,54 @@ import { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 
 /**
- * Indicatifs téléphoniques SILGAPP par pays (tous les pays supportés)
+ * Indicatifs SILGAPP — tous pays supportés
  */
-const COUNTRY_DIALCODES = {
-  BF: { code: "226", len: 8 },
-  CI: { code: "225", len: 10 },
-  TG: { code: "228", len: 8 },
-  BJ: { code: "229", len: 8 },
-  SN: { code: "221", len: 9 },
-  ML: { code: "223", len: 8 },
-  GN: { code: "224", len: 9 },
-  NE: { code: "227", len: 8 },
-};
+const DIAL_CODES = [
+  { code: "226", len: 8 },  // BF
+  { code: "225", len: 10 }, // CI
+  { code: "228", len: 8 },  // TG
+  { code: "229", len: 8 },  // BJ
+  { code: "221", len: 9 },  // SN
+  { code: "223", len: 8 },  // ML
+  { code: "224", len: 9 },  // GN
+  { code: "227", len: 8 },  // NE
+];
 
 /**
- * Génère toutes les variantes d'un numéro pour tous les pays SILGAPP.
- * Retourne un tableau [local_sans_indicatif, avec_indicatif_1, avec_indicatif_2, ...]
- * permettant de chercher dans ClientExterne sans connaître le pays a priori.
+ * Retourne [local_sans_indicatif, avec_indicatif] pour un numéro donné.
+ * Maximum 2 variantes → 2 requêtes parallèles max (pas de boucle séquentielle).
  */
 function phoneVariants(num) {
   const n = (num || "").replace(/\D/g, "");
   if (!n) return [];
   const variants = new Set([n]);
 
-  for (const { code, len } of Object.values(COUNTRY_DIALCODES)) {
-    // Si le numéro commence déjà par l'indicatif → extraire la partie locale
+  for (const { code, len } of DIAL_CODES) {
+    // Numéro déjà avec indicatif → ajouter aussi la version locale
     if (n.startsWith(code) && n.length === code.length + len) {
-      variants.add(n.slice(code.length)); // local sans indicatif
-      variants.add(n);                    // avec indicatif
+      variants.add(n.slice(code.length));
+      break; // indicatif identifié, inutile de continuer
     }
-    // Si le numéro est la partie locale seule → ajouter avec indicatif
+    // Numéro local seul → ajouter avec indicatif
     if (n.length === len && !n.startsWith("0")) {
       variants.add(code + n);
+      break;
     }
-    // Cas "0XXXXXXXX" (certains pays)
+    // "0XXXXXXXX" (préfixe local avec 0)
     if (n.startsWith("0") && n.length === len + 1) {
-      variants.add(n.slice(1));           // sans le 0
-      variants.add(code + n.slice(1));    // avec indicatif
+      variants.add(n.slice(1));
+      variants.add(code + n.slice(1));
+      break;
     }
   }
   return [...variants];
 }
 
 /**
- * Hook : poll le GPS live du destinataire depuis ClientExterne (toutes les 8s).
+ * Hook : poll le GPS live d'un contact depuis ClientExterne (toutes les 8s).
  * Compatible tous pays SILGAPP (BF, CI, TG, BJ, SN, ML, GN, NE).
+ * 2 requêtes parallèles max par poll (local + avec indicatif).
  * Retourne { gpsLat, gpsLng, lastUpdate, loading }
- * Si aucun GPS live → gpsLat/gpsLng = null (fallback à la charge du parent)
  */
 export function useDestinataireGPS(telephone, enabled = true) {
   const [state, setState] = useState({ gpsLat: null, gpsLng: null, lastUpdate: null, loading: true });
@@ -63,11 +64,13 @@ export function useDestinataireGPS(telephone, enabled = true) {
     const en = enabledRef.current;
     if (!tel || !en) { setState(prev => ({ ...prev, loading: false })); return; }
 
-    // Générer toutes les variantes du numéro (tous pays confondus)
     const variants = phoneVariants(tel);
     try {
-      for (const variant of variants) {
-        const res = await base44.entities.ClientExterne.filter({ telephone: variant });
+      // Requêtes parallèles (max 2)
+      const results = await Promise.all(
+        variants.map(v => base44.entities.ClientExterne.filter({ telephone: v }).catch(() => []))
+      );
+      for (const res of results) {
         if (res?.length > 0) {
           const client = res[0];
           if (client.latitude && client.longitude) {
@@ -79,7 +82,7 @@ export function useDestinataireGPS(telephone, enabled = true) {
             });
             return;
           }
-          // Client trouvé mais sans GPS → stop, pas besoin de tester d'autres variantes
+          // Client trouvé sans GPS → inutile de continuer
           break;
         }
       }

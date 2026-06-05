@@ -99,8 +99,11 @@ function useContactLive(telephone, enabled = true) {
     if (!tel || !en) return;
     const variants = phoneVariants(tel);
     try {
-      for (const variant of variants) {
-        const res = await base44.entities.ClientExterne.filter({ telephone: variant });
+      // Requêtes parallèles (max 2 variantes)
+      const results = await Promise.all(
+        variants.map(v => base44.entities.ClientExterne.filter({ telephone: v }).catch(() => []))
+      );
+      for (const res of results) {
         if (res?.length > 0) {
           const client = res[0];
           const gpsActif = !!(client.latitude && client.longitude);
