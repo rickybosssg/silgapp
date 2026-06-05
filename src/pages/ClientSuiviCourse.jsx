@@ -36,7 +36,8 @@ import ETADisplay from "@/components/client/ETADisplay";
 import HistoriqueCoursesClient from "@/components/client/HistoriqueCoursesClient";
 import FraisAnnulationBannerClient from "@/components/client/FraisAnnulationBannerClient";
 import { useDestinataireGPS } from "@/hooks/useDestinataireGPS";
-import { useSonEtVibration } from "@/hooks/useSonEtVibration";
+import { playNotificationSound } from "@/hooks/useSonEtVibration";
+
 
 function buildWhatsAppMessage(course) {
   const trackingUrl = course.tracking_token
@@ -71,22 +72,13 @@ export default function ClientSuiviCourse() {
     base44.auth.me().then(u => setUserEmail(u?.email)).catch(() => null);
   }, []);
 
-  // Notifications push avec son + vibration pour suivi de course
-  const [notifImportanteRecue, setNotifImportanteRecue] = useState(false);
+  // Notifications push — son + vibration déclenchés directement dans useClientNotifications
   useClientNotifications(userEmail, (notif) => {
     // Rafraîchir les courses dès qu'une notification arrive
     if (notif.course_id) {
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-      // Déclencher son + vibration pour notifications critiques
-      if (["nouvelle_course", "course_acceptee", "colis_recupere", "en_livraison", "livree"].includes(notif.type)) {
-        setNotifImportanteRecue(true);
-        setTimeout(() => setNotifImportanteRecue(false), 10000);
-      }
     }
   });
-
-  // Son + vibration — identique au système des livreurs
-  useSonEtVibration(notifImportanteRecue, true);
 
   // Récupérer l'ID user pour filtrer correctement
   useEffect(() => {
@@ -192,8 +184,8 @@ export default function ClientSuiviCourse() {
     
     const statutsCritiques = ["livreur_en_route", "colis_recupere", "en_livraison", "livree"];
     if (statutsCritiques.includes(maCourse.statut) && !statutsCritiques.includes(prevStatut)) {
-      setNotifImportanteRecue(true);
-      setTimeout(() => setNotifImportanteRecue(false), 10000);
+      playNotificationSound();
+      navigator.vibrate?.([500, 150, 500, 150, 500]);
     }
     
     setPrevStatut(maCourse.statut);

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { registerPushToken, subscribeToNotifications, showLocalNotification } from "@/lib/notifications";
+import { playNotificationSound } from "@/hooks/useSonEtVibration";
 
 // Types de notifications importantes pour clients/expéditeurs/destinataires
 const CLIENT_IMPORTANT_TYPES = [
@@ -51,6 +52,12 @@ export function useClientNotifications(userEmail, onNotification) {
     const unsub = subscribeToNotifications((notif) => {
       const isImportant = CLIENT_IMPORTANT_TYPES.includes(notif.type);
       const label = TYPE_LABELS[notif.type] || notif.titre;
+
+      // ✅ Son + vibration immédiat — au moment exact de la réception de la notification
+      if (isImportant) {
+        playNotificationSound();
+        navigator.vibrate?.([500, 150, 500, 150, 500]);
+      }
 
       // Toast visible dans l'app — durée plus longue pour les importants
       if (isImportant) {
