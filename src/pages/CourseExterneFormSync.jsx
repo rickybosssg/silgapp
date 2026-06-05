@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import CourseStepForm from "@/components/client/CourseStepForm";
 import { sauvegarderContactDB } from "@/components/client/CarnetAdresses";
 import LivreurRechercheAnimation from "@/components/client/LivreurRechercheAnimation";
+import InvitationWhatsAppModal from "@/components/client/InvitationWhatsAppModal";
 
 // Haversine
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -39,6 +40,7 @@ export default function CourseExterneFormSync() {
   const [courseCreated, setCourseCreated] = useState(false);
   const [createdCourse, setCreatedCourse] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false); // verrou anti-double-clic
+  const [invitationModal, setInvitationModal] = useState(null); // { telephone, nom } ou null
 
   // Lire brouillon (données pures, sans fonctions)
   const getDraftFromStorage = () => {
@@ -298,7 +300,6 @@ export default function CourseExterneFormSync() {
       );
       toast.success("Course créée ! Recherche d'un livreur en cours...");
       setCreatedCourse(response);
-      setCourseCreated(true);
       setIsSubmitting(false);
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(STEP_KEY);
@@ -307,8 +308,20 @@ export default function CourseExterneFormSync() {
       const ctel = clientProfil?.telephone;
       if (formData.type_course === "expedier") {
         sauvegarderContactDB(cid, ctel, formData.destinataire_nom, formData.destinataire_telephone, "destinataire").catch(() => {});
+        // Proposer invitation si destinataire non trouvé dans SILGAPP
+        if (!formData.destinataire_client_id && formData.destinataire_telephone) {
+          setInvitationModal({ telephone: formData.destinataire_telephone, nom: formData.destinataire_nom });
+        } else {
+          setCourseCreated(true);
+        }
       } else {
         sauvegarderContactDB(cid, ctel, formData.expediteur_nom, formData.expediteur_telephone, "expediteur").catch(() => {});
+        // Proposer invitation si expéditeur non trouvé dans SILGAPP
+        if (!formData.expediteur_client_id && formData.expediteur_telephone) {
+          setInvitationModal({ telephone: formData.expediteur_telephone, nom: formData.expediteur_nom });
+        } else {
+          setCourseCreated(true);
+        }
       }
     },
     onError: (err) => {
@@ -471,6 +484,22 @@ export default function CourseExterneFormSync() {
 
   if (courseCreated && createdCourse) {
     return <LivreurRechercheAnimation course={createdCourse} />;
+  }
+
+  // Modal invitation WhatsApp — affiché après création réussie si contact hors SILGAPP
+  if (invitationModal && createdCourse) {
+    return (
+      <>
+        <LivreurRechercheAnimation course={createdCourse} />
+        <InvitationWhatsAppModal
+          telephone={invitationModal.telephone}
+          nomContact={invitationModal.nom}
+          nomExpediteur={clientProfil?.nom || formData.client_nom || "Votre contact"}
+          onClose={() => { setInvitationModal(null); setCourseCreated(true); }}
+          onSend={() => { setInvitationModal(null); setCourseCreated(true); }}
+        />
+      </>
+    );
   }
 
   const totalSteps = 7;
