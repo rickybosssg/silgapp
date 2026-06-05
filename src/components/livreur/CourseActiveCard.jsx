@@ -339,10 +339,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             const contactRole = colisRecupere ? "Destinataire" : "Expéditeur";
 
             const handleWhatsApp = () => {
+              // Normalisation multi-pays : si le numéro a déjà un indicatif international (10+ chiffres), ok
+              // Sinon on laisse le numéro tel quel — wa.me gère les numéros locaux avec indicatif
               let num = (contactTel || "").replace(/\D/g, "");
-              if (num.startsWith("226") && num.length >= 11) { /* ok */ }
-              else if (num.startsWith("0") && num.length === 9) num = "226" + num.slice(1);
-              else if (num.length === 8) num = "226" + num;
+              // Rien à faire si déjà un numéro international (≥10 chiffres)
               const msg = encodeURIComponent(
                 colisRecupere
                   ? "Bonjour, je suis votre livreur SILGAPP. Je suis en route pour vous livrer votre colis."
@@ -439,15 +439,15 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs text-blue-700 font-semibold">Prix estimé</span>
-                  <span className="text-lg font-black text-blue-900">~{course.prix_estimate.toLocaleString()} F</span>
+                  <span className="text-lg font-black text-blue-900">~{course.prix_estimate.toLocaleString()} {course.devise || "F"}</span>
                 </div>
                 <p className="text-[10px] text-blue-600">
-                  Prix final calculé à la livraison (100 F/km réel)
+                  Prix final calculé à la livraison selon le tarif du pays
                 </p>
                 <div className="mt-2 pt-2 border-t border-blue-200 flex items-center justify-between text-xs">
                   <span className="text-blue-700">Votre gain (70%)</span>
                   <span className="font-bold text-green-700">
-                    {Math.round(course.prix_estimate * 0.7).toLocaleString()} F
+                    {Math.round(course.prix_estimate * 0.7).toLocaleString()} {course.devise || "F"}
                   </span>
                 </div>
               </div>
@@ -632,13 +632,13 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
                       <p className="text-[10px] text-gray-400 font-semibold uppercase">Prix final</p>
                       <p className="text-sm font-black text-blue-700">
-                        {prix !== null ? `${prix.toLocaleString()} F` : "—"}
+                        {prix !== null ? `${prix.toLocaleString()} ${course.devise || "F"}` : "—"}
                       </p>
                     </div>
                     <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
                       <p className="text-[10px] text-gray-400 font-semibold uppercase">Ton gain</p>
                       <p className="text-sm font-black text-green-700">
-                        {gain !== null ? `+${gain.toLocaleString()} F` : "—"}
+                        {gain !== null ? `+${gain.toLocaleString()} ${course.devise || "F"}` : "—"}
                       </p>
                     </div>
                   </div>
@@ -651,7 +651,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 )}
                 {isExterne && commission !== null && (
                   <p className="text-center text-xs text-gray-400">
-                    Commission Silga : {commission.toLocaleString()} F (30%)
+                    Commission Silga : {commission.toLocaleString()} {course.devise || "F"}
                   </p>
                 )}
               </div>

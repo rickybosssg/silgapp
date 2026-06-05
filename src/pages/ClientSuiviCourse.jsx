@@ -20,9 +20,8 @@ import LivreurAssigneCard from "@/components/client/LivreurAssigneCard";
 
 // Ouvre WhatsApp via wa.me (fonctionne sur Android/iOS, ouvre l'app si installée)
 function openWhatsApp(phone, message = "") {
-  let num = phone?.replace(/\D/g, "") || "";
-  if (num.startsWith("0") && num.length <= 9) num = "226" + num.slice(1);
-  if (num.length === 8) num = "226" + num;
+  // Numéro passé tel quel — doit déjà inclure l'indicatif pays (ex: 22670123456)
+  const num = phone?.replace(/\D/g, "") || "";
   const encoded = message ? encodeURIComponent(message) : "";
   const url = `https://wa.me/${num}${encoded ? `?text=${encoded}` : ""}`;
   window.open(url, "_blank", "noopener,noreferrer");
