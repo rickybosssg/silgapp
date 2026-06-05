@@ -13,7 +13,7 @@ export default function FraisAnnulationBannerClient({ fraisImpayes = [] }) {
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-black text-red-900 text-sm">
-          Frais d'annulation impayés — {total.toLocaleString()} FCFA
+          Frais d'annulation impayés — {total.toLocaleString()} {fraisImpayes[0]?.devise || "FCFA"}
         </p>
         <p className="text-xs text-red-700 mt-0.5 leading-relaxed">
           {fraisImpayes.length} annulation{fraisImpayes.length > 1 ? "s" : ""} après acceptation livreur. 

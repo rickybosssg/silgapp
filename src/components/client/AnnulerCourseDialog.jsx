@@ -110,7 +110,8 @@ export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, 
         }
       }
 
-      // Livreur accepté mais pas encore trop avancé → frais 250 FCFA
+      // Livreur accepté mais pas encore trop avancé → frais d'annulation
+      // Montant basé sur la devise du pays (250 pour FCFA, sinon fallback)
       setSituation({ type: "payant", montant: 250 });
     } catch (err) {
       console.error("Erreur analyse situation:", err);
@@ -128,7 +129,7 @@ export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, 
       // 1. Annuler la course
       await base44.entities.CourseExterne.update(course.id, {
         statut: "annulee",
-        notes: `Annulée par le client. Motif: ${motif}${situation?.type === "payant" ? " | Frais: 250 FCFA" : ""}`,
+        notes: `Annulée par le client. Motif: ${motif}${situation?.type === "payant" ? ` | Frais: ${situation.montant} ${course.devise || "FCFA"}` : ""}`,
       });
 
       // 2. Si frais → créer l'enregistrement FraisAnnulation
@@ -158,7 +159,7 @@ export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, 
       }
 
       if (situation?.type === "payant") {
-        toast.warning("Course annulée — Frais d'annulation de 250 FCFA ajoutés à votre compte.");
+        toast.warning(`Course annulée — Frais d'annulation de ${situation.montant} ${course.devise || "FCFA"} ajoutés à votre compte.`);
       } else {
         toast.success("Course annulée gratuitement.");
       }
@@ -184,7 +185,7 @@ export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, 
     );
     if (situation.type === "payant") return (
       <div className="flex items-center gap-2 p-3 rounded-xl bg-orange-50 border border-orange-200 text-sm font-semibold text-orange-800">
-        <CreditCard className="w-4 h-4 flex-shrink-0" /> Frais d'annulation : 250 FCFA
+        <CreditCard className="w-4 h-4 flex-shrink-0" /> Frais d'annulation : {situation.montant} {course.devise || "FCFA"}
       </div>
     );
     if (situation.type === "impossible") return (
@@ -222,7 +223,7 @@ export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, 
                       </li>
                       <li className="flex items-start gap-2">
                         <CreditCard className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
-                        <span><strong>Après acceptation par un livreur</strong>, des <strong>frais d'annulation de 250 FCFA</strong> sont appliqués.</span>
+                        <span><strong>Après acceptation par un livreur</strong>, des <strong>frais d'annulation</strong> sont appliqués.</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <XCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
@@ -264,7 +265,7 @@ export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, 
                   {situation?.type === "payant" && (
                     <div className="flex items-center gap-2 p-3 rounded-xl bg-orange-50 border border-orange-200 text-sm text-orange-800">
                       <CreditCard className="w-4 h-4 flex-shrink-0" />
-                      <span>Des frais de <strong>250 FCFA</strong> seront ajoutés à votre compte (statut : Impayé).</span>
+                      <span>Des frais de <strong>{situation?.montant || 250} {course.devise || "FCFA"}</strong> seront ajoutés à votre compte (statut : Impayé).</span>
                     </div>
                   )}
                   {situation?.type === "gratuit" && (
