@@ -1,5 +1,13 @@
 import React from "react";
-import { Clock, Ruler, MapPin } from "lucide-react";
+import { Clock, Ruler, MapPin, Wifi } from "lucide-react";
+
+function dureeDepuis(isoDate) {
+  if (!isoDate) return null;
+  const diff = Math.round((Date.now() - new Date(isoDate).getTime()) / 1000);
+  if (diff < 60) return `${diff}s`;
+  if (diff < 3600) return `${Math.floor(diff / 60)} min`;
+  return `${Math.floor(diff / 3600)} h`;
+}
 
 // Haversine distance (km)
 function haversine(lat1, lon1, lat2, lon2) {
@@ -28,7 +36,7 @@ function computeETA(distKm) {
  *   phase: "vers_recuperation" | "vers_livraison"
  *   statut: statut de la course
  */
-export default function ETADisplay({ livreurLat, livreurLng, targetLat, targetLng, livreurNom, phase, statut }) {
+export default function ETADisplay({ livreurLat, livreurLng, targetLat, targetLng, livreurNom, phase, statut, gpsLastUpdate }) {
   const isRecup = phase === "vers_recuperation";
   const prenom = livreurNom?.split(" ")[0] || "Le livreur";
 
@@ -91,6 +99,8 @@ export default function ETADisplay({ livreurLat, livreurLng, targetLat, targetLn
     message = eta <= 1 ? `${prenom} arrive chez vous dans moins d'1 min` : `${prenom} arrive chez vous dans ${eta} min`;
   }
 
+  const freshness = dureeDepuis(gpsLastUpdate);
+
   return (
     <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3">
       <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
@@ -98,7 +108,7 @@ export default function ETADisplay({ livreurLat, livreurLng, targetLat, targetLn
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-blue-900 leading-tight">{message}</p>
-        <div className="flex items-center gap-3 mt-1">
+        <div className="flex items-center gap-3 mt-1 flex-wrap">
           <span className="flex items-center gap-1 text-xs text-blue-600">
             <Ruler className="w-3 h-3" />
             {dist < 0.1 ? `${Math.round(dist * 1000)} m` : dist < 1 ? `${Math.round(dist * 1000)} m` : `${dist.toFixed(1)} km`}
@@ -107,6 +117,12 @@ export default function ETADisplay({ livreurLat, livreurLng, targetLat, targetLn
             <MapPin className="w-3 h-3" />
             {isRecup ? "Récupération" : "Livraison"}
           </span>
+          {freshness && (
+            <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+              <Wifi className="w-3 h-3" />
+              GPS live · {freshness}
+            </span>
+          )}
         </div>
       </div>
     </div>

@@ -36,6 +36,7 @@ import AnnulerCourseDialog from "@/components/client/AnnulerCourseDialog";
 import ETADisplay from "@/components/client/ETADisplay";
 import HistoriqueCoursesClient from "@/components/client/HistoriqueCoursesClient";
 import FraisAnnulationBannerClient from "@/components/client/FraisAnnulationBannerClient";
+import { useDestinataireGPS } from "@/hooks/useDestinataireGPS";
 
 function buildWhatsAppMessage(course) {
   const trackingUrl = course.tracking_token
@@ -59,6 +60,12 @@ export default function ClientSuiviCourse() {
   const [userEmail, setUserEmail] = useState(null);
 
   const queryClient = useQueryClient();
+
+  // GPS live du destinataire (actif uniquement quand une course est en livraison)
+  // maCourse n'est pas encore défini ici — on poll via un state intermédiaire
+  const [destTelephone, setDestTelephone] = useState(null);
+  const { gpsLat: destGpsLat, gpsLng: destGpsLng, lastUpdate: destGpsLastUpdate } =
+    useDestinataireGPS(destTelephone, !!destTelephone);
 
   useEffect(() => {
     base44.auth.me().then(u => setUserEmail(u?.email)).catch(() => null);
@@ -197,6 +204,13 @@ export default function ClientSuiviCourse() {
     // Rediriger immédiatement vers le dashboard — la course passera en historique
     navigate("/", { replace: true });
   };
+
+  // Activer le poll GPS live dès qu'une course est en phase de livraison
+  useEffect(() => {
+    if (!maCourse) { setDestTelephone(null); return; }
+    const isLivraisonPhase = ["colis_recupere", "en_livraison"].includes(maCourse.statut);
+    setDestTelephone(isLivraisonPhase ? (maCourse.destinataire_telephone || null) : null);
+  }, [maCourse?.id, maCourse?.statut, maCourse?.destinataire_telephone]);
 
   if (!userId) {
     return (
@@ -407,8 +421,9 @@ export default function ClientSuiviCourse() {
             const livreurLat = maCourse._livreur?.latitude;
             const livreurLng = maCourse._livreur?.longitude;
             const isVersRecup = maCourse.statut === "livreur_en_route";
-            const targetLat = isVersRecup ? maCourse.gps_depart_lat : maCourse.gps_arrivee_lat;
-            const targetLng = isVersRecup ? maCourse.gps_depart_lng : maCourse.gps_arrivee_lng;
+            // GPS live destinataire prioritaire pour la phase livraison, fallback gps_arrivee
+            const targetLat = isVersRecup ? maCourse.gps_depart_lat : (destGpsLat || maCourse.gps_arrivee_lat);
+            const targetLng = isVersRecup ? maCourse.gps_depart_lng : (destGpsLng || maCourse.gps_arrivee_lng);
             // CORRECTION : Afficher ETA même si GPS manquant (affichera "en route")
             return (
               <ETADisplay
@@ -438,11 +453,12 @@ export default function ClientSuiviCourse() {
               <ETADisplay
                 livreurLat={livreurLat || null}
                 livreurLng={livreurLng || null}
-                targetLat={maCourse.gps_arrivee_lat || null}
-                targetLng={maCourse.gps_arrivee_lng || null}
+                targetLat={destGpsLat || maCourse.gps_arrivee_lat || null}
+                targetLng={destGpsLng || maCourse.gps_arrivee_lng || null}
                 livreurNom={maCourse.livreur_nom}
                 phase="vers_livraison"
                 statut={maCourse.statut}
+                gpsLastUpdate={destGpsLastUpdate}
               />
             );
           })()
@@ -464,8 +480,9 @@ export default function ClientSuiviCourse() {
             const isLivree = maCourse.statut === "livree";
 
             // Cible livreur : vers expéditeur (récupération) ou vers destinataire (livraison)
-            const cibleLat = colisRecupere ? maCourse.gps_arrivee_lat : maCourse.gps_depart_lat;
-            const cibleLng = colisRecupere ? maCourse.gps_arrivee_lng : maCourse.gps_depart_lng;
+            // GPS live destinataire prioritaire pour la phase livraison
+            const cibleLat = colisRecupere ? (destGpsLat || maCourse.gps_arrivee_lat) : maCourse.gps_depart_lat;
+            const cibleLng = colisRecupere ? (destGpsLng || maCourse.gps_arrivee_lng) : maCourse.gps_depart_lng;
 
             // Distance affichée = livreur → cible (temps réel) si disponible, sinon distance réelle post-livraison
             const distLivreurCible = livreurLat && livreurLng && cibleLat && cibleLng
