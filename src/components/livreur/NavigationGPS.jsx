@@ -98,17 +98,17 @@ function useContactLive(telephone, enabled = true) {
     const en = enabledRef.current;
     if (!tel || !en) return;
     const variants = phoneVariants(tel);
+    console.log(`[NavigationGPS] Recherche contact, tél=${tel}, variantes=`, variants);
     try {
-      // Requêtes séquentielles : dès qu'un résultat est trouvé, on s'arrête
       for (const v of variants) {
         const res = await base44.entities.ClientExterne.filter({ telephone: v }).catch(() => []);
         if (res?.length > 0) {
           const client = res[0];
           const gpsActif = !!(client.latitude && client.longitude);
-          // Priorité : last_seen_at (heartbeat GPS) > updated_date > created_date
           const lastSeen = client.last_seen_at || client.updated_date || client.created_date;
           const ageSec = lastSeen ? (Date.now() - new Date(lastSeen).getTime()) / 1000 : Infinity;
           const connecte = client.actif !== false && ageSec < 300;
+          console.log(`[NavigationGPS] Contact trouvé via variante="${v}":`, { nom: client.nom, gpsActif, lat: client.latitude, lng: client.longitude, lastSeen, ageSec: Math.round(ageSec) });
           setState({
             client,
             gps: gpsActif ? { lat: client.latitude, lng: client.longitude } : null,
@@ -120,7 +120,10 @@ function useContactLive(telephone, enabled = true) {
           return;
         }
       }
-    } catch (_) {}
+      console.warn(`[NavigationGPS] Aucun ClientExterne trouvé pour tél=${tel} (${variants.length} variantes testées)`);
+    } catch (e) {
+      console.error(`[NavigationGPS] Erreur fetchGps:`, e);
+    }
     setState(prev => ({ ...prev, loading: false }));
   }).current;
 
