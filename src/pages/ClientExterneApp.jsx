@@ -132,9 +132,9 @@ export default function ClientExterneApp() {
         }
       } catch (_) {}
     };
-    // Vérifier au montage et toutes les 10s
+    // Vérifier au montage et toutes les 60s (notation non urgente)
     checkCourseNotation();
-    const iv = setInterval(checkCourseNotation, 10000);
+    const iv = setInterval(checkCourseNotation, 60000); // ⚡ 10s → 60s
     return () => clearInterval(iv);
   }, [clientProfil?.id, notationShownFor]);
 
@@ -216,7 +216,11 @@ export default function ClientExterneApp() {
 
   // Watch GPS continu (15s) — comme les livreurs
   // Met aussi à jour le quartier toutes les 5 min via reverse geocoding
+  // syncGpsDestinataire appelé ici (toutes les 15s) au lieu du polling (toutes les 5s) → -66% requêtes
   const lastQuartierSync = useRef(0);
+  const clientProfilForGps = useRef(null);
+  useEffect(() => { clientProfilForGps.current = clientProfil; }, [clientProfil]);
+
   useEffect(() => {
     if (!clientProfil?.id || !onboardingDone || !gpsActif) return;
     const interval = setInterval(() => {
@@ -240,6 +244,9 @@ export default function ClientExterneApp() {
             longitude: pos.coords.longitude,
             ...quartierUpdate,
           }).catch(() => null);
+          // syncGpsDestinataire ici (15s) — pas dans le polling 8s pour réduire les requêtes
+          const profil = clientProfilForGps.current;
+          if (profil) syncGpsDestinataire(posData, profil);
         },
         () => setGpsActif(false),
         { enableHighAccuracy: true }
@@ -272,13 +279,13 @@ export default function ClientExterneApp() {
     return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, [onboardingDone, clientProfil?.id]);
 
-  // Polling automatique des courses actives toutes les 5s + synchronisation GPS destinataire
+  // Polling automatique des courses actives toutes les 8s
+  // syncGpsDestinataire est appelé uniquement dans le watch GPS (15s) pour éviter le rate limit
   useEffect(() => {
     if (!onboardingDone || !clientProfil || !position) return;
     const interval = setInterval(() => {
       checkStatus(position, clientProfil);
-      syncGpsDestinataire(position, clientProfil);
-    }, 5000);
+    }, 8000); // ⚡ 5s → 8s : checkStatus fait 4-5 requêtes imbriquées
     return () => clearInterval(interval);
   }, [onboardingDone, clientProfil?.id, position]);
 

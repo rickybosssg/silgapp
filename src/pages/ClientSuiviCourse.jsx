@@ -147,9 +147,8 @@ export default function ClientSuiviCourse() {
     },
     enabled: !!userId,
     initialData: [],
-    refetchInterval: 2000, // CORRECTION : 2s au lieu de 5s
-    staleTime: 0, // Toujours frais
-    cacheTime: 0, // Pas de cache
+    refetchInterval: 5000, // ⚡ 2s → 5s : 4 requêtes imbriquées par poll = ~48/min max
+    staleTime: 2000,
   });
 
   // Toutes les courses actives / terminées

@@ -75,28 +75,30 @@ function useContactLive(telephone, enabled = true) {
     if (!tel || !en) return;
     const norm = normalizePhone(tel);
     const local = norm.startsWith("226") ? norm.slice(3) : norm;
-    const queries = [norm, local, tel];
-    for (const q of queries) {
-      try {
-        const res = await base44.entities.ClientExterne.filter({ telephone: q });
-        if (res?.length > 0) {
-          const client = res[0];
-          const gpsActif = !!(client.latitude && client.longitude);
-          const lastSeen = client.updated_date || client.created_date;
-          const ageSec = lastSeen ? (Date.now() - new Date(lastSeen).getTime()) / 1000 : Infinity;
-          const connecte = client.actif !== false && ageSec < 300;
-          setState({
-            client,
-            gps: gpsActif ? { lat: client.latitude, lng: client.longitude } : null,
-            connecte,
-            gpsActif,
-            lastUpdate: lastSeen,
-            loading: false,
-          });
-          return;
-        }
-      } catch (_) {}
-    }
+    // ⚡ CORRECTION RATE LIMIT : une seule requête avec le numéro local (8 chiffres)
+    // au lieu de 3 requêtes en cascade. Fallback sur le normalisé si aucun résultat.
+    try {
+      let res = await base44.entities.ClientExterne.filter({ telephone: local });
+      if (!res?.length && local !== norm) {
+        res = await base44.entities.ClientExterne.filter({ telephone: norm });
+      }
+      if (res?.length > 0) {
+        const client = res[0];
+        const gpsActif = !!(client.latitude && client.longitude);
+        const lastSeen = client.updated_date || client.created_date;
+        const ageSec = lastSeen ? (Date.now() - new Date(lastSeen).getTime()) / 1000 : Infinity;
+        const connecte = client.actif !== false && ageSec < 300;
+        setState({
+          client,
+          gps: gpsActif ? { lat: client.latitude, lng: client.longitude } : null,
+          connecte,
+          gpsActif,
+          lastUpdate: lastSeen,
+          loading: false,
+        });
+        return;
+      }
+    } catch (_) {}
     setState(prev => ({ ...prev, loading: false }));
   }).current;
 
@@ -106,7 +108,7 @@ function useContactLive(telephone, enabled = true) {
       return;
     }
     fetchGps();
-    const interval = setInterval(fetchGps, 5000);
+    const interval = setInterval(fetchGps, 8000); // ⚡ 5s → 8s pour limiter les requêtes
     return () => clearInterval(interval);
   }, [telephone, enabled]); // stable car fetchGps est une ref
 

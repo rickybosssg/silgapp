@@ -75,7 +75,7 @@ export default function LiveCounterBadge({ type = "livreurs", className = "" }) 
 
   useEffect(() => {
     fetchCount();
-    const interval = setInterval(fetchCount, 10000); // Mise à jour toutes les 10s
+    const interval = setInterval(fetchCount, 30000); // ⚡ 10s → 30s : badge décoratif, pas critique
     return () => clearInterval(interval);
   }, [type, userCountry]);
 

@@ -56,9 +56,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     select: (data) => Array.isArray(data) ? (data[0] || initialProfil) : initialProfil,
     initialData: [initialProfil],
     enabled: !!initialProfil?.id,
-    refetchInterval: 2000,
-    staleTime: 0,
-    cacheTime: 0,
+    refetchInterval: 8000, // ⚡ 2s → 8s : profil change rarement
+    staleTime: 4000,
   });
 
   // Heartbeat automatique
@@ -97,9 +96,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     },
     enabled: !!livreurId,
     initialData: [],
-    refetchInterval: 1000,
-    staleTime: 0,
-    cacheTime: 0,
+    refetchInterval: 4000, // ⚡ 1s → 4s : évite le rate limit (était 60 req/min)
+    staleTime: 2000,
   });
 
   // ─── Course en attente de réponse ─────────────────────────────────────────
