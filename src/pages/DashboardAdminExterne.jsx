@@ -24,6 +24,7 @@ import StatsPays from "@/components/international/StatsPays.jsx";
 import DownloadStatsPanel from "@/components/admin/DownloadStatsPanel";
 import AlertesLivreursPanel from "@/components/admin/AlertesLivreursPanel";
 import ZonesChaudesWidget from "@/components/carte/ZonesChaudes";
+import ComptabilitePanel from "@/components/admin/ComptabilitePanel";
 
 export default function DashboardAdminExterne() {
   console.log("🚨 DashboardAdminExterne.jsx EST CHARGÉ ET EXÉCUTÉ");
@@ -118,9 +119,9 @@ export default function DashboardAdminExterne() {
       shadow: "shadow-emerald-100",
     },
     {
-      to: "/admin/externe/dus-livreurs",
-      label: "Dus livreurs",
-      sub: "Commissions 30%",
+      scroll: "comptabilite",
+      label: "Comptabilité",
+      sub: "Livreurs & Clients",
       icon: CreditCard,
       grad: "from-orange-500 to-amber-500",
       shadow: "shadow-orange-100",
@@ -189,14 +190,7 @@ export default function DashboardAdminExterne() {
       grad: "from-violet-500 to-indigo-600",
       shadow: "shadow-violet-100",
     },
-    {
-      to: "/admin/frais-annulation",
-      label: "Frais d'annulation",
-      sub: "Clients · 250 FCFA",
-      icon: CreditCard,
-      grad: "from-red-500 to-rose-600",
-      shadow: "shadow-red-100",
-    },
+
   ];
 
   return (
@@ -364,6 +358,11 @@ export default function DashboardAdminExterne() {
       {/* ── ALERTES LIVREURS ─────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm" id="alertes-livreurs">
         <AlertesLivreursPanel />
+      </div>
+
+      {/* ── COMPTABILITÉ LIVREURS & CLIENTS ──────────────────────── */}
+      <div id="comptabilite">
+        <ComptabilitePanel />
       </div>
 
       {/* ── CODES PROMO ──────────────────────────────────────────── */}
