@@ -36,6 +36,7 @@ import ETADisplay from "@/components/client/ETADisplay";
 import HistoriqueCoursesClient from "@/components/client/HistoriqueCoursesClient";
 import FraisAnnulationBannerClient from "@/components/client/FraisAnnulationBannerClient";
 import { useDestinataireGPS } from "@/hooks/useDestinataireGPS";
+import { useSonEtVibration } from "@/hooks/useSonEtVibration";
 
 function buildWhatsAppMessage(course) {
   const trackingUrl = course.tracking_token
@@ -71,12 +72,35 @@ export default function ClientSuiviCourse() {
   }, []);
 
   // Notifications push avec son + vibration pour suivi de course
+  const [notifImportanteRecue, setNotifImportanteRecue] = useState(false);
   useClientNotifications(userEmail, (notif) => {
     // Rafraîchir les courses dès qu'une notification arrive
     if (notif.course_id) {
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      // Déclencher son + vibration pour notifications critiques
+      if (["nouvelle_course", "course_acceptee", "colis_recupere", "en_livraison", "livree"].includes(notif.type)) {
+        setNotifImportanteRecue(true);
+        setTimeout(() => setNotifImportanteRecue(false), 10000);
+      }
     }
   });
+
+  // Son + vibration — identique au système des livreurs
+  useSonEtVibration(notifImportanteRecue, true);
+
+  // Déclencheur direct sur changement de statut critique (fallback si notification ratée)
+  const [prevStatut, setPrevStatut] = useState(null);
+  useEffect(() => {
+    if (!maCourse?.statut || prevStatut === maCourse.statut) return;
+    
+    const statutsCritiques = ["livreur_en_route", "colis_recupere", "en_livraison", "livree"];
+    if (statutsCritiques.includes(maCourse.statut) && !statutsCritiques.includes(prevStatut)) {
+      setNotifImportanteRecue(true);
+      setTimeout(() => setNotifImportanteRecue(false), 10000);
+    }
+    
+    setPrevStatut(maCourse.statut);
+  }, [maCourse?.statut, prevStatut]);
 
   // Récupérer l'ID user pour filtrer correctement
   useEffect(() => {
