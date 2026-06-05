@@ -393,21 +393,7 @@ export default function CourseStepForm({
               <p className="text-sm text-gray-500 mt-1.5">Votre adresse de récupération</p>
             </div>
 
-            {!formData.recuperationGPS ? (
-              <button
-                type="button"
-                onClick={gpsHandlers?.onGetGPSDepart}
-                className="w-full rounded-3xl bg-gradient-to-r from-primary to-red-600 text-white font-bold text-base shadow-xl shadow-primary/30 active:scale-[0.98] transition-all overflow-hidden"
-              >
-                <div className="flex flex-col items-center justify-center gap-1 py-5 px-4">
-                  <div className="flex items-center gap-2 text-lg font-black">
-                    <Navigation className="w-6 h-6" />
-                    Utiliser ma position actuelle
-                  </div>
-                  <p className="text-xs text-red-100 font-normal">📍 Détection automatique de votre position</p>
-                </div>
-              </button>
-            ) : (
+            {formData.recuperationGPS ? (
               <div className="flex items-center gap-4 p-5 rounded-3xl bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 shadow-sm">
                 <div className="w-12 h-12 rounded-2xl bg-green-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-green-200">
                   <CheckCircle className="w-6 h-6 text-white" />
@@ -429,21 +415,37 @@ export default function CourseStepForm({
                   Changer
                 </button>
               </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={gpsHandlers?.onGetGPSDepart}
+                  className="w-full rounded-3xl bg-gradient-to-r from-primary to-red-600 text-white font-bold text-base shadow-xl shadow-primary/30 active:scale-[0.98] transition-all overflow-hidden"
+                >
+                  <div className="flex flex-col items-center justify-center gap-1 py-5 px-4">
+                    <div className="flex items-center gap-2 text-lg font-black">
+                      <Navigation className="w-6 h-6" />
+                      Utiliser ma position actuelle
+                    </div>
+                    <p className="text-xs text-red-100 font-normal">📍 Détection automatique de votre position</p>
+                  </div>
+                </button>
+
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px bg-gray-200" />
+                  <span className="text-xs text-gray-400 font-medium">ou saisir manuellement</span>
+                  <div className="flex-1 h-px bg-gray-200" />
+                </div>
+
+                <PremiumInput
+                  label="Adresse de récupération"
+                  required={false}
+                  value={formData.adresse_depart}
+                  onChange={(e) => setFormData({ ...formData, adresse_depart: e.target.value })}
+                  placeholder="Quartier, rue, point de repère... (optionnel)"
+                />
+              </>
             )}
-
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-px bg-gray-200" />
-              <span className="text-xs text-gray-400 font-medium">ou saisir manuellement</span>
-              <div className="flex-1 h-px bg-gray-200" />
-            </div>
-
-            <PremiumInput
-              label={`Adresse de récupération ${formData.recuperationGPS ? "" : "*"}`}
-              required={!formData.recuperationGPS}
-              value={formData.adresse_depart}
-              onChange={(e) => setFormData({ ...formData, adresse_depart: e.target.value })}
-              placeholder="Quartier, rue, point de repère..."
-            />
           </div>
         );
       }
@@ -760,7 +762,7 @@ export default function CourseStepForm({
     if (step === 0) return !formData.type_course;
     if (step === 1) {
       if (isRecevoir) return !formData.expediteur_telephone;
-      if (isExpedie) return !formData.adresse_depart && !formData.recuperationGPS;
+      // "expedier" : adresse de récupération optionnelle — toujours continuer
     }
     if (step === 2) {
       if (isExpedie) return !formData.destinataire_telephone;
