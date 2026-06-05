@@ -107,7 +107,7 @@ function useContactLive(telephone, enabled = true) {
         if (res?.length > 0) {
           const client = res[0];
           const gpsActif = !!(client.latitude && client.longitude);
-          const lastSeen = client.updated_date || client.created_date;
+          const lastSeen = client.last_seen_at || client.updated_date || client.created_date;
           const ageSec = lastSeen ? (Date.now() - new Date(lastSeen).getTime()) / 1000 : Infinity;
           const connecte = client.actif !== false && ageSec < 300;
           setState({
@@ -289,7 +289,7 @@ export default function NavigationGPS({
                 }
               </p>
             ) : (
-              <p className="text-[10px] text-gray-500">Synchronisation GPS inconnue</p>
+              <p className="text-[10px] text-green-600">GPS actif — synchronisation en cours</p>
             )}
           </div>
           <button onClick={refetch} className={cn(
@@ -311,7 +311,7 @@ export default function NavigationGPS({
               {destClient?.prenom || destClient?.nom || "Destinataire"} — GPS non disponible
             </p>
             <p className="text-[10px] text-gray-400">
-              {lastUpdate ? `Dernière sync il y a ${dureeDepuis(lastUpdate)}` : "Synchronisation GPS inconnue"}
+              {lastUpdate ? `Dernière sync il y a ${dureeDepuis(lastUpdate)}` : "GPS non disponible"}
             </p>
           </div>
         </div>
@@ -322,7 +322,7 @@ export default function NavigationGPS({
     return (
       <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5">
         <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-        <p className="text-[10px] text-gray-400">Synchronisation GPS inconnue</p>
+        <p className="text-[10px] text-gray-400">Position fixe de la course</p>
       </div>
     );
   };
