@@ -480,6 +480,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 destLng={course.gps_depart_lng}
                 destLabel={course.adresse_depart}
                 destinataireTelephone={course.expediteur_telephone || course.client_telephone}
+                contactClientId={course.expediteur_client_id || null}
               />
             ) : (
               // ✅ CORRECTION AUDIT : NavigationGPS relit le GPS du destinataire toutes les 5s via ClientExterne
@@ -491,7 +492,12 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 destLat={course.gps_arrivee_lat}
                 destLng={course.gps_arrivee_lng}
                 destLabel={course.adresse_arrivee}
-                destinataireTelephone={course.destinataire_phone_normalized || course.destinataire_telephone}
+                destinataireTelephone={
+                  course.destinataire_telephone ||
+                  course.destinataire_phone_normalized ||
+                  course.client_telephone
+                }
+                contactClientId={course.destinataire_client_id || null}
                 destinationInconnue={!!course.destination_inconnue}
               />
             )

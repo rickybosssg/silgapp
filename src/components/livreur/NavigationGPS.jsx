@@ -48,11 +48,11 @@ function dureeDepuis(isoDate) {
 
 /**
  * Hook générique : récupère et rafraîchit la position GPS d'un contact depuis ClientExterne
- * Cherche par téléphone (normalisé ou brut)
+ * Cherche par téléphone (normalisé ou brut) — toutes variantes en parallèle
  * Retourne { client, gps, connecte, gpsActif, lastUpdate, loading }
  * Utilisé pour EXPÉDITEUR (récupération) ET DESTINATAIRE (livraison)
  */
-function useContactLive(telephone, enabled = true) {
+function useContactLive(telephone, enabled = true, clientId = null) {
   const [state, setState] = useState({ client: null, gps: null, connecte: false, gpsActif: false, lastUpdate: null, loading: true });
 
   // useRef pour stabiliser fetchGps et éviter recreations en boucle
@@ -61,22 +61,61 @@ function useContactLive(telephone, enabled = true) {
   useEffect(() => { telephoneRef.current = telephone; }, [telephone]);
   useEffect(() => { enabledRef.current = enabled; }, [enabled]);
 
+  const clientIdRef = useRef(clientId);
+  useEffect(() => { clientIdRef.current = clientId; }, [clientId]);
+
   const fetchGps = useRef(async () => {
     const tel = telephoneRef.current;
     const en = enabledRef.current;
-    if (!tel || !en) return;
-    const variants = phoneVariants(tel);
+    const cid = clientIdRef.current;
+    if (!en) return;
+
+    // 1. Si on a l'ID direct → récupération directe (plus fiable que la recherche par tél)
+    if (cid) {
+      try {
+        const res = await base44.entities.ClientExterne.filter({ id: cid }).catch(() => []);
+        if (res?.length > 0) {
+          const client = res[0];
+          const gpsActif = !!(client.latitude && client.longitude);
+          const lastSeen = client.last_seen_at || client.updated_date || client.created_date;
+          const ageSec = lastSeen ? (Date.now() - new Date(lastSeen).getTime()) / 1000 : Infinity;
+          console.log(`[NavigationGPS] ✅ Contact trouvé par ID="${cid}":`, { nom: client.nom, gpsActif, lat: client.latitude, lng: client.longitude });
+          setState({
+            client,
+            gps: gpsActif ? { lat: client.latitude, lng: client.longitude } : null,
+            connecte: client.actif !== false && ageSec < 300,
+            gpsActif,
+            lastUpdate: lastSeen,
+            loading: false,
+          });
+          return;
+        }
+      } catch (_) {}
+    }
+
+    if (!tel) { setState(prev => ({ ...prev, loading: false })); return; }
+
+    // 2. Recherche par téléphone — toutes variantes en parallèle
+    // Générer les variantes ET ajouter le format brut tel quel (au cas où stocké avec des espaces ou +)
+    const rawClean = tel.replace(/\s/g, "").replace(/^\+/, "");
+    const variantsSet = new Set([...phoneVariants(tel), rawClean, tel.replace(/\s/g, "")]);
+    const variants = [...variantsSet].filter(Boolean);
+
     console.log(`[NavigationGPS] Recherche contact, tél=${tel}, variantes=`, variants);
     try {
-      for (const v of variants) {
-        const res = await base44.entities.ClientExterne.filter({ telephone: v }).catch(() => []);
+      // Requêtes parallèles pour toutes les variantes (plus rapide)
+      const results = await Promise.all(
+        variants.map(v => base44.entities.ClientExterne.filter({ telephone: v }).catch(() => []))
+      );
+      for (let i = 0; i < results.length; i++) {
+        const res = results[i];
         if (res?.length > 0) {
           const client = res[0];
           const gpsActif = !!(client.latitude && client.longitude);
           const lastSeen = client.last_seen_at || client.updated_date || client.created_date;
           const ageSec = lastSeen ? (Date.now() - new Date(lastSeen).getTime()) / 1000 : Infinity;
           const connecte = client.actif !== false && ageSec < 300;
-          console.log(`[NavigationGPS] Contact trouvé via variante="${v}":`, { nom: client.nom, gpsActif, lat: client.latitude, lng: client.longitude, lastSeen, ageSec: Math.round(ageSec) });
+          console.log(`[NavigationGPS] ✅ Contact trouvé via variante="${variants[i]}":`, { nom: client.nom, gpsActif, lat: client.latitude, lng: client.longitude, lastSeen, ageSec: Math.round(ageSec) });
           setState({
             client,
             gps: gpsActif ? { lat: client.latitude, lng: client.longitude } : null,
@@ -88,11 +127,11 @@ function useContactLive(telephone, enabled = true) {
           return;
         }
       }
-      console.warn(`[NavigationGPS] Aucun ClientExterne trouvé pour tél=${tel} (${variants.length} variantes testées)`);
+      console.warn(`[NavigationGPS] ❌ Aucun ClientExterne trouvé pour tél="${tel}" — variantes testées:`, variants);
     } catch (e) {
       console.error(`[NavigationGPS] Erreur fetchGps:`, e);
     }
-    setState(prev => ({ ...prev, loading: false }));
+    setState(prev => ({ ...prev, loading: false, client: prev.client }));
   }).current;
 
   useEffect(() => {
@@ -128,6 +167,7 @@ export default function NavigationGPS({
   destLabel,
   destinataireTelephone,
   destinationInconnue,
+  contactClientId, // ID direct du ClientExterne (prioritaire sur le téléphone)
 }) {
   const [livreurPos, setLivreurPos] = useState(null);
   const [dist, setDist] = useState(null);
@@ -136,11 +176,8 @@ export default function NavigationGPS({
 
   const isLivraison = phase === "livraison";
 
-  // ✅ CORRECTION AUDIT : relire le GPS du contact (expéditeur OU destinataire) toutes les 5s
-  // Phase récupération → on suit l'expéditeur (destinataireTelephone = expediteur_telephone)
-  // Phase livraison    → on suit le destinataire
   const { gps: contactGps, connecte, gpsActif: contactGpsActif, lastUpdate, loading: destLoading, client: destClient, refetch } =
-    useContactLive(destinataireTelephone || null, !!destinataireTelephone);
+    useContactLive(destinataireTelephone || null, !!(destinataireTelephone || contactClientId), contactClientId || null);
 
   // Destination effective : GPS live du contact (PRIORITÉ ABSOLUE), sinon coordonnées fixes
   // useMemo pour stabiliser les références et éviter les re-renders infinis
@@ -229,7 +266,13 @@ export default function NavigationGPS({
 
   // Bandeau statut GPS destinataire avec fraîcheur de synchronisation
   const DestStatut = () => {
-    if (destLoading) return null;
+    // Pendant le chargement → spinner discret, pas de label définitif
+    if (destLoading) return (
+      <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5">
+        <div className="w-2 h-2 rounded-full bg-gray-300 animate-pulse flex-shrink-0" />
+        <p className="text-[10px] text-gray-400">Vérification GPS du destinataire...</p>
+      </div>
+    );
 
     // Calcul de l'âge de la position GPS
     const ageSec = lastUpdate ? (Date.now() - new Date(lastUpdate).getTime()) / 1000 : null;

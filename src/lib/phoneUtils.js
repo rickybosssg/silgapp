@@ -81,6 +81,7 @@ export function normalizePhone(phone, countryCode = null) {
  * Maximum 3 variantes retournées.
  */
 export function phoneVariants(phone) {
+  // Nettoyer : supprimer espaces, tirets, parenthèses, ET le "+" initial
   const n = (phone || "").replace(/\D/g, "");
   if (!n) return [];
   const variants = new Set([n]);
