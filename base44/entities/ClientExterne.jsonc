@@ -54,6 +54,11 @@
       "default": true,
       "description": "Compte actif ou bloqu\u00e9"
     },
+    "bloque_frais_annulation": {
+      "type": "boolean",
+      "default": false,
+      "description": "Client bloqu\u00e9 pour frais d'annulation impay\u00e9s"
+    },
     "user_email": {
       "type": "string",
       "description": "Email du compte utilisateur li\u00e9"

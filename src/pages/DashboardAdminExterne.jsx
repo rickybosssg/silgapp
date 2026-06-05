@@ -189,6 +189,14 @@ export default function DashboardAdminExterne() {
       grad: "from-violet-500 to-indigo-600",
       shadow: "shadow-violet-100",
     },
+    {
+      to: "/admin/frais-annulation",
+      label: "Frais d'annulation",
+      sub: "Clients · 250 FCFA",
+      icon: CreditCard,
+      grad: "from-red-500 to-rose-600",
+      shadow: "shadow-red-100",
+    },
   ];
 
   return (

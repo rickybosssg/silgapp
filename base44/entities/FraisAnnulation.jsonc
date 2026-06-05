@@ -1,0 +1,68 @@
+{
+  "name": "FraisAnnulation",
+  "type": "object",
+  "properties": {
+    "course_id": {
+      "type": "string",
+      "description": "ID de la CourseExterne annul\u00e9e"
+    },
+    "client_id": {
+      "type": "string",
+      "description": "ID du ClientExterne"
+    },
+    "client_nom": {
+      "type": "string",
+      "description": "Nom du client"
+    },
+    "client_telephone": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone du client"
+    },
+    "livreur_id": {
+      "type": "string",
+      "description": "ID du livreur concern\u00e9"
+    },
+    "livreur_nom": {
+      "type": "string",
+      "description": "Nom du livreur concern\u00e9"
+    },
+    "montant": {
+      "type": "number",
+      "default": 250,
+      "description": "Montant des frais en FCFA"
+    },
+    "statut_paiement": {
+      "type": "string",
+      "enum": [
+        "impaye",
+        "paye"
+      ],
+      "default": "impaye",
+      "description": "Statut du paiement des frais"
+    },
+    "raison": {
+      "type": "string",
+      "default": "Annulation apr\u00e8s acceptation livreur",
+      "description": "Raison des frais"
+    },
+    "date_annulation": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date et heure de l'annulation"
+    },
+    "paye_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de paiement"
+    },
+    "admin_traitement": {
+      "type": "string",
+      "description": "Admin ayant trait\u00e9 le paiement"
+    }
+  },
+  "required": [
+    "course_id",
+    "client_id",
+    "client_telephone"
+  ]
+}
