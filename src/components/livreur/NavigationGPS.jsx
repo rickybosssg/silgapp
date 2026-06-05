@@ -21,13 +21,37 @@ function computeETA(distKm) {
   return Math.round((distKm / 25) * 60);
 }
 
-// Normaliser numéro BF
-function normalizePhone(num) {
+// Indicatifs téléphoniques tous pays SILGAPP
+const COUNTRY_DIALCODES = [
+  { code: "226", len: 8 },  // BF
+  { code: "225", len: 10 }, // CI
+  { code: "228", len: 8 },  // TG
+  { code: "229", len: 8 },  // BJ
+  { code: "221", len: 9 },  // SN
+  { code: "223", len: 8 },  // ML
+  { code: "224", len: 9 },  // GN
+  { code: "227", len: 8 },  // NE
+];
+
+// Génère toutes les variantes d'un numéro (tous pays SILGAPP)
+function phoneVariants(num) {
   const n = (num || "").replace(/\D/g, "");
-  if (n.startsWith("226") && n.length === 11) return n;
-  if (n.length === 8) return "226" + n;
-  if (n.startsWith("0") && n.length === 9) return "226" + n.slice(1);
-  return n;
+  if (!n) return [n];
+  const variants = new Set([n]);
+  for (const { code, len } of COUNTRY_DIALCODES) {
+    if (n.startsWith(code) && n.length === code.length + len) {
+      variants.add(n.slice(code.length));
+      variants.add(n);
+    }
+    if (n.length === len && !n.startsWith("0")) {
+      variants.add(code + n);
+    }
+    if (n.startsWith("0") && n.length === len + 1) {
+      variants.add(n.slice(1));
+      variants.add(code + n.slice(1));
+    }
+  }
+  return [...variants];
 }
 
 function openGoogleMaps(originLat, originLng, destLat, destLng) {
@@ -73,30 +97,26 @@ function useContactLive(telephone, enabled = true) {
     const tel = telephoneRef.current;
     const en = enabledRef.current;
     if (!tel || !en) return;
-    const norm = normalizePhone(tel);
-    const local = norm.startsWith("226") ? norm.slice(3) : norm;
-    // ⚡ CORRECTION RATE LIMIT : une seule requête avec le numéro local (8 chiffres)
-    // au lieu de 3 requêtes en cascade. Fallback sur le normalisé si aucun résultat.
+    const variants = phoneVariants(tel);
     try {
-      let res = await base44.entities.ClientExterne.filter({ telephone: local });
-      if (!res?.length && local !== norm) {
-        res = await base44.entities.ClientExterne.filter({ telephone: norm });
-      }
-      if (res?.length > 0) {
-        const client = res[0];
-        const gpsActif = !!(client.latitude && client.longitude);
-        const lastSeen = client.updated_date || client.created_date;
-        const ageSec = lastSeen ? (Date.now() - new Date(lastSeen).getTime()) / 1000 : Infinity;
-        const connecte = client.actif !== false && ageSec < 300;
-        setState({
-          client,
-          gps: gpsActif ? { lat: client.latitude, lng: client.longitude } : null,
-          connecte,
-          gpsActif,
-          lastUpdate: lastSeen,
-          loading: false,
-        });
-        return;
+      for (const variant of variants) {
+        const res = await base44.entities.ClientExterne.filter({ telephone: variant });
+        if (res?.length > 0) {
+          const client = res[0];
+          const gpsActif = !!(client.latitude && client.longitude);
+          const lastSeen = client.updated_date || client.created_date;
+          const ageSec = lastSeen ? (Date.now() - new Date(lastSeen).getTime()) / 1000 : Infinity;
+          const connecte = client.actif !== false && ageSec < 300;
+          setState({
+            client,
+            gps: gpsActif ? { lat: client.latitude, lng: client.longitude } : null,
+            connecte,
+            gpsActif,
+            lastUpdate: lastSeen,
+            loading: false,
+          });
+          return;
+        }
       }
     } catch (_) {}
     setState(prev => ({ ...prev, loading: false }));
