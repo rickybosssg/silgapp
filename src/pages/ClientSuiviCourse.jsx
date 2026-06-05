@@ -88,20 +88,6 @@ export default function ClientSuiviCourse() {
   // Son + vibration — identique au système des livreurs
   useSonEtVibration(notifImportanteRecue, true);
 
-  // Déclencheur direct sur changement de statut critique (fallback si notification ratée)
-  const [prevStatut, setPrevStatut] = useState(null);
-  useEffect(() => {
-    if (!maCourse?.statut || prevStatut === maCourse.statut) return;
-    
-    const statutsCritiques = ["livreur_en_route", "colis_recupere", "en_livraison", "livree"];
-    if (statutsCritiques.includes(maCourse.statut) && !statutsCritiques.includes(prevStatut)) {
-      setNotifImportanteRecue(true);
-      setTimeout(() => setNotifImportanteRecue(false), 10000);
-    }
-    
-    setPrevStatut(maCourse.statut);
-  }, [maCourse?.statut, prevStatut]);
-
   // Récupérer l'ID user pour filtrer correctement
   useEffect(() => {
     base44.auth.me().then(u => setUserId(u?.id)).catch(() => null);
@@ -198,6 +184,20 @@ export default function ClientSuiviCourse() {
   // Course sélectionnée : celle choisie ou la première active ou la dernière
   const maCourse = (selectedCourseId ? courses.find(c => c.id === selectedCourseId) : null)
     || coursesActives[0] || courses[0] || null;
+
+  // Déclencheur direct sur changement de statut critique (fallback si notification ratée)
+  const [prevStatut, setPrevStatut] = useState(null);
+  useEffect(() => {
+    if (!maCourse?.statut || prevStatut === maCourse.statut) return;
+    
+    const statutsCritiques = ["livreur_en_route", "colis_recupere", "en_livraison", "livree"];
+    if (statutsCritiques.includes(maCourse.statut) && !statutsCritiques.includes(prevStatut)) {
+      setNotifImportanteRecue(true);
+      setTimeout(() => setNotifImportanteRecue(false), 10000);
+    }
+    
+    setPrevStatut(maCourse.statut);
+  }, [maCourse?.statut, prevStatut]);
 
   // Auto-affichage notation quand course passe en "livree"
   useEffect(() => {
