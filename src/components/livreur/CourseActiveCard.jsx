@@ -491,7 +491,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 destLat={course.gps_arrivee_lat}
                 destLng={course.gps_arrivee_lng}
                 destLabel={course.adresse_arrivee}
-                destinataireTelephone={course.destinataire_telephone}
+                destinataireTelephone={course.destinataire_phone_normalized || course.destinataire_telephone}
                 destinationInconnue={!!course.destination_inconnue}
               />
             )

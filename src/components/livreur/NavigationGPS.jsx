@@ -99,14 +99,13 @@ function useContactLive(telephone, enabled = true) {
     if (!tel || !en) return;
     const variants = phoneVariants(tel);
     try {
-      // Requêtes parallèles (max 2 variantes)
-      const results = await Promise.all(
-        variants.map(v => base44.entities.ClientExterne.filter({ telephone: v }).catch(() => []))
-      );
-      for (const res of results) {
+      // Requêtes séquentielles : dès qu'un résultat est trouvé, on s'arrête
+      for (const v of variants) {
+        const res = await base44.entities.ClientExterne.filter({ telephone: v }).catch(() => []);
         if (res?.length > 0) {
           const client = res[0];
           const gpsActif = !!(client.latitude && client.longitude);
+          // Priorité : last_seen_at (heartbeat GPS) > updated_date > created_date
           const lastSeen = client.last_seen_at || client.updated_date || client.created_date;
           const ageSec = lastSeen ? (Date.now() - new Date(lastSeen).getTime()) / 1000 : Infinity;
           const connecte = client.actif !== false && ageSec < 300;
