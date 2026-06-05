@@ -55,11 +55,12 @@ function dureeDepuis(isoDate) {
 }
 
 /**
- * Hook : récupère et rafraîchit la position GPS du destinataire depuis ClientExterne
+ * Hook générique : récupère et rafraîchit la position GPS d'un contact depuis ClientExterne
  * Cherche par téléphone (normalisé ou brut)
  * Retourne { client, gps, connecte, gpsActif, lastUpdate, loading }
+ * Utilisé pour EXPÉDITEUR (récupération) ET DESTINATAIRE (livraison)
  */
-function useDestinataireLive(telephone, enabled = true) {
+function useContactLive(telephone, enabled = true) {
   const [state, setState] = useState({ client: null, gps: null, connecte: false, gpsActif: false, lastUpdate: null, loading: true });
 
   // useRef pour stabiliser fetchGps et éviter recreations en boucle
@@ -112,14 +113,17 @@ function useDestinataireLive(telephone, enabled = true) {
   return { ...state, refetch: fetchGps };
 }
 
+// Alias pour compatibilité
+const useDestinataireLive = useContactLive;
+
 /**
- * NavigationGPS — navigation + suivi temps réel destinataire
+ * NavigationGPS — navigation + suivi temps réel expéditeur/destinataire
  *
  * Props:
  *   phase: "recuperation" | "livraison"
- *   destLat, destLng: coordonnées destination fixe
+ *   destLat, destLng: coordonnées destination fixe (fallback si pas de GPS live)
  *   destLabel: texte adresse
- *   destinataireTelephone: numéro destinataire (pour contacts + recherche GPS)
+ *   destinataireTelephone: numéro du contact cible (expéditeur ou destinataire)
  *   destinationInconnue: boolean
  */
 export default function NavigationGPS({
@@ -137,21 +141,23 @@ export default function NavigationGPS({
 
   const isLivraison = phase === "livraison";
 
-  // Suivi GPS destinataire uniquement en phase livraison
-  const { gps: destGps, connecte, gpsActif: destGpsActif, lastUpdate, loading: destLoading, client: destClient, refetch } =
-    useDestinataireLive(isLivraison ? destinataireTelephone : null, isLivraison);
+  // ✅ CORRECTION AUDIT : relire le GPS du contact (expéditeur OU destinataire) toutes les 5s
+  // Phase récupération → on suit l'expéditeur (destinataireTelephone = expediteur_telephone)
+  // Phase livraison    → on suit le destinataire
+  const { gps: contactGps, connecte, gpsActif: contactGpsActif, lastUpdate, loading: destLoading, client: destClient, refetch } =
+    useContactLive(destinataireTelephone || null, !!destinataireTelephone);
 
-  // Destination effective : GPS destinataire si disponible (PRIORITÉ ABSOLUE), sinon coordonnées fixes
+  // Destination effective : GPS live du contact (PRIORITÉ ABSOLUE), sinon coordonnées fixes
   // useMemo pour stabiliser les références et éviter les re-renders infinis
   const effectiveLat = useMemo(
-    () => (isLivraison && destGps?.lat) ? destGps.lat : (destLat || null),
-    [isLivraison, destGps?.lat, destLat]
+    () => contactGps?.lat || destLat || null,
+    [contactGps?.lat, destLat]
   );
   const effectiveLng = useMemo(
-    () => (isLivraison && destGps?.lng) ? destGps.lng : (destLng || null),
-    [isLivraison, destGps?.lng, destLng]
+    () => contactGps?.lng || destLng || null,
+    [contactGps?.lng, destLng]
   );
-  const usesLiveGps = isLivraison && !!(destGps?.lat && destGps?.lng);
+  const usesLiveGps = !!(contactGps?.lat && contactGps?.lng);
 
   // CRITICAL : canNavigate doit être vrai si le GPS du destinataire existe, même si destinationInconnue=true
   const canNavigate = !!(effectiveLat && effectiveLng);
@@ -191,6 +197,23 @@ export default function NavigationGPS({
     if (!canNavigate) return null;
     return (
       <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
+        {/* ✅ Indicateur GPS live expéditeur */}
+        {usesLiveGps && destClient && (
+          <div className="flex items-center gap-2 bg-amber-100 border border-amber-200 rounded-xl px-3 py-2">
+            <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-amber-800">
+                {destClient?.prenom || destClient?.nom || "Expéditeur"} — GPS actif
+              </p>
+              {lastUpdate && (
+                <p className="text-[10px] text-amber-600">Mis à jour il y a {dureeDepuis(lastUpdate)}</p>
+              )}
+            </div>
+            <button onClick={refetch} className="p-1 rounded-lg hover:bg-amber-200 transition-colors">
+              <RefreshCw className="w-3.5 h-3.5 text-amber-600" />
+            </button>
+          </div>
+        )}
         {dist !== null && (
           <ETABar dist={dist} eta={eta} color="amber" />
         )}
@@ -200,7 +223,7 @@ export default function NavigationGPS({
           label="Naviguer vers la récupération"
           color="amber"
         />
-        {destLabel && (
+        {destLabel && !usesLiveGps && (
           <p className="text-xs text-center text-amber-700 truncate">{destLabel}</p>
         )}
       </div>
@@ -212,7 +235,7 @@ export default function NavigationGPS({
   // Bandeau statut destinataire
   const DestStatut = () => {
     if (destLoading) return null;
-    if (destGpsActif) {
+    if (contactGpsActif) {
       return (
         <div className="flex items-center gap-2 bg-green-100 border border-green-200 rounded-xl px-3 py-2">
           <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse flex-shrink-0" />

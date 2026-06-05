@@ -406,13 +406,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   {course.adresse_depart}
                 </p>
               </div>
-              {course.gps_depart_lat && !colisRecupere && (
-                <a href={`https://www.google.com/maps?q=${course.gps_depart_lat},${course.gps_depart_lng}`} target="_blank" rel="noreferrer">
-                  <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <Navigation className="w-4 h-4 text-primary" />
-                  </div>
-                </a>
-              )}
+              {/* Lien navigation statique supprimé — NavigationGPS gère la navigation avec GPS live */}
             </div>
 
             <div className="flex items-center gap-3 px-4">
@@ -476,17 +470,21 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           {/* Navigation GPS — affiché si coordonnées GPS disponibles */}
           {!colisLivre && (
             !colisRecupere ? (
-              (course.gps_depart_lat && course.gps_depart_lng) && (
-                <NavigationGPS
-                  key={`nav-recup-${course.id}`}
-                  phase="recuperation"
-                  destLat={course.gps_depart_lat}
-                  destLng={course.gps_depart_lng}
-                  destLabel={course.adresse_depart}
-                  destinataireTelephone={course.expediteur_telephone || course.client_telephone}
-                />
-              )
+              // ✅ CORRECTION AUDIT : NavigationGPS relit le GPS de l'expéditeur toutes les 5s via ClientExterne
+              // destLat/destLng sont les coords fixes enregistrées à la création (fallback)
+              // Le GPS live de l'expéditeur est prioritaire si disponible
+              <NavigationGPS
+                key={`nav-recup-${course.id}`}
+                phase="recuperation"
+                destLat={course.gps_depart_lat}
+                destLng={course.gps_depart_lng}
+                destLabel={course.adresse_depart}
+                destinataireTelephone={course.expediteur_telephone || course.client_telephone}
+              />
             ) : (
+              // ✅ CORRECTION AUDIT : NavigationGPS relit le GPS du destinataire toutes les 5s via ClientExterne
+              // destLat/destLng sont les coords fixes enregistrées à la création (fallback)
+              // Le GPS live du destinataire est prioritaire si disponible
               <NavigationGPS
                 key={`nav-livraison-${course.id}`}
                 phase="livraison"
