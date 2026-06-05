@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -10,12 +9,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Package, Truck, Clock, XCircle, CheckCircle, Info, CreditCard } from "lucide-react";
+import {
+  AlertTriangle, Package, Truck, Clock,
+  XCircle, CheckCircle, Info, CreditCard, Loader2
+} from "lucide-react";
 import { toast } from "sonner";
 import { base44 } from "@/api/base44Client";
 
 // Distance Haversine en km
 function haversineKm(lat1, lng1, lat2, lng2) {
+  if (!lat1 || !lng1 || !lat2 || !lng2) return null;
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
@@ -27,20 +30,6 @@ function haversineKm(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Calcule le % de trajet livreur→récupération déjà parcouru
-function getPourcentageTrajet(course, livreurLat, livreurLng) {
-  // Position de départ du livreur au moment de l'acceptation
-  // On utilise la position actuelle du livreur vs point de récupération
-  const recupLat = course.gps_depart_lat;
-  const recupLng = course.gps_depart_lng;
-  if (!recupLat || !recupLng || !livreurLat || !livreurLng) return null;
-
-  // Pour estimer le %, on a besoin d'une distance de référence
-  // On utilise latitude_arrivee_livraison comme point livreur si disponible
-  // Sinon on ne peut pas calculer — retourne null (sécurité = autoriser)
-  return null; // sera overridé par le check GPS ci-dessous
-}
-
 const MOTIFS = [
   { id: "trompe", label: "Je me suis trompé", icon: "🤔" },
   { id: "besoin", label: "Plus besoin", icon: "❌" },
@@ -49,141 +38,133 @@ const MOTIFS = [
   { id: "autre", label: "Autre", icon: "💬" },
 ];
 
-// Étape 1 : Affiche les règles d'annulation
-// Étape 2 : Sélection du motif + confirmation
+// step: "info" | "motif"
+// situation: { type: "gratuit" | "payant" | "impossible", raison? }
 export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, clientId }) {
-  const [step, setStep] = useState("info"); // "info" | "motif" | "impossible" | "bloque"
+  const [step, setStep] = useState("info");
   const [motif, setMotif] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [fraisInfo, setFraisInfo] = useState(null); // { gratuit, frais, impossible, livreurPct }
+  const [analysing, setAnalysing] = useState(false);
+  const [situation, setSituation] = useState(null); // null = en cours d'analyse
 
-  // Analyse la situation à l'ouverture
   useEffect(() => {
     if (!open || !course) return;
     setStep("info");
     setMotif(null);
-    analyser();
+    setSituation(null);
+    analyserSituation();
   }, [open, course?.id]);
 
-  const analyser = async () => {
+  const analyserSituation = async () => {
     if (!course) return;
-    const statut = course.statut;
+    setAnalysing(true);
+    try {
+      const statut = course.statut;
 
-    // Aucun livreur → gratuit
-    if (!course.livreur_id || ["nouvelle", "recherche_livreur"].includes(statut)) {
-      setFraisInfo({ gratuit: true, frais: false, impossible: false });
-      return;
-    }
+      // Cas 1 : aucun livreur ou course en recherche → gratuit
+      if (!course.livreur_id || ["nouvelle", "recherche_livreur"].includes(statut)) {
+        setSituation({ type: "gratuit" });
+        return;
+      }
 
-    // Colis déjà récupéré → impossible
-    if (["colis_recupere", "en_livraison", "livree"].includes(statut)) {
-      setFraisInfo({ gratuit: false, frais: false, impossible: true, raison: "Le colis a déjà été récupéré." });
-      return;
-    }
+      // Cas 3 : colis déjà récupéré ou en livraison → impossible
+      if (["colis_recupere", "en_livraison", "livree"].includes(statut)) {
+        setSituation({ type: "impossible", raison: "Le colis a déjà été récupéré par le livreur." });
+        return;
+      }
 
-    // Livreur en route → vérifier % trajet via position GPS du livreur
-    if (["livreur_en_route", "acceptee"].includes(statut) || course.livreur_id) {
-      try {
-        const livreurs = await base44.entities.Livreur.filter({ id: course.livreur_id });
-        const livreur = livreurs?.[0];
-        const livreurLat = livreur?.latitude;
-        const livreurLng = livreur?.longitude;
-        const recupLat = course.gps_depart_lat;
-        const recupLng = course.gps_depart_lng;
+      // Cas 2 : livreur accepté et en route → vérifier % trajet parcouru
+      // On récupère la position GPS actuelle du livreur
+      const livreurs = await base44.entities.Livreur.filter({ id: course.livreur_id });
+      const livreur = livreurs?.[0];
 
-        if (livreurLat && livreurLng && recupLat && recupLng && livreur?.derniere_position_date) {
-          // Distance actuelle livreur → récupération
-          const distActuelle = haversineKm(livreurLat, livreurLng, recupLat, recupLng);
+      if (livreur?.latitude && livreur?.longitude && course.gps_depart_lat && course.gps_depart_lng) {
+        // Distance actuelle livreur → point de récupération
+        const distActuelle = haversineKm(
+          livreur.latitude, livreur.longitude,
+          course.gps_depart_lat, course.gps_depart_lng
+        );
 
-          // Estimer distance initiale via position au moment acceptation
-          // On utilise heure_acceptation + derniere_position pour estimer
-          // Si livreur très proche (< 300m du point recup) → > 50% parcouru
-          // Approche conservative : si dist < 300m → impossible
-          if (distActuelle < 0.3) {
-            setFraisInfo({ gratuit: false, frais: false, impossible: true, raison: "Le livreur est déjà trop avancé vers le point de récupération." });
-            return;
-          }
-
-          // Calculer le % approximatif en comparant dist courante vs dist initiale estimée
-          // Distance de départ estimée : on récupère la position livreur au moment acceptation
-          // si non dispo, on estime via une distance max de 5km pour les courses urbaines
-          // Règle : si dist actuelle < 50% de dist estimée initiale → frais
-          // On estime la dist initiale à partir du score GPS livreur
-          // Sans historique GPS précis, si dist < 1.5km → considéré > 50%
-          const distEstimeeInitiale = 3; // distance max standard en ville (3km)
-          const pct = 1 - distActuelle / distEstimeeInitiale;
-          if (pct >= 0.5) {
-            setFraisInfo({ gratuit: false, frais: false, impossible: true, raison: "Le livreur est déjà trop avancé vers le point de récupération." });
-            return;
-          }
+        // Estimer la distance initiale livreur → récupération au moment de l'acceptation
+        // On utilise les coordonnées GPS du livreur stockées dans le profil
+        // Si moins de 300m restants → considéré > 50% parcouru
+        if (distActuelle !== null && distActuelle < 0.3) {
+          setSituation({
+            type: "impossible",
+            raison: "Le livreur est déjà trop avancé vers le point de récupération (moins de 300m)."
+          });
+          return;
         }
 
-        // Livreur accepté mais pas trop avancé → frais 250 F
-        setFraisInfo({ gratuit: false, frais: true, impossible: false, montant: 250 });
-      } catch (_) {
-        // En cas d'erreur GPS → frais par défaut (sécurité)
-        setFraisInfo({ gratuit: false, frais: true, impossible: false, montant: 250 });
+        // Calculer % avec distance de référence estimée
+        // Pour une distance actuelle donnée, on estime que le livreur partait d'une zone urbaine (max 3km)
+        // Si dist < 50% de la distance estimée initiale → > 50% parcouru
+        // Distance initiale estimée = distActuelle + distance parcourue (difficile à mesurer sans historique)
+        // Approche conservative : si dist actuelle < 1.5km → on suppose > 50% (zone urbaine dense)
+        if (distActuelle !== null && distActuelle < 1.5) {
+          setSituation({
+            type: "impossible",
+            raison: "Annulation impossible : le livreur est déjà trop avancé vers le point de récupération."
+          });
+          return;
+        }
       }
-      return;
-    }
 
-    // Défaut → frais
-    setFraisInfo({ gratuit: false, frais: true, impossible: false, montant: 250 });
+      // Livreur accepté mais pas encore trop avancé → frais 250 FCFA
+      setSituation({ type: "payant", montant: 250 });
+    } catch (err) {
+      console.error("Erreur analyse situation:", err);
+      // En cas d'erreur → autoriser avec frais par précaution
+      setSituation({ type: "payant", montant: 250 });
+    } finally {
+      setAnalysing(false);
+    }
   };
 
   const handleConfirmer = async () => {
-    if (!motif) {
-      toast.error("Veuillez sélectionner un motif");
-      return;
-    }
+    if (!motif) { toast.error("Veuillez sélectionner un motif"); return; }
     setLoading(true);
     try {
-      // Annuler la course
+      // 1. Annuler la course
       await base44.entities.CourseExterne.update(course.id, {
         statut: "annulee",
-        notes: `Annulée par le client. Motif: ${motif}${fraisInfo?.frais ? " | Frais d'annulation: 250 FCFA" : ""}`
+        notes: `Annulée par le client. Motif: ${motif}${situation?.type === "payant" ? " | Frais: 250 FCFA" : ""}`,
       });
 
-      // Si frais → créer l'enregistrement FraisAnnulation
-      if (fraisInfo?.frais && clientId) {
-        try {
-          await base44.entities.FraisAnnulation.create({
-            course_id: course.id,
-            client_id: clientId,
-            client_nom: course.client_nom || "",
-            client_telephone: course.client_telephone || "",
-            livreur_id: course.livreur_id || "",
-            livreur_nom: course.livreur_nom || "",
-            montant: 250,
-            statut_paiement: "impaye",
-            raison: "Annulation après acceptation livreur",
-            date_annulation: new Date().toISOString(),
-          });
-        } catch (err) {
-          console.error("Erreur création frais:", err);
-        }
+      // 2. Si frais → créer l'enregistrement FraisAnnulation
+      if (situation?.type === "payant" && clientId) {
+        await base44.entities.FraisAnnulation.create({
+          course_id: course.id,
+          client_id: clientId,
+          client_nom: course.client_nom || "",
+          client_telephone: course.client_telephone || "",
+          livreur_id: course.livreur_id || "",
+          livreur_nom: course.livreur_nom || "",
+          montant: 250,
+          statut_paiement: "impaye",
+          raison: "Annulation après acceptation livreur",
+          date_annulation: new Date().toISOString(),
+        });
       }
 
-      // Notifier le livreur si assigné
+      // 3. Notifier le livreur
       if (course.livreur_id) {
-        try {
-          await base44.functions.invoke("envoiNotificationPush", {
-            livreur_id: course.livreur_id,
-            titre: "Course annulée",
-            message: "La course a été annulée par le client.",
-            course_id: course.id
-          });
-        } catch (_) {}
+        base44.functions.invoke("envoiNotificationPush", {
+          livreur_id: course.livreur_id,
+          titre: "Course annulée",
+          message: "La course a été annulée par le client.",
+          course_id: course.id,
+        }).catch(() => {});
       }
 
-      if (fraisInfo?.frais) {
+      if (situation?.type === "payant") {
         toast.warning("Course annulée — Frais d'annulation de 250 FCFA ajoutés à votre compte.");
       } else {
         toast.success("Course annulée gratuitement.");
       }
       if (navigator.vibrate) navigator.vibrate(200);
       onClose();
-      onSuccess();
+      onSuccess?.();
     } catch (err) {
       console.error("Erreur annulation:", err);
       toast.error("Erreur lors de l'annulation");
@@ -193,6 +174,26 @@ export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, 
   };
 
   if (!course) return null;
+
+  const situationBadge = () => {
+    if (analysing || !situation) return null;
+    if (situation.type === "gratuit") return (
+      <div className="flex items-center gap-2 p-3 rounded-xl bg-green-50 border border-green-200 text-sm font-semibold text-green-800">
+        <CheckCircle className="w-4 h-4 flex-shrink-0" /> Votre annulation est gratuite
+      </div>
+    );
+    if (situation.type === "payant") return (
+      <div className="flex items-center gap-2 p-3 rounded-xl bg-orange-50 border border-orange-200 text-sm font-semibold text-orange-800">
+        <CreditCard className="w-4 h-4 flex-shrink-0" /> Frais d'annulation : 250 FCFA
+      </div>
+    );
+    if (situation.type === "impossible") return (
+      <div className="flex items-start gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-sm font-semibold text-red-800">
+        <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+        <span>{situation.raison || "Annulation impossible"}</span>
+      </div>
+    );
+  };
 
   return (
     <AlertDialog open={open} onOpenChange={onClose}>
@@ -205,15 +206,16 @@ export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, 
           <AlertDialogDescription asChild>
             <div className="space-y-4">
 
-              {/* ── Étape INFO : règles d'annulation ── */}
+              {/* ── ÉTAPE INFO : règles ── */}
               {step === "info" && (
                 <>
+                  {/* Bloc règles toujours visible */}
                   <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 space-y-3">
-                    <div className="flex items-start gap-2">
-                      <Info className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                      <p className="text-sm font-semibold text-blue-900">Politique d'annulation SILGAPP</p>
+                    <div className="flex items-center gap-2">
+                      <Info className="w-4 h-4 text-blue-600" />
+                      <p className="text-sm font-bold text-blue-900">Politique d'annulation SILGAPP</p>
                     </div>
-                    <ul className="space-y-2 text-sm text-blue-800 pl-1">
+                    <ul className="space-y-2 text-sm text-blue-800">
                       <li className="flex items-start gap-2">
                         <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
                         <span><strong>Avant acceptation par un livreur</strong>, l'annulation est <strong>gratuite</strong>.</span>
@@ -224,55 +226,49 @@ export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, 
                       </li>
                       <li className="flex items-start gap-2">
                         <XCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-                        <span>Si le livreur a déjà parcouru au moins <strong>50% du trajet</strong> vers le point de récupération, <strong>l'annulation n'est plus possible</strong>.</span>
+                        <span>Si le livreur a déjà parcouru <strong>au moins 50 %</strong> du trajet vers le point de récupération, <strong>l'annulation n'est plus possible</strong>.</span>
                       </li>
                     </ul>
                   </div>
 
                   {/* Situation actuelle */}
-                  {fraisInfo && (
-                    <div className={`p-3 rounded-xl border text-sm font-semibold flex items-center gap-2 ${
-                      fraisInfo.gratuit ? "bg-green-50 border-green-200 text-green-800" :
-                      fraisInfo.impossible ? "bg-red-50 border-red-200 text-red-800" :
-                      "bg-orange-50 border-orange-200 text-orange-800"
-                    }`}>
-                      {fraisInfo.gratuit && <><CheckCircle className="w-4 h-4" /> Votre annulation est gratuite</>}
-                      {fraisInfo.frais && <><CreditCard className="w-4 h-4" /> Frais d'annulation : 250 FCFA</>}
-                      {fraisInfo.impossible && <><XCircle className="w-4 h-4" /> {fraisInfo.raison || "Annulation impossible"}</>}
+                  {analysing ? (
+                    <div className="flex items-center gap-2 p-3 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-600">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Analyse en cours...
                     </div>
-                  )}
+                  ) : situationBadge()}
 
                   {/* Infos course */}
                   <div className="space-y-1.5 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Package className="w-4 h-4 text-muted-foreground" />
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <Package className="w-4 h-4" />
                       <span>{course.type_course === "expedier" ? "Expédition" : "Réception"}</span>
                     </div>
                     {course.livreur_nom && (
-                      <div className="flex items-center gap-2">
-                        <Truck className="w-4 h-4 text-muted-foreground" />
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <Truck className="w-4 h-4" />
                         <span>{course.livreur_nom}</span>
                       </div>
                     )}
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-muted-foreground" />
-                      <Badge variant="outline">{course.statut}</Badge>
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <Clock className="w-4 h-4" />
+                      <Badge variant="outline" className="text-xs">{course.statut}</Badge>
                     </div>
                   </div>
                 </>
               )}
 
-              {/* ── Étape MOTIF ── */}
+              {/* ── ÉTAPE MOTIF ── */}
               {step === "motif" && (
                 <>
-                  {fraisInfo?.frais && (
-                    <div className="p-3 rounded-xl bg-orange-50 border border-orange-200 text-sm text-orange-800 flex items-center gap-2">
+                  {situation?.type === "payant" && (
+                    <div className="flex items-center gap-2 p-3 rounded-xl bg-orange-50 border border-orange-200 text-sm text-orange-800">
                       <CreditCard className="w-4 h-4 flex-shrink-0" />
                       <span>Des frais de <strong>250 FCFA</strong> seront ajoutés à votre compte (statut : Impayé).</span>
                     </div>
                   )}
-                  {fraisInfo?.gratuit && (
-                    <div className="p-3 rounded-xl bg-green-50 border border-green-200 text-sm text-green-800 flex items-center gap-2">
+                  {situation?.type === "gratuit" && (
+                    <div className="flex items-center gap-2 p-3 rounded-xl bg-green-50 border border-green-200 text-sm text-green-800">
                       <CheckCircle className="w-4 h-4 flex-shrink-0" />
                       <span>Cette annulation est <strong>gratuite</strong>.</span>
                     </div>
@@ -286,7 +282,9 @@ export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, 
                           type="button"
                           onClick={() => setMotif(m.id)}
                           className={`p-3 rounded-xl border text-left transition-all ${
-                            motif === m.id ? "border-primary bg-primary/5" : "border-gray-200 hover:border-primary/50"
+                            motif === m.id
+                              ? "border-primary bg-primary/5"
+                              : "border-gray-200 hover:border-primary/50"
                           }`}
                         >
                           <span className="text-lg mr-2">{m.icon}</span>
@@ -305,31 +303,27 @@ export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, 
         <AlertDialogFooter className="gap-2">
           <AlertDialogCancel onClick={onClose}>Retour</AlertDialogCancel>
 
-          {/* Étape INFO → bouton Continuer (si pas impossible) */}
-          {step === "info" && fraisInfo && !fraisInfo.impossible && (
+          {/* Étape INFO → Continuer (si pas impossible et analyse terminée) */}
+          {step === "info" && !analysing && situation && situation.type !== "impossible" && (
             <button
               type="button"
               onClick={() => setStep("motif")}
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-red-600 hover:bg-red-700 text-white h-9 px-4 py-2 transition-colors"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-red-600 hover:bg-red-700 text-white h-9 px-4 transition-colors"
             >
               Continuer
             </button>
           )}
 
-          {/* Étape MOTIF → bouton Confirmer */}
+          {/* Étape MOTIF → Confirmer */}
           {step === "motif" && (
             <button
               type="button"
               onClick={handleConfirmer}
               disabled={loading || !motif}
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-red-600 hover:bg-red-700 text-white h-9 px-4 py-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-red-600 hover:bg-red-700 text-white h-9 px-4 transition-colors disabled:opacity-50 disabled:cursor-not-allowed gap-2"
             >
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Annulation...
-                </span>
-              ) : "Confirmer l'annulation"}
+              {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+              Confirmer l'annulation
             </button>
           )}
         </AlertDialogFooter>

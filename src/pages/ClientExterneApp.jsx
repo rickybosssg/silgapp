@@ -529,6 +529,31 @@ export default function ClientExterneApp() {
     );
   }
 
+  // ── Client bloqué pour frais d'annulation impayés ─────────────────────────
+  if (!loading && clientProfil?.bloque_frais_annulation) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-50 p-6">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center space-y-5">
+          <div className="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center mx-auto text-4xl">🔒</div>
+          <div>
+            <h2 className="text-xl font-black text-gray-900">Compte bloqué</h2>
+            <p className="text-sm text-gray-600 mt-3 leading-relaxed">
+              Votre compte est temporairement bloqué pour frais d'annulation impayés. Veuillez contacter Silga.
+            </p>
+          </div>
+          <a
+            href="https://wa.me/22667572857"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center w-full h-12 rounded-2xl bg-green-500 hover:bg-green-600 text-white font-bold text-sm transition-colors"
+          >
+            💬 Contacter Silga via WhatsApp
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   // Spinner uniquement si vraiment en chargement et pas encore de profil
   if (loading) {
     return (

@@ -715,7 +715,7 @@ export default function ClientSuiviCourse() {
           course={maCourse}
           open={showAnnulerDialog}
           onClose={() => setShowAnnulerDialog(false)}
-          onSuccess={() => navigate("/client")}
+          onSuccess={() => navigate("/")}
           clientId={clientProfilId}
         />
       </div>
