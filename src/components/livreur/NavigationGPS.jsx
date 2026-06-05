@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Navigation, MapPin, Clock, Ruler, Eye, WifiOff, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { base44 } from "@/api/base44Client";
+import { phoneVariants } from "@/lib/phoneUtils";
 
 // ─── Haversine ────────────────────────────────────────────────────────────────
 function haversine(lat1, lon1, lat2, lon2) {
@@ -19,39 +20,6 @@ function haversine(lat1, lon1, lat2, lon2) {
 function computeETA(distKm) {
   if (!distKm || distKm <= 0) return null;
   return Math.round((distKm / 25) * 60);
-}
-
-// Indicatifs téléphoniques tous pays SILGAPP
-const COUNTRY_DIALCODES = [
-  { code: "226", len: 8 },  // BF
-  { code: "225", len: 10 }, // CI
-  { code: "228", len: 8 },  // TG
-  { code: "229", len: 8 },  // BJ
-  { code: "221", len: 9 },  // SN
-  { code: "223", len: 8 },  // ML
-  { code: "224", len: 9 },  // GN
-  { code: "227", len: 8 },  // NE
-];
-
-// Génère toutes les variantes d'un numéro (tous pays SILGAPP)
-function phoneVariants(num) {
-  const n = (num || "").replace(/\D/g, "");
-  if (!n) return [n];
-  const variants = new Set([n]);
-  for (const { code, len } of COUNTRY_DIALCODES) {
-    if (n.startsWith(code) && n.length === code.length + len) {
-      variants.add(n.slice(code.length));
-      variants.add(n);
-    }
-    if (n.length === len && !n.startsWith("0")) {
-      variants.add(code + n);
-    }
-    if (n.startsWith("0") && n.length === len + 1) {
-      variants.add(n.slice(1));
-      variants.add(code + n.slice(1));
-    }
-  }
-  return [...variants];
 }
 
 function openGoogleMaps(originLat, originLng, destLat, destLng) {

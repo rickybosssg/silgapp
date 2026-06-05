@@ -1,49 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-
-/**
- * Indicatifs SILGAPP — tous pays supportés
- */
-const DIAL_CODES = [
-  { code: "226", len: 8 },  // BF
-  { code: "225", len: 10 }, // CI
-  { code: "228", len: 8 },  // TG
-  { code: "229", len: 8 },  // BJ
-  { code: "221", len: 9 },  // SN
-  { code: "223", len: 8 },  // ML
-  { code: "224", len: 9 },  // GN
-  { code: "227", len: 8 },  // NE
-];
-
-/**
- * Retourne [local_sans_indicatif, avec_indicatif] pour un numéro donné.
- * Maximum 2 variantes → 2 requêtes parallèles max (pas de boucle séquentielle).
- */
-function phoneVariants(num) {
-  const n = (num || "").replace(/\D/g, "");
-  if (!n) return [];
-  const variants = new Set([n]);
-
-  for (const { code, len } of DIAL_CODES) {
-    // Numéro déjà avec indicatif → ajouter aussi la version locale
-    if (n.startsWith(code) && n.length === code.length + len) {
-      variants.add(n.slice(code.length));
-      break; // indicatif identifié, inutile de continuer
-    }
-    // Numéro local seul → ajouter avec indicatif
-    if (n.length === len && !n.startsWith("0")) {
-      variants.add(code + n);
-      break;
-    }
-    // "0XXXXXXXX" (préfixe local avec 0)
-    if (n.startsWith("0") && n.length === len + 1) {
-      variants.add(n.slice(1));
-      variants.add(code + n.slice(1));
-      break;
-    }
-  }
-  return [...variants];
-}
+import { phoneVariants } from "@/lib/phoneUtils";
 
 /**
  * Hook : poll le GPS live d'un contact depuis ClientExterne (toutes les 8s).
@@ -77,7 +34,7 @@ export function useDestinataireGPS(telephone, enabled = true) {
             setState({
               gpsLat: client.latitude,
               gpsLng: client.longitude,
-              lastUpdate: client.updated_date || client.created_date,
+              lastUpdate: client.last_seen_at || client.updated_date || client.created_date,
               loading: false,
             });
             return;

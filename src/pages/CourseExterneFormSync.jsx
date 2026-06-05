@@ -10,6 +10,7 @@ import CourseStepForm from "@/components/client/CourseStepForm";
 import { sauvegarderContactDB } from "@/components/client/CarnetAdresses";
 import LivreurRechercheAnimation from "@/components/client/LivreurRechercheAnimation";
 import InvitationWhatsAppModal from "@/components/client/InvitationWhatsAppModal";
+import { normalizePhone, phoneVariants } from "@/lib/phoneUtils";
 
 // Haversine
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -225,12 +226,14 @@ export default function CourseExterneFormSync() {
       // Lookup destinataire (pour "expedier") — lie si inscrit
       if (!finalData.destinataire_client_id && finalData.destinataire_telephone) {
         try {
-          const digits = finalData.destinataire_telephone.replace(/\D/g, "").slice(-8);
-          const found = await base44.entities.ClientExterne.filter({ telephone: digits })
-            || await base44.entities.ClientExterne.filter({ telephone: "+226" + digits });
-          if (found?.length > 0) {
-            finalData.destinataire_client_id = found[0].id;
-            finalData.recipient_has_app = true;
+          const variants = phoneVariants(finalData.destinataire_telephone);
+          for (const v of variants) {
+            const found = await base44.entities.ClientExterne.filter({ telephone: v }).catch(() => []);
+            if (found?.length > 0) {
+              finalData.destinataire_client_id = found[0].id;
+              finalData.recipient_has_app = true;
+              break;
+            }
           }
         } catch (_) {}
       }
@@ -238,30 +241,16 @@ export default function CourseExterneFormSync() {
       // Lookup expéditeur (pour "recevoir") — lie si inscrit dans la base clients
       if (finalData.type_course === "recevoir" && !finalData.expediteur_client_id && finalData.expediteur_telephone) {
         try {
-          const phoneRaw = finalData.expediteur_telephone.replace(/\D/g, "");
-          const digits = phoneRaw.slice(-8);
-          const indicatif = phoneRaw.startsWith("226") ? "+226" : "+226";
-          const phoneNormalized = indicatif + digits;
-          
-          // Essayer plusieurs formats de recherche
-          const searchFormats = [
-            { telephone: phoneNormalized },
-            { telephone: digits },
-            { telephone: phoneRaw }
-          ];
-          
-          for (const format of searchFormats) {
-            const found = await base44.asServiceRole.entities.ClientExterne.filter(format);
-            if (found && found.length > 0) {
+          const variants = phoneVariants(finalData.expediteur_telephone);
+          for (const v of variants) {
+            const found = await base44.entities.ClientExterne.filter({ telephone: v }).catch(() => []);
+            if (found?.length > 0) {
               finalData.expediteur_client_id = found[0].id;
               finalData.expediteur_has_app = true;
-              console.log(`[Lookup Expéditeur] ✅ Trouvé: ${found[0].nom} ${found[0].prenom} (${found[0].telephone})`);
               break;
             }
           }
-        } catch (err) {
-          console.error("[Lookup Expéditeur] ❌ Erreur:", err);
-        }
+        } catch (_) {}
       }
       // Génération QR/codes dès la création
       // Pour "recevoir" : pickup = chez l'expéditeur, delivery = chez le destinataire
@@ -371,20 +360,20 @@ export default function CourseExterneFormSync() {
       expediteurNom = formData.client_nom;
       expediteurTel = formData.client_telephone;
       expediteurClientId = clientProfil?.id || null;
-      expediteurPhoneNormalized = formData.client_telephone.replace(/\D/g, "").replace(/^226/, "");
+      expediteurPhoneNormalized = normalizePhone(formData.client_telephone, clientProfil?.country_code);
       destinataireNom = formData.destinataire_nom;
       destinataireTel = formData.destinataire_telephone;
       destinataireClientId = formData.destinataire_client_id || null;
-      destinatairePhoneNormalized = formData.destinataire_telephone.replace(/\D/g, "").replace(/^226/, "");
+      destinatairePhoneNormalized = normalizePhone(formData.destinataire_telephone);
     } else {
       destinataireNom = formData.client_nom;
       destinataireTel = formData.client_telephone;
       destinataireClientId = clientProfil?.id || null;
-      destinatairePhoneNormalized = formData.client_telephone.replace(/\D/g, "").replace(/^226/, "");
+      destinatairePhoneNormalized = normalizePhone(formData.client_telephone, clientProfil?.country_code);
       expediteurNom = formData.expediteur_nom;
       expediteurTel = formData.expediteur_telephone;
       expediteurClientId = formData.expediteur_client_id || null;
-      expediteurPhoneNormalized = formData.expediteur_telephone.replace(/\D/g, "").replace(/^226/, "");
+      expediteurPhoneNormalized = normalizePhone(formData.expediteur_telephone);
     }
 
     console.log("[CourseForm] Soumission :", {
