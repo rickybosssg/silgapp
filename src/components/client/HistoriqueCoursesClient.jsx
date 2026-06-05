@@ -86,7 +86,7 @@ function CourseHistoriqueCard({ course, fraisAnnulation, onSelect }) {
           </div>
           <div className="flex items-center gap-2">
             {isTerminee && course.prix_final > 0 && (
-              <span className="font-bold text-green-700">{course.prix_final.toLocaleString()} F</span>
+              <span className="font-bold text-green-700">{course.prix_final.toLocaleString()} {course.devise || "F"}</span>
             )}
             {isTerminee && course.note_livreur && (
               <span className="flex items-center gap-0.5 text-yellow-600 font-bold">
@@ -97,7 +97,7 @@ function CourseHistoriqueCard({ course, fraisAnnulation, onSelect }) {
             {frais && frais.statut_paiement === "impaye" && (
               <span className="flex items-center gap-1 bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold text-xs">
                 <AlertTriangle className="w-3 h-3" />
-                250 F dû
+                {frais.montant || 250} {course.devise || "F"} dû
               </span>
             )}
             <ChevronRight className="w-4 h-4 text-gray-300" />
@@ -147,7 +147,7 @@ export default function HistoriqueCoursesClient({ courses = [], fraisAnnulation 
           <p className="text-xl font-black text-blue-700">
             {totalDepense > 0 ? `${(totalDepense / 1000).toFixed(0)}k` : "—"}
           </p>
-          <p className="text-[10px] text-blue-600 font-semibold uppercase">FCFA dépensés</p>
+          <p className="text-[10px] text-blue-600 font-semibold uppercase">Dépensés</p>
         </div>
         <div className="bg-yellow-50 rounded-2xl p-3 text-center border border-yellow-100">
           <p className="text-xl font-black text-yellow-700">

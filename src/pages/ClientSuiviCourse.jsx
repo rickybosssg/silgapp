@@ -634,13 +634,13 @@ export default function ClientSuiviCourse() {
             {maCourse.prix_estimate && !maCourse.prix_final && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Prix estimé</span>
-                <span className="font-medium">{maCourse.prix_estimate.toLocaleString()} FCFA</span>
+                <span className="font-medium">{maCourse.prix_estimate.toLocaleString()} {maCourse.devise || countries.find(c => c.code === maCourse.country_code)?.devise || "FCFA"}</span>
               </div>
             )}
             {maCourse.prix_final > 0 ? (
               <div className="flex justify-between pt-2 border-t">
                 <span className="text-muted-foreground font-semibold">Prix final</span>
-                <span className="font-bold text-lg text-primary">{maCourse.prix_final.toLocaleString()} FCFA</span>
+                <span className="font-bold text-lg text-primary">{maCourse.prix_final.toLocaleString()} {maCourse.devise || countries.find(c => c.code === maCourse.country_code)?.devise || "FCFA"}</span>
               </div>
             ) : null}
           </div>
@@ -707,7 +707,7 @@ export default function ClientSuiviCourse() {
                         <div className="bg-white rounded-xl p-3 text-center shadow-sm">
                           <Banknote className="w-4 h-4 mx-auto mb-1 text-green-600" />
                           <p className="text-sm font-black text-green-700">
-                            {prixFinal > 0 ? `${prixFinal.toLocaleString()} F` : "—"}
+                           {prixFinal > 0 ? `${prixFinal.toLocaleString()} ${maCourse.devise || countries.find(c => c.code === maCourse.country_code)?.devise || "F"}` : "—"}
                           </p>
                           <p className="text-[9px] text-gray-400 font-semibold uppercase">Prix final</p>
                         </div>
@@ -779,8 +779,6 @@ export default function ClientSuiviCourse() {
           />
         )}
 
-
-
         <AnnulerCourseDialog
           course={maCourse}
           open={showAnnulerDialog}
@@ -789,6 +787,7 @@ export default function ClientSuiviCourse() {
           clientId={clientProfilId}
         />
         </>
+        )} {/* fin onglet actives && maCourse */}
       </div>
     </div>
   );
