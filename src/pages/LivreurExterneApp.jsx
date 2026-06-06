@@ -140,11 +140,17 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   );
 
   // Détecter la réponse du client sur une proposition de prix manuel
+  // Statuts finaux pour lesquels on n'affiche JAMAIS la modale
+  const FINAL_STATUSES = ['livree', 'annulee', 'completed', 'delivered', 'canceled'];
+  
   useEffect(() => {
     if (!mesCourses.length || !livreurProfil?.id) return;
     mesCourses.forEach(course => {
       if (course.proposed_by_livreur_id !== livreurProfil.id) return;
-      if (!course.pricing_mode === 'manual') return;
+      if (course.pricing_mode !== 'manual') return;
+      // Ne pas afficher si la course est dans un statut final
+      if (FINAL_STATUSES.includes(course.statut)) return;
+      
       const watched = prixManuelWatchedRef.current[course.id];
       const status = course.manual_price_status;
       if ((status === 'accepted' || status === 'refused') && watched !== status) {
@@ -156,7 +162,21 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         });
       }
     });
-  }, [mesCourses, livreurProfil?.id]);
+    
+    // Nettoyer la modale si une course associée passe en statut final
+    if (prixManuelReponse) {
+      const courseActuelle = mesCourses.find(c => 
+        c.pricing_mode === 'manual' && 
+        c.proposed_by_livreur_id === livreurProfil.id &&
+        FINAL_STATUSES.includes(c.statut)
+      );
+      if (courseActuelle) {
+        setPrixManuelReponse(null);
+        // Marquer comme traité pour éviter réapparition
+        prixManuelWatchedRef.current[courseActuelle.id] = 'dismissed_by_final_status';
+      }
+    }
+  }, [mesCourses, livreurProfil?.id, prixManuelReponse]);
 
   // Auto-resync statut supprimé — le statut ne se change QUE manuellement via le bouton
 
@@ -403,15 +423,28 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       {/* VENUS — toujours visible */}
       <VenusFloatingButton />
 
-      {/* Réponse prix manuel du client */}
-      {prixManuelReponse && (
-        <PrixManuelReponseAlert
-          accepted={prixManuelReponse.accepted}
-          prix={prixManuelReponse.prix}
-          devise={prixManuelReponse.devise}
-          onDismiss={() => setPrixManuelReponse(null)}
-        />
-      )}
+      {/* Réponse prix manuel du client — ne pas afficher si toutes les courses associées sont terminées */}
+      {prixManuelReponse && (() => {
+        // Vérifier qu'il reste au moins une course active avec ce prix manuel
+        const courseEncoreActive = mesCourses.find(c =>
+          c.pricing_mode === 'manual' &&
+          c.proposed_by_livreur_id === livreurProfil?.id &&
+          !FINAL_STATUSES.includes(c.statut) &&
+          (c.manual_price_status === 'accepted' || c.manual_price_status === 'refused')
+        );
+        if (!courseEncoreActive) {
+          setPrixManuelReponse(null);
+          return null;
+        }
+        return (
+          <PrixManuelReponseAlert
+            accepted={prixManuelReponse.accepted}
+            prix={prixManuelReponse.prix}
+            devise={prixManuelReponse.devise}
+            onDismiss={() => setPrixManuelReponse(null)}
+          />
+        );
+      })()}
 
       {/* ── PUBLICITÉ PLEIN ÉCRAN LIVREUR ── */}
       <PubliciteFullscreen
