@@ -472,6 +472,7 @@ export default function DispatchMap({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [heatmapModeLocal, setHeatmapModeLocal] = useState(heatmapMode);
   const [showHeatmapHint, setShowHeatmapHint] = useState(true);
+  const [masquerInactifs, setMasquerInactifs] = useState(false);
 
   // Recentrer la carte quand le pays change
   useEffect(() => {
@@ -576,6 +577,7 @@ export default function DispatchMap({
       if (!livreur.latitude || !livreur.longitude) return;
       const estNoir = isLivreurNoir(livreur);
       if (!estNoir) return;
+      if (masquerInactifs) return; // filtre visuel
       const icon = buildLivreurIcon(livreur);
       const [lat, lng] = addMarkerOffset(livreur.latitude, livreur.longitude, markerIndex++);
       const marker = window.L.marker([lat, lng], {
@@ -592,6 +594,7 @@ export default function DispatchMap({
       if (!client.latitude || !client.longitude) return;
       const estNoir = isClientNoir(client);
       if (!estNoir) return;
+      if (masquerInactifs) return; // filtre visuel
       const icon = buildClientIcon(client);
       const [lat, lng] = addMarkerOffset(client.latitude, client.longitude, markerIndex++);
       const marker = window.L.marker([lat, lng], {
@@ -647,7 +650,7 @@ export default function DispatchMap({
       if (onMarkerClick) marker.on("click", () => onMarkerClick(client));
       markersRef.current.push(marker);
     });
-  }, [livreurs, clients, courses, mapLoaded]);
+  }, [livreurs, clients, courses, mapLoaded, masquerInactifs]);
 
   // Même règle que dispatchRules.js : libre = disponible + actif + validé + GPS présent
   const nbLibres = livreurs.filter(l => isLivreurLibre(l)).length;
@@ -736,6 +739,15 @@ export default function DispatchMap({
               </div>
             </div>
             
+            {/* Filtre inactifs */}
+            <button
+              onClick={() => setMasquerInactifs(v => !v)}
+              className={`dmap-overlay-badge flex items-center gap-2 text-xs font-semibold cursor-pointer transition-all w-full ${masquerInactifs ? "border-primary bg-primary/5 text-primary" : "text-slate-600"}`}
+            >
+              <span className={`w-3 h-3 rounded-full flex-shrink-0 border-2 ${masquerInactifs ? "bg-primary border-primary" : "border-gray-400"}`} />
+              {masquerInactifs ? "Inactifs masqués ✓" : "Masquer les inactifs"}
+            </button>
+
             {/* Légende GPS qualité */}
             <div className="dmap-overlay-badge text-xs text-slate-500 space-y-1">
               <div className="font-semibold text-slate-700 mb-1">Qualité GPS</div>
