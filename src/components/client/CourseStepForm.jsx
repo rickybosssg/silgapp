@@ -14,6 +14,34 @@ import {
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import CarnetAdresses from "@/components/client/CarnetAdresses";
+import { SILGAPP_COUNTRIES, phoneVariants } from "@/lib/phoneUtils";
+
+// Retourne l'indicatif affiché (ex: "+226") selon le pays
+function getDialCode(countryCode) {
+  const c = SILGAPP_COUNTRIES.find(x => x.code === countryCode);
+  return c ? `+${c.dial}` : "+226";
+}
+// Retourne le placeholder téléphone selon le pays (ex: "+226 XX XX XX XX")
+function getPhonePlaceholder(countryCode) {
+  const c = SILGAPP_COUNTRIES.find(x => x.code === countryCode);
+  if (!c) return "+226 XX XX XX XX";
+  const xs = "X".repeat(c.len).replace(/(.{2})/g, "$1 ").trim();
+  return `+${c.dial} ${xs}`;
+}
+// Normalise un numéro pour la recherche en BDD selon le pays actif
+function normalizeForSearch(phone, countryCode) {
+  const raw = (phone || "").replace(/\D/g, "");
+  if (!raw) return phone || "";
+  const c = SILGAPP_COUNTRIES.find(x => x.code === countryCode);
+  if (!c) return raw;
+  // Déjà complet avec indicatif
+  if (raw.startsWith(c.dial) && raw.length === c.dial.length + c.len) return "+" + raw;
+  // Numéro local (sans indicatif)
+  if (raw.length === c.len) return "+" + c.dial + raw;
+  // Avec 0 initial
+  if (raw.startsWith("0") && raw.length === c.len + 1) return "+" + c.dial + raw.slice(1);
+  return "+" + raw;
+}
 
 const STORAGE_KEY = "silgapp_course_draft";
 
@@ -61,7 +89,10 @@ export default function CourseStepForm({
   onAnnuler,
   isLoading,
   clientId,
+  countryCode, // pays actif — détermine l'indicatif téléphonique
 }) {
+  const activeCountry = countryCode || "BF";
+  const phonePlaceholder = getPhonePlaceholder(activeCountry);
   const [expediteurFound, setExpediteurFound] = useState(null);
   const [destinataireFound, setDestinataireFound] = useState(null);
   const [verifying, setVerifying] = useState(false);
@@ -88,13 +119,14 @@ export default function CourseStepForm({
     if (phone.length < 8) { toast.error("Numéro de téléphone invalide"); return; }
     setVerifying(true);
     try {
-      const normalized = phone.startsWith("226") ? "+" + phone : phone.length === 8 ? "+226" + phone : "+" + phone;
+      const normalized = normalizeForSearch(phone, activeCountry);
+      const variants = phoneVariants(phone);
       let clients = await base44.entities.ClientExterne.filter({ telephone: normalized, actif: true });
       if (!clients || clients.length === 0) {
-        try {
-          const digits8 = phone.slice(-8);
-          clients = await base44.entities.ClientExterne.filter({ telephone: digits8, actif: true });
-        } catch (_) {}
+        for (const v of variants) {
+          clients = await base44.entities.ClientExterne.filter({ telephone: v, actif: true }).catch(() => []);
+          if (clients?.length > 0) break;
+        }
       }
       if (clients && clients.length > 0) {
         const client = clients[0];
@@ -148,13 +180,14 @@ export default function CourseStepForm({
     if (phone.length < 8) { toast.error("Numéro de téléphone invalide"); return; }
     setVerifying(true);
     try {
-      const normalized = phone.startsWith("226") ? "+" + phone : phone.length === 8 ? "+226" + phone : "+" + phone;
+      const normalized = normalizeForSearch(phone, activeCountry);
+      const variants = phoneVariants(phone);
       let clients = await base44.entities.ClientExterne.filter({ telephone: normalized, actif: true });
       if (!clients || clients.length === 0) {
-        try {
-          const digits8 = phone.slice(-8);
-          clients = await base44.entities.ClientExterne.filter({ telephone: digits8, actif: true });
-        } catch (_) {}
+        for (const v of variants) {
+          clients = await base44.entities.ClientExterne.filter({ telephone: v, actif: true }).catch(() => []);
+          if (clients?.length > 0) break;
+        }
       }
       if (clients && clients.length > 0) {
         const client = clients[0];
@@ -344,10 +377,10 @@ export default function CourseStepForm({
                   type="tel"
                   value={formData.expediteur_telephone}
                   onChange={(e) => setFormData({ ...formData, expediteur_telephone: e.target.value })}
-                  placeholder="+226 XX XX XX XX"
+                  placeholder={phonePlaceholder}
                   className="h-14 rounded-2xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-400 px-4 text-base"
                 />
-                <p className="text-xs text-gray-400 pl-1">Format : +226 XX XX XX XX</p>
+                <p className="text-xs text-gray-400 pl-1">Format : {phonePlaceholder}</p>
                 <CarnetAdresses
                   clientId={clientId}
                   type="expediteur"
@@ -481,10 +514,10 @@ export default function CourseStepForm({
                     setFormData({ ...formData, destinataire_telephone: e.target.value });
                     setDestinataireFound(undefined);
                   }}
-                  placeholder="+226 XX XX XX XX"
+                  placeholder={phonePlaceholder}
                   className="h-14 rounded-2xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-400 px-4 text-base"
                 />
-                <p className="text-xs text-gray-400 pl-1">Format : +226 XX XX XX XX</p>
+                <p className="text-xs text-gray-400 pl-1">Format : {phonePlaceholder}</p>
                 <CarnetAdresses
                   clientId={clientId}
                   type="destinataire"

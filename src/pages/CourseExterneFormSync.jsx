@@ -552,6 +552,7 @@ export default function CourseExterneFormSync() {
               onAnnuler={handleAnnuler}
               isLoading={createMutation.isPending || isSubmitting}
               clientId={clientProfil?.id}
+              countryCode={clientProfil?.country_code}
             />
           </form>
         </Card>
