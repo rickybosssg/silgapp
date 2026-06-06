@@ -22,19 +22,38 @@ import { useZonesChaudesHalos } from "./ZonesChaudes";
  *  - showInactifs      : boolean — afficher les inactifs en gris
  */
 
-const GPS_SEUIL_MIN = 5;
-const GPS_EXPIRE_MIN = 10;
 const GPS_CLIENT_SEUIL_MIN = 30;
 
 function isEnCourse(livreur) {
   return livreur.statut === "en_course";
 }
 
+/**
+ * Libre = disponible + actif + validé + GPS renseigné (lat/lng présents)
+ * ⚠️ app_active / last_seen_at N'EST PAS un critère.
+ * Source unique de vérité identique à dispatchRules.js#isLibre
+ */
+function isLivreurLibre(livreur) {
+  return livreur.statut === "disponible"
+    && livreur.actif !== false
+    && livreur.validation === "valide"
+    && !!(livreur.latitude && livreur.longitude);
+}
+
+/**
+ * Noir = pas de GPS (lat ou lng absent) OU statut hors_ligne OU non validé OU inactif
+ * Un livreur avec app fermée mais GPS présent reste VERT (dispatchable via WhatsApp)
+ */
 function isLivreurNoir(livreur) {
-  const dt = livreur.last_seen_at || livreur.derniere_position_date;
-  if (!dt) return true;
-  const min = (Date.now() - new Date(dt).getTime()) / 60000;
-  return min > GPS_EXPIRE_MIN || livreur.statut === "hors_ligne";
+  if (!livreur.latitude || !livreur.longitude) return true;
+  if (livreur.statut === "hors_ligne") return true;
+  if (livreur.actif === false) return true;
+  if (livreur.validation !== "valide") return true;
+  // En course = orange, pas noir
+  if (livreur.statut === "en_course") return false;
+  // Disponible avec GPS = vert
+  if (livreur.statut === "disponible") return false;
+  return true;
 }
 
 function isClientNoir(client) {
@@ -292,7 +311,7 @@ function buildStyles() {
 
 function buildLivreurIcon(livreur) {
   const estNoir = isLivreurNoir(livreur);
-  const libre = livreur.statut === "disponible";
+  const libre = isLivreurLibre(livreur);
   const cssClass = estNoir ? "dmap-livreur-noir" : (libre ? "dmap-livreur-libre" : "dmap-livreur-course");
   const initial = livreur.nom?.charAt(0)?.toUpperCase() || "L";
   const photoHtml = livreur.photo_url
@@ -330,7 +349,7 @@ function buildClientIcon(client) {
 
 function buildLivreurPopup(livreur) {
   const estNoir = isLivreurNoir(livreur);
-  const libre = livreur.statut === "disponible";
+  const libre = isLivreurLibre(livreur);
   const statutLabel = estNoir
     ? "⚫ Hors ligne — non dispatchable"
     : libre ? "🟢 Libre — disponible" : "🟠 En course";
@@ -606,7 +625,7 @@ export default function DispatchMap({
       const [lat, lng] = addMarkerOffset(livreur.latitude, livreur.longitude, markerIndex++);
       const marker = window.L.marker([lat, lng], {
         icon,
-        zIndexOffset: livreur.statut === "disponible" ? 1200 : 1100,
+        zIndexOffset: isLivreurLibre(livreur) ? 1200 : 1100,
       }).addTo(map);
       marker.bindPopup(buildLivreurPopup(livreur), { maxWidth: 260 });
       if (onMarkerClick) marker.on("click", () => onMarkerClick(livreur));
@@ -630,8 +649,9 @@ export default function DispatchMap({
     });
   }, [livreurs, clients, courses, mapLoaded]);
 
-  const nbLibres = livreurs.filter(l => l.statut === "disponible" && !isLivreurNoir(l)).length;
-  const nbCourse = livreurs.filter(l => l.statut === "en_course" && !isLivreurNoir(l)).length;
+  // Même règle que dispatchRules.js : libre = disponible + actif + validé + GPS présent
+  const nbLibres = livreurs.filter(l => isLivreurLibre(l)).length;
+  const nbCourse = livreurs.filter(l => isEnCourse(l) && !isLivreurNoir(l)).length;
   const nbLivreursInactifs = livreurs.filter(l => isLivreurNoir(l)).length;
   const nbClientsNoirs = clients.filter(c => isClientNoir(c)).length;
   const nbClientsBleus = clients.filter(c => !isClientNoir(c)).length;
