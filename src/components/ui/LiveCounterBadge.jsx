@@ -8,83 +8,64 @@ import { Bike, Users, Wifi } from "lucide-react";
  * - type="clients"  : compte les clients actifs (pour livreurs)
  * Filtre par pays de l'utilisateur connecté.
  */
-export default function LiveCounterBadge({ type = "livreurs", className = "" }) {
+export default function LiveCounterBadge({ type = "livreurs", count: externalCount, className = "" }) {
   const [userCountry, setUserCountry] = useState(null);
-  const [count, setCount] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const prevCount = useRef(null);
+  const [internalCount, setInternalCount] = useState(null);
+  const [loading, setLoading] = useState(externalCount === undefined);
 
-  // Déterminer le pays de l'utilisateur
+  // Si un count externe est fourni, l'utiliser directement (même source que la carte)
+  const count = externalCount !== undefined ? externalCount : internalCount;
+
+  // Déterminer le pays de l'utilisateur — uniquement si pas de count externe
   useEffect(() => {
+    if (externalCount !== undefined) return;
     const detectCountry = async () => {
       try {
         const user = await base44.auth.me();
         if (!user) return;
-        // Chercher le pays dans ClientExterne ou Livreur
         const clients = await base44.entities.ClientExterne.filter({ user_email: user.email });
-        if (clients?.[0]?.country_code) {
-          setUserCountry(clients[0].country_code);
-          return;
-        }
+        if (clients?.[0]?.country_code) { setUserCountry(clients[0].country_code); return; }
         const livreurs = await base44.entities.Livreur.filter({ user_email: user.email });
-        if (livreurs?.[0]?.country_code) {
-          setUserCountry(livreurs[0].country_code);
-        }
+        if (livreurs?.[0]?.country_code) setUserCountry(livreurs[0].country_code);
       } catch (_) {}
     };
     detectCountry();
-  }, []);
+  }, [externalCount]);
 
   const fetchCount = async () => {
+    if (externalCount !== undefined) return; // pas besoin si fourni de l'extérieur
     try {
       const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
       if (type === "livreurs") {
-        const filter = {
-          statut: "disponible",
-          actif: true,
-          validation: "valide",
-          app_active: true,
-        };
+        const filter = { statut: "disponible", actif: true, validation: "valide", app_active: true };
         if (userCountry) filter.country_code = userCountry;
         const livreurs = await base44.entities.Livreur.filter(filter);
-        // Filtrer : GPS actif + connectés récemment
-        const actifs = (livreurs || []).filter(l =>
-          l.latitude && l.longitude &&
-          l.last_seen_at && l.last_seen_at >= cutoff
-        );
-        setCount(actifs.length);
+        const actifs = (livreurs || []).filter(l => l.latitude && l.longitude && l.last_seen_at && l.last_seen_at >= cutoff);
+        setInternalCount(actifs.length);
       } else {
-        // clients actifs
-        const filter = {
-          app_active: true,
-          actif: true,
-        };
+        const filter = { app_active: true, actif: true };
         if (userCountry) filter.country_code = userCountry;
         const clients = await base44.entities.ClientExterne.filter(filter);
-        const actifs = (clients || []).filter(c =>
-          c.last_seen_at && c.last_seen_at >= cutoff
-        );
-        setCount(actifs.length);
+        const actifs = (clients || []).filter(c => c.last_seen_at && c.last_seen_at >= cutoff);
+        setInternalCount(actifs.length);
       }
     } catch (_) {
-      // silencieux
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    if (externalCount !== undefined) return;
     fetchCount();
-    const interval = setInterval(fetchCount, 30000); // ⚡ 10s → 30s : badge décoratif, pas critique
+    const interval = setInterval(fetchCount, 30000);
     return () => clearInterval(interval);
-  }, [type, userCountry]);
+  }, [type, userCountry, externalCount]);
 
-  // Animation si le compteur change
+  // Quand count externe fourni, pas de loading
   useEffect(() => {
-    if (count !== null && prevCount.current !== null && count !== prevCount.current) {
-      prevCount.current = count;
-    }
-  }, [count]);
+    if (externalCount !== undefined) setLoading(false);
+  }, [externalCount]);
 
   if (loading || count === null) return null;
 

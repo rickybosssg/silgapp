@@ -698,7 +698,7 @@ export default function ClientExterneApp() {
                           </span>
                         </div>
                         <GPSBadge profil={clientProfil} onForceSync={handleForceGPSSync} />
-                        <LiveCounterBadge type="livreurs" />
+                        <LiveCounterBadge type="livreurs" count={livreursProches.length} />
                       </div>
                     </div>
                     <button
