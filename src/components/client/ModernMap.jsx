@@ -499,11 +499,11 @@ export default function ModernMap({
   };
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative w-full h-full" style={{ minHeight: "calc(100vh - 73px)" }}>
       <div 
         ref={mapRef} 
         className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-200"
-        style={{ minHeight: "300px" }}
+        style={{ minHeight: "calc(100vh - 73px)" }}
       />
       
       {/* Overlay de chargement */}

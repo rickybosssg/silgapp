@@ -832,26 +832,28 @@ export default function ClientExterneApp() {
         </div>
       </div>
 
-      {/* Modale carte temps réel — utilise la première course avec livreur actif */}
-      {showMap && position && (() => {
-        const courseMap = coursesActives.find(c => ["livreur_en_route","colis_recupere","en_livraison"].includes(c.statut)) || coursesActives[0];
-        if (!courseMap) return null;
-        return (
-          <div className="fixed inset-0 z-50 bg-background">
-            <div className="flex items-center justify-between p-4 border-b bg-card">
-              <h2 className="text-lg font-bold text-foreground">Suivi en temps réel</h2>
-              <Button variant="ghost" size="icon" onClick={() => setShowMap(false)} className="h-10 w-10">
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-            </div>
+      {/* Modale carte temps réel */}
+      {showMap && position && (
+        <div className="fixed inset-0 z-50 bg-background flex flex-col">
+          <div className="flex items-center justify-between p-4 border-b bg-card flex-shrink-0">
+            <h2 className="text-lg font-bold text-foreground">
+              {coursesActives.find(c => ["livreur_en_route","colis_recupere","en_livraison"].includes(c.statut))
+                ? "📍 Suivi en temps réel"
+                : "🗺️ Carte"}
+            </h2>
+            <Button variant="ghost" size="icon" onClick={() => setShowMap(false)} className="h-10 w-10">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+          </div>
+          <div className="flex-1 relative">
             <ModernMap
               position={position}
               livreursProches={livreursProches}
-              courseActive={courseMap}
+              courseActive={coursesActives.find(c => ["livreur_en_route","colis_recupere","en_livraison"].includes(c.statut)) || null}
             />
           </div>
-        );
-      })()}
+        </div>
+      )}
 
       {/* Profil modal — "Mes infos" */}
       {showProfilModal && clientProfil && (
