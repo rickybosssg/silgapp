@@ -37,7 +37,6 @@ import HistoriqueCoursesClient from "@/components/client/HistoriqueCoursesClient
 import FraisAnnulationBannerClient from "@/components/client/FraisAnnulationBannerClient";
 import { useDestinataireGPS } from "@/hooks/useDestinataireGPS";
 import { playNotificationSound } from "@/hooks/useSonEtVibration";
-import PrixManuelConfirmModal from "@/components/client/PrixManuelConfirmModal";
 import PrixManuelInlineCard from "@/components/client/PrixManuelInlineCard";
 
 

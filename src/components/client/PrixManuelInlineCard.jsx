@@ -1,13 +1,12 @@
 import React, { useState } from "react";
-import { Check, X, AlertCircle, Loader2, XCircle } from "lucide-react";
+import { Check, X, AlertCircle, Loader2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 /**
- * Carte inline affichée à la place du bloc "Recherche de livreur..."
+ * Carte inline affichée à la place du bloc "Recherche en cours"
  * quand un livreur propose un prix manuel.
- * Remplace visuellement l'écran d'attente — le client voit directement la proposition.
  */
 export default function PrixManuelInlineCard({ course, devise, onAccepted, onRefused, onAnnuler }) {
   const [loading, setLoading] = useState(false);
@@ -50,23 +49,21 @@ export default function PrixManuelInlineCard({ course, devise, onAccepted, onRef
   };
 
   return (
-    <div className="rounded-3xl overflow-hidden shadow-xl border-2 border-amber-300 bg-white">
-      {/* Header coloré */}
-      <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-5 pt-5 pb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-2xl animate-bounce flex-shrink-0">
-            💰
-          </div>
-          <div>
-            <p className="text-white font-black text-lg leading-tight">Prix proposé par le livreur</p>
-            <p className="text-white/70 text-xs mt-0.5">Votre accord est requis pour continuer</p>
-          </div>
+    <div className="rounded-2xl overflow-hidden border-2 border-amber-300 shadow-lg bg-white">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-4 flex items-center gap-3">
+        <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center text-2xl animate-bounce">
+          💰
+        </div>
+        <div>
+          <p className="text-white font-black text-base leading-tight">Prix proposé par le livreur</p>
+          <p className="text-white/70 text-xs">Votre accord est requis pour continuer</p>
         </div>
       </div>
 
       <div className="p-5 space-y-4">
-        {/* Prix proposé */}
-        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl px-5 py-4 text-center">
+        {/* Montant mis en avant */}
+        <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl px-5 py-4 text-center">
           <p className="text-xs font-bold text-amber-600 uppercase tracking-widest mb-1">Montant demandé</p>
           <p className="text-4xl font-black text-amber-900">
             {prix?.toLocaleString()}{" "}
@@ -82,7 +79,9 @@ export default function PrixManuelInlineCard({ course, devise, onAccepted, onRef
         {/* Livreur */}
         {course.livreur_nom && (
           <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5">
-            <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center text-lg flex-shrink-0">🚴</div>
+            <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center text-lg flex-shrink-0">
+              🚴
+            </div>
             <div>
               <p className="text-xs text-blue-600 font-semibold">Livreur</p>
               <p className="text-sm font-bold text-blue-900">{course.livreur_nom}</p>
@@ -90,11 +89,19 @@ export default function PrixManuelInlineCard({ course, devise, onAccepted, onRef
           </div>
         )}
 
+        {/* Trajet */}
+        <div className="bg-gray-50 rounded-2xl px-4 py-3 text-sm">
+          <p className="text-gray-500 text-xs uppercase font-semibold mb-1">Trajet</p>
+          <p className="font-bold text-gray-800">{course.adresse_depart}</p>
+          <p className="text-gray-400 text-xs my-0.5">→</p>
+          <p className="font-bold text-gray-800">{course.adresse_arrivee || "Destination en cours"}</p>
+        </div>
+
         {/* Avertissement */}
         <div className="flex items-start gap-2 bg-gray-50 rounded-xl px-3 py-2.5">
           <AlertCircle className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
           <p className="text-xs text-gray-500 leading-relaxed">
-            Si vous refusez, la course repart en recherche automatique avec le tarif calculé.
+            Si vous refusez, la course repart en recherche et un autre livreur sera sollicité au tarif automatique.
           </p>
         </div>
 
@@ -125,15 +132,13 @@ export default function PrixManuelInlineCard({ course, devise, onAccepted, onRef
         </div>
 
         {/* Annuler la course */}
-        <Button
-          variant="ghost"
-          className="w-full text-red-400 text-xs hover:text-red-600 hover:bg-red-50 h-9"
+        <button
           onClick={onAnnuler}
           disabled={loading}
+          className="w-full text-xs text-gray-400 underline text-center py-1 disabled:opacity-50"
         >
-          <XCircle className="w-3.5 h-3.5 mr-1.5" />
           Annuler la course
-        </Button>
+        </button>
       </div>
     </div>
   );
