@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { MapPin, Phone, Navigation, Check, X, Package, Clock, MessageCircle, Ruler, AlertCircle } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import { cn } from "@/lib/utils";
 import ManualPriceModal from "./ManualPriceModal";
 
 function haversine(lat1, lon1, lat2, lon2) {
@@ -397,15 +398,34 @@ export default function CourseEnAttenteModalExterne({
           {/* Prix + Distance */}
           <div className="flex items-center justify-between">
             <div>
-              {course.prix_estimate ? (
-                <p className="text-2xl font-black text-gray-900">{course.prix_estimate.toLocaleString()} <span className="text-base font-semibold text-gray-400">FCFA</span></p>
-              ) : null}
-              {course.type_colis && (
-                <div className="flex items-center gap-1 mt-0.5">
-                  <Package className="w-3.5 h-3.5 text-gray-400" />
-                  <span className="text-xs text-gray-500">{typeColisLabel[course.type_colis] || course.type_colis}</span>
-                </div>
-              )}
+              {(() => {
+                const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
+                const prixBase = isPrixManuel ? Number(course.manual_price) : (course.prix_estimate || 0);
+                if (!prixBase) return null;
+                return (
+                  <>
+                    <p className={cn("text-2xl font-black", isPrixManuel ? "text-green-700" : "text-gray-900")}>
+                      {isPrixManuel 
+                        ? `${prixBase.toLocaleString()} `
+                        : `~${prixBase.toLocaleString()} `
+                      }
+                      <span className={cn("text-base font-semibold", isPrixManuel ? "text-green-600" : "text-gray-400")}>FCFA</span>
+                    </p>
+                    {isPrixManuel && (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <Check className="w-3.5 h-3.5 text-green-600" />
+                        <span className="text-xs text-green-600 font-bold">Prix convenu avec le client</span>
+                      </div>
+                    )}
+                    {course.type_colis && !isPrixManuel && (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <Package className="w-3.5 h-3.5 text-gray-400" />
+                        <span className="text-xs text-gray-500">{typeColisLabel[course.type_colis] || course.type_colis}</span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
             {(() => {
               const dist = haversine(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng);

@@ -56,15 +56,25 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
   
   const livreesToday = coursesToday.filter(c => c.statut === "livree");
   const totalEncaisseToday = isExterne
-    ? livreesToday.reduce((sum, c) => sum + (c.prix_final || 0), 0)
+    ? livreesToday.reduce((sum, c) => {
+        // ⚠️ CORRECTION PRIX MANUEL : Utiliser manual_price si accepté
+        const isPrixManuel = c.pricing_mode === "manual" && c.manual_price_status === "accepted" && Number(c.manual_price) > 0;
+        return sum + (isPrixManuel ? Number(c.manual_price) : (c.prix_final || 0));
+      })
     : livreesToday.reduce((sum, c) => sum + (c.prix_reel || 0), 0);
   const gainLivreurToday = livreesToday.reduce((sum, c) => {
+    // ⚠️ CORRECTION PRIX MANUEL : Utiliser montant_livreur si déjà calculé, sinon recalculer avec respect du mode
     if (c.montant_livreur > 0) return sum + c.montant_livreur;
-    return sum + Math.round((c.prix_final || 0) * 0.7);
+    const isPrixManuel = c.pricing_mode === "manual" && c.manual_price_status === "accepted" && Number(c.manual_price) > 0;
+    const prixBase = isPrixManuel ? Number(c.manual_price) : (c.prix_final || 0);
+    return sum + Math.round(prixBase * 0.7);
   }, 0);
   const commissionToday = livreesToday.reduce((sum, c) => {
+    // ⚠️ CORRECTION PRIX MANUEL : Utiliser commission_silga si déjà calculée
     if (c.commission_silga > 0) return sum + c.commission_silga;
-    return sum + Math.round((c.prix_final || 0) * 0.3);
+    const isPrixManuel = c.pricing_mode === "manual" && c.manual_price_status === "accepted" && Number(c.manual_price) > 0;
+    const prixBase = isPrixManuel ? Number(c.manual_price) : (c.prix_final || 0);
+    return sum + Math.round(prixBase * 0.3);
   }, 0);
   const montantDuSilga = livreurProfil?.montant_du_silga || 0;
   const isPaye = livreurProfil?.statut_paiement === "paye";
@@ -210,7 +220,9 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
                         <div className="flex flex-wrap gap-1 mt-1">
                           {(() => {
                             const dist = course.distance_reelle_km > 0 ? Number(course.distance_reelle_km) : 0;
-                            const prix = course.prix_final > 0 ? Number(course.prix_final) : 0;
+                            // ⚠️ CORRECTION PRIX MANUEL
+                            const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
+                            const prix = isPrixManuel ? Number(course.manual_price) : (course.prix_final > 0 ? Number(course.prix_final) : 0);
                             const gain = course.montant_livreur > 0 ? Number(course.montant_livreur) : 0;
                             const commission = course.commission_silga > 0 ? Number(course.commission_silga) : 0;
                             let dureeMin = null;
@@ -229,8 +241,10 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
                                 </span>
                               )}
                               {prix > 0 && (
-                                <span className="text-xs font-semibold text-gray-700 bg-gray-50 rounded px-2 py-0.5">
-                                  💰 {prix.toLocaleString()} F
+                                <span className={cn("text-xs font-semibold rounded px-2 py-0.5", 
+                                  isPrixManuel ? "text-green-700 bg-green-50" : "text-gray-700 bg-gray-50"
+                                )}>
+                                  {isPrixManuel ? "✓ " : "💰 "}{prix.toLocaleString()} F
                                 </span>
                               )}
                               {gain > 0 && (

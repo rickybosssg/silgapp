@@ -435,23 +435,51 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
           {/* Prix */}
           {isExterne ? (
-            course.prix_estimate && course.prix_estimate > 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-blue-700 font-semibold">Prix estimé</span>
-                  <span className="text-lg font-black text-blue-900">~{course.prix_estimate.toLocaleString()} {course.devise || "F"}</span>
+            (() => {
+              const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
+              const prixBase = isPrixManuel ? Number(course.manual_price) : (course.prix_estimate || 0);
+              const gain = Math.round(prixBase * 0.7);
+              
+              if (prixBase <= 0) return null;
+              
+              return (
+                <div className={cn(
+                  "rounded-xl p-3 border",
+                  isPrixManuel 
+                    ? "bg-green-50 border-green-200" 
+                    : "bg-blue-50 border-blue-200"
+                )}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={cn("text-xs font-semibold", isPrixManuel ? "text-green-700" : "text-blue-700")}>
+                      {isPrixManuel ? "Prix validé ✓" : "Prix estimé"}
+                    </span>
+                    <span className={cn("text-lg font-black", isPrixManuel ? "text-green-900" : "text-blue-900")}>
+                      {isPrixManuel 
+                        ? `${prixBase.toLocaleString()} ${course.devise || "F"}`
+                        : `~${prixBase.toLocaleString()} ${course.devise || "F"}`
+                      }
+                    </span>
+                  </div>
+                  {isPrixManuel ? (
+                    <p className="text-[10px] text-green-600 font-medium">
+                      Prix convenu avec le client
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-blue-600">
+                      Prix final calculé à la livraison selon le tarif du pays
+                    </p>
+                  )}
+                  <div className="mt-2 pt-2 border-t flex items-center justify-between text-xs"
+                    style={{ borderColor: isPrixManuel ? "rgb(200, 235, 215)" : "rgb(191, 226, 255)" }}
+                  >
+                    <span className={cn("font-semibold", isPrixManuel ? "text-green-700" : "text-blue-700")}>Votre gain (70%)</span>
+                    <span className={cn("font-bold", isPrixManuel ? "text-green-800" : "text-green-700")}>
+                      +{gain.toLocaleString()} {course.devise || "F"}
+                    </span>
+                  </div>
                 </div>
-                <p className="text-[10px] text-blue-600">
-                  Prix final calculé à la livraison selon le tarif du pays
-                </p>
-                <div className="mt-2 pt-2 border-t border-blue-200 flex items-center justify-between text-xs">
-                  <span className="text-blue-700">Votre gain (70%)</span>
-                  <span className="font-bold text-green-700">
-                    {Math.round(course.prix_estimate * 0.7).toLocaleString()} {course.devise || "F"}
-                  </span>
-                </div>
-              </div>
-            )
+              );
+            })()
           ) : (
             course.prix > 0 && (
               <div className="flex items-center justify-between px-1">
