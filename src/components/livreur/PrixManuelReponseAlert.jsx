@@ -4,6 +4,7 @@ import { CheckCircle, XCircle } from "lucide-react";
 /**
  * Alerte affichée au livreur quand le client répond à sa proposition de prix manuel.
  * Déclenche son + vibration sur acceptation ou refus.
+ * CORRECTION : La modale reste affichée jusqu'à ce que le livreur la ferme manuellement.
  */
 function playSound(accepted) {
   try {
@@ -44,10 +45,17 @@ function playSound(accepted) {
 
 export default function PrixManuelReponseAlert({ accepted, prix, devise, onDismiss }) {
   const [visible, setVisible] = useState(true);
-  const timerRef = useRef(null);
+
+  // Handler explicite pour fermer la modale
+  const handleDismiss = () => {
+    console.log('[PrixManuelReponseAlert] Modale fermée par le livreur', { accepted, prix });
+    setVisible(false);
+    onDismiss?.();
+  };
 
   useEffect(() => {
     // Son + vibration au montage
+    console.log('[PrixManuelReponseAlert] ✅ Affichage notification prix manuel', { accepted, prix, devise });
     playSound(accepted);
     if (accepted) {
       navigator.vibrate?.([200, 100, 200, 100, 400]);
@@ -55,21 +63,22 @@ export default function PrixManuelReponseAlert({ accepted, prix, devise, onDismi
       navigator.vibrate?.([500, 150, 500]);
     }
 
-    // Auto-dismiss après 6 secondes
-    timerRef.current = setTimeout(() => {
-      setVisible(false);
-      onDismiss?.();
-    }, 6000);
-
-    return () => clearTimeout(timerRef.current);
-  }, [accepted, onDismiss]);
+    // ⚠️ CORRECTION : SUPPRESSION de l'auto-dismiss
+    // La modale reste affichée jusqu'à ce que le livreur la ferme manuellement
+    // Plus de timer automatique — garantie que le livreur voit la notification
+  }, [accepted, devise, prix]);
 
   if (!visible) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)" }}
-      onClick={() => { setVisible(false); onDismiss?.(); }}
+      onClick={(e) => {
+        // Fermer seulement si clic en dehors de la modale (overlay)
+        if (e.target === e.currentTarget) {
+          handleDismiss();
+        }
+      }}
     >
       <div className={`w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in duration-300 ${
         accepted ? "bg-white border-4 border-green-400" : "bg-white border-4 border-red-400"
@@ -92,7 +101,7 @@ export default function PrixManuelReponseAlert({ accepted, prix, devise, onDismi
             </p>
             <p className="text-white/80 text-sm mt-1">
               {accepted
-                ? `Le client a validé votre prix`
+                ? `Le client a validé votre proposition`
                 : "Le client a refusé votre proposition"}
             </p>
           </div>
@@ -111,10 +120,22 @@ export default function PrixManuelReponseAlert({ accepted, prix, devise, onDismi
           <p className={`text-sm font-bold ${accepted ? "text-green-700" : "text-red-700"}`}>
             {accepted
               ? "✅ La course peut commencer. Rendez-vous au point de récupération !"
-              : "❌ Vous êtes de nouveau disponible. Cette course peut vous être reproposée plus tard."}
+              : "❌ Vous êtes de nouveau disponible."}
           </p>
 
-          <p className="text-xs text-gray-400">Appuyez n'importe où pour fermer</p>
+          {/* Bouton d'action explicite pour le livreur */}
+          <button
+            onClick={handleDismiss}
+            className={`w-full h-12 rounded-2xl font-black text-sm shadow-lg active:scale-95 transition-all ${
+              accepted
+                ? "bg-gradient-to-b from-green-500 to-emerald-600 text-white shadow-green-200"
+                : "bg-gradient-to-b from-red-500 to-red-600 text-white shadow-red-200"
+            }`}
+          >
+            {accepted ? "Continuer la course →" : "Compris"}
+          </button>
+
+          <p className="text-xs text-gray-400">Ou appuyez en dehors pour fermer</p>
         </div>
       </div>
     </div>

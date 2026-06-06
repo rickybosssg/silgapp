@@ -571,12 +571,18 @@ Deno.serve(async (req) => {
 
         // Mettre le livreur en_course
         if (course.proposed_by_livreur_id) {
-          await base44.asServiceRole.entities.Livreur.update(course.proposed_by_livreur_id, { statut: 'en_course' });
+          const livreurId = course.proposed_by_livreur_id;
+          console.log(`[DISPATCH] 💰 Prix accepté pour course ${course_id} — livreur ${livreurId} notifié`);
+          
+          await base44.asServiceRole.entities.Livreur.update(livreurId, { statut: 'en_course' });
 
           // Notifier le livreur : prix accepté
           try {
-            const livreurData = await base44.asServiceRole.entities.Livreur.get(course.proposed_by_livreur_id);
+            const livreurData = await base44.asServiceRole.entities.Livreur.get(livreurId);
             if (livreurData?.user_email) {
+              // 📊 LOG DIAGNOSTIC
+              console.log(`[DISPATCH] 📧 Création notification BDD pour ${livreurData.user_email}`);
+              
               await base44.asServiceRole.entities.Notification.create({
                 titre: '✅ Prix accepté — La course peut commencer !',
                 message: `Le client a accepté votre prix de ${prixManuel.toLocaleString()} ${course.devise || 'FCFA'}. Rendez-vous au point de récupération.`,
@@ -585,9 +591,37 @@ Deno.serve(async (req) => {
                 destinataire_email: livreurData.user_email,
                 lue: false,
               });
+
+              // 📱 Notification push — si app ouverte
+              try {
+                console.log(`[DISPATCH] 📲 Envoi notification push à ${livreurData.user_email}`);
+                await base44.functions.invoke('envoiNotificationPush', {
+                  destinataire_email: livreurData.user_email,
+                  livreur_id: livreurId,
+                  titre: '✅ Prix accepté !',
+                  message: `Le client a validé ${prixManuel.toLocaleString()} ${course.devise || 'FCFA'}. Course ${course_id.substr(-8)}.`,
+                  type: 'course_acceptee',
+                  course_id: course_id,
+                });
+              } catch (err) {
+                console.error('[DISPATCH] ❌ Erreur notif push prix accepté:', err.message);
+              }
+
+              // 📞 Si app fermée → WhatsApp en complément
+              if (!livreurData.app_active && livreurData.telephone) {
+                try {
+                  console.log(`[DISPATCH] 📱 Envoi WhatsApp à ${livreurData.telephone} (app fermée)`);
+                  await base44.functions.invoke('envoyerAlerteWhatsApp', {
+                    telephone: livreurData.telephone,
+                    message: `✅ SILGAPP — Prix accepté !\n\nLe client a validé votre prix de ${prixManuel.toLocaleString()} ${course.devise || 'FCFA'}.\n\nRendez-vous au point de récupération pour commencer la course.`,
+                  });
+                } catch (err) {
+                  console.warn('[DISPATCH] ⚠️ Erreur WhatsApp prix accepté:', err.message);
+                }
+              }
             }
           } catch (e) {
-            console.warn('[DISPATCH] Erreur notif livreur prix accepté:', e.message);
+            console.error('[DISPATCH] ❌ Erreur notif livreur prix accepté:', e.message);
           }
         }
 

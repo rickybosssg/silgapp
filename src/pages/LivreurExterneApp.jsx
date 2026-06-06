@@ -145,6 +145,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   
   useEffect(() => {
     if (!mesCourses.length || !livreurProfil?.id) return;
+    
+    // LOG DIAGNOSTIC — vérifier toutes les courses
+    console.log('[PrixManuel] 🔍 Scan des courses pour réponse client...', mesCourses.length);
+    
     mesCourses.forEach(course => {
       if (course.proposed_by_livreur_id !== livreurProfil.id) return;
       if (course.pricing_mode !== 'manual') return;
@@ -153,7 +157,19 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       
       const watched = prixManuelWatchedRef.current[course.id];
       const status = course.manual_price_status;
+      
+      // LOG DIAGNOSTIC
+      if (status === 'accepted' || status === 'refused') {
+        console.log('[PrixManuel] ✅ Réponse détectée:', {
+          course_id: course.id,
+          status,
+          watched,
+          prix: course.manual_price,
+        });
+      }
+      
       if ((status === 'accepted' || status === 'refused') && watched !== status) {
+        console.log('[PrixManuel] 🎯 Déclenchement notification:', { accepted: status === 'accepted', prix: course.manual_price });
         prixManuelWatchedRef.current[course.id] = status;
         setPrixManuelReponse({
           accepted: status === 'accepted',
@@ -167,16 +183,17 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     if (prixManuelReponse) {
       const courseActuelle = mesCourses.find(c => 
         c.pricing_mode === 'manual' && 
-        c.proposed_by_livreur_id === livreurProfil.id &&
+        c.proposed_by_livreur_id === livreurProfil?.id &&
         FINAL_STATUSES.includes(c.statut)
       );
       if (courseActuelle) {
+        console.log('[PrixManuel] 🛑 Fermeture modale — course terminée');
         setPrixManuelReponse(null);
         // Marquer comme traité pour éviter réapparition
         prixManuelWatchedRef.current[courseActuelle.id] = 'dismissed_by_final_status';
       }
     }
-  }, [mesCourses, livreurProfil?.id, prixManuelReponse]);
+  }, [mesCourses, livreurProfil?.id]);
 
   // Auto-resync statut supprimé — le statut ne se change QUE manuellement via le bouton
 
