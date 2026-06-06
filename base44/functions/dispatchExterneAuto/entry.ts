@@ -42,8 +42,10 @@ async function trouverLivreursCandidats(base44, course, rayonKm, exclusions = []
 
   if (!livreurs || livreurs.length === 0) return [];
 
-  // Charger toutes les courses actives pour exclure les livreurs déjà en course
-  const coursesActives = await base44.asServiceRole.entities.CourseExterne.filter({});
+  // Charger les courses actives du MÊME pays pour exclure les livreurs déjà en course
+  // Filtre par country_code si disponible — garantit l'isolation multi-pays
+  const coursesActifFilter = course.country_code ? { country_code: course.country_code } : {};
+  const coursesActives = await base44.asServiceRole.entities.CourseExterne.filter(coursesActifFilter);
   const livreurIdsEnCourse = new Set(
     coursesActives
       .filter(c => ['livreur_en_route', 'colis_recupere', 'en_livraison'].includes(c.statut) && c.livreur_id)

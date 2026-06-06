@@ -6,11 +6,18 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Package, DollarSign, TrendingUp, CheckCircle2, MapPin, Clock, User } from "lucide-react";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { fr } from "date-fns/locale";
+import { useAdminContext } from "@/hooks/useAdminContext.js";
+import CountrySelector from "@/components/international/CountrySelector.jsx";
 
 export default function RapportJourExterne() {
+  const { isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
+  const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
+
   const { data: courses = [] } = useQuery({
-    queryKey: ["courses-externes-rapport"],
-    queryFn: () => base44.entities.CourseExterne.list("-created_date", 300),
+    queryKey: ["courses-externes-rapport", effectiveCountry || "all"],
+    queryFn: () => effectiveCountry
+      ? base44.entities.CourseExterne.filter({ country_code: effectiveCountry }, "-created_date", 300)
+      : base44.entities.CourseExterne.list("-created_date", 300),
     initialData: [],
     refetchInterval: 10000,
   });
@@ -70,10 +77,20 @@ export default function RapportJourExterne() {
             <div>
               <h1 className="text-xl font-black text-white tracking-tight">Rapport du Jour — Externe</h1>
               <p className="text-white/65 text-xs mt-0.5 capitalize">
-                {format(today, "EEEE d MMMM yyyy", { locale: fr })}
+                {format(today, "EEEE d MMMM yyyy", { locale: fr })} {effectiveCountry ? `· ${effectiveCountry}` : "· tous pays"}
               </p>
             </div>
           </div>
+          {/* Sélecteur pays — affiché uniquement pour les admins globaux */}
+          {!isPays && (
+            <div className="[&_button]:!bg-white/20 [&_button]:!text-white [&_button]:!border-white/30 [&_div]:!bg-white [&_div]:!text-slate-800 flex-shrink-0">
+              <CountrySelector
+                value={effectiveCountry || ""}
+                onChange={setSelectedCountry}
+                className="h-9 text-xs min-w-[120px]"
+              />
+            </div>
+          )}
         </div>
       </div>
 
