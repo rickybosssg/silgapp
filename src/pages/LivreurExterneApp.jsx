@@ -21,6 +21,7 @@ import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import AlertesLivreurModal from "@/components/livreur/AlertesLivreurModal";
 import PubliciteCarousel from "@/components/publicite/PubliciteCarousel";
 import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
+import PricingModeSelector from "@/components/livreur/PricingModeSelector";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -41,6 +42,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [gpsActif, setGpsActif] = useState(false);
   const [onboardingTermine, setOnboardingTermine] = useState(false);
   const [showMesInfos, setShowMesInfos] = useState(false);
+  const [pricingMode, setPricingMode] = useState(() => {
+    try { return localStorage.getItem("silgapp_pricing_mode") || "automatic"; } catch { return "automatic"; }
+  });
 
   // Pull-to-refresh
   const { pulling, refreshing } = usePullToRefresh(async () => {
@@ -59,6 +63,15 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     refetchInterval: 8000, // ⚡ 2s → 8s : profil change rarement
     staleTime: 4000,
   });
+
+  // Synchroniser le pricingMode depuis le profil BDD au chargement
+  useEffect(() => {
+    if (livreurProfil?.pricing_mode && livreurProfil.pricing_mode !== pricingMode) {
+      setPricingMode(livreurProfil.pricing_mode);
+      try { localStorage.setItem("silgapp_pricing_mode", livreurProfil.pricing_mode); } catch {}
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [livreurProfil?.id]);
 
   // Heartbeat automatique
   const { syncHeartbeat } = useHeartbeat({
@@ -292,6 +305,15 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     toast.success("Livraison terminée ! 🎉");
   };
 
+  const handlePricingModeChange = (mode) => {
+    setPricingMode(mode);
+    try { localStorage.setItem("silgapp_pricing_mode", mode); } catch {}
+    // Sauvegarder aussi en BDD pour persistance cross-device
+    if (livreurProfil?.id) {
+      saveLivreur(livreurProfil.id, { pricing_mode: mode }).catch(() => null);
+    }
+  };
+
   const handleLogout = () => {
     if (livreurProfil?.id) {
       saveLivreur(livreurProfil.id, { app_active: false }).catch(() => null);
@@ -370,7 +392,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         <CourseEnAttenteModalExterne
           course={courseEnAttente}
           livreurId={livreurProfil.id}
-          pricingMode={livreurProfil?.pricing_mode || "automatic"}
+          pricingMode={pricingMode}
           onAccepter={handleAccepter}
           onRefuser={handleRefuser}
           onExpire={() => {
@@ -453,6 +475,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                 </p>
               </div>
             )}
+
+            {/* ── MODE TARIFAIRE ── */}
+            <PricingModeSelector pricingMode={pricingMode} onChange={handlePricingModeChange} />
 
             <LivreurStatsBanner
               mesCourses={mesCourses}
