@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Truck } from "lucide-react";
@@ -22,6 +22,7 @@ import AlertesLivreurModal from "@/components/livreur/AlertesLivreurModal";
 import PubliciteCarousel from "@/components/publicite/PubliciteCarousel";
 import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
 import PricingModeSelector from "@/components/livreur/PricingModeSelector";
+import PrixManuelReponseAlert from "@/components/livreur/PrixManuelReponseAlert";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -45,6 +46,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [pricingMode, setPricingMode] = useState(() => {
     try { return localStorage.getItem("silgapp_pricing_mode") || "automatic"; } catch { return "automatic"; }
   });
+  // Réponse du client à une proposition de prix manuel
+  const [prixManuelReponse, setPrixManuelReponse] = useState(null); // { accepted, prix, devise }
+  const prixManuelWatchedRef = useRef({}); // track les course_id déjà notifiés
 
   // Pull-to-refresh
   const { pulling, refreshing } = usePullToRefresh(async () => {
@@ -134,6 +138,25 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     () => mesCourses.filter(c => ["livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut)),
     [mesCourses]
   );
+
+  // Détecter la réponse du client sur une proposition de prix manuel
+  useEffect(() => {
+    if (!mesCourses.length || !livreurProfil?.id) return;
+    mesCourses.forEach(course => {
+      if (course.proposed_by_livreur_id !== livreurProfil.id) return;
+      if (!course.pricing_mode === 'manual') return;
+      const watched = prixManuelWatchedRef.current[course.id];
+      const status = course.manual_price_status;
+      if ((status === 'accepted' || status === 'refused') && watched !== status) {
+        prixManuelWatchedRef.current[course.id] = status;
+        setPrixManuelReponse({
+          accepted: status === 'accepted',
+          prix: course.manual_price || 0,
+          devise: course.devise || 'FCFA',
+        });
+      }
+    });
+  }, [mesCourses, livreurProfil?.id]);
 
   // Auto-resync statut supprimé — le statut ne se change QUE manuellement via le bouton
 
@@ -379,6 +402,16 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
       {/* VENUS — toujours visible */}
       <VenusFloatingButton />
+
+      {/* Réponse prix manuel du client */}
+      {prixManuelReponse && (
+        <PrixManuelReponseAlert
+          accepted={prixManuelReponse.accepted}
+          prix={prixManuelReponse.prix}
+          devise={prixManuelReponse.devise}
+          onDismiss={() => setPrixManuelReponse(null)}
+        />
+      )}
 
       {/* ── PUBLICITÉ PLEIN ÉCRAN LIVREUR ── */}
       <PubliciteFullscreen

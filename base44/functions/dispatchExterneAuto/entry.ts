@@ -399,12 +399,20 @@ Deno.serve(async (req) => {
         return Response.json({ success: true, message: 'Course acceptée avec succès' });
       }
 
-      // En mode manuel : notifier le client via une notification
+      // En mode manuel : notifier le CRÉATEUR de la course (pas forcément l'expéditeur)
       try {
-        const notifDest = course.expediteur_client_id
-          ? await base44.asServiceRole.entities.ClientExterne.filter({ id: course.expediteur_client_id })
-          : [];
-        const clientEmail = notifDest?.[0]?.user_email;
+        // Priorité : chercher le créateur via created_by_id (User), sinon fallback expediteur_client_id
+        let clientEmail = null;
+        if (course.created_by_id) {
+          try {
+            const creator = await base44.asServiceRole.entities.User.get(course.created_by_id);
+            clientEmail = creator?.email || null;
+          } catch (_) {}
+        }
+        if (!clientEmail && course.expediteur_client_id) {
+          const notifDest = await base44.asServiceRole.entities.ClientExterne.filter({ id: course.expediteur_client_id });
+          clientEmail = notifDest?.[0]?.user_email || null;
+        }
         if (clientEmail) {
           await base44.asServiceRole.entities.Notification.create({
             titre: '💰 Prix proposé par le livreur',
@@ -550,11 +558,30 @@ Deno.serve(async (req) => {
         // Mettre le livreur en_course
         if (course.proposed_by_livreur_id) {
           await base44.asServiceRole.entities.Livreur.update(course.proposed_by_livreur_id, { statut: 'en_course' });
+
+          // Notifier le livreur : prix accepté
+          try {
+            const livreurData = await base44.asServiceRole.entities.Livreur.get(course.proposed_by_livreur_id);
+            if (livreurData?.user_email) {
+              await base44.asServiceRole.entities.Notification.create({
+                titre: '✅ Prix accepté — La course peut commencer !',
+                message: `Le client a accepté votre prix de ${prixManuel.toLocaleString()} ${course.devise || 'FCFA'}. Rendez-vous au point de récupération.`,
+                type: 'course_acceptee',
+                course_id: course_id,
+                destinataire_email: livreurData.user_email,
+                lue: false,
+              });
+            }
+          } catch (e) {
+            console.warn('[DISPATCH] Erreur notif livreur prix accepté:', e.message);
+          }
         }
 
         await supprimerNotificationsCourse(base44, course_id);
         return Response.json({ success: true, accepted: true });
       } else {
+        const livreurRefuseId = course.proposed_by_livreur_id;
+
         // Refus client → redispatch
         await base44.asServiceRole.entities.CourseExterne.update(course_id, {
           manual_price_status: 'refused',
@@ -569,8 +596,30 @@ Deno.serve(async (req) => {
           proposed_by_livreur_id: '',
         });
 
-        const exclusions = course.proposed_by_livreur_id ? [course.proposed_by_livreur_id] : [];
-        const result = await lancerDispatch(base44, course_id, exclusions);
+        // Remettre le livreur disponible
+        if (livreurRefuseId) {
+          await base44.asServiceRole.entities.Livreur.update(livreurRefuseId, { statut: 'disponible' });
+
+          // Notifier le livreur : prix refusé
+          try {
+            const livreurData = await base44.asServiceRole.entities.Livreur.get(livreurRefuseId);
+            if (livreurData?.user_email) {
+              await base44.asServiceRole.entities.Notification.create({
+                titre: '❌ Prix refusé — Vous êtes de nouveau disponible',
+                message: `Le client a refusé votre prix. Vous redevenez disponible pour d'autres courses. Cette course peut vous être reproposée plus tard.`,
+                type: 'course_refusee',
+                course_id: course_id,
+                destinataire_email: livreurData.user_email,
+                lue: false,
+              });
+            }
+          } catch (e) {
+            console.warn('[DISPATCH] Erreur notif livreur prix refusé:', e.message);
+          }
+        }
+
+        // ⚠️ Ne pas exclure le livreur du redispatch — il peut être reproposé plus tard
+        const result = await lancerDispatch(base44, course_id, []);
         return Response.json({ success: true, accepted: false, redispatched: !result.noLivreur });
       }
     }
