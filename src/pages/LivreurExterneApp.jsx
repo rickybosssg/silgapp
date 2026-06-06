@@ -49,33 +49,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // Réponse du client à une proposition de prix manuel
   const [prixManuelReponse, setPrixManuelReponse] = useState(null); // { accepted, prix, devise }
   const prixManuelWatchedRef = useRef({}); // track les course_id déjà notifiés
-  
-  // Nettoyer la notification au chargement si une course est déjà terminée
-  useEffect(() => {
-    if (!mesCourses.length || !livreurProfil?.id) return;
-    const FINAL_STATUSES = ['livree', 'annulee', 'completed', 'delivered', 'canceled'];
-    
-    // Vérifier si une course avec prix manuel est dans un statut final
-    const courseTerminee = mesCourses.find(c =>
-      c.pricing_mode === 'manual' &&
-      c.proposed_by_livreur_id === livreurProfil.id &&
-      FINAL_STATUSES.includes(c.statut)
-    );
-    
-    if (courseTerminee) {
-      // Marquer comme traitée pour éviter toute réapparition future
-      prixManuelWatchedRef.current[courseTerminee.id] = 'dismissed_by_final_status';
-      // Nettoyer localStorage
-      try {
-        const stored = localStorage.getItem('silgapp_prix_manuel_notified');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          delete parsed[courseTerminee.id];
-          localStorage.setItem('silgapp_prix_manuel_notified', JSON.stringify(parsed));
-        }
-      } catch {}
-    }
-  }, [mesCourses, livreurProfil?.id]);
 
   // Pull-to-refresh
   const { pulling, refreshing } = usePullToRefresh(async () => {
