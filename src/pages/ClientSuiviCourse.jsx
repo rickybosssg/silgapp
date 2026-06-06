@@ -256,7 +256,7 @@ export default function ClientSuiviCourse() {
     nouvelle: "Nouvelle course",
     recherche_livreur: (course) =>
       course?.pricing_mode === "manual" && course?.manual_price_status === "pending_client_validation"
-        ? "💰 Prix proposé — votre accord requis"
+        ? (course.created_by_id === userId ? "💰 Prix proposé — votre accord requis" : "🔍 Recherche de livreur...")
         : "Recherche de livreur...",
     livreur_en_route: "Livreur en route vers récupération",
     colis_recupere: "Colis récupéré",
@@ -398,7 +398,7 @@ export default function ClientSuiviCourse() {
           <div className="flex items-center justify-between mb-3">
             <h1 className="text-lg font-bold text-foreground">Suivi de course</h1>
             <Badge className={
-              maCourse?.pricing_mode === "manual" && maCourse?.manual_price_status === "pending_client_validation"
+              maCourse?.pricing_mode === "manual" && maCourse?.manual_price_status === "pending_client_validation" && maCourse?.created_by_id === userId
                 ? "bg-amber-100 text-amber-700 animate-pulse"
                 : statutColors[maCourse.statut]
             }>
@@ -826,8 +826,8 @@ export default function ClientSuiviCourse() {
           );
         })()}
 
-        {/* Modal validation prix manuel */}
-        {maCourse?.pricing_mode === "manual" && maCourse?.manual_price_status === "pending_client_validation" && (
+        {/* Modal validation prix manuel — uniquement pour le CRÉATEUR de la course */}
+        {maCourse?.pricing_mode === "manual" && maCourse?.manual_price_status === "pending_client_validation" && maCourse?.created_by_id === userId && (
           <PrixManuelConfirmModal
             course={maCourse}
             onAccepted={() => {
