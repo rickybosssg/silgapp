@@ -130,9 +130,15 @@ export default function RecapCourseLivreur() {
   const donneesEnCours = !course.prix_final || !course.distance_reelle_km;
 
   const dist = Number(course.distance_reelle_km || 0);
-  // Règle prix minimum SILGAPP : 1 000 F — appliqué AVANT tout calcul de commission
-  const prixBrut = course.prix_final ? Number(course.prix_final) : Math.round(dist * 100);
-  const prixFinal = Math.max(1000, prixBrut);
+
+  // Prix manuel accepté → priorité absolue, ne jamais recalculer à partir de la distance
+  const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
+
+  // Règle prix minimum SILGAPP : 1 000 F — appliqué UNIQUEMENT en mode automatique
+  const prixBrut = isPrixManuel
+    ? Number(course.manual_price)
+    : (course.prix_final ? Number(course.prix_final) : Math.round(dist * 100));
+  const prixFinal = isPrixManuel ? prixBrut : Math.max(1000, prixBrut);
   const gainLivreur = Number(course.montant_livreur) > 0 ? Number(course.montant_livreur) : Math.round(prixFinal * 0.7);
   const commissionSilga = Number(course.commission_silga) > 0 ? Number(course.commission_silga) : Math.round(prixFinal * 0.3);
   const duree = dureeMinutes(course.heure_recuperation, course.heure_livraison);
@@ -163,17 +169,25 @@ export default function RecapCourseLivreur() {
         <div className="bg-gray-900 rounded-3xl p-6 text-center space-y-3 border border-gray-800">
           <p className="text-gray-400 text-xs font-semibold uppercase tracking-widest">Prix de la course</p>
 
-          <div className="space-y-1">
-            <p className="text-gray-400 text-sm">Distance réelle</p>
-            <p className="text-white text-2xl font-black">{dist.toFixed(2)} km</p>
-          </div>
-
-          <div className="text-gray-500 text-sm">
-            {prixBrut < 1000
-              ? <span className="text-amber-400 font-semibold">Prix minimum SILGAPP appliqué</span>
-              : `Calcul : ${dist.toFixed(2)} km × 100 F`
-            }
-          </div>
+          {isPrixManuel ? (
+            <div className="space-y-1">
+              <p className="text-green-400 text-xs font-semibold uppercase tracking-wide">Prix convenu avec le client</p>
+              <p className="text-gray-400 text-sm">Proposition acceptée par le client</p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-1">
+                <p className="text-gray-400 text-sm">Distance réelle</p>
+                <p className="text-white text-2xl font-black">{dist.toFixed(2)} km</p>
+              </div>
+              <div className="text-gray-500 text-sm">
+                {prixBrut < 1000
+                  ? <span className="text-amber-400 font-semibold">Prix minimum SILGAPP appliqué</span>
+                  : `Calcul : ${dist.toFixed(2)} km × 100 F`
+                }
+              </div>
+            </>
+          )}
 
           <div className="border-t border-gray-700 pt-3">
             <p className="text-gray-400 text-xs mb-1">Montant final</p>

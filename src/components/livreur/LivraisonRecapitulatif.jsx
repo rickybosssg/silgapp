@@ -23,9 +23,12 @@ export default function LivraisonRecapitulatif({ course, onClose }) {
     || haversine(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng)
     || 0;
 
-  const prixFinal = Number(course.prix_final) > 0 
-    ? Number(course.prix_final)
-    : (distance > 0 ? Math.round(distance * 100) : 0);
+  // Prix manuel accepté → priorité absolue, ne jamais recalculer à partir de la distance
+  const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
+
+  const prixFinal = isPrixManuel
+    ? Number(course.manual_price)
+    : (Number(course.prix_final) > 0 ? Number(course.prix_final) : (distance > 0 ? Math.round(distance * 100) : 0));
 
   const montantLivreur = Number(course.montant_livreur) > 0 
     ? Number(course.montant_livreur)
@@ -88,16 +91,21 @@ export default function LivraisonRecapitulatif({ course, onClose }) {
             </div>
           )}
 
-          {/* Prix à payer (client) — toujours affiché (minimum 100F) */}
+          {/* Prix à payer (client) — toujours affiché */}
           <div className="flex items-center gap-4 bg-green-50 rounded-2xl p-4">
             <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
               <Banknote className="w-5 h-5 text-green-600" />
             </div>
             <div className="flex-1">
-              <p className="text-xs text-green-600 font-semibold uppercase tracking-wide">Prix à encaisser</p>
+              <p className="text-xs text-green-600 font-semibold uppercase tracking-wide">
+                Prix à encaisser{isPrixManuel ? " (prix convenu)" : ""}
+              </p>
               <p className="text-2xl font-black text-green-900">
                 {prixFinal > 0 ? `${prixFinal.toLocaleString()} FCFA` : "100 FCFA"}
               </p>
+              {isPrixManuel && (
+                <p className="text-[10px] text-green-600 mt-0.5">Prix accepté par le client</p>
+              )}
             </div>
           </div>
 
