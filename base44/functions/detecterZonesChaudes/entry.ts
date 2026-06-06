@@ -70,14 +70,26 @@ Deno.serve(async (req) => {
       return Response.json({ error: "Accès refusé" }, { status: 403 });
     }
 
+    // country_code transmis depuis le frontend (optionnel — si absent, analyse globale)
+    const body = await req.json().catch(() => ({}));
+    const countryCode = body.country_code || null;
+
     // ── Récupérer les données ────────────────────────────────────────────────
-    const [courses, livreurs] = await Promise.all([
+    const coursesFilter = countryCode ? { country_code: countryCode } : {};
+    const livreursFilter = countryCode
+      ? { actif: true, type_livreur: "externe", country_code: countryCode }
+      : { actif: true, type_livreur: "externe" };
+
+    const [courses, livreurs, paysData] = await Promise.all([
       base44.asServiceRole.entities.CourseExterne.filter(
-        {}, "-created_date", 200
+        coursesFilter, "-created_date", 200
       ).catch(() => []),
       base44.asServiceRole.entities.Livreur.filter(
-        { actif: true, type_livreur: "externe" }, "-updated_date", 500
+        livreursFilter, "-updated_date", 500
       ).catch(() => []),
+      countryCode
+        ? base44.asServiceRole.entities.Country.filter({ code: countryCode }).catch(() => [])
+        : Promise.resolve([]),
     ]);
 
     // Courses en attente créées dans les 2 dernières heures
@@ -95,8 +107,31 @@ Deno.serve(async (req) => {
       return disponible && gpsRecent && hasGPS;
     });
 
+    // ── Zones de référence adaptées au pays ──────────────────────────────────
+    // Si le pays a des coordonnées centre connues, générer des zones dynamiques
+    // sinon utiliser QUARTIERS_REF (Ouagadougou) comme fallback
+    let zonesRef = QUARTIERS_REF;
+    const pays = paysData?.[0];
+    if (pays?.latitude_centre && pays?.longitude_centre && countryCode && countryCode !== "BF") {
+      // Zones dynamiques centrées sur la ville principale du pays
+      const lat = pays.latitude_centre;
+      const lng = pays.longitude_centre;
+      const ville = pays.ville_principale || pays.nom || countryCode;
+      zonesRef = [
+        { nom: `${ville} Centre`,   lat: lat,        lng: lng,        rayon_km: 3.0 },
+        { nom: `${ville} Nord`,     lat: lat + 0.05, lng: lng,        rayon_km: 2.0 },
+        { nom: `${ville} Sud`,      lat: lat - 0.05, lng: lng,        rayon_km: 2.0 },
+        { nom: `${ville} Est`,      lat: lat,        lng: lng + 0.05, rayon_km: 2.0 },
+        { nom: `${ville} Ouest`,    lat: lat,        lng: lng - 0.05, rayon_km: 2.0 },
+        { nom: `${ville} Nord-Est`, lat: lat + 0.04, lng: lng + 0.04, rayon_km: 1.8 },
+        { nom: `${ville} Sud-Ouest`,lat: lat - 0.04, lng: lng - 0.04, rayon_km: 1.8 },
+        { nom: `${ville} Périphérie Nord`, lat: lat + 0.09, lng: lng, rayon_km: 2.5 },
+        { nom: `${ville} Périphérie Sud`,  lat: lat - 0.09, lng: lng, rayon_km: 2.5 },
+      ];
+    }
+
     // ── Analyse par quartier ─────────────────────────────────────────────────
-    const zonesAnalyse = QUARTIERS_REF.map(zone => {
+    const zonesAnalyse = zonesRef.map(zone => {
       // Courses dans ce quartier
       const coursesDansZone = coursesRecentes.filter(c => {
         if (!c.gps_depart_lat || !c.gps_depart_lng) {

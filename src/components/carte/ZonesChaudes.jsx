@@ -91,12 +91,12 @@ export function useZonesChaudesHalos(mapInstance, mapLoaded, zones = []) {
 }
 
 // ─── Widget admin ─────────────────────────────────────────────────────────────
-export default function ZonesChaudesWidget({ compact = false, onDataLoaded }) {
+export default function ZonesChaudesWidget({ compact = false, onDataLoaded, countryCode = "" }) {
   const [refreshing, setRefreshing] = useState(false);
   const [lastResult, setLastResult] = useState(null);
 
   const { data: alertesZones = [], refetch: refetchAlertes } = useQuery({
-    queryKey: ["alertes-zones-chaudes"],
+    queryKey: ["alertes-zones-chaudes", countryCode],
     queryFn: () => base44.entities.AlerteLivreur.filter(
       { actif: true }, "-created_date", 20
     ).then(arr => arr.filter(a => a.cree_par === "moteur_zones_chaudes")),
@@ -106,7 +106,9 @@ export default function ZonesChaudesWidget({ compact = false, onDataLoaded }) {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      const res = await base44.functions.invoke("detecterZonesChaudes", {});
+      const res = await base44.functions.invoke("detecterZonesChaudes", {
+        country_code: countryCode || undefined,
+      });
       setLastResult(res.data);
       refetchAlertes();
       if (onDataLoaded) onDataLoaded(res.data);
@@ -117,10 +119,10 @@ export default function ZonesChaudesWidget({ compact = false, onDataLoaded }) {
     }
   };
 
-  // Lancer une analyse au mount
+  // Relancer l'analyse quand le pays change
   useEffect(() => {
     handleRefresh();
-  }, []);
+  }, [countryCode]);
 
   const zones = lastResult?.zones_chaudes_detail || [];
   const toutesZones = lastResult?.toutes_zones_actives || [];

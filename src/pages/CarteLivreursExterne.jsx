@@ -493,6 +493,7 @@ export default function CarteLivreursExterne() {
         {/* ── Zones chaudes ──────────────────────────────────────────────── */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
           <ZonesChaudesWidget
+            countryCode={effectiveCountry}
             onDataLoaded={(data) => setZonesChaudesData(data?.toutes_zones_actives || [])}
           />
         </div>
