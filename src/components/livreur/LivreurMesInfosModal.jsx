@@ -1,18 +1,32 @@
 import React, { useState } from "react";
 import { toast } from "sonner";
 import { Check, Trash2 } from "lucide-react";
-import { normaliserTelephone, formaterTelephone } from "./LivreurExterneOnboarding";
+import { formaterTelephone } from "./LivreurExterneOnboarding";
 import PhotoPicker from "./PhotoPicker";
 import LivreurPhotoUploader from "./LivreurPhotoUploader";
 import { base44 } from "@/api/base44Client";
+import { SILGAPP_COUNTRIES } from "@/lib/phoneUtils";
 
 export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
+  const countryCode = livreurProfil?.country_code || "BF";
+  const countryInfo = SILGAPP_COUNTRIES.find(x => x.code === countryCode) || SILGAPP_COUNTRIES[0];
+  const dialCode = `+${countryInfo.dial}`;
+  const localLen = countryInfo.len;
+
+  // Extraire les chiffres locaux (sans indicatif)
+  const extractLocal = (tel) => {
+    if (!tel) return "";
+    const digits = tel.replace(/\D/g, "");
+    if (digits.startsWith(countryInfo.dial)) return digits.slice(countryInfo.dial.length);
+    return digits.slice(-localLen);
+  };
+
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [form, setForm] = useState({
     nom: livreurProfil?.nom || "",
     prenom: livreurProfil?.prenom || "",
-    telephone: livreurProfil?.telephone ? (livreurProfil.telephone.replace(/\D/g, "").slice(-8)) : "",
+    telephone: extractLocal(livreurProfil?.telephone || ""),
     quartier: livreurProfil?.quartier || "",
     vehicule: livreurProfil?.vehicule || livreurProfil?.type_vehicule || "moto",
     numero_plaque: livreurProfil?.numero_plaque || "",
@@ -26,20 +40,21 @@ export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
   const setF = (key, val) => setForm(f => ({ ...f, [key]: val }));
 
   const handleTelephone = (e) => {
-    const raw = e.target.value.replace(/\D/g, "").slice(0, 8);
+    const raw = e.target.value.replace(/\D/g, "").slice(0, localLen);
     setF("telephone", raw);
   };
 
-  const telValide = form.telephone.length === 8;
+  const telValide = form.telephone.length === localLen;
   const peutSauvegarder = form.nom.trim() && form.prenom.trim() && telValide && form.quartier.trim();
 
   const handleSave = async () => {
     if (!peutSauvegarder || saving) return;
     setSaving(true);
+    const telNormalise = `+${countryInfo.dial}${form.telephone}`;
     const data = {
       nom: form.nom.trim(),
       prenom: form.prenom.trim(),
-      telephone: normaliserTelephone(form.telephone),
+      telephone: telNormalise,
       quartier: form.quartier.trim(),
       vehicule: form.vehicule,
       type_vehicule: form.vehicule,
@@ -99,20 +114,22 @@ export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
 
       {/* Téléphone */}
       <div>
-        <label className="block text-xs font-semibold text-gray-500 mb-1">Téléphone * (8 chiffres)</label>
+        <label className="block text-xs font-semibold text-gray-500 mb-1">Téléphone * ({localLen} chiffres)</label>
         <div className="flex gap-2">
-          <div className="h-12 rounded-xl border border-gray-200 bg-gray-50 px-3 flex items-center text-sm font-semibold text-gray-500 flex-shrink-0">+226</div>
+          <div className="h-12 rounded-xl border border-gray-200 bg-gray-50 px-3 flex items-center text-sm font-semibold text-gray-500 flex-shrink-0">{dialCode}</div>
           <input
             value={formaterTelephone(form.telephone)}
             onChange={handleTelephone}
-            placeholder="70 71 45 00"
+            placeholder={"X".repeat(localLen).replace(/(.{2})/g, "$1 ").trim()}
             inputMode="numeric"
             className="flex-1 h-12 rounded-xl border border-gray-200 px-4 text-sm font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
           />
         </div>
         {form.telephone.length > 0 && (
           <p className={`text-xs mt-1 flex items-center gap-1 ${telValide ? "text-green-600" : "text-red-400"}`}>
-            {telValide ? <><Check className="w-3 h-3" />{normaliserTelephone(form.telephone)}</> : `${form.telephone.length}/8 chiffres`}
+            {telValide
+              ? <><Check className="w-3 h-3" />{dialCode}{form.telephone}</>
+              : `${form.telephone.length}/${localLen} chiffres`}
           </p>
         )}
       </div>

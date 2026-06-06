@@ -9,12 +9,12 @@ import { Search, Users, Eye, Lock, Unlock, Phone, Mail, Calendar, Activity, Truc
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
+import { formatPhoneDisplay } from "@/lib/phoneUtils";
 
 function formaterTel(tel) {
   if (!tel) return "-";
-  const digits = tel.replace(/\D/g, "").slice(-8);
-  if (digits.length !== 8) return tel;
-  return digits.slice(0, 2) + " " + digits.slice(2, 4) + " " + digits.slice(4, 6) + " " + digits.slice(6, 8);
+  const displayed = formatPhoneDisplay(tel);
+  return displayed || tel;
 }
 
 function getInitiales(nom, prenom) {

@@ -2,21 +2,28 @@ import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import { Check } from "lucide-react";
+import { SILGAPP_COUNTRIES, normalizePhone, formatPhoneDisplay } from "@/lib/phoneUtils";
 
-// ─── Helpers téléphone ────────────────────────────────────────────────────────
-export function normaliserTelephone(tel) {
-  if (!tel) return "";
-  const digits = tel.replace(/\D/g, "");
-  if (digits.startsWith("226") && digits.length === 11) return "+" + digits;
-  if (digits.length === 8) return "+226" + digits;
-  if (digits.length > 8) return "+" + digits.slice(-11);
-  return "";
+// ─── Helpers téléphone (délègue à phoneUtils) ─────────────────────────────────
+export function normaliserTelephone(tel, countryCode = "BF") {
+  return normalizePhone(tel, countryCode) ? "+" + (normalizePhone(tel, countryCode) || "") : "";
 }
 
 export function formaterTelephone(tel) {
   if (!tel) return "";
-  const digits = tel.replace(/\D/g, "").slice(-8);
+  // Formatage par groupes de 2 — agnostique pays
+  const digits = tel.replace(/\D/g, "");
   return digits.replace(/(\d{2})(?=\d)/g, "$1 ").trim();
+}
+
+function getDialCode(countryCode) {
+  const c = SILGAPP_COUNTRIES.find(x => x.code === countryCode);
+  return c ? `+${c.dial}` : "+226";
+}
+
+function getLocalLen(countryCode) {
+  const c = SILGAPP_COUNTRIES.find(x => x.code === countryCode);
+  return c ? c.len : 8;
 }
 
 // ─── Vérification profil livreur complet ─────────────────────────────────────
@@ -118,11 +125,23 @@ function EcranGPS({ livreurId, onGpsOk }) {
 
 // ─── Formulaire profil livreur ────────────────────────────────────────────────
 function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
-  // Pré-remplir avec les données existantes
+  const countryCode = livreurProfil?.country_code || "BF";
+  const dialCode = getDialCode(countryCode);
+  const localLen = getLocalLen(countryCode);
+
+  // Extraire les chiffres locaux (sans indicatif) depuis le téléphone stocké
+  const extractLocal = (tel) => {
+    if (!tel) return "";
+    const c = SILGAPP_COUNTRIES.find(x => x.code === countryCode);
+    const digits = tel.replace(/\D/g, "");
+    if (c && digits.startsWith(c.dial)) return digits.slice(c.dial.length);
+    return digits.slice(-localLen);
+  };
+
   const [form, setForm] = useState({
     nom: livreurProfil?.nom || "",
     prenom: livreurProfil?.prenom || "",
-    telephone: livreurProfil?.telephone ? livreurProfil.telephone.replace(/\D/g, "").slice(-8) : "",
+    telephone: livreurProfil?.telephone ? extractLocal(livreurProfil.telephone) : "",
     quartier: livreurProfil?.quartier || "",
     vehicule: livreurProfil?.vehicule || livreurProfil?.type_vehicule || "moto",
   });
@@ -131,17 +150,18 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
   const setF = (key, val) => setForm(f => ({ ...f, [key]: val }));
 
   const handleTelephone = (e) => {
-    const raw = e.target.value.replace(/\D/g, "").slice(0, 8);
+    const raw = e.target.value.replace(/\D/g, "").slice(0, localLen);
     setF("telephone", raw);
   };
 
-  const telValide = form.telephone.length === 8;
+  const telValide = form.telephone.length === localLen;
   const peutSauvegarder = form.nom.trim() && form.prenom.trim() && telValide && form.quartier.trim() && form.vehicule;
 
   const handleSauvegarder = async () => {
     if (!peutSauvegarder || saving) return;
     setSaving(true);
-    const telNormalise = normaliserTelephone(form.telephone);
+    const c = SILGAPP_COUNTRIES.find(x => x.code === countryCode);
+    const telNormalise = c ? `+${c.dial}${form.telephone}` : form.telephone;
     const data = {
       nom: form.nom.trim(),
       prenom: form.prenom.trim(),
@@ -209,20 +229,22 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
 
         {/* Téléphone */}
         <div>
-          <label className="block text-xs font-semibold text-gray-400 mb-1 uppercase tracking-wide">Téléphone * (8 chiffres)</label>
+          <label className="block text-xs font-semibold text-gray-400 mb-1 uppercase tracking-wide">Téléphone * ({localLen} chiffres)</label>
           <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-mono">+226</span>
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-mono">{dialCode}</span>
             <input
               value={formaterTelephone(form.telephone)}
               onChange={handleTelephone}
-              placeholder="70 71 45 00"
+              placeholder={"X".repeat(localLen).replace(/(.{2})/g, "$1 ").trim()}
               inputMode="numeric"
               className="w-full h-12 rounded-xl bg-zinc-900 border border-zinc-700 text-white pl-16 pr-4 text-sm font-mono focus:border-red-500 focus:outline-none tracking-widest"
             />
           </div>
           {form.telephone.length > 0 && (
             <p className={`text-xs mt-1 flex items-center gap-1 ${telValide ? "text-green-400" : "text-red-400"}`}>
-              {telValide ? <><Check className="w-3 h-3" /> {normaliserTelephone(form.telephone)}</> : `${form.telephone.length}/8 chiffres`}
+              {telValide
+                ? <><Check className="w-3 h-3" /> {dialCode}{form.telephone}</>
+                : `${form.telephone.length}/${localLen} chiffres`}
             </p>
           )}
         </div>
