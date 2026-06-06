@@ -400,11 +400,13 @@ export default function CarteLivreursExterne() {
               <p className="text-white/50 text-sm mt-0.5">Terrain réel · Réseau SILGAPP externe</p>
             </div>
             {isGlobal && paysActifs.length > 1 && (
-              <CountrySelector
-                value={effectiveCountry}
-                onChange={setSelectedCountry}
-                className="h-9 text-xs bg-white/10 border-white/20 text-white"
-              />
+              <div className="[&_button]:!bg-white [&_button]:!text-slate-800 [&_button]:!border-slate-300 [&_div]:!bg-white [&_div]:!text-slate-800">
+                <CountrySelector
+                  value={effectiveCountry}
+                  onChange={setSelectedCountry}
+                  className="h-9 text-xs"
+                />
+              </div>
             )}
           </div>
 
