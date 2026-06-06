@@ -9,20 +9,26 @@ import { useZonesChaudesHalos } from "./ZonesChaudes";
 /**
  * DispatchMap — Carte dédiée au dispatch temps réel
  *
- * Code couleur :
- *  🟢 Vert   = Livreur libre (disponible + ON + GPS récent + app active)
- *  🟠 Orange = Livreur en course (mission active + ON + GPS récent)
- *  🔵 Bleu   = Client (actif + GPS récent + app active)
- *  🔴 Rouge  = Course en attente (aucun livreur assigné)
- *  ⚫ Noir   = Inactif / non dispatchable (OFF, GPS expiré, app fermée, non validé)
+ * Code couleur Livreurs :
+ *  🟢 Vert   = Livreur libre (disponible + ON + GPS présent)
+ *  🟠 Orange = Livreur en course (mission active + ON + GPS présent)
+ *  ⚫ Noir   = Inactif / non dispatchable (OFF, GPS expiré, non validé)
  *
- * Props supplémentaires :
- *  - livreursInactifs  : livreurs masqués normalement (OFF, GPS expiré, etc.)
- *  - clientsInactifs   : clients sans GPS récent ou app fermée
- *  - showInactifs      : boolean — afficher les inactifs en gris
+ * Code couleur Clients :
+ *  🔵 Bleu   = Client actif (GPS < 5 min)
+ *  🟡 Jaune  = Client récent (GPS entre 5 et 15 min)
+ *  ⚫ Noir   = Client inactif (GPS > 15 min ou GPS absent)
+ *
+ * 🔴 Rouge = Course en attente (aucun livreur assigné)
+ *
+ * Filtres :
+ *  - showClients     : afficher/masquer les clients
+ *  - showLivreurs    : afficher/masquer les livreurs
+ *  - masquerInactifs : masquer les marqueurs noirs (inactifs)
  */
 
-const GPS_CLIENT_SEUIL_MIN = 30;
+const GPS_CLIENT_ACTIF_SEUIL_MIN = 5;
+const GPS_CLIENT_RECENT_SEUIL_MIN = 15;
 
 function isEnCourse(livreur) {
   return livreur.statut === "en_course";
@@ -56,11 +62,26 @@ function isLivreurNoir(livreur) {
   return true;
 }
 
-function isClientNoir(client) {
-  if (!client.latitude || !client.longitude) return true;
+function getClientStatut(client) {
+  if (!client.latitude || !client.longitude) return "inactif";
   const dt = client.last_seen_at;
-  if (!dt) return true;
-  return (Date.now() - new Date(dt).getTime()) > GPS_CLIENT_SEUIL_MIN * 60 * 1000;
+  if (!dt) return "inactif";
+  const minutes = (Date.now() - new Date(dt).getTime()) / 60000;
+  if (minutes < GPS_CLIENT_ACTIF_SEUIL_MIN) return "actif";
+  if (minutes < GPS_CLIENT_RECENT_SEUIL_MIN) return "recent";
+  return "inactif";
+}
+
+function isClientActif(client) {
+  return getClientStatut(client) === "actif";
+}
+
+function isClientRecent(client) {
+  return getClientStatut(client) === "recent";
+}
+
+function isClientNoir(client) {
+  return getClientStatut(client) === "inactif";
 }
 
 function getLastGPSMin(entity) {
@@ -121,22 +142,33 @@ function buildStyles() {
       opacity: 0.85;
     }
 
-    /* ─── Client (🔵 bleu) ─── */
-    .dmap-client .dmap-client-ring {
+    /* ─── Client ACTIF (🔵 bleu) ─── */
+    .dmap-client-actif .dmap-client-ring {
       background: rgba(37, 99, 235, 0.25);
       animation: dmap-pulse-bleu 2s ease-out infinite;
     }
-    .dmap-client .dmap-client-dot {
+    .dmap-client-actif .dmap-client-dot {
       background: #2563eb;
       border-color: white;
       box-shadow: 0 2px 8px rgba(37, 99, 235, 0.45);
     }
 
-    /* ─── Client NOIR (⚫ hors ligne) ─── */
-    .dmap-client-noir .dmap-client-ring {
+    /* ─── Client RÉCENT (🟡 jaune/orange) ─── */
+    .dmap-client-recent .dmap-client-ring {
+      background: rgba(234, 179, 8, 0.25);
+      animation: dmap-pulse-jaune 2s ease-out infinite;
+    }
+    .dmap-client-recent .dmap-client-dot {
+      background: #eab308;
+      border-color: white;
+      box-shadow: 0 2px 8px rgba(234, 179, 8, 0.45);
+    }
+
+    /* ─── Client INACTIF (⚫ noir) ─── */
+    .dmap-client-inactif .dmap-client-ring {
       background: rgba(0, 0, 0, 0.3);
     }
-    .dmap-client-noir .dmap-client-dot {
+    .dmap-client-inactif .dmap-client-dot {
       background: #000000;
       border-color: white;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
@@ -192,6 +224,10 @@ function buildStyles() {
       100% { transform: scale(1.6); opacity: 0; }
     }
     @keyframes dmap-pulse-bleu {
+      0%   { transform: scale(0.5); opacity: 1; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+    @keyframes dmap-pulse-jaune {
       0%   { transform: scale(0.5); opacity: 1; }
       100% { transform: scale(1.6); opacity: 0; }
     }
@@ -332,8 +368,10 @@ function buildLivreurIcon(livreur) {
 }
 
 function buildClientIcon(client) {
-  const estNoir = isClientNoir(client);
-  const cssClass = estNoir ? "dmap-client-noir" : "dmap-client";
+  const statut = getClientStatut(client);
+  const cssClass = statut === "actif" ? "dmap-client-actif"
+    : statut === "recent" ? "dmap-client-recent"
+    : "dmap-client-inactif";
   return window.L.divIcon({
     html: `
       <div class="dmap-client-wrapper ${cssClass}">
@@ -341,7 +379,7 @@ function buildClientIcon(client) {
         <div class="dmap-client-dot"></div>
       </div>
     `,
-    className: `dmap-client-container${estNoir ? " dmap-inactif-marker" : ""}`,
+    className: `dmap-client-container${statut === "inactif" ? " dmap-inactif-marker" : ""}`,
     iconSize: [44, 44],
     iconAnchor: [22, 22],
   });
@@ -426,11 +464,21 @@ function buildCoursePopup(course) {
 }
 
 function buildClientPopup(client) {
-  const estNoir = isClientNoir(client);
+  const statut = getClientStatut(client);
   const gpsMin = getLastGPSMin(client);
   const gpsStr = gpsMin === null ? "?" : gpsMin < 1 ? "à l'instant" : `${gpsMin} min`;
-  const statutLabel = estNoir ? "⚫ Hors ligne — non dispatchable" : "🔵 Client actif";
-  const statutColor = estNoir ? "#374151" : "#2563eb";
+  
+  const statutLabels = {
+    actif: "🔵 Client actif — GPS récent",
+    recent: "🟡 Client récent — GPS > 5 min",
+    inactif: "⚫ Hors ligne — non dispatchable",
+  };
+  
+  const statutColors = {
+    actif: "#2563eb",
+    recent: "#eab308",
+    inactif: "#374151",
+  };
   
   // Qualité GPS
   let gpsQuality = "";
@@ -445,7 +493,7 @@ function buildClientPopup(client) {
   return `
     <div style="min-width:210px;font-family:sans-serif;padding:4px 0">
       <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#1a1a1a">${client.prenom || ""} ${client.nom || ""}</p>
-      <p style="font-size:12px;margin:2px 0;color:${statutColor}">${statutLabel}</p>
+      <p style="font-size:12px;margin:2px 0;color:${statutColors[statut]}">${statutLabels[statut]}</p>
       ${client.telephone ? `<p style="font-size:12px;margin:2px 0;color:#444">📞 ${client.telephone}</p>` : ""}
       <p style="font-size:12px;margin:2px 0;color:#6b7280">📍 GPS il y a ${gpsStr}</p>
       ${gpsQuality ? `<p style="font-size:11px;margin:2px 0;color:#999">Qualité: ${gpsQuality}</p>` : ""}
@@ -466,6 +514,8 @@ export default function DispatchMap({
   onCountryChange,
   zonesChaudesData = [], // zones pour les halos colorés
   masquerInactifs = false, // prop contrôlée depuis le parent
+  showClients = true, // filtre : afficher les clients
+  showLivreurs = true, // filtre : afficher les livreurs
 }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -571,42 +621,8 @@ export default function DispatchMap({
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
 
-    // ⚫ Livreurs NOIRS (hors ligne) — zIndex bas
+    // 🔴 Courses en attente (toujours affichées)
     let markerIndex = 0;
-    livreurs.forEach(livreur => {
-      if (!livreur.latitude || !livreur.longitude) return;
-      const estNoir = isLivreurNoir(livreur);
-      if (!estNoir) return;
-      if (masquerInactifs) return; // filtre visuel
-      const icon = buildLivreurIcon(livreur);
-      const [lat, lng] = addMarkerOffset(livreur.latitude, livreur.longitude, markerIndex++);
-      const marker = window.L.marker([lat, lng], {
-        icon,
-        zIndexOffset: 100,
-      }).addTo(map);
-      marker.bindPopup(buildLivreurPopup(livreur), { maxWidth: 260 });
-      if (onMarkerClick) marker.on("click", () => onMarkerClick(livreur));
-      markersRef.current.push(marker);
-    });
-
-    // ⚫ Clients NOIRS (hors ligne) — zIndex bas
-    clients.forEach(client => {
-      if (!client.latitude || !client.longitude) return;
-      const estNoir = isClientNoir(client);
-      if (!estNoir) return;
-      if (masquerInactifs) return; // filtre visuel
-      const icon = buildClientIcon(client);
-      const [lat, lng] = addMarkerOffset(client.latitude, client.longitude, markerIndex++);
-      const marker = window.L.marker([lat, lng], {
-        icon,
-        zIndexOffset: 50,
-      }).addTo(map);
-      marker.bindPopup(buildClientPopup(client), { maxWidth: 260 });
-      if (onMarkerClick) marker.on("click", () => onMarkerClick(client));
-      markersRef.current.push(marker);
-    });
-
-    // 🔴 Courses en attente
     courses.forEach(course => {
       const lat = course.gps_depart_lat;
       const lng = course.gps_depart_lng;
@@ -619,46 +635,88 @@ export default function DispatchMap({
       markersRef.current.push(marker);
     });
 
-    // 🟢🟠 Livreurs actifs (déjà filtrés par buildLivreurIcon)
-    livreurs.forEach(livreur => {
-      if (!livreur.latitude || !livreur.longitude) return;
-      const estNoir = isLivreurNoir(livreur);
-      if (estNoir) return;
-      const icon = buildLivreurIcon(livreur);
-      const [lat, lng] = addMarkerOffset(livreur.latitude, livreur.longitude, markerIndex++);
-      const marker = window.L.marker([lat, lng], {
-        icon,
-        zIndexOffset: isLivreurLibre(livreur) ? 1200 : 1100,
-      }).addTo(map);
-      marker.bindPopup(buildLivreurPopup(livreur), { maxWidth: 260 });
-      if (onMarkerClick) marker.on("click", () => onMarkerClick(livreur));
-      markersRef.current.push(marker);
-    });
+    // 🟢🟠⚫ Livreurs (filtrés par showLivreurs)
+    if (showLivreurs) {
+      // Livreurs NOIRS (hors ligne) — zIndex bas
+      livreurs.forEach(livreur => {
+        if (!livreur.latitude || !livreur.longitude) return;
+        const estNoir = isLivreurNoir(livreur);
+        if (!estNoir) return;
+        if (masquerInactifs) return; // filtre visuel
+        const icon = buildLivreurIcon(livreur);
+        const [lat, lng] = addMarkerOffset(livreur.latitude, livreur.longitude, markerIndex++);
+        const marker = window.L.marker([lat, lng], {
+          icon,
+          zIndexOffset: 100,
+        }).addTo(map);
+        marker.bindPopup(buildLivreurPopup(livreur), { maxWidth: 260 });
+        if (onMarkerClick) marker.on("click", () => onMarkerClick(livreur));
+        markersRef.current.push(marker);
+      });
 
-    // 🔵 Clients BLEUS (actifs) — zIndex haut
-    clients.forEach(client => {
-      if (!client.latitude || !client.longitude) return;
-      const estNoir = isClientNoir(client);
-      if (estNoir) return;
-      const icon = buildClientIcon(client);
-      const [lat, lng] = addMarkerOffset(client.latitude, client.longitude, markerIndex++);
-      const marker = window.L.marker([lat, lng], {
-        icon,
-        zIndexOffset: 900,
-      }).addTo(map);
-      marker.bindPopup(buildClientPopup(client), { maxWidth: 260 });
-      if (onMarkerClick) marker.on("click", () => onMarkerClick(client));
-      markersRef.current.push(marker);
-    });
-  }, [livreurs, clients, courses, mapLoaded, masquerInactifs]);
+      // Livreurs actifs (VERT/ORANGE)
+      livreurs.forEach(livreur => {
+        if (!livreur.latitude || !livreur.longitude) return;
+        const estNoir = isLivreurNoir(livreur);
+        if (estNoir) return;
+        const icon = buildLivreurIcon(livreur);
+        const [lat, lng] = addMarkerOffset(livreur.latitude, livreur.longitude, markerIndex++);
+        const marker = window.L.marker([lat, lng], {
+          icon,
+          zIndexOffset: isLivreurLibre(livreur) ? 1200 : 1100,
+        }).addTo(map);
+        marker.bindPopup(buildLivreurPopup(livreur), { maxWidth: 260 });
+        if (onMarkerClick) marker.on("click", () => onMarkerClick(livreur));
+        markersRef.current.push(marker);
+      });
+    }
 
-  // Même règle que dispatchRules.js : libre = disponible + actif + validé + GPS présent
+    // 🔵🟡⚫ Clients (filtrés par showClients)
+    if (showClients) {
+      // Clients INACTIFS (NOIRS) — zIndex bas
+      clients.forEach(client => {
+        if (!client.latitude || !client.longitude) return;
+        const statut = getClientStatut(client);
+        if (statut !== "inactif") return;
+        if (masquerInactifs) return; // filtre visuel
+        const icon = buildClientIcon(client);
+        const [lat, lng] = addMarkerOffset(client.latitude, client.longitude, markerIndex++);
+        const marker = window.L.marker([lat, lng], {
+          icon,
+          zIndexOffset: 50,
+        }).addTo(map);
+        marker.bindPopup(buildClientPopup(client), { maxWidth: 260 });
+        if (onMarkerClick) marker.on("click", () => onMarkerClick(client));
+        markersRef.current.push(marker);
+      });
+
+      // Clients ACTIFS et RÉCENTS (BLEUS/JAUNES) — zIndex haut
+      clients.forEach(client => {
+        if (!client.latitude || !client.longitude) return;
+        const statut = getClientStatut(client);
+        if (statut === "inactif") return;
+        const icon = buildClientIcon(client);
+        const [lat, lng] = addMarkerOffset(client.latitude, client.longitude, markerIndex++);
+        const marker = window.L.marker([lat, lng], {
+          icon,
+          zIndexOffset: 900,
+        }).addTo(map);
+        marker.bindPopup(buildClientPopup(client), { maxWidth: 260 });
+        if (onMarkerClick) marker.on("click", () => onMarkerClick(client));
+        markersRef.current.push(marker);
+      });
+    }
+  }, [livreurs, clients, courses, mapLoaded, masquerInactifs, showClients, showLivreurs]);
+
+  // Compteurs avec les nouveaux statuts clients
   const nbLibres = livreurs.filter(l => isLivreurLibre(l)).length;
   const nbCourse = livreurs.filter(l => isEnCourse(l) && !isLivreurNoir(l)).length;
   const nbLivreursInactifs = livreurs.filter(l => isLivreurNoir(l)).length;
-  const nbClientsNoirs = clients.filter(c => isClientNoir(c)).length;
-  const nbClientsBleus = clients.filter(c => !isClientNoir(c)).length;
-  const nbInactifsTotal = nbLivreursInactifs + nbClientsNoirs;
+  const nbClientsActifs = clients.filter(c => getClientStatut(c) === "actif").length;
+  const nbClientsRecents = clients.filter(c => getClientStatut(c) === "recent").length;
+  const nbClientsInactifs = clients.filter(c => getClientStatut(c) === "inactif").length;
+  const nbClientsVisibles = showClients ? nbClientsActifs + nbClientsRecents : 0;
+  const nbLivreursVisibles = showLivreurs ? nbLibres + nbCourse : 0;
   
   // Points heatmap pour légende
   const nbPointsDemande = clients.filter(c => c.latitude && c.longitude).length + 
@@ -703,37 +761,43 @@ export default function DispatchMap({
                     <span className="text-red-700 font-bold">{courses.length} en attente !</span>
                   </div>
                 )}
-                {nbLibres > 0 && (
+                {showLivreurs && nbLibres > 0 && (
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" />
                     <span className="text-green-700">{nbLibres} libre{nbLibres > 1 ? "s" : ""}</span>
                   </div>
                 )}
-                {nbCourse > 0 && (
+                {showLivreurs && nbCourse > 0 && (
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-orange-500 flex-shrink-0" />
                     <span className="text-orange-700">{nbCourse} en course</span>
                   </div>
                 )}
-                {nbClientsBleus > 0 && (
+                {showClients && nbClientsActifs > 0 && (
                   <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" />
-                    <span className="text-blue-700">{nbClientsBleus} client{nbClientsBleus > 1 ? "s" : ""} (GPS)</span>
+                    <span className="w-3 h-3 rounded-full bg-blue-600 flex-shrink-0" />
+                    <span className="text-blue-700">{nbClientsActifs} actif{nbClientsActifs > 1 ? "s" : ""} (&lt;5 min)</span>
                   </div>
                 )}
-                {nbLivreursInactifs > 0 && (
+                {showClients && nbClientsRecents > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-yellow-500 flex-shrink-0" />
+                    <span className="text-yellow-700">{nbClientsRecents} récent{nbClientsRecents > 1 ? "s" : ""} (5-15 min)</span>
+                  </div>
+                )}
+                {!masquerInactifs && showLivreurs && nbLivreursInactifs > 0 && (
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-gray-400 flex-shrink-0" />
                     <span className="text-gray-700 font-medium">⚫ {nbLivreursInactifs} livreur{nbLivreursInactifs > 1 ? "s" : ""} inactif{nbLivreursInactifs > 1 ? "s" : ""}</span>
                   </div>
                 )}
-                {nbClientsNoirs > 0 && (
+                {!masquerInactifs && showClients && nbClientsInactifs > 0 && (
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-gray-400 flex-shrink-0" />
-                    <span className="text-gray-700 font-medium">⚫ {nbClientsNoirs} client{nbClientsNoirs > 1 ? "s" : ""} inactif{nbClientsNoirs > 1 ? "s" : ""}</span>
+                    <span className="text-gray-700 font-medium">⚫ {nbClientsInactifs} client{nbClientsInactifs > 1 ? "s" : ""} inactif{nbClientsInactifs > 1 ? "s" : ""}</span>
                   </div>
                 )}
-                {courses.length === 0 && nbLibres === 0 && nbCourse === 0 && clients.length === 0 && nbLivreursInactifs === 0 && nbClientsNoirs === 0 && (
+                {courses.length === 0 && nbLivreursVisibles === 0 && nbClientsVisibles === 0 && (
                   <span className="text-gray-400">Aucun élément visible</span>
                 )}
               </div>
