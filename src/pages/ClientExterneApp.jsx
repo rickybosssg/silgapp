@@ -498,23 +498,20 @@ export default function ClientExterneApp() {
         type_livreur: "externe",
         statut: "disponible",
         actif: true,
-        validation: "valide"
+        validation: "valide",
+        app_active: true,
       };
       if (clientProfil?.country_code) {
         filter.country_code = clientProfil.country_code;
       }
       const livreurs = await base44.entities.Livreur.filter(filter);
 
-      // Log diagnostic
-      const avecGPS = (livreurs || []).filter(l => l.latitude && l.longitude);
-      const sansGPS = (livreurs || []).filter(l => !l.latitude || !l.longitude);
-      console.log(`[Carte] Livreurs récupérés: ${(livreurs||[]).length} | Avec GPS: ${avecGPS.length} | Sans GPS: ${sansGPS.length}`);
-      if (sansGPS.length > 0) {
-        sansGPS.forEach(l => console.log(`[Carte] ⚠️ Exclu (pas de GPS): ${l.prenom || ''} ${l.nom} (id:${l.id})`));
-      }
-
-      // Afficher TOUS les livreurs éligibles avec GPS — pas de filtre distance, pas de limite
-      const eligibles = avecGPS;
+      // Filtrer : GPS actif (latitude + longitude renseignés) + app vue récemment (5 min)
+      const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      const eligibles = (livreurs || []).filter(l =>
+        l.latitude && l.longitude &&
+        l.last_seen_at && l.last_seen_at >= cutoff
+      );
       console.log(`[Carte] Affichés sur la carte: ${eligibles.length}`);
 
       // Ne pas écraser si la requête retourne vide (protection anti-flash)
