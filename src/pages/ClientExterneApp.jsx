@@ -504,13 +504,30 @@ export default function ClientExterneApp() {
         filter.country_code = clientProfil.country_code;
       }
       const livreurs = await base44.entities.Livreur.filter(filter);
-      const proches = livreurs.filter(l => {
-        if (!l.latitude || !l.longitude) return false;
-        return haversineDistance(pos.latitude, pos.longitude, l.latitude, l.longitude) <= 5;
-      }).slice(0, 5);
-      setLivreursProches(proches);
+
+      // Log diagnostic
+      const avecGPS = (livreurs || []).filter(l => l.latitude && l.longitude);
+      const sansGPS = (livreurs || []).filter(l => !l.latitude || !l.longitude);
+      console.log(`[Carte] Livreurs récupérés: ${(livreurs||[]).length} | Avec GPS: ${avecGPS.length} | Sans GPS: ${sansGPS.length}`);
+      if (sansGPS.length > 0) {
+        sansGPS.forEach(l => console.log(`[Carte] ⚠️ Exclu (pas de GPS): ${l.prenom || ''} ${l.nom} (id:${l.id})`));
+      }
+
+      // Afficher TOUS les livreurs éligibles avec GPS — pas de filtre distance, pas de limite
+      const eligibles = avecGPS;
+      console.log(`[Carte] Affichés sur la carte: ${eligibles.length}`);
+
+      // Ne pas écraser si la requête retourne vide (protection anti-flash)
+      if (eligibles.length > 0) {
+        setLivreursProches(eligibles);
+      } else if ((livreurs || []).length === 0) {
+        // Vraiment aucun livreur dispo — on peut vider
+        setLivreursProches([]);
+      }
+      // Si eligibles.length === 0 mais livreurs.length > 0, c'est un pb de GPS → on garde l'ancienne liste
     } catch (err) {
       console.error("Erreur chargement livreurs:", err);
+      // En cas d'erreur réseau, NE PAS vider la liste existante
     }
   };
 

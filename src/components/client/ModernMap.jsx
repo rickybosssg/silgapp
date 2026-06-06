@@ -58,37 +58,51 @@ export default function ModernMap({
     });
   }, [position]);
 
-  // Mettre à jour les marqueurs de livreurs et clients
+  // Map des marqueurs livreurs par id — pour mise à jour stable sans recréation
+  const livreurMarkersRef = useRef({}); // { [id]: marker }
+
+  // Mettre à jour les marqueurs de livreurs — diff intelligent (pas de suppression totale)
   useEffect(() => {
-    if (!mapInstanceRef.current || !livreursProches) return;
+    if (!mapInstanceRef.current || !window.L) return;
+    if (!livreursProches || livreursProches.length === 0) return; // Ne jamais vider sur tableau vide
 
     const map = mapInstanceRef.current;
-    
-    // Nettoyer les anciens marqueurs (garder seulement le marqueur principal)
-    markersRef.current.slice(1).forEach(marker => marker.remove());
-    markersRef.current = markersRef.current.slice(0, 1);
+    const currentIds = new Set(livreursProches.map(p => p.id));
 
-    // Ajouter les nouveaux marqueurs
-    livreursProches.forEach((personne, index) => {
+    // 1. Supprimer les marqueurs des livreurs qui ne sont plus dans la liste
+    Object.keys(livreurMarkersRef.current).forEach(id => {
+      if (!currentIds.has(id)) {
+        livreurMarkersRef.current[id].remove();
+        delete livreurMarkersRef.current[id];
+      }
+    });
+
+    // 2. Pour chaque livreur : mettre à jour la position si existant, ou créer si nouveau
+    livreursProches.forEach((personne) => {
       if (!personne.latitude || !personne.longitude) return;
+      if (!personne.id) return;
 
-      // Déterminer si c'est un livreur ou un client
       const isLivreur = !!personne.vehicule || !!personne.type_vehicule || !!personne.statut;
       const isClient = !isLivreur;
 
+      // Déjà un marqueur pour cet id → juste déplacer
+      if (livreurMarkersRef.current[personne.id]) {
+        livreurMarkersRef.current[personne.id].setLatLng([personne.latitude, personne.longitude]);
+        return;
+      }
+
+      // Nouveau marqueur
       const markerIcon = window.L.divIcon({
         html: isClient ? `
           <div class="client-marker-wrapper">
             <div class="client-marker-pulse"></div>
-            <div class="client-marker">
-              <div class="client-marker-dot"></div>
-            </div>
+            <div class="client-marker"><div class="client-marker-dot"></div></div>
           </div>
         ` : `
           <div class="livreur-marker-wrapper">
             <div class="livreur-marker-pulse"></div>
             <div class="livreur-marker">
-              ${personne.photo_url 
+              ${personne.photo_url
                 ? `<img src="${personne.photo_url}" alt="${personne.nom}" class="livreur-photo" />`
                 : `<div class="livreur-avatar">${personne.nom?.charAt(0) || 'L'}</div>`
               }
@@ -100,57 +114,37 @@ export default function ModernMap({
         iconAnchor: isClient ? [30, 30] : [24, 24],
       });
 
-      const marker = window.L.marker([personne.latitude, personne.longitude], { 
+      const marker = window.L.marker([personne.latitude, personne.longitude], {
         icon: markerIcon,
         zIndexOffset: 1000
       }).addTo(map);
 
-      // Callback React quand on clique sur un marqueur
       if (onMarkerClick) {
         marker.on('click', () => onMarkerClick(personne));
       }
 
-      // Helpers popup
-      const isEnLigneP = personne.app_active && personne.last_seen_at && (Date.now() - new Date(personne.last_seen_at).getTime()) < 3 * 60 * 1000;
-      const zone = personne.quartier || (personne.latitude ? 'Ouagadougou' : 'Zone inconnue');
+      const zone = personne.quartier || 'Ouagadougou';
       const lastSeen = (() => {
         const dt = personne.derniere_position_date || personne.last_seen_at || personne.updated_date;
         if (!dt) return null;
         const diff = Math.round((Date.now() - new Date(dt).getTime()) / 60000);
         if (diff < 1) return 'à l\'instant';
         if (diff < 60) return `il y a ${diff} min`;
-        const h = Math.round(diff / 60);
-        return `il y a ${h}h`;
+        return `il y a ${Math.round(diff / 60)}h`;
       })();
 
-      // Popup avec infos
-      if (isClient) {
-        marker.bindPopup(`
-          <div style="min-width:200px;font-family:sans-serif;padding:4px 0">
-            <p style="font-weight:700;font-size:14px;margin:0 0 6px 0;color:#1a1a1a">${personne.prenom || ''} ${personne.nom || ''}</p>
-            ${personne.telephone ? `<p style="font-size:12px;color:#444;margin:2px 0">📞 ${personne.telephone}</p>` : ''}
-            <p style="font-size:12px;color:#444;margin:2px 0">${isEnLigneP ? '🟢 Application ouverte' : '⚪ Application fermée'}</p>
-            <p style="font-size:12px;color:#444;margin:2px 0">📍 ${zone}</p>
-            ${lastSeen ? `<p style="font-size:12px;color:#888;margin:2px 0">🕒 Dernier GPS : ${lastSeen}</p>` : ''}
-          </div>
-        `, { maxWidth: 260 });
-      } else {
-        const isON = personne.statut === 'disponible' || personne.statut === 'en_course';
-        const statutLabel = personne.statut === 'disponible' ? '🟢 Libre' : personne.statut === 'en_course' ? '🔵 En course' : null;
-        marker.bindPopup(`
-          <div style="min-width:200px;font-family:sans-serif;padding:4px 0">
-            <p style="font-weight:700;font-size:14px;margin:0 0 6px 0;color:#1a1a1a">${personne.prenom || ''} ${personne.nom || ''}</p>
-            ${personne.telephone ? `<p style="font-size:12px;color:#444;margin:2px 0">📞 ${personne.telephone}</p>` : ''}
-            <p style="font-size:12px;color:#444;margin:2px 0">${isON ? '🟢 ON' : '⚪ OFF'}</p>
-            ${statutLabel ? `<p style="font-size:12px;color:#444;margin:2px 0">${statutLabel}</p>` : ''}
-            <p style="font-size:12px;color:#444;margin:2px 0">${isEnLigneP ? '🟢 Application ouverte' : '⚪ Application fermée'}</p>
-            <p style="font-size:12px;color:#444;margin:2px 0">📍 ${zone}</p>
-            ${lastSeen ? `<p style="font-size:12px;color:#888;margin:2px 0">🕒 Dernier GPS : ${lastSeen}</p>` : ''}
-          </div>
-        `, { maxWidth: 260 });
-      }
+      const statutLabel = personne.statut === 'disponible' ? '🟢 Libre' : personne.statut === 'en_course' ? '🔵 En course' : '⚪ Hors ligne';
+      marker.bindPopup(`
+        <div style="min-width:200px;font-family:sans-serif;padding:4px 0">
+          <p style="font-weight:700;font-size:14px;margin:0 0 6px 0;color:#1a1a1a">${personne.prenom || ''} ${personne.nom || ''}</p>
+          ${personne.telephone ? `<p style="font-size:12px;color:#444;margin:2px 0">📞 ${personne.telephone}</p>` : ''}
+          <p style="font-size:12px;color:#444;margin:2px 0">${statutLabel}</p>
+          <p style="font-size:12px;color:#444;margin:2px 0">📍 ${zone}</p>
+          ${lastSeen ? `<p style="font-size:12px;color:#888;margin:2px 0">🕒 Dernier GPS : ${lastSeen}</p>` : ''}
+        </div>
+      `, { maxWidth: 260 });
 
-      markersRef.current.push(marker);
+      livreurMarkersRef.current[personne.id] = marker;
     });
   }, [livreursProches]);
 
@@ -519,40 +513,23 @@ export default function ModernMap({
         </div>
       )}
       
-      {/* Badge livreurs et clients à proximité */}
-      {mapLoaded && livreursProches.length > 0 && (
-        <div className="absolute top-4 right-4 z-[1000] space-y-2">
-          {(() => {
-            const livreurs = livreursProches.filter(p => p.vehicule || p.type_vehicule || p.statut);
-            const clients = livreursProches.filter(p => !p.vehicule && !p.type_vehicule && !p.statut);
-            
-            return (
-              <>
-                {livreurs.length > 0 && (
-                  <div className="bg-white/95 backdrop-blur-sm rounded-2xl px-4 py-2.5 shadow-lg border border-slate-200">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                      <span className="text-xs font-bold text-slate-700">
-                        {livreurs.length} livr{livreurs.length === 1 ? "eur" : "eurs"}
-                      </span>
-                    </div>
-                  </div>
-                )}
-                {clients.length > 0 && (
-                  <div className="bg-white/95 backdrop-blur-sm rounded-2xl px-4 py-2.5 shadow-lg border border-slate-200">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                      <span className="text-xs font-bold text-slate-700">
-                        {clients.length} client{clients.length === 1 ? "" : "s"}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </>
-            );
-          })()}
-        </div>
-      )}
+      {/* Badge livreurs — même source que les marqueurs (avec GPS uniquement) */}
+      {mapLoaded && (() => {
+        const livreursAffiches = livreursProches.filter(p => (p.vehicule || p.type_vehicule || p.statut) && p.latitude && p.longitude);
+        if (livreursAffiches.length === 0) return null;
+        return (
+          <div className="absolute top-4 right-4 z-[1000]">
+            <div className="bg-white/95 backdrop-blur-sm rounded-2xl px-4 py-2.5 shadow-lg border border-slate-200">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-xs font-bold text-slate-700">
+                  {livreursAffiches.length} livr{livreursAffiches.length === 1 ? "eur" : "eurs"} disponible{livreursAffiches.length === 1 ? "" : "s"}
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
