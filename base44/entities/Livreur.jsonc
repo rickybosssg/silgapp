@@ -176,6 +176,15 @@
     "nombre_avis": {
       "type": "number",
       "default": 0
+    },
+    "pricing_mode": {
+      "type": "string",
+      "enum": [
+        "automatic",
+        "manual"
+      ],
+      "default": "automatic",
+      "description": "Mode de tarification pr\u00e9f\u00e9r\u00e9 par le livreur : automatique ou manuel"
     }
   },
   "required": [

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { MapPin, Phone, Navigation, Check, X, Package, Clock, MessageCircle, Ruler, AlertCircle } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import ManualPriceModal from "./ManualPriceModal";
 
 function haversine(lat1, lon1, lat2, lon2) {
   if (!lat1 || !lon1 || !lat2 || !lon2) return null;
@@ -72,13 +73,15 @@ export default function CourseEnAttenteModalExterne({
   livreurId, 
   onAccepter, 
   onRefuser,
-  onExpire 
+  onExpire,
+  pricingMode = "automatic", // "automatic" | "manual"
 }) {
   useVibration(true);
   const [tempsRestant, setTempsRestant] = useState(60);
   const [courseDejaPrise, setCourseDejaPrise] = useState(false);
   const [courseExpiree, setCourseExpiree] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showManualPriceModal, setShowManualPriceModal] = useState(false);
 
   // Sonnerie répétée
   useEffect(() => {
@@ -134,7 +137,17 @@ export default function CourseEnAttenteModalExterne({
     return () => clearInterval(interval);
   }, [course.id, livreurId]);
 
-  const handleAccepter = async () => {
+  const handleAccepterClick = () => {
+    if (isSubmitting) return;
+    // Si mode manuel → afficher le modal de saisie du prix d'abord
+    if (pricingMode === "manual") {
+      setShowManualPriceModal(true);
+    } else {
+      handleAccepterAuto();
+    }
+  };
+
+  const handleAccepterAuto = async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
@@ -145,14 +158,8 @@ export default function CourseEnAttenteModalExterne({
       });
       const data = res?.data;
 
-      if (data?.already_taken) {
-        setCourseDejaPrise(true);
-        return;
-      }
-      if (data?.expired) {
-        setCourseExpiree(true);
-        return;
-      }
+      if (data?.already_taken) { setCourseDejaPrise(true); return; }
+      if (data?.expired) { setCourseExpiree(true); return; }
       if (data?.success) {
         onAccepter();
       } else {
@@ -160,6 +167,36 @@ export default function CourseEnAttenteModalExterne({
       }
     } catch (err) {
       console.error('Erreur acceptation:', err);
+      alert('Erreur réseau');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAccepterManuel = async (montant) => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      // 1. Accepter la course côté dispatch (livreur assigné, statuts mis à jour)
+      const res = await base44.functions.invoke('dispatchExterneAuto', {
+        action: 'accepter_course',
+        course_id: course.id,
+        livreur_id: livreurId,
+        pricing_mode: "manual",
+        manual_price: montant,
+      });
+      const data = res?.data;
+
+      if (data?.already_taken) { setCourseDejaPrise(true); return; }
+      if (data?.expired) { setCourseExpiree(true); return; }
+      if (data?.success) {
+        setShowManualPriceModal(false);
+        onAccepter(data?.pending_client_validation === true);
+      } else {
+        alert(data?.error || "Erreur lors de l'acceptation");
+      }
+    } catch (err) {
+      console.error('Erreur acceptation manuelle:', err);
       alert('Erreur réseau');
     } finally {
       setIsSubmitting(false);
@@ -252,6 +289,15 @@ export default function CourseEnAttenteModalExterne({
   }
 
   return (
+    <>
+    {showManualPriceModal && (
+      <ManualPriceModal
+        course={course}
+        onConfirm={handleAccepterManuel}
+        onCancel={() => setShowManualPriceModal(false)}
+        isSubmitting={isSubmitting}
+      />
+    )}
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-3"
       style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(6px)" }}
     >
@@ -381,11 +427,18 @@ export default function CourseEnAttenteModalExterne({
             })()}
           </div>
 
+          {/* Badge mode tarification */}
+          {pricingMode === "manual" && (
+            <div className="flex items-center justify-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-1.5">
+              <span className="text-xs font-bold text-blue-700">💰 Mode prix manuel activé — vous allez saisir votre prix</span>
+            </div>
+          )}
+
           {/* Boutons */}
           <div className="grid grid-cols-2 gap-3 pt-1">
             <button
               className="h-16 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 disabled:opacity-50"
-              onClick={handleAccepter}
+              onClick={handleAccepterClick}
               disabled={isSubmitting}
             >
               <Check className="w-6 h-6" />
@@ -403,5 +456,6 @@ export default function CourseEnAttenteModalExterne({
         </div>
       </div>
     </div>
+    </>
   );
 }

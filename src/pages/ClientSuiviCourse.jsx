@@ -37,6 +37,7 @@ import HistoriqueCoursesClient from "@/components/client/HistoriqueCoursesClient
 import FraisAnnulationBannerClient from "@/components/client/FraisAnnulationBannerClient";
 import { useDestinataireGPS } from "@/hooks/useDestinataireGPS";
 import { playNotificationSound } from "@/hooks/useSonEtVibration";
+import PrixManuelConfirmModal from "@/components/client/PrixManuelConfirmModal";
 
 
 function buildWhatsAppMessage(course) {
@@ -253,12 +254,20 @@ export default function ClientSuiviCourse() {
 
   const statutLabels = {
     nouvelle: "Nouvelle course",
-    recherche_livreur: "Recherche de livreur...",
+    recherche_livreur: (course) =>
+      course?.pricing_mode === "manual" && course?.manual_price_status === "pending_client_validation"
+        ? "💰 Prix proposé — votre accord requis"
+        : "Recherche de livreur...",
     livreur_en_route: "Livreur en route vers récupération",
     colis_recupere: "Colis récupéré",
     en_livraison: "Livreur en route vers livraison",
     livree: "Course livrée",
     annulee: "Course annulée",
+  };
+
+  const getStatutLabel = (course) => {
+    const v = statutLabels[course?.statut];
+    return typeof v === "function" ? v(course) : (v || course?.statut);
   };
 
   const statutColors = {
@@ -388,8 +397,12 @@ export default function ClientSuiviCourse() {
         <Card className="p-4">
           <div className="flex items-center justify-between mb-3">
             <h1 className="text-lg font-bold text-foreground">Suivi de course</h1>
-            <Badge className={statutColors[maCourse.statut]}>
-              {statutLabels[maCourse.statut]}
+            <Badge className={
+              maCourse?.pricing_mode === "manual" && maCourse?.manual_price_status === "pending_client_validation"
+                ? "bg-amber-100 text-amber-700 animate-pulse"
+                : statutColors[maCourse.statut]
+            }>
+              {getStatutLabel(maCourse)}
             </Badge>
           </div>
 
@@ -812,6 +825,19 @@ export default function ClientSuiviCourse() {
             </>
           );
         })()}
+
+        {/* Modal validation prix manuel */}
+        {maCourse?.pricing_mode === "manual" && maCourse?.manual_price_status === "pending_client_validation" && (
+          <PrixManuelConfirmModal
+            course={maCourse}
+            onAccepted={() => {
+              queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+            }}
+            onRefused={() => {
+              queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+            }}
+          />
+        )}
 
         {showRating && (
           <LivreurRatingDialog

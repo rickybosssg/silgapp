@@ -9,6 +9,7 @@ import { base44 } from "@/api/base44Client";
 export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [pricingMode, setPricingMode] = useState(livreurProfil?.pricing_mode || "automatic");
   const [form, setForm] = useState({
     nom: livreurProfil?.nom || "",
     prenom: livreurProfil?.prenom || "",
@@ -45,6 +46,7 @@ export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
       type_vehicule: form.vehicule,
       numero_plaque: form.numero_plaque.trim(),
       photo_url: photoLivreur || null,
+      pricing_mode: pricingMode,
     };
     if (photoMoto) data.photo_moto_url = photoMoto;
     if (cnibRecto) data.photo_cnib_recto_url = cnibRecto;
@@ -114,6 +116,38 @@ export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
           <p className={`text-xs mt-1 flex items-center gap-1 ${telValide ? "text-green-600" : "text-red-400"}`}>
             {telValide ? <><Check className="w-3 h-3" />{normaliserTelephone(form.telephone)}</> : `${form.telephone.length}/8 chiffres`}
           </p>
+        )}
+      </div>
+
+      {/* Mode de tarification */}
+      <div>
+        <label className="block text-xs font-semibold text-gray-500 mb-2">Mode de tarification</label>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => setPricingMode("automatic")}
+            className={`h-16 rounded-xl border-2 font-semibold text-sm transition-all flex flex-col items-center justify-center gap-1 ${
+              pricingMode === "automatic" ? "border-green-500 bg-green-50 text-green-700" : "border-gray-200 text-gray-500"
+            }`}
+          >
+            <span className="text-xl">🤖</span>
+            <span className="text-xs">Prix automatique</span>
+          </button>
+          <button
+            onClick={() => setPricingMode("manual")}
+            className={`h-16 rounded-xl border-2 font-semibold text-sm transition-all flex flex-col items-center justify-center gap-1 ${
+              pricingMode === "manual" ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-500"
+            }`}
+          >
+            <span className="text-xl">💰</span>
+            <span className="text-xs">Prix manuel</span>
+          </button>
+        </div>
+        {pricingMode === "manual" && (
+          <div className="mt-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
+            <p className="text-xs text-blue-700 leading-relaxed">
+              <strong>Mode prix manuel :</strong> vous saisirez le montant de chaque course avant de l'accepter. Le client devra valider votre prix. Minimum : 1 000 FCFA.
+            </p>
+          </div>
         )}
       </div>
 

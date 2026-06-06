@@ -359,6 +359,42 @@
       "type": "string",
       "format": "date-time",
       "description": "Date et heure de confirmation de livraison"
+    },
+    "pricing_mode": {
+      "type": "string",
+      "enum": [
+        "automatic",
+        "manual"
+      ],
+      "default": "automatic",
+      "description": "Mode de tarification : automatique ou manuel (propos\u00e9 par le livreur)"
+    },
+    "manual_price": {
+      "type": "number",
+      "description": "Prix manuel propos\u00e9 par le livreur (minimum 1000 FCFA)"
+    },
+    "manual_price_status": {
+      "type": "string",
+      "enum": [
+        "pending_client_validation",
+        "accepted",
+        "refused"
+      ],
+      "description": "Statut de validation du prix manuel par le client"
+    },
+    "proposed_by_livreur_id": {
+      "type": "string",
+      "description": "ID du livreur ayant propos\u00e9 le prix manuel"
+    },
+    "client_price_validated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date d'acceptation du prix manuel par le client"
+    },
+    "client_price_refused_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de refus du prix manuel par le client"
     }
   },
   "required": [

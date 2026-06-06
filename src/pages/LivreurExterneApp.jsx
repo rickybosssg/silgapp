@@ -100,12 +100,21 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     staleTime: 2000,
   });
 
-  // ─── Course en attente de réponse ─────────────────────────────────────────
+  // ─── Course en attente de réponse du livreur ──────────────────────────────
   const courseEnAttente = useMemo(() => {
     return mesCourses.find(
       c => c.statut === "recherche_livreur" && c.dispatch_status === "propose"
+        && c.manual_price_status !== "pending_client_validation"
     ) || null;
   }, [mesCourses]);
+
+  // ─── Course en attente de validation prix par le client ───────────────────
+  const courseEnAttenteValidationPrix = useMemo(() => {
+    return mesCourses.find(
+      c => c.pricing_mode === "manual" && c.manual_price_status === "pending_client_validation"
+        && c.proposed_by_livreur_id === livreurProfil?.id
+    ) || null;
+  }, [mesCourses, livreurProfil?.id]);
 
   // ─── Courses actives ──────────────────────────────────────────────────────
   const coursesActives = useMemo(
@@ -207,11 +216,15 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     },
   });
 
-  const handleAccepter = () => {
+  const handleAccepter = (isPendingPrixManuel = false) => {
     queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
     queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
-    statutMutation.mutate("en_course");
-    toast.success("Course acceptée ! 🚀");
+    if (!isPendingPrixManuel) {
+      statutMutation.mutate("en_course");
+      toast.success("Course acceptée ! 🚀");
+    } else {
+      toast.success("Prix proposé au client — en attente de sa validation 💰");
+    }
   };
 
   const handleRefuser = () => {
@@ -357,6 +370,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         <CourseEnAttenteModalExterne
           course={courseEnAttente}
           livreurId={livreurProfil.id}
+          pricingMode={livreurProfil?.pricing_mode || "automatic"}
           onAccepter={handleAccepter}
           onRefuser={handleRefuser}
           onExpire={() => {
@@ -423,6 +437,19 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                 <span className="text-xl flex-shrink-0">📍</span>
                 <p className="text-sm text-amber-700 font-semibold leading-tight">
                   Activez votre GPS pour être visible sur la carte
+                </p>
+              </div>
+            )}
+
+            {/* Bannière : en attente validation prix par le client */}
+            {courseEnAttenteValidationPrix && (
+              <div className="rounded-2xl bg-blue-50 border-2 border-blue-300 px-4 py-3 space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                  <p className="text-sm font-black text-blue-800">En attente du client</p>
+                </div>
+                <p className="text-xs text-blue-600">
+                  Votre prix de <strong>{courseEnAttenteValidationPrix.manual_price?.toLocaleString()} {courseEnAttenteValidationPrix.devise || "FCFA"}</strong> est en cours de validation par le client.
                 </p>
               </div>
             )}

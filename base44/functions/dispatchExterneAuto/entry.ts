@@ -327,6 +327,8 @@ Deno.serve(async (req) => {
     if (action === 'accepter_course') {
       console.log(`[DISPATCH] ✅ Livreur ${livreur_id} accepte course ${course_id}`);
 
+      const { pricing_mode, manual_price } = body;
+
       const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
 
@@ -343,15 +345,28 @@ Deno.serve(async (req) => {
       const livreur = await base44.asServiceRole.entities.Livreur.get(livreur_id);
       if (!livreur) return Response.json({ error: 'Livreur introuvable' }, { status: 404 });
 
+      // Validation prix manuel
+      const PRIX_MIN = 1000;
+      if (pricing_mode === 'manual') {
+        const montant = Number(manual_price);
+        if (!montant || montant < PRIX_MIN) {
+          return Response.json({ success: false, error: `Prix minimum autorisé : ${PRIX_MIN} FCFA` }, { status: 400 });
+        }
+      }
+
       const pickupToken = generateToken();
       const deliveryToken = generateToken();
       const pickupPIN = generatePIN();
       const deliveryPIN = generatePIN();
 
-      await base44.asServiceRole.entities.CourseExterne.update(course_id, {
-        statut: 'livreur_en_route',
-        dispatch_status: 'accepte',
-        heure_acceptation: new Date().toISOString(),
+      const isManual = pricing_mode === 'manual' && manual_price >= PRIX_MIN;
+
+      // En mode manuel : statut reste "recherche_livreur" en attente de validation client
+      // En mode auto : statut passe directement à "livreur_en_route"
+      const updateData = {
+        dispatch_status: isManual ? 'propose' : 'accepte',
+        statut: isManual ? 'recherche_livreur' : 'livreur_en_route',
+        heure_acceptation: isManual ? null : new Date().toISOString(),
         livreur_id: livreur_id,
         livreur_nom: `${livreur.prenom || ''} ${livreur.nom}`.trim(),
         livreur_photo_url: livreur.photo_url || '',
@@ -363,16 +378,49 @@ Deno.serve(async (req) => {
         pickup_code_4_digits: pickupPIN,
         delivery_qr_token: deliveryToken,
         delivery_code_4_digits: deliveryPIN,
-      });
+      };
 
-      // Mettre le livreur en_course
-      await base44.asServiceRole.entities.Livreur.update(livreur_id, { statut: 'en_course' });
+      if (isManual) {
+        updateData.pricing_mode = 'manual';
+        updateData.manual_price = Number(manual_price);
+        updateData.manual_price_status = 'pending_client_validation';
+        updateData.proposed_by_livreur_id = livreur_id;
+        // Prolonger le timeout pour laisser le client répondre (5 min)
+        updateData.timeout_expires_at = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+      }
 
-      // 🧹 Archiver les notifications "nouvelle_course" liées à cette course
-      await supprimerNotificationsCourse(base44, course_id);
+      await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
 
-      console.log(`[DISPATCH] 🎉 Course ${course_id} acceptée par ${livreur_id}`);
-      return Response.json({ success: true, message: 'Course acceptée avec succès' });
+      // En mode auto seulement : mettre le livreur en_course immédiatement
+      if (!isManual) {
+        await base44.asServiceRole.entities.Livreur.update(livreur_id, { statut: 'en_course' });
+        await supprimerNotificationsCourse(base44, course_id);
+        console.log(`[DISPATCH] 🎉 Course ${course_id} acceptée (auto) par ${livreur_id}`);
+        return Response.json({ success: true, message: 'Course acceptée avec succès' });
+      }
+
+      // En mode manuel : notifier le client via une notification
+      try {
+        const notifDest = course.expediteur_client_id
+          ? await base44.asServiceRole.entities.ClientExterne.filter({ id: course.expediteur_client_id })
+          : [];
+        const clientEmail = notifDest?.[0]?.user_email;
+        if (clientEmail) {
+          await base44.asServiceRole.entities.Notification.create({
+            titre: '💰 Prix proposé par le livreur',
+            message: `Le livreur ${livreur.prenom || ''} ${livreur.nom} propose cette course à ${Number(manual_price).toLocaleString()} FCFA. Acceptez-vous ?`,
+            type: 'course_acceptee',
+            course_id: course_id,
+            destinataire_email: clientEmail,
+            lue: false,
+          });
+        }
+      } catch (e) {
+        console.warn('[DISPATCH] Erreur notif client prix manuel:', e.message);
+      }
+
+      console.log(`[DISPATCH] 💰 Prix manuel ${manual_price} proposé pour course ${course_id} par ${livreur_id} — en attente client`);
+      return Response.json({ success: true, pending_client_validation: true, message: 'Prix proposé au client — en attente de sa validation' });
     }
 
     // ─── 3. Refuser une course (ou timeout expiré côté livreur) ───────────
@@ -473,6 +521,58 @@ Deno.serve(async (req) => {
       }
 
       return Response.json({ success: true, retried: aRetenter.length, resultats });
+    }
+
+    // ─── 6. Valider le prix manuel côté client ────────────────────────────
+    if (action === 'valider_prix_manuel') {
+      const { accepted } = body;
+      const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+      if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
+
+      const now = new Date().toISOString();
+
+      if (accepted) {
+        const prixManuel = Number(course.manual_price);
+        const commission = Math.round(prixManuel * 0.3);
+        const montantLivreur = prixManuel - commission;
+
+        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+          manual_price_status: 'accepted',
+          client_price_validated_at: now,
+          statut: 'livreur_en_route',
+          dispatch_status: 'accepte',
+          heure_acceptation: now,
+          prix_final: prixManuel,
+          commission_silga: commission,
+          montant_livreur: montantLivreur,
+        });
+
+        // Mettre le livreur en_course
+        if (course.proposed_by_livreur_id) {
+          await base44.asServiceRole.entities.Livreur.update(course.proposed_by_livreur_id, { statut: 'en_course' });
+        }
+
+        await supprimerNotificationsCourse(base44, course_id);
+        return Response.json({ success: true, accepted: true });
+      } else {
+        // Refus client → redispatch
+        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+          manual_price_status: 'refused',
+          client_price_refused_at: now,
+          statut: 'recherche_livreur',
+          dispatch_status: 'redispatch',
+          livreur_id: '',
+          livreur_nom: '',
+          livreur_telephone: '',
+          pricing_mode: 'automatic',
+          manual_price: null,
+          proposed_by_livreur_id: '',
+        });
+
+        const exclusions = course.proposed_by_livreur_id ? [course.proposed_by_livreur_id] : [];
+        const result = await lancerDispatch(base44, course_id, exclusions);
+        return Response.json({ success: true, accepted: false, redispatched: !result.noLivreur });
+      }
     }
 
     return Response.json({ error: 'Action inconnue' }, { status: 400 });
