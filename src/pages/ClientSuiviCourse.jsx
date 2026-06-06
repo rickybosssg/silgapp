@@ -37,7 +37,6 @@ import HistoriqueCoursesClient from "@/components/client/HistoriqueCoursesClient
 import FraisAnnulationBannerClient from "@/components/client/FraisAnnulationBannerClient";
 import { useDestinataireGPS } from "@/hooks/useDestinataireGPS";
 import { playNotificationSound } from "@/hooks/useSonEtVibration";
-import PrixManuelInlineCard from "@/components/client/PrixManuelInlineCard";
 
 
 function buildWhatsAppMessage(course) {
@@ -393,19 +392,7 @@ export default function ClientSuiviCourse() {
           </Card>
         )}
 
-        {/* ── PRIX MANUEL — carte inline remplace "Recherche en cours" ── */}
-        {maCourse?.manual_price_status === "pending_client_validation" &&
-         maCourse?.manual_price > 0 &&
-         maCourse?.created_by_id === userId ? (
-          <PrixManuelInlineCard
-            course={maCourse}
-            devise={maCourse.devise || countries.find(c => c.code === maCourse.country_code)?.devise || "FCFA"}
-            onAccepted={() => queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] })}
-            onRefused={() => queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] })}
-            onAnnuler={() => setShowAnnulerDialog(true)}
-          />
-        ) : (
-        /* Statut course */
+        {/* Statut course */}
         <Card className="p-4">
           <div className="flex items-center justify-between mb-3">
             <h1 className="text-lg font-bold text-foreground">Suivi de course</h1>
@@ -444,7 +431,6 @@ export default function ClientSuiviCourse() {
             </Button>
           )}
         </Card>
-        )}
 
         {/* Infos livreur — Card style Uber uniquement si livreur a accepté */}
         {maCourse.livreur_id && maCourse.heure_acceptation && (

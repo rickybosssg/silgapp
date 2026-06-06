@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Truck, MapPin, Package, User, Smartphone, CheckCircle2, Loader2, Navigation, XCircle } from "lucide-react";
 import AnnulerCourseDialog from "./AnnulerCourseDialog";
+import PrixManuelInlineCard from "./PrixManuelInlineCard";
 
 const typeColisLabels = {
   petit_colis: "Petit colis",
@@ -59,11 +60,26 @@ export default function LivreurRechercheAnimation({ course }) {
     }
   }, [courseData, navigate]);
 
+  const liveCourse = courseData || course;
+  const hasPrixManuel =
+    liveCourse?.manual_price_status === "pending_client_validation" &&
+    liveCourse?.manual_price > 0;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-accent/5 p-4">
       <div className="max-w-lg mx-auto space-y-6">
 
-        {/* Header animé */}
+        {/* Prix manuel proposé par le livreur — prioritaire */}
+        {hasPrixManuel ? (
+          <PrixManuelInlineCard
+            course={liveCourse}
+            devise={liveCourse.devise || "FCFA"}
+            onAccepted={() => navigate("/client/suivi")}
+            onRefused={() => { /* le polling reprendra automatiquement */ }}
+            onAnnuler={() => setShowAnnulerDialog(true)}
+          />
+        ) : (
+        /* Header animé recherche */
         <Card className="p-6 bg-gradient-to-r from-primary to-red-600 text-white border-0 shadow-xl">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -84,6 +100,7 @@ export default function LivreurRechercheAnimation({ course }) {
             <p className="text-sm font-medium animate-pulse">{messages[currentMessage]}</p>
           </div>
         </Card>
+        )}
 
         {/* Résumé de la course */}
         <Card className="p-5 bg-gradient-to-br from-white to-gray-50">
