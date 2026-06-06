@@ -2,38 +2,20 @@
 // Fichier centralisé pour garantir l'uniformité des calculs dans toute l'application
 // Importer ce fichier dans DashboardExterne, CarteLivreursExterne, et tous les composants
 
-import { GPS_SEUIL_MIN, HEARTBEAT_SEUIL_MIN, HEARTBEAT_ON_SEUIL_MIN, isGPSRecent, hasValidGPS, isAppActive, isON, isLibre, isEnCourse } from "./dispatchRules";
-
-const GPS_EXPIRE_MIN = 10;        // GPS expiré si > 10 min → noir (livreurs)
-const GPS_CLIENT_SEUIL_MIN = 30;  // Client GPS valide si < 30 min
+import { isGPSRecent, hasValidGPS, isAppActive, isON, isLibre, isEnCourse, isClientGPSRecent, isClientNoir } from "./dispatchRules";
 
 /**
- * Livreur noir = hors ligne ou GPS expiré > 10 min
+ * Livreur noir = non dispatchable
+ * SOURCE UNIQUE : même règle que DispatchMap et CarteLivreursExterne
+ * ⚠️ last_seen_at / app_active N'EST PAS un critère.
+ * Noir = pas de GPS OU hors_ligne OU inactif OU non validé.
  */
 export function isLivreurNoir(livreur) {
-  const dt = livreur.last_seen_at || livreur.derniere_position_date;
-  if (!dt) return true; // jamais vu
-  const min = (Date.now() - new Date(dt).getTime()) / 60000;
-  return min > GPS_EXPIRE_MIN || livreur.statut === "hors_ligne";
-}
-
-/**
- * Client noir = GPS absent ou expiré > 30 min
- */
-export function isClientNoir(client) {
-  if (!client.latitude || !client.longitude) return true;
-  const dt = client.last_seen_at;
-  if (!dt) return true;
-  return (Date.now() - new Date(dt).getTime()) > GPS_CLIENT_SEUIL_MIN * 60000;
-}
-
-/**
- * Client GPS récent = position < 30 min
- */
-export function isClientGPSRecent(client) {
-  const dt = client.last_seen_at;
-  if (!dt) return false;
-  return (Date.now() - new Date(dt).getTime()) < GPS_CLIENT_SEUIL_MIN * 60000;
+  if (!livreur.latitude || !livreur.longitude) return true;
+  if (livreur.statut === "hors_ligne") return true;
+  if (livreur.actif === false) return true;
+  if (livreur.validation !== "valide") return true;
+  return false;
 }
 
 /**
@@ -85,6 +67,7 @@ export function calculateClientCounters(clients) {
     total: clients.length,
     avecGPS: clients.filter(c => c.latitude && c.longitude).length,
     gpsRecent: clients.filter(c => isClientGPSRecent(c)).length,
+    gpsRecents: clients.filter(c => isClientGPSRecent(c)).length, // alias utilisé par NetworkHealthBanner
     surCarte: clients.length, // TOUS les clients enregistrés
     noirs: clients.filter(c => isClientNoir(c)).length,
     bleus: clients.filter(c => !isClientNoir(c)).length, // alias pour GPS récent

@@ -15,89 +15,34 @@ import { fr } from "date-fns/locale";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import CountrySelector, { usePaysActifs } from "@/components/international/CountrySelector.jsx";
 import { calculateLivreurCounters, calculateClientCounters } from "@/lib/livreurCounters.js";
-import { isEligibleCarte } from "@/lib/dispatchRules.js";
 import ZonesChaudesWidget from "@/components/carte/ZonesChaudes";
 
-// ─── Constantes de seuils ────────────────────────────────────────────────────
+// ─── Helpers — importés depuis dispatchRules.js (source unique de vérité) ────
+// AUCUNE redéfinition locale — tout vient de dispatchRules.js
 
-const GPS_SEUIL_MIN = 5;          // GPS valide si < 5 min
-const HEARTBEAT_SEUIL_MIN = 5;    // App active si heartbeat < 5 min
-const HEARTBEAT_ON_SEUIL_MIN = 10; // ON si heartbeat < 10 min
-const GPS_EXPIRE_MIN = 10;        // GPS expiré si > 10 min → noir (livreurs)
-const GPS_CLIENT_SEUIL_MIN = 30;  // Client GPS valide si < 30 min
-
-// ─── Helpers (règles unifiées) ───────────────────────────────────────────────
-
-/** GPS récent = dernière position < GPS_SEUIL_MIN minutes */
-function isGPSRecent(entity) {
-  const dt = entity.derniere_position_date || entity.last_seen_at;
-  if (!dt) return false;
-  return (Date.now() - new Date(dt).getTime()) < GPS_SEUIL_MIN * 60 * 1000;
-}
-
-/** GPS valide = coordonnées non nulles ET récentes */
-function hasValidGPS(entity) {
-  return !!(entity.latitude && entity.longitude && isGPSRecent(entity));
-}
-
-/** App active = heartbeat < HEARTBEAT_SEUIL_MIN minutes */
-function isAppActive(entity) {
-  const dt = entity.last_seen_at;
-  if (!dt) return false;
-  return (Date.now() - new Date(dt).getTime()) < HEARTBEAT_SEUIL_MIN * 60 * 1000;
-}
-
-/** ON = statut actif ET heartbeat < HEARTBEAT_ON_SEUIL_MIN */
-function isON(livreur) {
-  const actifEnDB = livreur.statut === "disponible" || livreur.statut === "en_course";
-  const dt = livreur.last_seen_at || livreur.derniere_position_date;
-  if (!dt) return false;
-  return actifEnDB && (Date.now() - new Date(dt).getTime()) < HEARTBEAT_ON_SEUIL_MIN * 60 * 1000;
-}
+import {
+  isLibre,
+  isEnCourse,
+  isON,
+  isAppActive,
+  isGPSRecent,
+  hasValidGPS,
+  isClientGPSRecent,
+  isClientNoir,
+} from "@/lib/dispatchRules.js";
 
 /**
- * Libre = disponible + GPS renseigné
- * app_active N'EST PAS un critère — App fermée → WhatsApp, App ouverte → SILGAPP
- */
-function isLibre(livreur) {
-  return livreur.statut === "disponible"
-    && livreur.actif !== false
-    && livreur.validation === "valide"
-    && !!(livreur.latitude && livreur.longitude);
-}
-
-/** En course = statut en_course + ON */
-function isEnCourse(livreur) {
-  return livreur.statut === "en_course" && isON(livreur);
-}
-
-/**
- * Livreur noir = hors ligne ou GPS expiré > 10 min
+ * Livreur "noir" sur la carte = non dispatchable
+ * Règle unifiée : pas de GPS, statut hors_ligne, non validé ou inactif.
+ * ⚠️ last_seen_at / app_active N'EST PAS un critère de couleur.
+ * Un livreur avec app fermée mais GPS présent reste VERT (dispatchable via WhatsApp).
  */
 function isLivreurNoir(livreur) {
-  const dt = livreur.last_seen_at || livreur.derniere_position_date;
-  if (!dt) return true; // jamais vu
-  const min = (Date.now() - new Date(dt).getTime()) / 60000;
-  return min > GPS_EXPIRE_MIN || livreur.statut === "hors_ligne";
-}
-
-/**
- * Client noir = GPS absent ou expiré > 30 min
- */
-function isClientNoir(client) {
-  if (!client.latitude || !client.longitude) return true;
-  const dt = client.last_seen_at;
-  if (!dt) return true;
-  return (Date.now() - new Date(dt).getTime()) > GPS_CLIENT_SEUIL_MIN * 60 * 1000;
-}
-
-/**
- * Client GPS récent = position < 30 min
- */
-function isClientGPSRecent(client) {
-  const dt = client.last_seen_at;
-  if (!dt) return false;
-  return (Date.now() - new Date(dt).getTime()) < GPS_CLIENT_SEUIL_MIN * 60 * 1000;
+  if (!livreur.latitude || !livreur.longitude) return true;
+  if (livreur.statut === "hors_ligne") return true;
+  if (livreur.actif === false) return true;
+  if (livreur.validation !== "valide") return true;
+  return false;
 }
 
 const INDICATIFS = {
