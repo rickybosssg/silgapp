@@ -122,6 +122,7 @@ export default function CarteLivreursExterne() {
   const [heatmapMode, setHeatmapMode] = useState("off"); // "off" | "demande" | "couverture" | "opportunite"
   const [showHeatmapHint, setShowHeatmapHint] = useState(true);
   const [zonesChaudesData, setZonesChaudesData] = useState([]);
+  const [masquerInactifs, setMasquerInactifs] = useState(false);
   const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
   const paysActifs = usePaysActifs();
   const defaultCountry = paysActifs.length === 1 ? paysActifs[0].code : null;
@@ -657,14 +658,27 @@ export default function CarteLivreursExterne() {
                 <X className="w-4 h-4 text-white" />
               </button>
             </div>
-            <div className="px-4 pb-3">
-              <NetworkHealthBanner
-                libres={compteursLivreurs.verts}
-                enCourse={compteursLivreurs.oranges}
-                clientsGPS={compteursClients.gpsRecents}
-                clientsTotal={compteursClients.surCarte}
-                enAttente={coursesEnAttente.length}
-              />
+            <div className="px-4 pb-3 flex items-center gap-3">
+              <div className="flex-1">
+                <NetworkHealthBanner
+                  libres={compteursLivreurs.verts}
+                  enCourse={compteursLivreurs.oranges}
+                  clientsGPS={compteursClients.gpsRecents}
+                  clientsTotal={compteursClients.surCarte}
+                  enAttente={coursesEnAttente.length}
+                />
+              </div>
+              <button
+                onClick={() => setMasquerInactifs(v => !v)}
+                className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                  masquerInactifs
+                    ? "bg-white text-slate-900 border-white"
+                    : "bg-white/10 text-white/70 border-white/20 hover:bg-white/20"
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0" />
+                {masquerInactifs ? "⚫ Masqués" : "Voir inactifs"}
+              </button>
             </div>
           </div>
           <div className="flex flex-1 min-h-0">
@@ -679,6 +693,7 @@ export default function CarteLivreursExterne() {
                 countryCode={effectiveCountry}
                 onCountryChange={isGlobal ? setSelectedCountry : undefined}
                 zonesChaudesData={zonesChaudesData}
+                masquerInactifs={masquerInactifs}
               />
             </div>
             {selectedMarker && (

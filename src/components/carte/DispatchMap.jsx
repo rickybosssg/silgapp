@@ -465,6 +465,7 @@ export default function DispatchMap({
   countryCode = "",
   onCountryChange,
   zonesChaudesData = [], // zones pour les halos colorés
+  masquerInactifs = false, // prop contrôlée depuis le parent
 }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -472,7 +473,6 @@ export default function DispatchMap({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [heatmapModeLocal, setHeatmapModeLocal] = useState(heatmapMode);
   const [showHeatmapHint, setShowHeatmapHint] = useState(true);
-  const [masquerInactifs, setMasquerInactifs] = useState(false);
 
   // Recentrer la carte quand le pays change
   useEffect(() => {
@@ -739,15 +739,6 @@ export default function DispatchMap({
               </div>
             </div>
             
-            {/* Filtre inactifs */}
-            <button
-              onClick={() => setMasquerInactifs(v => !v)}
-              className={`dmap-overlay-badge flex items-center gap-2 text-xs font-semibold cursor-pointer transition-all w-full ${masquerInactifs ? "border-primary bg-primary/5 text-primary" : "text-slate-600"}`}
-            >
-              <span className={`w-3 h-3 rounded-full flex-shrink-0 border-2 ${masquerInactifs ? "bg-primary border-primary" : "border-gray-400"}`} />
-              {masquerInactifs ? "Inactifs masqués ✓" : "Masquer les inactifs"}
-            </button>
-
             {/* Légende GPS qualité */}
             <div className="dmap-overlay-badge text-xs text-slate-500 space-y-1">
               <div className="font-semibold text-slate-700 mb-1">Qualité GPS</div>
