@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { useAdminContext } from "@/hooks/useAdminContext.js";
+import CountrySelector, { usePaysActifs } from "@/components/international/CountrySelector";
 
 const CIBLES = [
   { value: "tous",              label: "Tous les utilisateurs", color: "bg-purple-100 text-purple-700" },
@@ -34,6 +36,7 @@ const defaultForm = {
   date_debut: "", date_fin: "", ordre: 0,
   couleur_fond: "#1a1a2e", couleur_texte: "#ffffff",
   annonceur_nom: "", annonceur_contact: "",
+  pays_cible: "", // code pays ISO (ex: "BF", "CI") — vide = tous pays
 };
 
 export default function GestionPublicites() {
@@ -43,10 +46,26 @@ export default function GestionPublicites() {
   const [form, setForm] = useState(defaultForm);
   const [uploading, setUploading] = useState(false);
   const [filterCible, setFilterCible] = useState("tous_filtres");
+  const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
+  const paysActifs = usePaysActifs();
+
+  const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || "");
+
+  const pubsFilter = effectiveCountry ? { pays_cibles: effectiveCountry } : {};
 
   const { data: pubs = [], isLoading } = useQuery({
-    queryKey: ["publicites"],
+    queryKey: ["publicites", effectiveCountry],
     queryFn: () => base44.entities.Publicite.list("-created_date", 100),
+    select: (data) => effectiveCountry
+      ? data.filter(p => {
+          if (!p.pays_cibles) return true; // sans ciblage pays → visible partout
+          if (p.pays_cibles === "tous") return true;
+          try {
+            const arr = JSON.parse(p.pays_cibles);
+            return Array.isArray(arr) ? arr.includes(effectiveCountry) : true;
+          } catch { return true; }
+        })
+      : data,
     initialData: [],
     refetchInterval: 15000,
   });
@@ -83,6 +102,14 @@ export default function GestionPublicites() {
   };
 
   const handleEdit = (pub) => {
+    // Extraire pays_cibles pour l'édition
+    let editPaysCibles = "";
+    if (pub.pays_cibles && pub.pays_cibles !== "tous") {
+      try {
+        const arr = JSON.parse(pub.pays_cibles);
+        editPaysCibles = Array.isArray(arr) ? arr[0] || "" : "";
+      } catch { editPaysCibles = ""; }
+    }
     setForm({
       titre: pub.titre || "",
       description: pub.description || "",
@@ -101,6 +128,7 @@ export default function GestionPublicites() {
       couleur_texte: pub.couleur_texte || "#ffffff",
       annonceur_nom: pub.annonceur_nom || "",
       annonceur_contact: pub.annonceur_contact || "",
+      pays_cible: editPaysCibles || effectiveCountry,
     });
     setEditingId(pub.id);
     setShowForm(true);
@@ -125,8 +153,11 @@ export default function GestionPublicites() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.titre.trim()) { toast.error("Titre requis"); return; }
+    const paysCibles = form.pays_cible ? JSON.stringify([form.pays_cible]) : "tous";
+    const { pays_cible, ...rest } = form;
     saveMutation.mutate({
-      ...form,
+      ...rest,
+      pays_cibles: paysCibles,
       date_debut: form.date_debut ? new Date(form.date_debut).toISOString() : null,
       date_fin: form.date_fin ? new Date(form.date_fin).toISOString() : null,
       ordre: Number(form.ordre) || 0,
@@ -168,7 +199,7 @@ export default function GestionPublicites() {
             </div>
           </div>
           <Button
-            onClick={() => { setShowForm(true); setEditingId(null); setForm(defaultForm); }}
+            onClick={() => { setShowForm(true); setEditingId(null); setForm({ ...defaultForm, pays_cible: effectiveCountry }); }}
             className="bg-white text-purple-700 hover:bg-white/90 font-bold gap-1.5 rounded-xl shadow-lg"
           >
             <Plus className="w-4 h-4" />
@@ -245,6 +276,25 @@ export default function GestionPublicites() {
                     </button>
                   ))}
                 </div>
+              </div>
+            </div>
+
+            {/* Pays cible */}
+            <div className="space-y-2">
+              <Label className="font-bold text-sm">🌍 Pays cible</Label>
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <CountrySelector
+                    value={form.pays_cible}
+                    onChange={(v) => setForm(p => ({ ...p, pays_cible: v }))}
+                    className="w-full"
+                  />
+                </div>
+                {!form.pays_cible && (
+                  <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 font-semibold flex-shrink-0">
+                    ⚠️ Visible dans tous les pays
+                  </span>
+                )}
               </div>
             </div>
 
@@ -388,23 +438,38 @@ export default function GestionPublicites() {
         </Card>
       )}
 
-      {/* ── FILTRES ── */}
-      <div className="flex gap-2 flex-wrap">
-        <button
-          onClick={() => setFilterCible("tous_filtres")}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${filterCible === "tous_filtres" ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-        >
-          Toutes ({pubs.length})
-        </button>
-        {CIBLES.map(c => (
+      {/* ── SÉLECTEUR PAYS + FILTRES ── */}
+      <div className="space-y-3">
+        {isGlobal && (
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-bold text-gray-500">🌍 Pays :</span>
+            <div className="w-48">
+              <CountrySelector value={effectiveCountry} onChange={setSelectedCountry} className="text-xs" />
+            </div>
+            {effectiveCountry && (
+              <span className="text-xs text-blue-600 font-semibold bg-blue-50 border border-blue-200 rounded-lg px-2 py-1">
+                Affiche {pubs.length} pub(s) pour {effectiveCountry}
+              </span>
+            )}
+          </div>
+        )}
+        <div className="flex gap-2 flex-wrap">
           <button
-            key={c.value}
-            onClick={() => setFilterCible(c.value)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${filterCible === c.value ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+            onClick={() => setFilterCible("tous_filtres")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${filterCible === "tous_filtres" ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
           >
-            {c.label}
+            Toutes ({pubs.length})
           </button>
-        ))}
+          {CIBLES.map(c => (
+            <button
+              key={c.value}
+              onClick={() => setFilterCible(c.value)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${filterCible === c.value ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── LISTE DES PUBS ── */}
@@ -450,6 +515,16 @@ export default function GestionPublicites() {
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${pub.format === "plein_ecran" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600"}`}>
                             {pub.format === "plein_ecran" ? "📢 Plein écran" : "🎠 Carrousel"}
                           </span>
+                          {pub.pays_cibles && pub.pays_cibles !== "tous" && (() => {
+                            try {
+                              const arr = JSON.parse(pub.pays_cibles);
+                              return Array.isArray(arr) && arr.length > 0 ? (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 bg-indigo-100 text-indigo-700">
+                                  🌍 {arr.join(", ")}
+                                </span>
+                              ) : null;
+                            } catch { return null; }
+                          })()}
                         </div>
                         {pub.description && <p className="text-xs text-gray-500 mt-0.5 truncate">{pub.description}</p>}
                         {pub.annonceur_nom && <p className="text-[10px] text-gray-400 mt-0.5">📍 {pub.annonceur_nom}</p>}

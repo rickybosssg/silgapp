@@ -6,7 +6,8 @@ import { useAdminContext } from "@/hooks/useAdminContext.js";
 import ClientsExternesPanel from "@/components/admin/ClientsExternesPanel";
 
 export default function ClientsExternesPage() {
-  const { isGlobal, isPays } = useAdminContext();
+  const { isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
+  const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || "");
 
   return (
     <div className="p-4 space-y-4 max-w-5xl mx-auto">
@@ -21,12 +22,12 @@ export default function ClientsExternesPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Panel Clients Externes</h1>
           <p className="text-sm text-muted-foreground">
-            Gérer les clients inscrits et migrer vers livreurs
+            {effectiveCountry ? `Clients du pays : ${effectiveCountry}` : "Tous pays — Gérer les clients inscrits"}
           </p>
         </div>
       </div>
 
-      {/* Panel principal */}
+      {/* Panel principal — filtré par pays via useAdminContext interne */}
       <ClientsExternesPanel />
     </div>
   );

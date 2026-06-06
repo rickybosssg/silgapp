@@ -10,6 +10,8 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 import { formatPhoneDisplay } from "@/lib/phoneUtils";
+import { useAdminContext } from "@/hooks/useAdminContext.js";
+import CountrySelector from "@/components/international/CountrySelector";
 
 function formaterTel(tel) {
   if (!tel) return "-";
@@ -315,22 +317,33 @@ function ClientDetailModal({ client, courses, migrationEnCours, onClose, onBloqu
   );
 }
 
-export default function ClientsExternesPanel() {
+export default function ClientsExternesPanel({ countryCode: countryCodeProp }) {
   const [recherche, setRecherche] = useState("");
   const [clientDetail, setClientDetail] = useState(null);
   const [migrationEnCours, setMigrationEnCours] = useState(null);
   const [suppressionEnCours, setSuppressionEnCours] = useState(null);
+  const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
+
+  // Source unique de vérité : prop forcée > admin-pays > sélecteur
+  const effectiveCountry = countryCodeProp || (isPays ? adminCountryCode : selectedCountry) || "";
+
+  const clientFilter = effectiveCountry ? { country_code: effectiveCountry } : {};
+  const coursesFilter = effectiveCountry ? { country_code: effectiveCountry } : {};
 
   const { data: clients = [], refetch } = useQuery({
-    queryKey: ["clients-externes-panel"],
-    queryFn: () => base44.entities.ClientExterne.list("-created_date", 200),
+    queryKey: ["clients-externes-panel", effectiveCountry],
+    queryFn: () => effectiveCountry
+      ? base44.entities.ClientExterne.filter(clientFilter, "-created_date", 200)
+      : base44.entities.ClientExterne.list("-created_date", 200),
     initialData: [],
     refetchInterval: 30000,
   });
 
   const { data: courses = [] } = useQuery({
-    queryKey: ["courses-externes-all"],
-    queryFn: () => base44.entities.CourseExterne.list("-created_date", 500),
+    queryKey: ["courses-externes-all", effectiveCountry],
+    queryFn: () => effectiveCountry
+      ? base44.entities.CourseExterne.filter(coursesFilter, "-created_date", 500)
+      : base44.entities.CourseExterne.list("-created_date", 500),
     initialData: [],
   });
 
@@ -407,17 +420,22 @@ export default function ClientsExternesPanel() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center shadow-md shadow-pink-200">
             <Users className="w-5 h-5 text-white" />
           </div>
           <div>
             <h2 className="text-base font-bold text-foreground">Clients inscrits</h2>
-            <p className="text-xs text-muted-foreground">{clients.length} comptes enregistrés</p>
+            <p className="text-xs text-muted-foreground">{clients.length} comptes enregistrés{effectiveCountry ? ` · ${effectiveCountry}` : " · tous pays"}</p>
           </div>
         </div>
-        <Badge className="bg-pink-100 text-pink-700 border-pink-200 text-sm font-bold px-3 py-1">{clients.length}</Badge>
+        <div className="flex items-center gap-2">
+          {isGlobal && !countryCodeProp && (
+            <CountrySelector value={effectiveCountry} onChange={setSelectedCountry} className="w-44 text-xs" />
+          )}
+          <Badge className="bg-pink-100 text-pink-700 border-pink-200 text-sm font-bold px-3 py-1">{clients.length}</Badge>
+        </div>
       </div>
 
       {/* Stats rapides */}
