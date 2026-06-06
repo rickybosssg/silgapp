@@ -25,7 +25,7 @@ import ClientOnboarding from "@/components/client/ClientOnboarding";
 import OngletCodePromo from "@/components/client/OngletCodePromo";
 import PubliciteCarousel from "@/components/publicite/PubliciteCarousel";
 import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
-import PrixManuelConfirmModal from "@/components/client/PrixManuelConfirmModal";
+
 
 function haversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -77,7 +77,7 @@ export default function ClientExterneApp() {
   const [aUnCodePromo, setAUnCodePromo] = useState(false);
   const [courseANoter, setCourseANoter] = useState(null);
   const [notationShownFor, setNotationShownFor] = useState(null);
-  const [coursesPrixManuel, setCoursesPrixManuel] = useState([]); // courses en attente de validation prix
+
   const [userId, setUserId] = useState(null);
   const queryClient = useQueryClient();
   const clientProfilRef = useRef(null);
@@ -471,14 +471,6 @@ export default function ClientExterneApp() {
       [...actives, ...activesDestinataire, ...activesExpediteur].forEach(c => map.set(c.id, c));
       const toutes = [...map.values()].sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
       setCoursesActives(toutes);
-
-      // Détecter les courses en attente de validation prix manuel (créateur uniquement)
-      const enAttenteValidation = toutes.filter(c =>
-        c.pricing_mode === "manual" &&
-        c.manual_price_status === "pending_client_validation" &&
-        c.created_by_id === user.id
-      );
-      setCoursesPrixManuel(enAttenteValidation);
 
       // Nettoyer les notifications obsolètes (courses supprimées ou terminées)
       const userNotifications = await base44.entities.Notification.filter({ destinataire_email: user.email, lue: false });
@@ -889,20 +881,6 @@ export default function ClientExterneApp() {
         />
       )}
 
-      {/* ── PRIX MANUEL — validation requise par le créateur ── */}
-      {coursesPrixManuel.length > 0 && (
-        <PrixManuelConfirmModal
-          course={coursesPrixManuel[0]}
-          onAccepted={() => {
-            setCoursesPrixManuel(prev => prev.slice(1));
-            if (position && clientProfil) checkStatus(position, clientProfil);
-          }}
-          onRefused={() => {
-            setCoursesPrixManuel(prev => prev.slice(1));
-            if (position && clientProfil) checkStatus(position, clientProfil);
-          }}
-        />
-      )}
 
       <VenusFloatingButton />
 
