@@ -394,8 +394,8 @@ export default function ClientSuiviCourse() {
         )}
 
         {/* ── PRIX MANUEL — carte inline remplace "Recherche en cours" ── */}
-        {maCourse?.pricing_mode === "manual" &&
-         maCourse?.manual_price_status === "pending_client_validation" &&
+        {maCourse?.manual_price_status === "pending_client_validation" &&
+         maCourse?.manual_price > 0 &&
          maCourse?.created_by_id === userId ? (
           <PrixManuelInlineCard
             course={maCourse}
