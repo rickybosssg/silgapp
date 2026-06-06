@@ -782,16 +782,18 @@ export default function DispatchMap({
           {/* Sélecteur pays (bottom-left) */}
           {onCountryChange && (
             <div className="absolute bottom-4 left-4 z-[1000]">
-              <div className="dmap-overlay-badge">
+              <div className="dmap-overlay-badge" style={{ colorScheme: "light" }}>
                 <div className="flex items-center gap-2 mb-1">
                   <Globe className="w-3 h-3 text-slate-500" />
                   <span className="text-xs font-semibold text-slate-700">Pays</span>
                 </div>
-                <CountrySelector
-                  value={countryCode}
-                  onChange={onCountryChange}
-                  className="w-full text-xs"
-                />
+                <div className="[&_button]:!bg-white [&_button]:!text-slate-800 [&_button]:!border-slate-200 [&_div]:!bg-white [&_div]:!text-slate-800">
+                  <CountrySelector
+                    value={countryCode}
+                    onChange={onCountryChange}
+                    className="w-full text-xs"
+                  />
+                </div>
               </div>
             </div>
           )}
