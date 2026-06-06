@@ -74,8 +74,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       setPricingMode(livreurProfil.pricing_mode);
       try { localStorage.setItem("silgapp_pricing_mode", livreurProfil.pricing_mode); } catch {}
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [livreurProfil?.id]);
+  }, [livreurProfil?.pricing_mode, livreurProfil?.id]);
 
   // Heartbeat automatique
   const { syncHeartbeat } = useHeartbeat({
@@ -146,9 +145,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   useEffect(() => {
     if (!mesCourses.length || !livreurProfil?.id) return;
     
-    // LOG DIAGNOSTIC — vérifier toutes les courses
-    console.log('[PrixManuel] 🔍 Scan des courses pour réponse client...', mesCourses.length);
-    
     // Étape 1 : Marquer TOUTES les courses terminées comme "dismissed" AVANT toute autre logique
     mesCourses.forEach(course => {
       if (course.proposed_by_livreur_id !== livreurProfil.id) return;
@@ -157,8 +153,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       // Si la course est dans un statut final → JAMAIS de notification
       if (FINAL_STATUSES.includes(course.statut)) {
         prixManuelWatchedRef.current[course.id] = 'dismissed_by_final_status';
-        console.log('[PrixManuel] 🚫 Course terminée — notification bloquée définitivement:', course.id);
-        return; // sortir de la boucle pour cette course
+        return;
       }
     });
     
@@ -166,27 +161,16 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     mesCourses.forEach(course => {
       if (course.proposed_by_livreur_id !== livreurProfil.id) return;
       if (course.pricing_mode !== 'manual') return;
-      if (FINAL_STATUSES.includes(course.statut)) return; // déjà géré
+      if (FINAL_STATUSES.includes(course.statut)) return;
       
       const watched = prixManuelWatchedRef.current[course.id];
       const status = course.manual_price_status;
-      
-      // LOG DIAGNOSTIC
-      if (status === 'accepted' || status === 'refused') {
-        console.log('[PrixManuel] ✅ Réponse détectée:', {
-          course_id: course.id,
-          status,
-          watched,
-          prix: course.manual_price,
-        });
-      }
       
       // Déclencher notification seulement si :
       // 1. Status accepted/refused
       // 2. Pas déjà watched OU dismissed
       // 3. Pas dans un statut final
       if ((status === 'accepted' || status === 'refused') && watched !== status && watched !== 'dismissed_by_final_status') {
-        console.log('[PrixManuel] 🎯 Déclenchement notification:', { accepted: status === 'accepted', prix: course.manual_price });
         prixManuelWatchedRef.current[course.id] = status;
         setPrixManuelReponse({
           accepted: status === 'accepted',
@@ -204,9 +188,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         FINAL_STATUSES.includes(c.statut)
       );
       if (courseActuelle) {
-        console.log('[PrixManuel] 🛑 Fermeture modale — course terminée');
         setPrixManuelReponse(null);
-        // Marquer comme traitée pour éviter réapparition
         prixManuelWatchedRef.current[courseActuelle.id] = 'dismissed_by_final_status';
       }
     }
@@ -362,7 +344,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       );
       const distanceVal = Number(distance || 0);
       const prixFinal = Math.max(Math.round(distanceVal * 100), 1000);
-        const commissionSilga = Math.round(prixFinal * 0.3);
+      const commissionSilga = Math.round(prixFinal * 0.3);
       const montantLivreur = prixFinal - commissionSilga;
 
       updateCourseMutation.mutate({
@@ -465,44 +447,15 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       {/* VENUS — toujours visible */}
       <VenusFloatingButton />
 
-      {/* Réponse prix manuel du client — ne jamais afficher si course terminée */}
-      {prixManuelReponse && (() => {
-        // Vérifier qu'aucune course avec ce prix manuel n'est dans un statut final
-        const courseTerminee = mesCourses.find(c =>
-          c.pricing_mode === 'manual' &&
-          c.proposed_by_livreur_id === livreurProfil?.id &&
-          FINAL_STATUSES.includes(c.statut)
-        );
-        
-        // Si une course est terminée → fermer définitivement la notification
-        if (courseTerminee) {
-          console.log('[PrixManuel] 🚫 Notification bloquée — course terminée');
-          setPrixManuelReponse(null);
-          return null;
-        }
-        
-        // Vérifier qu'il reste au moins une course active avec ce prix manuel
-        const courseEncoreActive = mesCourses.find(c =>
-          c.pricing_mode === 'manual' &&
-          c.proposed_by_livreur_id === livreurProfil?.id &&
-          !FINAL_STATUSES.includes(c.statut) &&
-          (c.manual_price_status === 'accepted' || c.manual_price_status === 'refused')
-        );
-        
-        if (!courseEncoreActive) {
-          setPrixManuelReponse(null);
-          return null;
-        }
-        
-        return (
-          <PrixManuelReponseAlert
-            accepted={prixManuelReponse.accepted}
-            prix={prixManuelReponse.prix}
-            devise={prixManuelReponse.devise}
-            onDismiss={() => setPrixManuelReponse(null)}
-          />
-        );
-      })()}
+      {/* Réponse prix manuel du client — garde de sécurité */}
+      {prixManuelReponse && (
+        <PrixManuelReponseAlert
+          accepted={prixManuelReponse.accepted}
+          prix={prixManuelReponse.prix}
+          devise={prixManuelReponse.devise}
+          onDismiss={() => setPrixManuelReponse(null)}
+        />
+      )}
 
       {/* ── PUBLICITÉ PLEIN ÉCRAN LIVREUR ── */}
       <PubliciteFullscreen
