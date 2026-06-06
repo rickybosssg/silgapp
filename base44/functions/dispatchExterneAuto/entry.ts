@@ -173,7 +173,8 @@ async function proposerAuLivreur(base44, courseId, course, livreur) {
         console.error('[DISPATCH] ❌ Erreur création notification:', err.message);
       }
 
-      // Notification push (en plus) — uniquement si notif pas en doublon
+      // Notification push — si app ouverte
+      // Si app fermée → WhatsApp en complément
       try {
         await base44.functions.invoke('envoiNotificationPush', {
           destinataire_email: livreur.user_email,
@@ -185,6 +186,19 @@ async function proposerAuLivreur(base44, courseId, course, livreur) {
         });
       } catch (err) {
         console.error('[DISPATCH] ❌ Erreur notif push:', err.message);
+      }
+
+      // Si l'app est fermée → envoyer aussi un WhatsApp pour ne pas rater la course
+      if (!livreur.app_active && livreur.telephone) {
+        try {
+          await base44.functions.invoke('envoyerAlerteWhatsApp', {
+            telephone: livreur.telephone,
+            message: `🚨 SILGAPP — Nouvelle course disponible !\n📍 ${course.adresse_depart} → ${course.adresse_arrivee || '?'}\n📏 À ${distanceLabel} de vous\n\nOuvrez l'application SILGAPP pour accepter (60 secondes).`,
+          });
+          console.log(`[DISPATCH] 📱 WhatsApp envoyé à ${livreur.telephone} (app fermée)`);
+        } catch (err) {
+          console.warn('[DISPATCH] ⚠️ Erreur WhatsApp livreur app fermée:', err.message);
+        }
       }
     }
   }

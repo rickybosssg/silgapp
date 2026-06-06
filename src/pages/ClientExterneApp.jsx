@@ -499,19 +499,15 @@ export default function ClientExterneApp() {
         statut: "disponible",
         actif: true,
         validation: "valide",
-        app_active: true,
       };
       if (clientProfil?.country_code) {
         filter.country_code = clientProfil.country_code;
       }
       const livreurs = await base44.entities.Livreur.filter(filter);
 
-      // Filtrer : GPS actif (latitude + longitude renseignés) + app vue récemment (5 min)
-      const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-      const eligibles = (livreurs || []).filter(l =>
-        l.latitude && l.longitude &&
-        l.last_seen_at && l.last_seen_at >= cutoff
-      );
+      // Seul critère restant : GPS renseigné (latitude + longitude)
+      // app_active n'est PAS un critère de disponibilité — seulement un critère de mode de notification
+      const eligibles = (livreurs || []).filter(l => l.latitude && l.longitude);
       console.log(`[Carte] Affichés sur la carte: ${eligibles.length}`);
 
       // Ne pas écraser si la requête retourne vide (protection anti-flash)
