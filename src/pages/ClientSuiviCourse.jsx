@@ -38,6 +38,7 @@ import FraisAnnulationBannerClient from "@/components/client/FraisAnnulationBann
 import { useDestinataireGPS } from "@/hooks/useDestinataireGPS";
 import { playNotificationSound } from "@/hooks/useSonEtVibration";
 import PrixManuelConfirmModal from "@/components/client/PrixManuelConfirmModal";
+import PrixManuelInlineCard from "@/components/client/PrixManuelInlineCard";
 
 
 function buildWhatsAppMessage(course) {
@@ -393,15 +394,23 @@ export default function ClientSuiviCourse() {
           </Card>
         )}
 
-        {/* Statut course */}
+        {/* ── PRIX MANUEL — carte inline remplace "Recherche en cours" ── */}
+        {maCourse?.pricing_mode === "manual" &&
+         maCourse?.manual_price_status === "pending_client_validation" &&
+         maCourse?.created_by_id === userId ? (
+          <PrixManuelInlineCard
+            course={maCourse}
+            devise={maCourse.devise || countries.find(c => c.code === maCourse.country_code)?.devise || "FCFA"}
+            onAccepted={() => queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] })}
+            onRefused={() => queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] })}
+            onAnnuler={() => setShowAnnulerDialog(true)}
+          />
+        ) : (
+        /* Statut course */
         <Card className="p-4">
           <div className="flex items-center justify-between mb-3">
             <h1 className="text-lg font-bold text-foreground">Suivi de course</h1>
-            <Badge className={
-              maCourse?.pricing_mode === "manual" && maCourse?.manual_price_status === "pending_client_validation" && maCourse?.created_by_id === userId
-                ? "bg-amber-100 text-amber-700 animate-pulse"
-                : statutColors[maCourse.statut]
-            }>
+            <Badge className={statutColors[maCourse.statut]}>
               {getStatutLabel(maCourse)}
             </Badge>
           </div>
@@ -436,6 +445,7 @@ export default function ClientSuiviCourse() {
             </Button>
           )}
         </Card>
+        )}
 
         {/* Infos livreur — Card style Uber uniquement si livreur a accepté */}
         {maCourse.livreur_id && maCourse.heure_acceptation && (
@@ -826,18 +836,7 @@ export default function ClientSuiviCourse() {
           );
         })()}
 
-        {/* Modal validation prix manuel — uniquement pour le CRÉATEUR de la course */}
-        {maCourse?.pricing_mode === "manual" && maCourse?.manual_price_status === "pending_client_validation" && maCourse?.created_by_id === userId && (
-          <PrixManuelConfirmModal
-            course={maCourse}
-            onAccepted={() => {
-              queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-            }}
-            onRefused={() => {
-              queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-            }}
-          />
-        )}
+        {/* Prix manuel géré inline dans la carte statut ci-dessus — pas de modale flottante */}
 
         {showRating && (
           <LivreurRatingDialog
