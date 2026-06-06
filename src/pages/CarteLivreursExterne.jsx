@@ -55,9 +55,15 @@ function isON(livreur) {
   return actifEnDB && (Date.now() - new Date(dt).getTime()) < HEARTBEAT_ON_SEUIL_MIN * 60 * 1000;
 }
 
-/** Libre = disponible + ON + app active + GPS récent → peut recevoir une course */
+/**
+ * Libre = disponible + GPS renseigné
+ * app_active N'EST PAS un critère — App fermée → WhatsApp, App ouverte → SILGAPP
+ */
 function isLibre(livreur) {
-  return livreur.statut === "disponible" && isON(livreur) && isAppActive(livreur) && hasValidGPS(livreur);
+  return livreur.statut === "disponible"
+    && livreur.actif !== false
+    && livreur.validation === "valide"
+    && !!(livreur.latitude && livreur.longitude);
 }
 
 /** En course = statut en_course + ON */
@@ -511,7 +517,7 @@ export default function CarteLivreursExterne() {
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             {[
               { dot: "bg-gray-800",   label: "Hors ligne" },
-              { dot: "bg-green-500",  label: "Libre (< 5min)" },
+              { dot: "bg-green-500",  label: "Libre (GPS actif)" },
               { dot: "bg-orange-500", label: "En course" },
               { dot: "bg-blue-500",   label: "Client actif" },
               { dot: "bg-red-600",    label: "Course attente" },

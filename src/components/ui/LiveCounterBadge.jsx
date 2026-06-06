@@ -37,11 +37,13 @@ export default function LiveCounterBadge({ type = "livreurs", count: externalCou
     try {
       const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
       if (type === "livreurs") {
-        const filter = { statut: "disponible", actif: true, validation: "valide", app_active: true };
+        // Règle métier : disponible + actif + validé + GPS renseigné
+        // app_active N'EST PAS un critère de disponibilité
+        const filter = { statut: "disponible", actif: true, validation: "valide" };
         if (userCountry) filter.country_code = userCountry;
         const livreurs = await base44.entities.Livreur.filter(filter);
-        const actifs = (livreurs || []).filter(l => l.latitude && l.longitude && l.last_seen_at && l.last_seen_at >= cutoff);
-        setInternalCount(actifs.length);
+        const eligibles = (livreurs || []).filter(l => l.latitude && l.longitude);
+        setInternalCount(eligibles.length);
       } else {
         const filter = { app_active: true, actif: true };
         if (userCountry) filter.country_code = userCountry;
