@@ -85,8 +85,21 @@ function CourseHistoriqueCard({ course, fraisAnnulation, onSelect }) {
             )}
           </div>
           <div className="flex items-center gap-2">
-            {isTerminee && course.prix_final > 0 && (
-              <span className="font-bold text-green-700">{course.prix_final.toLocaleString()} {course.devise || "F"}</span>
+            {isTerminee && (
+              (() => {
+                // ✅ Prix manuel accepté = priorité absolue
+                const isPrixManuel = course.pricing_mode === "manual" 
+                  && course.manual_price_status === "accepted" 
+                  && course.manual_price > 0;
+                const prix = isPrixManuel 
+                  ? Number(course.manual_price) 
+                  : (course.prix_final || 0);
+                return prix > 0 ? (
+                  <span className="font-bold text-green-700">
+                    {prix.toLocaleString()} {course.devise || "F"}
+                  </span>
+                ) : null;
+              })()
             )}
             {isTerminee && course.note_livreur && (
               <span className="flex items-center gap-0.5 text-yellow-600 font-bold">
@@ -120,8 +133,15 @@ export default function HistoriqueCoursesClient({ courses = [], fraisAnnulation 
   const nbLivrees = courses.filter(c => c.statut === "livree").length;
   const nbAnnulees = courses.filter(c => c.statut === "annulee").length;
   const totalDepense = courses
-    .filter(c => c.statut === "livree" && c.prix_final > 0)
-    .reduce((s, c) => s + c.prix_final, 0);
+    .filter(c => c.statut === "livree")
+    .reduce((s, c) => {
+      // ✅ Prix manuel accepté = priorité absolue
+      const isPrixManuel = c.pricing_mode === "manual" 
+        && c.manual_price_status === "accepted" 
+        && c.manual_price > 0;
+      const prix = isPrixManuel ? Number(c.manual_price) : (c.prix_final || 0);
+      return s + (prix > 0 ? prix : 0);
+    }, 0);
   const noteMoyenne = courses
     .filter(c => c.note_livreur)
     .reduce((acc, c, _, arr) => acc + c.note_livreur / arr.length, 0);

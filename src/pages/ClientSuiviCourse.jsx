@@ -536,8 +536,17 @@ export default function ClientSuiviCourse() {
               ? haversineKm(maCourse.gps_depart_lat, maCourse.gps_depart_lng, maCourse.gps_arrivee_lat, maCourse.gps_arrivee_lng)
               : null;
             const isFinal = isLivree && maCourse.prix_final > 0;
+            
+            // ✅ PRIX MANUEL ACCEPTÉ = prix officiel de la course
+            const isPrixManuelAccepte = maCourse.pricing_mode === "manual" 
+              && maCourse.manual_price_status === "accepted" 
+              && maCourse.manual_price > 0;
+            
             let prix = 0;
-            if (isFinal) {
+            if (isPrixManuelAccepte) {
+              // Prix manuel accepté = source de vérité unique
+              prix = Math.max(Number(maCourse.manual_price), PRIX_MIN);
+            } else if (isFinal) {
               prix = Math.max(maCourse.prix_final, PRIX_MIN);
             } else if (distCourse != null && distCourse > 0) {
               if (distCourse <= 10) {
@@ -568,7 +577,7 @@ export default function ClientSuiviCourse() {
                 <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-3 text-center shadow-lg">
                   <span className="text-2xl font-black text-white block">{prix > 0 ? prix.toLocaleString() : "—"}</span>
                   <span className="text-[10px] font-bold text-blue-100 uppercase tracking-wide">
-                    {isFinal ? "Prix final" : "Prix approx."}
+                    {isPrixManuelAccepte ? "Prix validé ✓" : isFinal ? "Prix final" : "Prix approx."}
                   </span>
                 </div>
               </div>
