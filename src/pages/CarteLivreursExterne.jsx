@@ -123,6 +123,8 @@ export default function CarteLivreursExterne() {
   const [showHeatmapHint, setShowHeatmapHint] = useState(true);
   const [zonesChaudesData, setZonesChaudesData] = useState([]);
   const [masquerInactifs, setMasquerInactifs] = useState(false);
+  const [showClients, setShowClients] = useState(true);
+  const [showLivreurs, setShowLivreurs] = useState(true);
   const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
   const paysActifs = usePaysActifs();
   const defaultCountry = paysActifs.length === 1 ? paysActifs[0].code : null;
@@ -670,17 +672,41 @@ export default function CarteLivreursExterne() {
                   enAttente={coursesEnAttente.length}
                 />
               </div>
-              <button
-                onClick={() => setMasquerInactifs(v => !v)}
-                className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                  masquerInactifs
-                    ? "bg-white text-slate-900 border-white"
-                    : "bg-white/10 text-white/70 border-white/20 hover:bg-white/20"
-                }`}
-              >
-                <span className="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0" />
-                {masquerInactifs ? "⚫ Masqués" : "Voir inactifs"}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setMasquerInactifs(v => !v)}
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                    masquerInactifs
+                      ? "bg-white text-slate-900 border-white"
+                      : "bg-white/10 text-white/70 border-white/20 hover:bg-white/20"
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0" />
+                  {masquerInactifs ? "⚫ Masqués" : "Voir inactifs"}
+                </button>
+                <button
+                  onClick={() => setShowLivreurs(v => !v)}
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                    showLivreurs
+                      ? "bg-green-600 text-white border-green-600"
+                      : "bg-white/10 text-white/70 border-white/20 hover:bg-white/20"
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                  🟢 Livreurs
+                </button>
+                <button
+                  onClick={() => setShowClients(v => !v)}
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                    showClients
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white/10 text-white/70 border-white/20 hover:bg-white/20"
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
+                  🔵 Clients
+                </button>
+              </div>
             </div>
           </div>
           <div className="flex flex-1 min-h-0">
@@ -696,6 +722,8 @@ export default function CarteLivreursExterne() {
                 onCountryChange={isGlobal ? setSelectedCountry : undefined}
                 zonesChaudesData={zonesChaudesData}
                 masquerInactifs={masquerInactifs}
+                showClients={showClients}
+                showLivreurs={showLivreurs}
               />
             </div>
             {selectedMarker && (
