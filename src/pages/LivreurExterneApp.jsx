@@ -191,16 +191,24 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   const totalEncaisse = useMemo(() =>
     livreesToday.reduce((sum, c) => {
+      // ⚠️ CORRECTION PRIX MANUEL : Utiliser montant_livreur si déjà calculé,
+      // sinon recalculer en respectant le mode de prix
       if (c.montant_livreur > 0) return sum + c.montant_livreur;
-      return sum + Math.round((c.prix_final || 0) * 0.7);
+      const isPrixManuel = c.pricing_mode === "manual" && c.manual_price_status === "accepted" && Number(c.manual_price) > 0;
+      const prixBase = isPrixManuel ? Number(c.manual_price) : (c.prix_final || 0);
+      return sum + Math.round(prixBase * 0.7);
     }, 0),
     [livreesToday]
   );
 
   const montantDüSilga = useMemo(() =>
     livreesToday.reduce((sum, c) => {
+      // ⚠️ CORRECTION PRIX MANUEL : Utiliser commission_silga si déjà calculée,
+      // sinon recalculer en respectant le mode de prix
       if (c.commission_silga > 0) return sum + c.commission_silga;
-      return sum + Math.round((c.prix_final || 0) * 0.3);
+      const isPrixManuel = c.pricing_mode === "manual" && c.manual_price_status === "accepted" && Number(c.manual_price) > 0;
+      const prixBase = isPrixManuel ? Number(c.manual_price) : (c.prix_final || 0);
+      return sum + Math.round(prixBase * 0.3);
     }, 0),
     [livreesToday]
   );

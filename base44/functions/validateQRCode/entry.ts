@@ -109,6 +109,11 @@ Deno.serve(async (req) => {
       // Règle métier SILGAPP : prix basé sur distance GPS expéditeur → destinataire
       // (gps_depart → gps_arrivee de la course), jamais sur la distance livreur.
       // Distance réelle parcourue = GPS récupération → GPS livraison (pour stats).
+      
+      // ⚠️ CORRECTION PRIX MANUEL : Si la course utilise un prix manuel accepté,
+      // ce montant devient le prix officiel. Ne JAMAIS recalculer.
+      const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
+      
       const latRecup = course.latitude_recuperation;
       const lngRecup = course.longitude_recuperation;
       const latLivr = latitude;
@@ -129,26 +134,48 @@ Deno.serve(async (req) => {
         ? haversine(latDepart, lngDepart, latArrivee, lngArrivee)
         : null;
 
-      if (latDepart && lngDepart && latArrivee && lngArrivee) {
+      // Récupérer le tarif du pays depuis la DB (pour mode automatique uniquement)
+      const countryCode = course.country_code || "BF";
+      let prixParKm = 100;
+      let prixMinimumPays = 500;
+      let commissionPct = 30;
+      try {
+        const countriesDB = await base44.asServiceRole.entities.Country.filter({ code: countryCode, actif: true });
+        if (countriesDB?.[0]) {
+          prixParKm    = countriesDB[0].prix_par_km    || 100;
+          prixMinimumPays = countriesDB[0].prix_minimum || 500;
+          commissionPct   = countriesDB[0].commission_pct || 30;
+        }
+      } catch (_) {}
+
+      const PRIX_MINIMUM_GLOBAL = 1000;
+
+      if (isPrixManuel) {
+        // ── MODE PRIX MANUEL : utiliser le prix accepté par le client ──
+        const prixFinal = Number(course.manual_price);
+        const commission = Math.round(prixFinal * (commissionPct / 100));
+        const montantLivreur = prixFinal - commission;
+        
+        updateData.prix_final = prixFinal;
+        updateData.commission_silga = commission;
+        updateData.montant_livreur = montantLivreur;
+        
+        // Distance réelle pour stats uniquement (pas pour le calcul du prix)
+        if (distReelle != null) {
+          updateData.distance_reelle_km = Math.max(Number(distReelle) || 0, 0.01);
+        } else if (latDepart && lngDepart && latArrivee && lngArrivee) {
+          const dist = haversine(latDepart, lngDepart, latArrivee, lngArrivee);
+          updateData.distance_reelle_km = Math.max(Number(dist) || 0, 0.01);
+        }
+        
+        updateData.latitude_arrivee_livraison = latitude;
+        updateData.longitude_arrivee_livraison = longitude;
+      } else if (latDepart && lngDepart && latArrivee && lngArrivee) {
+        // ── MODE PRIX AUTOMATIQUE : calcul basé sur la distance ──
         const dist = haversine(latDepart, lngDepart, latArrivee, lngArrivee);
         const distArrondie = Math.max(Number(dist) || 0, 0.01);
 
-        // Récupérer le tarif du pays depuis la DB
-        const countryCode = course.country_code || "BF";
-        let prixParKm = 100;
-        let prixMinimumPays = 500;
-        let commissionPct = 30;
-        try {
-          const countriesDB = await base44.asServiceRole.entities.Country.filter({ code: countryCode, actif: true });
-          if (countriesDB?.[0]) {
-            prixParKm    = countriesDB[0].prix_par_km    || 100;
-            prixMinimumPays = countriesDB[0].prix_minimum || 500;
-            commissionPct   = countriesDB[0].commission_pct || 30;
-          }
-        } catch (_) {}
-
         // Règle SILGAPP : ≤10km = 1000 F minimum, >10km = distance × 100 F (minimum 1000 F)
-        const PRIX_MINIMUM_GLOBAL = 1000;
         let prixBrut = distArrondie * prixParKm;
         // Si distance ≤ 10km, appliquer le minimum de 1000 F
         if (distArrondie <= 10) {
@@ -167,7 +194,6 @@ Deno.serve(async (req) => {
         updateData.longitude_arrivee_livraison = longitude;
       } else {
         // GPS course (départ/arrivée) manquants → appliquer le minimum SILGAPP
-        const PRIX_MINIMUM_GLOBAL = 1000;
         updateData.prix_final = PRIX_MINIMUM_GLOBAL;
         updateData.commission_silga = Math.round(PRIX_MINIMUM_GLOBAL * 0.3);
         updateData.montant_livreur = PRIX_MINIMUM_GLOBAL - Math.round(PRIX_MINIMUM_GLOBAL * 0.3);

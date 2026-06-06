@@ -615,10 +615,14 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           )}
 
           {colisLivre && (() => {
+            // ⚠️ CORRECTION PRIX MANUEL : Si la course utilise un prix manuel accepté,
+            // ce montant devient le prix officiel. Ne JAMAIS recalculer.
+            const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
+            
             const dist = Number(course.distance_reelle_km) > 0 ? Number(course.distance_reelle_km) : null;
-            // Règle prix minimum SILGAPP : 1 000 F — appliqué avant tout calcul de commission
-            const prixBrut = Number(course.prix_final) > 0 ? Number(course.prix_final) : (dist ? Math.round(dist * 100) : 0);
-            const prix = Math.max(1000, prixBrut) || null;
+            const prix = isPrixManuel
+              ? Number(course.manual_price)
+              : (Math.max(1000, Number(course.prix_final) || (dist ? Math.round(dist * 100) : 0)) || null);
             const gain = Number(course.montant_livreur) > 0 ? Number(course.montant_livreur) : (prix ? Math.round(prix * 0.7) : null);
             const commission = Number(course.commission_silga) > 0 ? Number(course.commission_silga) : (prix ? Math.round(prix * 0.3) : null);
             return (
@@ -636,10 +640,15 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                       </div>
                     )}
                     <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
-                      <p className="text-[10px] text-gray-400 font-semibold uppercase">Prix final</p>
+                      <p className="text-[10px] text-gray-400 font-semibold uppercase">
+                        Prix final {isPrixManuel && "✓"}
+                      </p>
                       <p className="text-sm font-black text-blue-700">
                         {prix !== null ? `${prix.toLocaleString()} ${course.devise || "F"}` : "—"}
                       </p>
+                      {isPrixManuel && (
+                        <p className="text-[9px] text-green-600 font-semibold mt-0.5">Prix convenu</p>
+                      )}
                     </div>
                     <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
                       <p className="text-[10px] text-gray-400 font-semibold uppercase">Ton gain</p>
