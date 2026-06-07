@@ -1,0 +1,67 @@
+{
+  "name": "VenusRapport",
+  "type": "object",
+  "properties": {
+    "type_rapport": {
+      "type": "string",
+      "enum": [
+        "quotidien",
+        "hebdomadaire",
+        "mensuel"
+      ],
+      "description": "Type de rapport"
+    },
+    "country_code": {
+      "type": "string",
+      "description": "Pays concern\u00e9 ou 'ALL' pour global"
+    },
+    "periode_debut": {
+      "type": "string",
+      "format": "date",
+      "description": "D\u00e9but de la p\u00e9riode"
+    },
+    "periode_fin": {
+      "type": "string",
+      "format": "date",
+      "description": "Fin de la p\u00e9riode"
+    },
+    "contenu_json": {
+      "type": "string",
+      "description": "Contenu du rapport en JSON stringifi\u00e9"
+    },
+    "nb_questions": {
+      "type": "number",
+      "default": 0
+    },
+    "nb_conversations": {
+      "type": "number",
+      "default": 0
+    },
+    "nb_resolues": {
+      "type": "number",
+      "default": 0
+    },
+    "top_categories": {
+      "type": "string",
+      "description": "JSON stringifi\u00e9 des top cat\u00e9gories"
+    },
+    "problemes_detectes": {
+      "type": "string",
+      "description": "JSON stringifi\u00e9 des probl\u00e8mes d\u00e9tect\u00e9s"
+    },
+    "recommandations": {
+      "type": "string",
+      "description": "Recommandations g\u00e9n\u00e9r\u00e9es par l'IA"
+    },
+    "genere_par": {
+      "type": "string",
+      "description": "Admin ou syst\u00e8me ayant g\u00e9n\u00e9r\u00e9 le rapport"
+    }
+  },
+  "required": [
+    "type_rapport",
+    "country_code",
+    "periode_debut",
+    "periode_fin"
+  ]
+}

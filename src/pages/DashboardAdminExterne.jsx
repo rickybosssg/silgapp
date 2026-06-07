@@ -25,6 +25,7 @@ import DownloadStatsPanel from "@/components/admin/DownloadStatsPanel";
 import AlertesLivreursPanel from "@/components/admin/AlertesLivreursPanel";
 import ZonesChaudesWidget from "@/components/carte/ZonesChaudes";
 import ComptabilitePanel from "@/components/admin/ComptabilitePanel";
+import VenusRapportsPanel from "@/components/admin/VenusRapportsPanel";
 
 export default function DashboardAdminExterne() {
   console.log("🚨 DashboardAdminExterne.jsx EST CHARGÉ ET EXÉCUTÉ");
@@ -452,6 +453,11 @@ export default function DashboardAdminExterne() {
 
       {/* ── HISTORIQUE DU JOUR ───────────────────────────────────── */}
       <HistoriqueDuJour courses={courses} />
+
+      {/* ── RAPPORTS VENUS ────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+        <VenusRapportsPanel />
+      </div>
 
       {/* ── SYNCHRONISATION GPS ──────────────────────────────────── */}
       <div className="grid gap-4">
