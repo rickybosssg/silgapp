@@ -1,34 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { 
-  LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
-  Package, TrendingUp, Menu, X, LogOut, Wallet, Globe, Shield
-} from "lucide-react";
+import { LayoutDashboard, MapPin, Package, Truck, Menu, X, LogOut, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
-const navItems = [
-  { path: "/", label: "Dashboard", icon: LayoutDashboard },
-  { path: "/carte", label: "Carte", icon: MapPin },
-  { path: "/courses", label: "Courses", icon: Package },
-  { path: "/livreurs", label: "Livreurs", icon: Truck },
-];
+import { navItems as allNavItems } from "@/components/layout/Sidebar";
 
-const allNavItems = [
-  { path: "/", label: "Tableau de bord", icon: LayoutDashboard },
-  { path: "/nouvelle-course", label: "Nouvelle course", icon: Plus, reseauOnly: "interne" },
-  { path: "/carte", label: "Carte en direct", icon: MapPin },
-  { path: "/courses", label: "Toutes les courses", icon: Package },
-  { path: "/livreurs", label: "Livreurs", icon: Truck },
-  { path: "/rapport", label: "Rapport du jour", icon: BarChart3 },
-  { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp },
-  { path: "/admin/externe/dus-livreurs", label: "Comptabilité", icon: Wallet, reseauOnly: "externe" },
-  { path: "/admin/global", label: "Admin Global", icon: Globe, reseauOnly: "externe" },
-  { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Globe, reseauOnly: "externe" },
-  { path: "/notifications", label: "Notifications", icon: Bell },
-  { path: "/maintenance", label: "Maintenance", icon: Shield },
-];
+// Bottom tab bar : items communs aux deux réseaux
+const bottomTabPaths = ["/", "/carte", "/courses", "/livreurs"];
 
 // Store scroll positions and state per route using sessionStorage for persistence
 const SCROLL_STORAGE_KEY = 'silgapp_scroll_';
@@ -144,15 +124,12 @@ export default function MobileNav({ notificationCount = 0, reseau }) {
 
             {/* Nav items */}
             <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
-              {allNavItems.filter(item => {
-                if (item.reseauOnly && item.reseauOnly !== reseau) return false;
-                return true;
-              }).map((item) => {
+              {allNavItems.filter(item => item.reseauOnly === reseau).map((item) => {
                 const isActive = location.pathname === item.path;
                 const Icon = item.icon;
                 return (
                   <Link
-                    key={item.path}
+                    key={item.path + item.reseauOnly}
                     to={item.path}
                     onClick={() => setShowMenu(false)}
                     className={cn(
@@ -192,7 +169,7 @@ export default function MobileNav({ notificationCount = 0, reseau }) {
       {/* ===== MOBILE BOTTOM TAB BAR ===== */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40 safe-area-bottom">
         <div className="flex items-stretch justify-around">
-          {navItems.map((item) => {
+          {allNavItems.filter(item => item.reseauOnly === reseau && bottomTabPaths.includes(item.path)).map((item) => {
             const isActive = location.pathname === item.path;
             const Icon = item.icon;
             return (
