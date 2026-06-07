@@ -287,10 +287,9 @@ export default function CarteLivreursExterne() {
     const eligibles = livreurs.filter(l => l.validation === "valide" && l.actif !== false);
     const base = calculateLivreurCounters(eligibles);
 
-    // Recalcul strict de "en course" : statut DB en_course ET course active existante
-    const vraisEnCourse = eligibles.filter(l =>
-      l.statut === "en_course" && livreurIdsEnCourseReelle.has(l.id)
-    );
+    // Recalcul strict de "en course" : livreur avec course ACTIVE (peu importe le statut DB)
+    // Un livreur peut avoir statut="disponible" mais avoir une course active → doit être orange
+    const vraisEnCourse = eligibles.filter(l => livreurIdsEnCourseReelle.has(l.id));
     console.log("🟠 DIAGNOSTIC livreurs en course:", {
       par_statut_db: eligibles.filter(l => l.statut === "en_course").length,
       avec_course_active: vraisEnCourse.length,
@@ -318,7 +317,7 @@ export default function CarteLivreursExterne() {
     const eligibles = livreurs.filter(l => l.validation === "valide" && l.actif !== false);
     const libres = eligibles.filter(l => isLibre(l));
     const enCourseDB = eligibles.filter(l => l.statut === "en_course");
-    const enCourseReelle = enCourseDB.filter(l => livreurIdsEnCourseReelle.has(l.id));
+    const enCourseReelle = eligibles.filter(l => livreurIdsEnCourseReelle.has(l.id));
     const enCourseFantomes = enCourseDB.filter(l => !livreurIdsEnCourseReelle.has(l.id));
 
     console.log("🔍 DIAGNOSTIC CARTE COMPLET:", {
@@ -326,7 +325,7 @@ export default function CarteLivreursExterne() {
       libres: libres.length,
       libres_ids: libres.map(l => l.id.slice(-8)),
       en_course_statut_db: enCourseDB.length,
-      en_course_avec_course_active: enCourseReelle.length,
+      en_course_reel_calcule: enCourseReelle.length,
       en_course_fantomes: enCourseFantomes.length,
       fantomes_detail: enCourseFantomes.map(l => ({
         id: l.id.slice(-8),
@@ -336,6 +335,12 @@ export default function CarteLivreursExterne() {
       })),
       courses_actives_en_db: coursesVraimentActives.length,
     });
+
+    // 🚨 ALERTE si livreurs "en_course" sans course active
+    if (enCourseFantomes.length > 0) {
+      console.warn(`⚠️ ${enCourseFantomes.length} livreur(s) "en_course" SANS course active !`);
+      console.warn("IDs:", enCourseFantomes.map(l => l.id.slice(-8)));
+    }
   }, [livreurs, coursesVraimentActives, livreurIdsEnCourseReelle]);
 
   // ─── Listes filtrées ────────────────────────────────────────────────────
@@ -343,8 +348,8 @@ export default function CarteLivreursExterne() {
     switch (filtreLivreur) {
       case "noirs":     return livreurs.filter(l => isLivreurNoir(l));
       case "verts":     return livreurs.filter(l => isLibre(l));
-      // En course = statut en_course ET course active confirmée en DB
-      case "oranges":   return livreurs.filter(l => l.statut === "en_course" && livreurIdsEnCourseReelle.has(l.id));
+      // En course = livreur avec course ACTIVE (peu importe le statut DB)
+      case "oranges":   return livreurs.filter(l => livreurIdsEnCourseReelle.has(l.id));
       default:          return livreurs;
     }
   }, [livreurs, filtreLivreur, livreurIdsEnCourseReelle]);
@@ -573,8 +578,8 @@ export default function CarteLivreursExterne() {
               {livreursAffiches.map(livreur => {
                 const estNoir   = isLivreurNoir(livreur);
                 const estVert   = isLibre(livreur);
-                // "En mission" seulement si statut en_course ET course active confirmée
-                const estOrange = livreur.statut === "en_course" && livreurIdsEnCourseReelle.has(livreur.id);
+                // "En mission" = livreur avec course ACTIVE (peu importe le statut DB)
+                const estOrange = livreurIdsEnCourseReelle.has(livreur.id);
                 return (
                   <div key={livreur.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
                     {/* Dot statut */}
