@@ -191,7 +191,14 @@ export default function DashboardAdminExterne() {
       grad: "from-violet-500 to-indigo-600",
       shadow: "shadow-violet-100",
     },
-
+    {
+      scroll: "venus-rapports",
+      label: "Rapports VENUS",
+      sub: "Analyse IA des conversations",
+      icon: MessageCircle,
+      grad: "from-purple-600 to-violet-700",
+      shadow: "shadow-purple-100",
+    },
   ];
 
   return (

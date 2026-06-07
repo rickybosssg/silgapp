@@ -168,8 +168,8 @@ export default function VenusChat({ onClose, countryContext }) {
   const sendMessage = async () => {
     if (!input.trim() || loading || !conversationId) return;
 
-    const question = input.trim();
-    const userMsg = { role: "user", content: question };
+    const userQuestion = input.trim();
+    const userMsg = { role: "user", content: userQuestion };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setLoading(true);
@@ -179,30 +179,20 @@ export default function VenusChat({ onClose, countryContext }) {
       const conversation = await base44.agents.getConversation(conversationId);
       await base44.agents.addMessage(conversation, userMsg);
 
-      // Enregistrement asynchrone de l'interaction (sans bloquer l'UX)
-      setTimeout(async () => {
-        try {
-          // Attendre la réponse de VENUS (2s) avant d'enregistrer
-          await new Promise(r => setTimeout(r, 2500));
-          const updatedConv = await base44.agents.getConversation(conversationId);
-          const lastAssistant = updatedConv?.messages?.filter(m => m.role === 'assistant').pop();
-          const duree = Math.round((Date.now() - msgStartTime) / 1000);
-          await base44.functions.invoke('venusAnalytics', {
-            action: 'save_interaction',
-            conversation_id: conversationId,
-            user_id: userEmail || 'anonymous',
-            user_type: 'client',
-            country_code: countryContext?.code || 'BF',
-            ville: countryContext?.ville || '',
-            question,
-            reponse: lastAssistant?.content || '',
-            nb_messages: updatedConv?.messages?.length || 1,
-            duree_secondes: duree,
-          });
-        } catch {
-          // Silencieux — ne pas perturber l'UX
-        }
-      }, 100);
+      // Enregistrer l'interaction pour les rapports VENUS (fire & forget)
+      const nbMessages = messages.filter(m => m.role === "user").length + 1;
+      base44.functions.invoke("venusAnalytics", {
+        action: "save_interaction",
+        conversation_id: conversationId,
+        user_id: userEmail || "anonymous",
+        user_type: "client",
+        country_code: countryContext?.code || "BF",
+        ville: countryContext?.ville || "",
+        question: userQuestion,
+        reponse: "",
+        nb_messages: nbMessages,
+        duree_secondes: Math.round((Date.now() - msgStartTime) / 1000),
+      }).catch(() => null); // silencieux
     } catch (err) {
       console.error("Erreur envoi message:", err);
       setMessages((prev) => [
