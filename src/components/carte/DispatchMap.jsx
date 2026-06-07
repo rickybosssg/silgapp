@@ -5,6 +5,7 @@ import HeatmapControls from "./HeatmapControls";
 import HeatmapLegend from "./HeatmapLegend";
 import CountrySelector from "@/components/international/CountrySelector";
 import { useZonesChaudesHalos } from "./ZonesChaudes";
+import { isLibre, isEnCourse, isON, GPS_DISPATCH_SEUIL_MIN } from "@/lib/dispatchRules";
 
 /**
  * DispatchMap — Carte dédiée au dispatch temps réel
@@ -29,22 +30,6 @@ import { useZonesChaudesHalos } from "./ZonesChaudes";
 
 const GPS_CLIENT_ACTIF_SEUIL_MIN = 5;
 const GPS_CLIENT_RECENT_SEUIL_MIN = 15;
-
-function isEnCourse(livreur) {
-  return livreur.statut === "en_course";
-}
-
-/**
- * Libre = disponible + actif + validé + GPS renseigné (lat/lng présents)
- * ⚠️ app_active / last_seen_at N'EST PAS un critère.
- * Source unique de vérité identique à dispatchRules.js#isLibre
- */
-function isLivreurLibre(livreur) {
-  return livreur.statut === "disponible"
-    && livreur.actif !== false
-    && livreur.validation === "valide"
-    && !!(livreur.latitude && livreur.longitude);
-}
 
 /**
  * Noir = pas de GPS (lat ou lng absent) OU statut hors_ligne OU non validé OU inactif
@@ -347,7 +332,7 @@ function buildStyles() {
 
 function buildLivreurIcon(livreur) {
   const estNoir = isLivreurNoir(livreur);
-  const libre = isLivreurLibre(livreur);
+  const libre = isLibre(livreur);  // Utilise dispatchRules.js (GPS < 10 min requis)
   const cssClass = estNoir ? "dmap-livreur-noir" : (libre ? "dmap-livreur-libre" : "dmap-livreur-course");
   const initial = livreur.nom?.charAt(0)?.toUpperCase() || "L";
   const photoHtml = livreur.photo_url
@@ -387,7 +372,7 @@ function buildClientIcon(client) {
 
 function buildLivreurPopup(livreur) {
   const estNoir = isLivreurNoir(livreur);
-  const libre = isLivreurLibre(livreur);
+  const libre = isLibre(livreur);  // Utilise dispatchRules.js (GPS < 10 min requis)
   const statutLabel = estNoir
     ? "⚫ Hors ligne — non dispatchable"
     : libre ? "🟢 Libre — disponible" : "🟠 En course";
@@ -426,7 +411,7 @@ function getRaisonInactif(livreur) {
   const dt = livreur.last_seen_at || livreur.derniere_position_date;
   if (dt) {
     const min = Math.round((Date.now() - new Date(dt).getTime()) / 60000);
-    if (min > 10) raisons.push(`inactif depuis ${min} min`);
+    if (min > GPS_DISPATCH_SEUIL_MIN) raisons.push(`GPS expiré ${min} min`);
   }
   if (!livreur.latitude || !livreur.longitude) raisons.push("pas de GPS");
   return raisons.length > 0 ? `(${raisons.join(", ")})` : "";
@@ -663,7 +648,7 @@ export default function DispatchMap({
         const [lat, lng] = addMarkerOffset(livreur.latitude, livreur.longitude, markerIndex++);
         const marker = window.L.marker([lat, lng], {
           icon,
-          zIndexOffset: isLivreurLibre(livreur) ? 1200 : 1100,
+          zIndexOffset: isLibre(livreur) ? 1200 : 1100,
         }).addTo(map);
         marker.bindPopup(buildLivreurPopup(livreur), { maxWidth: 260 });
         if (onMarkerClick) marker.on("click", () => onMarkerClick(livreur));
@@ -708,8 +693,8 @@ export default function DispatchMap({
     }
   }, [livreurs, clients, courses, mapLoaded, masquerInactifs, showClients, showLivreurs]);
 
-  // Compteurs avec les nouveaux statuts clients
-  const nbLibres = livreurs.filter(l => isLivreurLibre(l)).length;
+  // Compteurs avec les nouveaux statuts clients — utilise dispatchRules.js
+  const nbLibres = livreurs.filter(l => isLibre(l)).length;
   const nbCourse = livreurs.filter(l => isEnCourse(l) && !isLivreurNoir(l)).length;
   const nbLivreursInactifs = livreurs.filter(l => isLivreurNoir(l)).length;
   const nbClientsActifs = clients.filter(c => getClientStatut(c) === "actif").length;
