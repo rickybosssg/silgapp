@@ -24,26 +24,55 @@ function calculerDistance(lat1, lon1, lat2, lon2) {
 }
 
 /**
- * Trouve les livreurs disponibles, triés par distance.
- * Exclure les IDs déjà essayés.
+ * Trouve les livreurs disponibles par NIVEAUX de priorité.
+ * 
+ * NOUVELLE LOGIQUE DE DISPATCH PAR NIVEAUX :
+ * 
+ * NIVEAU 1 (PRIORITÉ ABSOLUE) :
+ *   - Pays correspondant
+ *   - Statut Libre (disponible + ON + validé + GPS)
+ *   - Heartbeat < 2 minutes
+ *   → Tri : GPS < 2 min, puis 2-5 min, puis 5-10 min, puis distance
+ * 
+ * NIVEAU 2 (SECOURS) :
+ *   - Pays correspondant
+ *   - Statut Libre
+ *   - Heartbeat < 10 minutes
+ *   → Tri : distance
+ * 
+ * NIVEAU 3 (SECOURS ÉTENDU) :
+ *   - Pays correspondant
+ *   - Statut Libre
+ *   - Heartbeat < 30 minutes
+ *   → Tri : distance
+ * 
+ * NIVEAU 4 (DERNIER RECOURS) :
+ *   - Tous les livreurs libres du pays
+ *   - Peu importe heartbeat
+ *   - Peu importe GPS
+ *   → Tri : distance
+ * 
+ * Le heartbeat ne sert plus à EXCLURE, mais à PRIORISER et choisir le canal de notification.
  */
-async function trouverLivreursCandidats(base44, course, rayonKm, exclusions = []) {
+async function trouverLivreursCandidatsParNiveaux(base44, course, exclusions = []) {
   const filterLivreur = {
     type_livreur: 'externe',
     validation: 'valide',
     actif: true,
     statut: 'disponible',
   };
-  // Filtrer par pays si la course a un country_code
+  // 🌍 FILTRE PAR PAYS — jamais traverser les frontières
   if (course.country_code) {
     filterLivreur.country_code = course.country_code;
   }
-  const livreurs = await base44.asServiceRole.entities.Livreur.filter(filterLivreur);
+  const tousLivreurs = await base44.asServiceRole.entities.Livreur.filter(filterLivreur);
 
-  if (!livreurs || livreurs.length === 0) return [];
+  if (!tousLivreurs || tousLivreurs.length === 0) {
+    console.log('[DISPATCH] 🚫 Aucun livreur trouvé avec filtres de base');
+    return [];
+  }
 
   // Charger les courses actives du MÊME pays pour exclure les livreurs déjà en course
-  // Filtre par country_code si disponible — garantit l'isolation multi-pays
   const coursesActifFilter = course.country_code ? { country_code: course.country_code } : {};
   const coursesActives = await base44.asServiceRole.entities.CourseExterne.filter(coursesActifFilter);
   const livreurIdsEnCourse = new Set(
@@ -53,59 +82,96 @@ async function trouverLivreursCandidats(base44, course, rayonKm, exclusions = []
   );
   console.log(`[DISPATCH] 🚫 Livreurs déjà en course exclus: ${livreurIdsEnCourse.size}`);
 
-  // Filtrer les livreurs avec GPS valide (coordonnées + récent < 10 min)
   const now = Date.now();
-  const livreursGPS = livreurs.filter(l => {
-    if (!l.latitude || !l.longitude) return false;
+
+  // Filtrer les livreurs éligibles (disponibilité métier)
+  const livreursEligibles = tousLivreurs.filter(l => {
+    if (!l.latitude || !l.longitude) return false; // GPS requis (coordonnées)
     if (exclusions.includes(l.id)) return false;
     if (livreurIdsEnCourse.has(l.id)) return false;
-    // Exclure les livreurs mis hors ligne par l'administration
     if (l.admin_hors_ligne === true) {
       console.log(`[DISPATCH] 🚫 ${l.nom} exclu - mis hors ligne par l'administration`);
       return false;
     }
+    return true; // Libre (disponible + valide + actif + GPS)
+  });
+
+  console.log(`[DISPATCH] ✅ ${livreursEligibles.length} livreurs éligibles (disponibilité métier)`);
+
+  // ─── CLASSEMENT PAR NIVEAUX ────────────────────────────────────────────────
+  
+  const niveau1 = []; // Heartbeat < 2 min
+  const niveau2 = []; // Heartbeat 2-10 min
+  const niveau3 = []; // Heartbeat 10-30 min
+  const niveau4 = []; // Heartbeat > 30 min (tous)
+
+  livreursEligibles.forEach(l => {
+    const hbDate = l.last_seen_at || l.derniere_position_date;
+    let heartbeatAgeMin = null;
     
-    // GPS récent = dernière position < 10 min
-    const dt = l.derniere_position_date || l.last_seen_at;
-    if (!dt) return false;
-    
-    // Calcul robuste : s'assurer que dt est une date valide
-    const gpsDate = new Date(dt);
-    if (isNaN(gpsDate.getTime())) {
-      console.log(`[DISPATCH] 🚫 ${l.nom} exclu - date GPS invalide`);
-      return false;
+    if (hbDate) {
+      const hb = new Date(hbDate);
+      if (!isNaN(hb.getTime())) {
+        heartbeatAgeMin = (now - hb.getTime()) / 60000;
+      }
     }
-    
-    const ageMin = (now - gpsDate.getTime()) / 60000;
-    
-    // DEBUG: log tous les livreurs avec leur âge GPS
-    console.log(`[DISPATCH] 📍 ${l.nom}: GPS il y a ${ageMin.toFixed(1)} min (${dt})`);
-    
-    const gpsValide = ageMin < 10;
-    if (!gpsValide) {
-      console.log(`[DISPATCH] 🚫 ${l.nom} exclu - GPS expiré (${ageMin.toFixed(1)} min)`);
+
+    // Calcul distance si GPS course disponible
+    let distance = 0;
+    if (course.gps_depart_lat && course.gps_depart_lng && l.latitude && l.longitude) {
+      distance = calculerDistance(course.gps_depart_lat, course.gps_depart_lng, l.latitude, l.longitude);
     }
-    return gpsValide;
+
+    const livreurAvecDistance = { ...l, distance, heartbeatAgeMin };
+
+    if (heartbeatAgeMin === null || heartbeatAgeMin >= 30) {
+      niveau4.push(livreurAvecDistance);
+    } else if (heartbeatAgeMin >= 10) {
+      niveau3.push(livreurAvecDistance);
+    } else if (heartbeatAgeMin >= 2) {
+      niveau2.push(livreurAvecDistance);
+    } else {
+      // NIVEAU 1 : heartbeat < 2 min → sous-tri par qualité GPS
+      const gpsDate = l.derniere_position_date;
+      let gpsAgeMin = null;
+      if (gpsDate) {
+        const gps = new Date(gpsDate);
+        if (!isNaN(gps.getTime())) {
+          gpsAgeMin = (now - gps.getTime()) / 60000;
+        }
+      }
+      livreurAvecDistance.gpsAgeMin = gpsAgeMin;
+      niveau1.push(livreurAvecDistance);
+    }
   });
 
-  console.log(`[DISPATCH] ✅ ${livreursGPS.length} livreurs avec GPS récent (< 10 min): ${livreursGPS.map(l => l.nom).join(', ')}`);
-
-  // ⚠️ SANS GPS COURSE : retourner TOUS les livreurs avec GPS récent (pas tous les livreurs)
-  if (!course.gps_depart_lat || !course.gps_depart_lng) {
-    console.log(`[DISPATCH] 🌍 Course sans GPS → ${livreursGPS.length} livreurs éligibles (dispatch global)`);
-    return livreursGPS;
-  }
-
-  const proches = livreursGPS.filter(l => {
-    const dist = calculerDistance(course.gps_depart_lat, course.gps_depart_lng, l.latitude, l.longitude);
-    return dist <= rayonKm;
+  // ─── SOUS-TRI NIVEAU 1 : par qualité GPS puis distance ─────────────────────
+  niveau1.sort((a, b) => {
+    // GPS < 2 min > GPS 2-5 min > GPS 5-10 min > distance
+    const gpsA = a.gpsAgeMin !== null ? a.gpsAgeMin : 999;
+    const gpsB = b.gpsAgeMin !== null ? b.gpsAgeMin : 999;
+    
+    // Tranche GPS
+    const trancheA = gpsA < 2 ? 0 : gpsA < 5 ? 1 : gpsA < 10 ? 2 : 3;
+    const trancheB = gpsB < 2 ? 0 : gpsB < 5 ? 1 : gpsB < 10 ? 2 : 3;
+    
+    if (trancheA !== trancheB) return trancheA - trancheB;
+    return a.distance - b.distance;
   });
 
-  return proches.sort((a, b) => {
-    const dA = calculerDistance(course.gps_depart_lat, course.gps_depart_lng, a.latitude, a.longitude);
-    const dB = calculerDistance(course.gps_depart_lat, course.gps_depart_lng, b.latitude, b.longitude);
-    return dA - dB;
+  // ─── TRI NIVEAUX 2-4 : par distance ────────────────────────────────────────
+  [niveau2, niveau3, niveau4].forEach(niveau => {
+    niveau.sort((a, b) => a.distance - b.distance);
   });
+
+  console.log(`[DISPATCH] 📊 Répartition par niveaux:`);
+  console.log(`   Niveau 1 (HB < 2 min): ${niveau1.length} livreurs`);
+  console.log(`   Niveau 2 (HB 2-10 min): ${niveau2.length} livreurs`);
+  console.log(`   Niveau 3 (HB 10-30 min): ${niveau3.length} livreurs`);
+  console.log(`   Niveau 4 (HB > 30 min): ${niveau4.length} livreurs`);
+
+  // Concaténer les niveaux
+  return [...niveau1, ...niveau2, ...niveau3, ...niveau4];
 }
 
 /**
@@ -132,8 +198,21 @@ async function notificationDoublonExiste(base44, courseId, livreurEmail) {
 
 /**
  * Propose la course à un livreur spécifique.
+ * Détermine automatiquement le canal de notification (SILGAPP vs WhatsApp)
+ * basé sur le heartbeat du livreur.
  */
-async function proposerAuLivreur(base44, courseId, course, livreur) {
+async function proposerAuLivreur(base44, courseId, course, livreur, niveauDispatch) {
+  // Déterminer le canal de notification
+  const heartbeatAgeMin = livreur.heartbeatAgeMin !== null 
+    ? livreur.heartbeatAgeMin.toFixed(1) 
+    : 'N/A';
+  const gpsAgeMin = livreur.gpsAgeMin !== null 
+    ? livreur.gpsAgeMin.toFixed(1) 
+    : 'N/A';
+  const appActive = heartbeatAgeMin !== 'N/A' && parseFloat(heartbeatAgeMin) < 2;
+  const canalNotification = appActive ? 'SILGAPP' : 'WhatsApp';
+
+  console.log(`[DISPATCH] 📡 Canal notification pour ${livreur.nom}: ${canalNotification} (HB: ${heartbeatAgeMin} min, GPS: ${gpsAgeMin} min, Niveau: ${niveauDispatch})`);
   // Calculer la distance réelle si GPS disponible des deux côtés
   let distance = 0;
   if (course.gps_depart_lat && course.gps_depart_lng && livreur.latitude && livreur.longitude) {
@@ -190,16 +269,25 @@ async function proposerAuLivreur(base44, courseId, course, livreur) {
         console.error('[DISPATCH] ❌ Erreur notif push:', err.message);
       }
 
-      // Si l'app est fermée → envoyer aussi un WhatsApp pour ne pas rater la course
-      if (!livreur.app_active && livreur.telephone) {
-        try {
-          await base44.functions.invoke('envoyerAlerteWhatsApp', {
-            telephone: livreur.telephone,
-            message: `🚨 SILGAPP — Nouvelle course disponible !\n📍 ${course.adresse_depart} → ${course.adresse_arrivee || '?'}\n📏 À ${distanceLabel} de vous\n\nOuvrez l'application SILGAPP pour accepter (60 secondes).`,
-          });
-          console.log(`[DISPATCH] 📱 WhatsApp envoyé à ${livreur.telephone} (app fermée)`);
-        } catch (err) {
-          console.warn('[DISPATCH] ⚠️ Erreur WhatsApp livreur app fermée:', err.message);
+      // 📡 NOTIFICATION MULTI-CANAUX selon heartbeat
+      // Heartbeat récent (< 2 min) → SILGAPP uniquement
+      // Heartbeat ancien (≥ 2 min) → WhatsApp (car app probablement fermée)
+      const appActive = livreur.heartbeatAgeMin !== null && livreur.heartbeatAgeMin < 2;
+      
+      if (appActive) {
+        console.log(`[DISPATCH] 📱 Notification SILGAPP pour ${livreur.user_email} (app active)`);
+      } else {
+        // WhatsApp pour heartbeat ancien
+        if (livreur.telephone) {
+          try {
+            await base44.functions.invoke('envoyerAlerteWhatsApp', {
+              telephone: livreur.telephone,
+              message: `🚨 SILGAPP — Nouvelle course disponible !\n📍 ${course.adresse_depart} → ${course.adresse_arrivee || '?'}\n📏 À ${distanceLabel} de vous\n\nOuvrez l'application SILGAPP pour accepter (60 secondes).`,
+            });
+            console.log(`[DISPATCH] 📱 WhatsApp envoyé à ${livreur.telephone} (heartbeat: ${livreur.heartbeatAgeMin?.toFixed(1) || '?'} min)`);
+          } catch (err) {
+            console.warn('[DISPATCH] ⚠️ Erreur WhatsApp:', err.message);
+          }
         }
       }
     }
@@ -234,25 +322,8 @@ async function lancerDispatch(base44, courseId, exclusions = []) {
     }
   }
 
-  let candidats = [];
-  let rayonUtilise = 0;
-
-  for (const rayon of [3, 5, 8]) {
-    candidats = await trouverLivreursCandidats(base44, course, rayon, exclusions);
-    if (candidats.length > 0) {
-      rayonUtilise = rayon;
-      console.log(`[DISPATCH] ✅ ${candidats.length} candidats dans ${rayon}km`);
-      break;
-    }
-    console.log(`[DISPATCH] ⚪ 0 candidat dans ${rayon}km`);
-  }
-
-  // Aucun dans 8km → essayer tous les livreurs disponibles
-  if (candidats.length === 0) {
-    candidats = await trouverLivreursCandidats(base44, course, 99999, exclusions);
-    rayonUtilise = 9999;
-    console.log(`[DISPATCH] 🌍 Recherche globale : ${candidats.length} candidats`);
-  }
+  // ─── DISPATCH PAR NIVEAUX (nouvelle logique) ───────────────────────────────
+  const candidats = await trouverLivreursCandidatsParNiveaux(base44, course, exclusions);
 
   if (candidats.length === 0) {
     // Mettre la course en attente visible (pas de livreur en ce moment)
@@ -265,9 +336,29 @@ async function lancerDispatch(base44, courseId, exclusions = []) {
     return { noLivreur: true };
   }
 
-  const livreur = candidats[0];
-  const dist = await proposerAuLivreur(base44, courseId, course, livreur);
-  return { propose: true, livreur: { id: livreur.id, nom: `${livreur.prenom || ''} ${livreur.nom}`.trim(), distance_km: dist.toFixed(1) }, rayon: rayonUtilise };
+  // Déterminer le niveau du premier candidat
+  const premierLivreur = candidats[0];
+  let niveauDispatch = 4;
+  if (premierLivreur.heartbeatAgeMin !== null) {
+    if (premierLivreur.heartbeatAgeMin < 2) niveauDispatch = 1;
+    else if (premierLivreur.heartbeatAgeMin < 10) niveauDispatch = 2;
+    else if (premierLivreur.heartbeatAgeMin < 30) niveauDispatch = 3;
+  }
+
+  console.log(`[DISPATCH] 🎯 Livreur sélectionné : ${premierLivreur.nom} (Niveau ${niveauDispatch}, HB: ${premierLivreur.heartbeatAgeMin?.toFixed(1) || '?'} min, GPS: ${premierLivreur.gpsAgeMin?.toFixed(1) || '?'} min, Distance: ${premierLivreur.distance.toFixed(1)} km)`);
+
+  const dist = await proposerAuLivreur(base44, courseId, course, premierLivreur, niveauDispatch);
+  return { 
+    propose: true, 
+    livreur: { 
+      id: premierLivreur.id, 
+      nom: `${premierLivreur.prenom || ''} ${premierLivreur.nom}`.trim(), 
+      distance_km: dist.toFixed(1),
+      niveau_dispatch: niveauDispatch,
+      heartbeat_age_min: premierLivreur.heartbeatAgeMin?.toFixed(1) || null,
+      gps_age_min: premierLivreur.gpsAgeMin?.toFixed(1) || null,
+    }, 
+  };
 }
 
 /**

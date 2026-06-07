@@ -32,17 +32,27 @@ const GPS_CLIENT_ACTIF_SEUIL_MIN = 5;
 const GPS_CLIENT_RECENT_SEUIL_MIN = 15;
 
 /**
- * Noir = pas de GPS (lat ou lng absent) OU statut hors_ligne OU non validé OU inactif
- * Un livreur avec app fermée mais GPS présent reste VERT (dispatchable via WhatsApp)
+ * NOUVELLE RÈGLE : Disponibilité métier uniquement
+ * 
+ * 🟢 VERT = Libre (disponible + ON + validé + GPS)
+ * 🟠 ORANGE = En course (course active réelle)
+ * ⚫ NOIR = Hors ligne / non dispatchable
+ * 
+ * ⚠️ IMPORTANT :
+ * - GPS ancien N'EXCLUT PAS (reste vert)
+ * - Heartbeat ancien N'EXCLUT PAS (reste vert)
+ * - App fermée N'EXCLUT PAS (reste vert, recevra WhatsApp)
+ * 
+ * Un livreur vert signifie : "Disponible pour travailler et peut recevoir une course (SILGAPP ou WhatsApp)"
  */
 function isLivreurNoir(livreur, livreurIdsEnCourseReelle) {
   if (!livreur.latitude || !livreur.longitude) return true;
   if (livreur.statut === "hors_ligne") return true;
   if (livreur.actif === false) return true;
   if (livreur.validation !== "valide") return true;
-  // 🎯 CORRECTION : En course = avec course ACTIVE (peu importe le statut DB)
+  // 🎯 En course = avec course ACTIVE (peu importe le statut DB)
   if (livreurIdsEnCourseReelle?.has(livreur.id)) return false;
-  // Disponible avec GPS = vert
+  // Disponible avec GPS = vert (même si GPS/heartbeat ancien)
   if (livreur.statut === "disponible") return false;
   return true;
 }

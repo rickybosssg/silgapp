@@ -7,18 +7,27 @@ import { isGPSRecent, hasValidGPS, isAppActive, isON, isLibre, isEnCourse, isCli
 /**
  * Livreur noir = non dispatchable
  * SOURCE UNIQUE : même règle que DispatchMap et CarteLivreursExterne
- * ⚠️ last_seen_at / app_active N'EST PAS un critère.
- * Noir = pas de GPS OU GPS expiré (> 10 min) OU hors_ligne OU inactif OU non validé.
+ * 
+ * NOUVELLE RÈGLE : Disponibilité métier uniquement
+ * Noir = hors_ligne OU inactif OU non validé OU pas de GPS
+ * 
+ * ⚠️ heartbeat et GPS ancien NE sont PLUS des critères d'exclusion
+ * Un livreur peut être :
+ *   - 🟢 Libre (disponible + ON + validé + GPS)
+ *   - 📍 GPS ancien (20+ min)
+ *   - 📡 Heartbeat ancien (app fermée)
+ *   - → Reste dispatchable (recevra WhatsApp)
  */
 export function isLivreurNoir(livreur, livreurIdsEnCourseReelle) {
   if (!livreur.latitude || !livreur.longitude) return true;
   if (livreur.statut === "hors_ligne") return true;
   if (livreur.actif === false) return true;
   if (livreur.validation !== "valide") return true;
-  // 🎯 CORRECTION : GPS expiré (> 10 min) = NOIR
-  // Sauf si le livreur a une course active (déjà occupé)
-  if (!livreurIdsEnCourseReelle?.has(livreur.id) && !isLibre(livreur)) return true;
-  return false;
+  // 🎯 CORRECTION : En course = avec course ACTIVE (peu importe le statut DB)
+  if (livreurIdsEnCourseReelle?.has(livreur.id)) return false;
+  // Disponible avec GPS = vert (même si GPS/heartbeat ancien)
+  if (livreur.statut === "disponible") return false;
+  return true;
 }
 
 /**
