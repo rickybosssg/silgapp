@@ -20,11 +20,11 @@ export default function AppLayout({ reseau }) {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-slate-50">
       {/* Desktop layout */}
       <div className="hidden lg:flex min-h-screen">
         <Sidebar notificationCount={notifCount} reseau={reseau} />
-        <main className="flex-1 min-h-screen overflow-x-hidden bg-background">
+        <main className="flex-1 min-h-screen overflow-x-hidden bg-slate-50">
           <Outlet />
         </main>
       </div>
@@ -32,7 +32,7 @@ export default function AppLayout({ reseau }) {
       {/* Mobile layout */}
       <div className="lg:hidden">
         <MobileNav notificationCount={notifCount} reseau={reseau} />
-        <main className="pt-14 pb-16 min-h-screen safe-area-top safe-area-bottom">
+        <main className="pt-14 pb-16 min-h-screen bg-slate-50 safe-area-top safe-area-bottom">
           <Outlet />
         </main>
       </div>

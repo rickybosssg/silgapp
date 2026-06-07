@@ -144,7 +144,7 @@ export default function DashboardExterne() {
   const taux = stats.total > 0 ? Math.round((stats.livrees / stats.total) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
+    <div className="min-h-screen bg-slate-50">
       <div className="px-4 py-4 lg:px-6 lg:py-6 space-y-5 max-w-7xl mx-auto">
 
         {/* ── HERO HEADER ─────────────────────────────────── */}
@@ -241,40 +241,49 @@ export default function DashboardExterne() {
         </div>
 
         {/* ── TÉLÉCHARGEMENTS ─────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
           <DownloadStatsPanel />
         </div>
 
         {/* ── CODES PROMO ─────────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+        <div className="bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm">
           <CodePromoPanel />
         </div>
 
         {/* ── ACTIVITÉ ─────────────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <ClientsEnLigne clients={clientsEnLigne} />
-          </div>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <LivreursEnLigne livreurs={livreursEnLigne} />
+        <div>
+          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">Activité en direct</p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 shadow-sm overflow-hidden">
+              <ClientsEnLigne clients={clientsEnLigne} />
+            </div>
+            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border border-emerald-100 shadow-sm overflow-hidden">
+              <LivreursEnLigne livreurs={livreursEnLigne} />
+            </div>
           </div>
         </div>
 
         {/* ── COURSES EN COURS ────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <CoursesEnTraitement
-            courses={coursesEnTraitement}
-            onView={setSelectedCourse}
-            isExterne={true}
-          />
+        <div>
+          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">Courses en cours</p>
+          <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+            <CoursesEnTraitement
+              courses={coursesEnTraitement}
+              onView={setSelectedCourse}
+              isExterne={true}
+            />
+          </div>
         </div>
 
         {/* ── HISTORIQUE DU JOUR ──────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <CoursesTerminees
-            courses={coursesTerminees}
-            onView={setSelectedCourse}
-          />
+        <div>
+          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">Historique du jour</p>
+          <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+            <CoursesTerminees
+              courses={coursesTerminees}
+              onView={setSelectedCourse}
+            />
+          </div>
         </div>
 
       </div>
