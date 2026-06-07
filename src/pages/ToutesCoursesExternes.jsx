@@ -7,6 +7,7 @@ import { ArrowLeft, Package, MapPin, Clock, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import CourseStatusBadge from "@/components/courses/CourseStatusBadge";
+import CanalNotifBadge from "@/components/courses/CanalNotifBadge";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 
 const STATUT_FILTRES = [
@@ -151,9 +152,10 @@ export default function ToutesCoursesExternes() {
 
                 {/* Infos */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
+                  <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                     <span className="font-bold text-sm text-foreground truncate">{course.client_nom || "Client"}</span>
                     <CourseStatusBadge statut={course.statut} />
+                    {course.livreur_id && <CanalNotifBadge course={course} />}
                   </div>
                   <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                     <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
