@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
-import { MapPin, Truck, Wifi, WifiOff, X, Clock, Users, Flame } from "lucide-react";
+import { MapPin, Truck, Wifi, WifiOff, X, Clock, Users, Flame, Wrench } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
@@ -125,6 +125,27 @@ export default function CarteLivreursExterne() {
   const [masquerInactifs, setMasquerInactifs] = useState(false);
   const [showClients, setShowClients] = useState(true);
   const [showLivreurs, setShowLivreurs] = useState(true);
+  const [correctionEnCours, setCorrectionEnCours] = useState(false);
+
+  const handleCorrectionEnCourse = async () => {
+    if (!confirm('Corriger les livreurs "en course" sans course active ?')) return;
+    setCorrectionEnCours(true);
+    try {
+      const res = await base44.functions.invoke('correctionEnCourse', {});
+      if (res.data?.success) {
+        alert(`✅ ${res.data.corriges} livreur(s) corrigé(s) !`);
+        // Rafraîchir les données
+        await refetchLivreurs();
+      } else {
+        alert('❌ Erreur: ' + (res.data?.error || 'Inconnue'));
+      }
+    } catch (err) {
+      alert('❌ Erreur: ' + err.message);
+    } finally {
+      setCorrectionEnCours(false);
+    }
+  };
+
   const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
   const paysActifs = usePaysActifs();
   const defaultCountry = paysActifs.length === 1 ? paysActifs[0].code : null;
@@ -401,15 +422,25 @@ export default function CarteLivreursExterne() {
               <h1 className="text-2xl font-black text-white leading-tight">Carte Dispatch</h1>
               <p className="text-white/50 text-sm mt-0.5">Terrain réel · Réseau SILGAPP externe</p>
             </div>
-            {isGlobal && paysActifs.length > 1 && (
-              <div className="[&_button]:!bg-white [&_button]:!text-slate-800 [&_button]:!border-slate-300 [&_div]:!bg-white [&_div]:!text-slate-800">
-                <CountrySelector
-                  value={effectiveCountry}
-                  onChange={setSelectedCountry}
-                  className="h-9 text-xs"
-                />
-              </div>
-            )}
+            <div className="flex items-center gap-2 flex-wrap">
+              {isGlobal && paysActifs.length > 1 && (
+                <div className="[&_button]:!bg-white [&_button]:!text-slate-800 [&_button]:!border-slate-300 [&_div]:!bg-white [&_div]:!text-slate-800">
+                  <CountrySelector
+                    value={effectiveCountry}
+                    onChange={setSelectedCountry}
+                    className="h-9 text-xs"
+                  />
+                </div>
+              )}
+              <button
+                onClick={handleCorrectionEnCourse}
+                disabled={correctionEnCours}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-colors"
+              >
+                <Wrench className="w-3.5 h-3.5" />
+                {correctionEnCours ? 'Correction...' : 'Corriger en_course'}
+              </button>
+            </div>
           </div>
 
           {/* KPI tiles */}
