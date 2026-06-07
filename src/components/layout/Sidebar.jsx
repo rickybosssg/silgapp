@@ -18,21 +18,29 @@ const doLogout = () => {
 
 
 export const navItems = [
-  { path: "/", label: "Tableau de bord", icon: LayoutDashboard },
+  { path: "/", label: "Tableau de bord", icon: LayoutDashboard, reseauOnly: "interne" },
+  { path: "/", label: "Tableau de bord", icon: LayoutDashboard, reseauOnly: "externe" },
   { path: "/nouvelle-course", label: "Nouvelle course", icon: Plus, reseauOnly: "interne" },
-  { path: "/carte", label: "Carte en direct", icon: MapPin },
-  { path: "/courses", label: "Toutes les courses", icon: Package },
-  { path: "/livreurs", label: "Livreurs", icon: Truck },
-  { path: "/rapport", label: "Rapport du jour", icon: BarChart3 },
-  { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp },
+  { path: "/carte", label: "Carte en direct", icon: MapPin, reseauOnly: "interne" },
+  { path: "/carte", label: "Carte en direct", icon: MapPin, reseauOnly: "externe" },
+  { path: "/courses", label: "Toutes les courses", icon: Package, reseauOnly: "interne" },
+  { path: "/courses", label: "Toutes les courses", icon: Package, reseauOnly: "externe" },
+  { path: "/livreurs", label: "Livreurs", icon: Truck, reseauOnly: "interne" },
+  { path: "/livreurs", label: "Livreurs", icon: Truck, reseauOnly: "externe" },
+  { path: "/rapport", label: "Rapport du jour", icon: BarChart3, reseauOnly: "interne" },
+  { path: "/rapport", label: "Rapport du jour", icon: BarChart3, reseauOnly: "externe" },
+  { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp, reseauOnly: "interne" },
+  { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp, reseauOnly: "externe" },
   { path: "/admin/externe/dus-livreurs", label: "Comptabilité", icon: Wallet, reseauOnly: "externe" },
   { path: "/admin/global", label: "Admin Global", icon: Globe, reseauOnly: "externe" },
   { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Settings, reseauOnly: "externe" },
   { path: "/admin/externe/clients", label: "Clients externes", icon: Users, reseauOnly: "externe" },
   { path: "/admin/publicites", label: "Publicités", icon: Megaphone, reseauOnly: "externe" },
   { path: "/admin/venus-rapports", label: "Rapports VENUS", icon: MessageCircle, reseauOnly: "externe" },
-  { path: "/notifications", label: "Notifications", icon: Bell },
-  { path: "/maintenance", label: "Maintenance", icon: Shield },
+  { path: "/notifications", label: "Notifications", icon: Bell, reseauOnly: "interne" },
+  { path: "/notifications", label: "Notifications", icon: Bell, reseauOnly: "externe" },
+  { path: "/maintenance", label: "Maintenance", icon: Shield, reseauOnly: "interne" },
+  { path: "/maintenance", label: "Maintenance", icon: Shield, reseauOnly: "externe" },
 ];
 
 export default function Sidebar({ notificationCount = 0, reseau }) {
