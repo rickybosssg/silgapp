@@ -312,6 +312,11 @@ export default function DashboardAdminExterne() {
         </div>
       </div>
 
+      {/* ── RAPPORTS VENUS (accès rapide) ─────────────────────────── */}
+      <div id="venus-rapports" className="rounded-2xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-white p-5 shadow-sm">
+        <VenusRapportsPanel />
+      </div>
+
       {/* ── CONFIG APK ────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
         <div className="flex items-center gap-3 mb-4">
@@ -460,11 +465,6 @@ export default function DashboardAdminExterne() {
 
       {/* ── HISTORIQUE DU JOUR ───────────────────────────────────── */}
       <HistoriqueDuJour courses={courses} />
-
-      {/* ── RAPPORTS VENUS ────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-        <VenusRapportsPanel />
-      </div>
 
       {/* ── SYNCHRONISATION GPS ──────────────────────────────────── */}
       <div className="grid gap-4">
