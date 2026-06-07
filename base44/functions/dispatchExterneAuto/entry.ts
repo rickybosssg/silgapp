@@ -203,18 +203,13 @@ async function notificationDoublonExiste(base44, courseId, livreurEmail) {
  * basé sur le heartbeat du livreur.
  */
 async function proposerAuLivreur(base44, courseId, course, livreur, niveauDispatch) {
-  // Déterminer le canal de notification
-  const heartbeatAgeMin = livreur.heartbeatAgeMin !== null 
-    ? livreur.heartbeatAgeMin.toFixed(1) 
-    : 'N/A';
-  const gpsAgeMin = livreur.gpsAgeMin !== null 
-    ? livreur.gpsAgeMin.toFixed(1) 
-    : 'N/A';
-  const appActive = heartbeatAgeMin !== 'N/A' && parseFloat(heartbeatAgeMin) < 2;
+  // Déterminer le canal AVANT envoi : app active = SILGAPP, hors app = WhatsApp immédiat
+  const heartbeatAgeMin = livreur.heartbeatAgeMin !== null ? livreur.heartbeatAgeMin : null;
+  const appActive = heartbeatAgeMin !== null && heartbeatAgeMin < 2;
   const canalNotification = appActive ? 'SILGAPP' : 'WhatsApp';
 
-  console.log(`[DISPATCH] 📡 Canal notification pour ${livreur.nom}: ${canalNotification} (HB: ${heartbeatAgeMin} min, GPS: ${gpsAgeMin} min, Niveau: ${niveauDispatch})`);
-  // Calculer la distance réelle si GPS disponible des deux côtés
+  console.log(`[DISPATCH] 📡 Canal: ${canalNotification} pour ${livreur.nom} (HB: ${heartbeatAgeMin?.toFixed(1) || 'N/A'} min, Niveau: ${niveauDispatch})`);
+
   let distance = 0;
   if (course.gps_depart_lat && course.gps_depart_lng && livreur.latitude && livreur.longitude) {
     distance = calculerDistance(course.gps_depart_lat, course.gps_depart_lng, livreur.latitude, livreur.longitude);
@@ -232,46 +227,96 @@ async function proposerAuLivreur(base44, courseId, course, livreur, niveauDispat
     timeout_expires_at: new Date(Date.now() + 60000).toISOString(),
   });
 
-  // Créer une Notification en base — l'automation "Alerte WhatsApp utilisateur" se déclenche automatiquement
-  // IMPORTANT : on crée TOUJOURS une nouvelle notification à chaque redispatch (nouveau livreur = nouveau destinataire)
-  // L'anti-doublon ne bloque que si le MÊME livreur est sollicité deux fois dans les 15 min
   if (livreur.user_email) {
     const doublon = await notificationDoublonExiste(base44, courseId, livreur.user_email);
     if (!doublon) {
-      const distanceLabel = distanceSafe > 0
-        ? `${distanceSafe.toFixed(1)}km`
-        : 'distance inconnue';
+      const distanceLabel = distanceSafe > 0 ? `${distanceSafe.toFixed(1)}km` : 'distance inconnue';
+      const titre = '🚨 Nouvelle course disponible !';
+      const message = `Course à ${distanceLabel} — ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`;
 
-      try {
-        // Cette création déclenche l'automation → WhatsApp envoyé automatiquement si opt-in actif
-        await base44.asServiceRole.entities.Notification.create({
-          titre: '🚨 Nouvelle course disponible !',
-          message: `Course à ${distanceLabel} — ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`,
-          type: 'nouvelle_course',
-          course_id: courseId,
-          destinataire_email: livreur.user_email,
-          lue: false,
-        });
-        console.log(`[DISPATCH] 🔔 Notification créée pour ${livreur.user_email} → automation WhatsApp déclenchée`);
-      } catch (err) {
-        console.error('[DISPATCH] ❌ Erreur création notification:', err.message);
+      if (appActive) {
+        // ── SILGAPP : notification interne + push Firebase ──────────────────
+        try {
+          await base44.asServiceRole.entities.Notification.create({
+            titre, message, type: 'nouvelle_course',
+            course_id: courseId, destinataire_email: livreur.user_email, lue: false,
+          });
+          console.log(`[DISPATCH] 🔔 SILGAPP — Notification créée pour ${livreur.nom}`);
+        } catch (err) {
+          console.error('[DISPATCH] ❌ Erreur notification SILGAPP:', err.message);
+        }
+        try {
+          await base44.functions.invoke('envoiNotificationPush', {
+            destinataire_email: livreur.user_email, livreur_id: livreur.id,
+            titre, message, type: 'nouvelle_course', course_id: courseId,
+          });
+        } catch (err) {
+          console.error('[DISPATCH] ❌ Erreur push Firebase:', err.message);
+        }
+
+      } else {
+        // ── WhatsApp IMMÉDIAT : livreur hors app ────────────────────────────
+        // On crée quand même la notification en BDD pour l'historique (lue=true pour ne pas polluer)
+        try {
+          await base44.asServiceRole.entities.Notification.create({
+            titre, message, type: 'nouvelle_course',
+            course_id: courseId, destinataire_email: livreur.user_email, lue: false,
+          });
+        } catch (err) {
+          console.error('[DISPATCH] ❌ Erreur notification BDD:', err.message);
+        }
+        // WhatsApp via Twilio directement (sans passer par l'automation)
+        try {
+          const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
+          const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+          const fromRaw = Deno.env.get('TWILIO_WHATSAPP_FROM') || '';
+          const fromNumber = fromRaw.startsWith('whatsapp:') ? fromRaw : `whatsapp:${fromRaw}`;
+
+          if (accountSid && authToken && fromRaw && livreur.telephone) {
+            // Normaliser le numéro
+            let tel = livreur.telephone.replace(/\s+/g, '').replace(/[^\d+]/g, '');
+            if (!tel.startsWith('+')) tel = '+226' + tel;
+
+            // Vérifier opt-in
+            if (livreur.whatsapp_opt_in !== false || livreur.whatsapp_opt_in_date) {
+              const waBody = `📦 *Nouvelle course disponible !*\nOuvrez SILGAPP pour accepter ou refuser la mission.`;
+              const formData = new URLSearchParams();
+              formData.append('From', fromNumber);
+              formData.append('To', `whatsapp:${tel}`);
+              formData.append('Body', waBody);
+
+              const creds = btoa(`${accountSid}:${authToken}`);
+              const resp = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
+                method: 'POST',
+                headers: { 'Authorization': `Basic ${creds}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData.toString(),
+              });
+              const data = await resp.json();
+              if (resp.ok && data.sid) {
+                console.log(`[DISPATCH] ✅ WhatsApp envoyé à ${livreur.nom} (${tel}) — SID: ${data.sid}`);
+                // Enregistrer l'alerte
+                await base44.asServiceRole.entities.WhatsAppAlerte.create({
+                  livreur_id: livreur.id, livreur_telephone: tel,
+                  notification_id: courseId, statut: 'sent',
+                  twilio_sid: data.sid, heure_envoi: new Date().toISOString(), canal: 'whatsapp',
+                });
+              } else {
+                console.warn(`[DISPATCH] ⚠️ WhatsApp échec pour ${livreur.nom}: ${data.message || data.code}`);
+                if (data.code === 63015) {
+                  await base44.asServiceRole.entities.Livreur.update(livreur.id, {
+                    whatsapp_opt_in: false, whatsapp_derniere_erreur: '63015',
+                    whatsapp_derniere_erreur_date: new Date().toISOString(),
+                  });
+                }
+              }
+            } else {
+              console.log(`[DISPATCH] ⚠️ ${livreur.nom} — pas d'opt-in WhatsApp → notification BDD uniquement`);
+            }
+          }
+        } catch (err) {
+          console.error('[DISPATCH] ❌ Erreur WhatsApp direct:', err.message);
+        }
       }
-
-      // Notification push Firebase
-      try {
-        await base44.functions.invoke('envoiNotificationPush', {
-          destinataire_email: livreur.user_email,
-          livreur_id: livreur.id,
-          titre: '🚨 Nouvelle course disponible !',
-          message: `Course à ${distanceLabel} — ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`,
-          type: 'nouvelle_course',
-          course_id: courseId,
-        });
-      } catch (err) {
-        console.error('[DISPATCH] ❌ Erreur notif push:', err.message);
-      }
-
-      console.log(`[DISPATCH] 📡 Notifications envoyées à ${livreur.nom} (HB: ${livreur.heartbeatAgeMin?.toFixed(1) || '?'} min) — WhatsApp géré par automation`);
     }
   }
 
