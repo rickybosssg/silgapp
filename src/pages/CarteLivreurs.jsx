@@ -247,26 +247,46 @@ export default function CarteLivreurs() {
   // Inactifs = validés mais OFF, ou pas d'app active, ou GPS expiré — avec coordonnées GPS
   const livreursInactifsGPS = useMemo(() =>
     validLivreurs.filter(l => !isON(l) && l.latitude && l.longitude), [validLivreurs]);
-  const actives = useMemo(() => coursesRaw.filter(c => !["livree", "annulee", "nouvelle"].includes(c.statut)), [coursesRaw]);
+  
+  // Courses VRAIMENT actives : statuts de livraison en cours + livreur assigné
+  const actives = useMemo(() => {
+    const STATUTS_LIVREUR_OCCUPE = ["livreur_en_route", "colis_recupere", "en_livraison"];
+    const STATUTS_TERMINAUX = ["annulee", "livree", "terminee", "completed"];
+    return coursesRaw.filter(c =>
+      STATUTS_LIVREUR_OCCUPE.includes(c.statut) &&
+      !STATUTS_TERMINAUX.includes(c.statut) &&
+      c.livreur_id
+    );
+  }, [coursesRaw]);
 
-  const compteurs = useMemo(() => ({
-    on:       validLivreurs.filter(l => isON(l)).length,
-    off:      validLivreurs.filter(l => !isON(l)).length,
-    libres:   validLivreurs.filter(l => l.statut === "disponible").length,
-    enCourse: validLivreurs.filter(l => l.statut === "en_course").length,
-    enLigne:  validLivreurs.filter(l => isEnLigne(l)).length,
-  }), [validLivreurs]);
+  // IDs des livreurs ayant une course réellement active en DB
+  const livreurIdsEnCourseReelle = useMemo(() =>
+    new Set(actives.map(c => c.livreur_id)),
+    [actives]
+  );
+
+  const compteurs = useMemo(() => {
+    // "En course" = livreur avec course ACTIVE (peu importe le statut DB)
+    const enCourseReel = validLivreurs.filter(l => livreurIdsEnCourseReelle.has(l.id));
+    return {
+      on:       validLivreurs.filter(l => isON(l)).length,
+      off:      validLivreurs.filter(l => !isON(l)).length,
+      libres:   validLivreurs.filter(l => l.statut === "disponible").length,
+      enCourse: enCourseReel.length,
+      enLigne:  validLivreurs.filter(l => isEnLigne(l)).length,
+    };
+  }, [validLivreurs, livreurIdsEnCourseReelle]);
 
   const livreursAffiches = useMemo(() => {
     switch (filtre) {
       case "on":        return validLivreurs.filter(l => isON(l));
       case "off":       return validLivreurs.filter(l => !isON(l));
       case "libres":    return validLivreurs.filter(l => l.statut === "disponible");
-      case "en_course": return validLivreurs.filter(l => l.statut === "en_course");
+      case "en_course": return validLivreurs.filter(l => livreurIdsEnCourseReelle.has(l.id));
       case "en_ligne":  return validLivreurs.filter(l => isEnLigne(l));
       default:          return validLivreurs;
     }
-  }, [validLivreurs, filtre]);
+  }, [validLivreurs, filtre, livreurIdsEnCourseReelle]);
 
   const livreursAvecGPS = useMemo(() => validLivreurs.filter(l => l.latitude && l.longitude), [validLivreurs]);
 
@@ -417,7 +437,7 @@ export default function CarteLivreurs() {
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Libre
                         </span>
                       )}
-                      {livreur.statut === "en_course" && (
+                      {livreurIdsEnCourseReelle.has(livreur.id) && (
                         <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
                           <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />En course
                         </span>
