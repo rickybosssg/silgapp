@@ -185,6 +185,30 @@
       ],
       "default": "automatic",
       "description": "Mode de tarification pr\u00e9f\u00e9r\u00e9 par le livreur : automatique ou manuel"
+    },
+    "whatsapp_opt_in": {
+      "type": "boolean",
+      "default": false,
+      "description": "Livreur inscrit au Sandbox WhatsApp Twilio (opt-in actif)"
+    },
+    "whatsapp_opt_in_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date du dernier opt-in WhatsApp Sandbox confirm\u00e9"
+    },
+    "whatsapp_opt_in_expire_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date d'expiration estim\u00e9e de l'opt-in (72h apr\u00e8s derni\u00e8re interaction)"
+    },
+    "whatsapp_derniere_erreur": {
+      "type": "string",
+      "description": "Derni\u00e8re erreur Twilio re\u00e7ue pour ce livreur (ex: 63015)"
+    },
+    "whatsapp_derniere_erreur_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de la derni\u00e8re erreur WhatsApp"
     }
   },
   "required": [

@@ -156,7 +156,13 @@ Deno.serve(async (req) => {
       const courseId = notification.course_id || 'inconnu';
 
       console.log(`\n[WhatsApp] === DÉBUT CHECK Course ${courseId} Livreur ${livreur.id} ===`);
-      console.log(`[WhatsApp] app_active=${livreur.app_active}, last_seen_at=${livreur.last_seen_at}`);
+      console.log(`[WhatsApp] app_active=${livreur.app_active}, last_seen_at=${livreur.last_seen_at}, whatsapp_opt_in=${livreur.whatsapp_opt_in}`);
+
+      // 🛡️ VÉRIFICATION OPT-IN SANDBOX — Skip si non inscrit
+      if (livreur.whatsapp_opt_in === false) {
+        console.log(`[WhatsApp] Livreur ${livreur.nom} — whatsapp_opt_in=false → SKIP WhatsApp (non inscrit au Sandbox)`);
+        return Response.json({ skipped: true, reason: 'livreur_non_optin_sandbox', livreur_id: livreur.id });
+      }
 
       if (!livreur.telephone) {
         console.log(`[WhatsApp] Course ${courseId} Livreur ${livreur.id}: telephone manquant → SKIP`);
@@ -297,6 +303,13 @@ Deno.serve(async (req) => {
           heure_envoi: new Date().toISOString(),
           canal: 'whatsapp'
         });
+        // ✅ Confirmer opt-in actif
+        await base44.asServiceRole.entities.Livreur.update(livreur.id, {
+          whatsapp_opt_in: true,
+          whatsapp_opt_in_date: new Date().toISOString(),
+          whatsapp_opt_in_expire_at: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(),
+          whatsapp_derniere_erreur: null,
+        });
         console.log(`[WhatsApp] ✅ SUCCÈS LIVREUR: SID=${data.sid}, To=${to}, Canal: WhatsApp\n`);
         return Response.json({ 
           success: true, 
@@ -311,7 +324,17 @@ Deno.serve(async (req) => {
       } else {
         // 🔄 FALLBACK SMS — Dernier recours
         console.log(`[WhatsApp] ⚠️ Échec WhatsApp (Code=${data.code}) → tentative SMS`);
-        
+
+        // Marquer opt-in expiré si erreur 63015
+        if (data.code === 63015) {
+          await base44.asServiceRole.entities.Livreur.update(livreur.id, {
+            whatsapp_opt_in: false,
+            whatsapp_derniere_erreur: '63015',
+            whatsapp_derniere_erreur_date: new Date().toISOString(),
+          });
+          console.log(`[WhatsApp] ⚠️ Livreur ${livreur.id} — whatsapp_opt_in=false (63015 avant SMS fallback)`);
+        }
+
         const messageSMS = messageLivreur.replace(/[*_`]/g, '').replace(/\n/g, ' ');
         const smsResult = await envoyerSMS(telephone, accountSid, authToken, fromNumber, messageSMS);
         
@@ -337,6 +360,15 @@ Deno.serve(async (req) => {
         } else {
           const erreur = `[${data.code || ''}] ${data.message || ''} raw:${JSON.stringify(data)}`.slice(0, 500);
           await base44.asServiceRole.entities.WhatsAppAlerte.update(alerte.id, { statut: 'failed', erreur, canal: 'whatsapp+sms' });
+          // 🔄 Mise à jour opt-in si erreur 63015
+          if (data.code === 63015) {
+            await base44.asServiceRole.entities.Livreur.update(livreur.id, {
+              whatsapp_opt_in: false,
+              whatsapp_derniere_erreur: '63015',
+              whatsapp_derniere_erreur_date: new Date().toISOString(),
+            });
+            console.log(`[WhatsApp] ⚠️ Livreur ${livreur.id} — whatsapp_opt_in mis à false (63015)`);
+          }
           console.error(`[WhatsApp/SMS] ❌ ÉCHEC DOUBLE: WhatsApp Code=${data.code}, SMS=${smsResult.data?.message || 'non tenté'}\n`);
           return Response.json({ success: false, type: 'livreur', erreur, course_id: courseId, canal: 'failed' });
         }
