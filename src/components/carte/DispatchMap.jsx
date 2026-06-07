@@ -35,13 +35,13 @@ const GPS_CLIENT_RECENT_SEUIL_MIN = 15;
  * Noir = pas de GPS (lat ou lng absent) OU statut hors_ligne OU non validé OU inactif
  * Un livreur avec app fermée mais GPS présent reste VERT (dispatchable via WhatsApp)
  */
-function isLivreurNoir(livreur) {
+function isLivreurNoir(livreur, livreurIdsEnCourseReelle) {
   if (!livreur.latitude || !livreur.longitude) return true;
   if (livreur.statut === "hors_ligne") return true;
   if (livreur.actif === false) return true;
   if (livreur.validation !== "valide") return true;
-  // En course = orange, pas noir
-  if (livreur.statut === "en_course") return false;
+  // 🎯 CORRECTION : En course = avec course ACTIVE (peu importe le statut DB)
+  if (livreurIdsEnCourseReelle?.has(livreur.id)) return false;
   // Disponible avec GPS = vert
   if (livreur.statut === "disponible") return false;
   return true;
@@ -330,10 +330,12 @@ function buildStyles() {
   `;
 }
 
-function buildLivreurIcon(livreur) {
-  const estNoir = isLivreurNoir(livreur);
-  const libre = isLibre(livreur);  // Utilise dispatchRules.js (GPS < 10 min requis)
-  const cssClass = estNoir ? "dmap-livreur-noir" : (libre ? "dmap-livreur-libre" : "dmap-livreur-course");
+function buildLivreurIcon(livreur, livreurIdsEnCourseReelle) {
+  const estNoir = isLivreurNoir(livreur, livreurIdsEnCourseReelle);
+  // 🎯 CORRECTION : Libre = disponible + GPS < 10 min, En course = course active réelle
+  const libre = isLibre(livreur);
+  const estEnCourse = livreurIdsEnCourseReelle?.has(livreur.id);
+  const cssClass = estNoir ? "dmap-livreur-noir" : (estEnCourse ? "dmap-livreur-course" : "dmap-livreur-libre");
   const initial = livreur.nom?.charAt(0)?.toUpperCase() || "L";
   const photoHtml = livreur.photo_url
     ? `<img src="${livreur.photo_url}" alt="" class="dmap-photo" />`
@@ -370,15 +372,17 @@ function buildClientIcon(client) {
   });
 }
 
-function buildLivreurPopup(livreur) {
-  const estNoir = isLivreurNoir(livreur);
-  const libre = isLibre(livreur);  // Utilise dispatchRules.js (GPS < 10 min requis)
+function buildLivreurPopup(livreur, livreurIdsEnCourseReelle) {
+  const estNoir = isLivreurNoir(livreur, livreurIdsEnCourseReelle);
+  // 🎯 CORRECTION : Statut basé sur course active réelle
+  const estEnCourse = livreurIdsEnCourseReelle?.has(livreur.id);
+  const libre = isLibre(livreur);
   const statutLabel = estNoir
     ? "⚫ Hors ligne — non dispatchable"
-    : libre ? "🟢 Libre — disponible" : "🟠 En course";
+    : estEnCourse ? "🟠 En course" : "🟢 Libre — disponible";
   const gpsMin = getLastGPSMin(livreur);
   const gpsStr = gpsMin === null ? "?" : gpsMin < 1 ? "à l'instant" : `${gpsMin} min`;
-  const statutColor = estNoir ? "#374151" : (libre ? "#16a34a" : "#ea580c");
+  const statutColor = estNoir ? "#374151" : (estEnCourse ? "#ea580c" : "#16a34a");
   
   // Qualité GPS
   let gpsQuality = "";
@@ -501,6 +505,7 @@ export default function DispatchMap({
   masquerInactifs = false, // prop contrôlée depuis le parent
   showClients = true, // filtre : afficher les clients
   showLivreurs = true, // filtre : afficher les livreurs
+  livreurIdsEnCourseReelle = new Set(), // 🎯 IDs des livreurs avec course active réelle
 }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -625,16 +630,16 @@ export default function DispatchMap({
       // Livreurs NOIRS (hors ligne) — zIndex bas
       livreurs.forEach(livreur => {
         if (!livreur.latitude || !livreur.longitude) return;
-        const estNoir = isLivreurNoir(livreur);
+        const estNoir = isLivreurNoir(livreur, livreurIdsEnCourseReelle);
         if (!estNoir) return;
         if (masquerInactifs) return; // filtre visuel
-        const icon = buildLivreurIcon(livreur);
+        const icon = buildLivreurIcon(livreur, livreurIdsEnCourseReelle);
         const [lat, lng] = addMarkerOffset(livreur.latitude, livreur.longitude, markerIndex++);
         const marker = window.L.marker([lat, lng], {
           icon,
           zIndexOffset: 100,
         }).addTo(map);
-        marker.bindPopup(buildLivreurPopup(livreur), { maxWidth: 260 });
+        marker.bindPopup(buildLivreurPopup(livreur, livreurIdsEnCourseReelle), { maxWidth: 260 });
         if (onMarkerClick) marker.on("click", () => onMarkerClick(livreur));
         markersRef.current.push(marker);
       });
@@ -642,15 +647,17 @@ export default function DispatchMap({
       // Livreurs actifs (VERT/ORANGE)
       livreurs.forEach(livreur => {
         if (!livreur.latitude || !livreur.longitude) return;
-        const estNoir = isLivreurNoir(livreur);
+        const estNoir = isLivreurNoir(livreur, livreurIdsEnCourseReelle);
         if (estNoir) return;
-        const icon = buildLivreurIcon(livreur);
+        const icon = buildLivreurIcon(livreur, livreurIdsEnCourseReelle);
         const [lat, lng] = addMarkerOffset(livreur.latitude, livreur.longitude, markerIndex++);
+        // 🎯 CORRECTION : zIndex basé sur course active réelle
+        const estEnCourse = livreurIdsEnCourseReelle?.has(livreur.id);
         const marker = window.L.marker([lat, lng], {
           icon,
-          zIndexOffset: isLibre(livreur) ? 1200 : 1100,
+          zIndexOffset: estEnCourse ? 1100 : 1200,
         }).addTo(map);
-        marker.bindPopup(buildLivreurPopup(livreur), { maxWidth: 260 });
+        marker.bindPopup(buildLivreurPopup(livreur, livreurIdsEnCourseReelle), { maxWidth: 260 });
         if (onMarkerClick) marker.on("click", () => onMarkerClick(livreur));
         markersRef.current.push(marker);
       });
@@ -691,12 +698,12 @@ export default function DispatchMap({
         markersRef.current.push(marker);
       });
     }
-  }, [livreurs, clients, courses, mapLoaded, masquerInactifs, showClients, showLivreurs]);
+  }, [livreurs, clients, courses, mapLoaded, masquerInactifs, showClients, showLivreurs, livreurIdsEnCourseReelle]);
 
-  // Compteurs avec les nouveaux statuts clients — utilise dispatchRules.js
+  // 🎯 Compteurs — utilise livreurIdsEnCourseReelle pour "en course"
   const nbLibres = livreurs.filter(l => isLibre(l)).length;
-  const nbCourse = livreurs.filter(l => isEnCourse(l) && !isLivreurNoir(l)).length;
-  const nbLivreursInactifs = livreurs.filter(l => isLivreurNoir(l)).length;
+  const nbCourse = livreurs.filter(l => livreurIdsEnCourseReelle?.has(l.id) && !isLivreurNoir(l, livreurIdsEnCourseReelle)).length;
+  const nbLivreursInactifs = livreurs.filter(l => isLivreurNoir(l, livreurIdsEnCourseReelle)).length;
   const nbClientsActifs = clients.filter(c => getClientStatut(c) === "actif").length;
   const nbClientsRecents = clients.filter(c => getClientStatut(c) === "recent").length;
   const nbClientsInactifs = clients.filter(c => getClientStatut(c) === "inactif").length;

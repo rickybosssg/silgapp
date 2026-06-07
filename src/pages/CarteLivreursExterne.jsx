@@ -761,6 +761,7 @@ export default function CarteLivreursExterne() {
                 masquerInactifs={masquerInactifs}
                 showClients={showClients}
                 showLivreurs={showLivreurs}
+                livreurIdsEnCourseReelle={livreurIdsEnCourseReelle}
               />
             </div>
             {selectedMarker && (
