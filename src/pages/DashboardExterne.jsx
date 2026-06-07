@@ -17,7 +17,6 @@ import CoursesTerminees from "@/components/dashboard/CoursesTerminees";
 import CourseDetailDialog from "@/components/courses/CourseDetailDialog";
 import CodePromoPanel from "@/components/admin/CodePromoPanel";
 import DownloadStatsPanel from "@/components/admin/DownloadStatsPanel";
-import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import StatDetailModal from "@/components/dashboard/StatDetailModal";
 import AppToggleButton from "@/components/admin/AppToggleButton";
 
@@ -300,7 +299,6 @@ export default function DashboardExterne() {
         type={statModal?.type}
         data={statModal?.data}
       />
-      <VenusFloatingButton />
     </div>
   );
 }
