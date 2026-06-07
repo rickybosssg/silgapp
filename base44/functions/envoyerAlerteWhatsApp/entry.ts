@@ -158,10 +158,17 @@ Deno.serve(async (req) => {
       console.log(`\n[WhatsApp] === DÉBUT CHECK Course ${courseId} Livreur ${livreur.id} ===`);
       console.log(`[WhatsApp] app_active=${livreur.app_active}, last_seen_at=${livreur.last_seen_at}, whatsapp_opt_in=${livreur.whatsapp_opt_in}`);
 
-      // 🛡️ VÉRIFICATION OPT-IN SANDBOX — Skip si non inscrit
+      // 🛡️ VÉRIFICATION OPT-IN SANDBOX
+      // On ne bloque QUE si opt_in=false ET whatsapp_opt_in_date est null (jamais inscrit)
+      // Si le livreur s'est inscrit récemment (même si une erreur 63015 a remis le flag à false),
+      // on tente quand même — c'est Twilio qui fait foi.
+      const jamaisInscrit = livreur.whatsapp_opt_in === false && !livreur.whatsapp_opt_in_date;
+      if (jamaisInscrit) {
+        console.log(`[WhatsApp] Livreur ${livreur.nom} — jamais inscrit au Sandbox → SKIP`);
+        return Response.json({ skipped: true, reason: 'livreur_jamais_optin_sandbox', livreur_id: livreur.id });
+      }
       if (livreur.whatsapp_opt_in === false) {
-        console.log(`[WhatsApp] Livreur ${livreur.nom} — whatsapp_opt_in=false → SKIP WhatsApp (non inscrit au Sandbox)`);
-        return Response.json({ skipped: true, reason: 'livreur_non_optin_sandbox', livreur_id: livreur.id });
+        console.log(`[WhatsApp] Livreur ${livreur.nom} — opt_in=false mais inscrit le ${livreur.whatsapp_opt_in_date} → tentative Twilio quand même`);
       }
 
       if (!livreur.telephone) {
