@@ -176,14 +176,27 @@ Deno.serve(async (req) => {
         return Response.json({ skipped: true, reason: 'livreur_no_telephone' });
       }
 
-      // 🎯 STRATÉGIE : WhatsApp envoyé systématiquement si opt-in actif
-      // Le SILGAPP est déjà géré par le dispatch (notification en BDD + push Firebase)
-      // WhatsApp est le backup qui assure que le livreur reçoit la course même app fermée
+      // 🎯 STRATÉGIE : WhatsApp uniquement si heartbeat >= 2 min (app fermée/inactive)
       const heartbeatAgeMin = livreur.last_seen_at 
         ? (Date.now() - new Date(livreur.last_seen_at).getTime()) / 60000 
         : null;
       
-      console.log(`[STRATÉGIE] Livreur ${livreur.nom} — Heartbeat: ${heartbeatAgeMin?.toFixed(1) || 'N/A'} min — Envoi WhatsApp systématique`);
+      console.log(`[STRATÉGIE] Livreur ${livreur.nom} — Heartbeat: ${heartbeatAgeMin?.toFixed(1) || 'N/A'} min, App active: ${livreur.app_active}`);
+      
+      // CAS 1: Heartbeat récent (< 2 min) → SILGAPP uniquement (app ouverte)
+      if (heartbeatAgeMin !== null && heartbeatAgeMin < 2) {
+        console.log(`[STRATÉGIE] ✅ Heartbeat récent (${heartbeatAgeMin.toFixed(1)} min) → SILGAPP uniquement (gratuit)\n`);
+        return Response.json({ 
+          success: true, 
+          type: 'livreur', 
+          canal: 'silgapp',
+          heartbeat_recent: true,
+          message: 'App ouverte — SILGAPP uniquement'
+        });
+      }
+      
+      // CAS 2: Heartbeat >= 2 min → WhatsApp
+      console.log(`[STRATÉGIE] ⏳ Heartbeat ancien (${heartbeatAgeMin?.toFixed(1) || 'N/A'} min) → Tentative WhatsApp`);
 
       const telephone = normaliserTelephone(livreur.telephone);
       if (!telephone) {
@@ -322,12 +335,27 @@ Deno.serve(async (req) => {
         return Response.json({ skipped: true, reason: 'client_no_telephone' });
       }
 
-      // 🎯 STRATÉGIE : WhatsApp envoyé systématiquement si opt-in actif
+      // 🎯 STRATÉGIE : WhatsApp uniquement si heartbeat >= 2 min (app fermée/inactive)
       const heartbeatAgeMinClient = client.last_seen_at 
         ? (Date.now() - new Date(client.last_seen_at).getTime()) / 60000 
         : null;
       
-      console.log(`[STRATÉGIE CLIENT] ${client.nom} — Heartbeat: ${heartbeatAgeMinClient?.toFixed(1) || 'N/A'} min — Envoi WhatsApp systématique`);
+      console.log(`[STRATÉGIE CLIENT] ${client.nom} — Heartbeat: ${heartbeatAgeMinClient?.toFixed(1) || 'N/A'} min, App active: ${client.app_active}`);
+      
+      // CAS 1: Heartbeat récent (< 2 min) → SILGAPP uniquement (app ouverte)
+      if (heartbeatAgeMinClient !== null && heartbeatAgeMinClient < 2) {
+        console.log(`[STRATÉGIE CLIENT] ✅ Heartbeat récent → SILGAPP uniquement (gratuit)\n`);
+        return Response.json({ 
+          success: true, 
+          type: 'client', 
+          canal: 'silgapp',
+          heartbeat_recent: true,
+          message: 'App ouverte — SILGAPP uniquement'
+        });
+      }
+      
+      // CAS 2: Heartbeat >= 2 min → WhatsApp
+      console.log(`[STRATÉGIE CLIENT] ⏳ Heartbeat ancien (${heartbeatAgeMinClient?.toFixed(1) || 'N/A'} min) → Tentative WhatsApp`);
 
       // Vérifier si WhatsApp déjà envoyé pour cette course
       const alertesCourse = await base44.asServiceRole.entities.WhatsAppAlerte.filter({ 

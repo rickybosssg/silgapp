@@ -562,6 +562,26 @@ Deno.serve(async (req) => {
       if (expired && course.dispatch_status === 'propose') {
         console.log(`[DISPATCH] ⏰ Timeout expiré pour course ${course_id} — redispatch`);
 
+        // Envoyer WhatsApp au livreur qui n'a pas répondu (il était dans l'app mais n'a pas vu la notif)
+        if (course.livreur_id) {
+          try {
+            const livreurExpire = await base44.asServiceRole.entities.Livreur.get(course.livreur_id);
+            if (livreurExpire?.user_email && livreurExpire?.whatsapp_opt_in) {
+              await base44.asServiceRole.entities.Notification.create({
+                titre: '⏰ Course expirée — vous avez manqué une course',
+                message: `La course ${course.adresse_depart} → ${course.adresse_arrivee || '?'} a été attribuée à un autre livreur car vous n'avez pas répondu à temps.`,
+                type: 'rappel_reponse',
+                course_id: course_id,
+                destinataire_email: livreurExpire.user_email,
+                lue: false,
+              });
+              console.log(`[DISPATCH] 📲 Notification rappel envoyée au livreur expiré ${livreurExpire.nom}`);
+            }
+          } catch (err) {
+            console.warn('[DISPATCH] ⚠️ Erreur notif livreur expiré:', err.message);
+          }
+        }
+
         await base44.asServiceRole.entities.CourseExterne.update(course_id, {
           dispatch_status: 'redispatch',
           livreur_id: '',
