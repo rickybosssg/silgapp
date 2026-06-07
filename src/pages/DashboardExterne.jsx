@@ -106,8 +106,14 @@ export default function DashboardExterne() {
     [coursesFiltrees]
   );
 
+  // Même critère que la carte dispatch : statut actif (disponible ou en_course) + validé + actif
+  // PAS de filtre heartbeat (isON) pour garantir la cohérence avec la carte
   const livreursEnLigne = useMemo(
-    () => livreurs.filter(l => isON(l) && l.validation === "valide" && l.actif !== false),
+    () => livreurs.filter(l =>
+      (l.statut === "disponible" || l.statut === "en_course") &&
+      l.validation === "valide" &&
+      l.actif !== false
+    ),
     [livreurs]
   );
 
