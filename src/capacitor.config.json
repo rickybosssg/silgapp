@@ -11,6 +11,7 @@
     "captureInput": true,
     "webContentsDebuggingEnabled": false,
     "backgroundColor": "#ffffff",
+    "allowedNavigationSchemes": ["whatsapp"],
     "buildOptions": {
       "keystorePath": "release-key.keystore",
       "keystorePassword": "silgapp2024",

@@ -9,26 +9,14 @@ const SANDBOX_CODE = "join rise-bit";
 const WA_DEEP_LINK = `whatsapp://send?phone=${SANDBOX_NUMERO}&text=${encodeURIComponent(SANDBOX_CODE)}`;
 const WA_FALLBACK = `https://wa.me/${SANDBOX_NUMERO}?text=${encodeURIComponent(SANDBOX_CODE)}`;
 
-function ouvrirWhatsApp() {
-  const isAndroid = /android/i.test(navigator.userAgent);
-  
-  if (isAndroid) {
-    // Intent Android : ouvre WhatsApp directement, fallback wa.me si non installé
-    const intentUrl = `intent://send?phone=${SANDBOX_NUMERO}&text=${encodeURIComponent(SANDBOX_CODE)}#Intent;scheme=whatsapp;package=com.whatsapp;S.browser_fallback_url=${encodeURIComponent(WA_FALLBACK)};end`;
-    window.location.href = intentUrl;
-  } else {
-    // iOS / web : scheme whatsapp:// avec fallback wa.me
-    const waApp = document.createElement('a');
-    waApp.href = WA_DEEP_LINK;
-    waApp.style.display = 'none';
-    document.body.appendChild(waApp);
-    waApp.click();
-    document.body.removeChild(waApp);
-    // Fallback wa.me si WhatsApp non installé (après 1.5s sans changement de page)
-    const fallbackTimer = setTimeout(() => {
-      window.location.href = WA_FALLBACK;
-    }, 1500);
-    window.addEventListener('blur', () => clearTimeout(fallbackTimer), { once: true });
+async function ouvrirWhatsApp() {
+  try {
+    // Capacitor App.openUrl avec whatsapp:// ouvre directement l'app native
+    const { App } = await import('@capacitor/app');
+    await App.openUrl({ url: WA_DEEP_LINK });
+  } catch {
+    // Fallback web : wa.me dans le navigateur
+    window.open(WA_FALLBACK, '_blank');
   }
 }
 
