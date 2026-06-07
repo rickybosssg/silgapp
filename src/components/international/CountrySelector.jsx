@@ -41,7 +41,7 @@ export default function CountrySelector({ value, onChange, className = "" }) {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between gap-2 w-full px-3 py-2 rounded-lg border border-input bg-background text-sm hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+        className="flex items-center justify-between gap-2 w-full px-3 py-2 rounded-lg border border-white/20 bg-white text-gray-900 text-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-white/30 transition-all"
       >
         <span className="flex items-center gap-2">
           <span className="text-lg">{selectedCountry?.emoji_flag || "🌍"}</span>
