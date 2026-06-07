@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Plus, MapPin, Package, Truck, Clock, CheckCircle2, XCircle, TrendingUp, ArrowLeft, Globe, Users, LayoutDashboard, Megaphone } from "lucide-react";
+import { MapPin, Package, Truck, Clock, CheckCircle2, XCircle, TrendingUp, ArrowLeft, Globe } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
 import StatCard from "@/components/dashboard/StatCard";
@@ -17,7 +17,6 @@ import { calculateLivreurCounters, calculateClientCounters } from "@/lib/livreur
 import CoursesEnTraitement from "@/components/dashboard/CoursesEnTraitement";
 import CoursesTerminees from "@/components/dashboard/CoursesTerminees";
 import CourseDetailDialog from "@/components/courses/CourseDetailDialog";
-import { Card } from "@/components/ui/card";
 import CodePromoPanel from "@/components/admin/CodePromoPanel";
 import DownloadStatsPanel from "@/components/admin/DownloadStatsPanel";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
@@ -181,42 +180,6 @@ export default function DashboardExterne() {
       {/* Statistiques Téléchargements */}
       <DownloadStatsPanel />
 
-      {/* Raccourcis admin */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Card className="p-4 cursor-pointer hover:shadow-lg transition-all border-2 border-pink-200 bg-pink-50">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-pink-600 flex items-center justify-center">
-              <LayoutDashboard className="w-6 h-6 text-white" />
-            </div>
-            <div className="flex-1">
-              <p className="font-bold text-pink-900">📋 Panel Clients Externes</p>
-              <p className="text-xs text-pink-700">Gérer les clients, migrer vers livreurs</p>
-            </div>
-            <Link to="/admin/externe/clients">
-              <Button size="sm" className="bg-pink-600 hover:bg-pink-700 text-white">
-                Ouvrir
-              </Button>
-            </Link>
-          </div>
-        </Card>
-
-        <Card className="p-4 cursor-pointer hover:shadow-lg transition-all border-2 border-violet-200 bg-violet-50">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
-              <Megaphone className="w-6 h-6 text-white" />
-            </div>
-            <div className="flex-1">
-              <p className="font-bold text-violet-900">📢 Publicités</p>
-              <p className="text-xs text-violet-700">Réseau publicitaire SILGAPP</p>
-            </div>
-            <Link to="/admin/publicites">
-              <Button size="sm" className="bg-violet-600 hover:bg-violet-700 text-white">
-                Ouvrir
-              </Button>
-            </Link>
-          </div>
-        </Card>
-      </div>
 
       {/* Stats principales */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
