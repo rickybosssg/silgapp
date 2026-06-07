@@ -58,6 +58,7 @@ const StatsTelechargements = lazy(() => import('./pages/StatsTelechargements.jsx
 const StatsTelechargementsAdmin = lazy(() => import('./pages/StatsTelechargementsAdmin.jsx'));
 const GestionPublicites = lazy(() => import('./pages/GestionPublicites.jsx'));
 const FraisAnnulationAdmin = lazy(() => import('./pages/FraisAnnulationAdmin.jsx'));
+const VenusRapportsPage = lazy(() => import('./pages/VenusRapportsPage.jsx'));
 const PolitiqueConfidentialite = lazy(() => import('./pages/PolitiqueConfidentialite.jsx'));
 
 function AnimatedRoutes({ children }) {
@@ -246,6 +247,7 @@ function AppContent() {
               <Route path="/admin/pays/:code/carte" element={<AnimatedRoutes><CarteLivreursExterne /></AnimatedRoutes>} />
               <Route path="/admin/publicites" element={<AnimatedRoutes><GestionPublicites /></AnimatedRoutes>} />
               <Route path="/admin/frais-annulation" element={<AnimatedRoutes><FraisAnnulationAdmin /></AnimatedRoutes>} />
+              <Route path="/admin/venus-rapports" element={<AnimatedRoutes><VenusRapportsPage /></AnimatedRoutes>} />
             </>
           )}
           <Route path="/notifications" element={<AnimatedRoutes><Notifications /></AnimatedRoutes>} />

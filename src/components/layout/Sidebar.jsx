@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
-  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings
+  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,7 @@ export const navItems = [
   { path: "/admin/externe/dus-livreurs", label: "Comptabilité", icon: Wallet, reseauOnly: "externe" },
   { path: "/admin/global", label: "Admin Global", icon: Globe, reseauOnly: "externe" },
   { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Settings, reseauOnly: "externe" },
+  { path: "/admin/venus-rapports", label: "Rapports VENUS", icon: MessageCircle, reseauOnly: "externe" },
   { path: "/notifications", label: "Notifications", icon: Bell },
   { path: "/maintenance", label: "Maintenance", icon: Shield },
 ];
