@@ -30,20 +30,7 @@ import {
   isClientGPSRecent,
   isClientNoir,
 } from "@/lib/dispatchRules.js";
-
-/**
- * Livreur "noir" sur la carte = non dispatchable
- * Règle unifiée : pas de GPS, statut hors_ligne, non validé ou inactif.
- * ⚠️ last_seen_at / app_active N'EST PAS un critère de couleur.
- * Un livreur avec app fermée mais GPS présent reste VERT (dispatchable via WhatsApp).
- */
-function isLivreurNoir(livreur) {
-  if (!livreur.latitude || !livreur.longitude) return true;
-  if (livreur.statut === "hors_ligne") return true;
-  if (livreur.actif === false) return true;
-  if (livreur.validation !== "valide") return true;
-  return false;
-}
+import { isLivreurNoir } from "@/lib/livreurCounters.js";
 
 const INDICATIFS = {
   BF: "+226", CI: "+225", TG: "+228", BJ: "+229",
@@ -300,10 +287,15 @@ export default function CarteLivreursExterne() {
         .map(l => ({ id: l.id.slice(-8), nom: `${l.prenom} ${l.nom}` })),
     });
 
+    // 🎯 CORRECTION : Utiliser isLibre() pour les "verts" (GPS < 10 min)
+    const libres = eligibles.filter(l => isLibre(l));
+    
     return {
       ...base,
       enCourse: vraisEnCourse.length,
       oranges: vraisEnCourse.length,
+      libres: libres.length,
+      verts: libres.length,
     };
   }, [livreurs, livreurIdsEnCourseReelle]);
 
@@ -315,14 +307,15 @@ export default function CarteLivreursExterne() {
   // 🔍 DIAGNOSTIC - Résumé de cohérence complet
   useEffect(() => {
     const eligibles = livreurs.filter(l => l.validation === "valide" && l.actif !== false);
-    const libres = eligibles.filter(l => isLibre(l));
+    const libres = eligibles.filter(l => isLibre(l)); // 🎯 GPS < 10 min
     const enCourseDB = eligibles.filter(l => l.statut === "en_course");
     const enCourseReelle = eligibles.filter(l => livreurIdsEnCourseReelle.has(l.id));
     const enCourseFantomes = enCourseDB.filter(l => !livreurIdsEnCourseReelle.has(l.id));
+    const noirs = eligibles.filter(l => isLivreurNoir(l, livreurIdsEnCourseReelle));
 
-    console.log("🔍 DIAGNOSTIC CARTE COMPLET:", {
+    console.log("🔍 DIAGNOSTIC CARTE COMPLET (RÈGLES UNIFIÉES) :", {
       total_livreurs: eligibles.length,
-      libres: libres.length,
+      libres_gps_recent: libres.length,
       libres_ids: libres.map(l => l.id.slice(-8)),
       en_course_statut_db: enCourseDB.length,
       en_course_reel_calcule: enCourseReelle.length,
@@ -333,6 +326,7 @@ export default function CarteLivreursExterne() {
         statut: l.statut,
         last_seen: l.last_seen_at,
       })),
+      noirs_non_dispatchables: noirs.length,
       courses_actives_en_db: coursesVraimentActives.length,
     });
 
@@ -346,8 +340,8 @@ export default function CarteLivreursExterne() {
   // ─── Listes filtrées ────────────────────────────────────────────────────
   const livreursAffiches = useMemo(() => {
     switch (filtreLivreur) {
-      case "noirs":     return livreurs.filter(l => isLivreurNoir(l));
-      case "verts":     return livreurs.filter(l => isLibre(l));
+      case "noirs":     return livreurs.filter(l => isLivreurNoir(l, livreurIdsEnCourseReelle));
+      case "verts":     return livreurs.filter(l => isLibre(l)); // 🎯 GPS < 10 min
       // En course = livreur avec course ACTIVE (peu importe le statut DB)
       case "oranges":   return livreurs.filter(l => livreurIdsEnCourseReelle.has(l.id));
       default:          return livreurs;
@@ -576,8 +570,8 @@ export default function CarteLivreursExterne() {
           ) : (
             <div className="divide-y divide-gray-50">
               {livreursAffiches.map(livreur => {
-                const estNoir   = isLivreurNoir(livreur);
-                const estVert   = isLibre(livreur);
+                const estNoir   = isLivreurNoir(livreur, livreurIdsEnCourseReelle);
+                const estVert   = isLibre(livreur); // 🎯 GPS < 10 min
                 // "En mission" = livreur avec course ACTIVE (peu importe le statut DB)
                 const estOrange = livreurIdsEnCourseReelle.has(livreur.id);
                 return (
