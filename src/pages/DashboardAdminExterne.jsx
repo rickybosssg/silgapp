@@ -15,7 +15,6 @@ import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
-import ClientsExternesPanel from "@/components/admin/ClientsExternesPanel";
 import CodePromoPanel from "@/components/admin/CodePromoPanel";
 import HistoriqueDuJour from "@/components/admin/HistoriqueDuJour";
 import SyncClientGPSPanel from "@/components/admin/SyncClientGPSPanel";
@@ -25,7 +24,6 @@ import DownloadStatsPanel from "@/components/admin/DownloadStatsPanel";
 import AlertesLivreursPanel from "@/components/admin/AlertesLivreursPanel";
 import ZonesChaudesWidget from "@/components/carte/ZonesChaudes";
 import ComptabilitePanel from "@/components/admin/ComptabilitePanel";
-import VenusRapportsPanel from "@/components/admin/VenusRapportsPanel";
 
 export default function DashboardAdminExterne() {
   console.log("🚨 DashboardAdminExterne.jsx EST CHARGÉ ET EXÉCUTÉ");
@@ -168,36 +166,12 @@ export default function DashboardAdminExterne() {
       shadow: "shadow-purple-100",
     },
     {
-      to: "/admin/externe/clients",
-      label: "Clients inscrits",
-      sub: `${stats.clientsTotal} comptes`,
-      icon: Users,
-      grad: "from-pink-500 to-rose-500",
-      shadow: "shadow-pink-100",
-    },
-    {
-      to: "/admin/externe/stats-telechargements",
+    to: "/admin/externe/stats-telechargements",
       label: "Stats téléchargements",
       sub: "Visites & analytics",
       icon: Download,
       grad: "from-red-500 to-orange-500",
       shadow: "shadow-red-100",
-    },
-    {
-      to: "/admin/publicites",
-      label: "Publicités",
-      sub: "Réseau publicitaire SILGAPP",
-      icon: Megaphone,
-      grad: "from-violet-500 to-indigo-600",
-      shadow: "shadow-violet-100",
-    },
-    {
-      scroll: "venus-rapports",
-      label: "Rapports VENUS",
-      sub: "Analyse IA des conversations",
-      icon: MessageCircle,
-      grad: "from-purple-600 to-violet-700",
-      shadow: "shadow-purple-100",
     },
   ];
 
@@ -310,11 +284,6 @@ export default function DashboardAdminExterne() {
             return <Link key={link.label} to={link.to}>{inner}</Link>;
           })}
         </div>
-      </div>
-
-      {/* ── RAPPORTS VENUS (accès rapide) ─────────────────────────── */}
-      <div id="venus-rapports" className="rounded-2xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-white p-5 shadow-sm">
-        <VenusRapportsPanel />
       </div>
 
       {/* ── CONFIG APK ────────────────────────────────────────────── */}
@@ -453,11 +422,6 @@ export default function DashboardAdminExterne() {
               })
           )}
         </div>
-      </div>
-
-      {/* ── CLIENTS INSCRITS ─────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-        <ClientsExternesPanel />
       </div>
 
       {/* ── STATS PAR PAYS ───────────────────────────────────────── */}
