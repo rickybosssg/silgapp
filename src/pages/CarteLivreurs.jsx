@@ -58,7 +58,7 @@ function getLastGPS(livreur) {
 
 // ─── Carte Leaflet full-screen ────────────────────────────────────────────────
 
-function MapView({ livreurs, livreursInactifs = [], showInactifs = false, coursesActives, onSelectLivreur }) {
+function MapView({ livreurs, livreursInactifs = [], showInactifs = false, coursesActives, onSelectLivreur, livreurIdsEnCourseReelle }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
@@ -155,8 +155,10 @@ function MapView({ livreurs, livreursInactifs = [], showInactifs = false, course
     }
 
     livreurs.filter(l => l.latitude && l.longitude && l.validation === "valide").forEach(livreur => {
-      const color = statusColors[livreur.statut] || "#6b7280";
-      const isActive = livreur.statut === "en_course";
+      // 🎯 CORRECTION : "En course" = livreur avec course ACTIVE (peu importe le statut DB)
+      const estEnCourse = livreurIdsEnCourseReelle && livreurIdsEnCourseReelle.has(livreur.id);
+      const color = estEnCourse ? statusColors.en_course : statusColors[livreur.statut] || "#6b7280";
+      const isActive = estEnCourse;
 
       const icon = L.divIcon({
         className: "",
@@ -175,7 +177,7 @@ function MapView({ livreurs, livreursInactifs = [], showInactifs = false, course
         .bindPopup(`<div style="font-family:sans-serif;font-size:13px;">
           <b style="color:#1e293b">${livreur.prenom ? livreur.prenom + " " + livreur.nom : livreur.nom}</b><br/>
           <span style="color:#475569">${formatTel(livreur.telephone, livreur.country_code)}</span><br/>
-          <span style="color:${color};font-weight:600">${statusLabels[livreur.statut]}</span>
+          <span style="color:${color};font-weight:600">${estEnCourse ? "En course" : statusLabels[livreur.statut]}</span>
           ${livreur.courses_du_jour ? `<br/><span style="color:#64748b;font-size:11px">${livreur.courses_du_jour} course(s) aujourd'hui</span>` : ""}
         </div>`)
         .addTo(map);
@@ -516,6 +518,7 @@ export default function CarteLivreurs() {
                 showInactifs={showInactifs}
                 coursesActives={actives}
                 onSelectLivreur={setSelectedLivreur}
+                livreurIdsEnCourseReelle={livreurIdsEnCourseReelle}
               />
             </div>
 
@@ -550,13 +553,17 @@ export default function CarteLivreurs() {
                         </p>
                         <p className="text-slate-400 text-xs">{formatTel(livreur.telephone, livreur.country_code)}</p>
                       </div>
-                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: statusColors[livreur.statut] }} />
+                      {/* 🎯 CORRECTION : Couleur basée sur course active réelle */}
+                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: livreurIdsEnCourseReelle?.has(livreur.id) ? statusColors.en_course : statusColors[livreur.statut] }} />
                     </div>
                     {selectedLivreur?.id === livreur.id && (
                       <div className="mt-2.5 pt-2.5 border-t border-slate-600/50 space-y-1.5">
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-slate-400">Statut</span>
-                          <span className="font-medium" style={{ color: statusColors[livreur.statut] }}>{statusLabels[livreur.statut]}</span>
+                          {/* 🎯 CORRECTION : Statut réel basé sur course active */}
+                          <span className="font-medium" style={{ color: livreurIdsEnCourseReelle?.has(livreur.id) ? statusColors.en_course : statusColors[livreur.statut] }}>
+                            {livreurIdsEnCourseReelle?.has(livreur.id) ? "En course" : statusLabels[livreur.statut]}
+                          </span>
                         </div>
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-slate-400">Courses aujourd'hui</span>
