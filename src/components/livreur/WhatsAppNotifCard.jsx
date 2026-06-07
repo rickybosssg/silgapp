@@ -9,11 +9,13 @@ const SANDBOX_CODE = "join rise-bit";
 const WA_DEEP_LINK = `whatsapp://send?phone=${SANDBOX_NUMERO}&text=${encodeURIComponent(SANDBOX_CODE)}`;
 const WA_FALLBACK = `https://wa.me/${SANDBOX_NUMERO}?text=${encodeURIComponent(SANDBOX_CODE)}`;
 
-async function ouvrirWhatsApp() {
-  try {
-    const { App } = await import('@capacitor/app');
-    await App.openUrl({ url: WA_DEEP_LINK });
-  } catch {
+function ouvrirWhatsApp() {
+  // Intent Android natif — bypass Capacitor, ouvre WhatsApp directement sans popup
+  const intentUrl = `intent://send/${SANDBOX_NUMERO}#Intent;scheme=smsto;package=com.whatsapp;S.sms_body=${encodeURIComponent(SANDBOX_CODE)};end`;
+  const isAndroid = /android/i.test(navigator.userAgent);
+  if (isAndroid) {
+    window.location.href = intentUrl;
+  } else {
     window.location.href = WA_DEEP_LINK;
   }
 }
