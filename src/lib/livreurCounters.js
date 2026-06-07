@@ -8,13 +8,16 @@ import { isGPSRecent, hasValidGPS, isAppActive, isON, isLibre, isEnCourse, isCli
  * Livreur noir = non dispatchable
  * SOURCE UNIQUE : même règle que DispatchMap et CarteLivreursExterne
  * ⚠️ last_seen_at / app_active N'EST PAS un critère.
- * Noir = pas de GPS OU hors_ligne OU inactif OU non validé.
+ * Noir = pas de GPS OU GPS expiré (> 10 min) OU hors_ligne OU inactif OU non validé.
  */
-export function isLivreurNoir(livreur) {
+export function isLivreurNoir(livreur, livreurIdsEnCourseReelle) {
   if (!livreur.latitude || !livreur.longitude) return true;
   if (livreur.statut === "hors_ligne") return true;
   if (livreur.actif === false) return true;
   if (livreur.validation !== "valide") return true;
+  // 🎯 CORRECTION : GPS expiré (> 10 min) = NOIR
+  // Sauf si le livreur a une course active (déjà occupé)
+  if (!livreurIdsEnCourseReelle?.has(livreur.id) && !isLibre(livreur)) return true;
   return false;
 }
 

@@ -44,6 +44,7 @@ export function isON(livreur) {
  *   - App fermée  → notification WhatsApp automatique
  * Un livreur reste dispatchable même si son app est fermée.
  * GPS > 10 min → non dispatchable → non compté comme libre.
+ * ⚠️ IMPORTANT : On utilise SEULEMENT derniere_position_date (GPS), PAS last_seen_at (heartbeat)
  */
 export function isLibre(livreur) {
   if (livreur.statut !== "disponible") return false;
@@ -51,7 +52,8 @@ export function isLibre(livreur) {
   if (livreur.validation !== "valide") return false;
   if (!livreur.latitude || !livreur.longitude) return false;
   // GPS doit être < GPS_DISPATCH_SEUIL_MIN (10 min) — même règle que le moteur dispatch
-  const dt = livreur.derniere_position_date || livreur.last_seen_at;
+  // IMPORTANT : utilise SEULEMENT derniere_position_date, pas last_seen_at
+  const dt = livreur.derniere_position_date;
   if (!dt) return false;
   return (Date.now() - new Date(dt).getTime()) < GPS_DISPATCH_SEUIL_MIN * 60 * 1000;
 }
