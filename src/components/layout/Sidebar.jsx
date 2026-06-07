@@ -81,7 +81,7 @@ export default function Sidebar({ notificationCount = 0, reseau }) {
           const Icon = item.icon;
           return (
             <Link
-              key={item.path}
+              key={item.path + item.reseauOnly}
               to={item.path}
               title={collapsed ? item.label : undefined}
               className={cn(
