@@ -54,31 +54,31 @@ export default function CountrySelector({ value, onChange, className = "" }) {
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-popover border border-border rounded-lg shadow-lg max-h-64 overflow-y-auto">
+          <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-white border border-gray-200 rounded-lg shadow-xl max-h-64 overflow-y-auto text-gray-900">
             {/* Option "Tous les pays" */}
             <button
               type="button"
               onClick={() => { onChange(""); setIsOpen(false); }}
               className={cn(
-                "w-full flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-muted transition-colors",
-                !value && "bg-muted"
+                "w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-900 hover:bg-gray-100 transition-colors",
+                !value && "bg-gray-100"
               )}
-            >
+              >
               <span className="text-lg">🌍</span>
               <span className="flex-1 text-left">Tous les pays</span>
               {!value && <Check className="w-4 h-4 text-primary" />}
-            </button>
-            
-            {/* Liste des pays */}
-            {pays.map((p) => (
+              </button>
+
+              {/* Liste des pays */}
+              {pays.map((p) => (
               <button
-                key={p.code}
-                type="button"
-                onClick={() => { onChange(p.code); setIsOpen(false); }}
-                className={cn(
-                  "w-full flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-muted transition-colors",
-                  value === p.code && "bg-muted"
-                )}
+              key={p.code}
+              type="button"
+              onClick={() => { onChange(p.code); setIsOpen(false); }}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-900 hover:bg-gray-100 transition-colors",
+                value === p.code && "bg-gray-100"
+              )}
               >
                 <span className="text-lg">{p.emoji_flag}</span>
                 <span className="flex-1 text-left">{p.nom}</span>
