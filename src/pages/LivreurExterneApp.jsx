@@ -23,6 +23,7 @@ import PubliciteCarousel from "@/components/publicite/PubliciteCarousel";
 import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
 import PricingModeSelector from "@/components/livreur/PricingModeSelector";
 import PrixManuelReponseAlert from "@/components/livreur/PrixManuelReponseAlert";
+import WhatsAppNotifCard from "@/components/livreur/WhatsAppNotifCard";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -555,6 +556,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
             {/* ── MODE TARIFAIRE ── */}
             <PricingModeSelector pricingMode={pricingMode} onChange={handlePricingModeChange} />
+
+            <WhatsAppNotifCard
+              livreurProfil={livreurProfil}
+              onOptInUpdated={() => queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] })}
+            />
 
             <LivreurStatsBanner
               mesCourses={mesCourses}
