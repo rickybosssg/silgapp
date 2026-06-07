@@ -180,17 +180,18 @@ async function trouverLivreursCandidatsParNiveaux(base44, course, exclusions = [
  * Retourne true si un doublon existe (ne pas recréer).
  */
 async function notificationDoublonExiste(base44, courseId, livreurEmail) {
-  const depuis15min = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+  // Anti-doublon strict : 90 secondes seulement
+  // Permet les redispatch vers le même livreur après timeout (> 90s)
+  const depuis90s = new Date(Date.now() - 90 * 1000).toISOString();
   const existantes = await base44.asServiceRole.entities.Notification.filter({
     course_id: courseId,
     destinataire_email: livreurEmail,
     type: 'nouvelle_course',
   });
 
-  // Filtrer celles créées dans les 15 dernières minutes
-  const recentes = existantes.filter(n => n.created_date > depuis15min);
+  const recentes = existantes.filter(n => n.created_date > depuis90s);
   if (recentes.length > 0) {
-    console.log(`[DISPATCH] 🛡️ Doublon détecté — notification déjà créée pour ${livreurEmail} course ${courseId} (${recentes.length} existante(s))`);
+    console.log(`[DISPATCH] 🛡️ Doublon détecté (< 90s) — notification déjà créée pour ${livreurEmail} course ${courseId}`);
     return true;
   }
   return false;
@@ -231,9 +232,10 @@ async function proposerAuLivreur(base44, courseId, course, livreur, niveauDispat
     timeout_expires_at: new Date(Date.now() + 60000).toISOString(),
   });
 
-  // Créer une Notification en base avec protection anti-doublon
+  // Créer une Notification en base — l'automation "Alerte WhatsApp utilisateur" se déclenche automatiquement
+  // IMPORTANT : on crée TOUJOURS une nouvelle notification à chaque redispatch (nouveau livreur = nouveau destinataire)
+  // L'anti-doublon ne bloque que si le MÊME livreur est sollicité deux fois dans les 15 min
   if (livreur.user_email) {
-    // ⚡ PROTECTION ANTI-DOUBLON : ne créer la notif que si elle n'existe pas déjà
     const doublon = await notificationDoublonExiste(base44, courseId, livreur.user_email);
     if (!doublon) {
       const distanceLabel = distanceSafe > 0
@@ -241,6 +243,7 @@ async function proposerAuLivreur(base44, courseId, course, livreur, niveauDispat
         : 'distance inconnue';
 
       try {
+        // Cette création déclenche l'automation → WhatsApp envoyé automatiquement si opt-in actif
         await base44.asServiceRole.entities.Notification.create({
           titre: '🚨 Nouvelle course disponible !',
           message: `Course à ${distanceLabel} — ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`,
@@ -249,13 +252,12 @@ async function proposerAuLivreur(base44, courseId, course, livreur, niveauDispat
           destinataire_email: livreur.user_email,
           lue: false,
         });
-        console.log(`[DISPATCH] 🔔 Notification créée pour ${livreur.user_email}`);
+        console.log(`[DISPATCH] 🔔 Notification créée pour ${livreur.user_email} → automation WhatsApp déclenchée`);
       } catch (err) {
         console.error('[DISPATCH] ❌ Erreur création notification:', err.message);
       }
 
-      // Notification push — si app ouverte
-      // Si app fermée → WhatsApp en complément
+      // Notification push Firebase
       try {
         await base44.functions.invoke('envoiNotificationPush', {
           destinataire_email: livreur.user_email,
@@ -269,32 +271,7 @@ async function proposerAuLivreur(base44, courseId, course, livreur, niveauDispat
         console.error('[DISPATCH] ❌ Erreur notif push:', err.message);
       }
 
-      // 📡 NOTIFICATION MULTI-CANAUX selon heartbeat
-      // Heartbeat récent (< 2 min) → SILGAPP uniquement
-      // Heartbeat ancien (≥ 2 min) → WhatsApp (car app probablement fermée)
-      const appActive = livreur.heartbeatAgeMin !== null && livreur.heartbeatAgeMin < 2;
-      
-      console.log(`[DISPATCH] 📡 Canal notification: ${appActive ? 'SILGAPP' : 'WhatsApp'} (HB: ${livreur.heartbeatAgeMin?.toFixed(1) || '?'} min)`);
-      
-      if (appActive) {
-        console.log(`[DISPATCH] 📱 Notification SILGAPP pour ${livreur.user_email} (app active)`);
-      }
-      
-      // WhatsApp TOUJOURS envoyé (même si app active — écran peut être verrouillé)
-      // La fonction envoyerAlerteWhatsApp gère l'anti-doublon
-      if (livreur.telephone) {
-        try {
-          await base44.functions.invoke('envoyerAlerteWhatsApp', {
-            telephone: livreur.telephone,
-            message: `🚨 SILGAPP — Nouvelle course disponible !\n📍 ${course.adresse_depart} → ${course.adresse_arrivee || '?'}\n📏 À ${distanceLabel} de vous\n\nOuvrez l'application SILGAPP pour accepter (60 secondes).`,
-          });
-          console.log(`[DISPATCH] ✅ WhatsApp envoyé à ${livreur.telephone} (HB: ${livreur.heartbeatAgeMin?.toFixed(1) || '?'} min)`);
-        } catch (err) {
-          console.warn('[DISPATCH] ⚠️ Erreur WhatsApp:', err.message);
-        }
-      } else {
-        console.warn(`[DISPATCH] ⚠️ Pas de téléphone pour ${livreur.nom} — WhatsApp impossible`);
-      }
+      console.log(`[DISPATCH] 📡 Notifications envoyées à ${livreur.nom} (HB: ${livreur.heartbeatAgeMin?.toFixed(1) || '?'} min) — WhatsApp géré par automation`);
     }
   }
 
