@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Sparkles, Move } from "lucide-react";
 import VenusChat from "./VenusChat";
+import { useAdminContext } from "@/hooks/useAdminContext";
+import { base44 } from "@/api/base44Client";
+import { useQuery } from "@tanstack/react-query";
 
 const VENUS_AVATAR_URL = "https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/17cf522aa_file_0000000034b871f7bf133c0de0c9eb62.png";
 
@@ -14,6 +17,57 @@ export default function VenusFloatingButton() {
   const [constraint, setConstraint] = useState({ left: 0, right: 0, top: 0, bottom: 0 });
   const imgRef = useRef(null);
   const buttonRef = useRef(null);
+
+  // Contexte admin (pays actif)
+  const { selectedCountry, isPays, countryCode } = useAdminContext();
+  const effectiveCountry = isPays ? countryCode : (selectedCountry || null);
+
+  // Charger les données du pays actif
+  const { data: countryData } = useQuery({
+    queryKey: ["country_context", effectiveCountry],
+    queryFn: () => base44.entities.Country.filter({ code: effectiveCountry }),
+    enabled: !!effectiveCountry,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Livreurs disponibles du pays
+  const { data: livreursData } = useQuery({
+    queryKey: ["livreurs_dispos_venus", effectiveCountry],
+    queryFn: () => base44.entities.Livreur.filter({ country_code: effectiveCountry, statut: "disponible", actif: true }),
+    enabled: !!effectiveCountry,
+    staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000,
+  });
+
+  // Publicités actives du pays
+  const { data: pubsData } = useQuery({
+    queryKey: ["pubs_actives_venus", effectiveCountry],
+    queryFn: () => base44.entities.Publicite.filter({ actif: true }),
+    enabled: !!effectiveCountry,
+    staleTime: 5 * 60 * 1000,
+    select: (pubs) => pubs.filter(p => {
+      if (!effectiveCountry) return true;
+      if (!p.pays_cibles || p.pays_cibles === "tous") return true;
+      try { const arr = JSON.parse(p.pays_cibles); return arr.includes(effectiveCountry); } catch { return false; }
+    }),
+  });
+
+  // Construire le contexte pays pour VENUS
+  const country = countryData?.[0];
+  const countryContext = country ? {
+    code: country.code,
+    nom: country.nom,
+    ville: country.ville_principale,
+    devise: country.devise || "FCFA",
+    prix_par_km: country.prix_par_km,
+    prix_minimum: country.prix_minimum,
+    commission_pct: country.commission_pct || 30,
+    indicatif: country.indicatif,
+    rayon_km: country.rayon_km,
+    emoji: country.emoji_flag,
+    livreursDispos: livreursData?.length ?? null,
+    pubsActives: pubsData?.length ?? 0,
+  } : null;
 
   // Préchargement de l'image
   useEffect(() => {
@@ -145,7 +199,7 @@ export default function VenusFloatingButton() {
 
       {/* Chat VENUS */}
       <AnimatePresence>
-        {showChat && <VenusChat onClose={() => setShowChat(false)} />}
+        {showChat && <VenusChat onClose={() => setShowChat(false)} countryContext={countryContext} />}
       </AnimatePresence>
 
       {/* Styles CSS pour l'animation */}

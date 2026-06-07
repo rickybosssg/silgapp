@@ -9,10 +9,24 @@ import ReactMarkdown from "react-markdown";
 
 const VENUS_AVATAR = "https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/17cf522aa_file_0000000034b871f7bf133c0de0c9eb62.png";
 
-const WELCOME_MESSAGE = {
-  role: "assistant",
-  content: "Bonjour 👋 Je suis **VENUS**, votre assistante intelligente **SILGAPP**.\n\n❤️ *Plus qu'un service, une promesse* ❤️\n\nSILGAPP est disponible dans **8 pays d'Afrique de l'Ouest** :\n🇧🇫 Burkina Faso · 🇨🇮 Côte d'Ivoire · 🇹🇬 Togo · 🇧🇯 Bénin · 🇸🇳 Sénégal · 🇲🇱 Mali · 🇬🇳 Guinée · 🇳🇪 Niger\n\nJe suis là pour vous aider à :\n\n✨ **Créer une course** — Expédier ou recevoir un colis\n\n🚚 **Suivre en temps réel** — Localisez votre livreur sur la carte\n\n📱 **QR codes & PIN** — Validation de récupération et livraison\n\n💰 **Prix adapté à votre pays** — Calculé automatiquement selon votre localisation\n\n📞 **Support** — +226 66 92 51 90\n\n**Dans quel pays êtes-vous ? Comment puis-je vous aider ?**",
+const buildWelcomeMessage = (countryContext) => {
+  if (!countryContext || !countryContext.code) {
+    return {
+      role: "assistant",
+      content: "Bonjour 👋 Je suis **VENUS**, votre assistante intelligente **SILGAPP**.\n\n❤️ *Plus qu'un service, une promesse* ❤️\n\nSILGAPP est disponible dans **8 pays d'Afrique de l'Ouest** :\n🇧🇫 Burkina Faso · 🇨🇮 Côte d'Ivoire · 🇹🇬 Togo · 🇧🇯 Bénin · 🇸🇳 Sénégal · 🇲🇱 Mali · 🇬🇳 Guinée · 🇳🇪 Niger\n\nJe suis là pour vous aider à :\n\n✨ **Créer une course** — Expédier ou recevoir un colis\n🚚 **Suivre en temps réel** — Localisez votre livreur sur la carte\n📱 **QR codes & PIN** — Validation de récupération et livraison\n💰 **Prix adapté à votre pays** — Calculé automatiquement selon votre localisation\n📞 **Support** — +226 66 92 51 90\n\n**Dans quel pays êtes-vous ? Comment puis-je vous aider ?**",
+    };
+  }
+
+  const { code, nom, ville, devise, prix_par_km, prix_minimum, commission_pct, indicatif, livreursDispos, pubsActives } = countryContext;
+  const gainLivreur = 100 - (commission_pct || 30);
+
+  return {
+    role: "assistant",
+    content: `Bonjour 👋 Je suis **VENUS**, votre assistante SILGAPP pour **${nom || code}** ${countryContext.emoji || "🌍"}\n\n❤️ *Plus qu'un service, une promesse* ❤️\n\n🌍 **Pays actif : ${nom || code} (${code})**\n📍 **Ville principale : ${ville || "N/D"}**\n📞 **Indicatif : ${indicatif || "N/D"}**\n\n💰 **Tarifs ${code} :**\n- Prix/km : **${prix_par_km || "N/D"} ${devise || "FCFA"}**\n- Minimum course : **${prix_minimum || 1000} ${devise || "FCFA"}**\n- Commission SILGAPP : **${commission_pct || 30}%** | Gain livreur : **${gainLivreur}%**\n\n🚚 **Réseau actuel à ${ville || code} :**\n- Livreurs disponibles : **${livreursDispos ?? "N/D"}**${pubsActives > 0 ? `\n- Offres actives dans votre pays : **${pubsActives}**` : ""}\n\nJe réponds **uniquement** aux questions concernant **${nom || code}**. Pour un autre pays, demandez-moi de changer de contexte.\n\n**Comment puis-je vous aider aujourd'hui ?**`,
+  };
 };
+
+const DEFAULT_WELCOME = buildWelcomeMessage(null);
 
 function getStorageKey(userEmail) {
   return `venus_conv_${userEmail || "anonymous"}`;
@@ -38,8 +52,9 @@ function clearConvId(userEmail) {
   } catch {}
 }
 
-export default function VenusChat({ onClose }) {
-  const [messages, setMessages] = useState([WELCOME_MESSAGE]);
+export default function VenusChat({ onClose, countryContext }) {
+  const welcomeMessage = countryContext?.code ? buildWelcomeMessage(countryContext) : DEFAULT_WELCOME;
+  const [messages, setMessages] = useState([welcomeMessage]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
@@ -48,6 +63,16 @@ export default function VenusChat({ onClose }) {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const messagesEndRef = useRef(null);
   const unsubscribeRef = useRef(null);
+
+  // Réinitialiser le message de bienvenue si le pays change
+  useEffect(() => {
+    setMessages(prev => {
+      if (prev.length === 1 && prev[0].role === "assistant") {
+        return [countryContext?.code ? buildWelcomeMessage(countryContext) : DEFAULT_WELCOME];
+      }
+      return prev;
+    });
+  }, [countryContext?.code]);
 
   useEffect(() => {
     initConversation();
@@ -61,7 +86,7 @@ export default function VenusChat({ onClose }) {
   }, [messages]);
 
   const buildMessages = (rawMessages) => {
-    const rebuilt = [WELCOME_MESSAGE];
+    const rebuilt = [welcomeMessage];
     rawMessages.forEach((m) => {
       if (m.role === "user" || m.role === "assistant") {
         rebuilt.push({ role: m.role, content: m.content });
@@ -113,10 +138,23 @@ export default function VenusChat({ onClose }) {
         }
       }
 
-      // Créer une nouvelle conversation
+      // Créer une nouvelle conversation avec contexte pays
+      const contextMeta = countryContext?.code ? {
+        name: `Conversation VENUS — ${countryContext.nom || countryContext.code}`,
+        description: `Assistance SILGAPP | Pays actif: ${countryContext.code} | Ville: ${countryContext.ville || "N/D"} | Devise: ${countryContext.devise || "FCFA"}`,
+        country_code: countryContext.code,
+        country_nom: countryContext.nom,
+        ville: countryContext.ville,
+        devise: countryContext.devise,
+        prix_par_km: countryContext.prix_par_km,
+        prix_minimum: countryContext.prix_minimum,
+        indicatif: countryContext.indicatif,
+        livreurs_dispos: countryContext.livreursDispos,
+      } : { name: "Conversation VENUS", description: "Assistance SILGAPP" };
+
       const conversation = await base44.agents.createConversation({
         agent_name: "venus",
-        metadata: { name: "Conversation VENUS", description: "Assistance SILGAPP" },
+        metadata: contextMeta,
       });
       setConversationId(conversation.id);
       saveConvId(email, conversation.id);
@@ -153,12 +191,17 @@ export default function VenusChat({ onClose }) {
     if (unsubscribeRef.current) unsubscribeRef.current();
     clearConvId(userEmail);
     setConversationId(null);
-    setMessages([WELCOME_MESSAGE]);
+    setMessages([welcomeMessage]);
     // Créer une toute nouvelle conversation
     try {
+      const contextMeta = countryContext?.code ? {
+        name: `Conversation VENUS — ${countryContext.nom || countryContext.code}`,
+        description: `Assistance SILGAPP | Pays actif: ${countryContext.code}`,
+        country_code: countryContext.code,
+      } : { name: "Conversation VENUS", description: "Assistance SILGAPP" };
       const conversation = await base44.agents.createConversation({
         agent_name: "venus",
-        metadata: { name: "Conversation VENUS", description: "Assistance SILGAPP" },
+        metadata: contextMeta,
       });
       setConversationId(conversation.id);
       saveConvId(userEmail, conversation.id);
@@ -184,9 +227,16 @@ export default function VenusChat({ onClose }) {
           <div className="flex items-center gap-3">
             <img src={VENUS_AVATAR} alt="VENUS" className="w-12 h-12 rounded-xl object-cover shadow-lg border-2 border-white" />
             <div>
-              <h2 className="font-black text-white text-lg leading-tight">VENUS</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-black text-white text-lg leading-tight">VENUS</h2>
+                {countryContext?.code && (
+                  <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full border border-white/30">
+                    🌍 {countryContext.code}
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-white/80 font-medium">
-                {initializing ? "Chargement de la mémoire..." : "Assistante intelligente SILGAPP"}
+                {initializing ? "Chargement de la mémoire..." : countryContext?.ville ? `Assistante locale — ${countryContext.ville}` : "Assistante intelligente SILGAPP"}
               </p>
             </div>
           </div>
