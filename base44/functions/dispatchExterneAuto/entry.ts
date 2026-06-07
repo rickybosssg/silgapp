@@ -274,21 +274,26 @@ async function proposerAuLivreur(base44, courseId, course, livreur, niveauDispat
       // Heartbeat ancien (≥ 2 min) → WhatsApp (car app probablement fermée)
       const appActive = livreur.heartbeatAgeMin !== null && livreur.heartbeatAgeMin < 2;
       
+      console.log(`[DISPATCH] 📡 Canal notification: ${appActive ? 'SILGAPP' : 'WhatsApp'} (HB: ${livreur.heartbeatAgeMin?.toFixed(1) || '?'} min)`);
+      
       if (appActive) {
         console.log(`[DISPATCH] 📱 Notification SILGAPP pour ${livreur.user_email} (app active)`);
-      } else {
-        // WhatsApp pour heartbeat ancien
-        if (livreur.telephone) {
-          try {
-            await base44.functions.invoke('envoyerAlerteWhatsApp', {
-              telephone: livreur.telephone,
-              message: `🚨 SILGAPP — Nouvelle course disponible !\n📍 ${course.adresse_depart} → ${course.adresse_arrivee || '?'}\n📏 À ${distanceLabel} de vous\n\nOuvrez l'application SILGAPP pour accepter (60 secondes).`,
-            });
-            console.log(`[DISPATCH] 📱 WhatsApp envoyé à ${livreur.telephone} (heartbeat: ${livreur.heartbeatAgeMin?.toFixed(1) || '?'} min)`);
-          } catch (err) {
-            console.warn('[DISPATCH] ⚠️ Erreur WhatsApp:', err.message);
-          }
+      }
+      
+      // WhatsApp TOUJOURS envoyé (même si app active — écran peut être verrouillé)
+      // La fonction envoyerAlerteWhatsApp gère l'anti-doublon
+      if (livreur.telephone) {
+        try {
+          await base44.functions.invoke('envoyerAlerteWhatsApp', {
+            telephone: livreur.telephone,
+            message: `🚨 SILGAPP — Nouvelle course disponible !\n📍 ${course.adresse_depart} → ${course.adresse_arrivee || '?'}\n📏 À ${distanceLabel} de vous\n\nOuvrez l'application SILGAPP pour accepter (60 secondes).`,
+          });
+          console.log(`[DISPATCH] ✅ WhatsApp envoyé à ${livreur.telephone} (HB: ${livreur.heartbeatAgeMin?.toFixed(1) || '?'} min)`);
+        } catch (err) {
+          console.warn('[DISPATCH] ⚠️ Erreur WhatsApp:', err.message);
         }
+      } else {
+        console.warn(`[DISPATCH] ⚠️ Pas de téléphone pour ${livreur.nom} — WhatsApp impossible`);
       }
     }
   }
