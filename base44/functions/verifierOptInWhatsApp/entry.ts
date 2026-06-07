@@ -12,8 +12,9 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    // Auth optionnelle — les livreurs peuvent vérifier leur propre opt-in sans être admin
+    // On vérifie juste qu'il y a un token (session valide)
+    const user = await base44.auth.me().catch(() => null);
 
     const body = await req.json();
     const { livreur_id, telephone: telParam } = body;

@@ -1,23 +1,15 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import { CheckCircle2, AlertCircle, RefreshCw, Copy, MessageCircle, Zap } from "lucide-react";
 
-// Ouvrir un lien externe compatible Android/Capacitor
-async function ouvrirLien(url) {
-  try {
-    const { Browser } = await import('@capacitor/browser');
-    await Browser.open({ url });
-  } catch {
-    window.open(url, '_blank');
-  }
-}
-
 const SANDBOX_NUMERO = "14155238886";
 const SANDBOX_CODE = "join rise-bit";
+const WA_URL = `https://wa.me/${SANDBOX_NUMERO}?text=${encodeURIComponent(SANDBOX_CODE)}`;
 
 export default function WhatsAppNotifCard({ livreurProfil, onOptInUpdated }) {
   const [verifying, setVerifying] = useState(false);
+  const linkRef = useRef(null);
 
   const optIn = livreurProfil?.whatsapp_opt_in === true;
   const expireAt = livreurProfil?.whatsapp_opt_in_expire_at;
@@ -35,10 +27,6 @@ export default function WhatsAppNotifCard({ livreurProfil, onOptInUpdated }) {
   };
 
   const expInfo = formatExpiration();
-
-  const handleActiver = () => {
-    ouvrirLien(`https://wa.me/${SANDBOX_NUMERO}?text=${encodeURIComponent(SANDBOX_CODE)}`);
-  };
 
   const handleCopier = () => {
     navigator.clipboard.writeText(SANDBOX_CODE)
@@ -114,6 +102,9 @@ export default function WhatsAppNotifCard({ livreurProfil, onOptInUpdated }) {
         )}
       </div>
 
+      {/* Lien natif caché — la seule méthode fiable sur Android/Capacitor */}
+      <a ref={linkRef} href={WA_URL} target="_blank" rel="noopener noreferrer" style={{ display: 'none' }} />
+
       {/* Actions si non activé */}
       {!optIn && (
         <div className="space-y-2">
@@ -121,13 +112,15 @@ export default function WhatsAppNotifCard({ livreurProfil, onOptInUpdated }) {
             Activez WhatsApp pour recevoir des alertes de courses même quand l'app est fermée.
           </p>
           <div className="flex gap-2">
-            <button
-              onClick={handleActiver}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-green-600 text-white text-xs font-bold active:scale-95 transition-transform"
+            <a
+              href={WA_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-green-600 text-white text-xs font-bold active:scale-95 transition-transform no-underline"
             >
               <MessageCircle className="w-3.5 h-3.5" />
               Activer WhatsApp
-            </button>
+            </a>
             <button
               onClick={handleCopier}
               className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-white border border-amber-200 text-amber-700 text-xs font-bold active:scale-95 transition-transform"
@@ -148,13 +141,15 @@ export default function WhatsAppNotifCard({ livreurProfil, onOptInUpdated }) {
           <p className="text-xs text-red-700 font-semibold leading-relaxed">
             ⚠️ Votre accès expire bientôt. Renvoyez le code pour renouveler.
           </p>
-          <button
-            onClick={handleActiver}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500 text-white text-xs font-bold active:scale-95 transition-transform"
+          <a
+            href={WA_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500 text-white text-xs font-bold active:scale-95 transition-transform no-underline"
           >
             <Zap className="w-3.5 h-3.5" />
             Renouveler l'accès
-          </button>
+          </a>
         </div>
       )}
 
