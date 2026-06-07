@@ -22,7 +22,7 @@
         "failed"
       ],
       "default": "pending",
-      "description": "Statut d'envoi de l'alerte WhatsApp"
+      "description": "Statut d'envoi de l'alerte"
     },
     "twilio_sid": {
       "type": "string",
@@ -40,12 +40,14 @@
     "canal": {
       "type": "string",
       "enum": [
+        "silgapp",
+        "push",
         "whatsapp",
         "sms",
         "whatsapp+sms"
       ],
-      "default": "whatsapp",
-      "description": "Canal utilis\u00e9 : WhatsApp, SMS (fallback) ou les deux"
+      "default": "silgapp",
+      "description": "Canal utilis\u00e9 : SILGAPP (gratuit), Push, WhatsApp, SMS ou combinaison"
     }
   },
   "required": [

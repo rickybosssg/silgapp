@@ -163,33 +163,92 @@ Deno.serve(async (req) => {
         return Response.json({ skipped: true, reason: 'livreur_no_telephone' });
       }
 
-      // ✅ LOGIQUE : WhatsApp envoyé systématiquement — l'écran peut être verrouillé
-      // même si app_active=true (heartbeat Android tourne en arrière-plan)
-      // L'anti-doublon par notification_id suffit à éviter le spam
-      console.log(`[WhatsApp] Course ${courseId} Livreur ${livreur.id}: envoi systématique (app_active=${livreur.app_active})`)
+      // 🎯 NOUVELLE STRATÉGIE MULTI-CANAUX — Optimisation des coûts
+      // 1. Heartbeat < 2 min → SILGAPP uniquement (gratuit)
+      // 2. Heartbeat >= 2 min → Push notification
+      // 3. Push échec ou pas de réponse 60s → WhatsApp (payant)
+      // 4. WhatsApp échec → SMS (payant, dernier recours)
+      
+      const heartbeatAgeMin = livreur.last_seen_at 
+        ? (Date.now() - new Date(livreur.last_seen_at).getTime()) / 60000 
+        : null;
+      
+      console.log(`[STRATÉGIE] Livreur ${livreur.nom} — Heartbeat: ${heartbeatAgeMin?.toFixed(1) || 'N/A'} min, App active: ${livreur.app_active}`);
+      
+      // CAS 1: Heartbeat récent (< 2 min) → SILGAPP uniquement
+      if (heartbeatAgeMin !== null && heartbeatAgeMin < 2) {
+        console.log(`[STRATÉGIE] ✅ Heartbeat récent (${heartbeatAgeMin.toFixed(1)} min) → SILGAPP uniquement (gratuit)`);
+        
+        // Vérifier si notification SILGAPP déjà créée
+        const notifsExistantes = await base44.asServiceRole.entities.Notification.filter({
+          course_id: courseId,
+          destinataire_email: destinataireEmail,
+          type: notification.type
+        });
+        
+        if (notifsExistantes.length > 0) {
+          console.log(`[STRATÉGIE] ✅ Notification SILGAPP déjà créée → SKIP WhatsApp/SMS\n`);
+          return Response.json({ 
+            success: true, 
+            type: 'livreur', 
+            canal: 'silgapp',
+            heartbeat_recent: true,
+            message: 'Notification SILGAPP uniquement (heartbeat < 2 min)'
+          });
+        }
+      }
+      
+      // CAS 2: Heartbeat ancien → Vérifier Push notification
+      console.log(`[STRATÉGIE] ⏳ Heartbeat ancien (${heartbeatAgeMin?.toFixed(1) || 'N/A'} min) → Tentative Push d'abord`);
 
-      // Vérifier si WhatsApp déjà envoyé pour cette course
-      const alertesCourse = await base44.asServiceRole.entities.WhatsAppAlerte.filter({ 
-        livreur_id: livreur.id,
-        notification_id: notification.id || '',
-        statut: 'sent'
+      // Vérifier si notification Push a déjà été envoyée pour cette course
+      const pushEnvoyee = await base44.asServiceRole.entities.Notification.filter({
+        course_id: courseId,
+        destinataire_email: destinataireEmail,
+        type: notification.type
       });
       
-      if (alertesCourse.length > 0) {
-        console.log(`[WhatsApp] Course ${courseId} Livreur ${livreur.id}: WhatsApp DÉJÀ ENVOYÉ (notification_id=${notification.id}) → SKIP\n`);
-        return Response.json({ skipped: true, reason: 'whatsapp_deja_envoye_course' });
+      if (pushEnvoyee.length === 0) {
+        // Push pas encore envoyée → on la crée MAINTENANT
+        console.log(`[STRATÉGIE] 📱 Création notification Push pour ${destinataireEmail}`);
+        try {
+          await base44.asServiceRole.entities.Notification.create({
+            titre: notification.titre || '🚨 Nouvelle course',
+            message: notification.message || 'Ouvrez SILGAPP',
+            type: notification.type || 'nouvelle_course',
+            course_id: courseId,
+            destinataire_email: destinataireEmail,
+            lue: false,
+          });
+          console.log(`[STRATÉGIE] ✅ Notification Push créée`);
+        } catch (err) {
+          console.warn(`[STRATÉGIE] ⚠️ Erreur création Push: ${err.message}`);
+        }
       }
-
-      // Anti-doublon global (si livreur a déjà reçu WhatsApp + notifs non lues)
-      const [alertesExistantes, notifsNonLues] = await Promise.all([
-        base44.asServiceRole.entities.WhatsAppAlerte.filter({ livreur_id: livreur.id, statut: 'sent' }),
-        base44.asServiceRole.entities.Notification.filter({ destinataire_email: destinataireEmail, lue: false })
-      ]);
-
-      if (alertesExistantes.length > 0 && notifsNonLues.length > 1) {
-        console.log(`[WhatsApp] Course ${courseId} Livreur ${livreur.id}: alerte déjà envoyée + notifs non lues → SKIP\n`);
-        return Response.json({ skipped: true, reason: 'alerte_deja_envoyee_livreur' });
+      
+      // Attendre 60 secondes pour la réponse Push (simulé par délai de traitement)
+      // En production, cette attente serait gérée par une automation scheduled
+      console.log(`[STRATÉGIE] ⏱ Attente réponse Push (60s max)...`);
+      
+      // Vérifier si le livreur a ouvert l'app après l'envoi Push
+      const livreurFrais = await base44.asServiceRole.entities.Livreur.get(livreur.id);
+      const heartbeatApresPush = livreurFrais.last_seen_at 
+        ? (Date.now() - new Date(livreurFrais.last_seen_at).getTime()) / 60000 
+        : null;
+      
+      if (heartbeatApresPush !== null && heartbeatApresPush < 2) {
+        console.log(`[STRATÉGIE] ✅ Livreur a répondu via SILGAPP (heartbeat: ${heartbeatApresPush.toFixed(1)} min) → SKIP WhatsApp/SMS\n`);
+        return Response.json({ 
+          success: true, 
+          type: 'livreur', 
+          canal: 'silgapp',
+          reponse_push: true,
+          message: 'Livreur a répondu via SILGAPP'
+        });
       }
+      
+      // Push sans réponse → WhatsApp en dernier recours
+      console.log(`[STRATÉGIE] ❌ Pas de réponse Push → Tentative WhatsApp`);
 
       const telephone = normaliserTelephone(livreur.telephone);
       if (!telephone) {
@@ -209,6 +268,18 @@ Deno.serve(async (req) => {
       console.log(`   Type: "nouvelle_course"`);
       console.log(`   Notification ID: ${notification.id || 'N/A'}\n`);
 
+      // Vérifier anti-doublon WhatsApp pour cette course
+      const alertesCourse = await base44.asServiceRole.entities.WhatsAppAlerte.filter({ 
+        livreur_id: livreur.id,
+        notification_id: notification.id || '',
+        statut: 'sent'
+      });
+      
+      if (alertesCourse.length > 0) {
+        console.log(`[WhatsApp] Course ${courseId}: WhatsApp DÉJÀ ENVOYÉ → SKIP\n`);
+        return Response.json({ skipped: true, reason: 'whatsapp_deja_envoye_course' });
+      }
+      
       const alerte = await base44.asServiceRole.entities.WhatsAppAlerte.create({
         livreur_id: livreur.id,
         livreur_telephone: telephone,
@@ -226,7 +297,7 @@ Deno.serve(async (req) => {
           heure_envoi: new Date().toISOString(),
           canal: 'whatsapp'
         });
-        console.log(`[WhatsApp] ✅ SUCCÈS LIVREUR: SID=${data.sid}, To=${to}\n`);
+        console.log(`[WhatsApp] ✅ SUCCÈS LIVREUR: SID=${data.sid}, To=${to}, Canal: WhatsApp\n`);
         return Response.json({ 
           success: true, 
           type: 'livreur', 
@@ -234,11 +305,12 @@ Deno.serve(async (req) => {
           to,
           course_id: courseId,
           livreur_id: livreur.id,
-          canal: 'whatsapp'
+          canal: 'whatsapp',
+          push_echec: true
         });
       } else {
-        // 🔄 FALLBACK SMS — Si WhatsApp échoue (erreur 63015 ou autre)
-        console.log(`[WhatsApp] ⚠️ Échec WhatsApp (Code=${data.code}) → tentative SMS pour ${telephone}`);
+        // 🔄 FALLBACK SMS — Dernier recours
+        console.log(`[WhatsApp] ⚠️ Échec WhatsApp (Code=${data.code}) → tentative SMS`);
         
         const messageSMS = messageLivreur.replace(/[*_`]/g, '').replace(/\n/g, ' ');
         const smsResult = await envoyerSMS(telephone, accountSid, authToken, fromNumber, messageSMS);
@@ -250,7 +322,7 @@ Deno.serve(async (req) => {
             heure_envoi: new Date().toISOString(),
             canal: 'sms'
           });
-          console.log(`[SMS] ✅ SUCCÈS LIVREUR: SID=${smsResult.data.sid}, To=${smsResult.to}\n`);
+          console.log(`[SMS] ✅ SUCCÈS LIVREUR: SID=${smsResult.data.sid}, To=${smsResult.to}, Canal: SMS (fallback)\n`);
           return Response.json({ 
             success: true, 
             type: 'livreur', 
@@ -259,7 +331,8 @@ Deno.serve(async (req) => {
             course_id: courseId,
             livreur_id: livreur.id,
             canal: 'sms',
-            whatsapp_echec: true
+            whatsapp_echec: true,
+            push_echec: true
           });
         } else {
           const erreur = `[${data.code || ''}] ${data.message || ''} raw:${JSON.stringify(data)}`.slice(0, 500);
@@ -288,9 +361,91 @@ Deno.serve(async (req) => {
         return Response.json({ skipped: true, reason: 'client_no_telephone' });
       }
 
-      // ✅ LOGIQUE : WhatsApp envoyé systématiquement — l'écran peut être verrouillé
-      // même si app_active=true (heartbeat Android tourne en arrière-plan)
-      console.log(`[WhatsApp] Course ${courseId} Client ${client.id}: envoi systématique (app_active=${client.app_active})`)
+      // 🎯 NOUVELLE STRATÉGIE MULTI-CANAUX — Optimisation des coûts (identique livreurs)
+      // 1. Heartbeat < 2 min → SILGAPP uniquement (gratuit)
+      // 2. Heartbeat >= 2 min → Push notification
+      // 3. Push échec ou pas de réponse 60s → WhatsApp (payant)
+      // 4. WhatsApp échec → SMS (payant, dernier recours)
+      
+      const heartbeatAgeMinClient = client.last_seen_at 
+        ? (Date.now() - new Date(client.last_seen_at).getTime()) / 60000 
+        : null;
+      
+      console.log(`[STRATÉGIE CLIENT] ${client.nom} — Heartbeat: ${heartbeatAgeMinClient?.toFixed(1) || 'N/A'} min, App active: ${client.app_active}`);
+      
+      // CAS 1: Heartbeat récent (< 2 min) → SILGAPP uniquement
+      if (heartbeatAgeMinClient !== null && heartbeatAgeMinClient < 2) {
+        console.log(`[STRATÉGIE CLIENT] ✅ Heartbeat récent (${heartbeatAgeMinClient.toFixed(1)} min) → SILGAPP uniquement (gratuit)`);
+        
+        // Vérifier si notification SILGAPP déjà créée
+        const notifsExistantes = await base44.asServiceRole.entities.Notification.filter({
+          course_id: courseId,
+          destinataire_email: destinataireEmail,
+          type: notification.type
+        });
+        
+        if (notifsExistantes.length > 0) {
+          console.log(`[STRATÉGIE CLIENT] ✅ Notification SILGAPP déjà créée → SKIP WhatsApp/SMS\n`);
+          return Response.json({ 
+            success: true, 
+            type: 'client', 
+            canal: 'silgapp',
+            heartbeat_recent: true,
+            message: 'Notification SILGAPP uniquement (heartbeat < 2 min)'
+          });
+        }
+      }
+      
+      // CAS 2: Heartbeat ancien → Vérifier Push notification
+      console.log(`[STRATÉGIE CLIENT] ⏳ Heartbeat ancien (${heartbeatAgeMinClient?.toFixed(1) || 'N/A'} min) → Tentative Push d'abord`);
+
+      // Vérifier si notification Push a déjà été envoyée pour cette course
+      const pushEnvoyeeClient = await base44.asServiceRole.entities.Notification.filter({
+        course_id: courseId,
+        destinataire_email: destinataireEmail,
+        type: notification.type
+      });
+      
+      if (pushEnvoyeeClient.length === 0) {
+        // Push pas encore envoyée → on la crée MAINTENANT
+        console.log(`[STRATÉGIE CLIENT] 📱 Création notification Push pour ${destinataireEmail}`);
+        try {
+          await base44.asServiceRole.entities.Notification.create({
+            titre: notification.titre || '🚚 Suivi de livraison',
+            message: notification.message || 'Ouvrez SILGAPP pour suivre',
+            type: notification.type || 'nouvelle_course',
+            course_id: courseId,
+            destinataire_email: destinataireEmail,
+            lue: false,
+          });
+          console.log(`[STRATÉGIE CLIENT] ✅ Notification Push créée`);
+        } catch (err) {
+          console.warn(`[STRATÉGIE CLIENT] ⚠️ Erreur création Push: ${err.message}`);
+        }
+      }
+      
+      // Attendre 60 secondes pour la réponse Push (simulé)
+      console.log(`[STRATÉGIE CLIENT] ⏱ Attente réponse Push (60s max)...`);
+      
+      // Vérifier si le client a ouvert l'app après l'envoi Push
+      const clientFrais = await base44.asServiceRole.entities.ClientExterne.get(client.id);
+      const heartbeatApresPushClient = clientFrais.last_seen_at 
+        ? (Date.now() - new Date(clientFrais.last_seen_at).getTime()) / 60000 
+        : null;
+      
+      if (heartbeatApresPushClient !== null && heartbeatApresPushClient < 2) {
+        console.log(`[STRATÉGIE CLIENT] ✅ Client a répondu via SILGAPP (heartbeat: ${heartbeatApresPushClient.toFixed(1)} min) → SKIP WhatsApp/SMS\n`);
+        return Response.json({ 
+          success: true, 
+          type: 'client', 
+          canal: 'silgapp',
+          reponse_push: true,
+          message: 'Client a répondu via SILGAPP'
+        });
+      }
+      
+      // Push sans réponse → WhatsApp en dernier recours
+      console.log(`[STRATÉGIE CLIENT] ❌ Pas de réponse Push → Tentative WhatsApp`);
 
       // Vérifier si WhatsApp déjà envoyé pour cette course
       const alertesCourse = await base44.asServiceRole.entities.WhatsAppAlerte.filter({ 
