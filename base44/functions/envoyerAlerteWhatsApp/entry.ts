@@ -90,6 +90,35 @@ async function envoyerWhatsApp(telephone, accountSid, authToken, fromNumber, mes
   return { ok: resp.ok, data, to };
 }
 
+/**
+ * Envoi SMS via Twilio (fallback si WhatsApp échoue)
+ */
+async function envoyerSMS(telephone, accountSid, authToken, fromNumber, message) {
+  // Nettoyer le formatage WhatsApp pour SMS
+  const messageSMS = message.replace(/[*_`]/g, '').replace(/\n/g, ' ');
+  const from = fromNumber.startsWith('whatsapp:') ? fromNumber.replace('whatsapp:', '') : fromNumber;
+
+  const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+  const credentials = btoa(`${accountSid}:${authToken}`);
+
+  const formData = new URLSearchParams();
+  formData.append('From', from);
+  formData.append('To', telephone.startsWith('+') ? telephone : `+${telephone}`);
+  formData.append('Body', messageSMS);
+
+  const resp = await fetch(twilioUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${credentials}`,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: formData.toString()
+  });
+
+  const data = await resp.json();
+  return { ok: resp.ok, data, to: telephone };
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -194,7 +223,8 @@ Deno.serve(async (req) => {
         await base44.asServiceRole.entities.WhatsAppAlerte.update(alerte.id, {
           statut: 'sent',
           twilio_sid: data.sid,
-          heure_envoi: new Date().toISOString()
+          heure_envoi: new Date().toISOString(),
+          canal: 'whatsapp'
         });
         console.log(`[WhatsApp] ✅ SUCCÈS LIVREUR: SID=${data.sid}, To=${to}\n`);
         return Response.json({ 
@@ -204,13 +234,39 @@ Deno.serve(async (req) => {
           to,
           course_id: courseId,
           livreur_id: livreur.id,
-          whatsapp_sent: true
+          canal: 'whatsapp'
         });
       } else {
-        const erreur = `[${data.code || ''}] ${data.message || ''} raw:${JSON.stringify(data)}`.slice(0, 500);
-        await base44.asServiceRole.entities.WhatsAppAlerte.update(alerte.id, { statut: 'failed', erreur });
-        console.error(`[WhatsApp] ❌ ÉCHEC LIVREUR: Code=${data.code}, Message=${data.message}, To=${to}, From=${fromNumber}\n`);
-        return Response.json({ success: false, type: 'livreur', erreur, course_id: courseId });
+        // 🔄 FALLBACK SMS — Si WhatsApp échoue (erreur 63015 ou autre)
+        console.log(`[WhatsApp] ⚠️ Échec WhatsApp (Code=${data.code}) → tentative SMS pour ${telephone}`);
+        
+        const messageSMS = messageLivreur.replace(/[*_`]/g, '').replace(/\n/g, ' ');
+        const smsResult = await envoyerSMS(telephone, accountSid, authToken, fromNumber, messageSMS);
+        
+        if (smsResult.ok && smsResult.data.sid) {
+          await base44.asServiceRole.entities.WhatsAppAlerte.update(alerte.id, {
+            statut: 'sent',
+            twilio_sid: smsResult.data.sid,
+            heure_envoi: new Date().toISOString(),
+            canal: 'sms'
+          });
+          console.log(`[SMS] ✅ SUCCÈS LIVREUR: SID=${smsResult.data.sid}, To=${smsResult.to}\n`);
+          return Response.json({ 
+            success: true, 
+            type: 'livreur', 
+            twilio_sid: smsResult.data.sid, 
+            to: smsResult.to,
+            course_id: courseId,
+            livreur_id: livreur.id,
+            canal: 'sms',
+            whatsapp_echec: true
+          });
+        } else {
+          const erreur = `[${data.code || ''}] ${data.message || ''} raw:${JSON.stringify(data)}`.slice(0, 500);
+          await base44.asServiceRole.entities.WhatsAppAlerte.update(alerte.id, { statut: 'failed', erreur, canal: 'whatsapp+sms' });
+          console.error(`[WhatsApp/SMS] ❌ ÉCHEC DOUBLE: WhatsApp Code=${data.code}, SMS=${smsResult.data?.message || 'non tenté'}\n`);
+          return Response.json({ success: false, type: 'livreur', erreur, course_id: courseId, canal: 'failed' });
+        }
       }
     }
 
@@ -291,7 +347,8 @@ Deno.serve(async (req) => {
         await base44.asServiceRole.entities.WhatsAppAlerte.update(alerte.id, {
           statut: 'sent',
           twilio_sid: data.sid,
-          heure_envoi: new Date().toISOString()
+          heure_envoi: new Date().toISOString(),
+          canal: 'whatsapp'
         });
         console.log(`[WhatsApp] ✅ SUCCÈS CLIENT: SID=${data.sid}, To=${to}\n`);
         return Response.json({ 
@@ -301,13 +358,39 @@ Deno.serve(async (req) => {
           to,
           course_id: courseId,
           client_id: client.id,
-          whatsapp_sent: true
+          canal: 'whatsapp'
         });
       } else {
-        const erreur = `[${data.code || ''}] ${data.message || ''} raw:${JSON.stringify(data)}`.slice(0, 500);
-        await base44.asServiceRole.entities.WhatsAppAlerte.update(alerte.id, { statut: 'failed', erreur });
-        console.error(`[WhatsApp] ❌ ÉCHEC CLIENT: Code=${data.code}, Message=${data.message}, To=${to}, From=${fromNumber}\n`);
-        return Response.json({ success: false, type: 'client', erreur, course_id: courseId });
+        // 🔄 FALLBACK SMS — Si WhatsApp échoue (erreur 63015 ou autre)
+        console.log(`[WhatsApp] ⚠️ Échec WhatsApp (Code=${data.code}) → tentative SMS pour ${telephone}`);
+        
+        const messageSMS = messageClient.replace(/[*_`]/g, '').replace(/\n/g, ' ');
+        const smsResult = await envoyerSMS(telephone, accountSid, authToken, fromNumber, messageSMS);
+        
+        if (smsResult.ok && smsResult.data.sid) {
+          await base44.asServiceRole.entities.WhatsAppAlerte.update(alerte.id, {
+            statut: 'sent',
+            twilio_sid: smsResult.data.sid,
+            heure_envoi: new Date().toISOString(),
+            canal: 'sms'
+          });
+          console.log(`[SMS] ✅ SUCCÈS CLIENT: SID=${smsResult.data.sid}, To=${smsResult.to}\n`);
+          return Response.json({ 
+            success: true, 
+            type: 'client', 
+            twilio_sid: smsResult.data.sid, 
+            to: smsResult.to,
+            course_id: courseId,
+            client_id: client.id,
+            canal: 'sms',
+            whatsapp_echec: true
+          });
+        } else {
+          const erreur = `[${data.code || ''}] ${data.message || ''} raw:${JSON.stringify(data)}`.slice(0, 500);
+          await base44.asServiceRole.entities.WhatsAppAlerte.update(alerte.id, { statut: 'failed', erreur, canal: 'whatsapp+sms' });
+          console.error(`[WhatsApp/SMS] ❌ ÉCHEC DOUBLE: WhatsApp Code=${data.code}, SMS=${smsResult.data?.message || 'non tenté'}\n`);
+          return Response.json({ success: false, type: 'client', erreur, course_id: courseId, canal: 'failed' });
+        }
       }
     }
 

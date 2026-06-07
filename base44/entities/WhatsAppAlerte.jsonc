@@ -36,6 +36,16 @@
       "type": "string",
       "format": "date-time",
       "description": "Heure d'envoi effective"
+    },
+    "canal": {
+      "type": "string",
+      "enum": [
+        "whatsapp",
+        "sms",
+        "whatsapp+sms"
+      ],
+      "default": "whatsapp",
+      "description": "Canal utilis\u00e9 : WhatsApp, SMS (fallback) ou les deux"
     }
   },
   "required": [
