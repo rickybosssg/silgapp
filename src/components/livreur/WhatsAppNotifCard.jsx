@@ -3,6 +3,16 @@ import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import { CheckCircle2, AlertCircle, RefreshCw, Copy, MessageCircle, Zap } from "lucide-react";
 
+// Ouvrir un lien externe compatible Android/Capacitor
+async function ouvrirLien(url) {
+  try {
+    const { Browser } = await import('@capacitor/browser');
+    await Browser.open({ url });
+  } catch {
+    window.open(url, '_blank');
+  }
+}
+
 const SANDBOX_NUMERO = "14155238886";
 const SANDBOX_CODE = "join rise-bit";
 
@@ -27,7 +37,7 @@ export default function WhatsAppNotifCard({ livreurProfil, onOptInUpdated }) {
   const expInfo = formatExpiration();
 
   const handleActiver = () => {
-    window.open(`https://wa.me/${SANDBOX_NUMERO}?text=${encodeURIComponent(SANDBOX_CODE)}`, "_blank");
+    ouvrirLien(`https://wa.me/${SANDBOX_NUMERO}?text=${encodeURIComponent(SANDBOX_CODE)}`);
   };
 
   const handleCopier = () => {
@@ -45,14 +55,16 @@ export default function WhatsAppNotifCard({ livreurProfil, onOptInUpdated }) {
       });
       const data = res?.data;
       if (data?.opt_in_actif) {
-        toast.success("✅ WhatsApp activé — notifications opérationnelles");
+        toast.success("✅ WhatsApp activé — vous allez recevoir les alertes !");
         onOptInUpdated?.(true);
       } else {
-        toast.error("❌ Pas encore inscrit — envoyez le code via WhatsApp d'abord");
+        // Afficher la raison précise
+        const raison = data?.raison || "Non inscrit";
+        toast.error(`❌ ${raison} — Cliquez "Activer WhatsApp" pour vous inscrire`);
         onOptInUpdated?.(false);
       }
     } catch (err) {
-      toast.error("Erreur de vérification");
+      toast.error("Erreur réseau — réessayez dans quelques secondes");
     } finally {
       setVerifying(false);
     }
