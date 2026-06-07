@@ -1,6 +1,7 @@
 // ─── Constantes de seuils ────────────────────────────────────────────────────
 
-export const GPS_SEUIL_MIN = 5;          // GPS valide si < 5 min
+export const GPS_SEUIL_MIN = 5;           // GPS valide si < 5 min (affichage badge)
+export const GPS_DISPATCH_SEUIL_MIN = 10; // GPS éligible dispatch si < 10 min (= moteur dispatch)
 export const HEARTBEAT_SEUIL_MIN = 5;    // App active si heartbeat < 5 min
 export const HEARTBEAT_ON_SEUIL_MIN = 10; // ON si heartbeat < 10 min
 export const GPS_CLIENT_SEUIL_MIN = 30;  // Client GPS valide si < 30 min
@@ -37,17 +38,22 @@ export function isON(livreur) {
 }
 
 /**
- * Libre = disponible + statut disponible + GPS renseigné (lat/lng présents)
+ * Libre = disponible + GPS récent < 10 min (même règle que le moteur dispatch externe)
  * ⚠️ app_active n'est PAS un critère de disponibilité :
  *   - App ouverte → notification SILGAPP
  *   - App fermée  → notification WhatsApp automatique
  * Un livreur reste dispatchable même si son app est fermée.
+ * GPS > 10 min → non dispatchable → non compté comme libre.
  */
 export function isLibre(livreur) {
-  return livreur.statut === "disponible"
-    && livreur.actif !== false
-    && livreur.validation === "valide"
-    && !!(livreur.latitude && livreur.longitude);
+  if (livreur.statut !== "disponible") return false;
+  if (livreur.actif === false) return false;
+  if (livreur.validation !== "valide") return false;
+  if (!livreur.latitude || !livreur.longitude) return false;
+  // GPS doit être < GPS_DISPATCH_SEUIL_MIN (10 min) — même règle que le moteur dispatch
+  const dt = livreur.derniere_position_date || livreur.last_seen_at;
+  if (!dt) return false;
+  return (Date.now() - new Date(dt).getTime()) < GPS_DISPATCH_SEUIL_MIN * 60 * 1000;
 }
 
 /** En course = statut en_course + ON */
