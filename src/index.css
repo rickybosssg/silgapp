@@ -86,6 +86,10 @@
     @apply bg-background text-foreground font-inter;
     overscroll-behavior-y: none;
   }
+  /* Force mode clair par défaut pour éviter texte blanc sur fond blanc */
+  html:not(.dark) {
+    color-scheme: light;
+  }
   button, nav, [role="navigation"] {
     user-select: none;
     -webkit-user-select: none;

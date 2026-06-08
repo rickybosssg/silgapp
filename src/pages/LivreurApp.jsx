@@ -397,7 +397,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
   const livreurVisible = isEnLigne && gpsActif && livreurProfil.latitude && livreurProfil.longitude;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <AlertesLivreurModal
         livreurId={livreurProfil?.id}
         livreurNom={`${livreurProfil?.prenom || ""} ${livreurProfil?.nom || ""}`.trim()}
