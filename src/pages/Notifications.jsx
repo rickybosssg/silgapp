@@ -55,7 +55,7 @@ export default function Notifications() {
           <div className="absolute -top-8 -right-8 w-40 h-40 bg-white rounded-full" />
           <div className="absolute -bottom-12 -left-6 w-56 h-56 bg-white rounded-full" />
         </div>
-        <div className="relative flex items-center justify-between gap-3">
+        <div className="relative flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             <div className="relative w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center">
               <Bell className="w-5 h-5 text-white" />
@@ -84,6 +84,15 @@ export default function Notifications() {
               <span className="hidden sm:inline">Tout marquer lu</span>
             </Button>
           )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-white hover:bg-white/20 border border-white/30 text-xs"
+            onClick={() => window.location.href = '/admin/test-notifications'}
+          >
+            <Bell className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Tester</span>
+          </Button>
         </div>
       </div>
 

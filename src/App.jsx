@@ -53,6 +53,7 @@ const GestionPublicites = lazy(() => import('./pages/GestionPublicites.jsx'));
 const FraisAnnulationAdmin = lazy(() => import('./pages/FraisAnnulationAdmin.jsx'));
 const VenusRapportsPage = lazy(() => import('./pages/VenusRapportsPage.jsx'));
 const PolitiqueConfidentialite = lazy(() => import('./pages/PolitiqueConfidentialite.jsx'));
+const TestNotifications = lazy(() => import('./pages/TestNotifications.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -246,6 +247,7 @@ function AppContent() {
             </>
           )}
           <Route path="/notifications" element={<AnimatedRoutes><Notifications /></AnimatedRoutes>} />
+          <Route path="/admin/test-notifications" element={<AnimatedRoutes><TestNotifications /></AnimatedRoutes>} />
         </Route>
         <Route path="*" element={<PageNotFound />} />
       </Routes>
