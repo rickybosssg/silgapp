@@ -60,7 +60,7 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
         // ⚠️ CORRECTION PRIX MANUEL : Utiliser manual_price si accepté
         const isPrixManuel = c.pricing_mode === "manual" && c.manual_price_status === "accepted" && Number(c.manual_price) > 0;
         return sum + (isPrixManuel ? Number(c.manual_price) : (c.prix_final || 0));
-      })
+      }, 0)
     : livreesToday.reduce((sum, c) => sum + (c.prix_reel || 0), 0);
   const gainLivreurToday = livreesToday.reduce((sum, c) => {
     // ⚠️ CORRECTION PRIX MANUEL : Utiliser montant_livreur si déjà calculé, sinon recalculer avec respect du mode
