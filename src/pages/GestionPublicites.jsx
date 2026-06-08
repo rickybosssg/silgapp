@@ -4,14 +4,12 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import {
   Plus, ArrowLeft, Eye, MousePointerClick, Video, Image, Type,
-  ToggleLeft, ToggleRight, Pencil, Trash2, TrendingUp, Calendar,
-  Users, Target, Loader2, X, Check, ExternalLink, Megaphone
+  ToggleLeft, ToggleRight, Pencil, Trash2, TrendingUp, Calendar, Target, Loader2, X, Check, Megaphone
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";

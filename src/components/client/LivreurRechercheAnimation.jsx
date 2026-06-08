@@ -3,9 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Truck, MapPin, Package, User, Smartphone, CheckCircle2, Loader2, Navigation, XCircle } from "lucide-react";
+import { Truck, MapPin, Package, User, CheckCircle2, Loader2, Navigation, XCircle } from "lucide-react";
 import AnnulerCourseDialog from "./AnnulerCourseDialog";
 import PrixManuelInlineCard from "./PrixManuelInlineCard";
 

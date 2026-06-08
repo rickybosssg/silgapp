@@ -5,7 +5,7 @@ import HeatmapControls from "./HeatmapControls";
 import HeatmapLegend from "./HeatmapLegend";
 import CountrySelector from "@/components/international/CountrySelector";
 import { useZonesChaudesHalos } from "./ZonesChaudes";
-import { isLibre, isEnCourse, isON, GPS_DISPATCH_SEUIL_MIN } from "@/lib/dispatchRules";
+import { isLibre, GPS_DISPATCH_SEUIL_MIN } from "@/lib/dispatchRules";
 
 /**
  * DispatchMap — Carte dédiée au dispatch temps réel

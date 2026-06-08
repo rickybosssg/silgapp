@@ -1,7 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
-import { Shield, Lock, Globe, RefreshCcw, MessageCircle, Phone, ArrowRight, Clock, MapPin } from "lucide-react";
+import { Shield, Lock, RefreshCcw, MessageCircle, Phone, ArrowRight, Clock, MapPin } from "lucide-react";
 
 const securityItems = [
   { icon: Lock, title: "Application officielle", desc: "Développée par SILGAPP" },

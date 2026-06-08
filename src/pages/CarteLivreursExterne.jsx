@@ -1,15 +1,12 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
-import { MapPin, Truck, Wifi, WifiOff, X, Clock, Users, Flame, Wrench } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { MapPin, Truck, Wifi, WifiOff, X, Clock, Users, Wrench } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import DispatchMap from "@/components/carte/DispatchMap";
 import MarkerInfoPanel from "@/components/carte/MarkerInfoPanel";
 import NetworkHealthBanner from "@/components/carte/NetworkHealthBanner";
-import GPSHealthBadge from "@/components/carte/GPSHealthBadge";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
@@ -25,10 +22,8 @@ import {
   isEnCourse,
   isON,
   isAppActive,
-  isGPSRecent,
   hasValidGPS,
   isClientGPSRecent,
-  isClientNoir,
 } from "@/lib/dispatchRules.js";
 import { isLivreurNoir } from "@/lib/livreurCounters.js";
 

@@ -1,6 +1,5 @@
 import React, { useRef, useState } from "react";
-import { Camera, X, Upload, User } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Camera } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 

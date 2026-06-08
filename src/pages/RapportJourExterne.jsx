@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Package, DollarSign, TrendingUp, CheckCircle2, MapPin, Clock, User } from "lucide-react";
+import { ArrowLeft, CheckCircle2, MapPin, Clock, User } from "lucide-react";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useAdminContext } from "@/hooks/useAdminContext.js";

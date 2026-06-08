@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { DollarSign, Check, X, AlertCircle } from "lucide-react";
+import { Check, X, AlertCircle } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 

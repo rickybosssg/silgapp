@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
-  MessageCircle, CheckCircle2, AlertCircle, Clock,
+  MessageCircle, CheckCircle2, AlertCircle,
   RefreshCw, ArrowLeft, Users, Activity, Zap, Bell,
   UserCheck, UserX, Copy, ExternalLink
 } from "lucide-react";

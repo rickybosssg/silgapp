@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Clock, Trash2, User, Phone, ArrowRight } from "lucide-react";
+import { Clock, Trash2, ArrowRight } from "lucide-react";
 import { Preferences } from "@capacitor/preferences";
 
 const STORAGE_KEY = "silgapp_contacts_recents";

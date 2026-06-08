@@ -1,10 +1,9 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Truck, Phone, RefreshCw, MapPin, Package, Wifi, WifiOff, Clock, X } from "lucide-react";
+import { Truck, Phone, RefreshCw, MapPin, Wifi, WifiOff, Clock, X } from "lucide-react";
 import NetworkHealthBanner from "@/components/carte/NetworkHealthBanner";
 import { cn } from "@/lib/utils";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";

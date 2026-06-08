@@ -1,5 +1,5 @@
 import React from "react";
-import { Phone, MessageCircle, Star, Bike, Car } from "lucide-react";
+import { Phone, MessageCircle, Star } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
 function openWhatsApp(phone) {

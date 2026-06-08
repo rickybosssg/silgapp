@@ -6,13 +6,10 @@ import { Link } from "react-router-dom";
 import {
   Button
 } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
-  ArrowLeft, Users, UserCheck, UserX, Phone, Mail, MapPin,
-  Eye, Ban, CheckCircle2, RefreshCw, Bike, Car, Truck,
-  XCircle, Banknote, Star, Wifi, WifiOff, Plus, Power, PowerOff
+  ArrowLeft, Users, UserCheck, UserX, Phone, Mail, MapPin, Ban, CheckCircle2, RefreshCw, Bike, Car, Truck,
+  XCircle, Banknote, Star, Wifi, WifiOff, Power, PowerOff
 } from "lucide-react";
 import CreateLivreurDialog from "@/components/livreurs/CreateLivreurDialog";
 import NotationLivreurPanel from "@/components/admin/NotationLivreurPanel";

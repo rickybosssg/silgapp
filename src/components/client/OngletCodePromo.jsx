@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Copy, Share2, Users, TrendingUp, Gift, Trophy, Medal, Award, CheckCircle, Clock, XCircle } from "lucide-react";
+import { Copy, Share2, Users, TrendingUp, Gift, CheckCircle, Clock, XCircle } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";

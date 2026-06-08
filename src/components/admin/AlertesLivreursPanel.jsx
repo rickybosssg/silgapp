@@ -2,14 +2,12 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { 
-  Bell, Plus, Trash2, CheckCircle, Users, Eye, EyeOff,
-  AlertTriangle, Info, Loader2, X, ChevronDown, ChevronUp
+  Bell, Plus, Trash2, Loader2, X, ChevronDown, ChevronUp
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 
 const NIVEAU_CONFIG = {
   information: { emoji: "🟢", label: "Information", color: "bg-green-100 text-green-700 border-green-200", dot: "bg-green-500" },

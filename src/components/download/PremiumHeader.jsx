@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { Sparkles, TrendingUp, Zap, Star } from "lucide-react";
+import { Sparkles, TrendingUp, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export default function PremiumHeader({ downloadCount }) {

@@ -16,12 +16,9 @@ import {
   MessageCircle,
   Video,
   ArrowRight,
-  Calendar,
-  Clock
+  Calendar
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { format } from "date-fns";
-import { fr } from "date-fns/locale";
 
 const PAYS = {
   BF: { nom: "Burkina Faso", emoji: "🇧🇫" },

@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import {
-  Package, MapPin, Clock, CheckCircle2, XCircle,
-  Star, ChevronRight, Truck, CreditCard, AlertTriangle
+  Package, Clock,
+  Star, ChevronRight, Truck, AlertTriangle
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";

@@ -1,11 +1,10 @@
 import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Users, Eye, Lock, Unlock, Phone, Mail, Calendar, Activity, Truck, Trash2, Tag, Plus, ToggleLeft, ToggleRight, X, MapPin, Package, CheckCircle2, XCircle } from "lucide-react";
+import { Search, Users, Lock, Unlock, Phone, Mail, Calendar, Truck, Trash2, Tag, Plus, ToggleLeft, ToggleRight, X, MapPin, Package, CheckCircle2, XCircle } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";

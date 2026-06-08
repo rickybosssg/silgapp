@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
-import { Truck, Building, Users } from "lucide-react";
+import React, { useState } from "react";
+import { Building, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import PinVerification from "@/components/auth/PinVerification";

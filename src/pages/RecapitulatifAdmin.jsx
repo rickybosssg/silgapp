@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { TrendingUp, Calendar, Building2, Globe } from "lucide-react";
+import { Calendar, Building2, Globe } from "lucide-react";
 import { format, subDays, startOfWeek, startOfMonth, isWithinInterval } from "date-fns";
 import { fr } from "date-fns/locale";
 import LivreurPerformanceCard from "@/components/livreurs/LivreurPerformanceCard";

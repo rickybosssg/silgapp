@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Flame, RefreshCw, TrendingUp, MapPin } from "lucide-react";
+import { Flame, RefreshCw } from "lucide-react";
 
 const NIVEAU_STYLE = {
   faible:     { emoji: "🟢", color: "#22c55e", label: "Faible",       ring: "rgba(34,197,94,0.25)",  glow: "rgba(34,197,94,0.15)" },

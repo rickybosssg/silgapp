@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { Check, X, AlertCircle, Loader2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 
 /**
  * Carte inline affichée à la place du bloc "Recherche en cours"

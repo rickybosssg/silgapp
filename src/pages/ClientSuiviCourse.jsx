@@ -6,7 +6,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Phone, Package, CheckCircle2, Clock, User, Star, XCircle, ArrowLeft, Share2, Ruler, Banknote } from "lucide-react";
+import { MapPin, Package, CheckCircle2, Clock, Star, XCircle, ArrowLeft, Share2, Ruler, Banknote } from "lucide-react";
 
 function haversineKm(lat1, lon1, lat2, lon2) {
   if (!lat1 || !lon1 || !lat2 || !lon2) return null;
