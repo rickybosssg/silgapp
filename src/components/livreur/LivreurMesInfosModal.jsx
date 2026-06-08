@@ -4,7 +4,6 @@ import { Check, Trash2 } from "lucide-react";
 import { formaterTelephone } from "./LivreurExterneOnboarding";
 import PhotoPicker from "./PhotoPicker";
 import LivreurPhotoUploader from "./LivreurPhotoUploader";
-import WhatsAppSandboxCard from "./WhatsAppSandboxCard";
 import { base44 } from "@/api/base44Client";
 import { SILGAPP_COUNTRIES } from "@/lib/phoneUtils";
 
@@ -157,16 +156,6 @@ export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
           ))}
         </div>
       </div>
-
-      {/* WhatsApp Sandbox */}
-      {livreurProfil?.type_livreur === "externe" && (
-        <WhatsAppSandboxCard
-          livreurProfil={livreurProfil}
-          onOptInUpdated={(val) => {
-            // Juste un retour visuel — le parent peut rafraîchir si besoin
-          }}
-        />
-      )}
 
       {/* Photos */}
       <div className="space-y-3">
