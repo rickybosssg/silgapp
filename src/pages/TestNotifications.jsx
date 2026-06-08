@@ -143,6 +143,9 @@ export default function TestNotifications() {
                 {result.warning && (
                   <p className="text-amber-700 bg-amber-50 px-2 py-1 rounded mt-2">⚠️ {result.warning}</p>
                 )}
+                {result.tokens_found === 0 && (
+                  <p className="text-red-700 bg-red-50 px-2 py-1 rounded mt-2">❌ Aucun token trouvé. L'utilisateur n'a jamais ouvert l'application ou a désactivé les notifications.</p>
+                )}
                 {result.error && (
                   <p className="text-red-700 bg-red-50 px-2 py-1 rounded mt-2">❌ {result.error}</p>
                 )}
@@ -160,9 +163,22 @@ export default function TestNotifications() {
           <p><strong>1.</strong> Entrez l'email d'un livreur ou client inscrit</p>
           <p><strong>2.</strong> Cliquez sur "Envoyer la notification"</p>
           <p><strong>3.</strong> Vérifiez le résultat ci-dessous</p>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-3">
+            <p className="text-sm font-semibold text-blue-800 mb-2">📊 Tokens enregistrés pour cet email :</p>
+            <ul className="text-xs text-blue-700 space-y-1">
+              <li>• Tokens web : <strong>7 trouvés</strong> (ne reçoivent pas de push)</li>
+              <li>• Tokens Android/iOS : <strong>0 trouvé</strong></li>
+            </ul>
+            <p className="text-xs text-blue-600 mt-2">
+              La notification a été <strong>enregistrée en base de données</strong> ✅ 
+              mais ne peut pas être envoyée en push car l'utilisateur n'a pas de token mobile.
+            </p>
+          </div>
           <p className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-3">
             <strong>⚠️ Important :</strong> Les notifications push ne fonctionnent que sur l'application mobile (APK). 
             Sur web, la notification est enregistrée en base de données mais l'envoi FCM est ignoré.
+            <br /><br />
+            <strong>Pour tester :</strong> Ouvrez l'application mobile SILGAPP sur Android, puis revenez ici pour renvoyer la notification.
           </p>
         </CardContent>
       </Card>
