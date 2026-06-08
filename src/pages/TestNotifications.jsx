@@ -143,6 +143,12 @@ export default function TestNotifications() {
                 {result.warning && (
                   <p className="text-amber-700 bg-amber-50 px-2 py-1 rounded mt-2">⚠️ {result.warning}</p>
                 )}
+                {result.message && (
+                  <p className="text-blue-700 bg-blue-50 px-2 py-1 rounded mt-2">ℹ️ {result.message}</p>
+                )}
+                {result.web_tokens !== undefined && (
+                  <p className="text-green-700 bg-green-50 px-2 py-1 rounded mt-2">✅ {result.web_tokens} token(s) web - Notification affichée via subscription temps réel</p>
+                )}
                 {result.tokens_found === 0 && (
                   <p className="text-red-700 bg-red-50 px-2 py-1 rounded mt-2">❌ Aucun token trouvé. L'utilisateur n'a jamais ouvert l'application ou a désactivé les notifications.</p>
                 )}

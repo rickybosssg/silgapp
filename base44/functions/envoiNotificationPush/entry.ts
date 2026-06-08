@@ -134,15 +134,22 @@ Deno.serve(async (req) => {
       }, { status: 404 });
     }
 
-    // Exclure les tokens web (pas de FCM natif)
-    const pushableTokens = tokens.filter(item => !String(item.token).startsWith('web_'));
-    if (pushableTokens.length === 0) {
+    // Tokens web (notifications via subscription temps réel) + tokens natifs (FCM)
+    const webTokens = tokens.filter(item => String(item.token).startsWith('web_'));
+    const nativeTokens = tokens.filter(item => !String(item.token).startsWith('web_'));
+    
+    // Si uniquement des tokens web → notification enregistrée, sera affichée via subscription
+    if (nativeTokens.length === 0 && webTokens.length > 0) {
       return Response.json({
         success: true,
         notification_id: notification.id,
-        warning: 'Only web fallback tokens found — notification saved but no native FCM push sent',
+        tokens_found: tokens.length,
+        web_tokens: webTokens.length,
+        message: 'Notification enregistree en base de donnees. Elle sera affichee via la subscription temps reel sur l\'application web.',
       });
     }
+    
+    const pushableTokens = nativeTokens;
 
     const { projectId, clientEmail, privateKey } = getFirebaseConfig();
     if (!projectId || !clientEmail || !privateKey) {
