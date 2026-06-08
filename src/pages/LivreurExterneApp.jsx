@@ -23,6 +23,7 @@ import PubliciteCarousel from "@/components/publicite/PubliciteCarousel";
 import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
 import PricingModeSelector from "@/components/livreur/PricingModeSelector";
 import PrixManuelReponseAlert from "@/components/livreur/PrixManuelReponseAlert";
+import { Bell } from "lucide-react";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -48,6 +49,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   });
   // Réponse du client à une proposition de prix manuel
   const [prixManuelReponse, setPrixManuelReponse] = useState(null); // { accepted, prix, devise }
+  // Test notification
+  const [testingNotif, setTestingNotif] = useState(false);
   const prixManuelWatchedRef = useRef({}); // track les course_id déjà notifiés
 
   // Pull-to-refresh
@@ -392,6 +395,28 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     setTimeout(() => window.location.reload(), 300);
   };
 
+  const handleTestNotification = async () => {
+    setTestingNotif(true);
+    try {
+      const response = await base44.functions.invoke("envoiNotificationPush", {
+        destinataire_email: livreurProfil.user_email,
+        titre: "🧪 Test Notification SILGAPP",
+        message: "Si vous voyez ceci, les notifications push fonctionnent ! ✅",
+        type: "test",
+      });
+      
+      if (response.success) {
+        toast.success(`Notification envoyée ! Tokens: ${response.tokens_found || 0}`);
+      } else {
+        toast.error(response.error || "Échec de l'envoi");
+      }
+    } catch (err) {
+      toast.error("Erreur: " + (err.message || "inconnue"));
+    } finally {
+      setTestingNotif(false);
+    }
+  };
+
   // ─── Onboarding externe obligatoire ──────────────────────────────────────
   if (!onboardingTermine) {
     return (
@@ -564,6 +589,16 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             />
 
             <LivreurStatutCard statut={livreurProfil.statut} livreur={livreurProfil} isExterne={true} />
+
+            {/* Bouton test notification */}
+            <button
+              onClick={handleTestNotification}
+              disabled={testingNotif}
+              className="w-full h-14 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-black text-base shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 disabled:opacity-60"
+            >
+              <Bell className={`w-5 h-5 ${testingNotif ? "animate-bounce" : ""}`} />
+              {testingNotif ? "Envoi en cours..." : "🧪 Tester Notification Push"}
+            </button>
 
             {coursesActives.length > 0 && (
               <div className="space-y-3">
