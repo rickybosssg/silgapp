@@ -51,6 +51,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [prixManuelReponse, setPrixManuelReponse] = useState(null); // { accepted, prix, devise }
   // Test notification
   const [testingNotif, setTestingNotif] = useState(false);
+  const [testResult, setTestResult] = useState(null);
   const prixManuelWatchedRef = useRef({}); // track les course_id déjà notifiés
 
   // Pull-to-refresh
@@ -397,6 +398,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   const handleTestNotification = async () => {
     setTestingNotif(true);
+    setTestResult(null);
     try {
       const response = await base44.functions.invoke("envoiNotificationPush", {
         destinataire_email: livreurProfil.user_email,
@@ -405,12 +407,15 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         type: "test",
       });
       
+      setTestResult(response);
+      
       if (response.success) {
         toast.success(`Notification envoyée ! Tokens: ${response.tokens_found || 0}`);
       } else {
         toast.error(response.error || "Échec de l'envoi");
       }
     } catch (err) {
+      setTestResult({ error: err.message, details: err.toString() });
       toast.error("Erreur: " + (err.message || "inconnue"));
     } finally {
       setTestingNotif(false);
@@ -599,6 +604,99 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               <Bell className={`w-5 h-5 ${testingNotif ? "animate-bounce" : ""}`} />
               {testingNotif ? "Envoi en cours..." : "🧪 Tester Notification Push"}
             </button>
+
+            {/* Logs détaillés du test */}
+            {testResult && (
+              <div className={`rounded-2xl p-4 border-2 ${testResult.success ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
+                <div className="flex items-center gap-2 mb-3">
+                  {testResult.success ? (
+                    <div className="w-8 h-8 rounded-full bg-green-200 flex items-center justify-center">
+                      <span className="text-green-700 font-black">✓</span>
+                    </div>
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-red-200 flex items-center justify-center">
+                      <span className="text-red-700 font-black">✕</span>
+                    </div>
+                  )}
+                  <h3 className="font-black text-lg">
+                    {testResult.success ? "✅ Succès" : "❌ Échec"}
+                  </h3>
+                </div>
+                
+                <div className="space-y-2 text-xs font-mono bg-white/50 rounded-xl p-3">
+                  {testResult.notification_id && (
+                    <div>
+                      <span className="text-gray-500">ID Notification:</span>
+                      <span className="ml-2 font-bold text-blue-700">{testResult.notification_id}</span>
+                    </div>
+                  )}
+                  {testResult.tokens_found !== undefined && (
+                    <div>
+                      <span className="text-gray-500">Tokens trouvés:</span>
+                      <span className="ml-2 font-bold">{testResult.tokens_found}</span>
+                    </div>
+                  )}
+                  {testResult.web_tokens !== undefined && (
+                    <div>
+                      <span className="text-gray-500">Tokens Web:</span>
+                      <span className="ml-2 font-bold text-green-700">{testResult.web_tokens}</span>
+                    </div>
+                  )}
+                  {testResult.android_tokens !== undefined && (
+                    <div>
+                      <span className="text-gray-500">Tokens Android:</span>
+                      <span className="ml-2 font-bold text-green-700">{testResult.android_tokens}</span>
+                    </div>
+                  )}
+                  {testResult.pushable_tokens !== undefined && (
+                    <div>
+                      <span className="text-gray-500">Tokens Pushables:</span>
+                      <span className="ml-2 font-bold">{testResult.pushable_tokens}</span>
+                    </div>
+                  )}
+                  {testResult.tokens_sent !== undefined && (
+                    <div>
+                      <span className="text-gray-500">Tokens envoyés:</span>
+                      <span className="ml-2 font-bold">{testResult.tokens_sent}</span>
+                    </div>
+                  )}
+                  {testResult.warning && (
+                    <div className="bg-amber-100 border border-amber-300 rounded-lg p-2 mt-2">
+                      <span className="text-amber-800">⚠️ {testResult.warning}</span>
+                    </div>
+                  )}
+                  {testResult.message && (
+                    <div className="bg-blue-100 border border-blue-300 rounded-lg p-2 mt-2">
+                      <span className="text-blue-800">ℹ️ {testResult.message}</span>
+                    </div>
+                  )}
+                  {testResult.error && (
+                    <div className="bg-red-100 border border-red-300 rounded-lg p-2 mt-2">
+                      <span className="text-red-800 font-bold">Erreur:</span>
+                      <span className="ml-2 text-red-700">{testResult.error}</span>
+                    </div>
+                  )}
+                  {testResult.details && (
+                    <div className="bg-gray-100 border border-gray-300 rounded-lg p-2 mt-2">
+                      <span className="text-gray-700 text-xs">{testResult.details}</span>
+                    </div>
+                  )}
+                  {!testResult.success && testResult.tokens_found === 0 && (
+                    <div className="bg-red-100 border border-red-300 rounded-lg p-2 mt-2">
+                      <p className="text-red-800 font-bold mb-1">📱 Problème détecté :</p>
+                      <p className="text-red-700 text-xs">
+                        Aucun token trouvé pour cet email. Cela signifie que :
+                      </p>
+                      <ul className="text-red-700 text-xs list-disc list-inside mt-1 space-y-1">
+                        <li>Soit tu n'as jamais ouvert l'APK sur ton téléphone</li>
+                        <li>Soit les notifications push ne sont pas activées</li>
+                        <li>Soit Firebase n'est pas correctement configuré dans l'APK</li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {coursesActives.length > 0 && (
               <div className="space-y-3">
