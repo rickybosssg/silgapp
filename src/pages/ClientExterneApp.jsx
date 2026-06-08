@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useClientNotifications } from "@/hooks/useClientNotifications";
+import { registerPushToken } from "@/lib/notifications";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import { useQueryClient } from "@tanstack/react-query";
 import { 
@@ -119,6 +120,16 @@ export default function ClientExterneApp() {
     position: position,
     enabled: !!clientProfil, // heartbeat dès que profil chargé
   });
+
+  // Enregistrement token push pour les clients (notifications même app fermée)
+  useEffect(() => {
+    if (!clientProfil?.id || !clientProfil?.user_email) return;
+    registerPushToken(null, {
+      email: clientProfil.user_email,
+      user_type: "client",
+      client_id: clientProfil.id,
+    }).catch(() => null);
+  }, [clientProfil?.id, clientProfil?.user_email]);
 
   useEffect(() => {
     loadProfil();

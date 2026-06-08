@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import {
   Shield, Play, Clock, CheckCircle2, AlertTriangle,
   XCircle, RefreshCw, ChevronDown, ChevronUp, Wrench,
-  Bug, Zap, ClipboardList
+  Bug, Zap, ClipboardList, Bell
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import DiagnosticPushPanel from "@/components/admin/DiagnosticPushPanel";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -397,6 +398,11 @@ export default function Maintenance() {
           )}
         </div>
       )}
+
+      {/* ── DIAGNOSTIC PUSH ──────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+        <DiagnosticPushPanel />
+      </div>
 
       {/* ── HISTORIQUE ───────────────────────────────── */}
       <div>

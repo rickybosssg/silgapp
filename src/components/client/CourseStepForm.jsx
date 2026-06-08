@@ -14,6 +14,7 @@ import {
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import CarnetAdresses from "@/components/client/CarnetAdresses";
+import ContactPickerButton from "@/components/client/ContactPickerButton";
 import { SILGAPP_COUNTRIES, phoneVariants } from "@/lib/phoneUtils";
 
 // Retourne l'indicatif affiché (ex: "+226") selon le pays
@@ -381,17 +382,29 @@ export default function CourseStepForm({
                   className="h-14 rounded-2xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-400 px-4 text-base"
                 />
                 <p className="text-xs text-gray-400 pl-1">Format : {phonePlaceholder}</p>
-                <CarnetAdresses
-                  clientId={clientId}
-                  type="expediteur"
-                  onSelect={(contact) => {
-                    setFormData({
-                      ...formData,
-                      expediteur_nom: contact.nom || formData.expediteur_nom,
-                      expediteur_telephone: contact.telephone,
-                    });
-                  }}
-                />
+                <div className="flex gap-2 flex-wrap">
+                  <CarnetAdresses
+                    clientId={clientId}
+                    type="expediteur"
+                    onSelect={(contact) => {
+                      setFormData({
+                        ...formData,
+                        expediteur_nom: contact.nom || formData.expediteur_nom,
+                        expediteur_telephone: contact.telephone,
+                      });
+                    }}
+                  />
+                  <ContactPickerButton
+                    countryCode={activeCountry}
+                    onSelect={(contact) => {
+                      setFormData({
+                        ...formData,
+                        expediteur_nom: contact.nom || formData.expediteur_nom,
+                        expediteur_telephone: contact.telephone,
+                      });
+                    }}
+                  />
+                </div>
               </div>
 
               <button
@@ -518,18 +531,31 @@ export default function CourseStepForm({
                   className="h-14 rounded-2xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-400 px-4 text-base"
                 />
                 <p className="text-xs text-gray-400 pl-1">Format : {phonePlaceholder}</p>
-                <CarnetAdresses
-                  clientId={clientId}
-                  type="destinataire"
-                  onSelect={(contact) => {
-                    setFormData({
-                      ...formData,
-                      destinataire_nom: contact.nom || formData.destinataire_nom,
-                      destinataire_telephone: contact.telephone,
-                    });
-                    setDestinataireFound(undefined);
-                  }}
-                />
+                <div className="flex gap-2 flex-wrap">
+                  <CarnetAdresses
+                    clientId={clientId}
+                    type="destinataire"
+                    onSelect={(contact) => {
+                      setFormData({
+                        ...formData,
+                        destinataire_nom: contact.nom || formData.destinataire_nom,
+                        destinataire_telephone: contact.telephone,
+                      });
+                      setDestinataireFound(undefined);
+                    }}
+                  />
+                  <ContactPickerButton
+                    countryCode={activeCountry}
+                    onSelect={(contact) => {
+                      setFormData({
+                        ...formData,
+                        destinataire_nom: contact.nom || formData.destinataire_nom,
+                        destinataire_telephone: contact.telephone,
+                      });
+                      setDestinataireFound(undefined);
+                    }}
+                  />
+                </div>
               </div>
 
               <button

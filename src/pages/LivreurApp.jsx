@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Truck } from "lucide-react";
 import { toast } from "sonner";
 import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
+import GPSIndicateur, { GPSAlerteBanner } from "@/components/livreur/GPSIndicateur";
 import LivreurHeader from "@/components/livreur/LivreurHeader";
 import LivreurStatsBanner from "@/components/livreur/LivreurStatsBanner";
 import LivreurStatutCard from "@/components/livreur/LivreurStatutCard";
@@ -29,6 +30,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
   const [activeTab, setActiveTab] = useState("courses");
   const [gpsActif, setGpsActif] = useState(false);
   const [gpsRequis, setGpsRequis] = useState(true);
+  const [gpsLastUpdate, setGpsLastUpdate] = useState(null);
 
   // Recharger le profil livreur en temps réel
   const { data: livreurProfil } = useQuery({
@@ -137,6 +139,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
       (pos) => {
         setGpsActif(true);
         setGpsRequis(false);
+        setGpsLastUpdate(Date.now());
         saveLivreur(livreurProfil.id, {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
@@ -156,11 +159,14 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
     if (!livreurProfil?.id || livreurProfil.statut === "hors_ligne" || !gpsActif) return;
     const interval = setInterval(() => {
       navigator.geolocation?.getCurrentPosition(
-        (pos) => saveLivreur(livreurProfil.id, {
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          derniere_position_date: new Date().toISOString(),
-        }).catch(() => null),
+        (pos) => {
+          setGpsLastUpdate(Date.now());
+          saveLivreur(livreurProfil.id, {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            derniere_position_date: new Date().toISOString(),
+          }).catch(() => null);
+        },
         () => setGpsActif(false),
         { enableHighAccuracy: true }
       );
@@ -430,6 +436,22 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
               onActiverGps={handleActiverGPS}
               onLogout={handleLogout}
             />
+
+            {/* Indicateur GPS */}
+            {gpsActif && (
+              <div className="flex items-center justify-between">
+                <GPSIndicateur
+                  indicateur={
+                    !gpsLastUpdate ? null
+                    : (Date.now() - gpsLastUpdate) < 2 * 60000 ? "recent"
+                    : (Date.now() - gpsLastUpdate) < 10 * 60000 ? "ancien"
+                    : "perdu"
+                  }
+                  ageMinutes={gpsLastUpdate ? (Date.now() - gpsLastUpdate) / 60000 : null}
+                  onActualiser={handleActiverGPS}
+                />
+              </div>
+            )}
 
             {isEnLigne && !livreurVisible && (
               <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-center gap-3">

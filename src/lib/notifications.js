@@ -292,14 +292,18 @@ async function saveTokenDirectly({ token, platform, livreurId, currentUser }) {
   return { success: true, action: "created-direct", ...payload };
 }
 
-async function persistPushToken({ token, platform, livreurId, currentUser }) {
+async function persistPushToken({ token, platform, livreurId, clientId, currentUser }) {
   const identity = resolveNotificationIdentity(livreurId, currentUser);
+  // Supporter user_type='client' passé explicitement
+  const resolvedUserType = currentUser?.user_type || identity.user_type;
+  const resolvedClientId = clientId || currentUser?.client_id || null;
   const payload = {
     token,
     platform,
     livreur_id: identity.livreur_id,
+    client_id: resolvedClientId || '',
     user_email: identity.user_email,
-    user_type: identity.user_type,
+    user_type: resolvedUserType,
   };
 
   try {
@@ -313,6 +317,7 @@ async function persistPushToken({ token, platform, livreurId, currentUser }) {
 }
 
 export async function registerPushToken(livreurId = null, currentUser = null) {
+  const clientId = currentUser?.client_id || null;
   try {
     const env = detectEnvironment();
     console.log("[registerPushToken] Environment:", env);
@@ -352,7 +357,7 @@ export async function registerPushToken(livreurId = null, currentUser = null) {
             console.log("[registerPushToken] Token FCM recu:", token);
 
             try {
-              await persistPushToken({ token, platform: "android", livreurId, currentUser });
+              await persistPushToken({ token, platform: "android", livreurId, clientId, currentUser });
               console.log("[registerPushToken] Token enregistre en DB");
               finish(token);
             } catch (err) {
