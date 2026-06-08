@@ -7,25 +7,26 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { KeyRound, User, Upload } from "lucide-react";
+import LivreurPhotoUploader from "@/components/livreur/LivreurPhotoUploader";
 import { toast } from "sonner";
-import { isIdentificationCodeAlreadyUsed } from "@/lib/codeIdentificationAuth";
 
 const emptyForm = {
   prenom: "",
   nom: "",
   telephone: "",
-  code_identification: "",
+  user_email: "",
   quartier: "",
   vehicule: "moto",
   photo_url: "",
   actif: true,
+  type_livreur: "interne",
+  reseau: "interne",
 };
+
 
 export default function LivreurFormDialog({ open, onClose, livreur }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(emptyForm);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const isEdit = !!livreur;
 
   useEffect(() => {
@@ -34,11 +35,13 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
         prenom: livreur.prenom || "",
         nom: livreur.nom || "",
         telephone: livreur.telephone || "",
-        code_identification: livreur.code_identification || "",
+        user_email: livreur.user_email || "",
         quartier: livreur.quartier || "",
         vehicule: livreur.vehicule || "moto",
         photo_url: livreur.photo_url || "",
         actif: livreur.actif !== false,
+        type_livreur: livreur.type_livreur || "interne",
+        reseau: livreur.reseau || "interne",
       });
     } else {
       setForm(emptyForm);
@@ -46,51 +49,42 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
   }, [livreur, open]);
 
   const mutation = useMutation({
-    mutationFn: (data) =>
-      isEdit
-        ? base44.entities.Livreur.update(livreur.id, data)
-        : base44.entities.Livreur.create({ ...data, validation: "valide", statut: "hors_ligne" }),
+    mutationFn: async (data) => {
+      if (isEdit) {
+        const res = await base44.functions.invoke('updateLivreur', { id: livreur.id, data });
+        if (!res.data?.success) throw new Error(res.data?.error || 'Erreur mise à jour');
+        return res.data.livreur;
+      } else {
+        const res = await base44.functions.invoke('createLivreur', { data });
+        if (!res.data?.success) throw new Error(res.data?.error || 'Erreur création');
+        return res.data.livreur;
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["livreurs"] });
       toast.success(isEdit ? "Livreur mis à jour ✅" : "Livreur créé ✅");
       onClose();
     },
-    onError: () => toast.error("Erreur. Réessayez."),
+    onError: (error) => {
+      toast.error(error.message || "Erreur. Réessayez.");
+    },
   });
-
-  const handlePhoto = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadingPhoto(true);
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    setForm((p) => ({ ...p, photo_url: file_url }));
-    setUploadingPhoto(false);
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.nom || !form.telephone) {
-      toast.error("Nom et téléphone sont obligatoires");
+    
+    // Validation stricte
+    const errors = [];
+    if (!form.nom?.trim()) errors.push("Le nom est obligatoire");
+    if (!form.telephone?.trim()) errors.push("Le téléphone est obligatoire");
+    if (!form.user_email?.trim()) errors.push("L'email du compte livreur est obligatoire");
+    
+    if (errors.length > 0) {
+      errors.forEach(err => toast.error(err));
       return;
     }
 
-    const codeIdentification = form.code_identification.trim().toUpperCase();
-    if (!codeIdentification) {
-      toast.error("Code d'identification obligatoire");
-      return;
-    }
-
-    try {
-      const codeExists = await isIdentificationCodeAlreadyUsed(codeIdentification, livreur?.id);
-      if (codeExists) {
-        toast.error("Ce code d'identification est deja utilise");
-        return;
-      }
-      mutation.mutate({ ...form, code_identification: codeIdentification });
-    } catch (error) {
-      console.error("[LivreurFormDialog] Code uniqueness check failed:", error);
-      toast.error("Impossible de verifier le code. Reessayez.");
-    }
+    mutation.mutate(form);
   };
 
   return (
@@ -109,6 +103,17 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
               <Label className="text-xs">Nom *</Label>
               <Input placeholder="Nom" value={form.nom} onChange={(e) => setForm((p) => ({ ...p, nom: e.target.value }))} required />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Email du compte livreur *</Label>
+            <Input
+              type="email"
+              placeholder="livreur@gmail.com"
+              value={form.user_email}
+              onChange={(e) => setForm((p) => ({ ...p, user_email: e.target.value.trim().toLowerCase() }))}
+            />
+            <p className="text-[10px] text-muted-foreground">Cet email est utilisé pour identifier le livreur lors de la connexion</p>
           </div>
 
           <div className="space-y-1.5">
@@ -136,23 +141,36 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs">Code d'identification *</Label>
-            <div className="relative">
-              <KeyRound className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Ex: LVR-001"
-                value={form.code_identification}
-                onChange={(e) => setForm((p) => ({ ...p, code_identification: e.target.value.toUpperCase() }))}
-                className="pl-9 uppercase"
-                required
-              />
-            </div>
-            <p className="text-[10px] text-muted-foreground">Code unique utilise par le livreur pour se connecter dans l'APK</p>
+            <Label className="text-xs">Quartier</Label>
+            <Input placeholder="Ex: Ouaga 2000" value={form.quartier} onChange={(e) => setForm((p) => ({ ...p, quartier: e.target.value }))} />
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs">Quartier</Label>
-            <Input placeholder="Ex: Ouaga 2000" value={form.quartier} onChange={(e) => setForm((p) => ({ ...p, quartier: e.target.value }))} />
+            <Label className="text-xs">Type de livreur *</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                className={`p-3 rounded-lg border-2 text-sm font-semibold transition-all ${
+                  form.type_livreur === "interne"
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border text-muted-foreground hover:bg-muted"
+                }`}
+                onClick={() => setForm((p) => ({ ...p, type_livreur: "interne", reseau: "interne" }))}
+              >
+                🏢 Interne
+              </button>
+              <button
+                type="button"
+                className={`p-3 rounded-lg border-2 text-sm font-semibold transition-all ${
+                  form.type_livreur === "externe"
+                    ? "border-accent bg-accent/5 text-accent"
+                    : "border-border text-muted-foreground hover:bg-muted"
+                }`}
+                onClick={() => setForm((p) => ({ ...p, type_livreur: "externe", reseau: "externe" }))}
+              >
+                🤝 Externe
+              </button>
+            </div>
           </div>
 
           <div className="space-y-1.5">
@@ -172,20 +190,16 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
           <div className="space-y-1.5">
             <Label className="text-xs">Photo</Label>
             <div className="flex items-center gap-3">
-              {form.photo_url ? (
-                <img src={form.photo_url} alt="Photo" className="w-12 h-12 rounded-full object-cover border-2 border-primary" />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                  <User className="w-6 h-6 text-muted-foreground" />
-                </div>
-              )}
-              <label className="cursor-pointer">
-                <input type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
-                <div className="flex items-center gap-2 text-xs border border-border rounded-lg px-3 py-2 hover:bg-muted transition-colors">
-                  <Upload className="w-3.5 h-3.5" />
-                  {uploadingPhoto ? "Envoi..." : form.photo_url ? "Changer" : "Ajouter"}
-                </div>
-              </label>
+              <LivreurPhotoUploader
+                photoUrl={form.photo_url}
+                nomComplet={`${form.prenom || ""} ${form.nom}`.trim()}
+                onPhotoChange={(newUrl) => setForm((p) => ({ ...p, photo_url: newUrl }))}
+                canEdit={true}
+                size="md"
+              />
+              <p className="text-xs text-muted-foreground">
+                Cliquez sur la photo pour la modifier
+              </p>
             </div>
           </div>
 
@@ -198,7 +212,7 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
 
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Annuler</Button>
-            <Button type="submit" className="flex-1 bg-primary" disabled={mutation.isPending || uploadingPhoto}>
+            <Button type="submit" className="flex-1 bg-primary" disabled={mutation.isPending}>
               {mutation.isPending ? "Enregistrement..." : isEdit ? "Mettre à jour" : "Créer le compte"}
             </Button>
           </div>

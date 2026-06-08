@@ -25,7 +25,7 @@ import { toast } from "sonner";
 import { format, startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { fr } from "date-fns/locale";
 import LivreurDetailDialog from "./LivreurDetailDialog";
-import { useAuth } from "@/lib/AuthContext";
+import { useSilgappAuth } from "@/lib/silgappAuth";
 
 const periodOptions = [
   { value: "today", label: "Aujourd'hui" },
@@ -37,7 +37,7 @@ const periodOptions = [
 
 export default function LivreurPerformanceTable() {
   const queryClient = useQueryClient();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser } = useSilgappAuth();
   const [selectedPeriod, setSelectedPeriod] = useState("today");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
@@ -45,14 +45,14 @@ export default function LivreurPerformanceTable() {
   const [showDetail, setShowDetail] = useState(false);
 
   const { data: livreurs = [] } = useQuery({
-    queryKey: ["livreurs"],
-    queryFn: () => base44.entities.Livreur.list(),
+    queryKey: ["livreurs-internes"],
+    queryFn: () => base44.entities.Livreur.filter({ type_livreur: "interne" }),
     initialData: [],
   });
 
   const { data: courses = [] } = useQuery({
-    queryKey: ["courses-all"],
-    queryFn: () => base44.entities.Course.list("-created_date", 1000),
+    queryKey: ["courses-internes-all"],
+    queryFn: () => base44.entities.Course.filter({ reseau: "interne" }, "-created_date", 1000),
     initialData: [],
   });
 
@@ -161,9 +161,10 @@ export default function LivreurPerformanceTable() {
         montant_paye: montant,
         heure_paiement: new Date().toISOString(),
         admin_paiement: currentUser?.full_name || currentUser?.email || "admin",
+        montant_du_silga: 0, // Remise à zéro du compteur
       },
     });
-    toast.success(`Paiement de ${montant.toLocaleString()} FCFA validé ✅`);
+    toast.success(`Paiement de ${montant.toLocaleString()} FCFA validé ✅ — Compteur remis à zéro`);
   };
 
   const handleViewDetail = (livreur) => {

@@ -2,33 +2,59 @@
   "name": "Livreur",
   "type": "object",
   "properties": {
-    "prenom": {
+    "reseau": {
       "type": "string",
-      "description": "Pr\u00e9nom du livreur"
+      "enum": [
+        "interne",
+        "externe"
+      ],
+      "default": "interne",
+      "description": "R\u00e9seau SILGAPP (interne ou externe)"
+    },
+    "type_livreur": {
+      "type": "string",
+      "enum": [
+        "interne",
+        "externe"
+      ],
+      "default": "interne",
+      "description": "Type de livreur (interne ou externe)"
+    },
+    "country_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE"
+      ],
+      "default": "BF",
+      "description": "Code pays ISO du livreur"
+    },
+    "prenom": {
+      "type": "string"
     },
     "nom": {
-      "type": "string",
-      "description": "Nom de famille du livreur"
+      "type": "string"
     },
     "telephone": {
-      "type": "string",
-      "description": "Num\u00e9ro de t\u00e9l\u00e9phone"
+      "type": "string"
     },
     "mot_de_passe": {
-      "type": "string",
-      "description": "Mot de passe du livreur"
-    },
-    "code_identification": {
-      "type": "string",
-      "description": "Code court utilise par SILGAPP 2 pour connecter le livreur sans navigateur"
+      "type": "string"
     },
     "quartier": {
-      "type": "string",
-      "description": "Quartier principal d'activit\u00e9"
+      "type": "string"
+    },
+    "ville": {
+      "type": "string"
     },
     "photo_url": {
-      "type": "string",
-      "description": "Photo de profil du livreur"
+      "type": "string"
     },
     "validation": {
       "type": "string",
@@ -37,13 +63,11 @@
         "valide",
         "refuse"
       ],
-      "default": "en_attente",
-      "description": "Statut de validation par l'admin"
+      "default": "en_attente"
     },
     "actif": {
       "type": "boolean",
-      "default": true,
-      "description": "Compte actif ou d\u00e9sactiv\u00e9 par l'admin"
+      "default": true
     },
     "statut": {
       "type": "string",
@@ -52,30 +76,33 @@
         "en_course",
         "hors_ligne"
       ],
-      "default": "hors_ligne",
-      "description": "Statut actuel du livreur"
+      "default": "hors_ligne"
+    },
+    "admin_hors_ligne": {
+      "type": "boolean",
+      "default": false,
+      "description": "Mis hors ligne par l'administration (non dispatchable)"
+    },
+    "admin_statut_log": {
+      "type": "string",
+      "description": "JSON stringifi\u00e9 de l'historique des actions administratives sur le statut"
     },
     "latitude": {
-      "type": "number",
-      "description": "Latitude actuelle"
+      "type": "number"
     },
     "longitude": {
-      "type": "number",
-      "description": "Longitude actuelle"
+      "type": "number"
     },
     "derniere_position_date": {
       "type": "string",
-      "format": "date-time",
-      "description": "Date de la derni\u00e8re mise \u00e0 jour de position"
+      "format": "date-time"
     },
     "courses_du_jour": {
       "type": "number",
-      "default": 0,
-      "description": "Nombre de courses effectu\u00e9es aujourd'hui"
+      "default": 0
     },
     "user_email": {
-      "type": "string",
-      "description": "Email du compte utilisateur li\u00e9"
+      "type": "string"
     },
     "vehicule": {
       "type": "string",
@@ -85,8 +112,29 @@
         "voiture",
         "a_pied"
       ],
-      "default": "moto",
-      "description": "Type de v\u00e9hicule"
+      "default": "moto"
+    },
+    "type_vehicule": {
+      "type": "string",
+      "enum": [
+        "moto",
+        "velo",
+        "voiture",
+        "a_pied"
+      ],
+      "default": "moto"
+    },
+    "numero_plaque": {
+      "type": "string"
+    },
+    "photo_cnib_recto_url": {
+      "type": "string"
+    },
+    "photo_cnib_verso_url": {
+      "type": "string"
+    },
+    "photo_moto_url": {
+      "type": "string"
     },
     "statut_paiement": {
       "type": "string",
@@ -94,25 +142,78 @@
         "non_paye",
         "paye"
       ],
-      "default": "non_paye",
-      "description": "Statut du versement journalier \u00e0 Silga"
+      "default": "non_paye"
     },
     "montant_paye": {
-      "type": "number",
-      "description": "Montant vers\u00e9 \u00e0 Silga aujourd'hui"
+      "type": "number"
     },
     "heure_paiement": {
       "type": "string",
-      "format": "date-time",
-      "description": "Heure du versement valid\u00e9"
+      "format": "date-time"
     },
     "admin_paiement": {
+      "type": "string"
+    },
+    "code_identification": {
+      "type": "string"
+    },
+    "app_active": {
+      "type": "boolean",
+      "default": false
+    },
+    "last_seen_at": {
       "type": "string",
-      "description": "Nom de l'admin ayant valid\u00e9 le paiement"
+      "format": "date-time"
+    },
+    "montant_du_silga": {
+      "type": "number",
+      "default": 0
+    },
+    "note_moyenne": {
+      "type": "number",
+      "default": 0
+    },
+    "nombre_avis": {
+      "type": "number",
+      "default": 0
+    },
+    "pricing_mode": {
+      "type": "string",
+      "enum": [
+        "automatic",
+        "manual"
+      ],
+      "default": "automatic",
+      "description": "Mode de tarification pr\u00e9f\u00e9r\u00e9 par le livreur : automatique ou manuel"
+    },
+    "whatsapp_opt_in": {
+      "type": "boolean",
+      "default": false,
+      "description": "Livreur inscrit au Sandbox WhatsApp Twilio (opt-in actif)"
+    },
+    "whatsapp_opt_in_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date du dernier opt-in WhatsApp Sandbox confirm\u00e9"
+    },
+    "whatsapp_opt_in_expire_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date d'expiration estim\u00e9e de l'opt-in (72h apr\u00e8s derni\u00e8re interaction)"
+    },
+    "whatsapp_derniere_erreur": {
+      "type": "string",
+      "description": "Derni\u00e8re erreur Twilio re\u00e7ue pour ce livreur (ex: 63015)"
+    },
+    "whatsapp_derniere_erreur_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de la derni\u00e8re erreur WhatsApp"
     }
   },
   "required": [
     "nom",
-    "telephone"
+    "telephone",
+    "type_livreur"
   ]
 }

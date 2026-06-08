@@ -1,0 +1,22 @@
+{
+  "name": "AppConfig",
+  "type": "object",
+  "properties": {
+    "cle": {
+      "type": "string",
+      "description": "Cl\u00e9 de configuration (ex: GOOGLE_DRIVE_APK_URL)"
+    },
+    "valeur": {
+      "type": "string",
+      "description": "Valeur de la configuration"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description de la config pour l'admin"
+    }
+  },
+  "required": [
+    "cle",
+    "valeur"
+  ]
+}

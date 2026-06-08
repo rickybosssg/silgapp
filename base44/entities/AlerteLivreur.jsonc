@@ -1,0 +1,63 @@
+{
+  "name": "AlerteLivreur",
+  "type": "object",
+  "properties": {
+    "titre": {
+      "type": "string",
+      "description": "Titre de l'alerte"
+    },
+    "message": {
+      "type": "string",
+      "description": "Contenu d\u00e9taill\u00e9 de l'alerte"
+    },
+    "niveau": {
+      "type": "string",
+      "enum": [
+        "information",
+        "important",
+        "urgent"
+      ],
+      "default": "information",
+      "description": "Niveau d'alerte : information, important, urgent"
+    },
+    "actif": {
+      "type": "boolean",
+      "default": true,
+      "description": "Alerte active ou archiv\u00e9e"
+    },
+    "reseau": {
+      "type": "string",
+      "enum": [
+        "tous",
+        "interne",
+        "externe"
+      ],
+      "default": "tous",
+      "description": "R\u00e9seau cibl\u00e9 : tous les livreurs, interne ou externe"
+    },
+    "delai_rappel_minutes": {
+      "type": "number",
+      "default": 30,
+      "description": "D\u00e9lai en minutes avant r\u00e9affichage si non lu (alertes importantes)"
+    },
+    "date_expiration": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date d'expiration optionnelle de l'alerte"
+    },
+    "nb_lectures": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de livreurs ayant lu l'alerte (calcul\u00e9)"
+    },
+    "cree_par": {
+      "type": "string",
+      "description": "Nom ou email de l'admin ayant cr\u00e9\u00e9 l'alerte"
+    }
+  },
+  "required": [
+    "titre",
+    "message",
+    "niveau"
+  ]
+}

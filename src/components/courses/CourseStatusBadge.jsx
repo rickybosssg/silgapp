@@ -13,7 +13,16 @@ const statusConfig = {
   annulee: { label: "Annulée", className: "bg-red-100 text-red-700 border-red-200" },
 };
 
-export default function CourseStatusBadge({ statut }) {
+export default function CourseStatusBadge({ statut, dispatchStatus }) {
+  // Priorité au statut dispatch pour affichage "Recherche livreur"
+  if (dispatchStatus === 'propose') {
+    return (
+      <Badge variant="outline" className={cn("text-[11px] font-medium border", "bg-orange-100 text-orange-700 border-orange-200")}>
+        🔍 Recherche livreur
+      </Badge>
+    );
+  }
+  
   const config = statusConfig[statut] || { label: statut, className: "bg-muted text-muted-foreground" };
   return (
     <Badge variant="outline" className={cn("text-[11px] font-medium border", config.className)}>

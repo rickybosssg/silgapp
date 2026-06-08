@@ -4,7 +4,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Phone, User, Package, Clock, Truck, ArrowDown } from "lucide-react";
+import { MapPin, Phone, User, Package, Clock, Truck, ArrowDown, Navigation } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import CourseStatusBadge from "./CourseStatusBadge";
@@ -117,6 +117,71 @@ export default function CourseDetailDialog({ course, open, onClose }) {
               <div>Livrée : {format(new Date(course.heure_livraison), "HH:mm")}</div>
             )}
           </div>
+
+          {/* GPS tracking info */}
+          {(course.distance_km || course.duree_livraison_minutes || course.colis_recupere_at) && (
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Navigation className="w-4 h-4 text-blue-600" />
+                <p className="text-xs font-bold text-blue-700 uppercase">Suivi GPS</p>
+              </div>
+              
+              {course.distance_km && (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-3 h-3 text-blue-600" />
+                    <span className="text-xs text-blue-600 font-semibold">Distance</span>
+                  </div>
+                  <span className="text-sm font-black text-blue-700">{course.distance_km.toFixed(2)} km</span>
+                  {course.gps_distance_type && (
+                    <span className="text-[10px] text-blue-400 uppercase font-bold">({course.gps_distance_type})</span>
+                  )}
+                </div>
+              )}
+
+              {course.duree_livraison_minutes && (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-3 h-3 text-purple-600" />
+                    <span className="text-xs text-purple-600 font-semibold">Durée</span>
+                  </div>
+                  <span className="text-sm font-black text-purple-700">{course.duree_livraison_minutes} min</span>
+                </div>
+              )}
+
+              {(course.latitude_depart_livraison || course.colis_recupere_at) && (
+                <div className="pt-2 border-t border-blue-200">
+                  <p className="text-[10px] text-blue-400 font-semibold uppercase mb-1">Départ livraison</p>
+                  {course.latitude_depart_livraison && (
+                    <p className="text-xs font-medium text-blue-700">
+                      {course.latitude_depart_livraison.toFixed(6)}, {course.longitude_depart_livraison?.toFixed(6)}
+                    </p>
+                  )}
+                  {course.colis_recupere_at && (
+                    <p className="text-[10px] text-blue-400 mt-0.5">
+                      {format(new Date(course.colis_recupere_at), "HH:mm:ss")}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {(course.latitude_arrivee_livraison || course.colis_livre_at) && (
+                <div className="pt-2 border-t border-blue-200">
+                  <p className="text-[10px] text-blue-400 font-semibold uppercase mb-1">Arrivée livraison</p>
+                  {course.latitude_arrivee_livraison && (
+                    <p className="text-xs font-medium text-blue-700">
+                      {course.latitude_arrivee_livraison.toFixed(6)}, {course.longitude_arrivee_livraison?.toFixed(6)}
+                    </p>
+                  )}
+                  {course.colis_livre_at && (
+                    <p className="text-[10px] text-blue-400 mt-0.5">
+                      {format(new Date(course.colis_livre_at), "HH:mm:ss")}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Notes */}
           {course.notes && (

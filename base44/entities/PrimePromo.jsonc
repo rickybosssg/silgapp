@@ -1,0 +1,72 @@
+{
+  "name": "PrimePromo",
+  "type": "object",
+  "properties": {
+    "code_promo_id": {
+      "type": "string",
+      "description": "ID du CodePromo concern\u00e9"
+    },
+    "code_promo_code": {
+      "type": "string",
+      "description": "Code promo utilis\u00e9"
+    },
+    "proprietaire_email": {
+      "type": "string",
+      "description": "Email du propri\u00e9taire du code"
+    },
+    "proprietaire_client_id": {
+      "type": "string",
+      "description": "ID ClientExterne du propri\u00e9taire"
+    },
+    "client_nouveau_id": {
+      "type": "string",
+      "description": "ID ClientExterne du nouveau client ayant utilis\u00e9 le code"
+    },
+    "client_nouveau_nom": {
+      "type": "string",
+      "description": "Nom du nouveau client"
+    },
+    "course_id": {
+      "type": "string",
+      "description": "ID de la CourseExterne concern\u00e9e"
+    },
+    "prix_course": {
+      "type": "number",
+      "description": "Prix final de la course"
+    },
+    "reduction_client": {
+      "type": "number",
+      "default": 100,
+      "description": "R\u00e9duction accord\u00e9e au client (100 FCFA fixe)"
+    },
+    "prime_proprietaire": {
+      "type": "number",
+      "default": 100,
+      "description": "Prime vers\u00e9e au propri\u00e9taire du code (100 FCFA fixe)"
+    },
+    "country_code": {
+      "type": "string",
+      "description": "Pays de la course"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "en_attente",
+        "validee",
+        "annulee"
+      ],
+      "default": "en_attente",
+      "description": "Statut de la prime"
+    },
+    "validee_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de validation de la prime"
+    }
+  },
+  "required": [
+    "code_promo_id",
+    "client_nouveau_id",
+    "course_id"
+  ]
+}

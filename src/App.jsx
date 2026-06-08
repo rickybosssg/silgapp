@@ -1,125 +1,286 @@
-import { Toaster } from "@/components/ui/toaster"
-import { QueryClientProvider } from '@tanstack/react-query'
-import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import React, { Suspense, lazy, useState, useEffect } from 'react';
+import SplashScreen from './components/SplashScreen';
+import { Toaster } from '@/components/ui/toaster';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
+import { queryClientInstance } from '@/lib/query-client';
 import PageNotFound from './lib/PageNotFound';
-import { AuthProvider, useAuth } from '@/lib/AuthContext';
-import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+import AuthGate from './components/auth/AuthGate.jsx';
+import SelectionReseau from './pages/SelectionReseau.jsx';
+import AppMaintenanceGate from './components/admin/AppMaintenanceGate.jsx';
 
-import Silgapp2Login from './pages/Silgapp2Login';
-import AppLayout from './components/layout/AppLayout';
-import Dashboard from './pages/Dashboard';
-import NouvelleCourse from './pages/NouvelleCourse';
-import CarteLivreurs from './pages/CarteLivreurs';
-import ToutesCourses from './pages/ToutesCourses';
-import Livreurs from './pages/Livreurs';
-import RapportJour from './pages/RapportJour';
-import Notifications from './pages/Notifications';
-import RecapitulatifAdmin from './pages/RecapitulatifAdmin';
-import LivreurApp from './pages/LivreurApp.jsx';
-import InscriptionLivreur from './pages/InscriptionLivreur';
-import TestNotificationsPush from './pages/TestNotificationsPush';
-import { useQuery } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
-import { Truck } from 'lucide-react';
+// LoadingScreen défini IMMÉDIATEMENT avant lazy loading
+const LoadingScreen = () => <SplashScreen />;
+const InscriptionLivreur = () => null;
 
-const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, user, isAuthenticated, logout } = useAuth();
+const AppLayout = lazy(() => import('./components/layout/AppLayout'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const DashboardExterne = lazy(() => import('./pages/DashboardExterne.jsx'));
+const NouvelleCourse = lazy(() => import('./pages/NouvelleCourse'));
 
-  const isAdmin = user?.role === "admin";
+const CarteLivreurs = lazy(() => import('./pages/CarteLivreurs'));
+const CarteLivreursExterne = lazy(() => import('./pages/CarteLivreursExterne'));
+const ToutesCourses = lazy(() => import('./pages/ToutesCourses'));
+const ToutesCoursesExternes = lazy(() => import('./pages/ToutesCoursesExternes'));
+const Livreurs = lazy(() => import('./pages/Livreurs'));
+const LivreursExternes = lazy(() => import('./pages/LivreursExternes'));
+const RapportJour = lazy(() => import('./pages/RapportJour'));
+const RapportJourExterne = lazy(() => import('./pages/RapportJourExterne'));
+const Notifications = lazy(() => import('./pages/Notifications'));
+const RecapitulatifAdmin = lazy(() => import('./pages/RecapitulatifAdmin'));
+const LivreurApp = lazy(() => import('./pages/LivreurApp.jsx'));
+const LivreurExterneApp = lazy(() => import('./pages/LivreurExterneApp.jsx'));
 
-  // Vérifier si l'utilisateur connecté a une fiche livreur (uniquement si non-admin)
-  const { data: livreurMatch, isLoading: isLoadingLivreur } = useQuery({
-    queryKey: ["livreur-check", user?.email],
-    queryFn: () => base44.entities.Livreur.filter({ user_email: user.email }),
-    enabled: !!user && !isAdmin && !user?.livreur,
-    select: (data) => data[0] || null,
-  });
-  const resolvedLivreurMatch = user?.livreur || livreurMatch;
+const ClientExterneApp = lazy(() => import('./pages/ClientExterneApp.jsx'));
+const RecapCourseLivreur = lazy(() => import('./pages/RecapCourseLivreur.jsx'));
+const CourseExterneForm = lazy(() => import('./pages/CourseExterneForm.jsx'));
+const CourseExterneFormSync = lazy(() => import('./pages/CourseExterneFormSync.jsx'));
+const ClientSuiviCourse = lazy(() => import('./pages/ClientSuiviCourse.jsx'));
+const DashboardAdminExterne = lazy(() => import('./pages/DashboardAdminExterne.jsx'));
+const DusLivreursExternes = lazy(() => import('./pages/DusLivreursExternes.jsx'));
+const ClientsExternesPage = lazy(() => import('./pages/ClientsExternesPage.jsx'));
+const PublicSuiviCourse = lazy(() => import('./pages/PublicSuiviCourse.jsx'));
+const GestionPays = lazy(() => import('./pages/GestionPays.jsx'));
+const AdminGlobal = lazy(() => import('./pages/AdminGlobal.jsx'));
+const DashboardPays = lazy(() => import('./pages/DashboardPays.jsx'));
+const Maintenance = lazy(() => import('./pages/Maintenance.jsx'));
+const TwilioSandboxMonitor = lazy(() => import('./pages/TwilioSandboxMonitor.jsx'));
+const TelechargerSILGAPP = lazy(() => import('./pages/TelechargerSILGAPP.jsx'));
+const StatsTelechargements = lazy(() => import('./pages/StatsTelechargements.jsx'));
+const StatsTelechargementsAdmin = lazy(() => import('./pages/StatsTelechargementsAdmin.jsx'));
+const GestionPublicites = lazy(() => import('./pages/GestionPublicites.jsx'));
+const FraisAnnulationAdmin = lazy(() => import('./pages/FraisAnnulationAdmin.jsx'));
+const VenusRapportsPage = lazy(() => import('./pages/VenusRapportsPage.jsx'));
+const PolitiqueConfidentialite = lazy(() => import('./pages/PolitiqueConfidentialite.jsx'));
+const DiagnosticPushComplet = lazy(() => import('./pages/DiagnosticPushComplet.jsx'));
 
-  // ── ÉCRAN CHARGEMENT ──────────────────────────────────────────────
-  if (isLoadingPublicSettings || isLoadingAuth || (!isAdmin && isAuthenticated && !user?.livreur && isLoadingLivreur)) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-background">
-        <div className="text-center space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
-            <Truck className="w-8 h-8 text-primary animate-pulse" />
-          </div>
-          <div>
-            <p className="text-base font-bold text-foreground">SILGAPP 2</p>
-            <p className="text-xs text-muted-foreground mt-1">Chargement en cours…</p>
-          </div>
-          <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin mx-auto"></div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── ERREURS D'AUTH ─────────────────────────────────────────────────
-  if (authError) {
-    if (authError.type === 'user_not_registered') {
-      return <UserNotRegisteredError />;
-    }
-
-    return <Silgapp2Login />;
-  }
-
-  // Utilisateur connecté mais inconnu (ni admin, ni livreur)
-  if (isAuthenticated && !isAdmin && resolvedLivreurMatch === null) {
-    return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center bg-background gap-4 p-8 text-center">
-        <Truck className="w-14 h-14 text-muted-foreground opacity-30" />
-        <h1 className="text-xl font-bold">Accès non autorisé</h1>
-        <p className="text-muted-foreground text-sm max-w-sm">
-          Votre compte (<span className="font-medium">{user?.email}</span>) n'est pas associé à un profil livreur. Contactez un administrateur Silga.
-        </p>
-        <button
-          className="text-xs text-muted-foreground underline mt-2"
-          onClick={logout}
-        >
-          Se déconnecter
-        </button>
-      </div>
-    );
-  }
-
+function AnimatedRoutes({ children }) {
+  // Variables définies DANS la fonction pour éviter init issues
+  const location = useLocation();
+  const pageVariants = {
+    initial: { opacity: 0, x: 24 },
+    animate: { opacity: 1, x: 0 },
+    exit: { opacity: 0, x: -24 },
+  };
+  const pageTransition = { duration: 0.22, ease: "easeInOut" };
   return (
-    <Routes>
-      {/* Routes publiques (sans authentification requise) */}
-      <Route path="/inscription-livreur" element={<InscriptionLivreur />} />
-
-      {/* Routes Admin */}
-      <Route element={isAdmin ? <AppLayout /> : <Navigate to="/livreur" replace />}>
-        {/* Racine : admin → Dashboard, sinon → espace livreur */}
-        <Route path="/" element={isAdmin ? <Dashboard /> : <Navigate to="/livreur" replace />} />
-        <Route path="/nouvelle-course" element={<NouvelleCourse />} />
-        <Route path="/carte" element={<CarteLivreurs />} />
-        <Route path="/courses" element={<ToutesCourses />} />
-        <Route path="/livreurs" element={<Livreurs />} />
-        <Route path="/rapport" element={<RapportJour />} />
-        <Route path="/recapitulatif" element={<RecapitulatifAdmin />} />
-        <Route path="/notifications" element={<Notifications />} />
-        <Route path="/test-notifications" element={<TestNotificationsPush />} />
-      </Route>
-
-      {/* Route Livreur */}
-      <Route path="/livreur" element={<LivreurApp />} />
-      <Route path="*" element={<PageNotFound />} />
-    </Routes>
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={location.pathname}
+        variants={pageVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        transition={pageTransition}
+        style={{ width: "100%", minHeight: "100%" }}
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
   );
-};
+}
+
+function AppContent() {
+  // Hook to apply system theme preference
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const applyTheme = (e) => {
+      if (e.matches) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    };
+    applyTheme(mediaQuery);
+    mediaQuery.addEventListener('change', applyTheme);
+    return () => mediaQuery.removeEventListener('change', applyTheme);
+  }, []);
+  
+  // Hook for Android hardware back button
+  const navigate = useNavigate();
+  const location = useLocation();
+  useEffect(() => {
+    const handleBackButton = (e) => {
+      e.preventDefault();
+      if (location.pathname !== '/') {
+        navigate(-1);
+      }
+    };
+    
+    document.addEventListener('backbutton', handleBackButton, false);
+    return () => document.removeEventListener('backbutton', handleBackButton);
+  }, [navigate, location]);
+  
+  const [livreurProfil, setLivreurProfil] = useState(null);
+  const [isClient, setIsClient] = useState(false);
+  const [reseau, setReseau] = useState(null);
+
+  // 🌍 ROUTES PUBLIQUES - ACCESSIBLES SANS AUTHENTIFICATION (PRIORITÉ ABSOLUE)
+  // Ces routes doivent être vérifiées AVANT toute logique d'authentification
+  const isPublicRoute = location.pathname === '/telecharger' || 
+                        location.pathname === '/privacy-policy' ||
+                        location.pathname === '/suivi-public/:token' || 
+                        location.pathname.startsWith('/suivi-public/');
+
+  if (isPublicRoute) {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <Routes>
+          {/* Route publique de téléchargement - 100% accessible */}
+          <Route path="/telecharger" element={<TelechargerSILGAPP />} />
+          {/* Route publique de suivi de course */}
+          <Route path="/suivi-public/:token" element={<PublicSuiviCourse />} />
+          {/* Politique de confidentialité — requise Google Play */}
+          <Route path="/privacy-policy" element={<PolitiqueConfidentialite />} />
+          <Route path="*" element={<PageNotFound />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+
+  // Si un profil livreur a été détecté, afficher directement l'app appropriée
+  if (livreurProfil) {
+    // Livreur externe → utiliser le lazy import défini en haut du fichier
+    if (livreurProfil.type_livreur === "externe") {
+      return (
+        <Suspense fallback={<LoadingScreen />}>
+          <AppMaintenanceGate>
+            <Routes>
+              <Route path="/livreur/recap-course/:courseId" element={<RecapCourseLivreur />} />
+              <Route path="*" element={<LivreurExterneApp livreurProfil={livreurProfil} />} />
+            </Routes>
+          </AppMaintenanceGate>
+        </Suspense>
+      );
+    }
+    // Livreur interne
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <AppMaintenanceGate>
+          <LivreurApp livreurProfil={livreurProfil} />
+        </AppMaintenanceGate>
+      </Suspense>
+    );
+  }
+
+  // Client → afficher directement le dashboard client
+  if (isClient) {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <Routes>
+          <Route path="/" element={<ClientExterneApp />} />
+          <Route path="/client/course/expedier" element={<CourseExterneFormSync />} />
+          <Route path="/client/course/recevoir" element={<CourseExterneFormSync />} />
+          <Route path="/client/suivi" element={<ClientSuiviCourse />} />
+          <Route path="/livreur/recap-course/:courseId" element={<RecapCourseLivreur />} />
+          <Route path="*" element={<ClientExterneApp />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+
+  // Admin → afficher SelectionReseau ou le dashboard selon le réseau sélectionné
+  if (!reseau) {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <Routes>
+          <Route
+            path="/diagnostic-push-complet"
+            element={
+              <AuthGate
+                onLivreur={setLivreurProfil}
+                onClient={() => setIsClient(true)}
+              >
+                <DiagnosticPushComplet />
+              </AuthGate>
+            }
+          />
+          <Route
+            path="*"
+            element={
+              <AuthGate 
+                onLivreur={setLivreurProfil}
+                onClient={() => setIsClient(true)}
+              >
+                <SelectionReseau onSelect={setReseau} />
+              </AuthGate>
+            }
+          />
+        </Routes>
+      </Suspense>
+    );
+  }
+
+  // Réseau sélectionné → afficher le dashboard approprié + routes admin communes
+  return (
+    <Suspense fallback={<LoadingScreen />}>
+      <Routes>
+        <Route path="/inscription-livreur" element={<InscriptionLivreur />} />
+        <Route element={<AppLayout reseau={reseau} />}>
+          {reseau === "interne" ? (
+            <>
+              <Route path="/" element={<AnimatedRoutes><Dashboard /></AnimatedRoutes>} />
+              <Route path="/nouvelle-course" element={<AnimatedRoutes><NouvelleCourse /></AnimatedRoutes>} />
+              <Route path="/carte" element={<AnimatedRoutes><CarteLivreurs /></AnimatedRoutes>} />
+              <Route path="/courses" element={<AnimatedRoutes><ToutesCourses /></AnimatedRoutes>} />
+              <Route path="/livreurs" element={<AnimatedRoutes><Livreurs /></AnimatedRoutes>} />
+              <Route path="/rapport" element={<AnimatedRoutes><RapportJour /></AnimatedRoutes>} />
+              <Route path="/recapitulatif" element={<AnimatedRoutes><RecapitulatifAdmin reseau="interne" /></AnimatedRoutes>} />
+              <Route path="/admin/externe" element={<AnimatedRoutes><DashboardAdminExterne /></AnimatedRoutes>} />
+              <Route path="/admin/externe/stats-telechargements" element={<AnimatedRoutes><StatsTelechargementsAdmin /></AnimatedRoutes>} />
+              <Route path="/admin/externe/dus-livreurs" element={<AnimatedRoutes><DusLivreursExternes /></AnimatedRoutes>} />
+              <Route path="/admin/externe/twilio-sandbox" element={<AnimatedRoutes><TwilioSandboxMonitor /></AnimatedRoutes>} />
+              <Route path="/admin/externe/clients" element={<AnimatedRoutes><ClientsExternesPage /></AnimatedRoutes>} />
+              <Route path="/admin/publicites" element={<AnimatedRoutes><GestionPublicites /></AnimatedRoutes>} />
+              <Route path="/admin/frais-annulation" element={<AnimatedRoutes><FraisAnnulationAdmin /></AnimatedRoutes>} />
+              <Route path="/maintenance" element={<AnimatedRoutes><Maintenance /></AnimatedRoutes>} />
+              <Route path="/diagnostic-push-complet" element={<AnimatedRoutes><DiagnosticPushComplet /></AnimatedRoutes>} />
+            </>
+          ) : (
+            <>
+              <Route path="/" element={<AnimatedRoutes><DashboardExterne /></AnimatedRoutes>} />
+              <Route path="/carte" element={<AnimatedRoutes><CarteLivreursExterne /></AnimatedRoutes>} />
+              <Route path="/courses" element={<AnimatedRoutes><ToutesCoursesExternes /></AnimatedRoutes>} />
+              <Route path="/livreurs" element={<AnimatedRoutes><LivreursExternes /></AnimatedRoutes>} />
+              <Route path="/rapport" element={<AnimatedRoutes><RapportJourExterne /></AnimatedRoutes>} />
+              <Route path="/recapitulatif" element={<AnimatedRoutes><RecapitulatifAdmin reseau="externe" /></AnimatedRoutes>} />
+              <Route path="/admin/externe/dus-livreurs" element={<AnimatedRoutes><DusLivreursExternes /></AnimatedRoutes>} />
+              <Route path="/admin/externe/clients" element={<AnimatedRoutes><ClientsExternesPage /></AnimatedRoutes>} />
+              <Route path="/admin/externe/stats-telechargements" element={<AnimatedRoutes><StatsTelechargementsAdmin /></AnimatedRoutes>} />
+              <Route path="/admin/gestion-pays" element={<AnimatedRoutes><GestionPays /></AnimatedRoutes>} />
+              <Route path="/admin/global" element={<AnimatedRoutes><AdminGlobal /></AnimatedRoutes>} />
+              <Route path="/admin/pays/:code" element={<AnimatedRoutes><DashboardPays /></AnimatedRoutes>} />
+              <Route path="/admin/pays/:code/carte" element={<AnimatedRoutes><CarteLivreursExterne /></AnimatedRoutes>} />
+              <Route path="/admin/publicites" element={<AnimatedRoutes><GestionPublicites /></AnimatedRoutes>} />
+              <Route path="/admin/frais-annulation" element={<AnimatedRoutes><FraisAnnulationAdmin /></AnimatedRoutes>} />
+              <Route path="/admin/venus-rapports" element={<AnimatedRoutes><VenusRapportsPage /></AnimatedRoutes>} />
+              <Route path="/maintenance" element={<AnimatedRoutes><Maintenance /></AnimatedRoutes>} />
+              <Route path="/diagnostic-push-complet" element={<AnimatedRoutes><DiagnosticPushComplet /></AnimatedRoutes>} />
+            </>
+          )}
+          <Route path="/notifications" element={<AnimatedRoutes><Notifications /></AnimatedRoutes>} />
+        </Route>
+        <Route path="*" element={<PageNotFound />} />
+      </Routes>
+    </Suspense>
+  );
+}
 
 function App() {
   return (
-    <AuthProvider>
-      <QueryClientProvider client={queryClientInstance}>
-        <Router>
-          <AuthenticatedApp />
-        </Router>
-        <Toaster />
-      </QueryClientProvider>
-    </AuthProvider>
-  )
+    <Router>
+      <AppContent />
+    </Router>
+  );
 }
 
-export default App
+function AppWithProviders() {
+  return (
+    <QueryClientProvider client={queryClientInstance}>
+      <App />
+    </QueryClientProvider>
+  );
+}
+
+export default AppWithProviders;

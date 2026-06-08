@@ -1,21 +1,21 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const APP_NOTIFICATIONS_URL = 'https://silga-dispatch-go.base44.app/notifications';
+const APP_URL = 'https://silga-dispatch-go.base44.app';
 const ANDROID_CHANNEL_ID = 'silgapp_default';
+const ANDROID_CLICK_ACTION = 'OPEN_SILGAPP';
 
-function base64UrlEncode(input: string | ArrayBuffer): string {
+function base64UrlEncode(input) {
   const bytes = typeof input === 'string'
     ? new TextEncoder().encode(input)
     : new Uint8Array(input);
-
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function pemToArrayBuffer(pem: string): ArrayBuffer {
+function pemToArrayBuffer(pem) {
   const normalized = pem.replace(/\\n/g, '\n');
   const base64 = normalized
     .replace('-----BEGIN PRIVATE KEY-----', '')
@@ -23,11 +23,11 @@ function pemToArrayBuffer(pem: string): ArrayBuffer {
     .replace(/\s/g, '');
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes.buffer;
 }
 
-async function signJwt(clientEmail: string, privateKey: string): Promise<string> {
+async function signJwt(clientEmail, privateKey) {
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: 'RS256', typ: 'JWT' };
   const payload = {
@@ -37,7 +37,6 @@ async function signJwt(clientEmail: string, privateKey: string): Promise<string>
     iat: now,
     exp: now + 3600,
   };
-
   const unsigned = `${base64UrlEncode(JSON.stringify(header))}.${base64UrlEncode(JSON.stringify(payload))}`;
   const key = await crypto.subtle.importKey(
     'pkcs8',
@@ -46,26 +45,26 @@ async function signJwt(clientEmail: string, privateKey: string): Promise<string>
     false,
     ['sign'],
   );
-  const signature = await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5',
-    key,
-    new TextEncoder().encode(unsigned),
-  );
-
+  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(unsigned));
   return `${unsigned}.${base64UrlEncode(signature)}`;
 }
 
 function getFirebaseConfig() {
   const serviceAccountJson = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_JSON');
   if (serviceAccountJson) {
-    const serviceAccount = JSON.parse(serviceAccountJson);
-    return {
-      projectId: serviceAccount.project_id,
-      clientEmail: serviceAccount.client_email,
-      privateKey: serviceAccount.private_key,
-    };
+    const sa = JSON.parse(serviceAccountJson);
+    console.log('[envoiNotificationPush] Firebase config: FIREBASE_SERVICE_ACCOUNT_JSON present', {
+      projectId: sa.project_id,
+      clientEmailPresent: !!sa.client_email,
+      privateKeyPresent: !!sa.private_key,
+    });
+    return { projectId: sa.project_id, clientEmail: sa.client_email, privateKey: sa.private_key };
   }
-
+  console.log('[envoiNotificationPush] Firebase config: using split env vars', {
+    projectIdPresent: !!Deno.env.get('FIREBASE_PROJECT_ID'),
+    clientEmailPresent: !!Deno.env.get('FIREBASE_CLIENT_EMAIL'),
+    privateKeyPresent: !!Deno.env.get('FIREBASE_PRIVATE_KEY'),
+  });
   return {
     projectId: Deno.env.get('FIREBASE_PROJECT_ID'),
     clientEmail: Deno.env.get('FIREBASE_CLIENT_EMAIL'),
@@ -73,36 +72,46 @@ function getFirebaseConfig() {
   };
 }
 
-async function getAccessToken(clientEmail: string, privateKey: string): Promise<string> {
+async function getAccessToken(clientEmail, privateKey) {
   const assertion = await signJwt(clientEmail, privateKey);
   const response = await fetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion,
-    }),
+    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion }),
   });
-
   const result = await response.json();
-  if (!response.ok) {
-    throw new Error(result.error_description || result.error || 'Unable to get Firebase access token');
-  }
+  if (!response.ok) throw new Error(result.error_description || result.error || 'Unable to get Firebase access token');
   return result.access_token;
 }
 
-async function sendFcmMessage(projectId: string, accessToken: string, token: string, payload: Record<string, unknown>) {
+async function sendFcmMessage(projectId, accessToken, token, payload) {
   const response = await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ message: { token, ...payload } }),
   });
-
   const result = await response.json();
   return { ok: response.ok, status: response.status, result };
+}
+
+function tokenDateValue(item) {
+  const raw = item.derniere_utilisation || item.updated_date || item.created_date || '';
+  const value = Date.parse(raw);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function selectLatestNativeTokens(tokens) {
+  const latestByPlatform = new Map();
+  for (const item of tokens) {
+    const token = String(item.token || '');
+    if (!token || token.startsWith('web_')) continue;
+    const platform = String(item.platform || 'native').toLowerCase();
+    const current = latestByPlatform.get(platform);
+    if (!current || tokenDateValue(item) >= tokenDateValue(current)) {
+      latestByPlatform.set(platform, item);
+    }
+  }
+  return [...latestByPlatform.values()];
 }
 
 Deno.serve(async (req) => {
@@ -114,30 +123,44 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { titre, message, type, destinataire_email, livreur_id, course_id } = body;
-    const targetEmail = String(destinataire_email || (livreur_id ? `livreur-${livreur_id}@silgapp2.local` : '')).trim().toLowerCase();
+    const { titre, message, type, destinataire_email, livreur_id, client_id, course_id } = body;
+    const targetEmail = String(destinataire_email || '').trim().toLowerCase();
 
     if (!titre || !message || !targetEmail) {
-      return Response.json({ error: 'Missing required fields' }, { status: 400 });
+      return Response.json({ error: 'Missing required fields: titre, message, destinataire_email' }, { status: 400 });
     }
 
-    const [emailTokens, livreurTokens] = await Promise.all([
-      base44.asServiceRole.entities.NotificationToken.filter({
-        user_email: targetEmail,
-        actif: true,
-      }),
+    // Chercher les tokens par email (livreurs + clients)
+    const [emailTokens, livreurTokens, clientTokens] = await Promise.all([
+      base44.asServiceRole.entities.NotificationToken.filter({ user_email: targetEmail, actif: true }),
       livreur_id
-        ? base44.asServiceRole.entities.NotificationToken.filter({
-          livreur_id,
-          actif: true,
-        })
+        ? base44.asServiceRole.entities.NotificationToken.filter({ livreur_id, actif: true })
+        : Promise.resolve([]),
+      client_id
+        ? base44.asServiceRole.entities.NotificationToken.filter({ client_id, actif: true })
         : Promise.resolve([]),
     ]);
 
     const tokenMap = new Map();
-    for (const item of [...emailTokens, ...livreurTokens]) tokenMap.set(item.token, item);
+    for (const item of [...emailTokens, ...livreurTokens, ...clientTokens]) {
+      tokenMap.set(item.token, item);
+    }
     const tokens = [...tokenMap.values()];
+    const nativeTokens = tokens.filter(item => !String(item.token).startsWith('web_'));
+    const pushableTokensPreview = selectLatestNativeTokens(tokens);
+    console.log('[envoiNotificationPush] Tokens resolved', {
+      targetEmail,
+      livreur_id: livreur_id || '',
+      client_id: client_id || '',
+      tokensFound: tokens.length,
+      pushableTokens: pushableTokensPreview.length,
+      nativeTokens: nativeTokens.length,
+      dedupedNativeTokens: nativeTokens.length - pushableTokensPreview.length,
+      webTokens: tokens.length - nativeTokens.length,
+      platforms: [...new Set(tokens.map(t => t.platform || 'unknown'))],
+    });
 
+    // Créer la notification en BDD
     const notification = await base44.asServiceRole.entities.Notification.create({
       titre,
       message,
@@ -151,76 +174,119 @@ Deno.serve(async (req) => {
       return Response.json({
         success: false,
         notification_id: notification.id,
-        error: 'Aucun token de notification trouve pour cet utilisateur',
+        error: 'Aucun token de notification trouvé pour cet utilisateur',
       }, { status: 404 });
     }
 
-    const pushableTokens = tokens.filter((item) => !String(item.token).startsWith('web_'));
+    // Exclure les tokens web (pas de FCM natif)
+    const pushableTokens = pushableTokensPreview;
     if (pushableTokens.length === 0) {
+      console.warn('[envoiNotificationPush] No native FCM token available', {
+        targetEmail,
+        tokensFound: tokens.length,
+      });
       return Response.json({
         success: true,
         notification_id: notification.id,
-        warning: 'Only web fallback tokens found, notification saved but no native FCM push was sent',
+        warning: 'Only web fallback tokens found — notification saved but no native FCM push sent',
       });
     }
 
     const { projectId, clientEmail, privateKey } = getFirebaseConfig();
     if (!projectId || !clientEmail || !privateKey) {
+      console.warn('[envoiNotificationPush] Firebase credentials missing', {
+        projectIdPresent: !!projectId,
+        clientEmailPresent: !!clientEmail,
+        privateKeyPresent: !!privateKey,
+      });
       return Response.json({
         success: true,
         notification_id: notification.id,
-        warning: 'Firebase HTTP v1 credentials not configured, notification saved but not sent',
-        required_env: ['FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_PROJECT_ID/FIREBASE_CLIENT_EMAIL/FIREBASE_PRIVATE_KEY'],
+        warning: 'Firebase credentials not configured — notification saved but not sent',
       });
     }
 
     const accessToken = await getAccessToken(clientEmail, privateKey);
+    const notificationTag = String(course_id || notification.id || `${type || 'generic'}-${targetEmail}`).slice(0, 64);
+
+    // Payload FCM — notification visible écran verrouillé + son + vibration
     const fcmPayload = {
-      notification: {
-        title: titre,
-        body: message,
-      },
+      notification: { title: titre, body: message },
       data: {
         type: String(type || 'generic'),
         livreur_id: String(livreur_id || ''),
+        client_id: String(client_id || ''),
         course_id: String(course_id || ''),
         notification_id: String(notification.id),
-        click_action: APP_NOTIFICATIONS_URL,
+        click_action: ANDROID_CLICK_ACTION,
       },
       android: {
+        collapse_key: notificationTag,
         priority: 'HIGH',
+        ttl: '86400s',
         notification: {
-          click_action: APP_NOTIFICATIONS_URL,
+          tag: notificationTag,
           channel_id: ANDROID_CHANNEL_ID,
+          sound: 'default',
+          vibrate_timings: ['0s', '0.2s', '0.1s', '0.2s', '0.1s', '0.4s'],
+          default_sound: true,
+          default_vibrate_timings: false,
+          notification_priority: 'PRIORITY_HIGH',
+          visibility: 'PUBLIC',
+          click_action: ANDROID_CLICK_ACTION,
         },
       },
       webpush: {
-        fcm_options: {
-          link: APP_NOTIFICATIONS_URL,
-        },
+        fcm_options: { link: APP_URL },
       },
     };
 
     const sendResults = await Promise.all(pushableTokens.map(async (item) => {
       const response = await sendFcmMessage(projectId, accessToken, item.token, fcmPayload);
+      const nowIso = new Date().toISOString();
+
       if (!response.ok) {
         const errorCode = response.result?.error?.details?.[0]?.errorCode || response.result?.error?.status;
-        if (['UNREGISTERED', 'INVALID_ARGUMENT'].includes(errorCode)) {
-          try {
-            await base44.asServiceRole.entities.NotificationToken.update(item.id, { actif: false });
-          } catch (_) {}
-        }
+        const isInvalid = ['UNREGISTERED', 'INVALID_ARGUMENT'].includes(errorCode);
+        try {
+          await base44.asServiceRole.entities.NotificationToken.update(item.id, {
+            actif: isInvalid ? false : item.actif,
+            derniere_notif_statut: 'failed',
+            derniere_notif_titre: titre,
+            derniere_notif_date: nowIso,
+            fcm_error: JSON.stringify(response.result?.error || {}).slice(0, 300),
+          });
+        } catch (_) {}
+      } else {
+        try {
+          await base44.asServiceRole.entities.NotificationToken.update(item.id, {
+            derniere_utilisation: nowIso,
+            derniere_notif_statut: 'success',
+            derniere_notif_titre: titre,
+            derniere_notif_date: nowIso,
+            fcm_error: null,
+          });
+        } catch (_) {}
       }
+
       return {
         token_id: item.id,
         platform: item.platform,
+        user_type: item.user_type,
         ok: response.ok,
         status: response.status,
         result: response.result,
       };
     }));
 
-    const sent = sendResults.filter((result) => result.ok).length;
+    const sent = sendResults.filter(r => r.ok).length;
+    console.log('[envoiNotificationPush] FCM send completed', {
+      targetEmail,
+      projectId,
+      sent,
+      attempted: pushableTokens.length,
+      failed: sendResults.filter(r => !r.ok).length,
+    });
 
     return Response.json({
       success: sent > 0,

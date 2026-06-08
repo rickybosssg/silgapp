@@ -1,0 +1,122 @@
+{
+  "name": "VenusInteraction",
+  "type": "object",
+  "properties": {
+    "conversation_id": {
+      "type": "string",
+      "description": "ID de la conversation VENUS"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "Identifiant de l'utilisateur"
+    },
+    "user_type": {
+      "type": "string",
+      "enum": [
+        "client",
+        "livreur",
+        "admin"
+      ],
+      "description": "Type d'utilisateur"
+    },
+    "country_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE"
+      ],
+      "default": "BF",
+      "description": "Pays de l'utilisateur"
+    },
+    "ville": {
+      "type": "string",
+      "description": "Ville de l'utilisateur si disponible"
+    },
+    "question": {
+      "type": "string",
+      "description": "Question pos\u00e9e par l'utilisateur"
+    },
+    "reponse": {
+      "type": "string",
+      "description": "R\u00e9ponse donn\u00e9e par VENUS"
+    },
+    "categorie": {
+      "type": "string",
+      "enum": [
+        "tarifs",
+        "expedition_colis",
+        "reception_colis",
+        "suivi_colis",
+        "gps",
+        "prix_manuel",
+        "prix_automatique",
+        "annulation_course",
+        "paiement",
+        "remboursement",
+        "compte_client",
+        "compte_livreur",
+        "inscription",
+        "notifications",
+        "publicites",
+        "probleme_technique",
+        "comptabilite",
+        "livraison_urgente",
+        "devenir_livreur",
+        "questions_generales",
+        "autres"
+      ],
+      "description": "Cat\u00e9gorie automatique de la question"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "resolu",
+        "non_resolu",
+        "escalade"
+      ],
+      "default": "resolu",
+      "description": "Statut de la r\u00e9solution"
+    },
+    "nb_messages": {
+      "type": "number",
+      "default": 1,
+      "description": "Nombre de messages \u00e9chang\u00e9s dans la conversation"
+    },
+    "duree_secondes": {
+      "type": "number",
+      "default": 0,
+      "description": "Dur\u00e9e de la conversation en secondes"
+    },
+    "reformulations": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de reformulations de la question"
+    },
+    "satisfaction": {
+      "type": "string",
+      "enum": [
+        "positive",
+        "negative",
+        "neutre"
+      ],
+      "default": "neutre",
+      "description": "Estimation de la satisfaction"
+    },
+    "date_conversation": {
+      "type": "string",
+      "format": "date",
+      "description": "Date de la conversation (YYYY-MM-DD)"
+    }
+  },
+  "required": [
+    "conversation_id",
+    "question",
+    "country_code"
+  ]
+}

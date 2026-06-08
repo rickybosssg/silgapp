@@ -1,0 +1,405 @@
+{
+  "name": "CourseExterne",
+  "type": "object",
+  "properties": {
+    "country_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE"
+      ],
+      "default": "BF",
+      "description": "Code pays de la course"
+    },
+    "client_nom": {
+      "type": "string",
+      "description": "Nom du client"
+    },
+    "client_telephone": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone du client"
+    },
+    "type_course": {
+      "type": "string",
+      "enum": [
+        "expedier",
+        "recevoir"
+      ],
+      "description": "Type de course : exp\u00e9dier ou recevoir un colis"
+    },
+    "expediteur_nom": {
+      "type": "string",
+      "description": "Nom de l'exp\u00e9diteur"
+    },
+    "expediteur_telephone": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone de l'exp\u00e9diteur"
+    },
+    "expediteur_phone_normalized": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone normalis\u00e9 (sans espaces, avec indicatif)"
+    },
+    "expediteur_client_id": {
+      "type": "string",
+      "description": "ID du client SILGAPP si l'exp\u00e9diteur existe"
+    },
+    "destinataire_nom": {
+      "type": "string",
+      "description": "Nom du destinataire"
+    },
+    "destinataire_telephone": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone du destinataire"
+    },
+    "destinataire_phone_normalized": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone normalis\u00e9 (sans espaces, avec indicatif)"
+    },
+    "destinataire_client_id": {
+      "type": "string",
+      "description": "ID du client SILGAPP si le destinataire existe"
+    },
+    "recipient_has_app": {
+      "type": "boolean",
+      "default": false,
+      "description": "Le destinataire a l'application SILGAPP"
+    },
+    "adresse_depart": {
+      "type": "string",
+      "description": "Adresse ou quartier de r\u00e9cup\u00e9ration"
+    },
+    "adresse_arrivee": {
+      "type": "string",
+      "description": "Adresse ou quartier de livraison"
+    },
+    "ville_depart": {
+      "type": "string",
+      "description": "Ville de d\u00e9part (d\u00e9tect\u00e9e par GPS)"
+    },
+    "ville_arrivee": {
+      "type": "string",
+      "description": "Ville d'arriv\u00e9e (d\u00e9tect\u00e9e par GPS)"
+    },
+    "destination_inconnue": {
+      "type": "boolean",
+      "default": false,
+      "description": "La destination finale n'est pas connue au moment de la commande"
+    },
+    "gps_depart_lat": {
+      "type": "number",
+      "description": "Latitude du point de d\u00e9part"
+    },
+    "gps_depart_lng": {
+      "type": "number",
+      "description": "Longitude du point de d\u00e9part"
+    },
+    "gps_arrivee_lat": {
+      "type": "number",
+      "description": "Latitude du point d'arriv\u00e9e"
+    },
+    "gps_arrivee_lng": {
+      "type": "number",
+      "description": "Longitude du point d'arriv\u00e9e"
+    },
+    "type_colis": {
+      "type": "string",
+      "enum": [
+        "petit_colis",
+        "moyen_colis",
+        "gros_colis",
+        "document",
+        "nourriture",
+        "autre"
+      ],
+      "description": "Type de colis"
+    },
+    "prix_estimate": {
+      "type": "number",
+      "description": "Prix estim\u00e9 (\u00e0 titre indicatif)"
+    },
+    "prix_final": {
+      "type": "number",
+      "description": "Prix final calcul\u00e9 apr\u00e8s livraison"
+    },
+    "distance_reelle_km": {
+      "type": "number",
+      "description": "Distance r\u00e9ellement parcourue en km"
+    },
+    "devise": {
+      "type": "string",
+      "default": "FCFA",
+      "description": "Devise utilis\u00e9e pour cette course"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "nouvelle",
+        "recherche_livreur",
+        "livreur_en_route",
+        "colis_recupere",
+        "en_livraison",
+        "livree",
+        "annulee"
+      ],
+      "default": "nouvelle",
+      "description": "Statut de la course"
+    },
+    "dispatch_status": {
+      "type": "string",
+      "enum": [
+        "en_attente",
+        "propose",
+        "accepte",
+        "expire",
+        "redispatch"
+      ],
+      "description": "Statut d\u00e9taill\u00e9 du dispatch automatique"
+    },
+    "timeout_expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure d'expiration du d\u00e9lai d'acceptation (60s)"
+    },
+    "heure_sollicitation": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure \u00e0 laquelle le livreur a \u00e9t\u00e9 sollicit\u00e9"
+    },
+    "livreur_id": {
+      "type": "string",
+      "description": "ID du livreur assign\u00e9"
+    },
+    "livreur_nom": {
+      "type": "string",
+      "description": "Nom du livreur assign\u00e9"
+    },
+    "livreur_photo_url": {
+      "type": "string",
+      "description": "Photo du livreur"
+    },
+    "livreur_telephone": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone du livreur"
+    },
+    "livreur_vehicule": {
+      "type": "string",
+      "description": "Type de v\u00e9hicule du livreur"
+    },
+    "livreur_note_moyenne": {
+      "type": "number",
+      "default": 0,
+      "description": "Note moyenne du livreur au moment de l'acceptation"
+    },
+    "livreur_nombre_avis": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre d'avis du livreur au moment de l'acceptation"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notes suppl\u00e9mentaires"
+    },
+    "remarque_livreur": {
+      "type": "string",
+      "description": "Remarque du livreur en cas de refus"
+    },
+    "heure_acceptation": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure d'acceptation par le livreur"
+    },
+    "heure_recuperation": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure de r\u00e9cup\u00e9ration du colis"
+    },
+    "heure_livraison": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure de livraison effective"
+    },
+    "latitude_recuperation": {
+      "type": "number",
+      "description": "Latitude au moment de 'Colis r\u00e9cup\u00e9r\u00e9'"
+    },
+    "longitude_recuperation": {
+      "type": "number",
+      "description": "Longitude au moment de 'Colis r\u00e9cup\u00e9r\u00e9'"
+    },
+    "latitude_livraison": {
+      "type": "number",
+      "description": "Latitude au moment de 'Colis livr\u00e9'"
+    },
+    "longitude_livraison": {
+      "type": "number",
+      "description": "Longitude au moment de 'Colis livr\u00e9'"
+    },
+    "latitude_arrivee_livraison": {
+      "type": "number",
+      "description": "Latitude finale de livraison (alias standard)"
+    },
+    "longitude_arrivee_livraison": {
+      "type": "number",
+      "description": "Longitude finale de livraison (alias standard)"
+    },
+    "colis_livre_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp exact de la livraison"
+    },
+    "commission_silga": {
+      "type": "number",
+      "description": "Commission Silga (% configurable par pays)"
+    },
+    "montant_livreur": {
+      "type": "number",
+      "description": "Montant net pour le livreur"
+    },
+    "statut_paiement_livreur": {
+      "type": "string",
+      "enum": [
+        "non_paye",
+        "paye"
+      ],
+      "default": "non_paye",
+      "description": "Statut du paiement du livreur \u00e0 Silga"
+    },
+    "note_livreur": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "Note officielle donn\u00e9e par l'exp\u00e9diteur (1 \u00e0 5 \u00e9toiles)"
+    },
+    "commentaire_livreur": {
+      "type": "string",
+      "description": "Commentaire laiss\u00e9 par l'exp\u00e9diteur"
+    },
+    "note_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date et heure de la notation par l'exp\u00e9diteur"
+    },
+    "destinataire_feedback": {
+      "type": "string",
+      "enum": [
+        "bon",
+        "mauvais"
+      ],
+      "description": "Feedback simple du destinataire"
+    },
+    "destinataire_feedback_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date du feedback destinataire"
+    },
+    "tracking_token": {
+      "type": "string",
+      "description": "Token unique pour le lien de suivi public"
+    },
+    "tracking_link": {
+      "type": "string",
+      "description": "Lien public de suivi de la course"
+    },
+    "tracking_shared_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de partage du lien de suivi"
+    },
+    "tracking_opened_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de fois o\u00f9 le lien a \u00e9t\u00e9 ouvert"
+    },
+    "pickup_qr_token": {
+      "type": "string",
+      "description": "Token unique pour QR code de r\u00e9cup\u00e9ration"
+    },
+    "pickup_code_4_digits": {
+      "type": "string",
+      "description": "Code \u00e0 4 chiffres pour validation manuelle de r\u00e9cup\u00e9ration"
+    },
+    "delivery_qr_token": {
+      "type": "string",
+      "description": "Token unique pour QR code de livraison"
+    },
+    "delivery_code_4_digits": {
+      "type": "string",
+      "description": "Code \u00e0 4 chiffres pour validation manuelle de livraison"
+    },
+    "pickup_confirmed_by": {
+      "type": "string",
+      "enum": [
+        "qr",
+        "manual_code",
+        "admin"
+      ],
+      "description": "M\u00e9thode de confirmation de r\u00e9cup\u00e9ration"
+    },
+    "delivery_confirmed_by": {
+      "type": "string",
+      "enum": [
+        "qr",
+        "manual_code",
+        "admin"
+      ],
+      "description": "M\u00e9thode de confirmation de livraison"
+    },
+    "pickup_confirmed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date et heure de confirmation de r\u00e9cup\u00e9ration"
+    },
+    "delivery_confirmed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date et heure de confirmation de livraison"
+    },
+    "pricing_mode": {
+      "type": "string",
+      "enum": [
+        "automatic",
+        "manual"
+      ],
+      "default": "automatic",
+      "description": "Mode de tarification : automatique ou manuel (propos\u00e9 par le livreur)"
+    },
+    "manual_price": {
+      "type": "number",
+      "description": "Prix manuel propos\u00e9 par le livreur (minimum 1000 FCFA)"
+    },
+    "manual_price_status": {
+      "type": "string",
+      "enum": [
+        "pending_client_validation",
+        "accepted",
+        "refused"
+      ],
+      "description": "Statut de validation du prix manuel par le client"
+    },
+    "proposed_by_livreur_id": {
+      "type": "string",
+      "description": "ID du livreur ayant propos\u00e9 le prix manuel"
+    },
+    "client_price_validated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date d'acceptation du prix manuel par le client"
+    },
+    "client_price_refused_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de refus du prix manuel par le client"
+    }
+  },
+  "required": [
+    "client_telephone",
+    "type_course",
+    "adresse_depart"
+  ]
+}

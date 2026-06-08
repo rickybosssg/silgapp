@@ -84,5 +84,46 @@
   }
   body {
     @apply bg-background text-foreground font-inter;
+    overscroll-behavior-y: none;
+  }
+  :where(.bg-white) {
+    color: #111827;
+  }
+  /* Force mode clair par défaut pour éviter texte blanc sur fond blanc */
+  html:not(.dark) {
+    color-scheme: light;
+  }
+  button, nav, [role="navigation"] {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  svg {
+    user-select: none;
+    -webkit-user-select: none;
+    pointer-events: none;
+  }
+}
+
+@layer components {
+  /* Safe area for mobile devices */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  /* Mobile optimizations */
+  @media (max-width: 640px) {
+    /* Prevent text overflow */
+    .truncate-mobile {
+      @apply truncate;
+    }
+    
+    /* Larger touch targets */
+    button, a {
+      @apply min-h-[44px];
+    }
   }
 }

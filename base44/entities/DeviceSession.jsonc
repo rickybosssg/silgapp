@@ -1,0 +1,74 @@
+{
+  "name": "DeviceSession",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email de l'utilisateur"
+    },
+    "user_type": {
+      "type": "string",
+      "enum": [
+        "client",
+        "livreur",
+        "admin"
+      ],
+      "description": "Type d'utilisateur"
+    },
+    "device_id": {
+      "type": "string",
+      "description": "Identifiant unique de l'appareil"
+    },
+    "platform": {
+      "type": "string",
+      "enum": [
+        "web",
+        "android",
+        "ios"
+      ],
+      "description": "Plateforme"
+    },
+    "notification_token": {
+      "type": "string",
+      "description": "Token pour notifications push"
+    },
+    "gps_actif": {
+      "type": "boolean",
+      "default": false,
+      "description": "GPS activ\u00e9 sur cet appareil"
+    },
+    "derniere_position_lat": {
+      "type": "number",
+      "description": "Derni\u00e8re latitude connue"
+    },
+    "derniere_position_lng": {
+      "type": "number",
+      "description": "Derni\u00e8re longitude connue"
+    },
+    "derniere_sync_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Derni\u00e8re synchronisation GPS"
+    },
+    "last_seen_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Derni\u00e8re activit\u00e9 (heartbeat)"
+    },
+    "app_active": {
+      "type": "boolean",
+      "default": false,
+      "description": "Application actuellement ouverte"
+    },
+    "session_actif": {
+      "type": "boolean",
+      "default": true,
+      "description": "Session active"
+    }
+  },
+  "required": [
+    "user_email",
+    "user_type",
+    "device_id"
+  ]
+}

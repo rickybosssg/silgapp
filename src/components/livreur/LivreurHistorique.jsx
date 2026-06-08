@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle2, XCircle, Clock, MapPin, Banknote, Calendar } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, MapPin, Banknote, Calendar, AlertCircle } from "lucide-react";
 import { format, subDays, startOfWeek, startOfMonth, isWithinInterval } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,7 @@ const periodFilters = [
   { value: "month", label: "Ce mois" },
 ];
 
-export default function LivreurHistorique({ mesCourses, livreurProfil }) {
+export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne = false }) {
   const [period, setPeriod] = useState("today");
 
   // Déterminer la période
@@ -37,23 +37,46 @@ export default function LivreurHistorique({ mesCourses, livreurProfil }) {
     }
   }, [period]);
 
-  // Filtrer les courses par période
+  // Filtrer les courses par période — utiliser heure_livraison pour les livrées, created_date sinon
   const filteredCourses = useMemo(() => {
     return mesCourses.filter(c => {
-      const courseDate = new Date(c.created_date);
-      return isWithinInterval(courseDate, { start: dateRange.start, end: dateRange.end });
+      const refDate = new Date(c.heure_livraison || c.updated_date || c.created_date);
+      const start = new Date(dateRange.start); start.setHours(0,0,0,0);
+      const end = new Date(dateRange.end); end.setHours(23,59,59,999);
+      return refDate >= start && refDate <= end;
     });
   }, [mesCourses, dateRange]);
 
   // Récapitulatif du jour (toujours aujourd'hui, peu importe le filtre)
   const today = new Date().toDateString();
-  const coursesToday = mesCourses.filter(c => 
-    new Date(c.created_date).toDateString() === today
-  );
+  const coursesToday = mesCourses.filter(c => {
+    const refDate = new Date(c.heure_livraison || c.updated_date || c.created_date);
+    return refDate.toDateString() === today;
+  });
   
   const livreesToday = coursesToday.filter(c => c.statut === "livree");
-  const totalEncaisseToday = livreesToday.reduce((sum, c) => sum + (c.prix_reel || 0), 0);
-  const montantDuToday = totalEncaisseToday;
+  const totalEncaisseToday = isExterne
+    ? livreesToday.reduce((sum, c) => {
+        // ⚠️ CORRECTION PRIX MANUEL : Utiliser manual_price si accepté
+        const isPrixManuel = c.pricing_mode === "manual" && c.manual_price_status === "accepted" && Number(c.manual_price) > 0;
+        return sum + (isPrixManuel ? Number(c.manual_price) : (c.prix_final || 0));
+      }, 0)
+    : livreesToday.reduce((sum, c) => sum + (c.prix_reel || 0), 0);
+  const gainLivreurToday = livreesToday.reduce((sum, c) => {
+    // ⚠️ CORRECTION PRIX MANUEL : Utiliser montant_livreur si déjà calculé, sinon recalculer avec respect du mode
+    if (c.montant_livreur > 0) return sum + c.montant_livreur;
+    const isPrixManuel = c.pricing_mode === "manual" && c.manual_price_status === "accepted" && Number(c.manual_price) > 0;
+    const prixBase = isPrixManuel ? Number(c.manual_price) : (c.prix_final || 0);
+    return sum + Math.round(prixBase * 0.7);
+  }, 0);
+  const commissionToday = livreesToday.reduce((sum, c) => {
+    // ⚠️ CORRECTION PRIX MANUEL : Utiliser commission_silga si déjà calculée
+    if (c.commission_silga > 0) return sum + c.commission_silga;
+    const isPrixManuel = c.pricing_mode === "manual" && c.manual_price_status === "accepted" && Number(c.manual_price) > 0;
+    const prixBase = isPrixManuel ? Number(c.manual_price) : (c.prix_final || 0);
+    return sum + Math.round(prixBase * 0.3);
+  }, 0);
+  const montantDuSilga = livreurProfil?.montant_du_silga || 0;
   const isPaye = livreurProfil?.statut_paiement === "paye";
 
   return (
@@ -64,36 +87,64 @@ export default function LivreurHistorique({ mesCourses, livreurProfil }) {
           <Calendar className="w-4 h-4" />
           Récapitulatif aujourd'hui
         </h3>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white/70 rounded-lg p-3 border border-amber-200">
-            <div className="flex items-center gap-1 text-amber-700 font-semibold text-sm mb-1">
-              <CheckCircle2 className="w-4 h-4" />
-              {livreesToday.length} course{livreesToday.length > 1 ? "s" : ""}
+        {isExterne ? (
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-white/70 rounded-lg p-3 border border-amber-200">
+                <div className="flex items-center gap-1 text-amber-700 font-semibold text-sm mb-1">
+                  <CheckCircle2 className="w-4 h-4" />
+                  {livreesToday.length} course{livreesToday.length > 1 ? "s" : ""}
+                </div>
+                <p className="text-xs text-amber-600">Livrées aujourd'hui</p>
+              </div>
+              <div className="bg-white/70 rounded-lg p-3 border border-amber-200">
+                <div className="flex items-center gap-1 text-gray-700 font-semibold text-sm mb-1">
+                  <Banknote className="w-4 h-4" />
+                  {totalEncaisseToday.toLocaleString()} FCFA
+                </div>
+                <p className="text-xs text-amber-600">Prix total courses</p>
+              </div>
             </div>
-            <p className="text-xs text-amber-600">Livrées aujourd'hui</p>
-          </div>
-          <div className="bg-white/70 rounded-lg p-3 border border-amber-200">
-            <div className="flex items-center gap-1 text-amber-700 font-semibold text-sm mb-1">
-              <Banknote className="w-4 h-4" />
-              {totalEncaisseToday.toLocaleString()} FCFA
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-green-50 rounded-lg p-2 border border-green-200 text-center">
+                <p className="text-xs font-bold text-green-700">{gainLivreurToday.toLocaleString()} FCFA</p>
+                <p className="text-[10px] text-green-600 mt-0.5">Votre gain (70%)</p>
+              </div>
+              <div className="bg-orange-50 rounded-lg p-2 border border-orange-200 text-center">
+                <p className="text-xs font-bold text-orange-700">{commissionToday.toLocaleString()} FCFA</p>
+                <p className="text-[10px] text-orange-600 mt-0.5">Commission (30%)</p>
+              </div>
+              <div className="bg-red-50 rounded-lg p-2 border border-red-200 text-center">
+                <p className="text-xs font-bold text-red-700">{commissionToday.toLocaleString()} FCFA</p>
+                <p className="text-[10px] text-red-600 mt-0.5">Dû à Silga (auj.)</p>
+              </div>
             </div>
-            <p className="text-xs text-amber-600">Total encaissé</p>
           </div>
-          <div className="bg-white/70 rounded-lg p-3 border border-amber-200">
-            <div className="flex items-center gap-1 text-blue-700 font-semibold text-sm mb-1">
-              <Banknote className="w-4 h-4" />
-              {montantDuToday.toLocaleString()} FCFA
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white/70 rounded-lg p-3 border border-amber-200">
+              <div className="flex items-center gap-1 text-amber-700 font-semibold text-sm mb-1">
+                <CheckCircle2 className="w-4 h-4" />
+                {livreesToday.length} course{livreesToday.length > 1 ? "s" : ""}
+              </div>
+              <p className="text-xs text-amber-600">Livrées aujourd'hui</p>
             </div>
-            <p className="text-xs text-blue-600">Dû à Silga</p>
-          </div>
-          <div className="bg-white/70 rounded-lg p-3 border border-amber-200">
-            <div className="flex items-center gap-1 text-green-700 font-semibold text-sm mb-1">
-              {isPaye ? <CheckCircle2 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
-              {isPaye ? "Payé" : "Non payé"}
+            <div className="bg-white/70 rounded-lg p-3 border border-amber-200">
+              <div className="flex items-center gap-1 text-amber-700 font-semibold text-sm mb-1">
+                <Banknote className="w-4 h-4" />
+                {totalEncaisseToday.toLocaleString()} FCFA
+              </div>
+              <p className="text-xs text-amber-600">Total encaissé</p>
             </div>
-            <p className="text-xs text-muted-foreground">Statut paiement</p>
+            <div className="bg-white/70 rounded-lg p-3 border border-amber-200">
+              <div className="flex items-center gap-1 text-green-700 font-semibold text-sm mb-1">
+                {isPaye ? <CheckCircle2 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                {isPaye ? "Payé" : "Non payé"}
+              </div>
+              <p className="text-xs text-muted-foreground">Statut paiement</p>
+            </div>
           </div>
-        </div>
+        )}
       </Card>
 
       {/* Filtres période */}
@@ -164,11 +215,64 @@ export default function LivreurHistorique({ mesCourses, livreurProfil }) {
                       <span className="truncate">{course.adresse_arrivee}</span>
                     </div>
 
-                    {course.prix_reel && course.statut === "livree" && (
-                      <div className="flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 rounded px-2 py-1 w-fit">
-                        <Banknote className="w-3 h-3" />
-                        {course.prix_reel.toLocaleString()} FCFA encaissés
-                      </div>
+                    {course.statut === "livree" && (
+                      isExterne ? (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {(() => {
+                            const dist = course.distance_reelle_km > 0 ? Number(course.distance_reelle_km) : 0;
+                            // ⚠️ CORRECTION PRIX MANUEL
+                            const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
+                            const prix = isPrixManuel ? Number(course.manual_price) : (course.prix_final > 0 ? Number(course.prix_final) : 0);
+                            const gain = course.montant_livreur > 0 ? Number(course.montant_livreur) : 0;
+                            const commission = course.commission_silga > 0 ? Number(course.commission_silga) : 0;
+                            let dureeMin = null;
+                            if (course.heure_livraison && course.heure_recuperation) {
+                              dureeMin = Math.round((new Date(course.heure_livraison) - new Date(course.heure_recuperation)) / 60000);
+                            }
+                            return <>
+                              {dist > 0 && (
+                                <span className="text-xs text-blue-600 bg-blue-50 rounded px-2 py-0.5">
+                                  📏 {dist.toFixed(1)} km
+                                </span>
+                              )}
+                              {dureeMin !== null && dureeMin > 0 && (
+                                <span className="text-xs text-purple-600 bg-purple-50 rounded px-2 py-0.5">
+                                  ⏱ {dureeMin} min
+                                </span>
+                              )}
+                              {prix > 0 && (
+                                <span className={cn("text-xs font-semibold rounded px-2 py-0.5", 
+                                  isPrixManuel ? "text-green-700 bg-green-50" : "text-gray-700 bg-gray-50"
+                                )}>
+                                  {isPrixManuel ? "✓ " : "💰 "}{prix.toLocaleString()} F
+                                </span>
+                              )}
+                              {gain > 0 && (
+                                <span className="text-xs font-bold text-green-700 bg-green-50 rounded px-2 py-0.5">
+                                  ✅ +{gain.toLocaleString()} F
+                                </span>
+                              )}
+                              {commission > 0 && (
+                                <span className="text-xs text-orange-600 bg-orange-50 rounded px-2 py-0.5">
+                                  Silga: {commission.toLocaleString()} F
+                                </span>
+                              )}
+                              {course.note_livreur > 0 && (
+                                <span className="text-xs text-yellow-700 bg-yellow-50 rounded px-2 py-0.5">
+                                  {"⭐".repeat(course.note_livreur)}
+                                </span>
+                              )}
+                            </>;
+                          })()}
+                        </div>
+                      ) : (
+                        course.prix_reel && (
+                          <div className="flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 rounded px-2 py-1 w-fit">
+                            <Banknote className="w-3 h-3" />
+                            {course.prix_reel.toLocaleString()} FCFA encaissés
+                          </div>
+                        )
+                      )
                     )}
                   </div>
                 </div>

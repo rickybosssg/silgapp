@@ -1,9 +1,9 @@
 import React from "react";
 import { cn } from "@/lib/utils";
-
 import BatterieFaibleButton from "./BatterieFaibleButton";
+import CoursePersonnelleButton from "./CoursePersonnelleButton";
 
-export default function LivreurStatutCard({ statut, livreur }) {
+export default function LivreurStatutCard({ statut, livreur, isExterne = false }) {
   const isDisponible = statut === "disponible";
   const isEnCourse = statut === "en_course";
   const isHorsLigne = statut === "hors_ligne";
@@ -11,53 +11,76 @@ export default function LivreurStatutCard({ statut, livreur }) {
   return (
     <div className="space-y-3">
       <div className={cn(
-        "rounded-2xl p-4 flex items-center gap-4 shadow-sm transition-all duration-500",
-        isDisponible && "bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-green-200",
-        isEnCourse && "bg-gradient-to-r from-primary to-red-600 text-white shadow-red-200",
-        isHorsLigne && "bg-gray-100 text-gray-500",
+        "rounded-3xl p-4 flex items-center gap-4 transition-all duration-500 relative overflow-hidden",
+        isDisponible && "bg-gradient-to-r from-emerald-500 to-green-400 text-white shadow-lg shadow-emerald-500/30",
+        isEnCourse && "bg-gradient-to-r from-blue-600 to-indigo-500 text-white shadow-lg shadow-blue-500/30",
+        isHorsLigne && "bg-gray-100 text-gray-500 border border-gray-200",
       )}>
-        {/* Animated dot */}
+        {/* Halo de fond décoratif */}
+        {isDisponible && <div className="absolute -right-6 -top-6 w-24 h-24 bg-white/10 rounded-full blur-xl pointer-events-none" />}
+        {isEnCourse && <div className="absolute -right-6 -top-6 w-24 h-24 bg-white/10 rounded-full blur-xl pointer-events-none" />}
+
+        {/* Icône statut */}
         <div className="relative flex-shrink-0">
           <div className={cn(
-            "w-12 h-12 rounded-2xl flex items-center justify-center text-2xl",
+            "w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-inner",
             isDisponible && "bg-white/20",
             isEnCourse && "bg-white/20",
             isHorsLigne && "bg-gray-200",
           )}>
-            {isDisponible && "✅"}
-            {isEnCourse && "🚀"}
-            {isHorsLigne && "⏸️"}
+            {isDisponible && "🟢"}
+            {isEnCourse && "🔵"}
+            {isHorsLigne && "⚪"}
           </div>
+          {/* Ping animé */}
           {(isDisponible || isEnCourse) && (
-            <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-white/80 animate-ping" />
+            <span className={cn(
+              "absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full animate-ping opacity-75",
+              isDisponible ? "bg-white" : "bg-sky-300"
+            )} />
           )}
         </div>
 
-        <div>
+        <div className="flex-1 min-w-0">
           <p className={cn(
-            "font-bold text-base leading-tight",
+            "font-black text-lg leading-tight",
             isHorsLigne && "text-gray-600"
           )}>
-            {isDisponible && "Disponible"}
+            {isDisponible && "Libre"}
             {isEnCourse && "En course"}
-            {isHorsLigne && "Hors ligne"}
+            {isHorsLigne && "OFF"}
           </p>
           <p className={cn(
-            "text-xs mt-0.5",
-            isDisponible && "text-white/70",
-            isEnCourse && "text-white/70",
+            "text-xs mt-0.5 leading-relaxed",
+            isDisponible && "text-white/75",
+            isEnCourse && "text-white/75",
             isHorsLigne && "text-gray-400",
           )}>
-            {isDisponible && "En attente de nouvelles courses…"}
+            {isDisponible && "Prêt à recevoir une mission"}
             {isEnCourse && "Vous êtes en déplacement"}
-            {isHorsLigne && "Activez le switch pour être en ligne"}
+            {isHorsLigne && "Appuyez sur « Activer » pour accepter des courses"}
           </p>
         </div>
+
+        {/* Badge statut secondaire */}
+        {isDisponible && (
+          <div className="bg-white/20 px-2.5 py-1 rounded-full flex-shrink-0">
+            <span className="text-[11px] font-bold text-white">🟢 ON</span>
+          </div>
+        )}
+        {isEnCourse && (
+          <div className="bg-white/20 px-2.5 py-1 rounded-full flex-shrink-0">
+            <span className="text-[11px] font-bold text-white">🔵 En mission</span>
+          </div>
+        )}
       </div>
 
-      {/* Bouton batterie faible */}
-      {(isDisponible || isEnCourse) && livreur && (
-        <BatterieFaibleButton livreur={livreur} />
+      {/* Boutons action - uniquement pour livreurs internes */}
+      {!isExterne && (isDisponible || isEnCourse) && livreur && (
+        <div className="pt-1 flex flex-wrap gap-2">
+          <BatterieFaibleButton livreur={livreur} />
+          {isDisponible && <CoursePersonnelleButton livreur={livreur} />}
+        </div>
       )}
     </div>
   );

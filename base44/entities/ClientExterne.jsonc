@@ -1,0 +1,94 @@
+{
+  "name": "ClientExterne",
+  "type": "object",
+  "properties": {
+    "nom": {
+      "type": "string",
+      "description": "Nom de famille du client"
+    },
+    "prenom": {
+      "type": "string",
+      "description": "Pr\u00e9nom du client"
+    },
+    "telephone": {
+      "type": "string",
+      "description": "Num\u00e9ro de t\u00e9l\u00e9phone"
+    },
+    "email": {
+      "type": "string",
+      "description": "Adresse email"
+    },
+    "country_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE"
+      ],
+      "default": "BF",
+      "description": "Code pays ISO du client"
+    },
+    "ville": {
+      "type": "string",
+      "description": "Ville du client (d\u00e9tect\u00e9e par GPS ou saisie)"
+    },
+    "quartier": {
+      "type": "string",
+      "description": "Quartier de r\u00e9sidence"
+    },
+    "latitude": {
+      "type": "number",
+      "description": "Latitude actuelle"
+    },
+    "longitude": {
+      "type": "number",
+      "description": "Longitude actuelle"
+    },
+    "actif": {
+      "type": "boolean",
+      "default": true,
+      "description": "Compte actif ou bloqu\u00e9"
+    },
+    "bloque_frais_annulation": {
+      "type": "boolean",
+      "default": false,
+      "description": "Client bloqu\u00e9 pour frais d'annulation impay\u00e9s"
+    },
+    "user_email": {
+      "type": "string",
+      "description": "Email du compte utilisateur li\u00e9"
+    },
+    "app_active": {
+      "type": "boolean",
+      "default": false,
+      "description": "Application actuellement ouverte"
+    },
+    "last_seen_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Derni\u00e8re activit\u00e9 dans l'application (heartbeat)"
+    },
+    "code_promo_utilise": {
+      "type": "string",
+      "description": "Code promo saisi \u00e0 l'inscription (usage unique)"
+    },
+    "code_promo_id": {
+      "type": "string",
+      "description": "ID du CodePromo utilis\u00e9"
+    },
+    "premiere_course_faite": {
+      "type": "boolean",
+      "default": false,
+      "description": "Le client a d\u00e9j\u00e0 effectu\u00e9 sa premi\u00e8re course (plus de r\u00e9duction possible)"
+    }
+  },
+  "required": [
+    "nom",
+    "telephone"
+  ]
+}

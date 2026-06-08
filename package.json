@@ -12,13 +12,19 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@base44/sdk": "^0.8.30",
-    "@base44/vite-plugin": "^1.0.18",
+    "@base44/sdk": "^0.8.31",
+    "@base44/vite-plugin": "^1.0.21",
+    "@capacitor-community/background-geolocation": "^1.2.26",
+    "@capacitor-community/contacts": "^5.1.1",
     "@capacitor/android": "^5.7.8",
     "@capacitor/app": "^5.0.8",
+    "@capacitor/browser": "^5.2.1",
     "@capacitor/cli": "^5.7.8",
     "@capacitor/core": "^5.7.8",
+    "@capacitor/geolocation": "^5.0.8",
+    "@capacitor/ios": "^5.7.8",
     "@capacitor/local-notifications": "^5.0.8",
+    "@capacitor/preferences": "^5.0.8",
     "@capacitor/push-notifications": "^5.1.2",
     "@hello-pangea/dnd": "^17.0.0",
     "@hookform/resolvers": "^4.1.2",
@@ -66,6 +72,7 @@
     "lucide-react": "^0.475.0",
     "moment": "^2.30.1",
     "next-themes": "^0.4.4",
+    "qrcode.react": "^3.2.0",
     "react": "^18.2.0",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.2.0",
@@ -83,6 +90,11 @@
     "three": "^0.171.0",
     "vaul": "^1.1.2",
     "zod": "^3.24.2"
+  },
+  "optionalDependencies": {
+    "@esbuild/linux-x64": "0.25.12",
+    "@rollup/rollup-linux-x64-gnu": "4.57.1",
+    "@rollup/rollup-linux-x64-musl": "4.57.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",

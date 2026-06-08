@@ -1,0 +1,36 @@
+{
+  "name": "AlerteLecture",
+  "type": "object",
+  "properties": {
+    "alerte_id": {
+      "type": "string",
+      "description": "ID de l'AlerteLivreur concern\u00e9e"
+    },
+    "livreur_id": {
+      "type": "string",
+      "description": "ID du livreur ayant lu l'alerte"
+    },
+    "livreur_nom": {
+      "type": "string",
+      "description": "Nom du livreur"
+    },
+    "livreur_reseau": {
+      "type": "string",
+      "enum": [
+        "interne",
+        "externe"
+      ],
+      "description": "R\u00e9seau du livreur"
+    },
+    "lue_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date et heure de lecture"
+    }
+  },
+  "required": [
+    "alerte_id",
+    "livreur_id",
+    "lue_at"
+  ]
+}

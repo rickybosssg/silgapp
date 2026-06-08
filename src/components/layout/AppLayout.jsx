@@ -1,23 +1,41 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Outlet } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import Sidebar from "./Sidebar";
+import MobileNav from "./MobileNav";
 
-export default function AppLayout() {
-  const { data: notifications = [] } = useQuery({
-    queryKey: ["notifications-unread"],
-    queryFn: () => base44.entities.Notification.filter({ lue: false }),
-    initialData: [],
-    refetchInterval: 30000,
-  });
+export default function AppLayout({ reseau }) {
+  const [notifCount, setNotifCount] = useState(0);
+
+  useEffect(() => {
+    const fetchNotifs = async () => {
+      try {
+        const data = await base44.entities.Notification.filter({ lue: false });
+        setNotifCount((data || []).length);
+      } catch (_) {}
+    };
+    fetchNotifs();
+    const iv = setInterval(fetchNotifs, 30000);
+    return () => clearInterval(iv);
+  }, []);
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar notificationCount={notifications.length} />
-      <main className="flex-1 overflow-y-auto">
-        <Outlet />
-      </main>
+    <div className="min-h-screen bg-slate-50">
+      {/* Desktop layout */}
+      <div className="hidden lg:flex min-h-screen">
+        <Sidebar notificationCount={notifCount} reseau={reseau} />
+        <main className="flex-1 min-h-screen overflow-x-hidden bg-slate-50">
+          <Outlet />
+        </main>
+      </div>
+
+      {/* Mobile layout */}
+      <div className="lg:hidden">
+        <MobileNav notificationCount={notifCount} reseau={reseau} />
+        <main className="pt-14 pb-16 min-h-screen bg-slate-50 safe-area-top safe-area-bottom">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }

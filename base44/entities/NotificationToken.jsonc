@@ -23,13 +23,18 @@
       "type": "string",
       "enum": [
         "admin",
-        "livreur"
+        "livreur",
+        "client"
       ],
       "description": "Type d'utilisateur"
     },
     "livreur_id": {
       "type": "string",
       "description": "ID du livreur si user_type='livreur'"
+    },
+    "client_id": {
+      "type": "string",
+      "description": "ID du client si user_type='client'"
     },
     "actif": {
       "type": "boolean",
@@ -40,6 +45,28 @@
       "type": "string",
       "format": "date-time",
       "description": "Derni\u00e8re fois que le token a \u00e9t\u00e9 utilis\u00e9"
+    },
+    "derniere_notif_titre": {
+      "type": "string",
+      "description": "Titre de la derni\u00e8re notification envoy\u00e9e"
+    },
+    "derniere_notif_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de la derni\u00e8re notification envoy\u00e9e"
+    },
+    "derniere_notif_statut": {
+      "type": "string",
+      "enum": [
+        "success",
+        "failed",
+        "pending"
+      ],
+      "description": "Statut de la derni\u00e8re notification"
+    },
+    "fcm_error": {
+      "type": "string",
+      "description": "Derni\u00e8re erreur FCM re\u00e7ue"
     }
   },
   "required": [

@@ -2,6 +2,15 @@
   "name": "Course",
   "type": "object",
   "properties": {
+    "reseau": {
+      "type": "string",
+      "enum": [
+        "interne",
+        "externe"
+      ],
+      "default": "interne",
+      "description": "R\u00e9seau SILGAPP (interne ou externe)"
+    },
     "client_nom": {
       "type": "string",
       "description": "Nom du client"
@@ -74,10 +83,33 @@
         "colis_recupere",
         "en_livraison",
         "livree",
-        "annulee"
+        "annulee",
+        "pause"
       ],
       "default": "nouvelle",
       "description": "Statut de la course"
+    },
+    "dispatch_mode": {
+      "type": "string",
+      "enum": [
+        "manuel",
+        "automatique"
+      ],
+      "default": "manuel",
+      "description": "Mode de dispatch choisi par l'admin"
+    },
+    "dispatch_status": {
+      "type": "string",
+      "enum": [
+        "en_attente_admin",
+        "recherche_livreur",
+        "propose",
+        "accepte",
+        "expire",
+        "assigne_manuel"
+      ],
+      "default": "en_attente_admin",
+      "description": "Statut d\u00e9taill\u00e9 du dispatch"
     },
     "livreur_id": {
       "type": "string",
@@ -109,6 +141,85 @@
       "type": "string",
       "format": "date-time",
       "description": "Heure de livraison effective"
+    },
+    "latitude_depart_livraison": {
+      "type": "number",
+      "description": "Latitude au moment de 'Colis r\u00e9cup\u00e9r\u00e9'"
+    },
+    "longitude_depart_livraison": {
+      "type": "number",
+      "description": "Longitude au moment de 'Colis r\u00e9cup\u00e9r\u00e9'"
+    },
+    "latitude_arrivee_livraison": {
+      "type": "number",
+      "description": "Latitude au moment de 'Colis livr\u00e9'"
+    },
+    "longitude_arrivee_livraison": {
+      "type": "number",
+      "description": "Longitude au moment de 'Colis livr\u00e9'"
+    },
+    "colis_recupere_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp exact de la r\u00e9cup\u00e9ration"
+    },
+    "colis_livre_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp exact de la livraison"
+    },
+    "distance_km": {
+      "type": "number",
+      "description": "Distance parcourue en km (r\u00e9elle ou estim\u00e9e)"
+    },
+    "duree_livraison_minutes": {
+      "type": "number",
+      "description": "Dur\u00e9e de livraison en minutes"
+    },
+    "gps_distance_type": {
+      "type": "string",
+      "enum": [
+        "reelle",
+        "estimee"
+      ],
+      "description": "Type de distance : r\u00e9elle (GPS continu) ou estim\u00e9e (entre 2 points)"
+    },
+    "pause_motif": {
+      "type": "string",
+      "enum": [
+        "client_injoignable",
+        "client_absent",
+        "adresse_a_confirmer",
+        "autre"
+      ],
+      "description": "Motif de la mise en pause"
+    },
+    "pause_started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure de d\u00e9but de pause"
+    },
+    "pause_livreur_id": {
+      "type": "string",
+      "description": "ID du livreur ayant mis la course en pause"
+    },
+    "pause_livreur_nom": {
+      "type": "string",
+      "description": "Nom du livreur ayant mis la course en pause"
+    },
+    "statut_pre_pause": {
+      "type": "string",
+      "enum": [
+        "acceptee",
+        "en_route_recuperation",
+        "colis_recupere",
+        "en_livraison"
+      ],
+      "description": "Statut avant la mise en pause"
+    },
+    "pause_duree_minutes": {
+      "type": "number",
+      "description": "Dur\u00e9e totale de pause en minutes"
     }
   },
   "required": [

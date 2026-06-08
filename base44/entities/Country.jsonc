@@ -1,0 +1,74 @@
+{
+  "name": "Country",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string",
+      "description": "Code ISO 2 lettres du pays (ex: BF, CI, TG, BJ, SN)"
+    },
+    "nom": {
+      "type": "string",
+      "description": "Nom du pays en fran\u00e7ais"
+    },
+    "indicatif": {
+      "type": "string",
+      "description": "Indicatif t\u00e9l\u00e9phonique (ex: +226, +225)"
+    },
+    "devise": {
+      "type": "string",
+      "default": "FCFA",
+      "description": "Devise locale (ex: FCFA, CFA)"
+    },
+    "prix_par_km": {
+      "type": "number",
+      "default": 100,
+      "description": "Tarif en devise locale par km parcouru"
+    },
+    "prix_minimum": {
+      "type": "number",
+      "default": 500,
+      "description": "Prix minimum d'une course dans ce pays"
+    },
+    "commission_pct": {
+      "type": "number",
+      "default": 30,
+      "description": "Pourcentage de commission Silga (par d\u00e9faut 30%)"
+    },
+    "ville_principale": {
+      "type": "string",
+      "description": "Ville principale d'op\u00e9ration (ex: Ouagadougou, Abidjan)"
+    },
+    "latitude_centre": {
+      "type": "number",
+      "description": "Latitude du centre de la ville principale"
+    },
+    "longitude_centre": {
+      "type": "number",
+      "description": "Longitude du centre de la ville principale"
+    },
+    "rayon_km": {
+      "type": "number",
+      "default": 30,
+      "description": "Rayon d'op\u00e9ration en km autour du centre"
+    },
+    "actif": {
+      "type": "boolean",
+      "default": false,
+      "description": "Pays actif pour les op\u00e9rations SILGAPP"
+    },
+    "emoji_flag": {
+      "type": "string",
+      "description": "Emoji drapeau du pays"
+    },
+    "ordre": {
+      "type": "number",
+      "default": 99,
+      "description": "Ordre d'affichage dans les listes"
+    }
+  },
+  "required": [
+    "code",
+    "nom",
+    "indicatif"
+  ]
+}

@@ -10,7 +10,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { notifyNouvelleCourse } from "@/lib/notificationsHelpers";
-import { getLivreurNotificationEmail } from "@/lib/codeIdentificationAuth";
 
 function getDistance(lat1, lng1, lat2, lng2) {
   if (!lat1 || !lng1 || !lat2 || !lng2) return null;
@@ -23,12 +22,16 @@ function getDistance(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-export default function AssignLivreurDialog({ course, open, onClose }) {
+export default function AssignLivreurDialog({ course, open, onClose, reseau = "interne" }) {
   const queryClient = useQueryClient();
 
   const { data: livreurs = [] } = useQuery({
-    queryKey: ["livreurs"],
-    queryFn: () => base44.entities.Livreur.list(),
+    queryKey: ["livreurs", reseau],
+    queryFn: () => base44.entities.Livreur.filter({ 
+      reseau,
+      validation: "valide",
+      actif: true
+    }, "-created_date"),
     initialData: [],
   });
 
@@ -38,9 +41,12 @@ export default function AssignLivreurDialog({ course, open, onClose }) {
         livreur_id: livreur.id,
         livreur_nom: livreur.nom,
         statut: "en_attente_livreur",
+        dispatch_mode: "manuel",
+        dispatch_status: "assigne_manuel",
+        heure_acceptation: new Date().toISOString(), // Initialiser le timer de 60s
       });
 
-      const notificationEmail = getLivreurNotificationEmail(livreur);
+      const notificationEmail = livreur.user_email;
       if (notificationEmail) {
         await notifyNouvelleCourse(notificationEmail, {
           ...course,
@@ -56,7 +62,7 @@ export default function AssignLivreurDialog({ course, open, onClose }) {
     },
   });
 
-  const disponibles = livreurs.filter(l => l.statut === "disponible");
+  const disponibles = livreurs.filter(l => l.statut === "disponible" && (l.reseau || "interne") === reseau);
   const sorted = [...disponibles].sort((a, b) => {
     if (!course?.gps_depart_lat) return 0;
     const distA = getDistance(course.gps_depart_lat, course.gps_depart_lng, a.latitude, a.longitude);

@@ -1,11 +1,79 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="https://base44.com/logo_v2.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/silgapp-icon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#CC0000" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="SILGAPP" />
+    <meta name="description" content="SILGAPP - Livraison express de colis au Burkina Faso, Côte d'Ivoire, Sénégal. Suivi GPS en temps réel." />
     <link rel="manifest" href="/manifest.json" />
-    <title>Base44 APP</title>
+    <title>SILGAPP</title>
+    <!-- 
+      CRITIQUE APK ANDROID : capture du token AVANT tout module ES
+      Les modules ES (main.jsx, base44Client.js) sont importés en parallèle par le navigateur.
+      Ce script inline s'exécute en premier, garantissant que localStorage a le token
+      avant que createClient() soit appelé.
+    -->
+    <script>
+      // Diagnostic APK — détecte l'erreur exacte
+      window.addEventListener('error', function(e) {
+        console.error('[DIAGNOSTIC]', e.message, 'at', e.filename, ':', e.lineno, ':', e.colno);
+        if (e.message && e.message.includes('before initialization')) {
+          console.error('[DIAGNOSTIC] ERREUR INITIALISATION:', e.message);
+          console.error('[DIAGNOSTIC] Stack:', e.error?.stack);
+        }
+      });
+      window.addEventListener('unhandledrejection', function(e) {
+        console.error('[DIAGNOSTIC] Promise rejected:', e.reason);
+      });
+      console.log('[DIAGNOSTIC] Script chargé à', new Date().toISOString());
+    </script>
+    <script>
+      (function() {
+        try {
+          var isAuthCallback = window.location.pathname === '/auth-callback';
+          var hasToken = window.location.search && window.location.search.indexOf('access_token=') !== -1;
+          var isNativeWebView = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+          if (isAuthCallback && hasToken && !isNativeWebView) {
+            window.location.replace('silgapp://auth-callback' + window.location.search);
+          }
+        } catch(e) {
+          console.error('[AUTH CALLBACK] Erreur redirection app:', e);
+        }
+      })();
+    </script>
+    <script>
+      (function() {
+        console.log('[TOKEN] Début capture token');
+        try {
+          var search = window.location.search;
+          if (search && search.indexOf('access_token=') !== -1) {
+            console.log('[TOKEN] access_token trouvé dans URL');
+            var params = new URLSearchParams(search);
+            var token = params.get('access_token');
+            if (token && token.length > 10 && token !== 'null' && token !== 'undefined') {
+              console.log('[TOKEN] Token valide, stockage...');
+              localStorage.setItem('base44_access_token', token);
+              localStorage.setItem('access_token', token);
+              params.delete('access_token');
+              var clean = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
+              window.history.replaceState({}, document.title, clean);
+              console.log('[TOKEN] Token stocké avec succès');
+            } else {
+              console.log('[TOKEN] Token invalide:', token);
+            }
+          } else {
+            console.log('[TOKEN] Pas de token dans URL');
+          }
+        } catch(e) {
+          console.error('[TOKEN] Erreur capture token:', e);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

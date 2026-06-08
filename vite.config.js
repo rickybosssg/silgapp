@@ -20,4 +20,12 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  optimizeDeps: {
+    entries: ['index.html'],
+  },
+  server: {
+    watch: {
+      ignored: ['**/android/**', '**/dist/**', '**/edge-profile*/**', '**/*.log'],
+    },
+  },
 });

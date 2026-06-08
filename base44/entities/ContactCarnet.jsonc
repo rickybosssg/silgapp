@@ -1,0 +1,45 @@
+{
+  "name": "ContactCarnet",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string",
+      "description": "ID du ClientExterne propri\u00e9taire de ce contact"
+    },
+    "client_telephone": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone du client propri\u00e9taire (pour retrouver ses contacts rapidement)"
+    },
+    "nom": {
+      "type": "string",
+      "description": "Nom du contact"
+    },
+    "telephone": {
+      "type": "string",
+      "description": "Num\u00e9ro de t\u00e9l\u00e9phone du contact"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "destinataire",
+        "expediteur"
+      ],
+      "description": "Type de contact : destinataire ou exp\u00e9diteur"
+    },
+    "nb_utilisations": {
+      "type": "number",
+      "default": 1,
+      "description": "Nombre de fois que ce contact a \u00e9t\u00e9 utilis\u00e9"
+    },
+    "derniere_utilisation": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de derni\u00e8re utilisation"
+    }
+  },
+  "required": [
+    "client_id",
+    "telephone",
+    "type"
+  ]
+}

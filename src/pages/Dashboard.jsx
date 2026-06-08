@@ -1,187 +1,201 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Plus, Package, Truck, Clock, CheckCircle2, 
-  XCircle, AlertTriangle, MapPin, TrendingUp 
-} from "lucide-react";
+import { Plus, MapPin, Package, Truck, Clock, CheckCircle2, XCircle, AlertTriangle, TrendingUp, Users } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
-import { toast } from "sonner";
-import StatCard from "../components/dashboard/StatCard";
-import CourseListItem from "../components/courses/CourseListItem";
-import CourseDetailDialog from "../components/courses/CourseDetailDialog";
-import AssignLivreurDialog from "../components/courses/AssignLivreurDialog";
-import DispatchModeSelector from "../components/dispatch/DispatchModeSelector";
-import DispatchMonitor from "../components/dispatch/DispatchMonitor";
-import BatterieAlertesPanel from "../components/admin/BatterieAlertesPanel";
-import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
-import { useAuth } from "@/lib/AuthContext";
-
-const statusFilters = [
-  { value: "toutes", label: "Toutes" },
-  { value: "active", label: "En cours" },
-  { value: "nouvelle", label: "Nouvelles" },
-  { value: "livree", label: "Livrées" },
-  { value: "annulee", label: "Annulées" },
-];
+import StatCard from "@/components/dashboard/StatCard";
+import { useQueryClient } from "@tanstack/react-query";
+import LivreursEnLigne from "@/components/dashboard/LivreursEnLigne";
+import CoursesADispatcher from "@/components/dashboard/CoursesADispatcher";
+import CoursesEnTraitement from "@/components/dashboard/CoursesEnTraitement";
+import CoursesTerminees from "@/components/dashboard/CoursesTerminees";
+import CourseDetailDialog from "@/components/courses/CourseDetailDialog";
+import AssignLivreurDialog from "@/components/courses/AssignLivreurDialog";
+import DispatchMonitor from "@/components/dispatch/DispatchMonitor";
+import BatterieAlertesPanel from "@/components/admin/BatterieAlertesPanel";
+import CoursesEnPausePanel from "@/components/admin/CoursesEnPausePanel";
+import VenusFloatingButton from "@/components/client/VenusFloatingButton";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 
 export default function Dashboard() {
-  const [statusFilter, setStatusFilter] = useState("toutes");
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [assignCourse, setAssignCourse] = useState(null);
-  const { user: currentUser } = useAuth();
-
-  useEffect(() => {
-    let unsubscribe = null;
-    let cancelled = false;
-
-    const setupNotifications = async () => {
-      if (cancelled) return;
-      if (!currentUser?.email) return;
-      
-      // Enregistrer le token push pour admin
-      const token = await registerPushToken(null, currentUser);
-      if (token) {
-        console.log('Token push admin enregistré:', token);
-      }
-
-      // S'abonner aux notifications
-      unsubscribe = subscribeToNotifications(
-        (notification) => {
-          toast.info(`${notification.titre}: ${notification.message}`);
-        },
-        currentUser.email
-      );
-    };
-
-    setupNotifications().catch(() => {});
-
-    return () => {
-      cancelled = true;
-      if (unsubscribe) unsubscribe();
-    };
-  }, [currentUser]);
+  const queryClient = useQueryClient();
 
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ["courses"],
-    queryFn: () => base44.entities.Course.list("-created_date", 200),
+    queryFn: () => base44.entities.Course.filter({ reseau: "interne" }, "-created_date", 500),
     initialData: [],
-    refetchInterval: 15000,
+    refetchInterval: 5000,
   });
 
   const { data: livreurs = [] } = useQuery({
     queryKey: ["livreurs"],
-    queryFn: () => base44.entities.Livreur.list(),
+    queryFn: () => base44.entities.Livreur.filter({ type_livreur: "interne" }),
     initialData: [],
+    refetchInterval: 5000,
   });
 
-  const todayCourses = useMemo(
-    () => courses.filter(c => isToday(new Date(c.created_date))),
+  // Courses du jour = créées aujourd'hui OU encore actives (pas terminées)
+  const todayCourses = useMemo(() => {
+    return courses.filter(c =>
+      isToday(new Date(c.created_date)) || !["livree", "annulee"].includes(c.statut)
+    );
+  }, [courses]);
+
+  // Courses à dispatcher : statut "nouvelle" SANS livreur assigné (en attente action admin)
+  const coursesADispatcher = useMemo(
+    () => todayCourses.filter(c =>
+      c.statut === "nouvelle" &&
+      (!c.livreur_id || c.livreur_id === "") &&
+      (!c.dispatch_status || c.dispatch_status === "en_attente_admin" || c.dispatch_status === "expire")
+    ),
+    [todayCourses]
+  );
+
+  // Courses en traitement : tout ce qui est actif + dispatch automatique en cours (statut=en_attente_livreur, dispatch_status=propose)
+  const coursesEnTraitement = useMemo(
+    () => todayCourses.filter(c =>
+      !["livree", "annulee"].includes(c.statut) &&
+      !(c.statut === "nouvelle" && (!c.dispatch_status || ["en_attente_admin", "expire"].includes(c.dispatch_status)))
+    ),
+    [todayCourses]
+  );
+
+  // Courses terminées aujourd'hui
+  const coursesTerminees = useMemo(
+    () => courses.filter(c =>
+      ["livree", "annulee"].includes(c.statut) &&
+      isToday(new Date(c.heure_livraison || c.updated_date || c.created_date))
+    ),
     [courses]
   );
 
-  const stats = useMemo(() => {
-    const total = todayCourses.length;
-    const livrees = todayCourses.filter(c => c.statut === "livree").length;
-    const annulees = todayCourses.filter(c => c.statut === "annulee").length;
-    const enCours = todayCourses.filter(c => 
-      !["livree", "annulee", "nouvelle"].includes(c.statut)
-    ).length;
-    const nouvelles = todayCourses.filter(c => c.statut === "nouvelle").length;
-    const ca = todayCourses.filter(c => c.statut === "livree").reduce((s, c) => s + (c.prix || 0), 0);
-    const dispoLivreurs = livreurs.filter(l => l.statut === "disponible").length;
-    return { total, livrees, annulees, enCours, nouvelles, ca, dispoLivreurs };
-  }, [todayCourses, livreurs]);
+  // Courses en pause
+  const coursesEnPause = useMemo(
+    () => courses.filter(c => c.statut === "pause"),
+    [courses]
+  );
 
-  const filteredCourses = useMemo(() => {
-    if (statusFilter === "toutes") return todayCourses;
-    if (statusFilter === "active") return todayCourses.filter(c => 
-      !["livree", "annulee", "nouvelle"].includes(c.statut)
-    );
-    return todayCourses.filter(c => c.statut === statusFilter);
-  }, [todayCourses, statusFilter]);
+  // Livreurs en ligne = disponible ou en_course, validés et actifs
+  const livreursEnLigne = useMemo(
+    () => livreurs.filter(l =>
+      l.statut !== "hors_ligne" &&
+      l.validation === "valide" &&
+      l.actif !== false
+    ),
+    [livreurs]
+  );
+
+  const stats = useMemo(() => {
+    const todayAll = courses.filter(c => isToday(new Date(c.created_date)));
+    const total = todayAll.length;
+    const livrees = courses.filter(c => c.statut === "livree" && isToday(new Date(c.heure_livraison || c.updated_date || c.created_date))).length;
+    const annulees = todayAll.filter(c => c.statut === "annulee").length;
+    const enCours = coursesEnTraitement.length;
+    const aDispatcher = coursesADispatcher.length;
+    const ca = courses.filter(c => c.statut === "livree" && isToday(new Date(c.heure_livraison || c.updated_date || c.created_date)))
+      .reduce((s, c) => s + (c.prix_reel || c.prix || 0), 0);
+    const dispoLivreurs = livreursEnLigne.filter(l => l.statut === "disponible").length;
+    return { total, livrees, annulees, enCours, aDispatcher, ca, dispoLivreurs };
+  }, [courses, coursesADispatcher, coursesEnTraitement, livreursEnLigne]);
+
+  const { pulling, refreshing } = usePullToRefresh(async () => {
+    await queryClient.invalidateQueries({ queryKey: ["courses"] });
+    await queryClient.invalidateQueries({ queryKey: ["livreurs"] });
+  });
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="px-4 py-4 lg:p-6 space-y-4 lg:space-y-5 max-w-7xl mx-auto">
+      <PullToRefreshIndicator pulling={pulling} refreshing={refreshing} />
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Tableau de bord</h1>
-          <p className="text-sm text-muted-foreground">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex-1">
+          <h1 className="text-xl lg:text-2xl font-bold text-foreground">Tableau de bord</h1>
+          <p className="text-xs lg:text-sm text-muted-foreground">
             {format(new Date(), "EEEE d MMMM yyyy", { locale: fr })}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Link to="/carte">
-            <Button variant="outline" size="sm" className="gap-1.5">
-              <MapPin className="w-4 h-4" /> Carte
+        <div className="flex flex-wrap gap-2">
+          <Link to="/nouvelle-course" className="flex-1 sm:flex-none">
+            <Button size="sm" className="w-full sm:w-auto gap-1.5 bg-primary">
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Nouvelle course</span>
+              <span className="sm:hidden">Course</span>
             </Button>
           </Link>
-          <Link to="/nouvelle-course">
-            <Button size="sm" className="gap-1.5 bg-primary">
-              <Plus className="w-4 h-4" /> Nouvelle course
+          <Link to="/carte" className="flex-1 sm:flex-none">
+            <Button variant="outline" size="sm" className="w-full sm:w-auto gap-1.5">
+              <MapPin className="w-4 h-4" />
+              <span className="hidden sm:inline">Carte</span>
             </Button>
           </Link>
+          <Link to="/admin/externe" className="flex-1 sm:flex-none">
+            <Button variant="outline" size="sm" className="w-full sm:w-auto gap-1.5 bg-accent text-accent-foreground hover:bg-accent/90">
+              <Users className="w-4 h-4" />
+              <span className="hidden sm:inline">Silga Externe</span>
+              <span className="sm:hidden">Externe</span>
+            </Button>
+          </Link>
+
         </div>
       </div>
 
-      {/* Dispatch Mode Selector */}
-      <DispatchModeSelector />
+      {/* Alertes batterie + dispatch monitor + courses en pause */}
+      <BatterieAlertesPanel currentUser={null} />
       <DispatchMonitor />
-      <BatterieAlertesPanel currentUser={currentUser} />
+      <CoursesEnPausePanel
+        courses={coursesEnPause}
+        onReprendre={(course) => {
+          base44.functions.invoke("gestionPauseCourse", {
+            action: "reprendre_course",
+            course_id: course.id,
+            livreur_id: course.livreur_id,
+          }).then(() => {
+            queryClient.invalidateQueries({ queryKey: ["courses"] });
+          }).catch(err => alert("Erreur : " + err.message));
+        }}
+      />
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         <StatCard title="Total" value={stats.total} icon={Package} iconBg="bg-primary" />
-        <StatCard title="Nouvelles" value={stats.nouvelles} icon={AlertTriangle} iconBg="bg-blue-500" />
-        <StatCard title="En cours" value={stats.enCours} icon={Clock} iconBg="bg-amber-500" />
+        <StatCard title="À dispatcher" value={stats.aDispatcher} icon={AlertTriangle} iconBg="bg-orange-500" />
+        <StatCard title="En traitement" value={stats.enCours} icon={Clock} iconBg="bg-blue-500" />
         <StatCard title="Livrées" value={stats.livrees} icon={CheckCircle2} iconBg="bg-emerald-500" />
         <StatCard title="Annulées" value={stats.annulees} icon={XCircle} iconBg="bg-red-500" />
         <StatCard title="CA du jour" value={`${stats.ca.toLocaleString()}`} icon={TrendingUp} iconBg="bg-indigo-500" trendLabel="FCFA" />
         <StatCard title="Livreurs dispo" value={stats.dispoLivreurs} icon={Truck} iconBg="bg-accent" />
       </div>
 
-      {/* Courses list */}
-      <Card className="p-0 overflow-hidden">
-        <div className="px-5 pt-5 pb-3 flex items-center justify-between border-b">
-          <h2 className="font-semibold text-base">Courses du jour</h2>
-          <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-            <TabsList className="h-8">
-              {statusFilters.map(f => (
-                <TabsTrigger key={f.value} value={f.value} className="text-xs h-7 px-3">
-                  {f.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-        </div>
-        <div className="p-4 space-y-2 max-h-[600px] overflow-y-auto">
-          {isLoading && (
-            <div className="text-center py-12 text-muted-foreground text-sm">Chargement...</div>
-          )}
-          {!isLoading && filteredCourses.length === 0 && (
-            <div className="text-center py-12 text-muted-foreground text-sm">
-              Aucune course pour ce filtre
-            </div>
-          )}
-          {filteredCourses.map(course => (
-            <CourseListItem
-              key={course.id}
-              course={course}
-              onView={setSelectedCourse}
-              onAssign={setAssignCourse}
-            />
-          ))}
-        </div>
-      </Card>
+      {/* Livreurs en ligne */}
+      <LivreursEnLigne livreurs={livreursEnLigne} />
+
+      {/* Courses à dispatcher */}
+      <CoursesADispatcher
+        courses={coursesADispatcher}
+        onAssign={setAssignCourse}
+        onView={setSelectedCourse}
+      />
+
+      {/* Courses en traitement */}
+      <CoursesEnTraitement
+        courses={coursesEnTraitement}
+        onView={setSelectedCourse}
+      />
+
+      {/* Historique du jour */}
+      <CoursesTerminees
+        courses={coursesTerminees}
+        onView={setSelectedCourse}
+      />
 
       {/* Dialogs */}
-      <CourseDetailDialog 
+      <CourseDetailDialog
         course={selectedCourse}
         open={!!selectedCourse}
         onClose={() => setSelectedCourse(null)}
@@ -191,6 +205,9 @@ export default function Dashboard() {
         open={!!assignCourse}
         onClose={() => setAssignCourse(null)}
       />
+
+      {/* Bouton flottant VENUS */}
+      <VenusFloatingButton />
     </div>
   );
 }

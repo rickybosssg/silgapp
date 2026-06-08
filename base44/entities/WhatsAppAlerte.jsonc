@@ -1,0 +1,57 @@
+{
+  "name": "WhatsAppAlerte",
+  "type": "object",
+  "properties": {
+    "livreur_id": {
+      "type": "string",
+      "description": "ID du livreur concern\u00e9"
+    },
+    "livreur_telephone": {
+      "type": "string",
+      "description": "Num\u00e9ro de t\u00e9l\u00e9phone du livreur"
+    },
+    "notification_id": {
+      "type": "string",
+      "description": "ID de la notification d\u00e9clencheuse"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "sent",
+        "failed"
+      ],
+      "default": "pending",
+      "description": "Statut d'envoi de l'alerte"
+    },
+    "twilio_sid": {
+      "type": "string",
+      "description": "SID du message Twilio (si envoy\u00e9)"
+    },
+    "erreur": {
+      "type": "string",
+      "description": "Message d'erreur en cas d'\u00e9chec"
+    },
+    "heure_envoi": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure d'envoi effective"
+    },
+    "canal": {
+      "type": "string",
+      "enum": [
+        "silgapp",
+        "push",
+        "whatsapp",
+        "sms",
+        "whatsapp+sms"
+      ],
+      "default": "silgapp",
+      "description": "Canal utilis\u00e9 : SILGAPP (gratuit), Push, WhatsApp, SMS ou combinaison"
+    }
+  },
+  "required": [
+    "livreur_id",
+    "livreur_telephone"
+  ]
+}

@@ -1,14 +1,34 @@
 import React, { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Truck, Phone, MapPin, Calendar, Clock, CheckCircle2, XCircle, Banknote } from "lucide-react";
+import LivreurPhotoUploader from "@/components/livreur/LivreurPhotoUploader";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { toast } from "sonner";
 
 export default function LivreurDetailDialog({ livreur, open, onClose }) {
+  const queryClient = useQueryClient();
+
+  const paiementMutation = useMutation({
+    mutationFn: ({ montant }) => base44.entities.Livreur.update(livreur.id, {
+      statut_paiement: "paye",
+      montant_paye: montant,
+      heure_paiement: new Date().toISOString(),
+      montant_du_silga: 0,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["livreurs-all"] });
+      queryClient.invalidateQueries({ queryKey: ["livreurs-internes"] });
+      toast.success("Paiement validé ✅ — Compteur remis à zéro");
+    },
+    onError: () => toast.error("Erreur lors de la validation du paiement"),
+  });
+
   const { data: courses = [] } = useQuery({
     queryKey: ["courses-all"],
     queryFn: () => base44.entities.Course.list("-created_date", 1000),
@@ -60,13 +80,12 @@ export default function LivreurDetailDialog({ livreur, open, onClose }) {
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
-            {livreur.photo_url ? (
-              <img src={livreur.photo_url} alt={livreur.nom} className="w-10 h-10 rounded-full" />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                <Truck className="w-6 h-6 text-muted-foreground" />
-              </div>
-            )}
+            <LivreurPhotoUploader
+              photoUrl={livreur.photo_url}
+              nomComplet={`${livreur.prenom || ""} ${livreur.nom}`.trim()}
+              canEdit={false}
+              size="md"
+            />
             {livreur.prenom} {livreur.nom}
           </DialogTitle>
         </DialogHeader>
@@ -115,6 +134,28 @@ export default function LivreurDetailDialog({ livreur, open, onClose }) {
                 value={livreur.statut_paiement === "paye" ? "Payé ✅" : "Non payé"} 
                 color={livreur.statut_paiement === "paye" ? "text-green-600" : "text-amber-600"}
               />
+              {/* Bouton paiement */}
+              {livreur.statut_paiement !== "paye" && stats.montantDu > 0 ? (
+                <div className="col-span-2 mt-1">
+                  <Button
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white gap-2"
+                    onClick={() => paiementMutation.mutate({ montant: stats.montantDu })}
+                    disabled={paiementMutation.isPending}
+                  >
+                    <Banknote className="w-4 h-4" />
+                    {paiementMutation.isPending ? "Validation..." : `💰 Valider paiement — ${stats.montantDu.toLocaleString()} FCFA → Compteur à zéro`}
+                  </Button>
+                </div>
+              ) : livreur.statut_paiement === "paye" ? (
+                <div className="col-span-2 mt-1 bg-green-50 border border-green-200 rounded-lg p-2 text-center text-sm text-green-700 font-semibold">
+                  ✅ Paiement déjà validé — Compteur à zéro
+                  {livreur.heure_paiement && (
+                    <span className="block text-xs font-normal text-green-600">
+                      à {format(new Date(livreur.heure_paiement), "HH:mm", { locale: fr })}
+                    </span>
+                  )}
+                </div>
+              ) : null}
               <StatItem label="Annulées" value={stats.coursesAnnulees} icon={XCircle} color="text-red-600" />
               <StatItem label="En cours" value={stats.coursesEnCours} icon={Clock} color="text-amber-600" />
               <StatItem label="Refusées" value={stats.coursesRefusees} />

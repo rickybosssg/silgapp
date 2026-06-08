@@ -1,0 +1,64 @@
+{
+  "name": "DownloadStats",
+  "type": "object",
+  "properties": {
+    "month": {
+      "type": "string",
+      "description": "Mois au format YYYY-MM (ex: 2026-06)"
+    },
+    "country_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE"
+      ],
+      "default": "BF",
+      "description": "Code pays du visiteur"
+    },
+    "platform": {
+      "type": "string",
+      "enum": [
+        "android",
+        "ios",
+        "web",
+        "unknown"
+      ],
+      "default": "web",
+      "description": "Plateforme d\u00e9tect\u00e9e"
+    },
+    "referrer": {
+      "type": "string",
+      "default": "direct",
+      "description": "Source du trafic (facebook, whatsapp, tiktok, direct)"
+    },
+    "page_visits": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de visites sur la page"
+    },
+    "clicks": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de clics sur le bouton de t\u00e9l\u00e9chargement"
+    },
+    "downloads": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de t\u00e9l\u00e9chargements effectifs"
+    },
+    "last_download_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date du dernier t\u00e9l\u00e9chargement"
+    }
+  },
+  "required": [
+    "month"
+  ]
+}

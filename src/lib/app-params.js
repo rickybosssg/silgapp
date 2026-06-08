@@ -12,6 +12,7 @@ const CORRUPT_VALUES = ['null', 'undefined', '', 'NaN'];
 const isValidValue = (v) => v && !CORRUPT_VALUES.includes(String(v).trim());
 
 export const BASE44_SERVER_URL = 'https://app.base44.com';
+export const BASE44_APP_ID = '6a0ec08f3af5e1d1284254c1';
 export const APP_PUBLIC_URL =
 	import.meta.env.VITE_BASE44_APP_PUBLIC_URL ||
 	import.meta.env.VITE_BASE44_APP_BASE_URL ||
@@ -46,12 +47,12 @@ const getAppParamValue = (paramName, { defaultValue = undefined, removeFromUrl =
 }
 
 // Détecte Capacitor (APK Android/iOS) pour adapter les URLs
+// IMPORTANT: ne pas se baser sur localhost — le preview web tourne aussi sur localhost
 const detectCapacitor = () => {
 	try {
 		if (typeof window === 'undefined') return false;
+		// Seul indicateur fiable : Capacitor.isNativePlatform()
 		if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) return true;
-		// Capacitor sert le WebView sur localhost
-		if (window.location.hostname === 'localhost') return true;
 		return false;
 	} catch (e) {
 		return false;
@@ -66,6 +67,20 @@ const getAppParams = () => {
 
 	const isCapacitor = detectCapacitor();
 
+	// Sur Capacitor, capturer le token depuis l'URL si présent (retour du login OAuth)
+	// Le SDK Base44 renvoie le token via ?access_token=... après authentification
+	if (isCapacitor && typeof window !== 'undefined') {
+		const urlParams = new URLSearchParams(window.location.search);
+		const tokenFromUrl = urlParams.get('access_token');
+		if (tokenFromUrl && isValidValue(tokenFromUrl)) {
+			storage.setItem('base44_access_token', tokenFromUrl);
+			// Nettoyer l'URL
+			urlParams.delete('access_token');
+			const newUrl = `${window.location.pathname}${urlParams.toString() ? `?${urlParams.toString()}` : ''}`;
+			window.history.replaceState({}, document.title, newUrl);
+		}
+	}
+
 	// Dans Capacitor, ne jamais utiliser localhost comme fromUrl — utiliser l'URL publique de l'app
 	const safeHref = isCapacitor
 		? (typeof window !== 'undefined' ? window.location.href : APP_PUBLIC_URL)
@@ -78,10 +93,10 @@ const getAppParams = () => {
 		: APP_PUBLIC_URL;
 
 	return {
-		appId: getAppParamValue("app_id", { defaultValue: import.meta.env.VITE_BASE44_APP_ID || "silgapp" }),
+		appId: getAppParamValue("app_id", { defaultValue: import.meta.env.VITE_BASE44_APP_ID || BASE44_APP_ID }),
 		token: getAppParamValue("access_token", { removeFromUrl: true }),
 		fromUrl: safeHref,
-		functionsVersion: getAppParamValue("functions_version", { defaultValue: import.meta.env.VITE_BASE44_FUNCTIONS_VERSION }),
+		functionsVersion: getAppParamValue("functions_version", { defaultValue: import.meta.env.VITE_BASE44_FUNCTIONS_VERSION || 'prod' }),
 		appBaseUrl,
 		isCapacitor,
 	}
