@@ -1,6 +1,6 @@
 {
   "appId": "com.silgapp2.app",
-  "appName": "SILGAPP 2",
+  "appName": "SILGAPP",
   "webDir": "dist",
   "server": {
     "androidScheme": "https",

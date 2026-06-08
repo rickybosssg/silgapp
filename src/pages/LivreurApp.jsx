@@ -4,7 +4,8 @@ import { base44 } from "@/api/base44Client";
 import { Truck } from "lucide-react";
 import { toast } from "sonner";
 import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
-import GPSIndicateur, { GPSAlerteBanner } from "@/components/livreur/GPSIndicateur";
+import { requestNativeAppPermissions } from "@/lib/nativePermissions";
+import GPSIndicateur from "@/components/livreur/GPSIndicateur";
 import LivreurHeader from "@/components/livreur/LivreurHeader";
 import LivreurStatsBanner from "@/components/livreur/LivreurStatsBanner";
 import LivreurStatutCard from "@/components/livreur/LivreurStatutCard";
@@ -45,7 +46,12 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
   // Notifications push
   useEffect(() => {
     if (!livreurProfil?.id || !livreurProfil?.user_email) return;
-    registerPushToken(livreurProfil.id, { email: livreurProfil.user_email }).catch(() => null);
+    registerPushToken(livreurProfil.id, {
+      email: livreurProfil.user_email,
+      user_email: livreurProfil.user_email,
+      user_type: "livreur",
+      livreur_id: livreurProfil.id,
+    }).catch(() => null);
     const unsub = subscribeToNotifications(
       (n) => toast.info(`${n.titre}: ${n.message}`),
       livreurProfil.user_email
@@ -146,6 +152,12 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
           derniere_position_date: new Date().toISOString(),
         }).then(() => {
           queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
+          requestNativeAppPermissions({
+            email: livreurProfil.user_email,
+            userType: "livreur",
+            livreurId: livreurProfil.id,
+            requestContacts: true,
+          }).catch(() => null);
           toast.success("GPS activé ✓");
         }).catch(() => toast.error("Position GPS non enregistrée"));
       },

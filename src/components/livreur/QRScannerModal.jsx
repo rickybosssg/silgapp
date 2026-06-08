@@ -1,202 +1,91 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { X, Camera, Keyboard, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { base44 } from "@/api/base44Client";
+import { getNativeCurrentPosition, scanNativeQrCode } from "@/lib/nativeAndroid";
 
-/**
- * Modal de scan QR (caméra) + fallback code 4 chiffres
- * Props :
- *   course        — objet course
- *   type          — "pickup" | "delivery"
- *   onSuccess(courseData) — appelé quand validation OK
- *   onClose()     — fermer le modal
- */
 export default function QRScannerModal({ course, type, onSuccess, onClose, livreurLat, livreurLng }) {
-  const [mode, setMode] = useState("camera"); // "camera" | "code"
+  const [mode, setMode] = useState("camera");
   const [code4, setCode4] = useState("");
   const [scanning, setScanning] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const [result, setResult] = useState(null); // "success" | "error"
-  const videoRef = useRef(null);
-  const streamRef = useRef(null);
-  const animFrameRef = useRef(null);
-  const canvasRef = useRef(null);
+  const [result, setResult] = useState(null);
 
-  const label = type === "pickup" ? "récupération" : "livraison";
-
-  // Démarrer la caméra
   useEffect(() => {
-    if (mode !== "camera") {
-      stopCamera();
-      return;
+    if (mode === "camera") {
+      startNativeScan();
     }
-    startCamera();
-    return () => stopCamera();
   }, [mode]);
 
-  const startCamera = async () => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      toast.error("Caméra non disponible sur cet appareil");
-      setMode("code");
-      return;
-    }
+  const getValidationGps = async () => {
     try {
-      setScanning(true);
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: 640, height: 480 }
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-        requestAnimationFrame(scanFrame);
+      return await getNativeCurrentPosition({ timeout: 8000, maximumAge: 1000 });
+    } catch (_) {
+      if (livreurLat && livreurLng && !Number.isNaN(Number(livreurLat)) && !Number.isNaN(Number(livreurLng))) {
+        return { latitude: Number(livreurLat), longitude: Number(livreurLng), source: "last-known" };
       }
+      return null;
+    }
+  };
+
+  const startNativeScan = async () => {
+    if (scanning || verifying) return;
+    setScanning(true);
+    try {
+      const value = await scanNativeQrCode();
+      await verifyCode(value, "qr");
     } catch (err) {
-      console.error("Erreur caméra:", err);
-      toast.error("Impossible d'accéder à la caméra");
-      setScanning(false);
-      setMode("code");
-    }
-  };
-
-  const stopCamera = () => {
-    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
-    }
-    setScanning(false);
-  };
-
-  // Scan frame par frame avec BarcodeDetector (natif) ou jsQR
-  const scanFrame = async () => {
-    if (!videoRef.current || !streamRef.current) return;
-    const video = videoRef.current;
-    if (video.readyState !== video.HAVE_ENOUGH_DATA) {
-      animFrameRef.current = requestAnimationFrame(scanFrame);
-      return;
-    }
-
-    try {
-      // Essayer BarcodeDetector natif (Chrome Android)
-      if ("BarcodeDetector" in window) {
-        const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
-        const codes = await detector.detect(video);
-        if (codes.length > 0) {
-          const qrValue = codes[0].rawValue;
-          stopCamera();
-          await verifyCode(qrValue, "qr");
-          return;
-        }
-      } else {
-        // Fallback canvas + jsQR dynamique
-        const canvas = canvasRef.current;
-        if (canvas) {
-          const ctx = canvas.getContext("2d");
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          
-          // Import dynamique jsQR (si disponible)
-          try {
-            const jsQR = (await import("https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js")).default;
-            const qrResult = jsQR && jsQR(imageData.data, imageData.width, imageData.height);
-            if (qrResult?.data) {
-              stopCamera();
-              await verifyCode(qrResult.data, "qr");
-              return;
-            }
-          } catch (_) {}
-        }
+      const message = err?.message || String(err);
+      if (!/annule/i.test(message)) {
+        toast.error("Impossible d'ouvrir le scanner QR Android");
       }
-    } catch (_) {}
-
-    animFrameRef.current = requestAnimationFrame(scanFrame);
+      setMode("code");
+    } finally {
+      setScanning(false);
+    }
   };
 
   const verifyCode = async (value, method) => {
     if (verifying) return;
     setVerifying(true);
     try {
-      // ── GPS OBLIGATOIRE avant toute validation ────────────────────────────
-      let latitude = null;
-      let longitude = null;
-
-      // Essayer d'abord une position fraîche via l'API
-      if (navigator.geolocation) {
-        try {
-          await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(
-              (pos) => {
-                latitude = pos.coords.latitude;
-                longitude = pos.coords.longitude;
-                resolve();
-              },
-              (err) => reject(err),
-              { enableHighAccuracy: true, timeout: 8000, maximumAge: 5000 }
-            );
-          });
-        } catch (_) {
-          // Timeout ou refus — utiliser la dernière position connue du livreur (déjà sauvegardée en DB)
-          if (livreurLat && livreurLng && !isNaN(livreurLat) && !isNaN(livreurLng)) {
-            latitude = livreurLat;
-            longitude = livreurLng;
-          }
-        }
-      } else if (livreurLat && livreurLng && !isNaN(livreurLat) && !isNaN(livreurLng)) {
-        // Pas de geolocation API — utiliser la dernière position sauvegardée
-        latitude = livreurLat;
-        longitude = livreurLng;
-      }
-
-      // Vérification finale : coordonnées valides
-      if (!latitude || !longitude || isNaN(latitude) || isNaN(longitude)) {
-        toast.error("📍 GPS requis pour valider cette étape — activez la localisation et réessayez");
-        setVerifying(false);
+      const gps = await getValidationGps();
+      if (!gps?.latitude || !gps?.longitude) {
+        toast.error("GPS requis pour valider cette etape. Activez la localisation et reessayez.");
         return;
       }
 
       const res = await base44.functions.invoke("validateQRCode", {
         course_id: course.id,
-        type: type,
-        value: value,
-        method: method,
-        latitude,
-        longitude,
+        type,
+        value,
+        method,
+        latitude: gps.latitude,
+        longitude: gps.longitude,
       });
+
       const data = res?.data;
       if (data?.success) {
         setResult("success");
-        // Enrichir les données course avec les champs calculés du backend
         const courseData = {
           ...data.course,
           prix_final: data.prix_final ?? data.course?.prix_final,
           distance_reelle_km: data.distance_km ?? data.course?.distance_reelle_km,
           montant_livreur: data.montant_livreur ?? data.course?.montant_livreur,
           commission_silga: data.commission_silga ?? data.course?.commission_silga,
-          // GPS livraison pour fallback client
-          latitude_livraison: latitude,
-          longitude_livraison: longitude,
+          latitude_livraison: gps.latitude,
+          longitude_livraison: gps.longitude,
         };
-        setTimeout(() => {
-          onSuccess(courseData);
-        }, 1200);
+        setTimeout(() => onSuccess(courseData), 700);
       } else {
         setResult("error");
-        setTimeout(() => {
-          setResult(null);
-          if (mode === "camera") startCamera();
-        }, 2000);
+        setTimeout(() => setResult(null), 1600);
       }
     } catch (err) {
-      console.error("Erreur validation:", err);
+      console.error("Erreur validation QR:", err);
       setResult("error");
-      setTimeout(() => {
-        setResult(null);
-        if (mode === "camera") startCamera();
-      }, 2000);
+      setTimeout(() => setResult(null), 1600);
     } finally {
       setVerifying(false);
     }
@@ -204,7 +93,7 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
 
   const handleCodeManuel = async () => {
     if (code4.length !== 4) {
-      toast.error("Entrez un code à 4 chiffres");
+      toast.error("Entrez un code a 4 chiffres");
       return;
     }
     await verifyCode(code4, "manual_code");
@@ -215,14 +104,13 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
       style={{ background: "rgba(0,0,0,0.9)", backdropFilter: "blur(6px)" }}
     >
       <div className="w-full max-w-sm bg-white rounded-3xl overflow-hidden shadow-2xl">
-        {/* Header */}
         <div className="bg-gradient-to-r from-gray-900 to-gray-800 px-5 py-4 flex items-center justify-between">
           <div>
             <p className="text-white font-black text-base">
-              {type === "pickup" ? "📦 Scanner pour récupérer" : "✅ Scanner pour livrer"}
+              {type === "pickup" ? "Scanner pour recuperer" : "Scanner pour livrer"}
             </p>
             <p className="text-white/60 text-xs mt-0.5">
-              Scannez le QR code chez {type === "pickup" ? "l'expéditeur" : "le destinataire"}
+              QR code ou code PIN du client
             </p>
           </div>
           <button onClick={onClose} className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
@@ -230,16 +118,14 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
           </button>
         </div>
 
-        {/* Résultat */}
         {result === "success" && (
           <div className="p-8 text-center space-y-3">
             <div className="w-20 h-20 rounded-full bg-green-500 flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-10 h-10 text-white" />
             </div>
             <p className="text-xl font-black text-green-700">
-              {type === "pickup" ? "Colis récupéré !" : "Livraison confirmée !"}
+              {type === "pickup" ? "Colis recupere !" : "Livraison confirmee !"}
             </p>
-            <p className="text-sm text-gray-500">Code validé avec succès</p>
           </div>
         )}
 
@@ -249,13 +135,12 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
               <XCircle className="w-10 h-10 text-red-500" />
             </div>
             <p className="text-xl font-black text-red-600">Code invalide</p>
-            <p className="text-sm text-gray-500">Ce code ne correspond pas à cette course</p>
+            <p className="text-sm text-gray-500">Ce code ne correspond pas a cette course</p>
           </div>
         )}
 
         {!result && (
           <>
-            {/* Tabs */}
             <div className="flex border-b">
               <button
                 className={`flex-1 py-3 text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${
@@ -275,52 +160,33 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
               </button>
             </div>
 
-            {/* Mode Caméra */}
             {mode === "camera" && (
-              <div className="p-4 space-y-3">
-                <div className="relative bg-black rounded-2xl overflow-hidden aspect-square">
-                  <video
-                    ref={videoRef}
-                    className="w-full h-full object-cover"
-                    muted
-                    playsInline
-                    autoPlay
-                  />
-                  <canvas ref={canvasRef} className="hidden" />
-                  {/* Viseur */}
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-48 h-48 border-2 border-white/70 rounded-xl relative">
-                      <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white rounded-tl-lg" />
-                      <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white rounded-tr-lg" />
-                      <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white rounded-bl-lg" />
-                      <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white rounded-br-lg" />
-                      {scanning && (
-                        <div className="absolute inset-x-0 top-0 h-0.5 bg-green-400 animate-bounce" style={{ animationDuration: "1.5s" }} />
-                      )}
-                    </div>
-                  </div>
+              <div className="p-6 space-y-4 text-center">
+                <div className="w-20 h-20 rounded-3xl bg-gray-900 flex items-center justify-center mx-auto">
+                  {scanning || verifying
+                    ? <Loader2 className="w-9 h-9 text-white animate-spin" />
+                    : <Camera className="w-9 h-9 text-white" />}
                 </div>
-                <p className="text-xs text-center text-gray-500">
-                  Pointez la caméra vers le QR code du client
+                <p className="text-sm text-gray-600">
+                  Le scanner Android doit s'ouvrir automatiquement.
                 </p>
-                {verifying && (
-                  <div className="flex items-center justify-center gap-2 text-primary">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span className="text-sm">Vérification...</span>
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={startNativeScan}
+                  disabled={scanning || verifying}
+                  className="w-full h-13 rounded-2xl bg-gray-900 text-white font-black disabled:opacity-60"
+                >
+                  {scanning || verifying ? "Scan en cours..." : "Ouvrir le scanner"}
+                </button>
               </div>
             )}
 
-            {/* Mode Code PIN */}
             {mode === "code" && (
               <div className="p-6 space-y-5">
                 <div className="text-center">
-                  <p className="text-base font-bold text-gray-800 mb-1">
-                    Code à 4 chiffres
-                  </p>
+                  <p className="text-base font-bold text-gray-800 mb-1">Code a 4 chiffres</p>
                   <p className="text-xs text-gray-500">
-                    Demandez le code au {type === "pickup" ? "client expéditeur" : "destinataire"}
+                    Demandez le code au {type === "pickup" ? "client expediteur" : "destinataire"}
                   </p>
                 </div>
                 <Input
@@ -339,14 +205,7 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
                   onClick={handleCodeManuel}
                   disabled={code4.length !== 4 || verifying}
                 >
-                  {verifying ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-5 h-5" />
-                      Valider le code
-                    </>
-                  )}
+                  {verifying ? <Loader2 className="w-5 h-5 animate-spin" /> : "Valider le code"}
                 </button>
               </div>
             )}

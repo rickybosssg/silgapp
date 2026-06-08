@@ -1,20 +1,20 @@
 import React, { useState, useEffect, useRef } from "react";
+import { Capacitor } from "@capacitor/core";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useClientNotifications } from "@/hooks/useClientNotifications";
 import { registerPushToken } from "@/lib/notifications";
+import { requestNativeAppPermissions } from "@/lib/nativePermissions";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import { useQueryClient } from "@tanstack/react-query";
 import { 
-  MapPin, Navigation, Phone, MessageCircle, User, Package, 
-  Clock, HelpCircle, ChevronRight, TrendingUp, 
-  Shield, Zap, Star, Loader2, ArrowLeft, RefreshCw
+  MapPin, Navigation, MessageCircle, User, Package,
+  Clock, ChevronRight, TrendingUp,
+  Loader2, ArrowLeft, RefreshCw
 } from "lucide-react";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
@@ -130,6 +130,28 @@ export default function ClientExterneApp() {
       client_id: clientProfil.id,
     }).catch(() => null);
   }, [clientProfil?.id, clientProfil?.user_email]);
+
+  useEffect(() => {
+    if (!clientProfil?.id || !clientProfil?.user_email || !onboardingDone) return;
+    if (!Capacitor.isNativePlatform()) return;
+
+    let alreadyAsked = false;
+    try { alreadyAsked = localStorage.getItem("client_native_permissions_requested") === "true"; } catch (_) {}
+    if (alreadyAsked) return;
+
+    requestNativeAppPermissions({
+      email: clientProfil.user_email,
+      userType: "client",
+      clientId: clientProfil.id,
+      requestContacts: true,
+    })
+      .then(() => {
+        localStorage.setItem("client_native_permissions_requested", "true");
+      })
+      .catch((error) => {
+        console.warn("[ClientExterneApp] Permissions natives ignorees:", error?.message);
+      });
+  }, [clientProfil?.id, clientProfil?.user_email, onboardingDone]);
 
   useEffect(() => {
     loadProfil();

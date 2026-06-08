@@ -53,6 +53,7 @@ const GestionPublicites = lazy(() => import('./pages/GestionPublicites.jsx'));
 const FraisAnnulationAdmin = lazy(() => import('./pages/FraisAnnulationAdmin.jsx'));
 const VenusRapportsPage = lazy(() => import('./pages/VenusRapportsPage.jsx'));
 const PolitiqueConfidentialite = lazy(() => import('./pages/PolitiqueConfidentialite.jsx'));
+const DiagnosticPushComplet = lazy(() => import('./pages/DiagnosticPushComplet.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -185,6 +186,17 @@ function AppContent() {
       <Suspense fallback={<LoadingScreen />}>
         <Routes>
           <Route
+            path="/diagnostic-push-complet"
+            element={
+              <AuthGate
+                onLivreur={setLivreurProfil}
+                onClient={() => setIsClient(true)}
+              >
+                <DiagnosticPushComplet />
+              </AuthGate>
+            }
+          />
+          <Route
             path="*"
             element={
               <AuthGate 
@@ -223,6 +235,7 @@ function AppContent() {
               <Route path="/admin/publicites" element={<AnimatedRoutes><GestionPublicites /></AnimatedRoutes>} />
               <Route path="/admin/frais-annulation" element={<AnimatedRoutes><FraisAnnulationAdmin /></AnimatedRoutes>} />
               <Route path="/maintenance" element={<AnimatedRoutes><Maintenance /></AnimatedRoutes>} />
+              <Route path="/diagnostic-push-complet" element={<AnimatedRoutes><DiagnosticPushComplet /></AnimatedRoutes>} />
             </>
           ) : (
             <>
@@ -243,6 +256,7 @@ function AppContent() {
               <Route path="/admin/frais-annulation" element={<AnimatedRoutes><FraisAnnulationAdmin /></AnimatedRoutes>} />
               <Route path="/admin/venus-rapports" element={<AnimatedRoutes><VenusRapportsPage /></AnimatedRoutes>} />
               <Route path="/maintenance" element={<AnimatedRoutes><Maintenance /></AnimatedRoutes>} />
+              <Route path="/diagnostic-push-complet" element={<AnimatedRoutes><DiagnosticPushComplet /></AnimatedRoutes>} />
             </>
           )}
           <Route path="/notifications" element={<AnimatedRoutes><Notifications /></AnimatedRoutes>} />

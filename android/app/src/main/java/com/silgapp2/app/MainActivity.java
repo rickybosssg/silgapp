@@ -13,6 +13,8 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(SilgappPushPlugin.class);
+        registerPlugin(SilgappNativePlugin.class);
         createDefaultNotificationChannel();
         super.onCreate(savedInstanceState);
     }

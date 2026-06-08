@@ -1,88 +1,89 @@
 import { useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { toast } from "sonner";
+import { isNativeMobile, startNativeLocationSync } from "@/lib/nativeAndroid";
 
-/**
- * Hook universel pour heartbeat automatique
- * Utilisé par : ClientExterneApp, LivreurExterneApp
- * Sync toutes les 30s + événements lifecycle
- */
 export function useHeartbeat({ user_type, position, enabled = true }) {
   const intervalRef = useRef(null);
-  const visibilityRef = useRef(null);
+  const nativeStopRef = useRef(null);
   const lastSyncRef = useRef(null);
 
-  // Fonction de sync
   const syncHeartbeat = async (pos, force = false) => {
     if (!enabled) return;
-    
-    // Éviter sync trop fréquentes (max toutes les 30s)
+
     const now = Date.now();
-    if (!force && lastSyncRef.current && (now - lastSyncRef.current) < 30000) {
+    if (!force && lastSyncRef.current && now - lastSyncRef.current < 5000) {
       return;
     }
-    
     lastSyncRef.current = now;
-    
+
     try {
-      await base44.functions.invoke('heartbeatAuto', {
-        user_type: user_type,
-        latitude: pos?.latitude || 0,
-        longitude: pos?.longitude || 0,
+      await base44.functions.invoke("heartbeatAuto", {
+        user_type,
+        latitude: pos?.latitude || position?.latitude || 0,
+        longitude: pos?.longitude || position?.longitude || 0,
         app_active: document.visibilityState === "visible",
-        device_id: navigator.userAgent.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 50),
+        device_id: navigator.userAgent.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 50),
       });
     } catch (err) {
-      console.error('[useHeartbeat] Erreur sync:', err);
+      console.error("[useHeartbeat] Erreur sync:", err);
     }
   };
 
-  // Sync initiale au montage (même sans GPS - pour anciens utilisateurs)
-  useEffect(() => {
-    if (enabled) {
-      syncHeartbeat(position, true); // Force sync immédiate
-    }
-  }, [enabled]);
-
-  // Heartbeat continu (30s) - fonctionne même sans GPS
   useEffect(() => {
     if (!enabled) return;
-    
+    syncHeartbeat(position, true);
+  }, [enabled]);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    if (isNativeMobile()) {
+      let cancelled = false;
+      startNativeLocationSync({
+        enabled,
+        intervalMs: 5000,
+        distanceFilter: 3,
+        backgroundTitle: "SILGAPP GPS actif",
+        backgroundMessage: "Synchronisation precise de votre position",
+        onPosition: (pos) => syncHeartbeat(pos, false),
+      }).then((stop) => {
+        if (cancelled) stop?.();
+        else nativeStopRef.current = stop;
+      });
+
+      return () => {
+        cancelled = true;
+        nativeStopRef.current?.();
+        nativeStopRef.current = null;
+      };
+    }
+
     intervalRef.current = setInterval(() => {
       syncHeartbeat(position);
-    }, 30000); // 30 secondes
+    }, 30000);
 
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
+      if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [enabled]);
+  }, [enabled, user_type]);
 
-  // Sync au retour au premier plan - fonctionne même sans GPS
   useEffect(() => {
     if (!enabled) return;
-    
+
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
-        console.log(`[useHeartbeat ${user_type}] App au premier plan → sync heartbeat`);
         syncHeartbeat(position, true);
       }
     };
-    
+
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [enabled]);
+  }, [enabled, user_type, position?.latitude, position?.longitude]);
 
-  // Cleanup au démontage
   useEffect(() => {
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-      if (visibilityRef.current) {
-        document.removeEventListener("visibilitychange", visibilityRef.current);
-      }
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      nativeStopRef.current?.();
     };
   }, []);
 

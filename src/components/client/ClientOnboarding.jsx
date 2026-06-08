@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
+import { requestNativeAppPermissions } from "@/lib/nativePermissions";
 import { toast } from "sonner";
 import { MapPin, User, Check, Loader2 } from "lucide-react";
 
@@ -46,8 +47,19 @@ async function reverseGeocode(lat, lng) {
   } catch (_) { return ""; }
 }
 
+async function requestPostGpsPermissions(clientProfil) {
+  const user = await base44.auth.me().catch(() => null);
+  const email = user?.email || clientProfil?.user_email || clientProfil?.email || "";
+  return requestNativeAppPermissions({
+    email,
+    userType: "client",
+    clientId: clientProfil?.id || "",
+    requestContacts: true,
+  });
+}
+
 // ─── GPS ──────────────────────────────────────────────────────────────────────
-function EtapeGPS({ onSuccess, clientId }) {
+function EtapeGPS({ onSuccess, clientId, clientProfil }) {
   const [loading, setLoading] = useState(false);
   const [quartier, setQuartier] = useState("");
 
@@ -79,6 +91,7 @@ function EtapeGPS({ onSuccess, clientId }) {
             console.error("[GPS Onboarding] ❌ Erreur BDD:", err);
           }
         }
+        await requestPostGpsPermissions(clientProfil);
         setLoading(false);
         onSuccess(posData);
       },
@@ -409,6 +422,7 @@ export default function ClientOnboarding({ clientProfil, onComplete }) {
     return (
       <EtapeGPS
         clientId={clientProfil?.id}
+        clientProfil={clientProfil}
         onSuccess={(posData) => {
           if (profilClientComplet(clientProfil)) {
             setStep("done");

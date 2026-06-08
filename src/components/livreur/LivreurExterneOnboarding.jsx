@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import { Check } from "lucide-react";
-import { SILGAPP_COUNTRIES, normalizePhone, formatPhoneDisplay } from "@/lib/phoneUtils";
+import { SILGAPP_COUNTRIES, normalizePhone } from "@/lib/phoneUtils";
+import { requestNativeAppPermissions } from "@/lib/nativePermissions";
 
 // ─── Helpers téléphone (délègue à phoneUtils) ─────────────────────────────────
 export function normaliserTelephone(tel, countryCode = "BF") {
@@ -176,6 +177,12 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
 
     try {
       await base44.functions.invoke('updateLivreur', { id: livreurProfil.id, data });
+      requestNativeAppPermissions({
+        email: livreurProfil.user_email,
+        userType: "livreur",
+        livreurId: livreurProfil.id,
+        requestContacts: true,
+      }).catch(() => null);
       // Marquer en localStorage que le profil est complet
       try { localStorage.setItem(`livreur_profil_complet_${livreurProfil.id}`, "true"); } catch (_) {}
       toast.success("Profil enregistré !");

@@ -8,6 +8,7 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 
 import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
+import { requestNativeAppPermissions } from "@/lib/nativePermissions";
 import LivreurHeader from "@/components/livreur/LivreurHeader";
 import LivreurStatsBanner from "@/components/livreur/LivreurStatsBanner";
 import LivreurStatutCard from "@/components/livreur/LivreurStatutCard";
@@ -88,13 +89,37 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const livreurEmail = livreurProfil?.user_email;
   useEffect(() => {
     if (!livreurId || !livreurEmail) return;
-    registerPushToken(livreurId, { email: livreurEmail, livreur_id: livreurId }).catch(() => null);
+    registerPushToken(livreurId, {
+      email: livreurEmail,
+      user_email: livreurEmail,
+      user_type: "livreur",
+      livreur_id: livreurId,
+    }).catch(() => null);
     const unsub = subscribeToNotifications(
       (n) => toast.info(n.titre, { description: n.message }),
       livreurEmail
     );
     return () => unsub?.();
   }, [livreurId, livreurEmail]);
+
+  useEffect(() => {
+    if (!livreurId || !livreurEmail || !onboardingTermine) return;
+
+    let alreadyAsked = false;
+    try { alreadyAsked = localStorage.getItem(`livreur_native_permissions_requested_${livreurId}`) === "true"; } catch (_) {}
+    if (alreadyAsked) return;
+
+    requestNativeAppPermissions({
+      email: livreurEmail,
+      userType: "livreur",
+      livreurId,
+      requestContacts: true,
+    }).then(() => {
+      localStorage.setItem(`livreur_native_permissions_requested_${livreurId}`, "true");
+    }).catch((error) => {
+      console.warn("[LivreurExterneApp] Permissions natives ignorees:", error?.message);
+    });
+  }, [livreurId, livreurEmail, onboardingTermine]);
 
   // ─── Heartbeat app_active ─────────────────────────────────────────────────
   // Géré par useHeartbeat hook + heartbeatAuto backend — supprimé pour éviter doublon

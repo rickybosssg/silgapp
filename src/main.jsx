@@ -1,7 +1,10 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
+import { installNativeGeolocationShim } from '@/lib/nativeAndroid'
 import '@/index.css'
+
+installNativeGeolocationShim()
 
 // Note: la capture du access_token depuis l'URL est faite dans index.html
 // (script inline synchrone, exécuté avant tout module ES)

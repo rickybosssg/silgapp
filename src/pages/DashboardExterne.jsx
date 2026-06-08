@@ -3,14 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { MapPin, Package, Truck, Clock, CheckCircle2, XCircle, TrendingUp, ArrowLeft, Globe, Users, Activity, Zap, ChevronRight } from "lucide-react";
+import { MapPin, Package, Truck, Clock, CheckCircle2, XCircle, TrendingUp, ArrowLeft, Globe, Users, Zap, ChevronRight, Bell } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
 import CountrySelector, { usePaysActifs } from "@/components/international/CountrySelector.jsx";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import LivreursEnLigne from "@/components/dashboard/LivreursEnLigne";
 import ClientsEnLigne from "@/components/dashboard/ClientsEnLigne";
-import { isON, isClientEligibleCarte } from "@/lib/dispatchRules.js";
+import { isClientEligibleCarte } from "@/lib/dispatchRules.js";
 import { calculateLivreurCounters, calculateClientCounters } from "@/lib/livreurCounters.js";
 import CoursesEnTraitement from "@/components/dashboard/CoursesEnTraitement";
 import CoursesTerminees from "@/components/dashboard/CoursesTerminees";
@@ -202,6 +202,12 @@ export default function DashboardExterne() {
                   className="h-8 text-xs bg-white/10 border-white/10 text-white rounded-xl"
                 />
               )}
+              <Link to="/diagnostic-push-complet?email=eric.nongbzanga@yahoo.fr">
+                <Button size="sm" variant="ghost" className="gap-1.5 text-white/70 hover:text-white hover:bg-white/10 border border-white/10 rounded-xl text-xs">
+                  <Bell className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Push</span>
+                </Button>
+              </Link>
               <AppToggleButton />
               <Link to="/carte">
                 <Button size="sm" className="gap-1.5 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs shadow-lg shadow-primary/30">

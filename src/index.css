@@ -86,6 +86,9 @@
     @apply bg-background text-foreground font-inter;
     overscroll-behavior-y: none;
   }
+  :where(.bg-white) {
+    color: #111827;
+  }
   /* Force mode clair par défaut pour éviter texte blanc sur fond blanc */
   html:not(.dark) {
     color-scheme: light;

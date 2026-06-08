@@ -10,6 +10,16 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const { token, platform, livreur_id, client_id, user_email, user_type } = body;
+    console.log('[enregistrerTokenPush] Request received', {
+      platform,
+      hasToken: !!token,
+      tokenPrefix: token ? String(token).slice(0, 16) : '',
+      tokenIsWeb: token ? String(token).startsWith('web_') : false,
+      livreur_id: livreur_id || '',
+      client_id: client_id || '',
+      user_email: user_email ? String(user_email).trim().toLowerCase() : '',
+      user_type: user_type || '',
+    });
 
     if (!token) {
       return Response.json({ error: 'Token is required' }, { status: 400 });
@@ -45,12 +55,45 @@ Deno.serve(async (req) => {
 
     if (existingTokens.length > 0) {
       await base44.asServiceRole.entities.NotificationToken.update(existingTokens[0].id, payload);
+      if (!String(token).startsWith('web_')) {
+        const sameUserTokens = await base44.asServiceRole.entities.NotificationToken.filter({
+          user_email: normalizedEmail,
+          user_type: resolvedUserType,
+          actif: true,
+        });
+        await Promise.all((sameUserTokens || [])
+          .filter(item => item.id !== existingTokens[0].id && !String(item.token || '').startsWith('web_'))
+          .map(item => base44.asServiceRole.entities.NotificationToken.update(item.id, { actif: false })));
+      }
+      console.log('[enregistrerTokenPush] Token updated', {
+        id: existingTokens[0].id,
+        platform: normalizedPlatform,
+        user_email: normalizedEmail,
+        user_type: resolvedUserType,
+      });
       return Response.json({ success: true, action: 'updated', user_email: normalizedEmail, user_type: resolvedUserType });
     }
 
-    await base44.asServiceRole.entities.NotificationToken.create(payload);
+    const created = await base44.asServiceRole.entities.NotificationToken.create(payload);
+    if (!String(token).startsWith('web_')) {
+      const sameUserTokens = await base44.asServiceRole.entities.NotificationToken.filter({
+        user_email: normalizedEmail,
+        user_type: resolvedUserType,
+        actif: true,
+      });
+      await Promise.all((sameUserTokens || [])
+        .filter(item => item.id !== created.id && !String(item.token || '').startsWith('web_'))
+        .map(item => base44.asServiceRole.entities.NotificationToken.update(item.id, { actif: false })));
+    }
+    console.log('[enregistrerTokenPush] Token created', {
+      platform: normalizedPlatform,
+      user_email: normalizedEmail,
+      user_type: resolvedUserType,
+      native: !String(token).startsWith('web_'),
+    });
     return Response.json({ success: true, action: 'created', user_email: normalizedEmail, user_type: resolvedUserType });
   } catch (error) {
+    console.error('[enregistrerTokenPush] Error', error);
     return Response.json({ error: error.message }, { status: 500 });
   }
 });

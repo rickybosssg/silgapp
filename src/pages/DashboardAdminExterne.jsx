@@ -5,13 +5,12 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Users, Package, DollarSign, TrendingUp, ArrowLeft, Truck,
+  Users, Package, ArrowLeft,
   AlertCircle, AlertTriangle, Eye, MapPin, CreditCard, Download,
   Save, ExternalLink, Bug, Search, CheckCircle2, XCircle,
-  Loader2, MessageCircle, Tag, Globe, Zap, ChevronRight, Bell, Flame, Megaphone
+  Loader2, MessageCircle, Tag, Globe, Zap, ChevronRight, Bell, Flame
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
@@ -24,6 +23,7 @@ import DownloadStatsPanel from "@/components/admin/DownloadStatsPanel";
 import AlertesLivreursPanel from "@/components/admin/AlertesLivreursPanel";
 import ZonesChaudesWidget from "@/components/carte/ZonesChaudes";
 import ComptabilitePanel from "@/components/admin/ComptabilitePanel";
+import DiagnosticPushPanel from "@/components/admin/DiagnosticPushPanel";
 
 export default function DashboardAdminExterne() {
   console.log("🚨 DashboardAdminExterne.jsx EST CHARGÉ ET EXÉCUTÉ");
@@ -109,6 +109,14 @@ export default function DashboardAdminExterne() {
   }, [courses, livreurs, clients]);
 
   const QUICK_LINKS = [
+    {
+      to: "/diagnostic-push-complet?email=eric.nongbzanga@yahoo.fr",
+      label: "Diagnostic Push",
+      sub: "Tokens Android & FCM",
+      icon: Bell,
+      grad: "from-blue-600 to-cyan-500",
+      shadow: "shadow-blue-100",
+    },
     {
       to: "/livreurs",
       label: "Livreurs externes",
@@ -228,6 +236,10 @@ export default function DashboardAdminExterne() {
 
       {/* ── STATISTIQUES TÉLÉCHARGEMENTS ───────────────────────────── */}
       <DownloadStatsPanel />
+
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm" id="diagnostic-push">
+        <DiagnosticPushPanel defaultSearchEmail="eric.nongbzanga@yahoo.fr" />
+      </div>
 
       {/* ── STATS KPI ──────────────────────────────────────────────── */}
       <div>

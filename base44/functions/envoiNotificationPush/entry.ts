@@ -4,6 +4,7 @@ const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const APP_URL = 'https://silga-dispatch-go.base44.app';
 const ANDROID_CHANNEL_ID = 'silgapp_default';
+const ANDROID_CLICK_ACTION = 'OPEN_SILGAPP';
 
 function base64UrlEncode(input) {
   const bytes = typeof input === 'string'
@@ -52,8 +53,18 @@ function getFirebaseConfig() {
   const serviceAccountJson = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_JSON');
   if (serviceAccountJson) {
     const sa = JSON.parse(serviceAccountJson);
+    console.log('[envoiNotificationPush] Firebase config: FIREBASE_SERVICE_ACCOUNT_JSON present', {
+      projectId: sa.project_id,
+      clientEmailPresent: !!sa.client_email,
+      privateKeyPresent: !!sa.private_key,
+    });
     return { projectId: sa.project_id, clientEmail: sa.client_email, privateKey: sa.private_key };
   }
+  console.log('[envoiNotificationPush] Firebase config: using split env vars', {
+    projectIdPresent: !!Deno.env.get('FIREBASE_PROJECT_ID'),
+    clientEmailPresent: !!Deno.env.get('FIREBASE_CLIENT_EMAIL'),
+    privateKeyPresent: !!Deno.env.get('FIREBASE_PRIVATE_KEY'),
+  });
   return {
     projectId: Deno.env.get('FIREBASE_PROJECT_ID'),
     clientEmail: Deno.env.get('FIREBASE_CLIENT_EMAIL'),
@@ -81,6 +92,26 @@ async function sendFcmMessage(projectId, accessToken, token, payload) {
   });
   const result = await response.json();
   return { ok: response.ok, status: response.status, result };
+}
+
+function tokenDateValue(item) {
+  const raw = item.derniere_utilisation || item.updated_date || item.created_date || '';
+  const value = Date.parse(raw);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function selectLatestNativeTokens(tokens) {
+  const latestByPlatform = new Map();
+  for (const item of tokens) {
+    const token = String(item.token || '');
+    if (!token || token.startsWith('web_')) continue;
+    const platform = String(item.platform || 'native').toLowerCase();
+    const current = latestByPlatform.get(platform);
+    if (!current || tokenDateValue(item) >= tokenDateValue(current)) {
+      latestByPlatform.set(platform, item);
+    }
+  }
+  return [...latestByPlatform.values()];
 }
 
 Deno.serve(async (req) => {
@@ -115,6 +146,19 @@ Deno.serve(async (req) => {
       tokenMap.set(item.token, item);
     }
     const tokens = [...tokenMap.values()];
+    const nativeTokens = tokens.filter(item => !String(item.token).startsWith('web_'));
+    const pushableTokensPreview = selectLatestNativeTokens(tokens);
+    console.log('[envoiNotificationPush] Tokens resolved', {
+      targetEmail,
+      livreur_id: livreur_id || '',
+      client_id: client_id || '',
+      tokensFound: tokens.length,
+      pushableTokens: pushableTokensPreview.length,
+      nativeTokens: nativeTokens.length,
+      dedupedNativeTokens: nativeTokens.length - pushableTokensPreview.length,
+      webTokens: tokens.length - nativeTokens.length,
+      platforms: [...new Set(tokens.map(t => t.platform || 'unknown'))],
+    });
 
     // Créer la notification en BDD
     const notification = await base44.asServiceRole.entities.Notification.create({
@@ -135,8 +179,12 @@ Deno.serve(async (req) => {
     }
 
     // Exclure les tokens web (pas de FCM natif)
-    const pushableTokens = tokens.filter(item => !String(item.token).startsWith('web_'));
+    const pushableTokens = pushableTokensPreview;
     if (pushableTokens.length === 0) {
+      console.warn('[envoiNotificationPush] No native FCM token available', {
+        targetEmail,
+        tokensFound: tokens.length,
+      });
       return Response.json({
         success: true,
         notification_id: notification.id,
@@ -146,6 +194,11 @@ Deno.serve(async (req) => {
 
     const { projectId, clientEmail, privateKey } = getFirebaseConfig();
     if (!projectId || !clientEmail || !privateKey) {
+      console.warn('[envoiNotificationPush] Firebase credentials missing', {
+        projectIdPresent: !!projectId,
+        clientEmailPresent: !!clientEmail,
+        privateKeyPresent: !!privateKey,
+      });
       return Response.json({
         success: true,
         notification_id: notification.id,
@@ -154,6 +207,7 @@ Deno.serve(async (req) => {
     }
 
     const accessToken = await getAccessToken(clientEmail, privateKey);
+    const notificationTag = String(course_id || notification.id || `${type || 'generic'}-${targetEmail}`).slice(0, 64);
 
     // Payload FCM — notification visible écran verrouillé + son + vibration
     const fcmPayload = {
@@ -164,12 +218,14 @@ Deno.serve(async (req) => {
         client_id: String(client_id || ''),
         course_id: String(course_id || ''),
         notification_id: String(notification.id),
-        click_action: APP_URL,
+        click_action: ANDROID_CLICK_ACTION,
       },
       android: {
+        collapse_key: notificationTag,
         priority: 'HIGH',
         ttl: '86400s',
         notification: {
+          tag: notificationTag,
           channel_id: ANDROID_CHANNEL_ID,
           sound: 'default',
           vibrate_timings: ['0s', '0.2s', '0.1s', '0.2s', '0.1s', '0.4s'],
@@ -177,7 +233,7 @@ Deno.serve(async (req) => {
           default_vibrate_timings: false,
           notification_priority: 'PRIORITY_HIGH',
           visibility: 'PUBLIC',
-          click_action: APP_URL,
+          click_action: ANDROID_CLICK_ACTION,
         },
       },
       webpush: {
@@ -224,6 +280,13 @@ Deno.serve(async (req) => {
     }));
 
     const sent = sendResults.filter(r => r.ok).length;
+    console.log('[envoiNotificationPush] FCM send completed', {
+      targetEmail,
+      projectId,
+      sent,
+      attempted: pushableTokens.length,
+      failed: sendResults.filter(r => !r.ok).length,
+    });
 
     return Response.json({
       success: sent > 0,
