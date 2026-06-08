@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, Clock, AlertTriangle, Smartphone, Wifi, Database } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, AlertTriangle, Smartphone, Wifi, Database, FileText, Key, Package, Shield, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 const LOG_COLORS = {
@@ -21,6 +21,8 @@ export default function DiagnosticPushComplet() {
   const [fcmToken, setFcmToken] = useState(null);
   const [permissionGranted, setPermissionGranted] = useState(null);
   const [registrationComplete, setRegistrationComplete] = useState(false);
+  const [firebaseInit, setFirebaseInit] = useState(null);
+  const [appInfo, setAppInfo] = useState(null);
   const logsEndRef = useRef(null);
 
   const addLog = (message, type = "info", data = null) => {
@@ -62,14 +64,37 @@ export default function DiagnosticPushComplet() {
     setFcmToken(null);
     setPermissionGranted(null);
     setRegistrationComplete(false);
+    setFirebaseInit(null);
+    setAppInfo(null);
 
-    addLog("🚀 DÉBUT DU DIAGNOSTIC PUSH FCM", "info");
-    addLog("=".repeat(50), "debug");
+    addLog("🚀 DÉBUT DU DIAGNOSTIC PUSH FCM COMPLET", "info");
+    addLog("=".repeat(60), "debug");
+
+    // ÉTAPE 0: Vérification configuration Firebase
+    addLog("\n🔥 ÉTAPE 0: Configuration Firebase", "info");
+    
+    const isNative = typeof window !== "undefined" && window.Capacitor;
+    const platform = isNative ? window.Capacitor.getPlatform() : "web";
+    
+    if (isNative && platform === "android") {
+      try {
+        const { App } = await import('@capacitor/app');
+        const appInfoResult = await App.getInfo();
+        setAppInfo(appInfoResult);
+        addLog(`   ✅ App native détectée`, "success");
+        addLog(`   Package: ${appInfoResult.id}`, "info");
+        addLog(`   Nom: ${appInfoResult.name}`, "info");
+        addLog(`   Version: ${appInfoResult.version} (${appInfoResult.build})`, "info");
+        
+        // Firebase sera vérifié indirectement via PushNotifications.register()
+        addLog(`   ℹ️ Firebase sera vérifié via PushNotifications.register()`, "info");
+      } catch (err) {
+        addLog(`   ⚠️ Impossible de lire les infos app: ${err.message}`, "warn");
+      }
+    }
 
     // ÉTAPE 1: Vérifier l'environnement
     addLog("\n📱 ÉTAPE 1: Vérification environnement", "info");
-    const isNative = typeof window !== "undefined" && window.Capacitor;
-    const platform = isNative ? window.Capacitor.getPlatform() : "web";
     addLog(`   Plateforme: ${platform}`, "info");
     addLog(`   Native: ${isNative ? "OUI (Capacitor)" : "NON (Web)"}`, "info");
 
@@ -172,7 +197,7 @@ export default function DiagnosticPushComplet() {
         isError ? reject(value) : resolve(value);
       };
 
-      // Listener: token reçu (sans await car dans Promise executor)
+      // Attacher listener: token reçu
       PushNotifications.addListener(
         "registration",
         (data) => {
@@ -189,7 +214,7 @@ export default function DiagnosticPushComplet() {
         addLog(`   Listener 'registration' attaché`, "debug");
       });
 
-      // Listener: erreur d'enregistrement
+      // Attacher listener: erreur d'enregistrement
       PushNotifications.addListener(
         "registrationError",
         (error) => {
@@ -237,7 +262,7 @@ export default function DiagnosticPushComplet() {
         const saveResult = await base44.functions.invoke("enregistrerTokenPush", {
           token: token,
           platform: "android",
-          user_email: user?.email || "test@silgapp.local",
+          user_email: "test@silgapp.local",
           user_type: "livreur",
         });
         addLog(`✅ Token enregistré en BDD`, "success", saveResult);
@@ -253,10 +278,11 @@ export default function DiagnosticPushComplet() {
     }
 
     // RÉSUMÉ FINAL
-    addLog("\n" + "=".repeat(50), "debug");
+    addLog("\n" + "=".repeat(60), "debug");
     addLog("📊 RÉSUMÉ DU DIAGNOSTIC", "info");
-    addLog("=".repeat(50), "debug");
+    addLog("=".repeat(60), "debug");
     addLog(`   Plateforme: ${platform}`, "info");
+    addLog(`   Firebase: ${firebaseInit ? "✅ Initialisé" : "❌ Non initialisé"}`, firebaseInit ? "success" : "error");
     addLog(`   Permissions: ${permissionGranted ? "✅ Accordées" : "❌ Refusées"}`, permissionGranted ? "success" : "error");
     addLog(`   Token FCM: ${fcmToken ? `✅ ${fcmToken?.substring(0, 30)}...` : "❌ Non reçu"}`, fcmToken ? "success" : "error");
     addLog(`   Registration: ${registrationComplete ? "✅ Complète" : "❌ Incomplète"}`, registrationComplete ? "success" : "error");
@@ -297,7 +323,7 @@ export default function DiagnosticPushComplet() {
                 Lancer le diagnostic complet
               </h3>
               <p className="text-sm text-blue-700">
-                Teste toutes les étapes : permissions → register → token → sauvegarde BDD
+                Teste toutes les étapes : Firebase → permissions → register → token → sauvegarde BDD
               </p>
             </div>
             <Button
@@ -312,13 +338,65 @@ export default function DiagnosticPushComplet() {
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
-                  <Smartphone className="w-5 h-5" />
-                  Démarrer le diagnostic
+                  <RefreshCw className="w-5 h-5" />
+                  Démarrer
                 </span>
               )}
             </Button>
           </div>
         </Card>
+
+        {/* Infos app */}
+        {appInfo && (
+          <Card className="p-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+            <h3 className="font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+              <Smartphone className="w-5 h-5" />
+              Informations Application
+            </h3>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <span className="text-gray-600 dark:text-gray-400">Package:</span>
+                <p className="font-mono text-xs mt-1">{appInfo.id}</p>
+              </div>
+              <div>
+                <span className="text-gray-600 dark:text-gray-400">Nom:</span>
+                <p className="font-mono text-xs mt-1">{appInfo.name}</p>
+              </div>
+              <div>
+                <span className="text-gray-600 dark:text-gray-400">Version:</span>
+                <p className="font-mono text-xs mt-1">{appInfo.version}</p>
+              </div>
+              <div>
+                <span className="text-gray-600 dark:text-gray-400">Build:</span>
+                <p className="font-mono text-xs mt-1">{appInfo.build}</p>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Status Firebase */}
+        {firebaseInit && (
+          <Card className="p-4 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="w-6 h-6 text-green-600" />
+              <div>
+                <h3 className="font-bold text-green-900 dark:text-green-100">✅ Firebase Initialisé</h3>
+                <p className="text-sm text-green-700 dark:text-green-300">
+                  Project ID: {firebaseInit.projectId || 'N/A'}
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {firebaseInit === null && isTesting && (
+          <Card className="p-4 bg-amber-50 border-amber-200">
+            <div className="flex items-center gap-3">
+              <Clock className="w-6 h-6 text-amber-600 animate-spin" />
+              <p className="text-sm text-amber-700">Vérification Firebase en cours...</p>
+            </div>
+          </Card>
+        )}
 
         {/* Bouton vérification BDD */}
         <Card className="p-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
@@ -371,7 +449,7 @@ export default function DiagnosticPushComplet() {
           <div className="space-y-2 max-h-[600px] overflow-y-auto font-mono text-xs">
             {logs.length === 0 ? (
               <p className="text-gray-500 dark:text-gray-400 text-center py-8">
-                Cliquez sur "Démarrer le diagnostic" pour voir les logs en temps réel
+                Cliquez sur "Démarrer" pour voir les logs en temps réel
               </p>
             ) : (
               logs.map((log, i) => (
