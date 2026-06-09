@@ -39,6 +39,10 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
         }
         return result.data;
       }
+      // Utiliser l'entité correcte selon le réseau
+      if (reseau === "externe") {
+        return await base44.entities.CourseExterne.update(id, data);
+      }
       return await base44.entities.Course.update(id, data);
     },
     onSuccess: (_, variables) => {
