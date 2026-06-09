@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import CourseStatusBadge from "./CourseStatusBadge";
 import UrgenceBadge from "./UrgenceBadge";
+import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
 
 export default function CourseListItem({ course, onAssign, onView }) {
   return (
@@ -48,6 +49,12 @@ export default function CourseListItem({ course, onAssign, onView }) {
             {course.urgence && course.urgence !== "normale" && (
               <UrgenceBadge urgence={course.urgence} />
             )}
+            <MultiColisProgressBadge
+              nbColis={course.nb_colis || 1}
+              nbLivres={course.nb_colis_livres || 0}
+              nbAnnules={course.nb_colis_annules || 0}
+              size="sm"
+            />
             <span className="text-[10px] text-muted-foreground flex items-center gap-1">
               <Clock className="w-3 h-3" />
               {format(new Date(course.created_date), "HH:mm", { locale: fr })}

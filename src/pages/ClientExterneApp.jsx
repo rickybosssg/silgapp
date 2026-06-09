@@ -27,6 +27,7 @@ import ClientOnboarding from "@/components/client/ClientOnboarding";
 import OngletCodePromo from "@/components/client/OngletCodePromo";
 import PubliciteCarousel from "@/components/publicite/PubliciteCarousel";
 import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
+import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
 
 const ACTIVE_GPS_STATUSES = ["nouvelle", "recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison"];
 const ACTIVE_GPS_STATUS_SET = new Set(ACTIVE_GPS_STATUSES);
@@ -745,6 +746,16 @@ export default function ClientExterneApp() {
                   <p className="text-[11px] text-gray-500 truncate mt-0.5">
                     {course.livreur_nom || "Livreur assigné"} · {course.adresse_depart} → {course.adresse_arrivee}
                   </p>
+                  {course.is_multi_colis && (
+                    <div className="mt-1">
+                      <MultiColisProgressBadge
+                        nbColis={course.nb_colis || 1}
+                        nbLivres={course.nb_colis_livres || 0}
+                        nbAnnules={course.nb_colis_annules || 0}
+                        size="sm"
+                      />
+                    </div>
+                  )}
                 </div>
                 <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
               </div>

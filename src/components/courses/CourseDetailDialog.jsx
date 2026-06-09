@@ -4,11 +4,12 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Phone, User, Package, Clock, Truck, ArrowDown, Navigation } from "lucide-react";
+import { MapPin, Phone, User, Package, Clock, Truck, ArrowDown, Navigation, XCircle } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import CourseStatusBadge from "./CourseStatusBadge";
 import UrgenceBadge from "./UrgenceBadge";
+import MultiColisAdminView from "./MultiColisAdminView";
 import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -18,19 +19,39 @@ const statuts = [
   "colis_recupere", "en_livraison", "livree", "annulee"
 ];
 
-export default function CourseDetailDialog({ course, open, onClose }) {
+export default function CourseDetailDialog({ course, open, onClose, reseau = "interne" }) {
   const queryClient = useQueryClient();
   const [newStatut, setNewStatut] = React.useState(course?.statut || "");
+  const [confirmAnnulation, setConfirmAnnulation] = React.useState(false);
 
   React.useEffect(() => {
     setNewStatut(course?.statut || "");
+    setConfirmAnnulation(false);
   }, [course]);
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Course.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["courses"] });
-      toast.success("Statut mis à jour");
+    mutationFn: async ({ id, data }) => {
+      if (data.statut === "annulee" && reseau === "externe") {
+        // Utiliser la fonction backend dédiée pour les courses externes
+        const result = await base44.functions.invoke("annulerCourseExterne", { course_id: id });
+        if (!result?.data?.success) {
+          throw new Error(result?.data?.error || "Échec annulation");
+        }
+        return result.data;
+      }
+      return await base44.entities.Course.update(id, data);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries();
+      if (variables.data.statut === "annulee") {
+        toast.success("Course annulée avec succès");
+        onClose();
+      } else {
+        toast.success("Statut mis à jour");
+      }
+    },
+    onError: (error) => {
+      toast.error("Erreur : " + (error?.message || "impossible d'annuler"));
     },
   });
 
@@ -183,6 +204,11 @@ export default function CourseDetailDialog({ course, open, onClose }) {
             </div>
           )}
 
+          {/* Multi-colis admin view */}
+          {reseau === "externe" && course.is_multi_colis && course.nb_colis > 1 && (
+            <MultiColisAdminView course={course} />
+          )}
+
           {/* Notes */}
           {course.notes && (
             <div className="text-sm text-muted-foreground bg-muted/30 p-3 rounded-lg">
@@ -212,6 +238,47 @@ export default function CourseDetailDialog({ course, open, onClose }) {
               Mettre à jour
             </Button>
           </div>
+
+          {/* Annulation rapide */}
+          {course.statut !== "annulee" && course.statut !== "livree" && (
+            <div className="pt-2 space-y-2">
+              {!confirmAnnulation ? (
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  disabled={updateMutation.isPending}
+                  onClick={() => setConfirmAnnulation(true)}
+                >
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Annuler la course
+                </Button>
+              ) : (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 space-y-2">
+                  <p className="text-sm text-red-700 font-medium text-center">Confirmer l'annulation ?</p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setConfirmAnnulation(false)}
+                    >
+                      Non
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      className="flex-1"
+                      disabled={updateMutation.isPending}
+                      onClick={() => {
+                        console.log("[Annulation] Clic confirmé, course.id:", course.id);
+                        updateMutation.mutate({ id: course.id, data: { statut: "annulee" } });
+                      }}
+                    >
+                      {updateMutation.isPending ? "..." : "Oui, annuler"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

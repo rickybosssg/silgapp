@@ -33,6 +33,26 @@
       ],
       "description": "Type de course : exp\u00e9dier ou recevoir un colis"
     },
+    "is_multi_colis": {
+      "type": "boolean",
+      "default": false,
+      "description": "TRUE si la course contient plusieurs colis (mode multi-colis)"
+    },
+    "nb_colis": {
+      "type": "number",
+      "default": 1,
+      "description": "Nombre total de colis dans cette course"
+    },
+    "nb_colis_livres": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de colis effectivement livr\u00e9s"
+    },
+    "nb_colis_annules": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de colis annul\u00e9s"
+    },
     "expediteur_nom": {
       "type": "string",
       "description": "Nom de l'exp\u00e9diteur"
@@ -51,11 +71,11 @@
     },
     "destinataire_nom": {
       "type": "string",
-      "description": "Nom du destinataire"
+      "description": "Nom du destinataire (colis unique) ou 'Multi-colis' si plusieurs"
     },
     "destinataire_telephone": {
       "type": "string",
-      "description": "T\u00e9l\u00e9phone du destinataire"
+      "description": "T\u00e9l\u00e9phone du destinataire (colis unique)"
     },
     "destinataire_phone_normalized": {
       "type": "string",
@@ -76,7 +96,7 @@
     },
     "adresse_arrivee": {
       "type": "string",
-      "description": "Adresse ou quartier de livraison"
+      "description": "Adresse ou quartier de livraison (colis unique) ou 'Tourn\u00e9e multi-colis' si plusieurs"
     },
     "ville_depart": {
       "type": "string",
@@ -101,11 +121,11 @@
     },
     "gps_arrivee_lat": {
       "type": "number",
-      "description": "Latitude du point d'arriv\u00e9e"
+      "description": "Latitude du point d'arriv\u00e9e (colis unique)"
     },
     "gps_arrivee_lng": {
       "type": "number",
-      "description": "Longitude du point d'arriv\u00e9e"
+      "description": "Longitude du point d'arriv\u00e9e (colis unique)"
     },
     "type_colis": {
       "type": "string",
@@ -117,7 +137,7 @@
         "nourriture",
         "autre"
       ],
-      "description": "Type de colis"
+      "description": "Type de colis (colis unique)"
     },
     "prix_estimate": {
       "type": "number",

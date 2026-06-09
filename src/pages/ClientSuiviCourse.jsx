@@ -35,6 +35,7 @@ import AnnulerCourseDialog from "@/components/client/AnnulerCourseDialog";
 import ETADisplay from "@/components/client/ETADisplay";
 import HistoriqueCoursesClient from "@/components/client/HistoriqueCoursesClient";
 import FraisAnnulationBannerClient from "@/components/client/FraisAnnulationBannerClient";
+import MultiColisClientView from "@/components/multi-colis/MultiColisClientView";
 import { useDestinataireGPS } from "@/hooks/useDestinataireGPS";
 import { playNotificationSound } from "@/hooks/useSonEtVibration";
 
@@ -615,6 +616,11 @@ export default function ClientSuiviCourse() {
 
 
         </Card>
+
+        {/* Multi-colis — progression par colis côté client */}
+        {maCourse.is_multi_colis && (
+          <MultiColisClientView course={maCourse} />
+        )}
 
         {/* QR Codes — dès que les codes existent */}
         {!["livree", "annulee"].includes(maCourse.statut) && (

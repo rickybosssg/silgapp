@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { MapPin, Phone, Package, Check, X, AlertTriangle, ChevronRight, QrCode, Clock, Ruler } from "lucide-react";
+import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
+import MultiColisLivreurView from "@/components/multi-colis/MultiColisLivreurView";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -121,6 +123,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const [showQRScanner, setShowQRScanner] = useState(null);
   const [showPauseModal, setShowPauseModal] = useState(false);
   const [pauseMotif, setPauseMotif] = useState("");
+  const [multiPickupPending, setMultiPickupPending] = useState(false);
   // Optimistic status — overrides course.statut immediately on tap
   const [optimisticStatut, setOptimisticStatut] = useState(null);
 
@@ -196,6 +199,45 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     onMettrePause?.(course, pauseMotif);
     setShowPauseModal(false);
     setPauseMotif("");
+  };
+
+  const handleMultiColisRecuperes = async () => {
+    if (multiPickupPending) return;
+    const now = new Date().toISOString();
+    setMultiPickupPending(true);
+    updateOptimisticStatut("colis_recupere", {
+      heure_recuperation: now,
+      pickup_confirmed_by: "livreur",
+      pickup_confirmed_at: now,
+    });
+
+    try {
+      const colis = await base44.entities.ColisExterne.filter({ course_id: course.id }, "numero_ordre", 50);
+      await Promise.all((colis || [])
+        .filter((item) => !["livre", "annule"].includes(item.statut))
+        .map((item) => base44.entities.ColisExterne.update(item.id, {
+          statut: "recupere",
+          heure_recuperation: now,
+        })));
+
+      await base44.entities.CourseExterne.update(course.id, {
+        statut: "colis_recupere",
+        heure_recuperation: now,
+        pickup_confirmed_by: "livreur",
+        pickup_confirmed_at: now,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["colis-externes", course.id] });
+      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      onColisRecupere({ ...course, statut: "colis_recupere", heure_recuperation: now });
+      toast.success("Tous les colis sont recuperes");
+    } catch (error) {
+      console.error("Erreur recuperation multi-colis:", error);
+      toast.error("Erreur lors de la recuperation des colis");
+      setOptimisticStatut(null);
+    } finally {
+      setMultiPickupPending(false);
+    }
   };
 
   return (
@@ -315,8 +357,23 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
             <p className="text-white text-sm font-bold">Course en cours</p>
+            {course.is_multi_colis && (
+              <span className="text-[10px] bg-purple-500 text-white px-2 py-0.5 rounded-full font-bold">
+                {course.nb_colis} colis
+              </span>
+            )}
           </div>
-          <span className="text-white/50 text-xs">#{course.id?.slice(-6)}</span>
+          <div className="flex items-center gap-2">
+            {course.is_multi_colis && (
+              <MultiColisProgressBadge
+                nbColis={course.nb_colis || 1}
+                nbLivres={course.nb_colis_livres || 0}
+                nbAnnules={course.nb_colis_annules || 0}
+                size="sm"
+              />
+            )}
+            <span className="text-white/50 text-xs">#{course.id?.slice(-6)}</span>
+          </div>
         </div>
 
         <div className="p-5 space-y-4">
@@ -495,6 +552,15 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             </p>
           )}
 
+          {/* Vue multi-colis livreur — remplace le bouton "Scanner pour livrer" côté externe */}
+          {isExterne && course.is_multi_colis && colisRecupere && !colisLivre && (
+            <MultiColisLivreurView
+              course={course}
+              colisRecupere={colisRecupere}
+              onAllLivres={() => onColisLivre(course, null)}
+            />
+          )}
+
           {/* Navigation GPS — affiché si coordonnées GPS disponibles */}
           {!colisLivre && (
             !colisRecupere ? (
@@ -536,15 +602,27 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             <div className="space-y-3 pt-1">
               {!colisRecupere ? (
                 isExterne ? (
-                  /* ── EXTERNE : Scanner QR pour récupérer ── */
-                  <button
-                    className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                    onClick={() => setShowQRScanner("pickup")}
-                    disabled={isPending}
-                  >
-                    <QrCode className="w-6 h-6" />
-                    Scanner pour récupérer le colis
-                  </button>
+                  /* ── EXTERNE multi-colis : bouton simple sans QR ── */
+                  /* ── EXTERNE colis unique : Scanner QR pour récupérer ── */
+                  course.is_multi_colis ? (
+                    <button
+                      className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                      onClick={handleMultiColisRecuperes}
+                      disabled={isPending || multiPickupPending}
+                    >
+                      <Package className="w-6 h-6" />
+                      📦 Colis récupérés ({course.nb_colis} colis)
+                    </button>
+                  ) : (
+                    <button
+                      className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                      onClick={() => setShowQRScanner("pickup")}
+                      disabled={isPending}
+                    >
+                      <QrCode className="w-6 h-6" />
+                      Scanner pour récupérer le colis
+                    </button>
+                  )
                 ) : (
                   /* ── INTERNE : bouton classique ── */
                   <button
@@ -563,15 +641,18 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 )
               ) : (
                 isExterne ? (
-                  /* ── EXTERNE : Scanner QR pour livrer ── */
-                  <button
-                    className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                    onClick={() => setShowQRScanner("delivery")}
-                    disabled={isPending}
-                  >
-                    <QrCode className="w-6 h-6" />
-                    Scanner pour livrer ✅
-                  </button>
+                  /* ── EXTERNE multi-colis : géré par MultiColisLivreurView ci-dessus ── */
+                  /* ── EXTERNE colis unique : Scanner QR pour livrer ── */
+                  !course.is_multi_colis && (
+                    <button
+                      className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                      onClick={() => setShowQRScanner("delivery")}
+                      disabled={isPending}
+                    >
+                      <QrCode className="w-6 h-6" />
+                      Scanner pour livrer ✅
+                    </button>
+                  )
                 ) : (
                   /* ── INTERNE : bouton classique avec GPS + récapitulatif ── */
                   <button
@@ -643,10 +724,40 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           )}
 
           {colisLivre && (() => {
-            // ⚠️ CORRECTION PRIX MANUEL : Si la course utilise un prix manuel accepté,
-            // ce montant devient le prix officiel. Ne JAMAIS recalculer.
+            const isMulti = isExterne && course.is_multi_colis && (course.nb_colis || 1) > 1;
+
+            // Multi-colis : totaux issus des montants par colis (pas de tarification auto)
+            if (isMulti) {
+              const total = Number(course.prix_final) || 0;
+              const gain = Number(course.montant_livreur) || Math.round(total * 0.7);
+              const commission = Number(course.commission_silga) || Math.round(total * 0.3);
+              return (
+                <div className="py-4 bg-green-50 rounded-2xl border border-green-200 space-y-3 px-4">
+                  <div className="text-center">
+                    <p className="text-2xl mb-1">🎉</p>
+                    <p className="font-black text-green-700 text-base">Tournée terminée !</p>
+                    <p className="text-xs text-green-600 mt-0.5">{course.nb_colis} colis livrés</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
+                      <p className="text-[10px] text-gray-400 font-semibold uppercase">Total</p>
+                      <p className="text-sm font-black text-gray-800">{total.toLocaleString()} {course.devise || "F"}</p>
+                    </div>
+                    <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
+                      <p className="text-[10px] text-gray-400 font-semibold uppercase">Ton gain</p>
+                      <p className="text-sm font-black text-green-700">+{gain.toLocaleString()} {course.devise || "F"}</p>
+                    </div>
+                    <div className="bg-white rounded-xl p-2.5 text-center border border-gray-100">
+                      <p className="text-[10px] text-gray-400 font-semibold uppercase">Commission</p>
+                      <p className="text-sm font-black text-gray-500">{commission.toLocaleString()} {course.devise || "F"}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            // Colis unique : logique existante inchangée
             const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
-            
             const dist = Number(course.distance_reelle_km) > 0 ? Number(course.distance_reelle_km) : null;
             const prix = isPrixManuel
               ? Number(course.manual_price)
