@@ -26,6 +26,16 @@ Deno.serve(async (req) => {
       country_code
     } = payload;
 
+    // 🛡️ VALIDATION STRICTE : country_code OBLIGATOIRE
+    if (!country_code) {
+      console.error('[initLivreurAuto] ❌ country_code manquant — inscription livreur rejetée');
+      return Response.json({ 
+        success: false, 
+        error: "country_code_required",
+        message: "Le pays est obligatoire pour utiliser SILGAPP. Veuillez sélectionner un pays lors de l'inscription."
+      }, { status: 400 });
+    }
+
     // 1. Créer le profil livreur s'il n'existe pas
     let livreur = await base44.asServiceRole.entities.Livreur.filter({ user_email: user.email });
     if (!livreur || livreur.length === 0) {
@@ -45,7 +55,7 @@ Deno.serve(async (req) => {
         quartier: quartier || "",
         app_active: false,
         last_seen_at: new Date().toISOString(),
-        ...(country_code ? { country_code } : {}),
+        country_code: country_code, // ✅ OBLIGATOIRE - rejeté si manquant
       });
     } else {
       livreur = livreur[0];

@@ -16,6 +16,16 @@ Deno.serve(async (req) => {
     const payload = await req.json();
     const { device_id, platform, notification_token, latitude, longitude, country_code } = payload;
 
+    // 🛡️ VALIDATION STRICTE : country_code OBLIGATOIRE
+    if (!country_code) {
+      console.error('[initClientAuto] ❌ country_code manquant — inscription rejetée');
+      return Response.json({ 
+        success: false, 
+        error: "country_code_required",
+        message: "Le pays est obligatoire pour utiliser SILGAPP. Veuillez sélectionner un pays lors de l'inscription."
+      }, { status: 400 });
+    }
+
     // 1. VÉRIFIER si l'email existe déjà dans Livreur (livreur externe)
     const existingLivreur = await base44.asServiceRole.entities.Livreur.filter({ user_email: user.email });
     if (existingLivreur && existingLivreur.length > 0) {
@@ -31,9 +41,6 @@ Deno.serve(async (req) => {
     // 2. Créer le profil client s'il n'existe pas
     let client = await base44.asServiceRole.entities.ClientExterne.filter({ user_email: user.email });
     if (!client || client.length === 0) {
-      if (!country_code) {
-        console.warn('[initClientAuto] ⚠️ country_code manquant — le dispatch sera bloqué pour ce client');
-      }
       client = await base44.asServiceRole.entities.ClientExterne.create({
         nom: user.full_name?.split(' ')[0] || user.email.split('@')[0],
         prenom: user.full_name?.split(' ').slice(1).join(' ') || '',
@@ -42,7 +49,7 @@ Deno.serve(async (req) => {
         actif: true,
         latitude: latitude || null,
         longitude: longitude || null,
-        country_code: country_code || null,
+        country_code: country_code, // ✅ OBLIGATOIRE - rejeté si manquant
       });
     } else {
       client = client[0];

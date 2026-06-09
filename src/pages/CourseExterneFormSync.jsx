@@ -544,10 +544,29 @@ export default function CourseExterneFormSync() {
       ? (colis[0]?.destinataire_telephone || "")
       : destinataireTel;
 
-    // ⚠️ country_code OBLIGATOIRE : détermine le pays du dispatch et le filtrage admin
-    const courseCountryCode = clientProfil?.country_code || null;
+    // 🛡️ country_code OBLIGATOIRE : détermine le pays du dispatch et le filtrage admin
+    // Si manquant, recharger le profil depuis la BDD (fallback de sécurité)
+    let courseCountryCode = clientProfil?.country_code || null;
     if (!courseCountryCode) {
-      console.warn("[CourseForm] ⚠️ country_code manquant sur clientProfil — le dispatch ne sera pas isolé par pays !");
+      console.warn("[CourseForm] ⚠️ country_code manquant — tentative de rechargement BDD...");
+      try {
+        const user = await base44.auth.me();
+        const clients = await base44.entities.ClientExterne.filter({ user_email: user.email }, 'created_date', 1);
+        if (clients?.[0]?.country_code) {
+          courseCountryCode = clients[0].country_code;
+          console.log("[CourseForm] ✅ country_code récupéré depuis la BDD:", courseCountryCode);
+        } else {
+          console.error("[CourseForm] ❌ country_code TOUJOURS manquant après rechargement BDD");
+          toast.error("Erreur : votre profil client n'a pas de pays. Veuillez contacter le support.");
+          setIsSubmitting(false);
+          return;
+        }
+      } catch (err) {
+        console.error("[CourseForm] ❌ Erreur rechargement BDD:", err);
+        toast.error("Erreur : impossible de vérifier votre pays. Réessayez.");
+        setIsSubmitting(false);
+        return;
+      }
     }
 
     createMutation.mutate({
