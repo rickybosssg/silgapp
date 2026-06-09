@@ -14,7 +14,7 @@ Deno.serve(async (req) => {
     }
 
     const payload = await req.json();
-    const { device_id, platform, notification_token, latitude, longitude } = payload;
+    const { device_id, platform, notification_token, latitude, longitude, country_code } = payload;
 
     // 1. VÉRIFIER si l'email existe déjà dans Livreur (livreur externe)
     const existingLivreur = await base44.asServiceRole.entities.Livreur.filter({ user_email: user.email });
@@ -39,6 +39,7 @@ Deno.serve(async (req) => {
         actif: true,
         latitude: latitude || null,
         longitude: longitude || null,
+        ...(country_code ? { country_code } : {}),
       });
     } else {
       client = client[0];

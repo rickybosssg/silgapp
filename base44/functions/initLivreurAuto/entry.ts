@@ -22,7 +22,8 @@ Deno.serve(async (req) => {
       longitude,
       telephone,
       vehicule,
-      quartier
+      quartier,
+      country_code
     } = payload;
 
     // 1. Créer le profil livreur s'il n'existe pas
@@ -44,6 +45,7 @@ Deno.serve(async (req) => {
         quartier: quartier || "",
         app_active: false,
         last_seen_at: new Date().toISOString(),
+        ...(country_code ? { country_code } : {}),
       });
     } else {
       livreur = livreur[0];
