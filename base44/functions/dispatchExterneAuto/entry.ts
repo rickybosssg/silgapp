@@ -273,9 +273,11 @@ async function proposerAuLivreur(base44, courseId, course, livreur, niveauDispat
           const fromNumber = fromRaw.startsWith('whatsapp:') ? fromRaw : `whatsapp:${fromRaw}`;
 
           if (accountSid && authToken && fromRaw && livreur.telephone) {
-            // Normaliser le numéro
+            // Normaliser le numéro selon le pays du livreur
+            const INDICATIFS = { BF: '+226', CI: '+225', TG: '+228', BJ: '+229', SN: '+221', ML: '+223', GN: '+224', NE: '+227' };
+            const indicatif = INDICATIFS[livreur.country_code] || '+226';
             let tel = livreur.telephone.replace(/\s+/g, '').replace(/[^\d+]/g, '');
-            if (!tel.startsWith('+')) tel = '+226' + tel;
+            if (!tel.startsWith('+')) tel = indicatif + tel;
 
             // Vérifier opt-in
             if (livreur.whatsapp_opt_in !== false || livreur.whatsapp_opt_in_date) {

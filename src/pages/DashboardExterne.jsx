@@ -81,7 +81,7 @@ export default function DashboardExterne() {
   });
 
   const coursesFiltrees = useMemo(
-    () => effectiveCountry ? courses.filter(c => (c.country_code || "BF") === effectiveCountry) : courses,
+    () => effectiveCountry ? courses.filter(c => c.country_code === effectiveCountry) : courses,
     [courses, effectiveCountry]
   );
 
