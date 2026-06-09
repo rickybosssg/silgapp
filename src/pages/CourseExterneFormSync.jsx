@@ -545,15 +545,19 @@ export default function CourseExterneFormSync() {
       ? (colis[0]?.destinataire_telephone || "")
       : destinataireTel;
 
-    // 🛡️ country_code OBLIGATOIRE : utilise TOUJOURS celui de la BDD
-    const courseCountryCode = clientFromDB?.country_code || clientProfil?.country_code;
+    // 🛡️ country_code OBLIGATOIRE : RECHARGER depuis BDD pour éviter stale state
+    // IMPORTANT : clientProfil peut venir du state React (potentiellement obsolète)
+    // On recharge TOUJOURS depuis la BDD pour garantir country_code correct
+    const freshClient = await base44.entities.ClientExterne.filter({ user_email: user.email }, 'created_date', 1);
+    const courseCountryCode = freshClient?.[0]?.country_code || clientFromDB?.country_code || clientProfil?.country_code;
+    
     if (!courseCountryCode) {
-      console.error("[CourseForm] ❌ country_code manquant — client:", clientProfil, "BDD:", clientFromDB);
+      console.error("[CourseForm] ❌ country_code manquant — client:", { freshClient, clientFromDB, clientProfil });
       toast.error("Erreur : votre profil client n'a pas de pays. Veuillez contacter le support.");
       setIsSubmitting(false);
       return;
     }
-    console.log("[CourseForm] ✅ country_code confirmé:", courseCountryCode);
+    console.log("[CourseForm] ✅ country_code confirmé (BDD fraîche):", courseCountryCode);
 
     createMutation.mutate({
       country_code: courseCountryCode,
