@@ -455,24 +455,25 @@ export default function CourseExterneFormSync() {
     let expediteurNom, expediteurTel, expediteurClientId, expediteurPhoneNormalized;
     let destinataireNom, destinataireTel, destinataireClientId, destinatairePhoneNormalized;
 
+    // 🛡️ UTILISER country_code CORRIGÉ (après fallback BDD)
     if (isExpedie) {
       expediteurNom = formData.client_nom;
       expediteurTel = formData.client_telephone;
       expediteurClientId = clientProfil?.id || null;
-      expediteurPhoneNormalized = normalizePhone(formData.client_telephone, clientProfil?.country_code);
+      expediteurPhoneNormalized = normalizePhone(formData.client_telephone, courseCountryCode); // ✅ Utiliser courseCountryCode garanti
       destinataireNom = formData.destinataire_nom;
       destinataireTel = formData.destinataire_telephone;
       destinataireClientId = formData.destinataire_client_id || null;
-      destinatairePhoneNormalized = normalizePhone(formData.destinataire_telephone);
+      destinatairePhoneNormalized = normalizePhone(formData.destinataire_telephone, courseCountryCode); // ✅
     } else {
       destinataireNom = formData.client_nom;
       destinataireTel = formData.client_telephone;
       destinataireClientId = clientProfil?.id || null;
-      destinatairePhoneNormalized = normalizePhone(formData.client_telephone, clientProfil?.country_code);
+      destinatairePhoneNormalized = normalizePhone(formData.client_telephone, courseCountryCode); // ✅
       expediteurNom = formData.expediteur_nom;
       expediteurTel = formData.expediteur_telephone;
       expediteurClientId = formData.expediteur_client_id || null;
-      expediteurPhoneNormalized = normalizePhone(formData.expediteur_telephone);
+      expediteurPhoneNormalized = normalizePhone(formData.expediteur_telephone, courseCountryCode); // ✅
     }
 
     console.log("[CourseForm] Soumission :", {
