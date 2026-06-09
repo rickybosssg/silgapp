@@ -29,6 +29,8 @@ export default function DispatchModeSelector() {
           mode: newMode,
           moteur_actif: newMode === "automatique",
           timeout_secondes: 60,
+          alert_duration_seconds: 60,
+          alert_interval_seconds: 5,
         });
       }
     },

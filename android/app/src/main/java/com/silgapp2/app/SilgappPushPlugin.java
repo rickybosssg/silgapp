@@ -86,4 +86,10 @@ public class SilgappPushPlugin extends Plugin {
         getContext().startActivity(intent);
         call.resolve();
     }
+
+    @PluginMethod
+    public void stopUrgentCourseAlert(PluginCall call) {
+        SilgappFirebaseMessagingService.stopUrgentCourseAlert();
+        call.resolve();
+    }
 }

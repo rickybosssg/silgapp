@@ -24,6 +24,7 @@ import AlertesLivreursPanel from "@/components/admin/AlertesLivreursPanel";
 import ZonesChaudesWidget from "@/components/carte/ZonesChaudes";
 import ComptabilitePanel from "@/components/admin/ComptabilitePanel";
 import DiagnosticPushPanel from "@/components/admin/DiagnosticPushPanel";
+import LivreurAlertSettingsPanel from "@/components/admin/LivreurAlertSettingsPanel";
 
 export default function DashboardAdminExterne() {
   console.log("🚨 DashboardAdminExterne.jsx EST CHARGÉ ET EXÉCUTÉ");
@@ -240,6 +241,8 @@ export default function DashboardAdminExterne() {
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm" id="diagnostic-push">
         <DiagnosticPushPanel defaultSearchEmail="eric.nongbzanga@yahoo.fr" />
       </div>
+
+      <LivreurAlertSettingsPanel />
 
       {/* ── STATS KPI ──────────────────────────────────────────────── */}
       <div>

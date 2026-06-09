@@ -3,6 +3,7 @@ import { MapPin, Phone, Navigation, Check, X, Package, Clock, MessageCircle, Rul
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
 import ManualPriceModal from "./ManualPriceModal";
+import { stopUrgentCourseAlert, useUrgentCourseAlert } from "@/lib/livreurUrgentAlert";
 
 function haversine(lat1, lon1, lat2, lon2) {
   if (!lat1 || !lon1 || !lat2 || !lon2) return null;
@@ -11,53 +12,6 @@ function haversine(lat1, lon1, lat2, lon2) {
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-// Vibration continue
-function useVibration(active) {
-  const intervalRef = useRef(null);
-  useEffect(() => {
-    if (active && navigator.vibrate) {
-      navigator.vibrate([500, 150, 500, 150, 500]);
-      intervalRef.current = setInterval(() => {
-        navigator.vibrate([500, 150, 500, 150, 500]);
-      }, 3000);
-    }
-    return () => {
-      navigator.vibrate?.(0);
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [active]);
-}
-
-let sharedAudioCtx = null;
-function getAudioCtx() {
-  if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
-    sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  if (sharedAudioCtx.state === 'suspended') {
-    sharedAudioCtx.resume();
-  }
-  return sharedAudioCtx;
-}
-
-function playNotificationSound() {
-  try {
-    const ctx = getAudioCtx();
-    const notes = [880, 1100, 880, 1100];
-    notes.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = freq;
-      osc.type = "sine";
-      gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.15);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.15 + 0.12);
-      osc.start(ctx.currentTime + i * 0.15);
-      osc.stop(ctx.currentTime + i * 0.15 + 0.13);
-    });
-  } catch (_) {}
 }
 
 const typeColisLabel = {
@@ -76,9 +30,17 @@ export default function CourseEnAttenteModalExterne({
   onRefuser,
   onExpire,
   pricingMode = "automatic", // "automatic" | "manual"
+  alertDurationSeconds = 60,
+  alertIntervalSeconds = 5,
 }) {
-  useVibration(true);
-  const [tempsRestant, setTempsRestant] = useState(60);
+  useUrgentCourseAlert(true, {
+    courseId: course?.id,
+    source: "course-modal",
+    durationSeconds: alertDurationSeconds,
+    intervalSeconds: alertIntervalSeconds,
+  });
+
+  const [tempsRestant, setTempsRestant] = useState(alertDurationSeconds);
   const [courseDejaPrise, setCourseDejaPrise] = useState(false);
   const [courseExpiree, setCourseExpiree] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -86,10 +48,10 @@ export default function CourseEnAttenteModalExterne({
 
   // Sonnerie répétée
   useEffect(() => {
-    playNotificationSound();
-    const t = setInterval(playNotificationSound, 5000);
-    return () => clearInterval(t);
-  }, []);
+    setTempsRestant(alertDurationSeconds);
+    setCourseDejaPrise(false);
+    setCourseExpiree(false);
+  }, [course?.id, alertDurationSeconds]);
 
   // Timer 60 secondes
   const onExpireRef = useRef(onExpire);
@@ -101,6 +63,7 @@ export default function CourseEnAttenteModalExterne({
         if (prev <= 1) {
           clearInterval(timer);
           setCourseExpiree(true);
+          stopUrgentCourseAlert("course-expired");
           // Ne pas appeler onExpire ici — le useEffect dédié ci-dessous gère le délai 3s
           return 0;
         }
@@ -108,7 +71,7 @@ export default function CourseEnAttenteModalExterne({
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [course?.id]);
 
   // Vérifier expiration backend
   const courseExpireeSentRef = useRef(false);
@@ -121,10 +84,12 @@ export default function CourseEnAttenteModalExterne({
         });
         const d = data?.data;
         if (d?.livreur_id && d.livreur_id !== livreurId && d.dispatch_status === 'accepte') {
+          stopUrgentCourseAlert("course-already-taken");
           setCourseDejaPrise(true);
         }
         if (d?.expired && !courseExpireeSentRef.current && !d?.livreur_id) {
           courseExpireeSentRef.current = true;
+          stopUrgentCourseAlert("course-expired-backend");
           setCourseExpiree(true);
           base44.functions.invoke('dispatchExterneAuto', {
             action: 'verifier_expiration',
@@ -159,9 +124,10 @@ export default function CourseEnAttenteModalExterne({
       });
       const data = res?.data;
 
-      if (data?.already_taken) { setCourseDejaPrise(true); return; }
-      if (data?.expired) { setCourseExpiree(true); return; }
+      if (data?.already_taken) { stopUrgentCourseAlert("course-already-taken"); setCourseDejaPrise(true); return; }
+      if (data?.expired) { stopUrgentCourseAlert("course-expired"); setCourseExpiree(true); return; }
       if (data?.success) {
+        stopUrgentCourseAlert("course-accepted");
         onAccepter();
       } else {
         alert(data?.error || "Erreur lors de l'acceptation");
@@ -188,9 +154,10 @@ export default function CourseEnAttenteModalExterne({
       });
       const data = res?.data;
 
-      if (data?.already_taken) { setCourseDejaPrise(true); return; }
-      if (data?.expired) { setCourseExpiree(true); return; }
+      if (data?.already_taken) { stopUrgentCourseAlert("course-already-taken"); setCourseDejaPrise(true); return; }
+      if (data?.expired) { stopUrgentCourseAlert("course-expired"); setCourseExpiree(true); return; }
       if (data?.success) {
+        stopUrgentCourseAlert("course-accepted-manual");
         setShowManualPriceModal(false);
         onAccepter(data?.pending_client_validation === true);
       } else {
@@ -215,6 +182,7 @@ export default function CourseEnAttenteModalExterne({
       });
       const data = res?.data;
       if (data?.success) {
+        stopUrgentCourseAlert("course-refused");
         onRefuser();
       }
     } catch (err) {
@@ -327,7 +295,7 @@ export default function CourseEnAttenteModalExterne({
             className={`h-full transition-all duration-1000 ${
               tempsRestant <= 10 ? 'bg-red-500' : tempsRestant <= 30 ? 'bg-amber-500' : 'bg-green-500'
             }`}
-            style={{ width: `${(tempsRestant / 60) * 100}%` }}
+            style={{ width: `${(tempsRestant / alertDurationSeconds) * 100}%` }}
           />
         </div>
 

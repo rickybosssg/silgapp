@@ -10,6 +10,11 @@ import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
 import { requestNativeAppPermissions } from "@/lib/nativePermissions";
 import { startNativeBackgroundHeartbeat } from "@/lib/nativeAndroid";
+import {
+  normalizeLivreurAlertConfig,
+  saveLivreurAlertConfig,
+  stopUrgentCourseAlert,
+} from "@/lib/livreurUrgentAlert";
 import LivreurHeader from "@/components/livreur/LivreurHeader";
 import LivreurStatsBanner from "@/components/livreur/LivreurStatsBanner";
 import LivreurStatutCard from "@/components/livreur/LivreurStatutCard";
@@ -86,6 +91,19 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     debugLabel: "LivreurExterneGPS",
   });
 
+  const { data: dispatchConfigs = [] } = useQuery({
+    queryKey: ["dispatch-config"],
+    queryFn: () => base44.entities.DispatchConfig.list(),
+    initialData: [],
+    refetchInterval: 30000,
+  });
+
+  const livreurAlertConfig = useMemo(() => {
+    const config = normalizeLivreurAlertConfig(dispatchConfigs?.[0] || {});
+    saveLivreurAlertConfig(config);
+    return config;
+  }, [dispatchConfigs]);
+
   useEffect(() => {
     if (!onboardingTermine || !gpsActif || livreurProfil?.statut === "hors_ligne") return;
     let stopNativeHeartbeat = null;
@@ -121,10 +139,25 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     }).catch(() => null);
     const unsub = subscribeToNotifications(
       (n) => toast.info(n.titre, { description: n.message }),
-      livreurEmail
+      livreurEmail,
+      { userType: "livreur", livreurId }
     );
     return () => unsub?.();
   }, [livreurId, livreurEmail]);
+
+  useEffect(() => {
+    const handleNotificationOpened = (event) => {
+      const data = event?.detail || {};
+      if (data.type !== "nouvelle_course" && data.type !== "course_assignee") return;
+      stopUrgentCourseAlert("app-opened");
+      setActiveTab("courses");
+      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+      toast.info("Course proposee", { description: "Ouverture de la course en attente..." });
+    };
+    window.addEventListener("silgapp:notification-opened", handleNotificationOpened);
+    return () => window.removeEventListener("silgapp:notification-opened", handleNotificationOpened);
+  }, [queryClient]);
 
   useEffect(() => {
     if (!livreurId || !livreurEmail || !onboardingTermine) return;
@@ -528,6 +561,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           course={courseEnAttente}
           livreurId={livreurProfil.id}
           pricingMode={pricingMode}
+          alertDurationSeconds={livreurAlertConfig.durationSeconds}
+          alertIntervalSeconds={livreurAlertConfig.intervalSeconds}
           onAccepter={handleAccepter}
           onRefuser={handleRefuser}
           onExpire={() => {

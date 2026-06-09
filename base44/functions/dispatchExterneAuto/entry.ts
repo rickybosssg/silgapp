@@ -197,12 +197,47 @@ async function notificationDoublonExiste(base44, courseId, livreurEmail) {
   return false;
 }
 
+function clampNumber(value, fallback, min, max) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.min(max, Math.max(min, Math.round(n)));
+}
+
+async function getLivreurAlertConfig(base44) {
+  const defaults = {
+    durationSeconds: 60,
+    intervalSeconds: 5,
+  };
+
+  try {
+    const configs = await base44.asServiceRole.entities.DispatchConfig.list();
+    const config = configs?.[0] || {};
+    const durationSeconds = clampNumber(
+      config.alert_duration_seconds || config.timeout_secondes,
+      defaults.durationSeconds,
+      10,
+      180,
+    );
+    const intervalSeconds = clampNumber(
+      config.alert_interval_seconds,
+      defaults.intervalSeconds,
+      3,
+      30,
+    );
+    return { durationSeconds, intervalSeconds };
+  } catch (err) {
+    console.warn('[DISPATCH] Config alerte livreur indisponible, defauts utilises:', err.message);
+    return defaults;
+  }
+}
+
 /**
  * Propose la course à un livreur spécifique.
  * Détermine automatiquement le canal de notification (SILGAPP vs WhatsApp)
  * basé sur le heartbeat du livreur.
  */
 async function proposerAuLivreur(base44, courseId, course, livreur, niveauDispatch) {
+  const alertConfig = await getLivreurAlertConfig(base44);
   // Déterminer le canal AVANT envoi : app active = SILGAPP, hors app = WhatsApp immédiat
   const heartbeatAgeMin = livreur.heartbeatAgeMin !== null ? livreur.heartbeatAgeMin : null;
   const appActive = heartbeatAgeMin !== null && heartbeatAgeMin < 2;
@@ -224,7 +259,7 @@ async function proposerAuLivreur(base44, courseId, course, livreur, niveauDispat
     statut: 'recherche_livreur',
     dispatch_status: 'propose',
     heure_sollicitation: new Date().toISOString(),
-    timeout_expires_at: new Date(Date.now() + 60000).toISOString(),
+    timeout_expires_at: new Date(Date.now() + alertConfig.durationSeconds * 1000).toISOString(),
   });
 
   if (livreur.user_email) {
@@ -249,6 +284,9 @@ async function proposerAuLivreur(base44, courseId, course, livreur, niveauDispat
           await base44.functions.invoke('envoiNotificationPush', {
             destinataire_email: livreur.user_email, livreur_id: livreur.id,
             titre, message, type: 'nouvelle_course', course_id: courseId,
+            user_type: 'livreur',
+            alert_duration_seconds: alertConfig.durationSeconds,
+            alert_interval_seconds: alertConfig.intervalSeconds,
           });
         } catch (err) {
           console.error('[DISPATCH] ❌ Erreur push Firebase:', err.message);
@@ -321,7 +359,7 @@ async function proposerAuLivreur(base44, courseId, course, livreur, niveauDispat
   }
 
   console.log(`[DISPATCH] 📤 Course ${courseId} proposée à ${livreur.nom} (${distanceSafe.toFixed(1)}km)`);
-  return distanceSafe;
+  return { distance: distanceSafe, alertConfig };
 }
 
 /**
@@ -374,9 +412,11 @@ async function lancerDispatch(base44, courseId, exclusions = []) {
 
   console.log(`[DISPATCH] 🎯 Livreur sélectionné : ${premierLivreur.nom} (Niveau ${niveauDispatch}, HB: ${premierLivreur.heartbeatAgeMin?.toFixed(1) || '?'} min, GPS: ${premierLivreur.gpsAgeMin?.toFixed(1) || '?'} min, Distance: ${premierLivreur.distance.toFixed(1)} km)`);
 
-  const dist = await proposerAuLivreur(base44, courseId, course, premierLivreur, niveauDispatch);
+  const proposal = await proposerAuLivreur(base44, courseId, course, premierLivreur, niveauDispatch);
+  const dist = proposal.distance;
   return { 
     propose: true, 
+    expires_in: proposal.alertConfig.durationSeconds,
     livreur: { 
       id: premierLivreur.id, 
       nom: `${premierLivreur.prenom || ''} ${premierLivreur.nom}`.trim(), 
@@ -453,7 +493,7 @@ Deno.serve(async (req) => {
         success: true,
         livreur: result.livreur,
         message: `Course proposée à ${result.livreur.nom} (${result.livreur.distance_km}km)`,
-        expires_in: 60,
+        expires_in: result.expires_in || 60,
       });
     }
 

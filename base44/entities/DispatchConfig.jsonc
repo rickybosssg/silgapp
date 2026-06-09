@@ -37,6 +37,16 @@
       "type": "number",
       "default": 60,
       "description": "D\u00e9lai en secondes avant de passer au livreur suivant"
+    },
+    "alert_duration_seconds": {
+      "type": "number",
+      "default": 60,
+      "description": "Dur\u00e9e maximale de l'alerte urgente livreur pour une nouvelle course"
+    },
+    "alert_interval_seconds": {
+      "type": "number",
+      "default": 5,
+      "description": "Intervalle entre deux vibrations/sonneries de l'alerte urgente livreur"
     }
   },
   "required": [

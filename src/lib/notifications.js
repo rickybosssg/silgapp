@@ -2,6 +2,12 @@ import { base44 } from "@/api/base44Client";
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { PushNotifications } from "@capacitor/push-notifications";
+import {
+  isLivreurNewCourseNotification,
+  saveLivreurAlertConfig,
+  startUrgentCourseAlert,
+  stopUrgentCourseAlert,
+} from "@/lib/livreurUrgentAlert";
 
 const ANDROID_CHANNEL_ID = "silgapp_default";
 const SilgappPush = registerPlugin("SilgappPush");
@@ -54,6 +60,29 @@ function savePushDebug(event, details = {}) {
     localStorage.setItem("silgapp_push_debug", JSON.stringify([...previous.slice(-24), entry]));
   } catch (_) {}
   console.log(`[SILGAPP Push] ${event}`, details);
+}
+
+function dispatchNotificationOpened(data = {}, source = "push") {
+  stopUrgentCourseAlert("notification-opened");
+  const detail = { ...(data || {}), source };
+  try {
+    localStorage.setItem("silgapp_last_opened_notification", JSON.stringify({
+      ...detail,
+      opened_at: new Date().toISOString(),
+    }));
+  } catch (_) {}
+  window.dispatchEvent(new CustomEvent("silgapp:notification-opened", { detail }));
+}
+
+function maybeStartLivreurCourseAlert(data = {}, source = "push") {
+  if (!isLivreurNewCourseNotification(data)) return;
+  const config = saveLivreurAlertConfig(data);
+  startUrgentCourseAlert({
+    courseId: data.course_id || "",
+    notificationId: data.notification_id || "",
+    source,
+    ...config,
+  });
 }
 
 export function detectEnvironment() {
@@ -174,6 +203,7 @@ async function ensureNativePushListeners() {
         savePushDebug("duplicate-push-skipped", { data });
         return;
       }
+      maybeStartLivreurCourseAlert(data, "push-received");
       showLocalNotification(title, body, { data });
     });
     await PushNotifications.addListener("pushNotificationActionPerformed", (event) => {
@@ -183,11 +213,7 @@ async function ensureNativePushListeners() {
         data: event?.notification?.data || {},
       });
       window.focus?.();
-      if (window.location.pathname === "/") {
-        window.dispatchEvent(new CustomEvent("silgapp:notification-opened", {
-          detail: event?.notification?.data || {},
-        }));
-      }
+      dispatchNotificationOpened(event?.notification?.data || {}, "push");
     });
   } catch (error) {
     console.warn("[Notifications] pushNotificationReceived listener failed:", error?.message);
@@ -202,6 +228,10 @@ async function ensureNativePushListeners() {
         data: event?.notification?.extra || event?.notification?.data || {},
       });
       window.focus?.();
+      dispatchNotificationOpened(
+        event?.notification?.extra || event?.notification?.data || {},
+        "local"
+      );
     });
   } catch (error) {
     console.warn("[Notifications] notification click listener failed:", error?.message);
@@ -690,7 +720,7 @@ export async function openNativeNotificationSettings() {
   return true;
 }
 
-export function subscribeToNotifications(onNotification, userEmail) {
+export function subscribeToNotifications(onNotification, userEmail, options = {}) {
   const processedIds = new Set();
   const normalizedEmail = String(userEmail || "").trim().toLowerCase();
 
@@ -706,6 +736,8 @@ export function subscribeToNotifications(onNotification, userEmail) {
       type: notification.type,
       course_id: notification.course_id,
       notification_id: notification.id,
+      user_type: options.userType || "",
+      livreur_id: options.livreurId || "",
     };
 
     if (!Capacitor.isNativePlatform()) {
@@ -715,6 +747,10 @@ export function subscribeToNotifications(onNotification, userEmail) {
       });
     } else {
       shouldSkipDuplicateNotification(data);
+    }
+
+    if (options.userType === "livreur") {
+      maybeStartLivreurCourseAlert(data, "realtime");
     }
 
     if (onNotification) onNotification(notification);

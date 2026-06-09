@@ -123,7 +123,18 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { titre, message, type, destinataire_email, livreur_id, client_id, course_id } = body;
+    const {
+      titre,
+      message,
+      type,
+      destinataire_email,
+      livreur_id,
+      client_id,
+      course_id,
+      user_type,
+      alert_duration_seconds,
+      alert_interval_seconds,
+    } = body;
     const targetEmail = String(destinataire_email || '').trim().toLowerCase();
 
     if (!titre || !message || !targetEmail) {
@@ -208,18 +219,23 @@ Deno.serve(async (req) => {
 
     const accessToken = await getAccessToken(clientEmail, privateKey);
     const notificationTag = String(course_id || notification.id || `${type || 'generic'}-${targetEmail}`).slice(0, 64);
+    const isUrgentLivreurCourse = String(type || '') === 'nouvelle_course' && !!livreur_id;
+    const dataPayload = {
+      type: String(type || 'generic'),
+      user_type: String(user_type || (livreur_id ? 'livreur' : client_id ? 'client' : '')),
+      livreur_id: String(livreur_id || ''),
+      client_id: String(client_id || ''),
+      course_id: String(course_id || ''),
+      notification_id: String(notification.id),
+      click_action: ANDROID_CLICK_ACTION,
+      alert_duration_seconds: String(alert_duration_seconds || 60),
+      alert_interval_seconds: String(alert_interval_seconds || 5),
+    };
 
     // Payload FCM — notification visible écran verrouillé + son + vibration
     const fcmPayload = {
       notification: { title: titre, body: message },
-      data: {
-        type: String(type || 'generic'),
-        livreur_id: String(livreur_id || ''),
-        client_id: String(client_id || ''),
-        course_id: String(course_id || ''),
-        notification_id: String(notification.id),
-        click_action: ANDROID_CLICK_ACTION,
-      },
+      data: dataPayload,
       android: {
         collapse_key: notificationTag,
         priority: 'HIGH',
@@ -241,8 +257,25 @@ Deno.serve(async (req) => {
       },
     };
 
+    const urgentAndroidPayload = {
+      data: {
+        ...dataPayload,
+        title: String(titre),
+        body: String(message),
+      },
+      android: {
+        collapse_key: notificationTag,
+        priority: 'HIGH',
+        ttl: `${Math.max(60, Number(alert_duration_seconds || 60) + 30)}s`,
+      },
+    };
+
     const sendResults = await Promise.all(pushableTokens.map(async (item) => {
-      const response = await sendFcmMessage(projectId, accessToken, item.token, fcmPayload);
+      const platform = String(item.platform || '').toLowerCase();
+      const payload = isUrgentLivreurCourse && platform.includes('android')
+        ? urgentAndroidPayload
+        : fcmPayload;
+      const response = await sendFcmMessage(projectId, accessToken, item.token, payload);
       const nowIso = new Date().toISOString();
 
       if (!response.ok) {
