@@ -68,35 +68,50 @@ export default function LivreurRechercheAnimation({ course, onRelancer }) {
   // ─── Écran "Aucun livreur disponible" ────────────────────────────────────
   if (aucunLivreur) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-red-50 p-4 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50 p-6 flex items-center justify-center">
         <div className="max-w-sm w-full space-y-6 text-center">
-          <div className="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center mx-auto">
-            <AlertCircle className="w-10 h-10 text-red-500" />
+
+          {/* Icône animée */}
+          <div className="relative mx-auto w-24 h-24">
+            <div className="absolute inset-0 bg-red-100 rounded-full animate-ping opacity-30" />
+            <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-red-100 to-orange-100 flex items-center justify-center shadow-lg">
+              <span className="text-4xl">😔</span>
+            </div>
           </div>
-          <div>
-            <h2 className="text-xl font-black text-gray-900 mb-2">Aucun livreur disponible</h2>
+
+          {/* Message */}
+          <div className="space-y-2">
+            <h2 className="text-2xl font-black text-gray-900">Aucun livreur disponible</h2>
             <p className="text-sm text-gray-500 leading-relaxed">
-              Nous n'avons pas trouvé de livreur disponible après 4 minutes. Vous pouvez relancer la recherche ou créer une nouvelle course.
+              Nous n'avons pas trouvé de livreur disponible dans votre zone après <strong>4 minutes</strong> de recherche.
             </p>
           </div>
-          <div className="space-y-3">
+
+          {/* Options */}
+          <div className="bg-white rounded-3xl shadow-md border border-gray-100 p-5 space-y-3">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Que souhaitez-vous faire ?</p>
+
             {onRelancer && (
-              <Button
-                className="w-full h-13 bg-primary text-white font-bold rounded-2xl"
+              <button
+                className="w-full h-14 rounded-2xl bg-gradient-to-r from-primary to-red-600 text-white font-black text-base shadow-lg shadow-red-200 active:scale-95 transition-all flex items-center justify-center gap-3"
                 onClick={onRelancer}
               >
-                <RefreshCw className="w-5 h-5 mr-2" />
-                Relancer la recherche
-              </Button>
+                <RefreshCw className="w-5 h-5" />
+                🔄 Relancer la recherche
+              </button>
             )}
-            <Button
-              variant="outline"
-              className="w-full h-12 rounded-2xl border-gray-200"
+
+            <button
+              className="w-full h-12 rounded-2xl border-2 border-gray-200 text-gray-700 font-bold text-sm active:scale-95 transition-all hover:bg-gray-50"
               onClick={() => navigate("/client")}
             >
-              Créer une nouvelle course
-            </Button>
+              ✕ Terminer et rentrer à l'accueil
+            </button>
           </div>
+
+          <p className="text-xs text-gray-400">
+            💡 Astuce : réessayez dans quelques minutes, de nouveaux livreurs se connectent régulièrement.
+          </p>
         </div>
       </div>
     );
