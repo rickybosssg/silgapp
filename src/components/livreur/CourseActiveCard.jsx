@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { MapPin, Phone, Navigation, Package, Check, X, AlertTriangle, ChevronRight, QrCode, Clock, Ruler } from "lucide-react";
 import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
+import MultiColisLivreurView from "@/components/multi-colis/MultiColisLivreurView";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -511,6 +512,15 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             </p>
           )}
 
+          {/* Vue multi-colis livreur — remplace le bouton "Scanner pour livrer" côté externe */}
+          {isExterne && course.is_multi_colis && colisRecupere && !colisLivre && (
+            <MultiColisLivreurView
+              course={course}
+              colisRecupere={colisRecupere}
+              onAllLivres={() => onColisLivre(course, null)}
+            />
+          )}
+
           {/* Navigation GPS — affiché si coordonnées GPS disponibles */}
           {!colisLivre && (
             !colisRecupere ? (
@@ -579,15 +589,18 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 )
               ) : (
                 isExterne ? (
-                  /* ── EXTERNE : Scanner QR pour livrer ── */
-                  <button
-                    className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                    onClick={() => setShowQRScanner("delivery")}
-                    disabled={isPending}
-                  >
-                    <QrCode className="w-6 h-6" />
-                    Scanner pour livrer ✅
-                  </button>
+                  /* ── EXTERNE multi-colis : géré par MultiColisLivreurView ci-dessus ── */
+                  /* ── EXTERNE colis unique : Scanner QR pour livrer ── */
+                  !course.is_multi_colis && (
+                    <button
+                      className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                      onClick={() => setShowQRScanner("delivery")}
+                      disabled={isPending}
+                    >
+                      <QrCode className="w-6 h-6" />
+                      Scanner pour livrer ✅
+                    </button>
+                  )
                 ) : (
                   /* ── INTERNE : bouton classique avec GPS + récapitulatif ── */
                   <button
