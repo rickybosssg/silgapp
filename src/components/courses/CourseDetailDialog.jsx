@@ -4,7 +4,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Phone, User, Package, Clock, Truck, ArrowDown, Navigation } from "lucide-react";
+import { MapPin, Phone, User, Package, Clock, Truck, ArrowDown, Navigation, XCircle } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import CourseStatusBadge from "./CourseStatusBadge";
@@ -212,6 +212,26 @@ export default function CourseDetailDialog({ course, open, onClose }) {
               Mettre à jour
             </Button>
           </div>
+
+          {/* Annulation rapide */}
+          {course.statut !== "annulee" && course.statut !== "livree" && (
+            <div className="pt-2">
+              <Button
+                variant="destructive"
+                className="w-full"
+                disabled={updateMutation.isPending}
+                onClick={() => {
+                  if (window.confirm("Confirmer l'annulation de cette course ?")) {
+                    updateMutation.mutate({ id: course.id, data: { statut: "annulee" } });
+                    onClose();
+                  }
+                }}
+              >
+                <XCircle className="w-4 h-4 mr-2" />
+                Annuler la course
+              </Button>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
