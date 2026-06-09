@@ -18,7 +18,7 @@ const statuts = [
   "colis_recupere", "en_livraison", "livree", "annulee"
 ];
 
-export default function CourseDetailDialog({ course, open, onClose }) {
+export default function CourseDetailDialog({ course, open, onClose, reseau = "interne" }) {
   const queryClient = useQueryClient();
   const [newStatut, setNewStatut] = React.useState(course?.statut || "");
   const [confirmAnnulation, setConfirmAnnulation] = React.useState(false);
@@ -30,12 +30,17 @@ export default function CourseDetailDialog({ course, open, onClose }) {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }) => {
-      console.log("[Annulation] Tentative update Course:", id, data);
-      const result = await base44.entities.Course.update(id, data);
-      console.log("[Annulation] Résultat:", result);
-      return result;
+      if (data.statut === "annulee" && reseau === "externe") {
+        // Utiliser la fonction backend dédiée pour les courses externes
+        const result = await base44.functions.invoke("annulerCourseExterne", { course_id: id });
+        if (!result?.data?.success) {
+          throw new Error(result?.data?.error || "Échec annulation");
+        }
+        return result.data;
+      }
+      return await base44.entities.Course.update(id, data);
     },
-    onSuccess: (result, variables) => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries();
       if (variables.data.statut === "annulee") {
         toast.success("Course annulée avec succès");
@@ -45,7 +50,6 @@ export default function CourseDetailDialog({ course, open, onClose }) {
       }
     },
     onError: (error) => {
-      console.error("Erreur annulation:", error);
       toast.error("Erreur : " + (error?.message || "impossible d'annuler"));
     },
   });
