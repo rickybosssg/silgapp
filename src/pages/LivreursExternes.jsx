@@ -328,24 +328,24 @@ export default function LivreursExternes() {
   const { isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
   const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
 
-  const livreurFilter = effectiveCountry
-    ? { type_livreur: "externe", country_code: effectiveCountry }
-    : { type_livreur: "externe" };
-
   const { data: livreurs = [] } = useQuery({
-    queryKey: ["livreurs-externes", effectiveCountry || "all"],
-    queryFn: () => base44.entities.Livreur.filter(livreurFilter, "-created_date"),
+    queryKey: ["livreurs-externes", effectiveCountry],
+    queryFn: () => effectiveCountry
+      ? base44.entities.Livreur.filter({ type_livreur: "externe", country_code: effectiveCountry }, "-created_date")
+      : Promise.resolve([]),
     initialData: [],
-    refetchInterval: 10000,
+    refetchInterval: effectiveCountry ? 10000 : false,
+    enabled: !!effectiveCountry,
   });
 
-  const coursesFilter = effectiveCountry ? { country_code: effectiveCountry } : {};
-
   const { data: coursesAll = [] } = useQuery({
-    queryKey: ["courses-externes-all-livreurs", isPays ? adminCountryCode : "all"],
-    queryFn: () => base44.entities.CourseExterne.filter(coursesFilter, "-created_date", 500),
+    queryKey: ["courses-externes-all-livreurs", effectiveCountry],
+    queryFn: () => effectiveCountry
+      ? base44.entities.CourseExterne.filter({ country_code: effectiveCountry }, "-created_date", 500)
+      : Promise.resolve([]),
     initialData: [],
-    refetchInterval: 30000,
+    refetchInterval: effectiveCountry ? 30000 : false,
+    enabled: !!effectiveCountry,
   });
 
   const stats = useMemo(() => {

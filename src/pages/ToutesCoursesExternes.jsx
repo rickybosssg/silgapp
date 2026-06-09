@@ -25,12 +25,13 @@ export default function ToutesCoursesExternes() {
   const [filtreActif, setFiltreActif] = useState("tous");
 
   const { data: courses = [] } = useQuery({
-    queryKey: ["courses-externes", effectiveCountry || "all"],
+    queryKey: ["courses-externes", effectiveCountry],
     queryFn: () => effectiveCountry
       ? base44.entities.CourseExterne.filter({ country_code: effectiveCountry }, "-created_date", 200)
-      : base44.entities.CourseExterne.list("-created_date", 200),
+      : Promise.resolve([]),
     initialData: [],
-    refetchInterval: 10000,
+    refetchInterval: effectiveCountry ? 10000 : false,
+    enabled: !!effectiveCountry,
   });
 
   const stats = useMemo(() => ({

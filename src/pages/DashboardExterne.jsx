@@ -54,30 +54,33 @@ export default function DashboardExterne() {
   const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || defaultCountry);
 
   const { data: courses = [] } = useQuery({
-    queryKey: ["courses-externes-dashboard", effectiveCountry || "all"],
+    queryKey: ["courses-externes-dashboard", effectiveCountry],
     queryFn: () => effectiveCountry
       ? base44.entities.CourseExterne.filter({ country_code: effectiveCountry }, "-created_date")
-      : base44.entities.CourseExterne.list("-created_date", 300),
+      : Promise.resolve([]),
     initialData: [],
-    refetchInterval: 5000,
+    refetchInterval: effectiveCountry ? 5000 : false,
+    enabled: !!effectiveCountry,
   });
 
   const { data: livreurs = [] } = useQuery({
-    queryKey: ["livreurs-externes", effectiveCountry || "all"],
-    queryFn: () => base44.entities.Livreur.filter(
-      effectiveCountry ? { type_livreur: "externe", country_code: effectiveCountry } : { type_livreur: "externe" }
-    ),
+    queryKey: ["livreurs-externes", effectiveCountry],
+    queryFn: () => effectiveCountry
+      ? base44.entities.Livreur.filter({ type_livreur: "externe", country_code: effectiveCountry })
+      : Promise.resolve([]),
     initialData: [],
-    refetchInterval: 5000,
+    refetchInterval: effectiveCountry ? 5000 : false,
+    enabled: !!effectiveCountry,
   });
 
   const { data: clients = [] } = useQuery({
-    queryKey: ["clients-externes", effectiveCountry || "all"],
-    queryFn: () => base44.entities.ClientExterne.filter(
-      effectiveCountry ? { actif: true, country_code: effectiveCountry } : { actif: true }
-    ),
+    queryKey: ["clients-externes", effectiveCountry],
+    queryFn: () => effectiveCountry
+      ? base44.entities.ClientExterne.filter({ actif: true, country_code: effectiveCountry })
+      : Promise.resolve([]),
     initialData: [],
-    refetchInterval: 10000,
+    refetchInterval: effectiveCountry ? 10000 : false,
+    enabled: !!effectiveCountry,
   });
 
   const coursesFiltrees = useMemo(
@@ -141,6 +144,33 @@ export default function DashboardExterne() {
   }, [coursesFiltrees, coursesEnTraitement, coursesTerminees, livreursEnLigne]);
 
   const taux = stats.total > 0 ? Math.round((stats.livrees / stats.total) * 100) : 0;
+
+  // Obliger la sélection d'un pays si aucun n'est actif
+  if (!effectiveCountry) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6">
+        <div className="max-w-sm w-full text-center space-y-6">
+          <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-primary to-red-600 flex items-center justify-center mx-auto shadow-xl shadow-red-200">
+            <Globe className="w-8 h-8 text-white" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-gray-900">Sélectionnez un pays</h2>
+            <p className="text-gray-500 text-sm mt-1">Les données sont isolées par pays. Choisissez un pays pour accéder au tableau de bord.</p>
+          </div>
+          <CountrySelector
+            value=""
+            onChange={(code) => setSelectedCountry(code)}
+            className="w-full h-12 text-base rounded-2xl border-2 border-gray-200"
+          />
+          <Link to="/">
+            <Button variant="outline" className="gap-2 rounded-xl">
+              <ArrowLeft className="w-4 h-4" /> Retour
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">

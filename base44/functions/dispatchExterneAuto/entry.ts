@@ -663,11 +663,14 @@ Deno.serve(async (req) => {
     // ─── 5. Retry courses en attente (appelé par un scheduled job) ────────
     // Cherche toutes les courses en recherche sans livreur proposé et les redispatche
     if (action === 'retry_courses_en_attente') {
-      console.log('[DISPATCH] 🔄 Retry courses en attente...');
+      const { country_code: filterCountry } = body;
+      console.log(`[DISPATCH] 🔄 Retry courses en attente... (pays: ${filterCountry || 'tous'})`);
 
-      const courses = await base44.asServiceRole.entities.CourseExterne.filter({
-        statut: 'recherche_livreur',
-      });
+      const filter = { statut: 'recherche_livreur' };
+      // OBLIGATOIRE : filtrer par pays si fourni, sinon ignorer (sécurité)
+      if (filterCountry) filter.country_code = filterCountry;
+
+      const courses = await base44.asServiceRole.entities.CourseExterne.filter(filter);
 
       const aRetenter = courses.filter(c =>
         ['en_attente', 'redispatch', 'expire'].includes(c.dispatch_status) ||
