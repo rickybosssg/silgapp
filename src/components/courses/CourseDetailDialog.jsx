@@ -21,9 +21,11 @@ const statuts = [
 export default function CourseDetailDialog({ course, open, onClose }) {
   const queryClient = useQueryClient();
   const [newStatut, setNewStatut] = React.useState(course?.statut || "");
+  const [confirmAnnulation, setConfirmAnnulation] = React.useState(false);
 
   React.useEffect(() => {
     setNewStatut(course?.statut || "");
+    setConfirmAnnulation(false);
   }, [course]);
 
   const updateMutation = useMutation({
@@ -223,20 +225,39 @@ export default function CourseDetailDialog({ course, open, onClose }) {
 
           {/* Annulation rapide */}
           {course.statut !== "annulee" && course.statut !== "livree" && (
-            <div className="pt-2">
-              <Button
-                variant="destructive"
-                className="w-full"
-                disabled={updateMutation.isPending}
-                onClick={() => {
-                  if (window.confirm("Confirmer l'annulation de cette course ?")) {
-                    updateMutation.mutate({ id: course.id, data: { statut: "annulee" } });
-                  }
-                }}
-              >
-                <XCircle className="w-4 h-4 mr-2" />
-                Annuler la course
-              </Button>
+            <div className="pt-2 space-y-2">
+              {!confirmAnnulation ? (
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  disabled={updateMutation.isPending}
+                  onClick={() => setConfirmAnnulation(true)}
+                >
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Annuler la course
+                </Button>
+              ) : (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 space-y-2">
+                  <p className="text-sm text-red-700 font-medium text-center">Confirmer l'annulation ?</p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setConfirmAnnulation(false)}
+                    >
+                      Non
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      className="flex-1"
+                      disabled={updateMutation.isPending}
+                      onClick={() => updateMutation.mutate({ id: course.id, data: { statut: "annulee" } })}
+                    >
+                      {updateMutation.isPending ? "..." : "Oui, annuler"}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
