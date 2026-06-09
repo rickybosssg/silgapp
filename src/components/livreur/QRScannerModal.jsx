@@ -18,14 +18,28 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
     }
   }, [mode]);
 
+  const lastKnownGps = () => {
+    if (livreurLat && livreurLng && !Number.isNaN(Number(livreurLat)) && !Number.isNaN(Number(livreurLng))) {
+      return { latitude: Number(livreurLat), longitude: Number(livreurLng), source: "last-known" };
+    }
+    return null;
+  };
+
   const getValidationGps = async () => {
+    const fallback = lastKnownGps();
+    const timeoutMs = fallback ? 2500 : 5000;
+    const timeoutGps = new Promise((resolve) => {
+      setTimeout(() => resolve(fallback), timeoutMs);
+    });
+
     try {
-      return await getNativeCurrentPosition({ timeout: 8000, maximumAge: 1000 });
+      const freshGps = await Promise.race([
+        getNativeCurrentPosition({ timeout: timeoutMs, maximumAge: 10000 }),
+        timeoutGps,
+      ]);
+      return freshGps || fallback;
     } catch (_) {
-      if (livreurLat && livreurLng && !Number.isNaN(Number(livreurLat)) && !Number.isNaN(Number(livreurLng))) {
-        return { latitude: Number(livreurLat), longitude: Number(livreurLng), source: "last-known" };
-      }
-      return null;
+      return fallback;
     }
   };
 
@@ -49,13 +63,17 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
   const verifyCode = async (value, method) => {
     if (verifying) return;
     setVerifying(true);
+    const startedAt = Date.now();
     try {
+      const gpsStartedAt = Date.now();
       const gps = await getValidationGps();
+      const gpsMs = Date.now() - gpsStartedAt;
       if (!gps?.latitude || !gps?.longitude) {
         toast.error("GPS requis pour valider cette etape. Activez la localisation et reessayez.");
         return;
       }
 
+      const networkStartedAt = Date.now();
       const res = await base44.functions.invoke("validateQRCode", {
         course_id: course.id,
         type,
@@ -63,6 +81,14 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
         method,
         latitude: gps.latitude,
         longitude: gps.longitude,
+      });
+      console.info("[QRScanner] validation timing", {
+        type,
+        method,
+        gps_ms: gpsMs,
+        network_ms: Date.now() - networkStartedAt,
+        total_ms: Date.now() - startedAt,
+        gps_source: gps.source || "fresh",
       });
 
       const data = res?.data;

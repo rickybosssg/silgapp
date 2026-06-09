@@ -182,7 +182,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       heure_livraison: new Date().toISOString(),
       ...courseData
     });
-    onColisLivre(course, null);
+    queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+    queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
     const courseId = courseData?.id || course.id;
     navigate(`/livreur/recap-course/${courseId}`);
   };
