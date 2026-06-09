@@ -13,13 +13,24 @@ Deno.serve(async (req) => {
     const now = new Date();
     const limite = new Date(now.getTime() - DELAI_FERMETURE_MS);
 
-    // Chercher toutes les courses encore en recherche_livreur
+    // 🌍 FILTRE PAR PAYS — Récupérer tous les pays actifs
+    const paysActifs = await base44.asServiceRole.entities.Country.filter({ actif: true });
+    const countryCodes = paysActifs.map(p => p.code);
+    
+    console.log(`[FERMETURE] 🌍 Pays actifs: ${countryCodes.join(', ')}`);
+    
+    // Chercher toutes les courses encore en recherche_livreur TOUS PAYS CONFONDUS
     const coursesEnRecherche = await base44.asServiceRole.entities.CourseExterne.filter({
       statut: 'recherche_livreur',
-    }, '-created_date', 100);
+    }, '-created_date', 500);
+    
+    // Filtrer manuellement par pays actifs (sécurité)
+    const coursesFiltrees = coursesEnRecherche.filter(c => countryCodes.includes(c.country_code));
+    
+    console.log(`[FERMETURE] 📊 ${coursesFiltrees.length} courses en recherche (sur ${coursesEnRecherche.length} totales)`);
 
-    const aFermer = coursesEnRecherche.filter(c => new Date(c.created_date) < limite);
-    console.log(`[FERMETURE] ⏰ ${aFermer.length} course(s) à fermer (> 4 min sans livreur), sur ${coursesEnRecherche.length} en recherche`);
+    const aFermer = coursesFiltrees.filter(c => new Date(c.created_date) < limite);
+    console.log(`[FERMETURE] ⏰ ${aFermer.length} course(s) à fermer (> 4 min sans livreur), sur ${coursesFiltrees.length} en recherche`);
 
     const fermetures = [];
     for (const c of aFermer) {

@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
+import { useAdminContext } from "@/hooks/useAdminContext.js";
 import CodePromoPanel from "@/components/admin/CodePromoPanel";
 import HistoriqueDuJour from "@/components/admin/HistoriqueDuJour";
 import SyncClientGPSPanel from "@/components/admin/SyncClientGPSPanel";
@@ -26,20 +27,23 @@ import ZonesChaudesWidget from "@/components/carte/ZonesChaudes";
 import ComptabilitePanel from "@/components/admin/ComptabilitePanel";
 
 export default function DashboardAdminExterne() {
-  console.log("🚨 DashboardAdminExterne.jsx EST CHARGÉ ET EXÉCUTÉ");
+  const { isPays, countryCode: adminCountryCode } = useAdminContext();
+  const effectiveCountry = isPays ? adminCountryCode : "BF"; // Fallback BF si global
   
   const { data: courses = [] } = useQuery({
-    queryKey: ["courses-externes"],
-    queryFn: () => base44.entities.CourseExterne.list("-created_date", 200),
+    queryKey: ["courses-externes", effectiveCountry],
+    queryFn: () => base44.entities.CourseExterne.filter({ country_code: effectiveCountry }, "-created_date", 200),
     initialData: [],
     refetchInterval: 10000,
+    enabled: !!effectiveCountry,
   });
 
   const { data: livreurs = [] } = useQuery({
-    queryKey: ["livreurs-externes"],
-    queryFn: () => base44.entities.Livreur.filter({ type_livreur: "externe" }, "-created_date"),
+    queryKey: ["livreurs-externes", effectiveCountry],
+    queryFn: () => base44.entities.Livreur.filter({ type_livreur: "externe", country_code: effectiveCountry }, "-created_date"),
     initialData: [],
     refetchInterval: 15000,
+    enabled: !!effectiveCountry,
   });
 
   const [apkUrl, setApkUrl] = useState("");
@@ -74,10 +78,11 @@ export default function DashboardAdminExterne() {
   };
 
   const { data: clients = [] } = useQuery({
-    queryKey: ["clients-externes"],
-    queryFn: () => base44.entities.ClientExterne.list("-created_date", 100),
+    queryKey: ["clients-externes", effectiveCountry],
+    queryFn: () => base44.entities.ClientExterne.filter({ country_code: effectiveCountry }, "-created_date", 100),
     initialData: [],
     refetchInterval: 30000,
+    enabled: !!effectiveCountry,
   });
 
   const stats = useMemo(() => {
