@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { isNativeMobile, startNativeLocationSync } from "@/lib/nativeAndroid";
 
-export function useHeartbeat({ user_type, position, enabled = true }) {
+export function useHeartbeat({ user_type, position, enabled = true, debugLabel = "" }) {
   const intervalRef = useRef(null);
   const nativeStopRef = useRef(null);
   const lastSyncRef = useRef(null);
@@ -17,13 +17,19 @@ export function useHeartbeat({ user_type, position, enabled = true }) {
     lastSyncRef.current = now;
 
     try {
-      await base44.functions.invoke("heartbeatAuto", {
+      const payload = {
         user_type,
         latitude: pos?.latitude || position?.latitude || 0,
         longitude: pos?.longitude || position?.longitude || 0,
         app_active: document.visibilityState === "visible",
         device_id: navigator.userAgent.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 50),
-      });
+      };
+      await base44.functions.invoke("heartbeatAuto", payload);
+      if (debugLabel) {
+        console.info(
+          `[${debugLabel}] heartbeatAuto OK lat=${Number(payload.latitude).toFixed(6)} lng=${Number(payload.longitude).toFixed(6)} active=${payload.app_active}`
+        );
+      }
     } catch (err) {
       console.error("[useHeartbeat] Erreur sync:", err);
     }

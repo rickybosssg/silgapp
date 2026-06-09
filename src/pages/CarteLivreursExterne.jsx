@@ -154,7 +154,7 @@ export default function CarteLivreursExterne() {
     queryKey: ["livreurs-externes-carte", effectiveCountry],
     queryFn: () => base44.entities.Livreur.filter(livreurFilter),
     initialData: [],
-    refetchInterval: 15000,
+    refetchInterval: 5000,
   });
 
   const { data: clients = [] } = useQuery({

@@ -7,6 +7,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.provider.ContactsContract;
 import android.provider.Settings;
+import android.os.Build;
 
 import androidx.activity.result.ActivityResult;
 import com.getcapacitor.JSObject;
@@ -19,7 +20,6 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 import com.google.mlkit.vision.barcode.common.Barcode;
-import com.google.android.gms.common.api.CommonStatusCodes;
 import com.google.android.gms.tasks.Task;
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanner;
 import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions;
@@ -29,10 +29,20 @@ import com.google.mlkit.vision.codescanner.GmsBarcodeScanning;
     name = "SilgappNative",
     permissions = {
         @Permission(strings = { Manifest.permission.READ_CONTACTS }, alias = "contacts"),
-        @Permission(strings = { Manifest.permission.CAMERA }, alias = "camera")
+        @Permission(strings = { Manifest.permission.CAMERA }, alias = "camera"),
+        @Permission(strings = {
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.ACCESS_BACKGROUND_LOCATION
+        }, alias = "location")
     }
 )
 public class SilgappNativePlugin extends Plugin {
+    private String heartbeatToken = "";
+    private String heartbeatServerUrl = "https://silga-dispatch-go.base44.app";
+    private String heartbeatAppId = "6a0ec08f3af5e1d1284254c1";
+    private String heartbeatFunctionsVersion = "prod";
+    private String heartbeatUserType = "livreur";
 
     @PluginMethod
     public void checkContactsPermission(PluginCall call) {
@@ -148,5 +158,59 @@ public class SilgappNativePlugin extends Plugin {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         getContext().startActivity(intent);
         call.resolve();
+    }
+
+    @PluginMethod
+    public void startBackgroundHeartbeat(PluginCall call) {
+        heartbeatToken = call.getString("token", "");
+        heartbeatServerUrl = call.getString("serverUrl", heartbeatServerUrl);
+        heartbeatAppId = call.getString("appId", heartbeatAppId);
+        heartbeatFunctionsVersion = call.getString("functionsVersion", heartbeatFunctionsVersion);
+        heartbeatUserType = call.getString("userType", "livreur");
+        Double intervalValue = call.getDouble("intervalMs", 5000.0);
+        Double distanceValue = call.getDouble("distanceFilter", 3.0);
+        long intervalMs = Math.max(3000L, intervalValue.longValue());
+        float distanceFilter = distanceValue.floatValue();
+
+        if (getPermissionState("location") != PermissionState.GRANTED) {
+            call.reject("Permission GPS refusee");
+            return;
+        }
+
+        try {
+            Intent intent = new Intent(getContext(), SilgappLocationService.class);
+            intent.putExtra("token", heartbeatToken);
+            intent.putExtra("serverUrl", heartbeatServerUrl);
+            intent.putExtra("appId", heartbeatAppId);
+            intent.putExtra("functionsVersion", heartbeatFunctionsVersion);
+            intent.putExtra("userType", heartbeatUserType);
+            intent.putExtra("intervalMs", intervalMs);
+            intent.putExtra("distanceFilter", distanceFilter);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                getContext().startForegroundService(intent);
+            } else {
+                getContext().startService(intent);
+            }
+            JSObject result = new JSObject();
+            result.put("success", true);
+            result.put("intervalMs", intervalMs);
+            result.put("distanceFilter", distanceFilter);
+            call.resolve(result);
+        } catch (SecurityException error) {
+            call.reject("Permission GPS refusee", error);
+        }
+    }
+
+    @PluginMethod
+    public void stopBackgroundHeartbeat(PluginCall call) {
+        stopNativeHeartbeat();
+        JSObject result = new JSObject();
+        result.put("success", true);
+        call.resolve(result);
+    }
+
+    private void stopNativeHeartbeat() {
+        Intent intent = new Intent(getContext(), SilgappLocationService.class);
+        getContext().stopService(intent);
     }
 }

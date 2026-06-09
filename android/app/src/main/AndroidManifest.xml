@@ -14,6 +14,12 @@
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="silgapp_default" />
 
+        <service
+            android:name=".SilgappLocationService"
+            android:exported="false"
+            android:foregroundServiceType="location"
+            android:stopWithTask="false" />
+
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
             android:name="com.silgapp2.app.MainActivity"

@@ -9,6 +9,7 @@ import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 
 import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
 import { requestNativeAppPermissions } from "@/lib/nativePermissions";
+import { startNativeBackgroundHeartbeat } from "@/lib/nativeAndroid";
 import LivreurHeader from "@/components/livreur/LivreurHeader";
 import LivreurStatsBanner from "@/components/livreur/LivreurStatsBanner";
 import LivreurStatutCard from "@/components/livreur/LivreurStatutCard";
@@ -82,7 +83,30 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     user_type: "livreur",
     position: livreurProfil?.latitude && livreurProfil?.longitude ? { latitude: livreurProfil.latitude, longitude: livreurProfil.longitude } : null,
     enabled: onboardingTermine && gpsActif && livreurProfil?.statut !== "hors_ligne",
+    debugLabel: "LivreurExterneGPS",
   });
+
+  useEffect(() => {
+    if (!onboardingTermine || !gpsActif || livreurProfil?.statut === "hors_ligne") return;
+    let stopNativeHeartbeat = null;
+    let cancelled = false;
+
+    startNativeBackgroundHeartbeat({
+      userType: "livreur",
+      intervalMs: 5000,
+      distanceFilter: 0,
+    }).then((stop) => {
+      if (cancelled) stop?.();
+      else stopNativeHeartbeat = stop;
+    }).catch((error) => {
+      console.warn("[LivreurExterneGPS] native background heartbeat unavailable:", error?.message);
+    });
+
+    return () => {
+      cancelled = true;
+      stopNativeHeartbeat?.();
+    };
+  }, [onboardingTermine, gpsActif, livreurProfil?.statut]);
 
   // ─── Notifications push ───────────────────────────────────────────────────
   const livreurId = livreurProfil?.id;
@@ -286,6 +310,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
           derniere_position_date: new Date().toISOString(),
+          last_seen_at: new Date().toISOString(),
+          app_active: true,
         }).then(() => {
           queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
           toast.success("GPS activé");
@@ -301,12 +327,19 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     if (!livreurId || livreurProfil?.statut === "hors_ligne" || !gpsActif) return;
     const interval = setInterval(() => {
       navigator.geolocation?.getCurrentPosition(
-        (pos) => saveLivreur(livreurId, {
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          derniere_position_date: new Date().toISOString(),
-        }).catch(() => null),
-        () => setGpsActif(false),
+        (pos) => {
+          console.info(
+            `[LivreurExterneGPS] fallback updateLivreur lat=${Number(pos.coords.latitude).toFixed(6)} lng=${Number(pos.coords.longitude).toFixed(6)}`
+          );
+          saveLivreur(livreurId, {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            derniere_position_date: new Date().toISOString(),
+            last_seen_at: new Date().toISOString(),
+            app_active: true,
+          }).catch(() => null);
+        },
+        (error) => console.warn("[LivreurExterneApp] GPS update skipped:", error?.message),
         { enableHighAccuracy: true }
       );
     }, 15000);

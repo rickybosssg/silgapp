@@ -1,6 +1,7 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { Geolocation } from "@capacitor/geolocation";
 import { Contacts } from "@capacitor-community/contacts";
+import { APP_PUBLIC_URL, BASE44_APP_ID } from "@/lib/app-params";
 
 export const SilgappNative = registerPlugin("SilgappNative");
 const BackgroundGeolocation = registerPlugin("BackgroundGeolocation");
@@ -123,6 +124,41 @@ export async function startNativeLocationSync({
     if (watcherId) {
       BackgroundGeolocation.removeWatcher({ id: watcherId }).catch(() => null);
     }
+  };
+}
+
+function getStoredAccessToken() {
+  const keys = ["base44_access_token", "access_token", "base44_token", "token"];
+  for (const key of keys) {
+    try {
+      const value = localStorage.getItem(key);
+      if (value && value !== "null" && value !== "undefined" && value.length > 10) return value;
+    } catch (_) {}
+  }
+  return "";
+}
+
+export async function startNativeBackgroundHeartbeat({
+  userType = "livreur",
+  intervalMs = 5000,
+  distanceFilter = 0,
+} = {}) {
+  if (!isNativeAndroid()) return () => {};
+
+  const token = getStoredAccessToken();
+  const result = await SilgappNative.startBackgroundHeartbeat({
+    token,
+    userType,
+    intervalMs,
+    distanceFilter,
+    serverUrl: APP_PUBLIC_URL,
+    appId: BASE44_APP_ID,
+    functionsVersion: "prod",
+  });
+  console.info(`[SilgappGPS] native background heartbeat started userType=${userType}`, result);
+
+  return () => {
+    SilgappNative.stopBackgroundHeartbeat().catch(() => null);
   };
 }
 
