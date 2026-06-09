@@ -18,6 +18,7 @@ import {
   Loader2, ArrowLeft, RefreshCw
 } from "lucide-react";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
+import CourseAnnuleeRelanceDialog from "@/components/client/CourseAnnuleeRelanceDialog";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import LiveCounterBadge from "@/components/ui/LiveCounterBadge";
 import ModernMap from "@/components/client/ModernMap";
@@ -82,6 +83,7 @@ export default function ClientExterneApp() {
   const [aUnCodePromo, setAUnCodePromo] = useState(false);
   const [courseANoter, setCourseANoter] = useState(null);
   const [notationShownFor, setNotationShownFor] = useState(null);
+  const [courseAnnuleeRelance, setCourseAnnuleeRelance] = useState(null); // course annulée auto → proposer relance
 
   const [userId, setUserId] = useState(null);
   const queryClient = useQueryClient();
@@ -620,6 +622,22 @@ export default function ClientExterneApp() {
           if (!seen.has(key)) seen.set(key, n);
         }
         setNotifications([...seen.values()]);
+
+        // ── Détecter les annulations automatiques (timeout 4 min) ─────────────
+        // Si une notif course_annulee existe et qu'aucun dialog n'est déjà ouvert
+        const notifAnnulee = userNotifications.find(n => n.type === 'course_annulee' && n.course_id);
+        if (notifAnnulee && !courseAnnuleeRelance) {
+          // Vérifier que la course est bien annulée par timeout (pas manuellement)
+          try {
+            const coursesAnnulees = await base44.entities.CourseExterne.filter({ id: notifAnnulee.course_id });
+            const c = coursesAnnulees?.[0];
+            if (c && c.statut === 'annulee' && c.dispatch_status === 'expire') {
+              setCourseAnnuleeRelance(c);
+              // Marquer la notif comme lue pour éviter de re-déclencher
+              base44.entities.Notification.update(notifAnnulee.id, { lue: true }).catch(() => null);
+            }
+          } catch (_) {}
+        }
       }
 
       await loadLivreursProches(pos);
@@ -1027,6 +1045,20 @@ export default function ClientExterneApp() {
 
 
       <VenusFloatingButton />
+
+      {/* ── COURSE ANNULÉE AUTO — proposer relance ou terminer ── */}
+      {courseAnnuleeRelance && (
+        <CourseAnnuleeRelanceDialog
+          course={courseAnnuleeRelance}
+          onRelancer={() => {
+            setCourseAnnuleeRelance(null);
+            navigate("/client/course/" + (courseAnnuleeRelance.type_course || "expedier"), {
+              state: { position, clientProfil }
+            });
+          }}
+          onTerminer={() => setCourseAnnuleeRelance(null)}
+        />
+      )}
 
       {/* ── NOTATION LIVREUR — déclenchée depuis le dashboard ── */}
       {courseANoter && (

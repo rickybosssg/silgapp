@@ -190,11 +190,15 @@ Deno.serve(async (req) => {
     }
 
     // Exclure les tokens web (pas de FCM natif)
+    const webTokens = tokens.filter(item => String(item.token).startsWith('web_'));
+    const nativeTokensForStats = tokens.filter(item => !String(item.token).startsWith('web_'));
     const pushableTokens = pushableTokensPreview;
     if (pushableTokens.length === 0) {
       console.warn('[envoiNotificationPush] No native FCM token available', {
         targetEmail,
         tokensFound: tokens.length,
+        nativeTokens: nativeTokensForStats.length,
+        webTokens: webTokens.length,
       });
       return Response.json({
         success: true,

@@ -254,6 +254,7 @@ function EtapeProfil({ clientProfil, onSuccess }) {
         notification_token: null,
         latitude: gpsData?.latitude,
         longitude: gpsData?.longitude,
+        country_code: countryCode,
       }).catch(() => null);
 
       onSuccess(updated || { ...(clientProfil || {}), ...profileData });

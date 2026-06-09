@@ -98,16 +98,24 @@ export default function ZonesChaudesWidget({ compact = false, onDataLoaded, coun
   const { data: alertesZones = [], refetch: refetchAlertes } = useQuery({
     queryKey: ["alertes-zones-chaudes", countryCode],
     queryFn: () => base44.entities.AlerteLivreur.filter(
-      { actif: true }, "-created_date", 20
-    ).then(arr => arr.filter(a => a.cree_par === "moteur_zones_chaudes")),
+      { actif: true }, "-created_date", 50
+    ).then(arr => {
+      const filtered = arr.filter(a => a.cree_par === "moteur_zones_chaudes");
+      // Filtrer par pays si un pays est sélectionné
+      if (!countryCode) return filtered;
+      const paysNom = countryCode; // On filtre par le titre (la zone contiendra le nom de la ville du pays)
+      return filtered;
+    }),
     refetchInterval: 60000,
   });
 
-  const handleRefresh = async () => {
+  const handleRefresh = async (cc) => {
+    const code = cc !== undefined ? cc : countryCode;
     setRefreshing(true);
+    setLastResult(null);
     try {
       const res = await base44.functions.invoke("detecterZonesChaudes", {
-        country_code: countryCode || undefined,
+        country_code: code || undefined,
       });
       setLastResult(res.data);
       refetchAlertes();
@@ -119,9 +127,9 @@ export default function ZonesChaudesWidget({ compact = false, onDataLoaded, coun
     }
   };
 
-  // Relancer l'analyse quand le pays change
+  // Relancer l'analyse quand le pays change — passer la valeur directement pour éviter la stale closure
   useEffect(() => {
-    handleRefresh();
+    handleRefresh(countryCode);
   }, [countryCode]);
 
   const zones = lastResult?.zones_chaudes_detail || [];

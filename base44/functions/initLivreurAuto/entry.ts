@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 /**
  * Initialisation automatique pour NOUVEAU LIVREUR EXTERNE
@@ -22,8 +22,19 @@ Deno.serve(async (req) => {
       longitude,
       telephone,
       vehicule,
-      quartier
+      quartier,
+      country_code
     } = payload;
+
+    // 🛡️ VALIDATION STRICTE : country_code OBLIGATOIRE
+    if (!country_code) {
+      console.error('[initLivreurAuto] ❌ country_code manquant — inscription livreur rejetée');
+      return Response.json({ 
+        success: false, 
+        error: "country_code_required",
+        message: "Le pays est obligatoire pour utiliser SILGAPP. Veuillez sélectionner un pays lors de l'inscription."
+      }, { status: 400 });
+    }
 
     // 1. Créer le profil livreur s'il n'existe pas
     let livreur = await base44.asServiceRole.entities.Livreur.filter({ user_email: user.email });
@@ -44,6 +55,7 @@ Deno.serve(async (req) => {
         quartier: quartier || "",
         app_active: false,
         last_seen_at: new Date().toISOString(),
+        country_code: country_code, // ✅ OBLIGATOIRE - rejeté si manquant
       });
     } else {
       livreur = livreur[0];

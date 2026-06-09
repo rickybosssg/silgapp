@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 /**
  * ANNULATION DE COURSE - SILGAPP EXTERNE
@@ -150,8 +150,8 @@ Deno.serve(async (req) => {
       updateData.notes = motif;
     }
 
-    // Timestamp d'annulation
-    updateData.colis_livre_at = new Date().toISOString(); // Réutiliser ce champ pour la date d'annulation
+    // Timestamp d'annulation (champ dédié via notes, pas colis_livre_at)
+    updateData.date_annulation = new Date().toISOString();
 
     await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
 

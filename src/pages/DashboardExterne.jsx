@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { MapPin, Package, Truck, Clock, CheckCircle2, XCircle, TrendingUp, ArrowLeft, Globe, Users, Zap, ChevronRight, Bell } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
-import CountrySelector, { usePaysActifs } from "@/components/international/CountrySelector.jsx";
+import { usePaysActifs } from "@/components/international/CountrySelector.jsx";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import LivreursEnLigne from "@/components/dashboard/LivreursEnLigne";
 import ClientsEnLigne from "@/components/dashboard/ClientsEnLigne";
@@ -48,7 +48,7 @@ function KpiCard({ label, value, icon: Icon, color, suffix, onClick }) {
 export default function DashboardExterne() {
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [statModal, setStatModal] = useState(null);
-  const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
+  const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
   const paysActifs = usePaysActifs();
   const defaultCountry = paysActifs.length === 1 ? paysActifs[0].code : null;
   const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || defaultCountry);
@@ -194,13 +194,6 @@ export default function DashboardExterne() {
                     <span className="hidden sm:inline">Global</span>
                   </Button>
                 </Link>
-              )}
-              {!isPays && (
-                <CountrySelector
-                  value={effectiveCountry || ""}
-                  onChange={(code) => setSelectedCountry(code)}
-                  className="h-8 text-xs bg-white/10 border-white/10 text-white rounded-xl"
-                />
               )}
               <Link to="/diagnostic-push-complet?email=eric.nongbzanga@yahoo.fr">
                 <Button size="sm" variant="ghost" className="gap-1.5 text-white/70 hover:text-white hover:bg-white/10 border border-white/10 rounded-xl text-xs">

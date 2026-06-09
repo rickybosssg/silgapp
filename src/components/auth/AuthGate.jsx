@@ -266,7 +266,7 @@ export default function AuthGate({ children, onLivreur, onClient }) {
         // Créer profil client automatiquement
         try {
           clientProfil = await base44.entities.ClientExterne.create({
-            nom: user.full_name || user.email.split('@')[0],
+            nom: user.full_name || user.email.split('@')[0] || "Client",
             telephone: "",
             email: user.email,
             user_email: user.email,

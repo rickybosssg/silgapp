@@ -124,16 +124,28 @@ function EcranGPS({ livreurId, onGpsOk }) {
   );
 }
 
+// Pays SILGAPP pour la sélection livreur
+const PAYS_LIVREUR = [
+  { code: "BF", nom: "Burkina Faso",  emoji: "🇧🇫" },
+  { code: "CI", nom: "Côte d'Ivoire", emoji: "🇨🇮" },
+  { code: "TG", nom: "Togo",          emoji: "🇹🇬" },
+  { code: "BJ", nom: "Bénin",         emoji: "🇧🇯" },
+  { code: "SN", nom: "Sénégal",       emoji: "🇸🇳" },
+  { code: "ML", nom: "Mali",          emoji: "🇲🇱" },
+  { code: "GN", nom: "Guinée",        emoji: "🇬🇳" },
+  { code: "NE", nom: "Niger",         emoji: "🇳🇪" },
+];
+
 // ─── Formulaire profil livreur ────────────────────────────────────────────────
 function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
-  const countryCode = livreurProfil?.country_code || "BF";
-  const dialCode = getDialCode(countryCode);
-  const localLen = getLocalLen(countryCode);
+  const [countryCode, setCountryCode] = useState(livreurProfil?.country_code || "");
+  const dialCode = getDialCode(countryCode || "BF");
+  const localLen = getLocalLen(countryCode || "BF");
 
   // Extraire les chiffres locaux (sans indicatif) depuis le téléphone stocké
-  const extractLocal = (tel) => {
+  const extractLocal = (tel, cc) => {
     if (!tel) return "";
-    const c = SILGAPP_COUNTRIES.find(x => x.code === countryCode);
+    const c = SILGAPP_COUNTRIES.find(x => x.code === (cc || "BF"));
     const digits = tel.replace(/\D/g, "");
     if (c && digits.startsWith(c.dial)) return digits.slice(c.dial.length);
     return digits.slice(-localLen);
@@ -142,7 +154,7 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
   const [form, setForm] = useState({
     nom: livreurProfil?.nom || "",
     prenom: livreurProfil?.prenom || "",
-    telephone: livreurProfil?.telephone ? extractLocal(livreurProfil.telephone) : "",
+    telephone: livreurProfil?.telephone ? extractLocal(livreurProfil.telephone, livreurProfil?.country_code) : "",
     quartier: livreurProfil?.quartier || "",
     vehicule: livreurProfil?.vehicule || livreurProfil?.type_vehicule || "moto",
   });
@@ -156,7 +168,7 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
   };
 
   const telValide = form.telephone.length === localLen;
-  const peutSauvegarder = form.nom.trim() && form.prenom.trim() && telValide && form.quartier.trim() && form.vehicule;
+  const peutSauvegarder = form.nom.trim() && form.prenom.trim() && telValide && form.quartier.trim() && form.vehicule && !!countryCode;
 
   const handleSauvegarder = async () => {
     if (!peutSauvegarder || saving) return;
@@ -170,6 +182,7 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
       quartier: form.quartier.trim(),
       vehicule: form.vehicule,
       type_vehicule: form.vehicule,
+      country_code: countryCode,
       latitude: gpsData?.lat || null,
       longitude: gpsData?.lng || null,
       derniere_position_date: gpsData ? new Date().toISOString() : null,
@@ -194,6 +207,7 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
         telephone: data.telephone,
         vehicule: data.vehicule,
         quartier: data.quartier,
+        country_code: countryCode,
         latitude: gpsData?.lat,
         longitude: gpsData?.lng,
       }).catch(() => null);
@@ -234,6 +248,28 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
           </div>
         ))}
 
+        {/* Pays */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wide">🌍 Pays * (obligatoire)</label>
+          <div className="grid grid-cols-2 gap-2">
+            {PAYS_LIVREUR.map(pays => (
+              <button
+                key={pays.code}
+                type="button"
+                onClick={() => { setCountryCode(pays.code); setF("telephone", ""); }}
+                className={`h-11 rounded-xl border-2 text-sm font-semibold flex items-center gap-2 px-3 transition-all ${
+                  countryCode === pays.code
+                    ? "border-red-600 bg-red-600/10 text-red-400"
+                    : "border-zinc-700 bg-zinc-900 text-gray-400"
+                }`}
+              >
+                <span className="text-lg">{pays.emoji}</span>
+                <span className="text-xs truncate">{pays.nom}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Téléphone */}
         <div>
           <label className="block text-xs font-semibold text-gray-400 mb-1 uppercase tracking-wide">Téléphone * ({localLen} chiffres)</label>
@@ -244,7 +280,8 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
               onChange={handleTelephone}
               placeholder={"X".repeat(localLen).replace(/(.{2})/g, "$1 ").trim()}
               inputMode="numeric"
-              className="w-full h-12 rounded-xl bg-zinc-900 border border-zinc-700 text-white pl-16 pr-4 text-sm font-mono focus:border-red-500 focus:outline-none tracking-widest"
+              disabled={!countryCode}
+              className="w-full h-12 rounded-xl bg-zinc-900 border border-zinc-700 text-white pl-16 pr-4 text-sm font-mono focus:border-red-500 focus:outline-none tracking-widest disabled:opacity-40"
             />
           </div>
           {form.telephone.length > 0 && (

@@ -14,13 +14,19 @@ import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-const statuts = [
+const STATUTS_INTERNE = [
   "nouvelle", "en_attente_livreur", "acceptee", "en_route_recuperation",
   "colis_recupere", "en_livraison", "livree", "annulee"
 ];
 
+const STATUTS_EXTERNE = [
+  "nouvelle", "recherche_livreur", "livreur_en_route", "colis_recupere",
+  "en_livraison", "livree", "annulee"
+];
+
 export default function CourseDetailDialog({ course, open, onClose, reseau = "interne" }) {
   const queryClient = useQueryClient();
+  const statuts = reseau === "externe" ? STATUTS_EXTERNE : STATUTS_INTERNE;
   const [newStatut, setNewStatut] = React.useState(course?.statut || "");
   const [confirmAnnulation, setConfirmAnnulation] = React.useState(false);
 
@@ -38,6 +44,10 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
           throw new Error(result?.data?.error || "Échec annulation");
         }
         return result.data;
+      }
+      // Utiliser l'entité correcte selon le réseau
+      if (reseau === "externe") {
+        return await base44.entities.CourseExterne.update(id, data);
       }
       return await base44.entities.Course.update(id, data);
     },

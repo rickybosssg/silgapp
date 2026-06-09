@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Truck, MapPin, Package, User, CheckCircle2, Loader2, Navigation, XCircle } from "lucide-react";
+import { Truck, MapPin, Package, User, CheckCircle2, Loader2, Navigation, XCircle, RefreshCw } from "lucide-react";
 import AnnulerCourseDialog from "./AnnulerCourseDialog";
 import PrixManuelInlineCard from "./PrixManuelInlineCard";
 
@@ -25,10 +25,11 @@ const messages = [
   "En attente de confirmation...",
 ];
 
-export default function LivreurRechercheAnimation({ course }) {
+export default function LivreurRechercheAnimation({ course, onRelancer }) {
   const navigate = useNavigate();
   const [showAnnulerDialog, setShowAnnulerDialog] = useState(false);
   const [currentMessage, setCurrentMessage] = useState(0);
+  const [aucunLivreur, setAucunLivreur] = useState(false);
 
   // Rotation des messages
   useEffect(() => {
@@ -43,7 +44,7 @@ export default function LivreurRechercheAnimation({ course }) {
     queryKey: ["suivi-course-recherche", course.id],
     queryFn: () => base44.entities.CourseExterne.filter({ id: course.id }),
     select: (data) => Array.isArray(data) ? data[0] : null,
-    enabled: !!course.id,
+    enabled: !!course.id && !aucunLivreur,
     refetchInterval: 3000,
   });
 
@@ -53,9 +54,9 @@ export default function LivreurRechercheAnimation({ course }) {
     if (courseData.statut === "livreur_en_route" || courseData.dispatch_status === "accepte") {
       navigate("/client/suivi");
     }
-    // Rediriger aussi si annulée
-    if (courseData.statut === "annulee") {
-      navigate("/client");
+    // Fermée automatiquement après 4 min sans livreur → afficher l'écran "Aucun livreur"
+    if (courseData.statut === "annulee" && courseData.dispatch_status === "expire") {
+      setAucunLivreur(true);
     }
   }, [courseData, navigate]);
 
@@ -63,6 +64,58 @@ export default function LivreurRechercheAnimation({ course }) {
   const hasPrixManuel =
     liveCourse?.manual_price_status === "pending_client_validation" &&
     liveCourse?.manual_price > 0;
+
+  // ─── Écran "Aucun livreur disponible" ────────────────────────────────────
+  if (aucunLivreur) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50 p-6 flex items-center justify-center">
+        <div className="max-w-sm w-full space-y-6 text-center">
+
+          {/* Icône animée */}
+          <div className="relative mx-auto w-24 h-24">
+            <div className="absolute inset-0 bg-red-100 rounded-full animate-ping opacity-30" />
+            <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-red-100 to-orange-100 flex items-center justify-center shadow-lg">
+              <span className="text-4xl">😔</span>
+            </div>
+          </div>
+
+          {/* Message */}
+          <div className="space-y-2">
+            <h2 className="text-2xl font-black text-gray-900">Aucun livreur disponible</h2>
+            <p className="text-sm text-gray-500 leading-relaxed">
+              Nous n'avons pas trouvé de livreur disponible dans votre zone après <strong>4 minutes</strong> de recherche.
+            </p>
+          </div>
+
+          {/* Options */}
+          <div className="bg-white rounded-3xl shadow-md border border-gray-100 p-5 space-y-3">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Que souhaitez-vous faire ?</p>
+
+            {onRelancer && (
+              <button
+                className="w-full h-14 rounded-2xl bg-gradient-to-r from-primary to-red-600 text-white font-black text-base shadow-lg shadow-red-200 active:scale-95 transition-all flex items-center justify-center gap-3"
+                onClick={onRelancer}
+              >
+                <RefreshCw className="w-5 h-5" />
+                🔄 Relancer la recherche
+              </button>
+            )}
+
+            <button
+              className="w-full h-12 rounded-2xl border-2 border-gray-200 text-gray-700 font-bold text-sm active:scale-95 transition-all hover:bg-gray-50"
+              onClick={() => navigate("/client")}
+            >
+              ✕ Terminer et rentrer à l'accueil
+            </button>
+          </div>
+
+          <p className="text-xs text-gray-400">
+            💡 Astuce : réessayez dans quelques minutes, de nouveaux livreurs se connectent régulièrement.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-accent/5 p-4">

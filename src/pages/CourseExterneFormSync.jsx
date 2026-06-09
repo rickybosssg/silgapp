@@ -522,10 +522,13 @@ export default function CourseExterneFormSync() {
       ? (colis[0]?.destinataire_telephone || "")
       : destinataireTel;
 
-    // ⚠️ country_code OBLIGATOIRE : détermine le pays du dispatch et le filtrage admin
-    const courseCountryCode = clientProfil?.country_code || null;
+    // country_code obligatoire : utiliser la BDD fraiche pour eviter un dispatch hors pays.
+    const courseCountryCode = clientFromDB?.country_code;
     if (!courseCountryCode) {
-      console.warn("[CourseForm] ⚠️ country_code manquant sur clientProfil — le dispatch ne sera pas isolé par pays !");
+      console.error("[CourseForm] country_code manquant sur clientFromDB:", clientFromDB);
+      toast.error("Erreur : votre profil client n'a pas de pays. Veuillez contacter le support.");
+      setIsSubmitting(false);
+      return;
     }
 
     createMutation.mutate({

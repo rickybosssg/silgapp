@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 /**
  * Initialisation automatique pour NOUVEAU CLIENT
@@ -14,7 +14,17 @@ Deno.serve(async (req) => {
     }
 
     const payload = await req.json();
-    const { device_id, platform, notification_token, latitude, longitude } = payload;
+    const { device_id, platform, notification_token, latitude, longitude, country_code } = payload;
+
+    // 🛡️ VALIDATION STRICTE : country_code OBLIGATOIRE
+    if (!country_code) {
+      console.error('[initClientAuto] ❌ country_code manquant — inscription rejetée');
+      return Response.json({ 
+        success: false, 
+        error: "country_code_required",
+        message: "Le pays est obligatoire pour utiliser SILGAPP. Veuillez sélectionner un pays lors de l'inscription."
+      }, { status: 400 });
+    }
 
     // 1. VÉRIFIER si l'email existe déjà dans Livreur (livreur externe)
     const existingLivreur = await base44.asServiceRole.entities.Livreur.filter({ user_email: user.email });
@@ -39,6 +49,7 @@ Deno.serve(async (req) => {
         actif: true,
         latitude: latitude || null,
         longitude: longitude || null,
+        country_code: country_code, // ✅ OBLIGATOIRE - rejeté si manquant
       });
     } else {
       client = client[0];
