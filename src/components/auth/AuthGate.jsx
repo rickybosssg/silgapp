@@ -23,10 +23,12 @@ export default function AuthGate({ children, onLivreur, onClient }) {
     let mounted = true;
 
     async function check() {
-      // Si le SDK n'a pas de token mais localStorage en a un → reload propre
+      // Si le SDK n'a pas de token mais localStorage en a un → reload propre (max 1 fois)
       if (!detectedToken) {
         const storedToken = localStorage.getItem('base44_access_token') || localStorage.getItem('access_token');
-        if (storedToken && storedToken.length > 10) {
+        const reloadDone = sessionStorage.getItem('authgate_reload_done');
+        if (storedToken && storedToken.length > 10 && !reloadDone) {
+          sessionStorage.setItem('authgate_reload_done', '1');
           window.location.reload();
           return;
         }
@@ -111,21 +113,17 @@ export default function AuthGate({ children, onLivreur, onClient }) {
       if (!mounted) return;
 
       if (!clients || clients.length === 0) {
-        // Créer profil client automatiquement
-        try {
-          await base44.entities.ClientExterne.create({
-            nom: user.full_name || user.email.split('@')[0],
-            telephone: "",
-            email: user.email,
-            user_email: user.email,
-            actif: true
-          });
-        } catch (err) {
-          console.error("Erreur création profil client:", err);
-        }
+        // Créer profil client automatiquement (erreur ignorée — ne doit pas bloquer la connexion)
+        base44.entities.ClientExterne.create({
+          nom: user.full_name || user.email.split('@')[0] || "Client",
+          telephone: "",
+          email: user.email,
+          user_email: user.email,
+          actif: true
+        }).catch(err => console.error("Erreur création profil client:", err));
       }
 
-      // Router vers dashboard client
+      // Router vers dashboard client (ne pas attendre la création du profil)
       setState("client");
       onClient?.();
 
