@@ -562,15 +562,30 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             <div className="space-y-3 pt-1">
               {!colisRecupere ? (
                 isExterne ? (
-                  /* ── EXTERNE : Scanner QR pour récupérer ── */
-                  <button
-                    className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                    onClick={() => setShowQRScanner("pickup")}
-                    disabled={isPending}
-                  >
-                    <QrCode className="w-6 h-6" />
-                    Scanner pour récupérer le colis
-                  </button>
+                  /* ── EXTERNE multi-colis : bouton simple sans QR ── */
+                  /* ── EXTERNE colis unique : Scanner QR pour récupérer ── */
+                  course.is_multi_colis ? (
+                    <button
+                      className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                      onClick={() => {
+                        updateOptimisticStatut("colis_recupere", { heure_recuperation: new Date().toISOString() });
+                        onColisRecupere(course);
+                      }}
+                      disabled={isPending}
+                    >
+                      <Package className="w-6 h-6" />
+                      📦 Colis récupérés ({course.nb_colis} colis)
+                    </button>
+                  ) : (
+                    <button
+                      className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                      onClick={() => setShowQRScanner("pickup")}
+                      disabled={isPending}
+                    >
+                      <QrCode className="w-6 h-6" />
+                      Scanner pour récupérer le colis
+                    </button>
+                  )
                 ) : (
                   /* ── INTERNE : bouton classique ── */
                   <button

@@ -14,23 +14,64 @@ function WhatsAppIcon({ className }) {
   );
 }
 
-// Dialogue de confirmation inline (sans window.confirm)
-function ConfirmDialog({ colis, onConfirm, onCancel, isPending }) {
+// Dialogue : Confirmation + saisie montant
+function ConfirmMontantDialog({ colis, devise, onConfirm, onCancel, isPending }) {
+  const [montant, setMontant] = useState("");
+
+  const handleSubmit = () => {
+    const val = parseFloat(montant);
+    if (!montant || isNaN(val) || val < 0) {
+      return; // bouton désactivé si invalide
+    }
+    onConfirm(val);
+  };
+
+  const isValid = montant !== "" && !isNaN(parseFloat(montant)) && parseFloat(montant) >= 0;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }}
     >
       <div className="w-full max-w-xs bg-white rounded-3xl p-6 shadow-2xl space-y-4">
+        {/* Header */}
         <div className="text-center">
           <div className="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center mx-auto mb-3 text-3xl">
             📦
           </div>
-          <p className="text-lg font-black text-gray-900">Confirmer la livraison ?</p>
-          <p className="text-sm text-gray-500 mt-1">
-            Colis <strong>{colis.colis_uid}</strong> — {colis.destinataire_nom || "Destinataire"}
+          <p className="text-lg font-black text-gray-900">Livraison confirmée ?</p>
+          <p className="text-sm text-gray-600 mt-1">
+            <strong>{colis.colis_uid || "Colis"}</strong> — {colis.destinataire_nom || "Destinataire"}
           </p>
-          <p className="text-xs text-gray-400 mt-0.5">{colis.adresse_livraison}</p>
+          {colis.adresse_livraison && (
+            <p className="text-xs text-gray-400 mt-0.5">{colis.adresse_livraison}</p>
+          )}
         </div>
+
+        {/* Saisie montant */}
+        <div>
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+            Montant encaissé pour ce colis
+          </p>
+          <div className="relative">
+            <input
+              type="number"
+              placeholder="0"
+              value={montant}
+              onChange={(e) => setMontant(e.target.value)}
+              className="w-full text-center text-2xl font-black h-14 rounded-2xl border-2 border-gray-200 focus:border-green-400 focus:outline-none pr-16 pl-4"
+              autoFocus
+              min="0"
+            />
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">
+              {devise || "F"}
+            </span>
+          </div>
+          <p className="text-[10px] text-gray-400 text-center mt-1">
+            Entrez 0 si aucun montant n'est à encaisser
+          </p>
+        </div>
+
+        {/* Boutons */}
         <div className="grid grid-cols-2 gap-3">
           <button
             className="h-12 rounded-2xl border border-gray-200 text-gray-600 font-bold text-sm"
@@ -41,10 +82,10 @@ function ConfirmDialog({ colis, onConfirm, onCancel, isPending }) {
           </button>
           <button
             className="h-12 rounded-2xl bg-gradient-to-b from-green-500 to-green-700 text-white font-black text-sm shadow-lg disabled:opacity-50"
-            onClick={onConfirm}
-            disabled={isPending}
+            onClick={handleSubmit}
+            disabled={!isValid || isPending}
           >
-            ✅ Confirmer
+            ✅ Valider
           </button>
         </div>
       </div>
@@ -54,12 +95,10 @@ function ConfirmDialog({ colis, onConfirm, onCancel, isPending }) {
 
 /**
  * Vue multi-colis pour le livreur externe.
- * Affichée dans CourseActiveCard quand course.is_multi_colis === true ET colis récupéré.
- *
- * Props:
- *   course       - CourseExterne
- *   colisRecupere - boolean
- *   onAllLivres  - callback quand tous les colis sont livrés
+ * - Pas de QR Code ni de PIN Code
+ * - Bouton "✅ Livrer ce colis" → dialogue confirmation + saisie montant
+ * - Calcul automatique : total, gain livreur (70%), commission Silga (30%)
+ * - Fin de course automatique quand tous les colis sont livrés/annulés
  */
 export default function MultiColisLivreurView({ course, colisRecupere, onAllLivres }) {
   const queryClient = useQueryClient();
@@ -75,39 +114,61 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
     initialData: [],
   });
 
-  // Mutation : livrer un colis individuel
+  // Mutation : livrer un colis individuel + mettre à jour les totaux de la course
   const livrerColisMutation = useMutation({
-    mutationFn: async (colisItem) => {
+    mutationFn: async ({ colisItem, montantEncaisse }) => {
       const now = new Date().toISOString();
+
       // 1. Mettre à jour le colis
       await base44.entities.ColisExterne.update(colisItem.id, {
         statut: "livre",
         heure_livraison: now,
         delivery_confirmed_by: "livreur",
         delivery_confirmed_at: now,
+        montant_a_encaisser: montantEncaisse,
       });
-      // 2. Recalculer nb_colis_livres sur la course parente
-      const nbLivres = (course.nb_colis_livres || 0) + 1;
-      const nbTotal = course.nb_colis || 1;
+
+      // 2. Recalculer les totaux sur la course parente
+      const colisActuel = colis;
+      const montantTotal = colisActuel.reduce((sum, c) => {
+        if (c.id === colisItem.id) return sum + montantEncaisse;
+        if (c.statut === "livre") return sum + (c.montant_a_encaisser || 0);
+        return sum;
+      }, 0);
+
+      const nbLivres = colisActuel.filter(c => c.id === colisItem.id || c.statut === "livre").length;
       const nbAnnules = course.nb_colis_annules || 0;
+      const nbTotal = course.nb_colis || 1;
       const tousTermines = nbLivres + nbAnnules >= nbTotal;
-      const updateData = { nb_colis_livres: nbLivres };
+
+      const gainLivreur = Math.round(montantTotal * 0.7);
+      const commissionSilga = Math.round(montantTotal * 0.3);
+
+      const updateData = {
+        nb_colis_livres: nbLivres,
+        prix_final: montantTotal,
+        montant_livreur: gainLivreur,
+        commission_silga: commissionSilga,
+      };
+
       if (tousTermines) {
         updateData.statut = "livree";
         updateData.heure_livraison = now;
+        updateData.colis_livre_at = now;
       }
+
       await base44.entities.CourseExterne.update(course.id, updateData);
-      return { nbLivres, tousTermines };
+      return { nbLivres, tousTermines, montantTotal, gainLivreur };
     },
-    onSuccess: ({ tousTermines }) => {
+    onSuccess: ({ tousTermines, montantTotal, gainLivreur }) => {
       queryClient.invalidateQueries({ queryKey: ["colis-externes", course.id] });
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
       setConfirmColis(null);
       if (tousTermines) {
-        toast.success("🎉 Tous les colis ont été livrés !");
+        toast.success(`🎉 Tournée terminée ! Total : ${montantTotal.toLocaleString()} ${course.devise || "F"}`);
         onAllLivres?.();
       } else {
-        toast.success("Colis livré ✅");
+        toast.success(`Colis livré ✅ — +${gainLivreur.toLocaleString()} ${course.devise || "F"} (70%)`);
       }
     },
     onError: () => toast.error("Erreur lors de la mise à jour"),
@@ -118,15 +179,18 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
     setConfirmColis(colisItem);
   };
 
-  const handleConfirmer = () => {
+  const handleConfirmer = (montant) => {
     if (!confirmColis) return;
-    livrerColisMutation.mutate(confirmColis);
+    livrerColisMutation.mutate({ colisItem: confirmColis, montantEncaisse: montant });
   };
 
-  // Progression
+  // Progression + totaux
   const nbTotal = colis.length || course.nb_colis || 1;
   const nbLivres = colis.filter(c => c.statut === "livre").length;
   const nbAnnules = colis.filter(c => c.statut === "annule").length;
+  const totalEncaisse = colis.filter(c => c.statut === "livre").reduce((s, c) => s + (c.montant_a_encaisser || 0), 0);
+  const gainLivreur = Math.round(totalEncaisse * 0.7);
+  const commission = Math.round(totalEncaisse * 0.3);
 
   if (isLoading) {
     return (
@@ -141,10 +205,11 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
 
   return (
     <>
-      {/* Dialogue de confirmation */}
+      {/* Dialogue confirmation + montant */}
       {confirmColis && (
-        <ConfirmDialog
+        <ConfirmMontantDialog
           colis={confirmColis}
+          devise={course.devise || "F"}
           onConfirm={handleConfirmer}
           onCancel={() => setConfirmColis(null)}
           isPending={livrerColisMutation.isPending}
@@ -152,17 +217,18 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
       )}
 
       <div className="bg-purple-50 border border-purple-200 rounded-2xl overflow-hidden">
-        {/* Header multi-colis avec progression */}
+        {/* Header collapsible */}
         <button
           className="w-full flex items-center justify-between px-4 py-3 bg-purple-100 border-b border-purple-200"
           onClick={() => setExpanded(v => !v)}
         >
           <div className="flex items-center gap-2">
             <Package className="w-4 h-4 text-purple-700" />
-            <span className="text-sm font-black text-purple-900">Tournée multi-colis</span>
+            <span className="text-sm font-black text-purple-900">
+              📦 {nbTotal} colis à livrer
+            </span>
           </div>
           <div className="flex items-center gap-2">
-            {/* Progression globale */}
             <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
               nbLivres === nbTotal ? "bg-green-500 text-white" : "bg-purple-200 text-purple-800"
             }`}>
@@ -188,7 +254,7 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
               const estAnnule = colisItem.statut === "annule";
               const estVerrouille = estLivre || estAnnule;
 
-              // URL Google Maps vers ce destinataire
+              // URLs actions
               const mapsUrl = colisItem.gps_livraison_lat && colisItem.gps_livraison_lng
                 ? `https://www.google.com/maps/dir/?api=1&destination=${colisItem.gps_livraison_lat},${colisItem.gps_livraison_lng}`
                 : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(colisItem.adresse_livraison || "")}`;
@@ -200,13 +266,13 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
                 <div
                   key={colisItem.id}
                   className={`p-4 space-y-3 transition-all ${
-                    estVerrouille ? "opacity-60 bg-gray-50" : "bg-white"
+                    estVerrouille ? "bg-gray-50" : "bg-white"
                   }`}
                 >
-                  {/* Numéro + statut */}
+                  {/* Numéro + nom + statut */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0 ${
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-black text-white flex-shrink-0 ${
                         estLivre ? "bg-green-500" :
                         estAnnule ? "bg-gray-400" :
                         "bg-purple-600"
@@ -220,7 +286,6 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
                         <p className="text-[10px] text-gray-500">{colisItem.destinataire_telephone}</p>
                       </div>
                     </div>
-                    {/* Icône verrouillage */}
                     {estVerrouille && (
                       <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         estLivre ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
@@ -239,12 +304,29 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
                     </div>
                   )}
 
-                  {/* Actions — masquées si verrouillé */}
+                  {/* Récapitulatif si livré */}
+                  {estLivre && (
+                    <div className="bg-green-50 rounded-xl px-3 py-2 flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                        <p className="text-[10px] text-green-700 font-semibold">
+                          Livré à {new Date(colisItem.heure_livraison).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      </div>
+                      {(colisItem.montant_a_encaisser || 0) > 0 && (
+                        <p className="text-xs font-black text-green-800">
+                          {colisItem.montant_a_encaisser.toLocaleString()} {course.devise || "F"}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Boutons d'action — masqués si verrouillé */}
                   {!estVerrouille && colisRecupere && (
                     <div className="flex gap-2">
                       {/* Appeler */}
                       <a href={`tel:${colisItem.destinataire_telephone}`} className="flex-none">
-                        <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center">
+                        <div className="w-11 h-11 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center">
                           <Phone className="w-4 h-4 text-blue-600" />
                         </div>
                       </a>
@@ -256,7 +338,7 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
                         rel="noopener noreferrer"
                         className="flex-none"
                       >
-                        <div className="w-10 h-10 rounded-xl bg-green-50 border border-green-200 flex items-center justify-center">
+                        <div className="w-11 h-11 rounded-xl bg-green-50 border border-green-200 flex items-center justify-center">
                           <WhatsAppIcon className="w-4 h-4 text-green-600" />
                         </div>
                       </a>
@@ -268,28 +350,21 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
                         rel="noopener noreferrer"
                         className="flex-none"
                       >
-                        <div className="w-10 h-10 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center">
+                        <div className="w-11 h-11 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center">
                           <Navigation className="w-4 h-4 text-red-500" />
                         </div>
                       </a>
 
                       {/* Bouton Livrer */}
                       <button
-                        className="flex-1 h-10 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-black text-xs shadow-sm active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+                        className="flex-1 h-11 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-black text-xs shadow-sm active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
                         onClick={() => handleLivrer(colisItem)}
                         disabled={livrerColisMutation.isPending}
                       >
                         <CheckCircle className="w-4 h-4" />
-                        Livrer ce colis
+                        ✅ Colis {colisItem.colis_uid || idx + 1} livré
                       </button>
                     </div>
-                  )}
-
-                  {/* Heure de livraison si livré */}
-                  {estLivre && colisItem.heure_livraison && (
-                    <p className="text-[10px] text-green-600 font-semibold text-center">
-                      ✅ Livré à {new Date(colisItem.heure_livraison).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                    </p>
                   )}
                 </div>
               );
@@ -297,8 +372,8 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
           </div>
         )}
 
-        {/* Footer progression globale */}
-        <div className="px-4 py-2.5 bg-purple-50 border-t border-purple-100">
+        {/* Footer — progression + totaux financiers */}
+        <div className="px-4 py-3 bg-purple-50 border-t border-purple-100 space-y-2">
           <MultiColisProgressBadge
             nbColis={nbTotal}
             nbLivres={nbLivres}
@@ -306,6 +381,22 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
             showDetails={true}
             size="sm"
           />
+          {totalEncaisse > 0 && (
+            <div className="grid grid-cols-3 gap-2 pt-1">
+              <div className="bg-white rounded-xl p-2 text-center border border-purple-100">
+                <p className="text-[9px] text-gray-400 font-bold uppercase">Total</p>
+                <p className="text-xs font-black text-gray-800">{totalEncaisse.toLocaleString()} {course.devise || "F"}</p>
+              </div>
+              <div className="bg-white rounded-xl p-2 text-center border border-green-100">
+                <p className="text-[9px] text-gray-400 font-bold uppercase">Ton gain (70%)</p>
+                <p className="text-xs font-black text-green-700">+{gainLivreur.toLocaleString()} {course.devise || "F"}</p>
+              </div>
+              <div className="bg-white rounded-xl p-2 text-center border border-gray-100">
+                <p className="text-[9px] text-gray-400 font-bold uppercase">Commission</p>
+                <p className="text-xs font-black text-gray-500">{commission.toLocaleString()} {course.devise || "F"}</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>

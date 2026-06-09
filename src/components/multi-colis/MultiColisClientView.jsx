@@ -1,7 +1,7 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { MapPin, CheckCircle, Clock, Package } from "lucide-react";
+import { MapPin, CheckCircle, Clock, Package, Banknote } from "lucide-react";
 import MultiColisProgressBadge from "./MultiColisProgressBadge";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -23,7 +23,7 @@ const STATUT_COLORS = {
 };
 
 /**
- * Vue multi-colis pour le client — affiche la progression de chaque colis.
+ * Vue multi-colis pour le client — affiche la progression et les montants par colis.
  * Props:
  *   course - CourseExterne
  */
@@ -41,6 +41,9 @@ export default function MultiColisClientView({ course }) {
   const nbLivres = colis.filter(c => c.statut === "livre").length;
   const nbAnnules = colis.filter(c => c.statut === "annule").length;
   const nbTotal = colis.length || course.nb_colis;
+  const totalEncaisse = colis.filter(c => c.statut === "livre").reduce((s, c) => s + (c.montant_a_encaisser || 0), 0);
+  const gainLivreur = Math.round(totalEncaisse * 0.7);
+  const commission = Math.round(totalEncaisse * 0.3);
 
   if (isLoading) {
     return (
@@ -80,58 +83,84 @@ export default function MultiColisClientView({ course }) {
       {/* Liste colis */}
       <div className="divide-y divide-purple-100">
         {colis.map((colisItem, idx) => (
-          <div key={colisItem.id} className={`px-4 py-3 flex items-center gap-3 ${
+          <div key={colisItem.id} className={`px-4 py-3 space-y-1.5 ${
             colisItem.statut === "livre" ? "bg-green-50" :
             colisItem.statut === "annule" ? "bg-gray-50 opacity-60" :
             "bg-white"
           }`}>
-            {/* Numéro */}
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0 ${
-              colisItem.statut === "livre" ? "bg-green-500" :
-              colisItem.statut === "annule" ? "bg-gray-400" :
-              "bg-purple-600"
-            }`}>
-              {colisItem.statut === "livre" ? "✓" :
-               colisItem.statut === "annule" ? "✕" :
-               colisItem.colis_uid || idx + 1}
-            </div>
-
-            {/* Infos */}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-gray-900 truncate">
-                {colisItem.destinataire_nom || `Destinataire ${idx + 1}`}
-              </p>
-              {colisItem.adresse_livraison && (
-                <div className="flex items-center gap-1 mt-0.5">
-                  <MapPin className="w-2.5 h-2.5 text-gray-400 flex-shrink-0" />
-                  <p className="text-[10px] text-gray-500 truncate">{colisItem.adresse_livraison}</p>
+            {/* Numéro + nom + statut */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0 ${
+                  colisItem.statut === "livre" ? "bg-green-500" :
+                  colisItem.statut === "annule" ? "bg-gray-400" :
+                  "bg-purple-600"
+                }`}>
+                  {colisItem.statut === "livre" ? "✓" :
+                   colisItem.statut === "annule" ? "✕" :
+                   colisItem.colis_uid || idx + 1}
                 </div>
-              )}
-              {colisItem.heure_livraison && (
-                <div className="flex items-center gap-1 mt-0.5">
-                  <Clock className="w-2.5 h-2.5 text-green-500 flex-shrink-0" />
-                  <p className="text-[10px] text-green-600 font-semibold">
-                    Livré à {format(new Date(colisItem.heure_livraison), "HH:mm", { locale: fr })}
+                <div>
+                  <p className="text-sm font-bold text-gray-900 truncate max-w-[160px]">
+                    {colisItem.destinataire_nom || `Destinataire ${idx + 1}`}
                   </p>
+                  {colisItem.adresse_livraison && (
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <MapPin className="w-2.5 h-2.5 text-gray-400 flex-shrink-0" />
+                      <p className="text-[10px] text-gray-500 truncate max-w-[140px]">{colisItem.adresse_livraison}</p>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
+              <div className="flex flex-col items-end gap-1">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUT_COLORS[colisItem.statut] || "bg-gray-100 text-gray-600"}`}>
+                  {STATUT_LABELS[colisItem.statut] || colisItem.statut}
+                </span>
+                {colisItem.statut === "livre" && (colisItem.montant_a_encaisser || 0) > 0 && (
+                  <p className="text-xs font-black text-green-700">
+                    {colisItem.montant_a_encaisser.toLocaleString()} {course.devise || "F"}
+                  </p>
+                )}
+              </div>
             </div>
 
-            {/* Statut badge */}
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${STATUT_COLORS[colisItem.statut] || "bg-gray-100 text-gray-600"}`}>
-              {STATUT_LABELS[colisItem.statut] || colisItem.statut}
-            </span>
+            {/* Heure de livraison */}
+            {colisItem.heure_livraison && (
+              <div className="flex items-center gap-1">
+                <Clock className="w-2.5 h-2.5 text-green-500 flex-shrink-0" />
+                <p className="text-[10px] text-green-600 font-semibold">
+                  Livré à {format(new Date(colisItem.heure_livraison), "HH:mm", { locale: fr })}
+                </p>
+              </div>
+            )}
           </div>
         ))}
       </div>
 
-      {/* Footer */}
-      <div className="px-4 py-2.5 bg-purple-50 border-t border-purple-100">
+      {/* Footer — totaux */}
+      <div className="px-4 py-3 bg-purple-50 border-t border-purple-100 space-y-2">
         <p className="text-xs text-purple-700 font-semibold text-center">
           {nbLivres === nbTotal
             ? "✅ Tous les colis ont été livrés"
             : `${nbLivres}/${nbTotal} colis livré${nbLivres > 1 ? "s" : ""}`}
         </p>
+        {totalEncaisse > 0 && (
+          <div className="grid grid-cols-3 gap-2 pt-1">
+            <div className="bg-white rounded-xl p-2 text-center border border-purple-100">
+              <Banknote className="w-3 h-3 mx-auto mb-0.5 text-gray-400" />
+              <p className="text-[9px] text-gray-400 font-bold uppercase">Total encaissé</p>
+              <p className="text-xs font-black text-gray-800">{totalEncaisse.toLocaleString()} {course.devise || "F"}</p>
+            </div>
+            <div className="bg-white rounded-xl p-2 text-center border border-green-100">
+              <p className="text-[9px] text-gray-400 font-bold uppercase">Gain livreur</p>
+              <p className="text-xs font-black text-green-700">{gainLivreur.toLocaleString()} {course.devise || "F"}</p>
+            </div>
+            <div className="bg-white rounded-xl p-2 text-center border border-gray-100">
+              <p className="text-[9px] text-gray-400 font-bold uppercase">Commission</p>
+              <p className="text-xs font-black text-gray-500">{commission.toLocaleString()} {course.devise || "F"}</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
