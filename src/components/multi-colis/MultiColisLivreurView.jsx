@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Phone, Navigation, MapPin, CheckCircle, Lock, Package, ChevronDown, ChevronUp } from "lucide-react";
+import { Phone, Copy, MapPin, CheckCircle, Lock, Package, ChevronDown, ChevronUp } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -254,11 +254,6 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
               const estAnnule = colisItem.statut === "annule";
               const estVerrouille = estLivre || estAnnule;
 
-              // URLs actions
-              const mapsUrl = colisItem.gps_livraison_lat && colisItem.gps_livraison_lng
-                ? `https://www.google.com/maps/dir/?api=1&destination=${colisItem.gps_livraison_lat},${colisItem.gps_livraison_lng}`
-                : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(colisItem.adresse_livraison || "")}`;
-
               const telRaw = (colisItem.destinataire_telephone || colisItem.destinataire_phone_normalized || "").replace(/\D/g, "");
               const waMsg = encodeURIComponent(`Bonjour, je suis votre livreur SILGAPP. Je suis en route pour vous livrer votre colis (${colisItem.colis_uid || idx + 1}).`);
 
@@ -343,17 +338,18 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
                         </div>
                       </a>
 
-                      {/* Google Maps */}
-                      <a
-                        href={mapsUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      {/* Copier le numéro */}
+                      <button
                         className="flex-none"
+                        onClick={() => {
+                          navigator.clipboard.writeText(colisItem.destinataire_telephone || "");
+                          toast.success("Numéro copié !");
+                        }}
                       >
-                        <div className="w-11 h-11 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center">
-                          <Navigation className="w-4 h-4 text-red-500" />
+                        <div className="w-11 h-11 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-center">
+                          <Copy className="w-4 h-4 text-gray-500" />
                         </div>
-                      </a>
+                      </button>
 
                       {/* Bouton Livrer */}
                       <button
