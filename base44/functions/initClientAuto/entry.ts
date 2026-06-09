@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 /**
  * Initialisation automatique pour NOUVEAU CLIENT
@@ -31,6 +31,9 @@ Deno.serve(async (req) => {
     // 2. Créer le profil client s'il n'existe pas
     let client = await base44.asServiceRole.entities.ClientExterne.filter({ user_email: user.email });
     if (!client || client.length === 0) {
+      if (!country_code) {
+        console.warn('[initClientAuto] ⚠️ country_code manquant — le dispatch sera bloqué pour ce client');
+      }
       client = await base44.asServiceRole.entities.ClientExterne.create({
         nom: user.full_name?.split(' ')[0] || user.email.split('@')[0],
         prenom: user.full_name?.split(' ').slice(1).join(' ') || '',
@@ -39,7 +42,7 @@ Deno.serve(async (req) => {
         actif: true,
         latitude: latitude || null,
         longitude: longitude || null,
-        ...(country_code ? { country_code } : {}),
+        country_code: country_code || null,
       });
     } else {
       client = client[0];

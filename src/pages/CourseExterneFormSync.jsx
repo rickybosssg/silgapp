@@ -236,7 +236,7 @@ export default function CourseExterneFormSync() {
       let finalData = { ...data };
 
       // ─── OPTIMISTIC UI: Créer un brouillon temporaire pour affichage immédiat ──
-      const tempId = `temp_${Date.now()}`;
+      const tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
       const tempCourse = {
         ...data,
         id: tempId,
@@ -362,9 +362,9 @@ export default function CourseExterneFormSync() {
       return course;
     },
     onSuccess: (response) => {
-      // OPTIMISTIC UI: Remplacer le brouillon temporaire par la vraie course
+      // OPTIMISTIC UI: Retirer tous les brouillons temporaires + ajouter la vraie course
       queryClient.setQueryData(['courses-externes-client'], (old) => 
-        (old || []).filter(c => c.id !== `temp_${Date.now()}`).concat(response)
+        (old || []).filter(c => !c.id?.startsWith('temp_')).concat(response)
       );
       toast.success("Course créée ! Recherche d'un livreur en cours...");
       setCreatedCourse(response);

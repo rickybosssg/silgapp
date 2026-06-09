@@ -128,8 +128,8 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
         montant_a_encaisser: montantEncaisse,
       });
 
-      // 2. Recalculer les totaux sur la course parente
-      const colisActuel = colis;
+      // 2. Relire les colis depuis l'API pour éviter la stale closure
+      const colisActuel = await base44.entities.ColisExterne.filter({ course_id: course.id }, "numero_ordre", 20);
       const montantTotal = colisActuel.reduce((sum, c) => {
         if (c.id === colisItem.id) return sum + montantEncaisse;
         if (c.statut === "livre") return sum + (c.montant_a_encaisser || 0);
