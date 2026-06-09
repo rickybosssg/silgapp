@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
@@ -55,10 +55,30 @@ export default function CourseExterneFormSync() {
   const navigate = useNavigate();
   const typeCourse = location.pathname.includes("expedier") ? "expedier" : "recevoir";
   const position = location.state?.position || JSON.parse(localStorage.getItem("client_gps_position") || "null");
-  const clientProfil = location.state?.clientProfil;
+  const locationClientProfil = location.state?.clientProfil;
   // Coords sauvegardées en DB — utilisées comme fallback si getCurrentPosition timeout
-  const savedLat = clientProfil?.latitude || position?.latitude || null;
-  const savedLng = clientProfil?.longitude || position?.longitude || null;
+  const savedLat = locationClientProfil?.latitude || position?.latitude || null;
+  const savedLng = locationClientProfil?.longitude || position?.longitude || null;
+
+  // 🛡️ CHARGEMENT SÉCURISÉ DU PROFIL CLIENT — fallback BDD si state perdu
+  const [clientProfil, setClientProfil] = useState(locationClientProfil || null);
+  const { data: clientFromDB } = useQuery({
+    queryKey: ['client-profil-course'],
+    queryFn: async () => {
+      const user = await base44.auth.me();
+      if (!user) return null;
+      const clients = await base44.entities.ClientExterne.filter({ user_email: user.email }, 'created_date', 1);
+      return clients?.[0] || null;
+    },
+    initialData: null,
+    enabled: !locationClientProfil, // Seulement si state manquant
+  });
+
+  useEffect(() => {
+    if (clientFromDB && !locationClientProfil) {
+      setClientProfil(clientFromDB);
+    }
+  }, [clientFromDB, locationClientProfil]);
 
   // Restaurer l'étape depuis localStorage si disponible
   const savedStep = parseInt(localStorage.getItem(STEP_KEY) || "0", 10);
