@@ -30,7 +30,9 @@ export default function CourseDetailDialog({ course, open, onClose }) {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }) => {
+      console.log("[Annulation] Tentative update Course:", id, data);
       const result = await base44.entities.Course.update(id, data);
+      console.log("[Annulation] Résultat:", result);
       return result;
     },
     onSuccess: (result, variables) => {
@@ -255,7 +257,10 @@ export default function CourseDetailDialog({ course, open, onClose }) {
                       variant="destructive"
                       className="flex-1"
                       disabled={updateMutation.isPending}
-                      onClick={() => updateMutation.mutate({ id: course.id, data: { statut: "annulee" } })}
+                      onClick={() => {
+                        console.log("[Annulation] Clic confirmé, course.id:", course.id);
+                        updateMutation.mutate({ id: course.id, data: { statut: "annulee" } });
+                      }}
                     >
                       {updateMutation.isPending ? "..." : "Oui, annuler"}
                     </Button>
