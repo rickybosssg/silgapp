@@ -77,6 +77,7 @@ export default function CourseExterneFormSync() {
   useEffect(() => {
     if (clientFromDB) {
       setClientProfil(clientFromDB); // ✅ Toujours mettre à jour avec BDD
+      setIsBddReady(true); // ✅ BDD chargée et prête
     }
   }, [clientFromDB]);
 
@@ -87,6 +88,7 @@ export default function CourseExterneFormSync() {
   const [createdCourse, setCreatedCourse] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false); // verrou anti-double-clic
   const [invitationModal, setInvitationModal] = useState(null); // { telephone, nom } ou null
+  const [isBddReady, setIsBddReady] = useState(false); // 🛡️ Bloquer tant que BDD pas chargée
 
   // Lire brouillon (données pures, sans fonctions)
   const getDraftFromStorage = () => {
@@ -423,6 +425,12 @@ export default function CourseExterneFormSync() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // 🛡️ BLOQUER si BDD pas chargée — ÉVITE country_code incorrect
+    if (!isBddReady || !clientFromDB?.country_code) {
+      toast.error("Chargement du profil en cours... Veuillez patienter.");
+      return;
+    }
+
     // ─── Verrou anti-double-soumission (double-clic, re-render) ─────────────
     if (isSubmitting || createMutation.isPending) return;
     setIsSubmitting(true);
@@ -545,14 +553,12 @@ export default function CourseExterneFormSync() {
       ? (colis[0]?.destinataire_telephone || "")
       : destinataireTel;
 
-    // 🛡️ country_code OBLIGATOIRE : RECHARGER depuis BDD pour éviter stale state
-    // IMPORTANT : clientProfil peut venir du state React (potentiellement obsolète)
-    // On recharge TOUJOURS depuis la BDD pour garantir country_code correct
-    const freshClient = await base44.entities.ClientExterne.filter({ user_email: user.email }, 'created_date', 1);
-    const courseCountryCode = freshClient?.[0]?.country_code || clientFromDB?.country_code || clientProfil?.country_code;
+    // 🛡️ country_code OBLIGATOIRE : Utiliser UNIQUEMENT clientFromDB (BDD fraîche)
+    // IMPORTANT : NE PAS utiliser clientProfil (state React potentiellement obsolète)
+    const courseCountryCode = clientFromDB.country_code;
     
     if (!courseCountryCode) {
-      console.error("[CourseForm] ❌ country_code manquant — client:", { freshClient, clientFromDB, clientProfil });
+      console.error("[CourseForm] ❌ country_code manquant — clientFromDB:", clientFromDB);
       toast.error("Erreur : votre profil client n'a pas de pays. Veuillez contacter le support.");
       setIsSubmitting(false);
       return;
@@ -632,6 +638,25 @@ export default function CourseExterneFormSync() {
           onSend={() => { setInvitationModal(null); setCourseCreated(true); }}
         />
       </>
+    );
+  }
+
+  // 🛡️ BLOQUER le formulaire tant que BDD pas chargée
+  if (!isBddReady || clientLoading) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center space-y-5">
+          <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center mx-auto animate-pulse">
+            <span className="text-4xl">⏳</span>
+          </div>
+          <div>
+            <h2 className="text-xl font-black text-gray-900">Chargement...</h2>
+            <p className="text-sm text-gray-600 mt-3 leading-relaxed">
+              Vérification de votre profil en cours.
+            </p>
+          </div>
+        </div>
+      </div>
     );
   }
 
