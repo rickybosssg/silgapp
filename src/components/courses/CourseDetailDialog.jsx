@@ -28,9 +28,17 @@ export default function CourseDetailDialog({ course, open, onClose }) {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Course.update(id, data),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["courses"] });
-      toast.success("Statut mis à jour");
+      if (variables.data.statut === "annulee") {
+        toast.success("Course annulée avec succès");
+        onClose();
+      } else {
+        toast.success("Statut mis à jour");
+      }
+    },
+    onError: () => {
+      toast.error("Erreur lors de la mise à jour");
     },
   });
 
@@ -223,7 +231,6 @@ export default function CourseDetailDialog({ course, open, onClose }) {
                 onClick={() => {
                   if (window.confirm("Confirmer l'annulation de cette course ?")) {
                     updateMutation.mutate({ id: course.id, data: { statut: "annulee" } });
-                    onClose();
                   }
                 }}
               >
