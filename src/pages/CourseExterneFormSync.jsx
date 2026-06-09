@@ -60,9 +60,9 @@ export default function CourseExterneFormSync() {
   const savedLat = locationClientProfil?.latitude || position?.latitude || null;
   const savedLng = locationClientProfil?.longitude || position?.longitude || null;
 
-  // 🛡️ CHARGEMENT SÉCURISÉ DU PROFIL CLIENT — fallback BDD si state perdu
+  // 🛡️ CHARGEMENT SÉCURISÉ DU PROFIL CLIENT — TOUJOURS charger depuis BDD
   const [clientProfil, setClientProfil] = useState(locationClientProfil || null);
-  const { data: clientFromDB } = useQuery({
+  const { data: clientFromDB, isLoading: clientLoading } = useQuery({
     queryKey: ['client-profil-course'],
     queryFn: async () => {
       const user = await base44.auth.me();
@@ -71,14 +71,14 @@ export default function CourseExterneFormSync() {
       return clients?.[0] || null;
     },
     initialData: null,
-    enabled: !locationClientProfil, // Seulement si state manquant
+    enabled: true, // ✅ TOUJOURS activer pour garantir country_code correct
   });
 
   useEffect(() => {
-    if (clientFromDB && !locationClientProfil) {
-      setClientProfil(clientFromDB);
+    if (clientFromDB) {
+      setClientProfil(clientFromDB); // ✅ Toujours mettre à jour avec BDD
     }
-  }, [clientFromDB, locationClientProfil]);
+  }, [clientFromDB]);
 
   // Restaurer l'étape depuis localStorage si disponible
   const savedStep = parseInt(localStorage.getItem(STEP_KEY) || "0", 10);
@@ -545,30 +545,15 @@ export default function CourseExterneFormSync() {
       ? (colis[0]?.destinataire_telephone || "")
       : destinataireTel;
 
-    // 🛡️ country_code OBLIGATOIRE : détermine le pays du dispatch et le filtrage admin
-    // Si manquant, recharger le profil depuis la BDD (fallback de sécurité)
-    let courseCountryCode = clientProfil?.country_code || null;
+    // 🛡️ country_code OBLIGATOIRE : utilise TOUJOURS celui de la BDD
+    const courseCountryCode = clientFromDB?.country_code || clientProfil?.country_code;
     if (!courseCountryCode) {
-      console.warn("[CourseForm] ⚠️ country_code manquant — tentative de rechargement BDD...");
-      try {
-        const user = await base44.auth.me();
-        const clients = await base44.entities.ClientExterne.filter({ user_email: user.email }, 'created_date', 1);
-        if (clients?.[0]?.country_code) {
-          courseCountryCode = clients[0].country_code;
-          console.log("[CourseForm] ✅ country_code récupéré depuis la BDD:", courseCountryCode);
-        } else {
-          console.error("[CourseForm] ❌ country_code TOUJOURS manquant après rechargement BDD");
-          toast.error("Erreur : votre profil client n'a pas de pays. Veuillez contacter le support.");
-          setIsSubmitting(false);
-          return;
-        }
-      } catch (err) {
-        console.error("[CourseForm] ❌ Erreur rechargement BDD:", err);
-        toast.error("Erreur : impossible de vérifier votre pays. Réessayez.");
-        setIsSubmitting(false);
-        return;
-      }
+      console.error("[CourseForm] ❌ country_code manquant — client:", clientProfil, "BDD:", clientFromDB);
+      toast.error("Erreur : votre profil client n'a pas de pays. Veuillez contacter le support.");
+      setIsSubmitting(false);
+      return;
     }
+    console.log("[CourseForm] ✅ country_code confirmé:", courseCountryCode);
 
     createMutation.mutate({
       country_code: courseCountryCode,
