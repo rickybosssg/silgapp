@@ -687,10 +687,40 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           )}
 
           {colisLivre && (() => {
-            // ⚠️ CORRECTION PRIX MANUEL : Si la course utilise un prix manuel accepté,
-            // ce montant devient le prix officiel. Ne JAMAIS recalculer.
+            const isMulti = isExterne && course.is_multi_colis && (course.nb_colis || 1) > 1;
+
+            // Multi-colis : totaux issus des montants par colis (pas de tarification auto)
+            if (isMulti) {
+              const total = Number(course.prix_final) || 0;
+              const gain = Number(course.montant_livreur) || Math.round(total * 0.7);
+              const commission = Number(course.commission_silga) || Math.round(total * 0.3);
+              return (
+                <div className="py-4 bg-green-50 rounded-2xl border border-green-200 space-y-3 px-4">
+                  <div className="text-center">
+                    <p className="text-2xl mb-1">🎉</p>
+                    <p className="font-black text-green-700 text-base">Tournée terminée !</p>
+                    <p className="text-xs text-green-600 mt-0.5">{course.nb_colis} colis livrés</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
+                      <p className="text-[10px] text-gray-400 font-semibold uppercase">Total</p>
+                      <p className="text-sm font-black text-gray-800">{total.toLocaleString()} {course.devise || "F"}</p>
+                    </div>
+                    <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
+                      <p className="text-[10px] text-gray-400 font-semibold uppercase">Ton gain</p>
+                      <p className="text-sm font-black text-green-700">+{gain.toLocaleString()} {course.devise || "F"}</p>
+                    </div>
+                    <div className="bg-white rounded-xl p-2.5 text-center border border-gray-100">
+                      <p className="text-[10px] text-gray-400 font-semibold uppercase">Commission</p>
+                      <p className="text-sm font-black text-gray-500">{commission.toLocaleString()} {course.devise || "F"}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            // Colis unique : logique existante inchangée
             const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
-            
             const dist = Number(course.distance_reelle_km) > 0 ? Number(course.distance_reelle_km) : null;
             const prix = isPrixManuel
               ? Number(course.manual_price)

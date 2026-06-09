@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import CourseStatusBadge from "./CourseStatusBadge";
 import UrgenceBadge from "./UrgenceBadge";
+import MultiColisAdminView from "./MultiColisAdminView";
 import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -201,6 +202,11 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
                 </div>
               )}
             </div>
+          )}
+
+          {/* Multi-colis admin view */}
+          {reseau === "externe" && course.is_multi_colis && course.nb_colis > 1 && (
+            <MultiColisAdminView course={course} />
           )}
 
           {/* Notes */}
