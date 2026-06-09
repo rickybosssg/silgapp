@@ -145,28 +145,20 @@ export default function DashboardExterne() {
 
   const taux = stats.total > 0 ? Math.round((stats.livrees / stats.total) * 100) : 0;
 
-  // Obliger la sélection d'un pays si aucun n'est actif
+  // Aucun pays sélectionné → message d'invite
   if (!effectiveCountry) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6">
-        <div className="max-w-sm w-full text-center space-y-6">
+        <div className="max-w-sm w-full text-center space-y-4">
           <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-primary to-red-600 flex items-center justify-center mx-auto shadow-xl shadow-red-200">
             <Globe className="w-8 h-8 text-white" />
           </div>
-          <div>
-            <h2 className="text-2xl font-black text-gray-900">Sélectionnez un pays</h2>
-            <p className="text-gray-500 text-sm mt-1">Les données sont isolées par pays. Choisissez un pays pour accéder au tableau de bord.</p>
+          <h2 className="text-2xl font-black text-gray-900">Sélectionnez un pays</h2>
+          <p className="text-gray-500 text-sm">Choisissez un pays dans le menu à gauche pour accéder au tableau de bord.</p>
+          <div className="flex items-center gap-2 justify-center text-gray-400 text-xs">
+            <span>←</span>
+            <span>Utilisez le sélecteur de pays dans la sidebar</span>
           </div>
-          <CountrySelector
-            value=""
-            onChange={(code) => setSelectedCountry(code)}
-            className="w-full h-12 text-base rounded-2xl border-2 border-gray-200"
-          />
-          <Link to="/">
-            <Button variant="outline" className="gap-2 rounded-xl">
-              <ArrowLeft className="w-4 h-4" /> Retour
-            </Button>
-          </Link>
         </div>
       </div>
     );
@@ -225,13 +217,7 @@ export default function DashboardExterne() {
                   </Button>
                 </Link>
               )}
-              {!isPays && (
-                <CountrySelector
-                  value={effectiveCountry || ""}
-                  onChange={(code) => setSelectedCountry(code)}
-                  className="h-8 text-xs bg-white/10 border-white/10 text-white rounded-xl"
-                />
-              )}
+              {/* Sélecteur de pays déplacé dans la sidebar */}
               <AppToggleButton />
               <Link to="/carte">
                 <Button size="sm" className="gap-1.5 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs shadow-lg shadow-primary/30">
