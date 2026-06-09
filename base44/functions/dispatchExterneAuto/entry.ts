@@ -55,16 +55,19 @@ function calculerDistance(lat1, lon1, lat2, lon2) {
  * Le heartbeat ne sert plus à EXCLURE, mais à PRIORISER et choisir le canal de notification.
  */
 async function trouverLivreursCandidatsParNiveaux(base44, course, exclusions = []) {
+  // 🌍 FILTRE PAR PAYS — OBLIGATOIRE : jamais traverser les frontières
+  if (!course.country_code) {
+    console.error(`[DISPATCH] ❌ BLOQUÉ — course ${course.id} sans country_code. Dispatch inter-pays interdit.`);
+    return [];
+  }
+
   const filterLivreur = {
     type_livreur: 'externe',
     validation: 'valide',
     actif: true,
     statut: 'disponible',
+    country_code: course.country_code,
   };
-  // 🌍 FILTRE PAR PAYS — jamais traverser les frontières
-  if (course.country_code) {
-    filterLivreur.country_code = course.country_code;
-  }
   const tousLivreurs = await base44.asServiceRole.entities.Livreur.filter(filterLivreur);
 
   if (!tousLivreurs || tousLivreurs.length === 0) {

@@ -524,7 +524,14 @@ export default function CourseExterneFormSync() {
       ? (colis[0]?.destinataire_telephone || "")
       : destinataireTel;
 
+    // ⚠️ country_code OBLIGATOIRE : détermine le pays du dispatch et le filtrage admin
+    const courseCountryCode = clientProfil?.country_code || null;
+    if (!courseCountryCode) {
+      console.warn("[CourseForm] ⚠️ country_code manquant sur clientProfil — le dispatch ne sera pas isolé par pays !");
+    }
+
     createMutation.mutate({
+      country_code: courseCountryCode,
       client_nom: formData.client_nom,
       client_telephone: formData.client_telephone,
       type_course: formData.type_course,
