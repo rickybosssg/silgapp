@@ -16,6 +16,8 @@ import { toast } from "sonner";
 import CarnetAdresses from "@/components/client/CarnetAdresses";
 import ContactPickerButton from "@/components/client/ContactPickerButton";
 import { SILGAPP_COUNTRIES, phoneVariants } from "@/lib/phoneUtils";
+import NombreColisSelector from "@/components/multi-colis/NombreColisSelector";
+import MultiColisFormStep from "@/components/multi-colis/MultiColisFormStep";
 
 // Retourne l'indicatif affiché (ex: "+226") selon le pays
 function getDialCode(countryCode) {
@@ -91,6 +93,11 @@ export default function CourseStepForm({
   isLoading,
   clientId,
   countryCode, // pays actif — détermine l'indicatif téléphonique
+  // Multi-colis
+  colis,
+  onColisChange,
+  savedLat,
+  savedLng,
 }) {
   const activeCountry = countryCode || "BF";
   const phonePlaceholder = getPhonePlaceholder(activeCountry);
@@ -347,6 +354,16 @@ export default function CourseStepForm({
                 </div>
               </button>
             </div>
+
+            {/* ── Sélecteur nombre de colis — uniquement pour "expedier" ── */}
+            {formData.type_course === "expedier" && (
+              <div className="mt-5 p-4 bg-white rounded-2xl border-2 border-gray-100 shadow-sm">
+                <NombreColisSelector
+                  value={formData.nb_colis || 1}
+                  onChange={(nb) => setFormData({ ...formData, nb_colis: nb })}
+                />
+              </div>
+            )}
           </div>
         );
 
@@ -498,6 +515,20 @@ export default function CourseStepForm({
 
       // ─── ÉTAPE 2 ───────────────────────────────────────────────────────────
       case 2: {
+        // Mode multi-colis : afficher les formulaires des colis
+        if (isExpedie && (formData.nb_colis || 1) > 1) {
+          return (
+            <MultiColisFormStep
+              colis={colis || []}
+              onChange={onColisChange}
+              clientId={clientId}
+              countryCode={countryCode}
+              savedLat={savedLat}
+              savedLng={savedLng}
+            />
+          );
+        }
+
         if (isExpedie) {
           return (
             <div className="space-y-5">
@@ -818,12 +849,17 @@ export default function CourseStepForm({
   const isContinueDisabled = () => {
     const isExpedie = formData.type_course === "expedier";
     const isRecevoir = formData.type_course === "recevoir";
+    const isMulti = isExpedie && (formData.nb_colis || 1) > 1;
     if (step === 0) return !formData.type_course;
     if (step === 1) {
       if (isRecevoir) return !formData.expediteur_telephone;
       // "expedier" : adresse de récupération optionnelle — toujours continuer
     }
     if (step === 2) {
+      // Multi-colis : tous les colis doivent avoir un téléphone
+      if (isMulti) {
+        return !(colis || []).every(c => !!c.destinataire_telephone);
+      }
       if (isExpedie) return !formData.destinataire_telephone;
       // "recevoir" : adresse de récupération optionnelle — toujours continuer
     }

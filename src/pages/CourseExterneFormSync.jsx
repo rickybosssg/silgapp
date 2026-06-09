@@ -12,6 +12,31 @@ import LivreurRechercheAnimation from "@/components/client/LivreurRechercheAnima
 import InvitationWhatsAppModal from "@/components/client/InvitationWhatsAppModal";
 import { normalizePhone, phoneVariants } from "@/lib/phoneUtils";
 
+// Génère les IDs de colis : A, B, C...
+const COLIS_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
+
+function createColisDefaults(nb) {
+  return Array.from({ length: nb }, (_, i) => ({
+    colis_uid: COLIS_LETTERS[i] || String(i + 1),
+    numero_ordre: i + 1,
+    destinataire_nom: "",
+    destinataire_telephone: "",
+    destinataire_phone_normalized: "",
+    destinataire_client_id: null,
+    recipient_has_app: false,
+    adresse_livraison: "",
+    gps_livraison_lat: null,
+    gps_livraison_lng: null,
+    type_colis: "petit_colis",
+    description_colis: "",
+    instructions: "",
+    statut: "en_attente",
+    montant_a_encaisser: 0,
+    mode_paiement: "especes",
+    ordre_livraison: i + 1,
+  }));
+}
+
 // Haversine
 function calculerDistance(lat1, lng1, lat2, lng2) {
   const R = 6371;
@@ -91,6 +116,28 @@ export default function CourseExterneFormSync() {
   };
 
   const [formData, setFormData] = useState(initialData);
+
+  // ── État multi-colis ─────────────────────────────────────────────────────
+  const [colis, setColis] = useState(() => createColisDefaults(1));
+
+  // Sync: quand nb_colis change, adapter le tableau de colis
+  useEffect(() => {
+    const nb = formData.nb_colis || 1;
+    setColis(prev => {
+      if (prev.length === nb) return prev;
+      if (nb > prev.length) {
+        // Ajouter des colis
+        const extra = createColisDefaults(nb).slice(prev.length);
+        return [...prev, ...extra];
+      }
+      // Réduire
+      return prev.slice(0, nb);
+    });
+  }, [formData.nb_colis]);
+
+  const handleColisChange = (index, field, value) => {
+    setColis(prev => prev.map((c, i) => i === index ? { ...c, [field]: value } : c));
+  };
 
   // Pré-remplir depuis profil si pas de brouillon — UNE SEULE FOIS au mount
   useEffect(() => {
@@ -266,6 +313,38 @@ export default function CourseExterneFormSync() {
       finalData.delivery_confirmed_at = null;
 
       const course = await base44.entities.CourseExterne.create(finalData);
+
+      // ── Créer les sous-colis si mode multi-colis ──────────────────────────
+      if (finalData.is_multi_colis && finalData._colisData?.length > 1) {
+        const colisPromises = finalData._colisData.map((c) => {
+          const deliveryQrToken = crypto.randomUUID().replace(/-/g, "");
+          const deliveryCode4 = String(Math.floor(1000 + Math.random() * 9000));
+          return base44.entities.ColisExterne.create({
+            course_id: course.id,
+            colis_uid: c.colis_uid,
+            numero_ordre: c.numero_ordre,
+            destinataire_nom: c.destinataire_nom || "Destinataire",
+            destinataire_telephone: c.destinataire_telephone,
+            destinataire_phone_normalized: normalizePhone(c.destinataire_telephone) || c.destinataire_telephone,
+            destinataire_client_id: c.destinataire_client_id || null,
+            recipient_has_app: c.recipient_has_app || false,
+            adresse_livraison: c.adresse_livraison || "",
+            gps_livraison_lat: c.gps_livraison_lat || null,
+            gps_livraison_lng: c.gps_livraison_lng || null,
+            type_colis: c.type_colis || "petit_colis",
+            description_colis: c.description_colis || "",
+            instructions: c.instructions || "",
+            statut: "en_attente",
+            montant_a_encaisser: 0,
+            mode_paiement: "especes",
+            delivery_qr_token: deliveryQrToken,
+            delivery_code_4_digits: deliveryCode4,
+            ordre_livraison: c.ordre_livraison || c.numero_ordre,
+          });
+        });
+        await Promise.all(colisPromises);
+      }
+
       // Notifier toujours (la fonction vérifie en interne)
       try {
         await base44.functions.invoke("notifyClientSync", { course_id: course.id });
@@ -431,6 +510,20 @@ export default function CourseExterneFormSync() {
       console.warn("[CourseForm] validateCourseRoles indisponible, on continue :", err.message);
     }
 
+    const nbColis = (formData.nb_colis || 1);
+    const isMulti = isExpedie && nbColis > 1;
+
+    // Pour multi-colis : résumé des destinataires
+    const adresseArriveeFinale = isMulti
+      ? "Tournée multi-colis"
+      : adresseArrivee;
+    const destinataireNomFinal = isMulti
+      ? `${nbColis} destinataires`
+      : (destinataireNom || "Destinataire");
+    const destinataireTelFinal = isMulti
+      ? (colis[0]?.destinataire_telephone || "")
+      : destinataireTel;
+
     createMutation.mutate({
       client_nom: formData.client_nom,
       client_telephone: formData.client_telephone,
@@ -439,24 +532,31 @@ export default function CourseExterneFormSync() {
       expediteur_telephone: expediteurTel,
       expediteur_phone_normalized: expediteurPhoneNormalized,
       expediteur_client_id: expediteurClientId,
-      destinataire_nom: destinataireNom || "Destinataire",
-      destinataire_telephone: destinataireTel,
-      destinataire_phone_normalized: destinatairePhoneNormalized,
-      destinataire_client_id: destinataireClientId,
+      destinataire_nom: destinataireNomFinal,
+      destinataire_telephone: destinataireTelFinal,
+      destinataire_phone_normalized: isMulti ? "" : destinatairePhoneNormalized,
+      destinataire_client_id: isMulti ? null : destinataireClientId,
       recipient_has_app: false,
       expediteur_has_app: false,
       adresse_depart: formData.adresse_depart || (formData.recuperationGPS ? "Position GPS" : "À définir"),
-      adresse_arrivee: adresseArrivee,
-      type_colis: formData.type_colis,
+      adresse_arrivee: adresseArriveeFinale,
+      type_colis: isMulti ? (colis[0]?.type_colis || "petit_colis") : formData.type_colis,
       notes: formData.notes,
       gps_depart_lat: formData.gps_depart_lat,
       gps_depart_lng: formData.gps_depart_lng,
-      gps_arrivee_lat: gpsArriveLat,
-      gps_arrivee_lng: gpsArriveLng,
+      gps_arrivee_lat: isMulti ? null : gpsArriveLat,
+      gps_arrivee_lng: isMulti ? null : gpsArriveLng,
       destination_inconnue: destInconnue,
       prix_estimate: prixEstime,
       statut: "recherche_livreur",
       dispatch_status: "en_attente",
+      // Champs multi-colis
+      is_multi_colis: isMulti,
+      nb_colis: nbColis,
+      nb_colis_livres: 0,
+      nb_colis_annules: 0,
+      // Données internes pour création des sous-colis (non persistées sur la course)
+      _colisData: isMulti ? colis : null,
     });
   };
 
@@ -553,6 +653,10 @@ export default function CourseExterneFormSync() {
               isLoading={createMutation.isPending || isSubmitting}
               clientId={clientProfil?.id}
               countryCode={clientProfil?.country_code}
+              colis={colis}
+              onColisChange={handleColisChange}
+              savedLat={savedLat}
+              savedLng={savedLng}
             />
           </form>
         </Card>

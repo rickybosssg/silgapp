@@ -1,0 +1,145 @@
+{
+  "name": "ColisExterne",
+  "type": "object",
+  "properties": {
+    "course_id": {
+      "type": "string",
+      "description": "ID de la CourseExterne parente"
+    },
+    "colis_uid": {
+      "type": "string",
+      "description": "Identifiant unique du colis dans la course (ex: A, B, C ou 1, 2, 3)"
+    },
+    "numero_ordre": {
+      "type": "number",
+      "description": "Num\u00e9ro d'ordre du colis dans la course (1, 2, 3...)"
+    },
+    "destinataire_nom": {
+      "type": "string",
+      "description": "Nom du destinataire de ce colis"
+    },
+    "destinataire_telephone": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone du destinataire"
+    },
+    "destinataire_phone_normalized": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone normalis\u00e9 (avec indicatif)"
+    },
+    "destinataire_client_id": {
+      "type": "string",
+      "description": "ID du ClientExterne si inscrit dans SILGAPP"
+    },
+    "recipient_has_app": {
+      "type": "boolean",
+      "default": false,
+      "description": "Le destinataire a l'application SILGAPP"
+    },
+    "adresse_livraison": {
+      "type": "string",
+      "description": "Adresse ou quartier de livraison pour ce colis"
+    },
+    "gps_livraison_lat": {
+      "type": "number",
+      "description": "Latitude du point de livraison de ce colis"
+    },
+    "gps_livraison_lng": {
+      "type": "number",
+      "description": "Longitude du point de livraison de ce colis"
+    },
+    "type_colis": {
+      "type": "string",
+      "enum": [
+        "petit_colis",
+        "moyen_colis",
+        "gros_colis",
+        "document",
+        "nourriture",
+        "autre"
+      ],
+      "default": "petit_colis",
+      "description": "Type de colis"
+    },
+    "description_colis": {
+      "type": "string",
+      "description": "Description du contenu du colis"
+    },
+    "instructions": {
+      "type": "string",
+      "description": "Instructions particuli\u00e8res pour la livraison de ce colis"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "en_attente",
+        "recupere",
+        "en_livraison",
+        "livre",
+        "annule"
+      ],
+      "default": "en_attente",
+      "description": "Statut individuel de ce colis"
+    },
+    "heure_recuperation": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure de r\u00e9cup\u00e9ration de ce colis"
+    },
+    "heure_livraison": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure de livraison effective de ce colis"
+    },
+    "commentaire_livraison": {
+      "type": "string",
+      "description": "Commentaire du livreur lors de la livraison (pr\u00e9vu Phase 2)"
+    },
+    "montant_a_encaisser": {
+      "type": "number",
+      "default": 0,
+      "description": "Montant \u00e0 encaisser aupr\u00e8s du destinataire (pr\u00e9vu Phase 2)"
+    },
+    "mode_paiement": {
+      "type": "string",
+      "enum": [
+        "especes",
+        "mobile_money",
+        "gratuit"
+      ],
+      "default": "especes",
+      "description": "Mode de paiement pour ce colis (pr\u00e9vu Phase 2)"
+    },
+    "delivery_qr_token": {
+      "type": "string",
+      "description": "Token QR unique pour validation de livraison de ce colis"
+    },
+    "delivery_code_4_digits": {
+      "type": "string",
+      "description": "Code 4 chiffres pour validation manuelle de livraison de ce colis"
+    },
+    "delivery_confirmed_by": {
+      "type": "string",
+      "enum": [
+        "qr",
+        "manual_code",
+        "livreur",
+        "admin"
+      ],
+      "description": "M\u00e9thode de confirmation de livraison"
+    },
+    "delivery_confirmed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date et heure de confirmation de livraison"
+    },
+    "ordre_livraison": {
+      "type": "number",
+      "description": "Ordre de livraison optimis\u00e9 (peut \u00eatre modifi\u00e9 par le livreur)"
+    }
+  },
+  "required": [
+    "course_id",
+    "colis_uid",
+    "destinataire_telephone"
+  ]
+}

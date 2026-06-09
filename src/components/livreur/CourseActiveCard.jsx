@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { MapPin, Phone, Navigation, Package, Check, X, AlertTriangle, ChevronRight, QrCode, Clock, Ruler } from "lucide-react";
+import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -315,8 +316,23 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
             <p className="text-white text-sm font-bold">Course en cours</p>
+            {course.is_multi_colis && (
+              <span className="text-[10px] bg-purple-500 text-white px-2 py-0.5 rounded-full font-bold">
+                {course.nb_colis} colis
+              </span>
+            )}
           </div>
-          <span className="text-white/50 text-xs">#{course.id?.slice(-6)}</span>
+          <div className="flex items-center gap-2">
+            {course.is_multi_colis && (
+              <MultiColisProgressBadge
+                nbColis={course.nb_colis || 1}
+                nbLivres={course.nb_colis_livres || 0}
+                nbAnnules={course.nb_colis_annules || 0}
+                size="sm"
+              />
+            )}
+            <span className="text-white/50 text-xs">#{course.id?.slice(-6)}</span>
+          </div>
         </div>
 
         <div className="p-5 space-y-4">

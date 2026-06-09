@@ -9,6 +9,7 @@ import { fr } from "date-fns/locale";
 import CourseStatusBadge from "@/components/courses/CourseStatusBadge";
 import CanalNotifBadge from "@/components/courses/CanalNotifBadge";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
+import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
 
 const STATUT_FILTRES = [
   { key: "tous",        label: "Toutes" },
@@ -156,6 +157,12 @@ export default function ToutesCoursesExternes() {
                     <span className="font-bold text-sm text-foreground truncate">{course.client_nom || "Client"}</span>
                     <CourseStatusBadge statut={course.statut} />
                     {course.livreur_id && <CanalNotifBadge course={course} />}
+                    <MultiColisProgressBadge
+                      nbColis={course.nb_colis || 1}
+                      nbLivres={course.nb_colis_livres || 0}
+                      nbAnnules={course.nb_colis_annules || 0}
+                      size="sm"
+                    />
                   </div>
                   <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                     <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
