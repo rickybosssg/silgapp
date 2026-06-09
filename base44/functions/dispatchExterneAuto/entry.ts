@@ -663,6 +663,64 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── 5b. Fermer courses sans livreur après 4 minutes ─────────────────
+    // Appelé par un scheduled job toutes les minutes
+    if (action === 'fermer_courses_expirees') {
+      const DELAI_FERMETURE_MS = 4 * 60 * 1000; // 4 minutes
+      const now = new Date();
+      const limite = new Date(now.getTime() - DELAI_FERMETURE_MS);
+
+      // Chercher toutes les courses encore en recherche
+      const coursesEnRecherche = await base44.asServiceRole.entities.CourseExterne.filter({
+        statut: 'recherche_livreur',
+      });
+
+      const aFermer = coursesEnRecherche.filter(c => new Date(c.created_date) < limite);
+      console.log(`[DISPATCH] ⏰ Fermeture courses expirées : ${aFermer.length} course(s) à fermer (> 4 min sans livreur)`);
+
+      const fermetures = [];
+      for (const c of aFermer) {
+        // 1. Passer la course en annulée
+        await base44.asServiceRole.entities.CourseExterne.update(c.id, {
+          statut: 'annulee',
+          dispatch_status: 'expire',
+          remarque_livreur: 'Aucun livreur disponible après 4 minutes — fermée automatiquement',
+        });
+
+        // 2. Notifier le client (créateur de la course)
+        try {
+          let clientEmail = null;
+          if (c.created_by_id) {
+            try {
+              const creator = await base44.asServiceRole.entities.User.get(c.created_by_id);
+              clientEmail = creator?.email || null;
+            } catch (_) {}
+          }
+          if (!clientEmail && c.expediteur_client_id) {
+            const clients = await base44.asServiceRole.entities.ClientExterne.filter({ id: c.expediteur_client_id });
+            clientEmail = clients?.[0]?.user_email || null;
+          }
+          if (clientEmail) {
+            await base44.asServiceRole.entities.Notification.create({
+              titre: '😔 Aucun livreur disponible',
+              message: 'Nous n\'avons pas trouvé de livreur disponible pour votre course. Vous pouvez relancer la recherche ou créer une nouvelle course.',
+              type: 'course_annulee',
+              course_id: c.id,
+              destinataire_email: clientEmail,
+              lue: false,
+            });
+            console.log(`[DISPATCH] 📩 Client notifié : ${clientEmail} — course ${c.id} fermée après 4 min`);
+          }
+        } catch (err) {
+          console.warn('[DISPATCH] ⚠️ Erreur notification client fermeture:', err.message);
+        }
+
+        fermetures.push({ course_id: c.id, created_date: c.created_date });
+      }
+
+      return Response.json({ success: true, fermees: fermetures.length, details: fermetures });
+    }
+
     // ─── 5. Retry courses en attente (appelé par un scheduled job) ────────
     // Cherche toutes les courses en recherche sans livreur proposé et les redispatche
     if (action === 'retry_courses_en_attente') {

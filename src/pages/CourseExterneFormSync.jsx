@@ -576,15 +576,25 @@ export default function CourseExterneFormSync() {
     navigate("/client");
   };
 
+  const handleRelancer = () => {
+    // Réinitialiser pour permettre une nouvelle soumission
+    setCourseCreated(false);
+    setCreatedCourse(null);
+    setIsSubmitting(false);
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STEP_KEY);
+    setCurrentStep(0);
+  };
+
   if (courseCreated && createdCourse) {
-    return <LivreurRechercheAnimation course={createdCourse} />;
+    return <LivreurRechercheAnimation course={createdCourse} onRelancer={handleRelancer} />;
   }
 
   // Modal invitation WhatsApp — affiché après création réussie si contact hors SILGAPP
   if (invitationModal && createdCourse) {
     return (
       <>
-        <LivreurRechercheAnimation course={createdCourse} />
+        <LivreurRechercheAnimation course={createdCourse} onRelancer={handleRelancer} />
         <InvitationWhatsAppModal
           telephone={invitationModal.telephone}
           nomContact={invitationModal.nom}

@@ -3,9 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Truck, MapPin, Package, User, Smartphone, CheckCircle2, Loader2, Navigation, XCircle } from "lucide-react";
+import { Truck, MapPin, Package, User, CheckCircle2, Loader2, Navigation, XCircle, RefreshCw, AlertCircle } from "lucide-react";
 import AnnulerCourseDialog from "./AnnulerCourseDialog";
 import PrixManuelInlineCard from "./PrixManuelInlineCard";
 
@@ -26,10 +25,11 @@ const messages = [
   "En attente de confirmation...",
 ];
 
-export default function LivreurRechercheAnimation({ course }) {
+export default function LivreurRechercheAnimation({ course, onRelancer }) {
   const navigate = useNavigate();
   const [showAnnulerDialog, setShowAnnulerDialog] = useState(false);
   const [currentMessage, setCurrentMessage] = useState(0);
+  const [aucunLivreur, setAucunLivreur] = useState(false);
 
   // Rotation des messages
   useEffect(() => {
@@ -44,7 +44,7 @@ export default function LivreurRechercheAnimation({ course }) {
     queryKey: ["suivi-course-recherche", course.id],
     queryFn: () => base44.entities.CourseExterne.filter({ id: course.id }),
     select: (data) => Array.isArray(data) ? data[0] : null,
-    enabled: !!course.id,
+    enabled: !!course.id && !aucunLivreur,
     refetchInterval: 3000,
   });
 
@@ -54,9 +54,9 @@ export default function LivreurRechercheAnimation({ course }) {
     if (courseData.statut === "livreur_en_route" || courseData.dispatch_status === "accepte") {
       navigate("/client/suivi");
     }
-    // Rediriger aussi si annulée
-    if (courseData.statut === "annulee") {
-      navigate("/client");
+    // Fermée automatiquement après 4 min sans livreur → afficher l'écran "Aucun livreur"
+    if (courseData.statut === "annulee" && courseData.dispatch_status === "expire") {
+      setAucunLivreur(true);
     }
   }, [courseData, navigate]);
 
@@ -64,6 +64,43 @@ export default function LivreurRechercheAnimation({ course }) {
   const hasPrixManuel =
     liveCourse?.manual_price_status === "pending_client_validation" &&
     liveCourse?.manual_price > 0;
+
+  // ─── Écran "Aucun livreur disponible" ────────────────────────────────────
+  if (aucunLivreur) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-red-50 p-4 flex items-center justify-center">
+        <div className="max-w-sm w-full space-y-6 text-center">
+          <div className="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center mx-auto">
+            <AlertCircle className="w-10 h-10 text-red-500" />
+          </div>
+          <div>
+            <h2 className="text-xl font-black text-gray-900 mb-2">Aucun livreur disponible</h2>
+            <p className="text-sm text-gray-500 leading-relaxed">
+              Nous n'avons pas trouvé de livreur disponible après 4 minutes. Vous pouvez relancer la recherche ou créer une nouvelle course.
+            </p>
+          </div>
+          <div className="space-y-3">
+            {onRelancer && (
+              <Button
+                className="w-full h-13 bg-primary text-white font-bold rounded-2xl"
+                onClick={onRelancer}
+              >
+                <RefreshCw className="w-5 h-5 mr-2" />
+                Relancer la recherche
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              className="w-full h-12 rounded-2xl border-gray-200"
+              onClick={() => navigate("/client")}
+            >
+              Créer une nouvelle course
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-accent/5 p-4">
