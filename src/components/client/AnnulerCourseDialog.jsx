@@ -135,6 +135,7 @@ export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, 
       // 2. Si frais → créer l'enregistrement FraisAnnulation
       if (situation?.type === "payant" && clientId) {
         await base44.entities.FraisAnnulation.create({
+          country_code: course.country_code || "",
           course_id: course.id,
           client_id: clientId,
           client_nom: course.client_nom || "",

@@ -12,6 +12,7 @@ import {
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
+import { useAdminContext } from "@/hooks/useAdminContext.js";
 
 // ── Onglets ────────────────────────────────────────────────────────────────────
 const TABS = [
@@ -132,17 +133,25 @@ function DusLivreursTab() {
   const queryClient = useQueryClient();
   const [filtre, setFiltre] = useState("aujourd_hui");
   const [detailEntry, setDetailEntry] = useState(null);
+  const { isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
+  const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || "");
+  const coursesLivreesFilter = effectiveCountry
+    ? { statut: "livree", country_code: effectiveCountry }
+    : { statut: "livree" };
+  const livreursFilter = effectiveCountry
+    ? { type_livreur: "externe", country_code: effectiveCountry }
+    : { type_livreur: "externe" };
 
   const { data: courses = [] } = useQuery({
-    queryKey: ["courses-externes-livrees"],
-    queryFn: () => base44.entities.CourseExterne.filter({ statut: "livree" }, "-heure_livraison", 500),
+    queryKey: ["courses-externes-livrees", effectiveCountry],
+    queryFn: () => base44.entities.CourseExterne.filter(coursesLivreesFilter, "-heure_livraison", 500),
     initialData: [],
     refetchInterval: 15000,
   });
 
   const { data: livreurs = [] } = useQuery({
-    queryKey: ["livreurs-externes-all"],
-    queryFn: () => base44.entities.Livreur.filter({ type_livreur: "externe" }, "-created_date", 200),
+    queryKey: ["livreurs-externes-all", effectiveCountry],
+    queryFn: () => base44.entities.Livreur.filter(livreursFilter, "-created_date", 200),
     initialData: [],
     refetchInterval: 15000,
   });
@@ -315,10 +324,15 @@ function DusLivreursTab() {
 function FraisAnnulationTab() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const { isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
+  const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || "");
+  const fraisFilter = effectiveCountry ? { country_code: effectiveCountry } : null;
 
   const { data: frais = [], isLoading, refetch } = useQuery({
-    queryKey: ["frais-annulation"],
-    queryFn: () => base44.entities.FraisAnnulation.list("-created_date", 200),
+    queryKey: ["frais-annulation", effectiveCountry],
+    queryFn: () => fraisFilter
+      ? base44.entities.FraisAnnulation.filter(fraisFilter, "-created_date", 200)
+      : base44.entities.FraisAnnulation.list("-created_date", 200),
     refetchInterval: 30000,
   });
 

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { useAdminContext } from "@/hooks/useAdminContext.js";
 
 const NIVEAU_CONFIG = {
   information: { emoji: "🟢", label: "Information", color: "bg-green-100 text-green-700 border-green-200", dot: "bg-green-500" },
@@ -15,7 +16,7 @@ const NIVEAU_CONFIG = {
   urgent:      { emoji: "🔴", label: "Urgent",      color: "bg-red-100 text-red-700 border-red-200", dot: "bg-red-500" },
 };
 
-function NouvelleAlerteForm({ onClose, onCreated }) {
+function NouvelleAlerteForm({ onClose, onCreated, countryCode }) {
   const [form, setForm] = useState({
     titre: "",
     message: "",
@@ -37,6 +38,7 @@ function NouvelleAlerteForm({ onClose, onCreated }) {
       const user = await base44.auth.me();
       const data = {
         ...form,
+        country_code: countryCode || "",
         actif: true,
         nb_lectures: 0,
         cree_par: user?.full_name || user?.email || "Admin",
@@ -284,11 +286,21 @@ export default function AlertesLivreursPanel() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [filtreActif, setFiltreActif] = useState(true);
+  const { isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
+  const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || "");
+  const alertesFilter = {
+    ...(filtreActif ? { actif: true } : {}),
+    ...(effectiveCountry ? { country_code: effectiveCountry } : {}),
+  };
+  const livreursFilter = {
+    actif: true,
+    ...(effectiveCountry ? { country_code: effectiveCountry } : {}),
+  };
 
   const { data: alertes = [], isLoading } = useQuery({
-    queryKey: ["alertes-livreurs-admin", filtreActif],
+    queryKey: ["alertes-livreurs-admin", filtreActif, effectiveCountry],
     queryFn: () => base44.entities.AlerteLivreur.filter(
-      filtreActif ? { actif: true } : {},
+      alertesFilter,
       "-created_date",
       100
     ),
@@ -296,8 +308,8 @@ export default function AlertesLivreursPanel() {
   });
 
   const { data: livreurs = [] } = useQuery({
-    queryKey: ["livreurs-actifs-alertes"],
-    queryFn: () => base44.entities.Livreur.filter({ actif: true }, "-created_date", 500),
+    queryKey: ["livreurs-actifs-alertes", effectiveCountry],
+    queryFn: () => base44.entities.Livreur.filter(livreursFilter, "-created_date", 500),
   });
 
   const archiverMutation = useMutation({
@@ -375,6 +387,7 @@ export default function AlertesLivreursPanel() {
       {showForm && (
         <NouvelleAlerteForm
           onClose={() => setShowForm(false)}
+          countryCode={effectiveCountry}
           onCreated={() => {
             queryClient.invalidateQueries({ queryKey: ["alertes-livreurs-admin"] });
           }}

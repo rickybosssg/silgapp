@@ -41,7 +41,7 @@ export default function CreateLivreurDialog({ reseau = "interne", countryCode = 
     vehicule: "moto",
     type_livreur: reseau,
     reseau: reseau,
-    country_code: effectiveCountryCode || "BF",
+    country_code: effectiveCountryCode || "",
   });
 
   const activeCountry = effectiveCountryCode || form.country_code || "BF";
@@ -50,10 +50,14 @@ export default function CreateLivreurDialog({ reseau = "interne", countryCode = 
   const createMutation = useMutation({
     mutationFn: async () => {
       const code = `LIV-${Date.now()}`;
+      const selectedCountryCode = effectiveCountryCode || form.country_code;
+      if (!selectedCountryCode) {
+        throw new Error("Le pays du livreur est obligatoire");
+      }
       const response = await base44.functions.invoke("createLivreur", {
         data: {
           ...form,
-          country_code: effectiveCountryCode || form.country_code || "BF",
+          country_code: selectedCountryCode,
           code_identification: code,
         }
       });
@@ -78,7 +82,7 @@ export default function CreateLivreurDialog({ reseau = "interne", countryCode = 
         vehicule: "moto",
         type_livreur: reseau,
         reseau: reseau,
-        country_code: effectiveCountryCode || "BF",
+        country_code: effectiveCountryCode || "",
       });
     },
     onError: (err) => {
@@ -183,6 +187,7 @@ export default function CreateLivreurDialog({ reseau = "interne", countryCode = 
                   value={form.country_code}
                   onChange={(e) => setForm(p => ({ ...p, country_code: e.target.value }))}
                 >
+                  <option value="" disabled>SÃ©lectionner un pays</option>
                   {["BF","CI","TG","BJ","SN","ML","GN","NE"].map(c => (
                     <option key={c} value={c}>{c}</option>
                   ))}

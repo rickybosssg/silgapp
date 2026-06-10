@@ -114,6 +114,88 @@ function selectLatestNativeTokens(tokens) {
   return [...latestByPlatform.values()];
 }
 
+function normalizeCountryCode(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
+function countryMismatchPayload(course, target, context) {
+  const courseCountry = normalizeCountryCode(course?.country_code);
+  const targetCountry = normalizeCountryCode(target?.country_code);
+  console.error('[envoiNotificationPush][CRITICAL_COUNTRY_BLOCK]', {
+    context,
+    course_id: course?.id || '',
+    course_country_code: courseCountry || 'ABSENT',
+    target_id: target?.id || '',
+    target_email: target?.user_email || '',
+    target_country_code: targetCountry || 'ABSENT',
+  });
+  return {
+    success: false,
+    error: 'Notification inter-pays interdite',
+    blocked_reason: 'country_mismatch',
+    course_country_code: courseCountry || '',
+    target_country_code: targetCountry || '',
+  };
+}
+
+async function assertNotificationCountry(base44, { course_id, livreur_id, client_id, targetEmail, type }) {
+  if (!course_id) return { ok: true };
+
+  const course = await base44.asServiceRole.entities.CourseExterne.get(course_id).catch(() => null);
+  if (!course) return { ok: true };
+
+  const courseCountry = normalizeCountryCode(course.country_code);
+  if (!courseCountry) {
+    console.error('[envoiNotificationPush][CRITICAL_COUNTRY_MISSING]', {
+      course_id,
+      targetEmail,
+      type,
+    });
+    return {
+      ok: false,
+      status: 400,
+      payload: {
+        success: false,
+        error: 'country_code obligatoire absent sur la course',
+        blocked_reason: 'missing_course_country_code',
+      },
+    };
+  }
+
+  const targets = [];
+  if (livreur_id) {
+    const livreur = await base44.asServiceRole.entities.Livreur.get(livreur_id).catch(() => null);
+    if (livreur) targets.push({ entity: livreur, context: 'livreur_id' });
+  }
+  if (client_id) {
+    const client = await base44.asServiceRole.entities.ClientExterne.get(client_id).catch(() => null);
+    if (client) targets.push({ entity: client, context: 'client_id' });
+  }
+
+  if (targetEmail && String(type || '') === 'nouvelle_course') {
+    const livreurs = await base44.asServiceRole.entities.Livreur.filter({
+      user_email: targetEmail,
+      actif: true,
+    }).catch(() => []);
+    for (const livreur of livreurs || []) {
+      targets.push({ entity: livreur, context: 'destinataire_email_livreur' });
+    }
+  }
+
+  for (const target of targets) {
+    const targetCountry = normalizeCountryCode(target.entity?.country_code);
+    if (!targetCountry || targetCountry !== courseCountry) {
+      return {
+        ok: false,
+        status: 403,
+        payload: countryMismatchPayload(course, target.entity, target.context),
+      };
+    }
+  }
+
+  return { ok: true };
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -139,6 +221,17 @@ Deno.serve(async (req) => {
 
     if (!titre || !message || !targetEmail) {
       return Response.json({ error: 'Missing required fields: titre, message, destinataire_email' }, { status: 400 });
+    }
+
+    const countryGuard = await assertNotificationCountry(base44, {
+      course_id,
+      livreur_id,
+      client_id,
+      targetEmail,
+      type,
+    });
+    if (!countryGuard.ok) {
+      return Response.json(countryGuard.payload, { status: countryGuard.status });
     }
 
     // Chercher les tokens par email (livreurs + clients)

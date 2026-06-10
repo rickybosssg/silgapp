@@ -2,6 +2,20 @@
   "name": "FraisAnnulation",
   "type": "object",
   "properties": {
+    "country_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE"
+      ],
+      "description": "Code pays de la course annul\u00e9e"
+    },
     "course_id": {
       "type": "string",
       "description": "ID de la CourseExterne annul\u00e9e"

@@ -54,14 +54,58 @@ function getMessageWhatsApp(type, destinataire) {
   return `🚚 *SILGAPP – Notification*\nOuvrez l'application pour consulter les détails de votre livraison.`;
 }
 
-function normaliserTelephone(tel) {
+const INDICATIFS_PAYS = {
+  BF: '+226',
+  CI: '+225',
+  TG: '+228',
+  BJ: '+229',
+  SN: '+221',
+  ML: '+223',
+  GN: '+224',
+  NE: '+227',
+};
+
+function normaliserTelephone(tel, countryCode = 'BF') {
   if (!tel) return null;
   let t = tel.replace(/\s+/g, '').replace(/[^\d+]/g, '');
   if (t.startsWith('+')) return t;
-  if (t.startsWith('226')) return '+' + t;
-  if (t.startsWith('0') && t.length <= 9) return '+226' + t.slice(1);
-  if (t.length === 8) return '+226' + t;
-  return '+226' + t;
+  const indicatif = INDICATIFS_PAYS[normalizeCountryCode(countryCode)] || '+226';
+  const indicatifSansPlus = indicatif.replace('+', '');
+  if (t.startsWith(indicatifSansPlus)) return '+' + t;
+  if (t.startsWith('0') && t.length <= 9) return indicatif + t.slice(1);
+  if (t.length === 8) return indicatif + t;
+  return indicatif + t;
+}
+
+function normalizeCountryCode(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
+async function assertSameCountryForCourse(base44, courseId, target, context) {
+  if (!courseId || courseId === 'inconnu') return { ok: true };
+  const course = await base44.asServiceRole.entities.CourseExterne.get(courseId).catch(() => null);
+  if (!course) return { ok: true };
+
+  const courseCountry = normalizeCountryCode(course.country_code);
+  const targetCountry = normalizeCountryCode(target?.country_code);
+  if (!courseCountry || !targetCountry || courseCountry !== targetCountry) {
+    console.error('[WhatsApp][CRITICAL_COUNTRY_BLOCK]', {
+      context,
+      course_id: courseId,
+      course_country_code: courseCountry || 'ABSENT',
+      target_id: target?.id || '',
+      target_email: target?.user_email || '',
+      target_country_code: targetCountry || 'ABSENT',
+      message: 'Alerte WhatsApp/SMS inter-pays bloquee',
+    });
+    return {
+      ok: false,
+      reason: 'country_mismatch',
+      course_country_code: courseCountry || '',
+      target_country_code: targetCountry || '',
+    };
+  }
+  return { ok: true };
 }
 
 
@@ -154,6 +198,17 @@ Deno.serve(async (req) => {
     if (livreurs && livreurs.length > 0) {
       const livreur = livreurs[0];
       const courseId = notification.course_id || 'inconnu';
+      const countryGuard = await assertSameCountryForCourse(base44, courseId, livreur, 'livreur_whatsapp');
+      if (!countryGuard.ok) {
+        return Response.json({
+          skipped: true,
+          reason: countryGuard.reason,
+          course_id: courseId,
+          livreur_id: livreur.id,
+          course_country_code: countryGuard.course_country_code,
+          livreur_country_code: countryGuard.target_country_code,
+        }, { status: 403 });
+      }
 
       console.log(`\n[WhatsApp] === DÉBUT CHECK Course ${courseId} Livreur ${livreur.id} ===`);
       console.log(`[WhatsApp] app_active=${livreur.app_active}, last_seen_at=${livreur.last_seen_at}, whatsapp_opt_in=${livreur.whatsapp_opt_in}`);
@@ -198,7 +253,7 @@ Deno.serve(async (req) => {
       // CAS 2: Heartbeat >= 2 min → WhatsApp
       console.log(`[STRATÉGIE] ⏳ Heartbeat ancien (${heartbeatAgeMin?.toFixed(1) || 'N/A'} min) → Tentative WhatsApp`);
 
-      const telephone = normaliserTelephone(livreur.telephone);
+      const telephone = normaliserTelephone(livreur.telephone, livreur.country_code);
       if (!telephone) {
         console.log(`[WhatsApp] Course ${courseId} Livreur ${livreur.id}: téléphone invalide "${livreur.telephone}" → SKIP\n`);
         return Response.json({ skipped: true, reason: 'telephone_invalide' });
@@ -229,6 +284,7 @@ Deno.serve(async (req) => {
       }
       
       const alerte = await base44.asServiceRole.entities.WhatsAppAlerte.create({
+        country_code: livreur.country_code || '',
         livreur_id: livreur.id,
         livreur_telephone: telephone,
         notification_id: notification.id || '',
@@ -326,6 +382,17 @@ Deno.serve(async (req) => {
     if (clients && clients.length > 0) {
       const client = clients[0];
       const courseId = notification.course_id || 'inconnu';
+      const countryGuard = await assertSameCountryForCourse(base44, courseId, client, 'client_whatsapp');
+      if (!countryGuard.ok) {
+        return Response.json({
+          skipped: true,
+          reason: countryGuard.reason,
+          course_id: courseId,
+          client_id: client.id,
+          course_country_code: countryGuard.course_country_code,
+          client_country_code: countryGuard.target_country_code,
+        }, { status: 403 });
+      }
 
       console.log(`\n[WhatsApp] === DÉBUT CHECK Client ${client.id} Course ${courseId} ===`);
       console.log(`[WhatsApp] app_active=${client.app_active}, last_seen_at=${client.last_seen_at}`);
@@ -359,7 +426,7 @@ Deno.serve(async (req) => {
 
       // Vérifier si WhatsApp déjà envoyé pour cette course
       const alertesCourse = await base44.asServiceRole.entities.WhatsAppAlerte.filter({ 
-        livreur_telephone: normaliserTelephone(client.telephone),
+        livreur_telephone: normaliserTelephone(client.telephone, client.country_code),
         notification_id: notification.id || '',
         statut: 'sent'
       });
@@ -371,7 +438,7 @@ Deno.serve(async (req) => {
 
       // Anti-doublon global
       const [alertesExistantes, notifsNonLues] = await Promise.all([
-        base44.asServiceRole.entities.WhatsAppAlerte.filter({ livreur_telephone: normaliserTelephone(client.telephone), statut: 'sent' }),
+        base44.asServiceRole.entities.WhatsAppAlerte.filter({ livreur_telephone: normaliserTelephone(client.telephone, client.country_code), statut: 'sent' }),
         base44.asServiceRole.entities.Notification.filter({ destinataire_email: destinataireEmail, lue: false })
       ]);
 
@@ -380,7 +447,7 @@ Deno.serve(async (req) => {
         return Response.json({ skipped: true, reason: 'alerte_deja_envoyee_client' });
       }
 
-      const telephone = normaliserTelephone(client.telephone);
+      const telephone = normaliserTelephone(client.telephone, client.country_code);
       if (!telephone) {
         console.log(`[WhatsApp] Course ${courseId} Client ${client.id}: téléphone invalide "${client.telephone}" → SKIP\n`);
         return Response.json({ skipped: true, reason: 'telephone_invalide_client' });
@@ -399,6 +466,7 @@ Deno.serve(async (req) => {
       console.log(`   Notification ID: ${notification.id || 'N/A'}\n`);
 
       const alerte = await base44.asServiceRole.entities.WhatsAppAlerte.create({
+        country_code: client.country_code || '',
         livreur_id: client.id,
         livreur_telephone: telephone,
         notification_id: notification.id || '',

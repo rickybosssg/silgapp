@@ -13,6 +13,16 @@ Deno.serve(async (req) => {
     }
 
     // Vérifier unicité du code
+    const countryCode = String(data.country_code || '').trim().toUpperCase();
+    if (!countryCode) {
+      console.error('[createLivreur][CRITICAL_COUNTRY_MISSING] country_code obligatoire absent');
+      return Response.json({
+        success: false,
+        error: 'country_code obligatoire pour creer un livreur',
+        blocked_reason: 'missing_livreur_country_code',
+      }, { status: 400 });
+    }
+
     const codeIdentification = String(data.code_identification || '').toUpperCase().trim();
     console.log("🔍 [createLivreur] Code à vérifier:", codeIdentification);
     const existing = await base44.asServiceRole.entities.Livreur.filter({ code_identification: codeIdentification });
@@ -24,6 +34,7 @@ Deno.serve(async (req) => {
     console.log("✅ [createLivreur] Création du livreur...");
     const created = await base44.asServiceRole.entities.Livreur.create({
       ...data,
+      country_code: countryCode,
       code_identification: codeIdentification,
       validation: 'valide',   // Toujours valide quand créé par admin
       statut: 'hors_ligne',

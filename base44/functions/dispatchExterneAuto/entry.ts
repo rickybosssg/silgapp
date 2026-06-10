@@ -10,6 +10,63 @@ function generatePIN() {
   return String(Math.floor(1000 + Math.random() * 9000));
 }
 
+function normalizeCountryCode(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
+function getCourseCountry(course) {
+  return normalizeCountryCode(course?.country_code);
+}
+
+function getLivreurCountry(livreur) {
+  return normalizeCountryCode(livreur?.country_code);
+}
+
+function logCountryBlock(context, course, livreur, extra = {}) {
+  console.error('[DISPATCH][CRITICAL_COUNTRY_BLOCK]', {
+    context,
+    course_id: course?.id || '',
+    course_country_code: getCourseCountry(course) || 'ABSENT',
+    livreur_id: livreur?.id || '',
+    livreur_email: livreur?.user_email || '',
+    livreur_country_code: getLivreurCountry(livreur) || 'ABSENT',
+    ...extra,
+  });
+}
+
+function countryBlockResponse(course, livreur) {
+  return Response.json({
+    success: false,
+    error: 'Assignation inter-pays interdite',
+    blocked_reason: 'country_mismatch',
+    course_country_code: getCourseCountry(course) || '',
+    livreur_country_code: getLivreurCountry(livreur) || '',
+  }, { status: 403 });
+}
+
+function assertCourseHasCountry(course, context) {
+  const countryCode = getCourseCountry(course);
+  if (!countryCode) {
+    console.error('[DISPATCH][CRITICAL_COUNTRY_MISSING]', {
+      context,
+      course_id: course?.id || '',
+      message: 'CourseExterne.country_code obligatoire absent. Dispatch bloque.',
+    });
+    return false;
+  }
+  return true;
+}
+
+function assertSameCountry(course, livreur, context) {
+  const courseCountry = getCourseCountry(course);
+  const livreurCountry = getLivreurCountry(livreur);
+  if (!courseCountry || !livreurCountry || courseCountry !== livreurCountry) {
+    logCountryBlock(context, course, livreur);
+    return false;
+  }
+  return true;
+}
+
 /** Haversine */
 function calculerDistance(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -56,7 +113,8 @@ function calculerDistance(lat1, lon1, lat2, lon2) {
  */
 async function trouverLivreursCandidatsParNiveaux(base44, course, exclusions = []) {
   // 🌍 FILTRE PAR PAYS — OBLIGATOIRE : jamais traverser les frontières
-  if (!course.country_code) {
+  const courseCountry = getCourseCountry(course);
+  if (!courseCountry) {
     console.error(`[DISPATCH] ❌ BLOQUÉ — course ${course.id} sans country_code. Dispatch inter-pays interdit.`);
     return [];
   }
@@ -66,9 +124,17 @@ async function trouverLivreursCandidatsParNiveaux(base44, course, exclusions = [
     validation: 'valide',
     actif: true,
     statut: 'disponible',
-    country_code: course.country_code,
   };
-  const tousLivreurs = await base44.asServiceRole.entities.Livreur.filter(filterLivreur);
+  const tousLivreursBase = await base44.asServiceRole.entities.Livreur.filter(filterLivreur);
+  const tousLivreurs = (tousLivreursBase || []).filter(l => getLivreurCountry(l) === courseCountry);
+
+  console.log('[DISPATCH][COUNTRY_FILTER]', {
+    course_id: course.id,
+    course_country_code: courseCountry,
+    livreurs_total_disponibles: tousLivreursBase?.length || 0,
+    livreurs_meme_pays: tousLivreurs.length,
+    livreurs_exclus_autre_pays: Math.max(0, (tousLivreursBase?.length || 0) - tousLivreurs.length),
+  });
 
   if (!tousLivreurs || tousLivreurs.length === 0) {
     console.log('[DISPATCH] 🚫 Aucun livreur trouvé avec filtres de base');
@@ -76,7 +142,7 @@ async function trouverLivreursCandidatsParNiveaux(base44, course, exclusions = [
   }
 
   // Charger les courses actives du MÊME pays pour exclure les livreurs déjà en course
-  const coursesActifFilter = course.country_code ? { country_code: course.country_code } : {};
+  const coursesActifFilter = { country_code: courseCountry };
   const coursesActives = await base44.asServiceRole.entities.CourseExterne.filter(coursesActifFilter);
   const livreurIdsEnCourse = new Set(
     coursesActives
@@ -99,7 +165,12 @@ async function trouverLivreursCandidatsParNiveaux(base44, course, exclusions = [
     return true; // Libre (disponible + valide + actif + GPS)
   });
 
-  console.log(`[DISPATCH] ✅ ${livreursEligibles.length} livreurs éligibles (disponibilité métier)`);
+  console.log('[DISPATCH][COUNTRY_ELIGIBILITY]', {
+    course_id: course.id,
+    course_country_code: courseCountry,
+    livreurs_meme_pays: tousLivreurs.length,
+    livreurs_eligibles_apres_disponibilite: livreursEligibles.length,
+  });
 
   // ─── CLASSEMENT PAR NIVEAUX ────────────────────────────────────────────────
   
@@ -240,6 +311,10 @@ async function getLivreurAlertConfig(base44) {
  * basé sur le heartbeat du livreur.
  */
 async function proposerAuLivreur(base44, courseId, course, livreur, niveauDispatch) {
+  if (!assertSameCountry(course, livreur, 'proposer_au_livreur')) {
+    throw new Error(`Assignation inter-pays interdite: course=${getCourseCountry(course) || 'ABSENT'} livreur=${getLivreurCountry(livreur) || 'ABSENT'}`);
+  }
+
   const alertConfig = await getLivreurAlertConfig(base44);
   // Déterminer le canal AVANT envoi : app active = SILGAPP, hors app = WhatsApp immédiat
   const heartbeatAgeMin = livreur.heartbeatAgeMin !== null ? livreur.heartbeatAgeMin : null;
@@ -339,6 +414,7 @@ async function proposerAuLivreur(base44, courseId, course, livreur, niveauDispat
                 console.log(`[DISPATCH] ✅ WhatsApp envoyé à ${livreur.nom} (${tel}) — SID: ${data.sid}`);
                 // Enregistrer l'alerte
                 await base44.asServiceRole.entities.WhatsAppAlerte.create({
+                  country_code: getCourseCountry(course),
                   livreur_id: livreur.id, livreur_telephone: tel,
                   notification_id: courseId, statut: 'sent',
                   twilio_sid: data.sid, heure_envoi: new Date().toISOString(), canal: 'whatsapp',
@@ -375,6 +451,9 @@ async function proposerAuLivreur(base44, courseId, course, livreur, niveauDispat
 async function lancerDispatch(base44, courseId, exclusions = []) {
   const course = await base44.asServiceRole.entities.CourseExterne.get(courseId);
   if (!course) return { erreur: 'Course introuvable' };
+  if (!assertCourseHasCountry(course, 'lancer_dispatch')) {
+    return { erreur: 'country_code obligatoire absent sur la course', status: 400 };
+  }
 
   // Ne pas dispatcher si la course est déjà acceptée, livrée ou annulée
   if (['livreur_en_route', 'colis_recupere', 'en_livraison', 'livree', 'annulee'].includes(course.statut)) {
@@ -415,7 +494,17 @@ async function lancerDispatch(base44, courseId, exclusions = []) {
     else if (premierLivreur.heartbeatAgeMin < 30) niveauDispatch = 3;
   }
 
-  console.log(`[DISPATCH] 🎯 Livreur sélectionné : ${premierLivreur.nom} (Niveau ${niveauDispatch}, HB: ${premierLivreur.heartbeatAgeMin?.toFixed(1) || '?'} min, GPS: ${premierLivreur.gpsAgeMin?.toFixed(1) || '?'} min, Distance: ${premierLivreur.distance.toFixed(1)} km)`);
+  console.log('[DISPATCH][COUNTRY_ASSIGNMENT]', {
+    course_id: courseId,
+    course_country_code: getCourseCountry(course),
+    livreur_id: premierLivreur.id,
+    livreur_nom: premierLivreur.nom,
+    livreur_country_code: getLivreurCountry(premierLivreur),
+    niveau_dispatch: niveauDispatch,
+    heartbeat_min: premierLivreur.heartbeatAgeMin,
+    gps_age_min: premierLivreur.gpsAgeMin,
+    distance_km: premierLivreur.distance,
+  });
 
   const proposal = await proposerAuLivreur(base44, courseId, course, premierLivreur, niveauDispatch);
   const dist = proposal.distance;
@@ -481,6 +570,9 @@ Deno.serve(async (req) => {
       // Récupérer la course
       const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
+      if (!assertCourseHasCountry(course, 'lancer_recherche_auto')) {
+        return Response.json({ success: false, error: 'country_code obligatoire absent sur la course' }, { status: 400 });
+      }
       
       // ⚠️ SANS GPS : on dispatch quand même à TOUS les livreurs disponibles (cercle infini)
       if (!course.gps_depart_lat || !course.gps_depart_lng) {
@@ -489,7 +581,7 @@ Deno.serve(async (req) => {
 
       const result = await lancerDispatch(base44, course_id, []);
 
-      if (result.erreur) return Response.json({ error: result.erreur }, { status: 404 });
+      if (result.erreur) return Response.json({ error: result.erreur }, { status: result.status || 404 });
       if (result.ignore) return Response.json({ success: true, message: `Dispatch ignoré : ${result.statut}` });
       if (result.noLivreur) return Response.json({ success: false, noLivreur: true, message: 'Aucun livreur disponible pour le moment — réessai automatique prévu' });
       if (result.en_attente) return Response.json({ success: true, en_attente: true, message: `Déjà proposée, expire dans ${result.remaining}s` });
@@ -523,6 +615,12 @@ Deno.serve(async (req) => {
 
       const livreur = await base44.asServiceRole.entities.Livreur.get(livreur_id);
       if (!livreur) return Response.json({ error: 'Livreur introuvable' }, { status: 404 });
+      if (!assertCourseHasCountry(course, 'accepter_course')) {
+        return Response.json({ success: false, error: 'country_code obligatoire absent sur la course' }, { status: 400 });
+      }
+      if (!assertSameCountry(course, livreur, 'accepter_course')) {
+        return countryBlockResponse(course, livreur);
+      }
 
       // Validation prix manuel
       const PRIX_MIN = 1000;
@@ -618,6 +716,17 @@ Deno.serve(async (req) => {
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
 
       // Course déjà acceptée → ne pas redispatcher
+      if (!assertCourseHasCountry(course, 'refuser_course')) {
+        return Response.json({ success: false, error: 'country_code obligatoire absent sur la course' }, { status: 400 });
+      }
+      if (livreur_id) {
+        const livreur = await base44.asServiceRole.entities.Livreur.get(livreur_id);
+        if (!livreur) return Response.json({ error: 'Livreur introuvable' }, { status: 404 });
+        if (!assertSameCountry(course, livreur, 'refuser_course')) {
+          return countryBlockResponse(course, livreur);
+        }
+      }
+
       if (course.dispatch_status === 'accepte') {
         return Response.json({ success: false, message: 'Course déjà acceptée par un autre livreur' });
       }
@@ -656,7 +765,9 @@ Deno.serve(async (req) => {
         if (course.livreur_id) {
           try {
             const livreurExpire = await base44.asServiceRole.entities.Livreur.get(course.livreur_id);
-            if (livreurExpire?.user_email && livreurExpire?.whatsapp_opt_in) {
+            if (livreurExpire && !assertSameCountry(course, livreurExpire, 'verifier_expiration_rappel')) {
+              console.error('[DISPATCH][CRITICAL_COUNTRY_BLOCK] Rappel timeout non envoye au livreur hors pays');
+            } else if (livreurExpire?.user_email && livreurExpire?.whatsapp_opt_in) {
               await base44.asServiceRole.entities.Notification.create({
                 titre: '⏰ Course expirée — vous avez manqué une course',
                 message: `La course ${course.adresse_depart} → ${course.adresse_arrivee || '?'} a été attribuée à un autre livreur car vous n'avez pas répondu à temps.`,
@@ -796,6 +907,16 @@ Deno.serve(async (req) => {
       const { accepted } = body;
       const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
+      if (!assertCourseHasCountry(course, 'valider_prix_manuel')) {
+        return Response.json({ success: false, error: 'country_code obligatoire absent sur la course' }, { status: 400 });
+      }
+      if (course.proposed_by_livreur_id) {
+        const proposedLivreur = await base44.asServiceRole.entities.Livreur.get(course.proposed_by_livreur_id);
+        if (!proposedLivreur) return Response.json({ error: 'Livreur propose introuvable' }, { status: 404 });
+        if (!assertSameCountry(course, proposedLivreur, 'valider_prix_manuel')) {
+          return countryBlockResponse(course, proposedLivreur);
+        }
+      }
 
       const now = new Date().toISOString();
 

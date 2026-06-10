@@ -13,6 +13,7 @@ import MultiColisAdminView from "./MultiColisAdminView";
 import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useAdminContext } from "@/hooks/useAdminContext.js";
 
 const STATUTS_INTERNE = [
   "nouvelle", "en_attente_livreur", "acceptee", "en_route_recuperation",
@@ -26,9 +27,11 @@ const STATUTS_EXTERNE = [
 
 export default function CourseDetailDialog({ course, open, onClose, reseau = "interne" }) {
   const queryClient = useQueryClient();
+  const { isPays, countryCode: adminCountryCode } = useAdminContext();
   const statuts = reseau === "externe" ? STATUTS_EXTERNE : STATUTS_INTERNE;
   const [newStatut, setNewStatut] = React.useState(course?.statut || "");
   const [confirmAnnulation, setConfirmAnnulation] = React.useState(false);
+  const countryMismatch = reseau === "externe" && isPays && course?.country_code && course.country_code !== adminCountryCode;
 
   React.useEffect(() => {
     setNewStatut(course?.statut || "");
@@ -37,6 +40,9 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }) => {
+      if (countryMismatch) {
+        throw new Error("Action interdite : cette course appartient a un autre pays");
+      }
       if (data.statut === "annulee" && reseau === "externe") {
         // Utiliser la fonction backend dédiée pour les courses externes
         const result = await base44.functions.invoke("annulerCourseExterne", { course_id: id });
@@ -66,6 +72,23 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
   });
 
   if (!course) return null;
+  if (countryMismatch) {
+    return (
+      <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <XCircle className="w-5 h-5" />
+              Acces refuse
+            </DialogTitle>
+          </DialogHeader>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
+            Cette course appartient au pays {course.country_code}. Votre compte admin est limite au pays {adminCountryCode}.
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   const handleStatusUpdate = () => {
     const updateData = { statut: newStatut };

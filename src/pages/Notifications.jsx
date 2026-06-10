@@ -84,15 +84,6 @@ export default function Notifications() {
               <span className="hidden sm:inline">Tout marquer lu</span>
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 text-white hover:bg-white/20 border border-white/30 text-xs"
-            onClick={() => window.location.href = '/admin/test-notifications'}
-          >
-            <Bell className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Tester</span>
-          </Button>
         </div>
       </div>
 
