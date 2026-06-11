@@ -141,6 +141,8 @@ Deno.serve(async (req) => {
     // ─── 3. Mettre à jour la course (statut → 'annulee') ───────────────────
     const updateData = {
       statut: 'annulee',
+      // Si course en recherche livreur → marquer dispatch comme expiré pour bloquer le modal
+      ...(course.dispatch_status === 'propose' && !course.livreur_id ? { dispatch_status: 'expire' } : {}),
       // Garder les infos du livreur pour l'historique (mais course annulée)
       // Ne pas effacer livreur_id/livreur_nom pour tracer qui était assigné
     };
