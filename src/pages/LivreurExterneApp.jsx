@@ -116,17 +116,67 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     },
     enabled: !!livreurId,
     initialData: [],
-    refetchInterval: 4000, // ⚡ 1s → 4s : évite le rate limit (était 60 req/min)
+    refetchInterval: 4000,
+    staleTime: 2000,
+  });
+
+  // ─── Courses proposées (multi-livreurs) — via notifications non lues ──────
+  // Le livreur peut figurer dans dispatch_notified_ids sans être livreur_id
+  const { data: coursesProposees = [] } = useQuery({
+    queryKey: ["courses-proposees-livreur", livreurId],
+    queryFn: async () => {
+      if (!livreurId || !livreurEmail) return [];
+      // Chercher notifications nouvelle_course non lues de ce livreur
+      const notifs = await base44.entities.Notification.filter({
+        destinataire_email: livreurEmail,
+        type: "nouvelle_course",
+        lue: false,
+      });
+      if (!notifs?.length) return [];
+      // Récupérer les courses correspondantes en attente
+      const courseIds = [...new Set(notifs.map(n => n.course_id).filter(Boolean))];
+      const proposees = [];
+      for (const cid of courseIds.slice(0, 5)) {
+        try {
+          const res = await base44.functions.invoke("dispatchExterneAuto", {
+            action: "check_course_pour_livreur",
+            course_id: cid,
+            livreur_id: livreurId,
+          });
+          const d = res?.data;
+          if (d?.found && d?.course && !d?.expired) {
+            proposees.push(d.course);
+          }
+        } catch (_) {}
+      }
+      return proposees;
+    },
+    enabled: !!livreurId && !!livreurEmail,
+    initialData: [],
+    refetchInterval: 4000,
     staleTime: 2000,
   });
 
   // ─── Course en attente de réponse du livreur ──────────────────────────────
+  // Priorité : courses liées à ce livreur directement OU courses proposées multi
   const courseEnAttente = useMemo(() => {
-    return mesCourses.find(
+    // 1. Course directement liée (livreur_id = livreurId) — rétrocompat + mode verrou posé
+    const directe = mesCourses.find(
       c => c.statut === "recherche_livreur" && c.dispatch_status === "propose"
         && c.manual_price_status !== "pending_client_validation"
-    ) || null;
-  }, [mesCourses]);
+    );
+    if (directe) return directe;
+
+    // 2. Course proposée via dispatch multi (livreur dans dispatch_notified_ids)
+    // Ne pas afficher si déjà verrouillée par un autre
+    const multi = coursesProposees.find(
+      c => c.statut === "recherche_livreur"
+        && c.dispatch_status === "propose"
+        && c.manual_price_status !== "pending_client_validation"
+        && c.livreur_id !== livreurId  // pas notre verrou posé
+    );
+    return multi || null;
+  }, [mesCourses, coursesProposees, livreurId]);
 
   // ─── Course en attente de validation prix par le client ───────────────────
   const courseEnAttenteValidationPrix = useMemo(() => {

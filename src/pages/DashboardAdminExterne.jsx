@@ -25,7 +25,7 @@ import DownloadStatsPanel from "@/components/admin/DownloadStatsPanel";
 import AlertesLivreursPanel from "@/components/admin/AlertesLivreursPanel";
 import ZonesChaudesWidget from "@/components/carte/ZonesChaudes";
 import ComptabilitePanel from "@/components/admin/ComptabilitePanel";
-import DispatchParamsPanel from "@/components/admin/DispatchParamsPanel";
+import DispatchConfigPanel from "@/components/admin/DispatchConfigPanel";
 
 export default function DashboardAdminExterne() {
   const { isPays, countryCode: adminCountryCode } = useAdminContext();
@@ -148,6 +148,14 @@ export default function DashboardAdminExterne() {
       shadow: "shadow-green-100",
     },
     {
+      scroll: "dispatch-config",
+      label: "Dispatch Externe",
+      sub: "Vagues, timeout, nb livreurs",
+      icon: Zap,
+      grad: "from-primary to-red-600",
+      shadow: "shadow-red-100",
+    },
+    {
       scroll: "zones-chaudes",
       label: "Zones chaudes",
       sub: "Demande & positionnement",
@@ -172,19 +180,11 @@ export default function DashboardAdminExterne() {
       shadow: "shadow-purple-100",
     },
     {
-      to: "/admin/externe/stats-telechargements",
+    to: "/admin/externe/stats-telechargements",
       label: "Stats téléchargements",
       sub: "Visites & analytics",
       icon: Download,
       grad: "from-red-500 to-orange-500",
-      shadow: "shadow-red-100",
-    },
-    {
-      scroll: "dispatch-params",
-      label: "Dispatch externe",
-      sub: "Nb livreurs & timeout",
-      icon: Zap,
-      grad: "from-primary to-red-600",
       shadow: "shadow-red-100",
     },
   ];
@@ -346,9 +346,18 @@ export default function DashboardAdminExterne() {
         <DiagnosticInterne />
       </div>
 
-      {/* ── PARAMÈTRES DISPATCH ──────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm" id="dispatch-params">
-        <DispatchParamsPanel />
+      {/* ── DISPATCH CONFIG ──────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm" id="dispatch-config">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-red-600 flex items-center justify-center shadow-md shadow-red-100">
+            <Zap className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <p className="font-bold text-sm text-foreground">Paramètres Dispatch Externe</p>
+            <p className="text-xs text-muted-foreground">Nombre de livreurs notifiés · Temps de réponse</p>
+          </div>
+        </div>
+        <DispatchConfigPanel />
       </div>
 
       {/* ── ZONES CHAUDES ────────────────────────────────────────── */}

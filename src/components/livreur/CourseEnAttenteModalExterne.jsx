@@ -76,10 +76,26 @@ export default function CourseEnAttenteModalExterne({
   onRefuser,
   onExpire,
   pricingMode = "automatic", // "automatic" | "manual"
-  timeoutSecondes = 60, // configurable via dispatch params
 }) {
   useVibration(true);
-  const [tempsRestant, setTempsRestant] = useState(timeoutSecondes);
+
+  // Calculer le temps restant depuis timeout_expires_at de la course (dynamique)
+  const getTempsInitial = () => {
+    if (course.timeout_expires_at) {
+      const remaining = Math.round((new Date(course.timeout_expires_at) - Date.now()) / 1000);
+      return Math.max(0, remaining);
+    }
+    return 60;
+  };
+
+  const totalTimeout = (() => {
+    if (course.timeout_expires_at && course.heure_sollicitation) {
+      return Math.round((new Date(course.timeout_expires_at) - new Date(course.heure_sollicitation)) / 1000);
+    }
+    return 60;
+  })();
+
+  const [tempsRestant, setTempsRestant] = useState(getTempsInitial);
   const [courseDejaPrise, setCourseDejaPrise] = useState(false);
   const [courseExpiree, setCourseExpiree] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -92,49 +108,53 @@ export default function CourseEnAttenteModalExterne({
     return () => clearInterval(t);
   }, []);
 
-  // Timer 60 secondes
   const onExpireRef = useRef(onExpire);
   useEffect(() => { onExpireRef.current = onExpire; }, [onExpire]);
 
+  // Timer basé sur timeout_expires_at
   useEffect(() => {
+    if (tempsRestant <= 0) {
+      setCourseExpiree(true);
+      return;
+    }
     const timer = setInterval(() => {
-      setTempsRestant(prev => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setCourseExpiree(true);
-          return 0;
-        }
-        return prev - 1;
-      });
+      const remaining = Math.round((new Date(course.timeout_expires_at || Date.now()) - Date.now()) / 1000);
+      if (remaining <= 0) {
+        clearInterval(timer);
+        setCourseExpiree(true);
+        setTempsRestant(0);
+      } else {
+        setTempsRestant(remaining);
+      }
     }, 1000);
     return () => clearInterval(timer);
-  }, [timeoutSecondes]);
+  }, [course.timeout_expires_at]);
 
-  // Vérifier expiration backend
+  // Vérifier le verrou toutes les 3s — si un autre livreur a pris la course → "déjà prise"
   const courseExpireeSentRef = useRef(false);
   useEffect(() => {
     const checkStatus = async () => {
       try {
         const data = await base44.functions.invoke('dispatchExterneAuto', {
-          action: 'verifier_expiration',
+          action: 'check_course_pour_livreur',
           course_id: course.id,
+          livreur_id: livreurId,
         });
         const d = data?.data;
-        if (d?.livreur_id && d.livreur_id !== livreurId && d.dispatch_status === 'accepte') {
+        // Un autre livreur a verrouillé la course
+        if (d?.already_taken || (d?.found === false && !d?.expired)) {
           setCourseDejaPrise(true);
+          return;
         }
-        if (d?.expired && !courseExpireeSentRef.current && !d?.livreur_id) {
+        // Course expirée côté backend
+        if (d?.expired && !courseExpireeSentRef.current) {
           courseExpireeSentRef.current = true;
           setCourseExpiree(true);
-          base44.functions.invoke('dispatchExterneAuto', {
-            action: 'verifier_expiration',
-            course_id: course.id,
-          }).catch(() => null);
         }
       } catch (_) {}
     };
 
-    const interval = setInterval(checkStatus, 4000);
+    const interval = setInterval(checkStatus, 3000);
     return () => clearInterval(interval);
   }, [course.id, livreurId]);
 
@@ -327,7 +347,7 @@ export default function CourseEnAttenteModalExterne({
             className={`h-full transition-all duration-1000 ${
               tempsRestant <= 10 ? 'bg-red-500' : tempsRestant <= 30 ? 'bg-amber-500' : 'bg-green-500'
             }`}
-            style={{ width: `${(tempsRestant / timeoutSecondes) * 100}%` }}
+            style={{ width: `${(tempsRestant / Math.max(totalTimeout, 1)) * 100}%` }}
           />
         </div>
 
