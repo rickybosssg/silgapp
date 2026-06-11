@@ -180,23 +180,28 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   }, [livreurId, livreurEmail]);
 
   // ─── Course en attente de réponse du livreur ──────────────────────────────
-  // Priorité : courses liées à ce livreur directement OU courses proposées multi
   const courseEnAttente = useMemo(() => {
-    // 1. Course directement liée (livreur_id = livreurId) — rétrocompat + mode verrou posé
+    // 1. Course directement liée (livreur_id = livreurId)
     const directe = mesCourses.find(
       c => c.statut === "recherche_livreur" && c.dispatch_status === "propose"
         && c.manual_price_status !== "pending_client_validation"
     );
     if (directe) return directe;
 
-    // 2. Course proposée via dispatch multi (livreur dans dispatch_notified_ids)
-    // Ne pas afficher si déjà verrouillée par un autre (dispatch_status='accepte')
+    // 2. Course proposée via dispatch multi
     const multi = coursesProposees.find(
       c => c.statut === "recherche_livreur"
         && c.dispatch_status === "propose"
         && c.manual_price_status !== "pending_client_validation"
     );
-    return multi || null;
+    
+    // DEBUG: log si on trouve rien
+    if (!directe && !multi && coursesProposees.length > 0) {
+      console.warn('⚠️ [DEBUG] coursesProposees:', coursesProposees.length, 'mais courseEnAttente=null');
+      console.warn('⚠️ [DEBUG] Premier courseProposee:', coursesProposees[0]);
+    }
+    
+    return multi || directe || null;
   }, [mesCourses, coursesProposees, livreurId]);
 
   // ─── Course en attente de validation prix par le client ───────────────────
