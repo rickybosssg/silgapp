@@ -121,88 +121,87 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     staleTime: 2000,
   });
 
-  // ─── Courses proposées (multi-livreurs) — via notifications non lues ──────
-  // Le livreur peut figurer dans dispatch_notified_ids sans être livreur_id
+  // ─── Courses proposées (POLLING ROBUSTE) — via dispatch_notified_ids ──────
+  // POLLING: Vérifie TOUTES les courses en dispatch_status="propose" où le livreur est notifié
   const [coursesProposees, setCoursesProposees] = useState([]);
+  const [courseFallbackVisible, setCourseFallbackVisible] = useState(null); // Course à afficher en fallback
   
   useEffect(() => {
     if (!livreurId || !livreurEmail) return;
     
     const checkCourses = async () => {
       try {
-        console.log('🔍 [DEBUG] Checking courses pour', livreurEmail, 'ID:', livreurId);
-        
-        // Chercher notifications nouvelle_course non lues de ce livreur
-        const notifs = await base44.entities.Notification.filter({
-          destinataire_email: livreurEmail,
-          type: "nouvelle_course",
-          lue: false,
+        // 1. Récupérer TOUTES les courses en dispatch_status="propose" du pays du livreur
+        const allCourses = await base44.entities.CourseExterne.filter({
+          dispatch_status: "propose",
+          statut: "recherche_livreur",
+          country_code: livreurProfil?.country_code || "BF",
         });
         
-        console.log('📬 [DEBUG] Notifications trouvées:', notifs?.length || 0);
-        
-        if (!notifs?.length) {
+        if (!allCourses?.length) {
           setCoursesProposees([]);
+          setCourseFallbackVisible(null);
           return;
         }
         
-        // Récupérer les courses correspondantes en attente
-        const courseIds = [...new Set(notifs.map(n => n.course_id).filter(Boolean))];
-        console.log('🎯 [DEBUG] Course IDs from notifs:', courseIds);
-        
+        // 2. Filtrer celles où le livreur est dans dispatch_notified_ids
         const proposees = [];
-        for (const cid of courseIds.slice(0, 5)) {
+        for (const course of allCourses) {
           try {
-            const res = await base44.functions.invoke("dispatchExterneAuto", {
-              action: "check_course_pour_livreur",
-              course_id: cid,
-              livreur_id: livreurId,
-            });
-            const d = res?.data;
-            console.log('✅ [DEBUG] Course', cid, 'result:', d);
-            if (d?.found && d?.course && !d?.expired) {
-              proposees.push(d.course);
+            const notifiedIds = course.dispatch_notified_ids ? JSON.parse(course.dispatch_notified_ids) : [];
+            const isNotifie = notifiedIds.includes(livreurId);
+            const isAssignee = course.livreur_id === livreurId;
+            
+            // Vérifier si pas expirée
+            const isExpired = course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date();
+            
+            if ((isNotifie || isAssignee) && !isExpired) {
+              proposees.push(course);
             }
           } catch (err) {
-            console.error('❌ [DEBUG] Error checking course:', err.message);
+            console.error('Error checking course:', course.id, err.message);
           }
         }
-        console.log('🚀 [DEBUG] Courses proposees to display:', proposees.length);
+        
         setCoursesProposees(proposees);
+        
+        // 3. Fallback: si une course est trouvée, l'afficher en bouton
+        if (proposees.length > 0) {
+          setCourseFallbackVisible(proposees[0]);
+        } else {
+          setCourseFallbackVisible(null);
+        }
       } catch (err) {
-        console.error('💥 [DEBUG] Error fetching courses proposees:', err.message);
+        console.error('Error fetching courses proposees:', err.message);
       }
     };
     
     checkCourses();
-    const interval = setInterval(checkCourses, 2000); // Vérifie toutes les 2s
+    // Polling toutes les 3 secondes
+    const interval = setInterval(checkCourses, 3000);
     return () => clearInterval(interval);
-  }, [livreurId, livreurEmail]);
+  }, [livreurId, livreurEmail, livreurProfil?.country_code]);
 
-  // ─── Course en attente de réponse du livreur ──────────────────────────────
+  // ─── Course en attente de réponse du livreur (LOGIQUE SIMPLE) ─────────────
+  // Priorité 1: coursesProposees (via polling dispatch_notified_ids)
+  // Priorité 2: mesCourses avec livreur_id
   const courseEnAttente = useMemo(() => {
-    // 1. Course directement liée (livreur_id = livreurId)
+    // 1. D'abord vérifier coursesProposees (polling robuste)
+    if (coursesProposees && coursesProposees.length > 0) {
+      const firstProposee = coursesProposees.find(
+        c => c.dispatch_status === "propose" && c.manual_price_status !== "pending_client_validation"
+      );
+      if (firstProposee) return firstProposee;
+    }
+    
+    // 2. Ensuite mesCourses (livreur déjà assigné)
     const directe = mesCourses.find(
       c => c.statut === "recherche_livreur" && c.dispatch_status === "propose"
         && c.manual_price_status !== "pending_client_validation"
     );
-    if (directe) return directe;
-
-    // 2. Course proposée via dispatch multi
-    const multi = coursesProposees.find(
-      c => c.statut === "recherche_livreur"
-        && c.dispatch_status === "propose"
-        && c.manual_price_status !== "pending_client_validation"
-    );
     
-    // DEBUG: log si on trouve rien
-    if (!directe && !multi && coursesProposees.length > 0) {
-      console.warn('⚠️ [DEBUG] coursesProposees:', coursesProposees.length, 'mais courseEnAttente=null');
-      console.warn('⚠️ [DEBUG] Premier courseProposee:', coursesProposees[0]);
-    }
-    
-    return multi || directe || null;
-  }, [mesCourses, coursesProposees, livreurId]);
+    return directe || null;
+  }, [coursesProposees, mesCourses]);
 
   // ─── Course en attente de validation prix par le client ───────────────────
   const courseEnAttenteValidationPrix = useMemo(() => {
@@ -681,10 +680,30 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               {testingNotif ? "Envoi en cours..." : "🧪 Tester Notification Push"}
             </button>
 
-            {/* DEBUG PANEL - À SUPPRIMER APRÈS FIX */}
-            <DebugCoursesPanel livreurId={livreurId} livreurEmail={livreurEmail} />
+            {/* BOUTON FALLBACK - Si course disponible mais modal ne s'affiche pas */}
+            {courseFallbackVisible && !courseEnAttente && (
+              <div className="rounded-2xl bg-red-50 border-2 border-red-300 px-4 py-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                  <p className="text-sm font-black text-red-800">⚠️ Course disponible</p>
+                </div>
+                <p className="text-xs text-red-600">
+                  Une course vous attend mais le modal ne s'affiche pas. Cliquez ci-dessous :
+                </p>
+                <button
+                  onClick={() => {
+                    // Force l'affichage en ajoutant la course aux mesCourses
+                    setCoursesProposees(prev => [courseFallbackVisible, ...prev.filter(c => c.id !== courseFallbackVisible.id)]);
+                  }}
+                  className="w-full h-14 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 text-white font-black text-base shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                >
+                  <Truck className="w-5 h-5" />
+                  OUVRIR LA COURSE DISPONIBLE
+                </button>
+              </div>
+            )}
 
-            {/* Bouton DEBUG - Afficher notifications et courses */}
+            {/* DEBUG PANEL */}
             <DebugCoursesPanel livreurEmail={livreurEmail} livreurId={livreurId} />
 
             {coursesActives.length > 0 && (

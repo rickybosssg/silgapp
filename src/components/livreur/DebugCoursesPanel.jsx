@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Bug, CheckCircle, XCircle, Clock, Bell } from "lucide-react";
+import { Bug, CheckCircle, XCircle, Clock, Bell, Truck } from "lucide-react";
 
 export default function DebugCoursesPanel({ livreurEmail, livreurId }) {
   const [debugData, setDebugData] = useState(null);
@@ -13,40 +13,32 @@ export default function DebugCoursesPanel({ livreurEmail, livreurId }) {
     setExpanded(true);
     
     try {
-      // 1. Notifications non lues
-      const notifs = await base44.entities.Notification.filter({
-        destinataire_email: livreurEmail,
-        type: "nouvelle_course",
-        lue: false,
+      // 1. Récupérer TOUTES les courses en dispatch_status="propose"
+      const allCourses = await base44.entities.CourseExterne.filter({
+        dispatch_status: "propose",
+        statut: "recherche_livreur",
       });
       
-      console.log('📬 Notifications:', notifs?.length);
-      
-      // 2. Courses correspondantes
-      const courseIds = [...new Set(notifs?.map(n => n.course_id).filter(Boolean) || [])];
-      const courses = [];
-      
-      for (const cid of courseIds.slice(0, 5)) {
+      // 2. Filtrer celles où le livreur est notifié
+      const proposees = [];
+      for (const course of allCourses || []) {
         try {
-          const res = await base44.functions.invoke("dispatchExterneAuto", {
-            action: "check_course_pour_livreur",
-            course_id: cid,
-            livreur_id: livreurId,
-          });
-          const d = res?.data;
-          if (d?.found && d?.course && !d?.expired) {
-            courses.push(d.course);
+          const notifiedIds = course.dispatch_notified_ids ? JSON.parse(course.dispatch_notified_ids) : [];
+          const isNotifie = notifiedIds.includes(livreurId);
+          const isExpired = course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date();
+          
+          if (isNotifie && !isExpired) {
+            proposees.push(course);
           }
         } catch (err) {
-          console.error('Error course', cid, err.message);
+          console.error('Error course', course.id, err.message);
         }
       }
       
       setDebugData({
-        notifCount: notifs?.length || 0,
-        courseCount: courses.length,
-        courses: courses,
-        courseIds: courseIds,
+        totalCoursesPropose: allCourses?.length || 0,
+        courseCount: proposees.length,
+        courses: proposees,
       });
     } catch (err) {
       console.error('Debug error:', err.message);
@@ -84,13 +76,13 @@ export default function DebugCoursesPanel({ livreurEmail, livreurId }) {
           ) : (
             <>
               <div className="flex items-center gap-2">
-                <Bell className="w-4 h-4 text-blue-400" />
-                <span>Notifications non lues: <strong className="text-white">{debugData.notifCount}</strong></span>
+                <Truck className="w-4 h-4 text-blue-400" />
+                <span>Courses en dispatch: <strong className="text-white">{debugData.totalCoursesPropose}</strong></span>
               </div>
               
               <div className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-green-400" />
-                <span>Courses disponibles: <strong className="text-white">{debugData.courseCount}</strong></span>
+                <span>Courses pour moi: <strong className="text-white">{debugData.courseCount}</strong></span>
               </div>
               
               {debugData.courses?.length > 0 && (
@@ -114,7 +106,7 @@ export default function DebugCoursesPanel({ livreurEmail, livreurId }) {
                 <div className="bg-amber-900/50 border border-amber-700 rounded-xl p-3">
                   <p className="text-amber-300 font-bold">⚠️ AUCUNE COURSE DISPONIBLE</p>
                   <p className="text-amber-400/70 text-[10px] mt-1">
-                    Les notifications existent mais les courses sont expirées ou déjà prises.
+                    Aucune course en dispatch_status="propose" pour votre ID.
                   </p>
                 </div>
               )}
