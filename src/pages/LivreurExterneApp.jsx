@@ -122,43 +122,53 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   // ─── Courses proposées (multi-livreurs) — via notifications non lues ──────
   // Le livreur peut figurer dans dispatch_notified_ids sans être livreur_id
-  const { data: coursesProposees = [], refetch: refetchProposees } = useQuery({
-    queryKey: ["courses-proposees-livreur", livreurId, livreurEmail],
-    queryFn: async () => {
-      if (!livreurId || !livreurEmail) return [];
-      // Chercher notifications nouvelle_course non lues de ce livreur
-      const notifs = await base44.entities.Notification.filter({
-        destinataire_email: livreurEmail,
-        type: "nouvelle_course",
-        lue: false,
-      });
-      if (!notifs?.length) return [];
-      // Récupérer les courses correspondantes en attente
-      const courseIds = [...new Set(notifs.map(n => n.course_id).filter(Boolean))];
-      const proposees = [];
-      for (const cid of courseIds.slice(0, 5)) {
-        try {
-          const res = await base44.functions.invoke("dispatchExterneAuto", {
-            action: "check_course_pour_livreur",
-            course_id: cid,
-            livreur_id: livreurId,
-          });
-          const d = res?.data;
-          if (d?.found && d?.course && !d?.expired) {
-            proposees.push(d.course);
-          }
-        } catch (err) {
-          console.error('Error checking course:', err.message);
+  const [coursesProposees, setCoursesProposees] = useState([]);
+  
+  useEffect(() => {
+    if (!livreurId || !livreurEmail) return;
+    
+    const checkCourses = async () => {
+      try {
+        // Chercher notifications nouvelle_course non lues de ce livreur
+        const notifs = await base44.entities.Notification.filter({
+          destinataire_email: livreurEmail,
+          type: "nouvelle_course",
+          lue: false,
+        });
+        
+        if (!notifs?.length) {
+          setCoursesProposees([]);
+          return;
         }
+        
+        // Récupérer les courses correspondantes en attente
+        const courseIds = [...new Set(notifs.map(n => n.course_id).filter(Boolean))];
+        const proposees = [];
+        for (const cid of courseIds.slice(0, 5)) {
+          try {
+            const res = await base44.functions.invoke("dispatchExterneAuto", {
+              action: "check_course_pour_livreur",
+              course_id: cid,
+              livreur_id: livreurId,
+            });
+            const d = res?.data;
+            if (d?.found && d?.course && !d?.expired) {
+              proposees.push(d.course);
+            }
+          } catch (err) {
+            console.error('Error checking course:', err.message);
+          }
+        }
+        setCoursesProposees(proposees);
+      } catch (err) {
+        console.error('Error fetching courses proposees:', err.message);
       }
-      return proposees;
-    },
-    enabled: !!livreurId && !!livreurEmail,
-    initialData: [],
-    refetchInterval: 3000, // 3s
-    staleTime: 2000, // 2s
-    retry: 2,
-  });
+    };
+    
+    checkCourses();
+    const interval = setInterval(checkCourses, 2000); // Vérifie toutes les 2s
+    return () => clearInterval(interval);
+  }, [livreurId, livreurEmail]);
 
   // ─── Course en attente de réponse du livreur ──────────────────────────────
   // Priorité : courses liées à ce livreur directement OU courses proposées multi
