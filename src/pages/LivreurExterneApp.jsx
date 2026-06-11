@@ -132,9 +132,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         type: "nouvelle_course",
         lue: false,
       });
+      console.log('[LIVREUR] 📬 Notifications non lues:', notifs?.length || 0);
       if (!notifs?.length) return [];
       // Récupérer les courses correspondantes en attente
       const courseIds = [...new Set(notifs.map(n => n.course_id).filter(Boolean))];
+      console.log('[LIVREUR] 🎯 Course IDs from notifs:', courseIds);
       const proposees = [];
       for (const cid of courseIds.slice(0, 5)) {
         try {
@@ -144,11 +146,15 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             livreur_id: livreurId,
           });
           const d = res?.data;
+          console.log('[LIVREUR] ✅ Check course result:', { course_id: cid, found: d?.found, expired: d?.expired, statut: d?.course?.statut, dispatch_status: d?.course?.dispatch_status });
           if (d?.found && d?.course && !d?.expired) {
             proposees.push(d.course);
           }
-        } catch (_) {}
+        } catch (err) {
+          console.error('[LIVREUR] ❌ Error checking course:', err.message);
+        }
       }
+      console.log('[LIVREUR] 📦 Courses proposees:', proposees.length);
       return proposees;
     },
     enabled: !!livreurId && !!livreurEmail,
