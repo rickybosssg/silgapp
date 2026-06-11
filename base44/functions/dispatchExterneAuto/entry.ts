@@ -354,6 +354,25 @@ Deno.serve(async (req) => {
       const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
       if (!course) return Response.json({ found: false });
 
+      // Course annulée ou livrée → plus disponible, nettoyer les notifs du livreur
+      if (course.statut === 'annulee' || course.statut === 'livree') {
+        try {
+          const livreurData = await base44.asServiceRole.entities.Livreur.get(livreur_id);
+          if (livreurData?.user_email) {
+            const notifs = await base44.asServiceRole.entities.Notification.filter({
+              course_id: course_id,
+              destinataire_email: livreurData.user_email,
+              type: 'nouvelle_course',
+              lue: false,
+            });
+            for (const n of notifs) {
+              await base44.asServiceRole.entities.Notification.update(n.id, { lue: true });
+            }
+          }
+        } catch (_) {}
+        return Response.json({ found: false, cancelled: true });
+      }
+
       // Cours déjà acceptée par quelqu'un → notifier le demandeur
       if (course.dispatch_status === 'accepte') {
         return Response.json({ found: false, already_taken: true, taken_by: course.livreur_id });
