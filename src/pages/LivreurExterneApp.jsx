@@ -144,9 +144,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             livreur_id: livreurId,
           });
           const d = res?.data;
-          // Inclure même si expirée — le modal CourseEnAttenteModalExterne gère l'affichage "expirée"
-          // Ne pas exclure les courses expirées ici sinon le modal n'apparaît jamais
-          if (d?.found && d?.course) {
+          if (d?.found && d?.course && !d?.expired) {
             proposees.push(d.course);
           }
         } catch (_) {}
@@ -155,8 +153,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     },
     enabled: !!livreurId && !!livreurEmail,
     initialData: [],
-    refetchInterval: 4000,
-    staleTime: 2000,
+    refetchInterval: 2000,
+    staleTime: 1000,
   });
 
   // ─── Course en attente de réponse du livreur ──────────────────────────────
