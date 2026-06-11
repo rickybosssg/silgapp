@@ -13,15 +13,17 @@ export default function DebugCoursesPanel({ livreurEmail, livreurId }) {
     setExpanded(true);
     
     try {
-      // 1. Récupérer TOUTES les courses en dispatch_status="propose"
-      const allCourses = await base44.entities.CourseExterne.filter({
-        dispatch_status: "propose",
-        statut: "recherche_livreur",
-      });
+      // 1. Récupérer TOUTES les courses (list() fonctionne en frontend)
+      const allCourses = await base44.entities.CourseExterne.list('-created_date', 100);
       
-      // 2. Filtrer celles où le livreur est notifié
+      // 2. Filtrer celles en dispatch_status="propose"
+      const coursesEnDispatch = allCourses.filter(c => 
+        c.dispatch_status === "propose" && c.statut === "recherche_livreur"
+      );
+      
+      // 3. Filtrer celles où le livreur est notifié
       const proposees = [];
-      for (const course of allCourses || []) {
+      for (const course of coursesEnDispatch) {
         try {
           const notifiedIds = course.dispatch_notified_ids ? JSON.parse(course.dispatch_notified_ids) : [];
           const isNotifie = notifiedIds.includes(livreurId);
@@ -36,7 +38,7 @@ export default function DebugCoursesPanel({ livreurEmail, livreurId }) {
       }
       
       setDebugData({
-        totalCoursesPropose: allCourses?.length || 0,
+        totalCoursesPropose: coursesEnDispatch.length,
         courseCount: proposees.length,
         courses: proposees,
       });
