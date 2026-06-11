@@ -131,12 +131,16 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     
     const checkCourses = async () => {
       try {
+        console.log('[POLLING] Start check for livreur', livreurId, 'country', livreurProfil?.country_code);
+        
         // 1. Récupérer TOUTES les courses en dispatch_status="propose" du pays du livreur
         const allCourses = await base44.entities.CourseExterne.filter({
           dispatch_status: "propose",
           statut: "recherche_livreur",
           country_code: livreurProfil?.country_code || "BF",
         });
+        
+        console.log('[POLLING] Found', allCourses?.length || 0, 'courses in propose status');
         
         if (!allCourses?.length) {
           setCoursesProposees([]);
@@ -155,6 +159,15 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             // Vérifier si pas expirée
             const isExpired = course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date();
             
+            console.log('[POLLING] Course', course.id, {
+              client: course.client_nom,
+              notifiedIds,
+              isNotifie,
+              isAssignee,
+              isExpired,
+              timeout: course.timeout_expires_at,
+            });
+            
             if ((isNotifie || isAssignee) && !isExpired) {
               proposees.push(course);
             }
@@ -163,11 +176,13 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           }
         }
         
+        console.log('[POLLING] Courses for this livreur:', proposees.length);
         setCoursesProposees(proposees);
         
         // 3. Fallback: si une course est trouvée, l'afficher en bouton
         if (proposees.length > 0) {
           setCourseFallbackVisible(proposees[0]);
+          console.log('[POLLING] Setting fallback visible:', proposees[0].id);
         } else {
           setCourseFallbackVisible(null);
         }
