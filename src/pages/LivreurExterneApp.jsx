@@ -53,6 +53,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // Test notification
   const [testingNotif, setTestingNotif] = useState(false);
   const [testResult, setTestResult] = useState(null);
+  // Test modal
+  const [showTestModal, setShowTestModal] = useState(false);
   const prixManuelWatchedRef = useRef({}); // track les course_id déjà notifiés
 
   // Pull-to-refresh
@@ -516,6 +518,34 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         />
       )}
 
+      {/* Modal TEST pour Aissam */}
+      {showTestModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(6px)" }}>
+          <div className="w-full max-w-sm bg-white rounded-3xl overflow-hidden shadow-2xl">
+            <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-5 pt-5 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-2xl">✅</div>
+                <div>
+                  <p className="text-white font-black text-xl leading-tight">MODAL TEST</p>
+                  <p className="text-white/70 text-xs">Pour Aissam uniquement</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-gray-600">
+                Si tu vois ce modal, alors l'affichage des modals fonctionne correctement sur ton appareil ! 🎉
+              </p>
+              <button
+                onClick={() => setShowTestModal(false)}
+                className="w-full h-14 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-black text-base shadow-lg active:scale-[0.98] transition-all"
+              >
+                Fermer le test
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Navigation sticky en haut ──────────────── */}
       <div className="sticky top-0 z-30 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-sm px-4 pt-3 pb-2 border-b border-gray-100 dark:border-gray-800">
         <div className="max-w-lg mx-auto flex gap-1 bg-white dark:bg-gray-800 rounded-2xl p-1 shadow-sm border border-gray-100 dark:border-gray-700">
@@ -627,6 +657,14 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             >
               <Bell className={`w-5 h-5 ${testingNotif ? "animate-bounce" : ""}`} />
               {testingNotif ? "Envoi en cours..." : "🧪 Tester Notification Push"}
+            </button>
+
+            {/* Bouton test modal */}
+            <button
+              onClick={() => setShowTestModal(true)}
+              className="w-full h-14 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-black text-base shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2.5"
+            >
+              🧪 TEST MODAL (Aissam)
             </button>
 
             {/* DEBUG PANEL */}
