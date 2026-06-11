@@ -97,11 +97,18 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     if (!livreurId || !livreurEmail) return;
     registerPushToken(livreurId, { email: livreurEmail, livreur_id: livreurId }).catch(() => null);
     const unsub = subscribeToNotifications(
-      (n) => toast.info(n.titre, { description: n.message }),
+      (n) => {
+        toast.info(n.titre, { description: n.message });
+        // Si notification de nouvelle course → refresh immédiat + affichage modal
+        if (n.type === "nouvelle_course" && n.course_id) {
+          queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+          queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
+        }
+      },
       livreurEmail
     );
     return () => unsub?.();
-  }, [livreurId, livreurEmail]);
+  }, [livreurId, livreurEmail, queryClient]);
 
   // ─── Heartbeat app_active ─────────────────────────────────────────────────
   // Géré par useHeartbeat hook + heartbeatAuto backend — supprimé pour éviter doublon
