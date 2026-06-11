@@ -409,7 +409,8 @@ export default function ClientExterneApp() {
           telephone: "",
           user_email: user.email,
           actif: true,
-          country_code: "BF"
+          // ⚠️ PAS de country_code ici — sera défini par l'onboarding (EtapeProfil)
+          // Mettre BF par défaut causait des courses créées avec le mauvais pays
         });
       }
       setClientProfil(profil);
