@@ -49,8 +49,11 @@ Deno.serve(async (req) => {
       }, { status: 400 });
     }
 
-    // Déterminer le pays de la course
-    const countryCode = course.country_code || "BF";
+    // Déterminer le pays de la course — PAS de fallback BF arbitraire
+    const countryCode = course.country_code;
+    if (!countryCode) {
+      return Response.json({ error: 'country_code manquant sur la course — impossible de calculer le prix' }, { status: 400 });
+    }
 
     // Essayer de récupérer la config depuis la DB
     let tarif = TARIFS_PAYS[countryCode] || TARIFS_PAYS["BF"];
