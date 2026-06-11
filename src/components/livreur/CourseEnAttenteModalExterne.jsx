@@ -76,9 +76,10 @@ export default function CourseEnAttenteModalExterne({
   onRefuser,
   onExpire,
   pricingMode = "automatic", // "automatic" | "manual"
+  timeoutSecondes = 60, // configurable via dispatch params
 }) {
   useVibration(true);
-  const [tempsRestant, setTempsRestant] = useState(60);
+  const [tempsRestant, setTempsRestant] = useState(timeoutSecondes);
   const [courseDejaPrise, setCourseDejaPrise] = useState(false);
   const [courseExpiree, setCourseExpiree] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -101,14 +102,13 @@ export default function CourseEnAttenteModalExterne({
         if (prev <= 1) {
           clearInterval(timer);
           setCourseExpiree(true);
-          // Ne pas appeler onExpire ici — le useEffect dédié ci-dessous gère le délai 3s
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [timeoutSecondes]);
 
   // Vérifier expiration backend
   const courseExpireeSentRef = useRef(false);
@@ -327,7 +327,7 @@ export default function CourseEnAttenteModalExterne({
             className={`h-full transition-all duration-1000 ${
               tempsRestant <= 10 ? 'bg-red-500' : tempsRestant <= 30 ? 'bg-amber-500' : 'bg-green-500'
             }`}
-            style={{ width: `${(tempsRestant / 60) * 100}%` }}
+            style={{ width: `${(tempsRestant / timeoutSecondes) * 100}%` }}
           />
         </div>
 
