@@ -25,7 +25,8 @@ import PricingModeSelector from "@/components/livreur/PricingModeSelector";
 import PrixManuelReponseAlert from "@/components/livreur/PrixManuelReponseAlert";
 import DebugCoursesPanel from "@/components/livreur/DebugCoursesPanel";
 import AuditLivreurPanel from "@/components/livreur/AuditLivreurPanel";
-import { Bell, Bug, Stethoscope } from "lucide-react";
+import PollingDebugPanel from "@/components/livreur/PollingDebugPanel";
+import { Bell, Bug, Stethoscope, Eye } from "lucide-react";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -736,6 +737,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
             {/* AUDIT PANEL */}
             <AuditLivreurPanel livreurEmail={livreurEmail} livreurId={livreurId} country_code={livreurProfil?.country_code} />
+
+            {/* POLLING DEBUG PANEL */}
+            <PollingDebugPanel livreurId={livreurId} livreurProfil={livreurProfil} />
 
             {/* DEBUG PANEL */}
             <DebugCoursesPanel livreurEmail={livreurEmail} livreurId={livreurId} />
