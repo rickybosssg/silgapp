@@ -129,12 +129,16 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     
     const checkCourses = async () => {
       try {
+        console.log('🔍 [DEBUG] Checking courses pour', livreurEmail, 'ID:', livreurId);
+        
         // Chercher notifications nouvelle_course non lues de ce livreur
         const notifs = await base44.entities.Notification.filter({
           destinataire_email: livreurEmail,
           type: "nouvelle_course",
           lue: false,
         });
+        
+        console.log('📬 [DEBUG] Notifications trouvées:', notifs?.length || 0);
         
         if (!notifs?.length) {
           setCoursesProposees([]);
@@ -143,6 +147,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         
         // Récupérer les courses correspondantes en attente
         const courseIds = [...new Set(notifs.map(n => n.course_id).filter(Boolean))];
+        console.log('🎯 [DEBUG] Course IDs from notifs:', courseIds);
+        
         const proposees = [];
         for (const cid of courseIds.slice(0, 5)) {
           try {
@@ -152,16 +158,18 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               livreur_id: livreurId,
             });
             const d = res?.data;
+            console.log('✅ [DEBUG] Course', cid, 'result:', d);
             if (d?.found && d?.course && !d?.expired) {
               proposees.push(d.course);
             }
           } catch (err) {
-            console.error('Error checking course:', err.message);
+            console.error('❌ [DEBUG] Error checking course:', err.message);
           }
         }
+        console.log('🚀 [DEBUG] Courses proposees to display:', proposees.length);
         setCoursesProposees(proposees);
       } catch (err) {
-        console.error('Error fetching courses proposees:', err.message);
+        console.error('💥 [DEBUG] Error fetching courses proposees:', err.message);
       }
     };
     
