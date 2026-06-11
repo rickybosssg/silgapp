@@ -123,4 +123,29 @@
       @apply min-h-[44px];
     }
   }
+
+  /* ── Lisibilité universelle — WCAG AA ── */
+  /* Texte dans les inputs toujours très lisible */
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    color: #111827; /* gray-900 */
+    font-size: 0.9375rem; /* 15px — lisible sur mobile */
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: #9ca3af; /* gray-400 — assez visible */
+    opacity: 1;
+  }
+  /* Empêcher texte blanc sur fond clair dans les cartes */
+  .bg-white input,
+  .bg-white textarea {
+    color: #111827;
+  }
+  /* Messages d'erreur toujours bien lisibles */
+  .text-red-400 { color: #dc2626 !important; } /* forcer red-600 au lieu de red-400 sur fond blanc */
+  .text-muted-foreground {
+    color: hsl(var(--muted-foreground));
+    /* minimum contrast garantit */
+  }
 }

@@ -252,7 +252,7 @@ export default function VenusChat({ onClose, countryContext }) {
                   </span>
                 )}
               </div>
-              <p className="text-xs text-white/80 font-medium">
+              <p className="text-xs text-white font-semibold">
                 {initializing ? "Chargement de la mémoire..." : countryContext?.ville ? `Assistante locale — ${countryContext.ville}` : "Assistante intelligente SILGAPP"}
               </p>
             </div>
@@ -288,12 +288,12 @@ export default function VenusChat({ onClose, countryContext }) {
         )}
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-slate-50 to-white">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
           {initializing ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center space-y-3">
                 <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
-                <p className="text-sm text-muted-foreground">Restauration de la mémoire VENUS...</p>
+                <p className="text-sm text-gray-700 font-medium">Restauration de la mémoire VENUS...</p>
               </div>
             </div>
           ) : (
@@ -304,14 +304,19 @@ export default function VenusChat({ onClose, countryContext }) {
                     <img src={VENUS_AVATAR} alt="VENUS" className="w-8 h-8 rounded-full object-cover flex-shrink-0 shadow-md" />
                   )}
                   <div className={cn(
-                    "max-w-[75%] rounded-2xl px-4 py-3 text-sm",
-                    message.role === "user"
-                      ? "bg-gradient-to-r from-primary to-red-600 text-white shadow-lg"
-                      : "bg-white border border-slate-200 shadow-md"
+                   "max-w-[75%] rounded-2xl px-4 py-3 text-sm",
+                   message.role === "user"
+                     ? "bg-gradient-to-r from-primary to-red-600 text-white shadow-lg"
+                     : "bg-white border border-slate-300 shadow-md"
                   )}>
-                    <ReactMarkdown className={cn("prose prose-sm max-w-none", message.role === "user" && "prose-invert")}>
-                      {message.content}
-                    </ReactMarkdown>
+                   <ReactMarkdown className={cn(
+                     "prose prose-sm max-w-none",
+                     message.role === "user"
+                       ? "prose-invert [&_*]:text-white [&_strong]:text-white [&_em]:text-white/90"
+                       : "[&_*]:text-gray-900 [&_p]:text-gray-900 [&_strong]:text-gray-900 [&_li]:text-gray-900 [&_a]:text-primary"
+                   )}>
+                     {message.content}
+                   </ReactMarkdown>
                   </div>
                 </div>
               ))}

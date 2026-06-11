@@ -72,7 +72,7 @@ export default function ProfilModal({ clientProfil, onClose, onSave }) {
             </div>
             <div>
               <h2 className="font-bold text-gray-900">Mes informations</h2>
-              <p className="text-xs text-gray-400">Modifier vos coordonnées</p>
+              <p className="text-xs text-gray-600">Modifier vos coordonnées</p>
             </div>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
@@ -83,7 +83,7 @@ export default function ProfilModal({ clientProfil, onClose, onSave }) {
         {/* Champs */}
         <div className="space-y-3">
           <div>
-            <label className="text-xs font-bold text-gray-600 mb-1 block">Nom *</label>
+            <label className="text-xs font-bold text-gray-800 mb-1 block">Nom *</label>
             <input
               value={nom}
               onChange={e => setNom(e.target.value)}
@@ -92,7 +92,7 @@ export default function ProfilModal({ clientProfil, onClose, onSave }) {
             />
           </div>
           <div>
-            <label className="text-xs font-bold text-gray-600 mb-1 block">Prénom *</label>
+            <label className="text-xs font-bold text-gray-800 mb-1 block">Prénom *</label>
             <input
               value={prenom}
               onChange={e => setPrenom(e.target.value)}
@@ -101,9 +101,9 @@ export default function ProfilModal({ clientProfil, onClose, onSave }) {
             />
           </div>
           <div>
-            <label className="text-xs font-bold text-gray-600 mb-1 block">Téléphone * (8 chiffres)</label>
+            <label className="text-xs font-bold text-gray-800 mb-1 block">Téléphone * (8 chiffres)</label>
             <div className="flex gap-2">
-              <div className="h-12 rounded-xl border border-gray-200 bg-gray-50 px-3 flex items-center text-sm font-semibold text-gray-500 flex-shrink-0">
+              <div className="h-12 rounded-xl border border-gray-200 bg-gray-100 px-3 flex items-center text-sm font-bold text-gray-700 flex-shrink-0">
                 +226
               </div>
               <input
