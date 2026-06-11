@@ -127,49 +127,56 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   });
 
   // ─── POLLING DIRECT: Course en dispatch pour ce livreur ───────────────────
-  // Vérifie directement via dispatchExterneAuto si une course est disponible
   const [courseProposee, setCourseProposee] = useState(null);
+  const [debugInfo, setDebugInfo] = useState({ total: 0, dispatch: 0, notifie: 0, error: null });
   
   useEffect(() => {
     if (!livreurId) return;
     
     const checkCourseDispo = async () => {
       try {
-        // Récupère TOUTES les courses en dispatch_status="propose"
+        // Récupère TOUTES les courses - utilise list() qui marche en frontend
         const allCourses = await base44.entities.CourseExterne.list('-created_date', 50);
-        const coursesEnDispatch = allCourses.filter(c => 
-          c.dispatch_status === 'propose' && 
-          c.statut === 'recherche_livreur'
-        );
+        setDebugInfo(d => ({ ...d, total: allCourses.length }));
+        
+        // Filtrer dispatch_status="propose"
+        const coursesEnDispatch = allCourses.filter(c => c.dispatch_status === 'propose');
+        setDebugInfo(d => ({ ...d, dispatch: coursesEnDispatch.length }));
         
         // Trouver celle où ce livreur est notifié
+        let found = null;
         for (const course of coursesEnDispatch) {
-          // Vérifier si expirée
+          // Vérifier expiration
           if (course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date()) {
             continue;
           }
           
-          // Vérifier si ce livreur est dans dispatch_notified_ids
+          // Vérifier dispatch_notified_ids
           try {
             const notifiedIds = course.dispatch_notified_ids ? JSON.parse(course.dispatch_notified_ids) : [];
             if (notifiedIds.includes(livreurId)) {
-              setCourseProposee(course);
-              return;
+              found = course;
+              setDebugInfo(d => ({ ...d, notifie: 1, course: course.id }));
+              break;
             }
-          } catch (_) {}
+          } catch (e) {
+            console.error('Error parse IDs:', e.message);
+          }
         }
         
-        // Aucune course trouvée
-        setCourseProposee(null);
+        setCourseProposee(found);
+        if (!found) {
+          setDebugInfo(d => ({ ...d, notifie: 0 }));
+        }
       } catch (err) {
-        console.error('Erreur polling direct:', err.message);
+        console.error('Erreur polling:', err.message);
+        setDebugInfo({ error: err.message, total: 0, dispatch: 0, notifie: 0 });
         setCourseProposee(null);
       }
     };
     
-    // Polling toutes les 2 secondes
     const interval = setInterval(checkCourseDispo, 2000);
-    checkCourseDispo(); // Premier check immédiat
+    checkCourseDispo();
     
     return () => clearInterval(interval);
   }, [livreurId]);
@@ -719,7 +726,39 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               🧪 TEST MODAL (Aissam)
             </button>
 
-            {/* DEBUG PANEL */}
+            {/* DEBUG PANEL - NOUVEAU */}
+            <div className="rounded-2xl bg-slate-900 text-white p-4 space-y-2 text-xs">
+              <p className="font-black text-green-400">🔍 DEBUG POLLING TEMPS RÉEL</p>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-slate-800 rounded-lg p-2 text-center">
+                  <p className="text-slate-400 text-[10px]">Total courses</p>
+                  <p className="text-lg font-black">{debugInfo.total || 0}</p>
+                </div>
+                <div className="bg-slate-800 rounded-lg p-2 text-center">
+                  <p className="text-slate-400 text-[10px]">En dispatch</p>
+                  <p className="text-lg font-black text-amber-400">{debugInfo.dispatch || 0}</p>
+                </div>
+                <div className="bg-slate-800 rounded-lg p-2 text-center">
+                  <p className="text-slate-400 text-[10px]">Pour VOUS</p>
+                  <p className="text-lg font-black text-green-400">{debugInfo.notifie || 0}</p>
+                </div>
+              </div>
+              {debugInfo.course && (
+                <div className="bg-green-900/30 border border-green-700 rounded-lg p-2">
+                  <p className="text-green-400 font-bold">✅ Course trouvée !</p>
+                  <p className="text-[10px] text-slate-300 font-mono">ID: {debugInfo.course}</p>
+                </div>
+              )}
+              {debugInfo.error && (
+                <div className="bg-red-900/30 border border-red-700 rounded-lg p-2">
+                  <p className="text-red-400 font-bold">❌ Erreur</p>
+                  <p className="text-[10px] text-red-300">{debugInfo.error}</p>
+                </div>
+              )}
+              <p className="text-[10px] text-slate-500 text-center">Polling: 2s</p>
+            </div>
+
+            {/* DEBUG PANEL - ANCIEN */}
             <DebugCoursesPanel livreurEmail={livreurEmail} livreurId={livreurId} />
 
             {coursesActives.length > 0 && (
