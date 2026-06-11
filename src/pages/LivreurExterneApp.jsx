@@ -123,7 +123,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // ─── Courses proposées (multi-livreurs) — via notifications non lues ──────
   // Le livreur peut figurer dans dispatch_notified_ids sans être livreur_id
   const { data: coursesProposees = [], refetch: refetchProposees } = useQuery({
-    queryKey: ["courses-proposees-livreur", livreurId],
+    queryKey: ["courses-proposees-livreur", livreurId, livreurEmail],
     queryFn: async () => {
       if (!livreurId || !livreurEmail) return [];
       // Chercher notifications nouvelle_course non lues de ce livreur
@@ -132,14 +132,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         type: "nouvelle_course",
         lue: false,
       });
-      console.log('[LIVREUR] 📬 Notifications non lues:', notifs?.length || 0);
-      if (!notifs?.length) {
-        console.log('[LIVREUR] ❌ Aucune notification non lue');
-        return [];
-      }
+      if (!notifs?.length) return [];
       // Récupérer les courses correspondantes en attente
       const courseIds = [...new Set(notifs.map(n => n.course_id).filter(Boolean))];
-      console.log('[LIVREUR] 🎯 Course IDs from notifs:', courseIds);
       const proposees = [];
       for (const cid of courseIds.slice(0, 5)) {
         try {
@@ -149,37 +144,21 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             livreur_id: livreurId,
           });
           const d = res?.data;
-          console.log('[LIVREUR] ✅ Check course result:', { course_id: cid, found: d?.found, expired: d?.expired, statut: d?.course?.statut, dispatch_status: d?.course?.dispatch_status });
           if (d?.found && d?.course && !d?.expired) {
             proposees.push(d.course);
-          } else if (!d?.found) {
-            console.log('[LIVREUR] ⚠️ Course pas trouvée pour ce livreur');
-          } else if (d?.expired) {
-            console.log('[LIVREUR] ⏰ Course expirée');
           }
         } catch (err) {
-          console.error('[LIVREUR] ❌ Error checking course:', err.message);
+          console.error('Error checking course:', err.message);
         }
       }
-      console.log('[LIVREUR] 📦 Courses proposees:', proposees.length);
       return proposees;
     },
     enabled: !!livreurId && !!livreurEmail,
     initialData: [],
-    refetchInterval: 1000, // ⚡ 1s au lieu de 2s
-    staleTime: 0, // ⚡ Toujours fresh
-    retry: 3,
+    refetchInterval: 3000, // 3s
+    staleTime: 2000, // 2s
+    retry: 2,
   });
-
-  // Rafraîchissement forcé toutes les 5s
-  useEffect(() => {
-    if (!livreurId || !livreurEmail) return;
-    const interval = setInterval(() => {
-      console.log('[LIVREUR] 🔄 Forced refetch courses proposees');
-      refetchProposees();
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [livreurId, livreurEmail, refetchProposees]);
 
   // ─── Course en attente de réponse du livreur ──────────────────────────────
   // Priorité : courses liées à ce livreur directement OU courses proposées multi
