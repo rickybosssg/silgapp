@@ -114,7 +114,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // Géré par useHeartbeat hook + heartbeatAuto backend — supprimé pour éviter doublon
 
   // ─── Mes courses ──────────────────────────────────────────────────────────
-  // Utilise getAllCoursesForLivreur pour inclure les courses en dispatch (livreur_id vide mais dispatch_notified_ids contient le livreur)
   const { data: mesCourses = [] } = useQuery({
     queryKey: ["mes-courses-externes", livreurId],
     queryFn: async () => {
@@ -126,6 +125,54 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     refetchInterval: 3000,
     staleTime: 1000,
   });
+
+  // ─── POLLING DIRECT: Course en dispatch pour ce livreur ───────────────────
+  // Vérifie directement via dispatchExterneAuto si une course est disponible
+  const [courseProposee, setCourseProposee] = useState(null);
+  
+  useEffect(() => {
+    if (!livreurId) return;
+    
+    const checkCourseDispo = async () => {
+      try {
+        // Récupère TOUTES les courses en dispatch_status="propose"
+        const allCourses = await base44.entities.CourseExterne.list('-created_date', 50);
+        const coursesEnDispatch = allCourses.filter(c => 
+          c.dispatch_status === 'propose' && 
+          c.statut === 'recherche_livreur'
+        );
+        
+        // Trouver celle où ce livreur est notifié
+        for (const course of coursesEnDispatch) {
+          // Vérifier si expirée
+          if (course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date()) {
+            continue;
+          }
+          
+          // Vérifier si ce livreur est dans dispatch_notified_ids
+          try {
+            const notifiedIds = course.dispatch_notified_ids ? JSON.parse(course.dispatch_notified_ids) : [];
+            if (notifiedIds.includes(livreurId)) {
+              setCourseProposee(course);
+              return;
+            }
+          } catch (_) {}
+        }
+        
+        // Aucune course trouvée
+        setCourseProposee(null);
+      } catch (err) {
+        console.error('Erreur polling direct:', err.message);
+        setCourseProposee(null);
+      }
+    };
+    
+    // Polling toutes les 2 secondes
+    const interval = setInterval(checkCourseDispo, 2000);
+    checkCourseDispo(); // Premier check immédiat
+    
+    return () => clearInterval(interval);
+  }, [livreurId]);
 
 
 
@@ -503,10 +550,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         userType="livreur"
       />
 
-      {/* Modal plein écran si course en attente */}
-      {courseEnAttente && (
+      {/* Modal plein écran si course en attente — utilise courseProposee (polling direct) */}
+      {courseProposee && (
         <CourseEnAttenteModalExterne
-          course={courseEnAttente}
+          course={courseProposee}
           livreurId={livreurProfil.id}
           pricingMode={pricingMode}
           onAccepter={handleAccepter}
@@ -515,6 +562,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             if (coursesActives.length === 0 && livreurProfil?.statut !== "hors_ligne") {
               saveLivreur(livreurProfil.id, { statut: "disponible" }).catch(() => null);
             }
+            setCourseProposee(null);
             queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
             queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
             queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
