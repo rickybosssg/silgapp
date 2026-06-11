@@ -24,9 +24,7 @@ import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
 import PricingModeSelector from "@/components/livreur/PricingModeSelector";
 import PrixManuelReponseAlert from "@/components/livreur/PrixManuelReponseAlert";
 import DebugCoursesPanel from "@/components/livreur/DebugCoursesPanel";
-import AuditLivreurPanel from "@/components/livreur/AuditLivreurPanel";
-import PollingDebugPanel from "@/components/livreur/PollingDebugPanel";
-import { Bell, Bug, Stethoscope, Eye } from "lucide-react";
+import { Bell } from "lucide-react";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -123,96 +121,15 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     staleTime: 2000,
   });
 
-  // ─── Courses proposées (POLLING ROBUSTE) — via dispatch_notified_ids ──────
-  // POLLING: Vérifie TOUTES les courses en dispatch_status="propose" où le livreur est notifié
-  const [coursesProposees, setCoursesProposees] = useState([]);
-  const [courseFallbackVisible, setCourseFallbackVisible] = useState(null); // Course à afficher en fallback
-  
-  useEffect(() => {
-    if (!livreurId || !livreurEmail) return;
-    
-    const checkCourses = async () => {
-      try {
-        console.log('[POLLING] Start check for livreur', livreurId, 'country', livreurProfil?.country_code);
-        
-        // 1. Récupérer TOUTES les courses via backend function (frontend-compatible)
-        const result = await base44.functions.invoke('getAllCoursesForLivreur', {
-          livreur_id: livreurId,
-          country_code: livreurProfil?.country_code || "BF",
-        });
-        
-        const allCourses = result?.courses || [];
-        const coursesEnDispatch = allCourses.filter(c => c.dispatch_status === "propose");
-        
-        console.log('[POLLING] Found', coursesEnDispatch.length, 'courses in propose status');
-        
-        if (coursesEnDispatch.length === 0) {
-          setCoursesProposees([]);
-          setCourseFallbackVisible(null);
-          return;
-        }
-        
-        // 2. Filtrer celles où le livreur est dans dispatch_notified_ids
-        const proposees = [];
-        for (const course of coursesEnDispatch) {
-          const notifiedIds = course.dispatch_notified_ids ? JSON.parse(course.dispatch_notified_ids) : [];
-          const isNotifie = notifiedIds.includes(livreurId);
-          const isAssignee = course.livreur_id === livreurId;
-          const isExpired = course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date();
-          
-          console.log('[POLLING] Course', course.id, {
-            client: course.client_nom,
-            notifiedIds: notifiedIds.length,
-            isNotifie,
-            isAssignee,
-            isExpired,
-          });
-          
-          if ((isNotifie || isAssignee) && !isExpired) {
-            proposees.push(course);
-          }
-        }
-        
-        console.log('[POLLING] Courses for this livreur:', proposees.length);
-        setCoursesProposees(proposees);
-        
-        // 3. Fallback: si une course est trouvée, l'afficher en bouton
-        if (proposees.length > 0) {
-          setCourseFallbackVisible(proposees[0]);
-          console.log('[POLLING] Setting fallback visible:', proposees[0].id);
-        } else {
-          setCourseFallbackVisible(null);
-        }
-      } catch (err) {
-        console.error('Error fetching courses proposees:', err.message);
-      }
-    };
-    
-    checkCourses();
-    // Polling toutes les 3 secondes
-    const interval = setInterval(checkCourses, 3000);
-    return () => clearInterval(interval);
-  }, [livreurId, livreurEmail, livreurProfil?.country_code]);
 
-  // ─── Course en attente de réponse du livreur (LOGIQUE SIMPLE) ─────────────
-  // Priorité 1: coursesProposees (via polling dispatch_notified_ids)
-  // Priorité 2: mesCourses avec livreur_id
-  const courseEnAttente = useMemo(() => {
-    // 1. D'abord vérifier coursesProposees (polling robuste)
-    if (coursesProposees && coursesProposees.length > 0) {
-      const firstProposee = coursesProposees.find(
-        c => c.dispatch_status === "propose"
-      );
-      if (firstProposee) return firstProposee;
-    }
-    
-    // 2. Ensuite mesCourses (livreur déjà assigné)
-    const directe = mesCourses.find(
+
+  // ─── Course en attente de réponse du livreur ───────────────────────────────
+  const courseEnAttente = useMemo(
+    () => mesCourses.find(
       c => c.statut === "recherche_livreur" && c.dispatch_status === "propose"
-    );
-    
-    return directe || null;
-  }, [coursesProposees, mesCourses]);
+    ) || null,
+    [mesCourses]
+  );
 
   // ─── Course en attente de validation prix par le client ───────────────────
   const courseEnAttenteValidationPrix = useMemo(() => {
@@ -711,35 +628,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               <Bell className={`w-5 h-5 ${testingNotif ? "animate-bounce" : ""}`} />
               {testingNotif ? "Envoi en cours..." : "🧪 Tester Notification Push"}
             </button>
-
-            {/* BOUTON FALLBACK - Si course disponible mais modal ne s'affiche pas */}
-            {courseFallbackVisible && !courseEnAttente && (
-              <div className="rounded-2xl bg-red-50 border-2 border-red-300 px-4 py-3 space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                  <p className="text-sm font-black text-red-800">⚠️ Course disponible</p>
-                </div>
-                <p className="text-xs text-red-600">
-                  Une course vous attend mais le modal ne s'affiche pas. Cliquez ci-dessous :
-                </p>
-                <button
-                  onClick={() => {
-                    // Force l'affichage en ajoutant la course aux mesCourses
-                    setCoursesProposees(prev => [courseFallbackVisible, ...prev.filter(c => c.id !== courseFallbackVisible.id)]);
-                  }}
-                  className="w-full h-14 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 text-white font-black text-base shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                >
-                  <Truck className="w-5 h-5" />
-                  OUVRIR LA COURSE DISPONIBLE
-                </button>
-              </div>
-            )}
-
-            {/* AUDIT PANEL */}
-            <AuditLivreurPanel livreurEmail={livreurEmail} livreurId={livreurId} country_code={livreurProfil?.country_code} />
-
-            {/* POLLING DEBUG PANEL */}
-            <PollingDebugPanel livreurId={livreurId} livreurProfil={livreurProfil} />
 
             {/* DEBUG PANEL */}
             <DebugCoursesPanel livreurEmail={livreurEmail} livreurId={livreurId} />
