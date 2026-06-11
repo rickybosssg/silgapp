@@ -399,13 +399,19 @@ Deno.serve(async (req) => {
     if (action === 'accepter_course') {
       const { pricing_mode, manual_price } = body;
 
+      // ── VERROU ATOMIQUE RENFORCÉ ──
+      // Re-fetch immédiat pour éviter race condition
       const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
 
-      // ── VERROU ATOMIQUE ──
-      // Si dispatch_status === 'accepte', un autre livreur a déjà le verrou
-      if (course.dispatch_status === 'accepte') {
+      // Vérification 1 : Si déjà acceptée par un autre
+      if (course.dispatch_status === 'accepte' && course.livreur_id && course.livreur_id !== livreur_id) {
         return Response.json({ success: false, error: 'Course déjà prise', already_taken: true });
+      }
+
+      // Vérification 2 : Si livreur_id est déjà fixé (même en propose)
+      if (course.livreur_id && course.livreur_id !== livreur_id && course.dispatch_status === 'propose') {
+        return Response.json({ success: false, error: 'Course déjà prise par un autre livreur', already_taken: true });
       }
 
       // Vérifier que ce livreur fait partie des notifiés
@@ -435,6 +441,17 @@ Deno.serve(async (req) => {
 
       const isManual = pricing_mode === 'manual' && manual_price >= PRIX_MIN;
 
+      // ── DELAI DE GRÂCE ANTI-RACE ──
+      // Attendre 200ms pour laisser le temps à un éventuel autre livreur de verrouiller
+      // Cela réduit drastiquement les doubles acceptations simultanées
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Re-vérification finale AVANT de verrouiller (double-check locking)
+      const courseFinal = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+      if (courseFinal.dispatch_status === 'accepte' && courseFinal.livreur_id && courseFinal.livreur_id !== livreur_id) {
+        return Response.json({ success: false, error: 'Course déjà prise pendant votre attente', already_taken: true });
+      }
+
       // Générer tokens QR/PIN
       const pickupToken = generateToken();
       const deliveryToken = generateToken();
@@ -442,12 +459,11 @@ Deno.serve(async (req) => {
       const deliveryPIN = generatePIN();
 
       // ── POSER LE VERROU ATOMIQUE ──
-      // dispatch_status passe à 'accepte' (mode auto) ou reste 'propose' avec livreur_id (mode manuel)
       const updateData = {
         dispatch_status: isManual ? 'propose' : 'accepte',
         statut: isManual ? 'recherche_livreur' : 'livreur_en_route',
         heure_acceptation: isManual ? null : new Date().toISOString(),
-        livreur_id: livreur_id,  // ← VERROU : fixe le propriétaire
+        livreur_id: livreur_id,
         livreur_nom: `${livreur.prenom || ''} ${livreur.nom}`.trim(),
         livreur_photo_url: livreur.photo_url || '',
         livreur_telephone: livreur.telephone,
