@@ -23,7 +23,8 @@ import PubliciteCarousel from "@/components/publicite/PubliciteCarousel";
 import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
 import PricingModeSelector from "@/components/livreur/PricingModeSelector";
 import PrixManuelReponseAlert from "@/components/livreur/PrixManuelReponseAlert";
-import { Bell } from "lucide-react";
+import DebugCoursesPanel from "@/components/livreur/DebugCoursesPanel";
+import { Bell, Bug } from "lucide-react";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -674,6 +675,12 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               <Bell className={`w-5 h-5 ${testingNotif ? "animate-bounce" : ""}`} />
               {testingNotif ? "Envoi en cours..." : "🧪 Tester Notification Push"}
             </button>
+
+            {/* DEBUG PANEL - À SUPPRIMER APRÈS FIX */}
+            <DebugCoursesPanel livreurId={livreurId} livreurEmail={livreurEmail} />
+
+            {/* Bouton DEBUG - Afficher notifications et courses */}
+            <DebugCoursesPanel livreurEmail={livreurEmail} livreurId={livreurId} />
 
             {coursesActives.length > 0 && (
               <div className="space-y-3">
