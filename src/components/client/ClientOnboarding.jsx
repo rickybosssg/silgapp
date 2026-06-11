@@ -135,7 +135,7 @@ function EtapeGPS({ onSuccess, clientId, clientProfil }) {
           {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <MapPin className="w-5 h-5" />}
           {loading ? "Localisation en cours..." : "Activer le GPS"}
         </button>
-        <p className="text-xs text-gray-400">Appuyez sur "Autoriser" lorsque votre appareil vous demande</p>
+        <p className="text-xs text-gray-600">Appuyez sur "Autoriser" lorsque votre appareil vous demande</p>
       </div>
     </div>
   );
@@ -273,23 +273,23 @@ function EtapeProfil({ clientProfil, onSuccess }) {
             <User className="w-8 h-8 text-primary" />
           </div>
           <p className="text-xl font-black text-gray-900">Complétez vos informations</p>
-          <p className="text-xs text-gray-500">Ces informations permettent de synchroniser vos courses.</p>
+          <p className="text-xs text-gray-600">Ces informations permettent de synchroniser vos courses.</p>
         </div>
 
         <div className="space-y-3">
           {/* Pays */}
           <div>
-            <label className="text-xs font-bold text-gray-700 mb-1 block">🌍 Pays *</label>
+            <label className="text-xs font-bold text-gray-800 mb-1 block">🌍 Pays *</label>
             <div className="grid grid-cols-2 gap-2">
               {PAYS_LISTE.map(pays => (
                 <button
                   key={pays.code}
                   type="button"
                   onClick={() => { setCountryCode(pays.code); setTelAffiche(""); }}
-                  className={`h-11 rounded-xl border text-sm font-semibold flex items-center gap-2 px-3 transition-all ${
+                  className={`h-11 rounded-xl border-2 text-sm font-semibold flex items-center gap-2 px-3 transition-all ${
                     countryCode === pays.code
-                      ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/20"
-                      : "border-gray-200 bg-white text-gray-700 hover:border-primary/40"
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-gray-300 bg-white text-gray-800 hover:border-primary/50"
                   }`}
                 >
                   <span className="text-lg">{pays.emoji}</span>
@@ -300,29 +300,29 @@ function EtapeProfil({ clientProfil, onSuccess }) {
           </div>
 
           <div>
-            <label className="text-xs font-bold text-gray-700 mb-1 block">Nom *</label>
+            <label className="text-xs font-bold text-gray-800 mb-1 block">Nom *</label>
             <input
               value={nom}
               onChange={e => setNom(e.target.value)}
               placeholder="Votre nom de famille"
-              className="w-full h-12 rounded-xl border border-gray-200 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+              className="w-full h-12 rounded-xl border-2 border-gray-300 px-4 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
             />
           </div>
           <div>
-            <label className="text-xs font-bold text-gray-700 mb-1 block">Prénom *</label>
+            <label className="text-xs font-bold text-gray-800 mb-1 block">Prénom *</label>
             <input
               value={prenom}
               onChange={e => setPrenom(e.target.value)}
               placeholder="Votre prénom"
-              className="w-full h-12 rounded-xl border border-gray-200 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+              className="w-full h-12 rounded-xl border-2 border-gray-300 px-4 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
             />
           </div>
           <div>
-            <label className="text-xs font-bold text-gray-700 mb-1 block">
+            <label className="text-xs font-bold text-gray-800 mb-1 block">
               Téléphone * {paysSelectionne ? `(${paysSelectionne.digits} chiffres)` : "(sélectionnez un pays)"}
             </label>
             <div className="flex gap-2">
-              <div className="h-12 rounded-xl border border-gray-200 bg-gray-50 px-3 flex items-center text-sm font-semibold text-gray-600 flex-shrink-0">
+              <div className="h-12 rounded-xl border-2 border-gray-300 bg-gray-100 px-3 flex items-center text-sm font-bold text-gray-800 flex-shrink-0">
                 {paysSelectionne ? `${paysSelectionne.emoji} ${paysSelectionne.indicatif}` : "🌍"}
               </div>
               <input
@@ -331,7 +331,7 @@ function EtapeProfil({ clientProfil, onSuccess }) {
                 onChange={handleTelChange}
                 placeholder={paysSelectionne ? "0".repeat(paysSelectionne.digits).replace(/(.{2})/g, "$1 ").trim() : "—"}
                 disabled={!countryCode}
-                className="flex-1 h-12 rounded-xl border border-gray-200 px-4 text-sm tracking-widest font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:bg-gray-50 disabled:text-gray-400"
+                className="flex-1 h-12 rounded-xl border-2 border-gray-300 px-4 text-sm text-gray-900 tracking-widest font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:bg-gray-50 disabled:text-gray-500"
               />
             </div>
             {telAffiche.length > 0 && (
@@ -347,7 +347,7 @@ function EtapeProfil({ clientProfil, onSuccess }) {
           {/* Champ code promo */}
           {!clientProfil?.code_promo_utilise && (
             <div>
-              <label className="text-xs font-bold text-gray-700 mb-1 block">🎁 Code promo (optionnel)</label>
+              <label className="text-xs font-bold text-gray-800 mb-1 block">🎁 Code promo (optionnel)</label>
               <input
                 value={codePromo}
                 onChange={e => {
@@ -371,7 +371,7 @@ function EtapeProfil({ clientProfil, onSuccess }) {
                 <p className="text-xs text-red-500 mt-1">❌ Code promo invalide ou désactivé</p>
               )}
               {!codePromoStatut && (
-                <p className="text-xs text-gray-400 mt-1">Bénéficiez de 10% de réduction sur votre première course !</p>
+                <p className="text-xs text-gray-600 mt-1">Bénéficiez de 10% de réduction sur votre première course !</p>
               )}
             </div>
           )}

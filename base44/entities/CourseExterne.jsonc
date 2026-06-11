@@ -414,6 +414,10 @@
       "type": "string",
       "format": "date-time",
       "description": "Date de refus du prix manuel par le client"
+    },
+    "dispatch_notified_ids": {
+      "type": "string",
+      "description": "JSON stringifi\u00e9 des IDs des livreurs notifi\u00e9s pour cette course (dispatch multi-livreurs)"
     }
   },
   "required": [

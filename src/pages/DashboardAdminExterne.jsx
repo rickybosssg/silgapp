@@ -24,8 +24,7 @@ import DownloadStatsPanel from "@/components/admin/DownloadStatsPanel";
 import AlertesLivreursPanel from "@/components/admin/AlertesLivreursPanel";
 import ZonesChaudesWidget from "@/components/carte/ZonesChaudes";
 import ComptabilitePanel from "@/components/admin/ComptabilitePanel";
-import DiagnosticPushPanel from "@/components/admin/DiagnosticPushPanel";
-import LivreurAlertSettingsPanel from "@/components/admin/LivreurAlertSettingsPanel";
+import DispatchConfigPanel from "@/components/admin/DispatchConfigPanel";
 
 export default function DashboardAdminExterne() {
   const { isPays, countryCode: adminCountryCode } = useAdminContext();
@@ -116,14 +115,6 @@ export default function DashboardAdminExterne() {
 
   const QUICK_LINKS = [
     {
-      to: "/diagnostic-push-complet?email=eric.nongbzanga@yahoo.fr",
-      label: "Diagnostic Push",
-      sub: "Tokens Android & FCM",
-      icon: Bell,
-      grad: "from-blue-600 to-cyan-500",
-      shadow: "shadow-blue-100",
-    },
-    {
       to: "/livreurs",
       label: "Livreurs externes",
       sub: "Validations & blocages",
@@ -154,6 +145,14 @@ export default function DashboardAdminExterne() {
       icon: MessageCircle,
       grad: "from-green-500 to-emerald-600",
       shadow: "shadow-green-100",
+    },
+    {
+      scroll: "dispatch-config",
+      label: "Dispatch Externe",
+      sub: "Vagues, timeout, nb livreurs",
+      icon: Zap,
+      grad: "from-primary to-red-600",
+      shadow: "shadow-red-100",
     },
     {
       scroll: "zones-chaudes",
@@ -242,12 +241,6 @@ export default function DashboardAdminExterne() {
 
       {/* ── STATISTIQUES TÉLÉCHARGEMENTS ───────────────────────────── */}
       <DownloadStatsPanel />
-
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm" id="diagnostic-push">
-        <DiagnosticPushPanel defaultSearchEmail="eric.nongbzanga@yahoo.fr" />
-      </div>
-
-      <LivreurAlertSettingsPanel />
 
       {/* ── STATS KPI ──────────────────────────────────────────────── */}
       <div>
@@ -350,6 +343,20 @@ export default function DashboardAdminExterne() {
           </div>
         </div>
         <DiagnosticInterne />
+      </div>
+
+      {/* ── DISPATCH CONFIG ──────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm" id="dispatch-config">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-red-600 flex items-center justify-center shadow-md shadow-red-100">
+            <Zap className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <p className="font-bold text-sm text-foreground">Paramètres Dispatch Externe</p>
+            <p className="text-xs text-muted-foreground">Nombre de livreurs notifiés · Temps de réponse</p>
+          </div>
+        </div>
+        <DispatchConfigPanel />
       </div>
 
       {/* ── ZONES CHAUDES ────────────────────────────────────────── */}

@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
 import { X, Send, Loader2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
@@ -236,8 +234,8 @@ export default function VenusChat({ onClose, countryContext }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg h-[600px] flex flex-col animate-in zoom-in-95 duration-200 shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-lg h-[600px] flex flex-col shadow-2xl overflow-hidden rounded-2xl bg-white" style={{backgroundColor: '#ffffff'}}>
 
         {/* Header */}
         <div className="p-4 border-b flex items-center justify-between bg-gradient-to-r from-primary via-blue-600 to-red-600">
@@ -252,7 +250,7 @@ export default function VenusChat({ onClose, countryContext }) {
                   </span>
                 )}
               </div>
-              <p className="text-xs text-white/80 font-medium">
+              <p className="text-xs text-white font-semibold">
                 {initializing ? "Chargement de la mémoire..." : countryContext?.ville ? `Assistante locale — ${countryContext.ville}` : "Assistante intelligente SILGAPP"}
               </p>
             </div>
@@ -288,12 +286,12 @@ export default function VenusChat({ onClose, countryContext }) {
         )}
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-slate-50 to-white">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4" style={{backgroundColor: '#f3f4f6'}}>
           {initializing ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center space-y-3">
                 <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
-                <p className="text-sm text-muted-foreground">Restauration de la mémoire VENUS...</p>
+                <p className="text-sm text-gray-700 font-medium">Restauration de la mémoire VENUS...</p>
               </div>
             </div>
           ) : (
@@ -303,15 +301,34 @@ export default function VenusChat({ onClose, countryContext }) {
                   {message.role === "assistant" && (
                     <img src={VENUS_AVATAR} alt="VENUS" className="w-8 h-8 rounded-full object-cover flex-shrink-0 shadow-md" />
                   )}
-                  <div className={cn(
-                    "max-w-[75%] rounded-2xl px-4 py-3 text-sm",
-                    message.role === "user"
-                      ? "bg-gradient-to-r from-primary to-red-600 text-white shadow-lg"
-                      : "bg-white border border-slate-200 shadow-md"
-                  )}>
-                    <ReactMarkdown className={cn("prose prose-sm max-w-none", message.role === "user" && "prose-invert")}>
-                      {message.content}
-                    </ReactMarkdown>
+                  <div
+                    className="max-w-[75%] rounded-2xl px-4 py-3"
+                    style={message.role === "user" ? {
+                      backgroundColor: '#dc2626',
+                      color: '#ffffff',
+                      fontSize: '15px',
+                      lineHeight: '1.5',
+                      fontWeight: '500',
+                    } : {
+                      backgroundColor: '#ffffff',
+                      color: '#111827',
+                      fontSize: '15px',
+                      lineHeight: '1.5',
+                      border: '1px solid #d1d5db',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    }}
+                  >
+                  <ReactMarkdown
+                    components={{
+                      p: ({children}) => <p style={{color: message.role === 'user' ? '#ffffff' : '#111827', margin: '2px 0', fontSize: '15px'}}>{children}</p>,
+                      strong: ({children}) => <strong style={{color: message.role === 'user' ? '#ffffff' : '#111827', fontWeight: '700'}}>{children}</strong>,
+                      em: ({children}) => <em style={{color: message.role === 'user' ? '#ffe4e4' : '#374151'}}>{children}</em>,
+                      li: ({children}) => <li style={{color: message.role === 'user' ? '#ffffff' : '#111827', fontSize: '15px'}}>{children}</li>,
+                      a: ({children, href}) => <a href={href} style={{color: message.role === 'user' ? '#fecaca' : '#dc2626'}}>{children}</a>,
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
                   </div>
                 </div>
               ))}
@@ -335,15 +352,25 @@ export default function VenusChat({ onClose, countryContext }) {
         </div>
 
         {/* Input */}
-        <div className="p-4 border-t bg-white">
+        <div className="p-4 border-t" style={{backgroundColor: '#ffffff'}}>
           <div className="flex gap-2">
-            <Input
+            <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Posez votre question à VENUS..."
-              className="flex-1 rounded-xl border-slate-200 focus:border-primary"
               disabled={loading || initializing}
+              style={{
+                flex: 1,
+                height: '44px',
+                borderRadius: '12px',
+                border: '1.5px solid #d1d5db',
+                padding: '0 14px',
+                fontSize: '15px',
+                color: '#111827',
+                backgroundColor: '#ffffff',
+                outline: 'none',
+              }}
             />
             <Button
               onClick={sendMessage}
@@ -355,7 +382,7 @@ export default function VenusChat({ onClose, countryContext }) {
           </div>
         </div>
 
-      </Card>
+      </div>
     </div>
   );
 }

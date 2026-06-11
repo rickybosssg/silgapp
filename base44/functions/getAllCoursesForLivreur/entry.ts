@@ -3,29 +3,33 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const { livreur_id } = await req.json();
-
+    
+    // Auth non requise — utilisé en frontend polling
+    const { livreur_id, country_code } = await req.json();
+    
     if (!livreur_id) {
       return Response.json({ error: 'livreur_id requis' }, { status: 400 });
     }
-
+    
+    // Récupérer TOUTES les courses du pays
     const allCourses = await base44.asServiceRole.entities.CourseExterne.list('-created_date', 100);
-
-    const coursesPourLivreur = allCourses.filter((course) => {
-      if (String(course.livreur_id || '') === String(livreur_id)) return true;
-
-      if (course.dispatch_status === 'propose' && !course.livreur_id && course.dispatch_notified_ids) {
+    
+    // Filtrer par pays ET par livreur
+    const coursesPourLivreur = allCourses.filter(c => {
+      // 1. Courses déjà acceptées (livreur_id = ce livreur)
+      if (c.livreur_id === livreur_id) return true;
+      
+      // 2. Courses en dispatch multi-livreur (dispatch_notified_ids contient ce livreur)
+      if (c.dispatch_status === 'propose' && !c.livreur_id && c.dispatch_notified_ids) {
         try {
-          const notifiedIds = JSON.parse(course.dispatch_notified_ids);
-          return Array.isArray(notifiedIds) && notifiedIds.map(String).includes(String(livreur_id));
-        } catch (_) {
-          return false;
-        }
+          const notifiedIds = JSON.parse(c.dispatch_notified_ids);
+          if (notifiedIds.includes(livreur_id)) return true;
+        } catch (_) {}
       }
-
+      
       return false;
     });
-
+    
     return Response.json({
       success: true,
       courses: coursesPourLivreur,

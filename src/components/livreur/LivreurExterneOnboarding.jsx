@@ -100,7 +100,7 @@ function EcranGPS({ livreurId, onGpsOk }) {
         </div>
         <div>
           <p className="text-2xl font-black text-white mb-2">GPS Obligatoire</p>
-          <p className="text-sm text-gray-400 leading-relaxed">
+          <p className="text-sm text-gray-300 leading-relaxed">
             Activez votre GPS pour recevoir des courses et être visible sur la carte.
           </p>
         </div>
@@ -118,7 +118,7 @@ function EcranGPS({ livreurId, onGpsOk }) {
             <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Activation...</>
           ) : "📍 Activer le GPS"}
         </button>
-        <p className="text-xs text-gray-600">Appuyez sur "Autoriser" lorsque l'appareil vous le demande</p>
+        <p className="text-xs text-gray-400">Appuyez sur "Autoriser" lorsque l'appareil vous le demande</p>
       </div>
     </div>
   );
@@ -238,19 +238,19 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
           { key: "quartier", label: "Quartier de résidence *", placeholder: "Ex: Wemtenga" },
         ].map(({ key, label, placeholder }) => (
           <div key={key}>
-            <label className="block text-xs font-semibold text-gray-400 mb-1 uppercase tracking-wide">{label}</label>
+            <label className="block text-xs font-bold text-gray-300 mb-1 uppercase tracking-wide">{label}</label>
             <input
               value={form[key]}
               onChange={e => setF(key, e.target.value)}
               placeholder={placeholder}
-              className="w-full h-12 rounded-xl bg-zinc-900 border border-zinc-700 text-white px-4 text-sm focus:border-red-500 focus:outline-none"
+              className="w-full h-12 rounded-xl bg-zinc-800 border-2 border-zinc-600 text-white placeholder-zinc-500 px-4 text-sm focus:border-red-500 focus:outline-none"
             />
           </div>
         ))}
 
         {/* Pays */}
         <div>
-          <label className="block text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wide">🌍 Pays * (obligatoire)</label>
+          <label className="block text-xs font-bold text-gray-300 mb-2 uppercase tracking-wide">🌍 Pays * (obligatoire)</label>
           <div className="grid grid-cols-2 gap-2">
             {PAYS_LIVREUR.map(pays => (
               <button
@@ -259,8 +259,8 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
                 onClick={() => { setCountryCode(pays.code); setF("telephone", ""); }}
                 className={`h-11 rounded-xl border-2 text-sm font-semibold flex items-center gap-2 px-3 transition-all ${
                   countryCode === pays.code
-                    ? "border-red-600 bg-red-600/10 text-red-400"
-                    : "border-zinc-700 bg-zinc-900 text-gray-400"
+                    ? "border-red-500 bg-red-600/20 text-red-300"
+                    : "border-zinc-600 bg-zinc-800 text-gray-200 hover:border-zinc-400"
                 }`}
               >
                 <span className="text-lg">{pays.emoji}</span>
@@ -272,16 +272,16 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
 
         {/* Téléphone */}
         <div>
-          <label className="block text-xs font-semibold text-gray-400 mb-1 uppercase tracking-wide">Téléphone * ({localLen} chiffres)</label>
+          <label className="block text-xs font-bold text-gray-300 mb-1 uppercase tracking-wide">Téléphone * ({localLen} chiffres)</label>
           <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-mono">{dialCode}</span>
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-200 text-sm font-bold font-mono">{dialCode}</span>
             <input
               value={formaterTelephone(form.telephone)}
               onChange={handleTelephone}
               placeholder={"X".repeat(localLen).replace(/(.{2})/g, "$1 ").trim()}
               inputMode="numeric"
               disabled={!countryCode}
-              className="w-full h-12 rounded-xl bg-zinc-900 border border-zinc-700 text-white pl-16 pr-4 text-sm font-mono focus:border-red-500 focus:outline-none tracking-widest disabled:opacity-40"
+              className="w-full h-12 rounded-xl bg-zinc-800 border-2 border-zinc-600 text-white placeholder-zinc-500 pl-16 pr-4 text-sm font-mono focus:border-red-500 focus:outline-none tracking-widest disabled:opacity-40"
             />
           </div>
           {form.telephone.length > 0 && (
@@ -295,7 +295,7 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
 
         {/* Véhicule */}
         <div>
-          <label className="block text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wide">Type de véhicule *</label>
+          <label className="block text-xs font-bold text-gray-300 mb-2 uppercase tracking-wide">Type de véhicule *</label>
           <div className="grid grid-cols-2 gap-2">
             {[
               { val: "moto", label: "🏍️ Moto" },
@@ -307,7 +307,7 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
                 key={val}
                 onClick={() => setF("vehicule", val)}
                 className={`h-12 rounded-xl border-2 font-semibold text-sm transition-all ${
-                  form.vehicule === val ? "border-red-600 bg-red-600/10 text-red-400" : "border-zinc-700 bg-zinc-900 text-gray-400"
+                  form.vehicule === val ? "border-red-500 bg-red-600/20 text-red-300" : "border-zinc-600 bg-zinc-800 text-gray-200 hover:border-zinc-400"
                 }`}
               >
                 {label}
@@ -326,7 +326,7 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
             <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Sauvegarde...</>
           ) : <><Check className="w-5 h-5" /> Valider mon profil</>}
         </button>
-        <p className="text-center text-xs text-gray-600 pb-8">
+        <p className="text-center text-xs text-gray-400 pb-8">
           Ces informations sont visibles par les clients lors de la livraison
         </p>
       </div>

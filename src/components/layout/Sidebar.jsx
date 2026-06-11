@@ -39,6 +39,7 @@ export const navItems = [
   { path: "/admin/externe/clients", label: "Clients externes", icon: Users, reseauOnly: "externe" },
   { path: "/admin/publicites", label: "Publicités", icon: Megaphone, reseauOnly: "externe" },
   { path: "/admin/venus-rapports", label: "Rapports VENUS", icon: MessageCircle, reseauOnly: "externe" },
+  { path: "/admin/externe", label: "Config Dispatch", icon: Settings, reseauOnly: "externe" },
   { path: "/notifications", label: "Notifications", icon: Bell, reseauOnly: "interne" },
   { path: "/notifications", label: "Notifications", icon: Bell, reseauOnly: "externe" },
   { path: "/maintenance", label: "Maintenance", icon: Shield, reseauOnly: "interne" },

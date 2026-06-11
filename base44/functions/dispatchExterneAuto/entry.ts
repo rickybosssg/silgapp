@@ -1,73 +1,13 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-/** Génère un token UUID simplifié */
 function generateToken() {
   return crypto.randomUUID().replace(/-/g, '');
 }
 
-/** Génère un code PIN à 4 chiffres */
 function generatePIN() {
   return String(Math.floor(1000 + Math.random() * 9000));
 }
 
-function normalizeCountryCode(value) {
-  return String(value || '').trim().toUpperCase();
-}
-
-function getCourseCountry(course) {
-  return normalizeCountryCode(course?.country_code);
-}
-
-function getLivreurCountry(livreur) {
-  return normalizeCountryCode(livreur?.country_code);
-}
-
-function logCountryBlock(context, course, livreur, extra = {}) {
-  console.error('[DISPATCH][CRITICAL_COUNTRY_BLOCK]', {
-    context,
-    course_id: course?.id || '',
-    course_country_code: getCourseCountry(course) || 'ABSENT',
-    livreur_id: livreur?.id || '',
-    livreur_email: livreur?.user_email || '',
-    livreur_country_code: getLivreurCountry(livreur) || 'ABSENT',
-    ...extra,
-  });
-}
-
-function countryBlockResponse(course, livreur) {
-  return Response.json({
-    success: false,
-    error: 'Assignation inter-pays interdite',
-    blocked_reason: 'country_mismatch',
-    course_country_code: getCourseCountry(course) || '',
-    livreur_country_code: getLivreurCountry(livreur) || '',
-  }, { status: 403 });
-}
-
-function assertCourseHasCountry(course, context) {
-  const countryCode = getCourseCountry(course);
-  if (!countryCode) {
-    console.error('[DISPATCH][CRITICAL_COUNTRY_MISSING]', {
-      context,
-      course_id: course?.id || '',
-      message: 'CourseExterne.country_code obligatoire absent. Dispatch bloque.',
-    });
-    return false;
-  }
-  return true;
-}
-
-function assertSameCountry(course, livreur, context) {
-  const courseCountry = getCourseCountry(course);
-  const livreurCountry = getLivreurCountry(livreur);
-  if (!courseCountry || !livreurCountry || courseCountry !== livreurCountry) {
-    logCountryBlock(context, course, livreur);
-    return false;
-  }
-  return true;
-}
-
-/** Haversine */
 function calculerDistance(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -81,401 +21,238 @@ function calculerDistance(lat1, lon1, lat2, lon2) {
 }
 
 /**
- * Trouve les livreurs disponibles par NIVEAUX de priorité.
- * 
- * NOUVELLE LOGIQUE DE DISPATCH PAR NIVEAUX :
- * 
- * NIVEAU 1 (PRIORITÉ ABSOLUE) :
- *   - Pays correspondant
- *   - Statut Libre (disponible + ON + validé + GPS)
- *   - Heartbeat < 2 minutes
- *   → Tri : GPS < 2 min, puis 2-5 min, puis 5-10 min, puis distance
- * 
- * NIVEAU 2 (SECOURS) :
- *   - Pays correspondant
- *   - Statut Libre
- *   - Heartbeat < 10 minutes
- *   → Tri : distance
- * 
- * NIVEAU 3 (SECOURS ÉTENDU) :
- *   - Pays correspondant
- *   - Statut Libre
- *   - Heartbeat < 30 minutes
- *   → Tri : distance
- * 
- * NIVEAU 4 (DERNIER RECOURS) :
- *   - Tous les livreurs libres du pays
- *   - Peu importe heartbeat
- *   - Peu importe GPS
- *   → Tri : distance
- * 
- * Le heartbeat ne sert plus à EXCLURE, mais à PRIORISER et choisir le canal de notification.
+ * Charge la configuration de dispatch depuis AppConfig.
+ * Clés : DISPATCH_NB_LIVREURS (défaut: 3), DISPATCH_TIMEOUT_SEC (défaut: 60)
  */
-async function trouverLivreursCandidatsParNiveaux(base44, course, exclusions = []) {
-  // 🌍 FILTRE PAR PAYS — OBLIGATOIRE : jamais traverser les frontières
-  const courseCountry = getCourseCountry(course);
-  if (!courseCountry) {
-    console.error(`[DISPATCH] ❌ BLOQUÉ — course ${course.id} sans country_code. Dispatch inter-pays interdit.`);
+async function chargerConfigDispatch(base44) {
+  try {
+    const configs = await base44.asServiceRole.entities.AppConfig.filter({});
+    const nbConfig = configs.find(c => c.cle === 'DISPATCH_NB_LIVREURS');
+    const timeoutConfig = configs.find(c => c.cle === 'DISPATCH_TIMEOUT_SEC');
+    const nb = nbConfig ? (nbConfig.valeur === 'tous' ? 999 : parseInt(nbConfig.valeur, 10) || 3) : 3;
+    const timeout = timeoutConfig ? (parseInt(timeoutConfig.valeur, 10) || 60) : 60;
+    return { nb, timeout };
+  } catch (err) {
+    console.warn('[DISPATCH] ⚠️ Impossible de charger config dispatch, valeurs par défaut utilisées:', err.message);
+    return { nb: 3, timeout: 60 };
+  }
+}
+
+/**
+ * Trouve les livreurs candidats classés par niveaux de priorité.
+ * exclusions = [livreur_id] : le livreur qui détient actuellement le verrou actif.
+ */
+async function trouverLivreursCandidats(base44, course, exclusions = []) {
+  if (!course.country_code) {
+    console.error(`[DISPATCH] ❌ BLOQUÉ — course ${course.id} sans country_code`);
     return [];
   }
 
-  const filterLivreur = {
+  const tousLivreurs = await base44.asServiceRole.entities.Livreur.filter({
     type_livreur: 'externe',
     validation: 'valide',
     actif: true,
     statut: 'disponible',
-  };
-  const tousLivreursBase = await base44.asServiceRole.entities.Livreur.filter(filterLivreur);
-  const tousLivreurs = (tousLivreursBase || []).filter(l => getLivreurCountry(l) === courseCountry);
-
-  console.log('[DISPATCH][COUNTRY_FILTER]', {
-    course_id: course.id,
-    course_country_code: courseCountry,
-    livreurs_total_disponibles: tousLivreursBase?.length || 0,
-    livreurs_meme_pays: tousLivreurs.length,
-    livreurs_exclus_autre_pays: Math.max(0, (tousLivreursBase?.length || 0) - tousLivreurs.length),
+    country_code: course.country_code,
   });
 
-  if (!tousLivreurs || tousLivreurs.length === 0) {
-    console.log('[DISPATCH] 🚫 Aucun livreur trouvé avec filtres de base');
-    return [];
-  }
+  if (!tousLivreurs || tousLivreurs.length === 0) return [];
 
-  // Charger les courses actives du MÊME pays pour exclure les livreurs déjà en course
-  const coursesActifFilter = { country_code: courseCountry };
-  const coursesActives = await base44.asServiceRole.entities.CourseExterne.filter(coursesActifFilter);
+  // Livreurs déjà en course active (même pays)
+  const coursesActives = await base44.asServiceRole.entities.CourseExterne.filter({ country_code: course.country_code });
   const livreurIdsEnCourse = new Set(
     coursesActives
       .filter(c => ['livreur_en_route', 'colis_recupere', 'en_livraison'].includes(c.statut) && c.livreur_id)
       .map(c => c.livreur_id)
   );
-  console.log(`[DISPATCH] 🚫 Livreurs déjà en course exclus: ${livreurIdsEnCourse.size}`);
 
   const now = Date.now();
 
-  // Filtrer les livreurs éligibles (disponibilité métier)
-  const livreursEligibles = tousLivreurs.filter(l => {
-    if (!l.latitude || !l.longitude) return false; // GPS requis (coordonnées)
-    if (exclusions.includes(l.id)) return false;
+  const eligibles = tousLivreurs.filter(l => {
+    if (!l.latitude || !l.longitude) return false;
+    if (exclusions.includes(l.id)) return false;  // Seul le détenteur du verrou actif est exclu
     if (livreurIdsEnCourse.has(l.id)) return false;
-    if (l.admin_hors_ligne === true) {
-      console.log(`[DISPATCH] 🚫 ${l.nom} exclu - mis hors ligne par l'administration`);
-      return false;
-    }
-    return true; // Libre (disponible + valide + actif + GPS)
+    if (l.admin_hors_ligne === true) return false;
+    return true;
   });
 
-  console.log('[DISPATCH][COUNTRY_ELIGIBILITY]', {
-    course_id: course.id,
-    course_country_code: courseCountry,
-    livreurs_meme_pays: tousLivreurs.length,
-    livreurs_eligibles_apres_disponibilite: livreursEligibles.length,
-  });
+  // Calculer heartbeat, gps age, distance pour chaque livreur
+  const niveau1 = [], niveau2 = [], niveau3 = [], niveau4 = [];
 
-  // ─── CLASSEMENT PAR NIVEAUX ────────────────────────────────────────────────
-  
-  const niveau1 = []; // Heartbeat < 2 min
-  const niveau2 = []; // Heartbeat 2-10 min
-  const niveau3 = []; // Heartbeat 10-30 min
-  const niveau4 = []; // Heartbeat > 30 min (tous)
-
-  livreursEligibles.forEach(l => {
+  eligibles.forEach(l => {
     const hbDate = l.last_seen_at || l.derniere_position_date;
     let heartbeatAgeMin = null;
-    
     if (hbDate) {
       const hb = new Date(hbDate);
-      if (!isNaN(hb.getTime())) {
-        heartbeatAgeMin = (now - hb.getTime()) / 60000;
-      }
+      if (!isNaN(hb.getTime())) heartbeatAgeMin = (now - hb.getTime()) / 60000;
     }
 
-    // Calcul distance si GPS course disponible
     let distance = 0;
     if (course.gps_depart_lat && course.gps_depart_lng && l.latitude && l.longitude) {
       distance = calculerDistance(course.gps_depart_lat, course.gps_depart_lng, l.latitude, l.longitude);
     }
 
-    const livreurAvecDistance = { ...l, distance, heartbeatAgeMin };
+    const enriched = { ...l, distance, heartbeatAgeMin };
 
     if (heartbeatAgeMin === null || heartbeatAgeMin >= 30) {
-      niveau4.push(livreurAvecDistance);
+      niveau4.push(enriched);
     } else if (heartbeatAgeMin >= 10) {
-      niveau3.push(livreurAvecDistance);
+      niveau3.push(enriched);
     } else if (heartbeatAgeMin >= 2) {
-      niveau2.push(livreurAvecDistance);
+      niveau2.push(enriched);
     } else {
-      // NIVEAU 1 : heartbeat < 2 min → sous-tri par qualité GPS
       const gpsDate = l.derniere_position_date;
       let gpsAgeMin = null;
       if (gpsDate) {
         const gps = new Date(gpsDate);
-        if (!isNaN(gps.getTime())) {
-          gpsAgeMin = (now - gps.getTime()) / 60000;
-        }
+        if (!isNaN(gps.getTime())) gpsAgeMin = (now - gps.getTime()) / 60000;
       }
-      livreurAvecDistance.gpsAgeMin = gpsAgeMin;
-      niveau1.push(livreurAvecDistance);
+      enriched.gpsAgeMin = gpsAgeMin;
+      niveau1.push(enriched);
     }
   });
 
-  // ─── SOUS-TRI NIVEAU 1 : par qualité GPS puis distance ─────────────────────
   niveau1.sort((a, b) => {
-    // GPS < 2 min > GPS 2-5 min > GPS 5-10 min > distance
     const gpsA = a.gpsAgeMin !== null ? a.gpsAgeMin : 999;
     const gpsB = b.gpsAgeMin !== null ? b.gpsAgeMin : 999;
-    
-    // Tranche GPS
     const trancheA = gpsA < 2 ? 0 : gpsA < 5 ? 1 : gpsA < 10 ? 2 : 3;
     const trancheB = gpsB < 2 ? 0 : gpsB < 5 ? 1 : gpsB < 10 ? 2 : 3;
-    
     if (trancheA !== trancheB) return trancheA - trancheB;
     return a.distance - b.distance;
   });
+  [niveau2, niveau3, niveau4].forEach(n => n.sort((a, b) => a.distance - b.distance));
 
-  // ─── TRI NIVEAUX 2-4 : par distance ────────────────────────────────────────
-  [niveau2, niveau3, niveau4].forEach(niveau => {
-    niveau.sort((a, b) => a.distance - b.distance);
-  });
-
-  console.log(`[DISPATCH] 📊 Répartition par niveaux:`);
-  console.log(`   Niveau 1 (HB < 2 min): ${niveau1.length} livreurs`);
-  console.log(`   Niveau 2 (HB 2-10 min): ${niveau2.length} livreurs`);
-  console.log(`   Niveau 3 (HB 10-30 min): ${niveau3.length} livreurs`);
-  console.log(`   Niveau 4 (HB > 30 min): ${niveau4.length} livreurs`);
-
-  // Concaténer les niveaux
-  return [...niveau1, ...niveau2, ...niveau3, ...niveau4];
+  const tous = [...niveau1, ...niveau2, ...niveau3, ...niveau4];
+  console.log(`[DISPATCH] 📊 ${tous.length} candidats (N1:${niveau1.length} N2:${niveau2.length} N3:${niveau3.length} N4:${niveau4.length})`);
+  return tous;
 }
 
 /**
- * Anti-doublon : vérifie si une notification "nouvelle_course" existe déjà
- * pour ce couple (course_id, destinataire_email) dans les 15 dernières minutes.
- * Retourne true si un doublon existe (ne pas recréer).
+ * Envoie une notification à un livreur (SILGAPP + push + WhatsApp si hors app).
  */
-async function notificationDoublonExiste(base44, courseId, livreurEmail) {
-  // Anti-doublon strict : 90 secondes seulement
-  // Permet les redispatch vers le même livreur après timeout (> 90s)
-  const depuis90s = new Date(Date.now() - 90 * 1000).toISOString();
+async function notifierLivreur(base44, courseId, course, livreur, timeoutSec) {
+  if (!livreur.user_email) return;
+
+  // Anti-doublon : pas de notification si envoyée dans les X secondes (timeout actuel)
+  const depuis = new Date(Date.now() - timeoutSec * 1000).toISOString();
   const existantes = await base44.asServiceRole.entities.Notification.filter({
     course_id: courseId,
-    destinataire_email: livreurEmail,
+    destinataire_email: livreur.user_email,
     type: 'nouvelle_course',
   });
-
-  const recentes = existantes.filter(n => n.created_date > depuis90s);
+  const recentes = existantes.filter(n => n.created_date > depuis);
   if (recentes.length > 0) {
-    console.log(`[DISPATCH] 🛡️ Doublon détecté (< 90s) — notification déjà créée pour ${livreurEmail} course ${courseId}`);
-    return true;
-  }
-  return false;
-}
-
-function clampNumber(value, fallback, min, max) {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) return fallback;
-  return Math.min(max, Math.max(min, Math.round(n)));
-}
-
-async function getLivreurAlertConfig(base44) {
-  const defaults = {
-    durationSeconds: 60,
-    intervalSeconds: 5,
-  };
-
-  try {
-    const configs = await base44.asServiceRole.entities.DispatchConfig.list();
-    const config = configs?.[0] || {};
-    const durationSeconds = clampNumber(
-      config.alert_duration_seconds || config.timeout_secondes,
-      defaults.durationSeconds,
-      10,
-      180,
-    );
-    const intervalSeconds = clampNumber(
-      config.alert_interval_seconds,
-      defaults.intervalSeconds,
-      3,
-      30,
-    );
-    return { durationSeconds, intervalSeconds };
-  } catch (err) {
-    console.warn('[DISPATCH] Config alerte livreur indisponible, defauts utilises:', err.message);
-    return defaults;
-  }
-}
-
-/**
- * Propose la course à un livreur spécifique.
- * Détermine automatiquement le canal de notification (SILGAPP vs WhatsApp)
- * basé sur le heartbeat du livreur.
- */
-async function proposerAuLivreur(base44, courseId, course, livreur, niveauDispatch) {
-  if (!assertSameCountry(course, livreur, 'proposer_au_livreur')) {
-    throw new Error(`Assignation inter-pays interdite: course=${getCourseCountry(course) || 'ABSENT'} livreur=${getLivreurCountry(livreur) || 'ABSENT'}`);
+    console.log(`[DISPATCH] 🛡️ Doublon notification (< ${timeoutSec}s) pour ${livreur.user_email}`);
+    return;
   }
 
-  const alertConfig = await getLivreurAlertConfig(base44);
-  // Déterminer le canal AVANT envoi : app active = SILGAPP, hors app = WhatsApp immédiat
-  const heartbeatAgeMin = livreur.heartbeatAgeMin !== null ? livreur.heartbeatAgeMin : null;
+  const distanceSafe = livreur.distance ? Number(livreur.distance).toFixed(1) : '?';
+  const titre = '🚨 Nouvelle course disponible !';
+  const message = `Course à ${distanceSafe}km — ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`;
+
+  const heartbeatAgeMin = livreur.heartbeatAgeMin;
   const appActive = heartbeatAgeMin !== null && heartbeatAgeMin < 2;
-  const canalNotification = appActive ? 'SILGAPP' : 'WhatsApp';
 
-  console.log(`[DISPATCH] 📡 Canal: ${canalNotification} pour ${livreur.nom} (HB: ${heartbeatAgeMin?.toFixed(1) || 'N/A'} min, Niveau: ${niveauDispatch})`);
-
-  let distance = 0;
-  if (course.gps_depart_lat && course.gps_depart_lng && livreur.latitude && livreur.longitude) {
-    distance = calculerDistance(course.gps_depart_lat, course.gps_depart_lng, livreur.latitude, livreur.longitude);
+  // Notification BDD (toujours)
+  try {
+    await base44.asServiceRole.entities.Notification.create({
+      titre, message, type: 'nouvelle_course',
+      course_id: courseId, destinataire_email: livreur.user_email, lue: false,
+    });
+  } catch (err) {
+    console.error('[DISPATCH] ❌ Notif BDD:', err.message);
   }
-  const distanceSafe = Number(distance || 0);
 
-  await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-    livreur_id: livreur.id,
-    livreur_nom: `${livreur.prenom || ''} ${livreur.nom}`.trim(),
-    livreur_photo_url: livreur.photo_url || '',
-    livreur_telephone: livreur.telephone,
-    statut: 'recherche_livreur',
-    dispatch_status: 'propose',
-    heure_sollicitation: new Date().toISOString(),
-    timeout_expires_at: new Date(Date.now() + alertConfig.durationSeconds * 1000).toISOString(),
-  });
+  // Push Firebase
+  try {
+    await base44.functions.invoke('envoiNotificationPush', {
+      destinataire_email: livreur.user_email, livreur_id: livreur.id,
+      titre, message, type: 'nouvelle_course', course_id: courseId,
+    });
+  } catch (err) {
+    console.error('[DISPATCH] ❌ Push Firebase:', err.message);
+  }
 
-  if (livreur.user_email) {
-    const doublon = await notificationDoublonExiste(base44, courseId, livreur.user_email);
-    if (!doublon) {
-      const distanceLabel = distanceSafe > 0 ? `${distanceSafe.toFixed(1)}km` : 'distance inconnue';
-      const titre = '🚨 Nouvelle course disponible !';
-      const message = `Course à ${distanceLabel} — ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`;
+  // WhatsApp si hors app
+  if (!appActive && livreur.telephone) {
+    try {
+      const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
+      const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+      const fromRaw = Deno.env.get('TWILIO_WHATSAPP_FROM') || '';
+      if (accountSid && authToken && fromRaw) {
+        const INDICATIFS = { BF: '+226', CI: '+225', TG: '+228', BJ: '+229', SN: '+221', ML: '+223', GN: '+224', NE: '+227' };
+        const indicatif = INDICATIFS[livreur.country_code] || '+226';
+        let tel = livreur.telephone.replace(/\s+/g, '').replace(/[^\d+]/g, '');
+        if (!tel.startsWith('+')) tel = indicatif + tel;
 
-      if (appActive) {
-        // ── SILGAPP : notification interne + push Firebase ──────────────────
-        try {
-          await base44.asServiceRole.entities.Notification.create({
-            titre, message, type: 'nouvelle_course',
-            course_id: courseId, destinataire_email: livreur.user_email, lue: false,
-          });
-          console.log(`[DISPATCH] 🔔 SILGAPP — Notification créée pour ${livreur.nom}`);
-        } catch (err) {
-          console.error('[DISPATCH] ❌ Erreur notification SILGAPP:', err.message);
-        }
-        try {
-          await base44.functions.invoke('envoiNotificationPush', {
-            destinataire_email: livreur.user_email, livreur_id: livreur.id,
-            titre, message, type: 'nouvelle_course', course_id: courseId,
-            user_type: 'livreur',
-            alert_duration_seconds: alertConfig.durationSeconds,
-            alert_interval_seconds: alertConfig.intervalSeconds,
-          });
-        } catch (err) {
-          console.error('[DISPATCH] ❌ Erreur push Firebase:', err.message);
-        }
-
-      } else {
-        // ── WhatsApp IMMÉDIAT : livreur hors app ────────────────────────────
-        // On crée quand même la notification en BDD pour l'historique (lue=true pour ne pas polluer)
-        try {
-          await base44.asServiceRole.entities.Notification.create({
-            titre, message, type: 'nouvelle_course',
-            course_id: courseId, destinataire_email: livreur.user_email, lue: false,
-          });
-        } catch (err) {
-          console.error('[DISPATCH] ❌ Erreur notification BDD:', err.message);
-        }
-        // WhatsApp via Twilio directement (sans passer par l'automation)
-        try {
-          const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-          const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-          const fromRaw = Deno.env.get('TWILIO_WHATSAPP_FROM') || '';
+        if (livreur.whatsapp_opt_in !== false || livreur.whatsapp_opt_in_date) {
           const fromNumber = fromRaw.startsWith('whatsapp:') ? fromRaw : `whatsapp:${fromRaw}`;
+          const formData = new URLSearchParams();
+          formData.append('From', fromNumber);
+          formData.append('To', `whatsapp:${tel}`);
+          formData.append('Body', `📦 *Nouvelle course disponible !*\nOuvrez SILGAPP pour accepter ou refuser.`);
 
-          if (accountSid && authToken && fromRaw && livreur.telephone) {
-            // Normaliser le numéro selon le pays du livreur
-            const INDICATIFS = { BF: '+226', CI: '+225', TG: '+228', BJ: '+229', SN: '+221', ML: '+223', GN: '+224', NE: '+227' };
-            const indicatif = INDICATIFS[livreur.country_code] || '+226';
-            let tel = livreur.telephone.replace(/\s+/g, '').replace(/[^\d+]/g, '');
-            if (!tel.startsWith('+')) tel = indicatif + tel;
-
-            // Vérifier opt-in
-            if (livreur.whatsapp_opt_in !== false || livreur.whatsapp_opt_in_date) {
-              const waBody = `📦 *Nouvelle course disponible !*\nOuvrez SILGAPP pour accepter ou refuser la mission.`;
-              const formData = new URLSearchParams();
-              formData.append('From', fromNumber);
-              formData.append('To', `whatsapp:${tel}`);
-              formData.append('Body', waBody);
-
-              const creds = btoa(`${accountSid}:${authToken}`);
-              const resp = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
-                method: 'POST',
-                headers: { 'Authorization': `Basic ${creds}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: formData.toString(),
-              });
-              const data = await resp.json();
-              if (resp.ok && data.sid) {
-                console.log(`[DISPATCH] ✅ WhatsApp envoyé à ${livreur.nom} (${tel}) — SID: ${data.sid}`);
-                // Enregistrer l'alerte
-                await base44.asServiceRole.entities.WhatsAppAlerte.create({
-                  country_code: getCourseCountry(course),
-                  livreur_id: livreur.id, livreur_telephone: tel,
-                  notification_id: courseId, statut: 'sent',
-                  twilio_sid: data.sid, heure_envoi: new Date().toISOString(), canal: 'whatsapp',
-                });
-              } else {
-                console.warn(`[DISPATCH] ⚠️ WhatsApp échec pour ${livreur.nom}: ${data.message || data.code}`);
-                if (data.code === 63015) {
-                  await base44.asServiceRole.entities.Livreur.update(livreur.id, {
-                    whatsapp_opt_in: false, whatsapp_derniere_erreur: '63015',
-                    whatsapp_derniere_erreur_date: new Date().toISOString(),
-                  });
-                }
-              }
-            } else {
-              console.log(`[DISPATCH] ⚠️ ${livreur.nom} — pas d'opt-in WhatsApp → notification BDD uniquement`);
-            }
+          const creds = btoa(`${accountSid}:${authToken}`);
+          const resp = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
+            method: 'POST',
+            headers: { 'Authorization': `Basic ${creds}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString(),
+          });
+          const data = await resp.json();
+          if (resp.ok && data.sid) {
+            await base44.asServiceRole.entities.WhatsAppAlerte.create({
+              livreur_id: livreur.id, livreur_telephone: tel,
+              notification_id: courseId, statut: 'sent',
+              twilio_sid: data.sid, heure_envoi: new Date().toISOString(), canal: 'whatsapp',
+            });
+          } else if (data.code === 63015) {
+            await base44.asServiceRole.entities.Livreur.update(livreur.id, {
+              whatsapp_opt_in: false, whatsapp_derniere_erreur: '63015',
+              whatsapp_derniere_erreur_date: new Date().toISOString(),
+            });
           }
-        } catch (err) {
-          console.error('[DISPATCH] ❌ Erreur WhatsApp direct:', err.message);
         }
       }
+    } catch (err) {
+      console.error('[DISPATCH] ❌ WhatsApp:', err.message);
     }
   }
 
-  console.log(`[DISPATCH] 📤 Course ${courseId} proposée à ${livreur.nom} (${distanceSafe.toFixed(1)}km)`);
-  return { distance: distanceSafe, alertConfig };
+  console.log(`[DISPATCH] 📤 Notifié: ${livreur.nom} (${distanceSafe}km, HB: ${heartbeatAgeMin?.toFixed(1) || '?'}min)`);
 }
 
 /**
- * Logique principale de dispatch : cherche un livreur disponible et propose la course.
- * Recherche progressive 3km → 5km → 8km → tous.
- * Retourne { proposé: bool, livreur?, noLivreur: bool }
+ * DISPATCH MULTI-LIVREURS :
+ * Sélectionne les X meilleurs candidats et leur envoie la course simultanément.
+ * Stocke les IDs notifiés dans dispatch_notified_ids (JSON sur la course).
+ * Le livreur_id principal est VIDE jusqu'à ce qu'un livreur accepte (verrou atomique).
  */
-async function lancerDispatch(base44, courseId, exclusions = []) {
+async function lancerDispatchMulti(base44, courseId, exclusions = []) {
   const course = await base44.asServiceRole.entities.CourseExterne.get(courseId);
   if (!course) return { erreur: 'Course introuvable' };
-  if (!assertCourseHasCountry(course, 'lancer_dispatch')) {
-    return { erreur: 'country_code obligatoire absent sur la course', status: 400 };
-  }
 
-  // Ne pas dispatcher si la course est déjà acceptée, livrée ou annulée
   if (['livreur_en_route', 'colis_recupere', 'en_livraison', 'livree', 'annulee'].includes(course.statut)) {
-    console.log(`[DISPATCH] ⛔ Course ${courseId} statut=${course.statut} → dispatch ignoré`);
     return { ignore: true, statut: course.statut };
   }
 
-  // Si déjà en "propose" et pas encore expiré → attendre
-  if (course.dispatch_status === 'propose' && course.timeout_expires_at) {
+  // Si un livreur détient le verrou (dispatch_status = 'propose') et pas encore expiré → attendre
+  if (course.dispatch_status === 'propose' && course.livreur_id && course.timeout_expires_at) {
     const expires = new Date(course.timeout_expires_at);
     if (expires > new Date()) {
       const remaining = Math.round((expires - Date.now()) / 1000);
-      console.log(`[DISPATCH] ⏳ Course ${courseId} déjà proposée, expire dans ${remaining}s`);
+      console.log(`[DISPATCH] ⏳ Verrou actif sur course ${courseId} (livreur ${course.livreur_id}), expire dans ${remaining}s`);
       return { en_attente: true, remaining };
     }
   }
 
-  // ─── DISPATCH PAR NIVEAUX (nouvelle logique) ───────────────────────────────
-  const candidats = await trouverLivreursCandidatsParNiveaux(base44, course, exclusions);
+  const config = await chargerConfigDispatch(base44);
+  console.log(`[DISPATCH] ⚙️ Config: ${config.nb} livreurs, ${config.timeout}s`);
+
+  // Trouver les meilleurs candidats
+  // exclusions = uniquement le livreur qui détient le verrou actif (si price refused ou expired)
+  const candidats = await trouverLivreursCandidats(base44, course, exclusions);
 
   if (candidats.length === 0) {
-    // Mettre la course en attente visible (pas de livreur en ce moment)
     await base44.asServiceRole.entities.CourseExterne.update(courseId, {
       dispatch_status: 'en_attente',
       livreur_id: '',
@@ -485,62 +262,51 @@ async function lancerDispatch(base44, courseId, exclusions = []) {
     return { noLivreur: true };
   }
 
-  // Déterminer le niveau du premier candidat
-  const premierLivreur = candidats[0];
-  let niveauDispatch = 4;
-  if (premierLivreur.heartbeatAgeMin !== null) {
-    if (premierLivreur.heartbeatAgeMin < 2) niveauDispatch = 1;
-    else if (premierLivreur.heartbeatAgeMin < 10) niveauDispatch = 2;
-    else if (premierLivreur.heartbeatAgeMin < 30) niveauDispatch = 3;
-  }
+  // Sélectionner les X meilleurs (tous si config.nb >= 999)
+  const selection = config.nb >= 999 ? candidats : candidats.slice(0, config.nb);
+  console.log(`[DISPATCH] 🎯 Sélection de ${selection.length}/${candidats.length} livreurs pour course ${courseId}`);
 
-  console.log('[DISPATCH][COUNTRY_ASSIGNMENT]', {
-    course_id: courseId,
-    course_country_code: getCourseCountry(course),
-    livreur_id: premierLivreur.id,
-    livreur_nom: premierLivreur.nom,
-    livreur_country_code: getLivreurCountry(premierLivreur),
-    niveau_dispatch: niveauDispatch,
-    heartbeat_min: premierLivreur.heartbeatAgeMin,
-    gps_age_min: premierLivreur.gpsAgeMin,
-    distance_km: premierLivreur.distance,
+  const timeoutAt = new Date(Date.now() + config.timeout * 1000).toISOString();
+  const notifiedIds = selection.map(l => l.id);
+
+  // Mettre à jour la course : pas de livreur_id fixé (verrou libre), liste des notifiés
+  await base44.asServiceRole.entities.CourseExterne.update(courseId, {
+    statut: 'recherche_livreur',
+    dispatch_status: 'propose',  // "propose" = en attente de réponse
+    livreur_id: '',              // Pas de livreur assigné avant acceptation
+    livreur_nom: '',
+    livreur_telephone: '',
+    heure_sollicitation: new Date().toISOString(),
+    timeout_expires_at: timeoutAt,
+    dispatch_notified_ids: JSON.stringify(notifiedIds),
   });
 
-  const proposal = await proposerAuLivreur(base44, courseId, course, premierLivreur, niveauDispatch);
-  const dist = proposal.distance;
-  return { 
-    propose: true, 
-    expires_in: proposal.alertConfig.durationSeconds,
-    livreur: { 
-      id: premierLivreur.id, 
-      nom: `${premierLivreur.prenom || ''} ${premierLivreur.nom}`.trim(), 
-      distance_km: dist.toFixed(1),
-      niveau_dispatch: niveauDispatch,
-      heartbeat_age_min: premierLivreur.heartbeatAgeMin?.toFixed(1) || null,
-      gps_age_min: premierLivreur.gpsAgeMin?.toFixed(1) || null,
-    }, 
+  // Notifier tous les livreurs sélectionnés en parallèle
+  const notifPromises = selection.map(l => notifierLivreur(base44, courseId, course, l, config.timeout));
+  await Promise.allSettled(notifPromises);
+
+  console.log(`[DISPATCH] ✅ ${selection.length} livreur(s) notifiés pour course ${courseId}, timeout: ${config.timeout}s`);
+  return {
+    propose: true,
+    nb_notifies: selection.length,
+    livreurs: selection.map(l => ({ id: l.id, nom: `${l.prenom || ''} ${l.nom}`.trim(), distance_km: l.distance?.toFixed(1) })),
+    timeout_sec: config.timeout,
   };
 }
 
 /**
- * Supprime les notifications "nouvelle_course" liées à une course
- * quand elle est acceptée, refusée ou expirée.
+ * Archiver les notifications "nouvelle_course" d'une course.
  */
 async function supprimerNotificationsCourse(base44, courseId) {
   try {
-    const notifs = await base44.asServiceRole.entities.Notification.filter({
-      course_id: courseId,
-      type: 'nouvelle_course',
-    });
+    const notifs = await base44.asServiceRole.entities.Notification.filter({ course_id: courseId, type: 'nouvelle_course' });
     const nonLues = notifs.filter(n => !n.lue);
     for (const n of nonLues) {
       await base44.asServiceRole.entities.Notification.update(n.id, { lue: true });
     }
-    if (nonLues.length > 0) {
-      console.log(`[DISPATCH] 🧹 ${nonLues.length} notification(s) archivée(s) pour course ${courseId}`);
-    }
+    if (nonLues.length > 0) console.log(`[DISPATCH] 🧹 ${nonLues.length} notification(s) archivée(s)`);
   } catch (err) {
-    console.warn('[DISPATCH] ⚠️ Erreur archivage notifications:', err.message);
+    console.warn('[DISPATCH] ⚠️ Erreur archivage:', err.message);
   }
 }
 
@@ -548,73 +314,79 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const body = await req.json();
-
-    // L'automation entity passe { event, data } — extraire course_id
-    // L'appel direct passe { action, course_id, livreur_id, raison }
     let { action, course_id, livreur_id, raison } = body;
 
-    // ─── Déclenchement depuis automation entity ────────────────────────────
-    // L'automation passe event.entity_id et data directement
+    // Déclenchement depuis automation entity
     if (!action && body.event?.entity_id) {
       action = 'lancer_recherche_auto';
       course_id = body.event.entity_id;
-      console.log(`[DISPATCH] 🤖 Automation entity → course ${course_id}`);
     }
 
-    // ─── 1. Lancer la recherche automatique ───────────────────────────────
+    // ─── 1. Lancer la recherche automatique (multi-livreurs) ──────────────
     if (action === 'lancer_recherche_auto') {
-      console.log(`[DISPATCH] 🚀 Démarrage dispatch pour course ${course_id}`);
-
       if (!course_id) return Response.json({ error: 'course_id requis' }, { status: 400 });
 
-      // Récupérer la course
       const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
-      if (!assertCourseHasCountry(course, 'lancer_recherche_auto')) {
-        return Response.json({ success: false, error: 'country_code obligatoire absent sur la course' }, { status: 400 });
-      }
-      
-      // ⚠️ SANS GPS : on dispatch quand même à TOUS les livreurs disponibles (cercle infini)
+
       if (!course.gps_depart_lat || !course.gps_depart_lng) {
-        console.warn(`[DISPATCH] ⚠️ Course ${course_id} sans GPS — dispatch global (tous livreurs)`);
+        console.warn(`[DISPATCH] ⚠️ Course ${course_id} sans GPS`);
       }
 
-      const result = await lancerDispatch(base44, course_id, []);
+      const result = await lancerDispatchMulti(base44, course_id, []);
 
-      if (result.erreur) return Response.json({ error: result.erreur }, { status: result.status || 404 });
-      if (result.ignore) return Response.json({ success: true, message: `Dispatch ignoré : ${result.statut}` });
-      if (result.noLivreur) return Response.json({ success: false, noLivreur: true, message: 'Aucun livreur disponible pour le moment — réessai automatique prévu' });
-      if (result.en_attente) return Response.json({ success: true, en_attente: true, message: `Déjà proposée, expire dans ${result.remaining}s` });
+      if (result.erreur) return Response.json({ error: result.erreur }, { status: 404 });
+      if (result.ignore) return Response.json({ success: true, message: `Dispatch ignoré: ${result.statut}` });
+      if (result.noLivreur) return Response.json({ success: false, noLivreur: true });
+      if (result.en_attente) return Response.json({ success: true, en_attente: true });
 
       return Response.json({
         success: true,
-        livreur: result.livreur,
-        message: `Course proposée à ${result.livreur.nom} (${result.livreur.distance_km}km)`,
-        expires_in: result.expires_in || 60,
+        nb_notifies: result.nb_notifies,
+        livreurs: result.livreurs,
+        timeout_sec: result.timeout_sec,
       });
     }
 
-    // ─── 2. Accepter une course ────────────────────────────────────────────
+    // ─── 2. Vérifier si un livreur est dans la liste notifiée ─────────────
+    // Utilisé par le frontend livreur pour savoir si la course lui est proposée
     if (action === 'check_course_pour_livreur') {
       const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
       if (!course) return Response.json({ found: false });
 
+      // Course annulée ou livrée → plus disponible, nettoyer les notifs du livreur
       if (course.statut === 'annulee' || course.statut === 'livree') {
-        return Response.json({ found: false, already_taken: true });
+        try {
+          const livreurData = await base44.asServiceRole.entities.Livreur.get(livreur_id);
+          if (livreurData?.user_email) {
+            const notifs = await base44.asServiceRole.entities.Notification.filter({
+              course_id: course_id,
+              destinataire_email: livreurData.user_email,
+              type: 'nouvelle_course',
+              lue: false,
+            });
+            for (const n of notifs) {
+              await base44.asServiceRole.entities.Notification.update(n.id, { lue: true });
+            }
+          }
+        } catch (_) {}
+        return Response.json({ found: false, cancelled: true });
       }
 
-      if (course.dispatch_status === 'accepte' && course.livreur_id !== livreur_id) {
+      // Cours déjà acceptée par quelqu'un → notifier le demandeur
+      if (course.dispatch_status === 'accepte') {
         return Response.json({ found: false, already_taken: true, taken_by: course.livreur_id });
       }
 
+      // Vérifier si ce livreur est dans les notifiés
       let notifiedIds = [];
-      try { notifiedIds = JSON.parse(course.dispatch_notified_ids || '[]'); } catch (_) {}
-      const isNotified = Array.isArray(notifiedIds) && notifiedIds.map(String).includes(String(livreur_id));
-      const isAssigned = String(course.livreur_id || '') === String(livreur_id || '');
+      try { notifiedIds = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
+      const isNotified = notifiedIds.includes(livreur_id);
 
-      if (!isNotified && !isAssigned) return Response.json({ found: false });
+      if (!isNotified) return Response.json({ found: false });
 
       const expired = !!(course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date());
+
       return Response.json({
         found: true,
         course,
@@ -623,59 +395,70 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── 3. Accepter une course — VERROU ATOMIQUE ─────────────────────────
     if (action === 'accepter_course') {
-      console.log(`[DISPATCH] ✅ Livreur ${livreur_id} accepte course ${course_id}`);
-
       const { pricing_mode, manual_price } = body;
 
+      // ── VERROU ATOMIQUE RENFORCÉ ──
+      // Re-fetch immédiat pour éviter race condition
       const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
 
-      // Course déjà acceptée par quelqu'un d'autre ?
-      if (course.dispatch_status === 'accepte' && course.livreur_id !== livreur_id) {
+      // Vérification 1 : Si déjà acceptée par un autre
+      if (course.dispatch_status === 'accepte' && course.livreur_id && course.livreur_id !== livreur_id) {
         return Response.json({ success: false, error: 'Course déjà prise', already_taken: true });
       }
 
-      // Timeout dépassé ?
-      let notifiedIds = [];
-      try { notifiedIds = JSON.parse(course.dispatch_notified_ids || '[]'); } catch (_) {}
-      const isNotified = Array.isArray(notifiedIds) && notifiedIds.map(String).includes(String(livreur_id));
-      const isAssigned = String(course.livreur_id || '') === String(livreur_id || '');
-      if (course.dispatch_notified_ids && !isNotified && !isAssigned) {
-        return Response.json({ success: false, error: "Vous n'etes pas eligible pour cette course", not_eligible: true });
+      // Vérification 2 : Si livreur_id est déjà fixé (même en propose)
+      if (course.livreur_id && course.livreur_id !== livreur_id && course.dispatch_status === 'propose') {
+        return Response.json({ success: false, error: 'Course déjà prise par un autre livreur', already_taken: true });
       }
 
+      // Vérifier que ce livreur fait partie des notifiés
+      let notifiedIds = [];
+      try { notifiedIds = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
+      // Rétrocompatibilité : si dispatch_notified_ids vide mais livreur_id correspond
+      const isEligible = notifiedIds.includes(livreur_id) || course.livreur_id === livreur_id;
+      if (!isEligible) {
+        return Response.json({ success: false, error: 'Vous n\'êtes pas éligible pour cette course', not_eligible: true });
+      }
+
+      // Timeout dépassé ?
       if (course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date()) {
-        return Response.json({ success: false, error: 'Course expirée — un autre livreur sera trouvé', expired: true });
+        return Response.json({ success: false, error: 'Course expirée', expired: true });
       }
 
       const livreur = await base44.asServiceRole.entities.Livreur.get(livreur_id);
       if (!livreur) return Response.json({ error: 'Livreur introuvable' }, { status: 404 });
-      if (!assertCourseHasCountry(course, 'accepter_course')) {
-        return Response.json({ success: false, error: 'country_code obligatoire absent sur la course' }, { status: 400 });
-      }
-      if (!assertSameCountry(course, livreur, 'accepter_course')) {
-        return countryBlockResponse(course, livreur);
-      }
 
-      // Validation prix manuel
       const PRIX_MIN = 1000;
       if (pricing_mode === 'manual') {
         const montant = Number(manual_price);
         if (!montant || montant < PRIX_MIN) {
-          return Response.json({ success: false, error: `Prix minimum autorisé : ${PRIX_MIN} FCFA` }, { status: 400 });
+          return Response.json({ success: false, error: `Prix minimum : ${PRIX_MIN} FCFA` }, { status: 400 });
         }
       }
 
+      const isManual = pricing_mode === 'manual' && manual_price >= PRIX_MIN;
+
+      // ── DELAI DE GRÂCE ANTI-RACE ──
+      // Attendre 200ms pour laisser le temps à un éventuel autre livreur de verrouiller
+      // Cela réduit drastiquement les doubles acceptations simultanées
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Re-vérification finale AVANT de verrouiller (double-check locking)
+      const courseFinal = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+      if (courseFinal.dispatch_status === 'accepte' && courseFinal.livreur_id && courseFinal.livreur_id !== livreur_id) {
+        return Response.json({ success: false, error: 'Course déjà prise pendant votre attente', already_taken: true });
+      }
+
+      // Générer tokens QR/PIN
       const pickupToken = generateToken();
       const deliveryToken = generateToken();
       const pickupPIN = generatePIN();
       const deliveryPIN = generatePIN();
 
-      const isManual = pricing_mode === 'manual' && manual_price >= PRIX_MIN;
-
-      // En mode manuel : statut reste "recherche_livreur" en attente de validation client
-      // En mode auto : statut passe directement à "livreur_en_route"
+      // ── POSER LE VERROU ATOMIQUE ──
       const updateData = {
         dispatch_status: isManual ? 'propose' : 'accepte',
         statut: isManual ? 'recherche_livreur' : 'livreur_en_route',
@@ -698,23 +481,20 @@ Deno.serve(async (req) => {
         updateData.manual_price = Number(manual_price);
         updateData.manual_price_status = 'pending_client_validation';
         updateData.proposed_by_livreur_id = livreur_id;
-        // Prolonger le timeout pour laisser le client répondre (5 min)
         updateData.timeout_expires_at = new Date(Date.now() + 5 * 60 * 1000).toISOString();
       }
 
       await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
 
-      // En mode auto seulement : mettre le livreur en_course immédiatement
       if (!isManual) {
         await base44.asServiceRole.entities.Livreur.update(livreur_id, { statut: 'en_course' });
         await supprimerNotificationsCourse(base44, course_id);
-        console.log(`[DISPATCH] 🎉 Course ${course_id} acceptée (auto) par ${livreur_id}`);
-        return Response.json({ success: true, message: 'Course acceptée avec succès' });
+        console.log(`[DISPATCH] 🎉 Course ${course_id} verrouillée (auto) par ${livreur_id}`);
+        return Response.json({ success: true });
       }
 
-      // En mode manuel : notifier le CRÉATEUR de la course (pas forcément l'expéditeur)
+      // Mode manuel : notifier le créateur de la course
       try {
-        // Priorité : chercher le créateur via created_by_id (User), sinon fallback expediteur_client_id
         let clientEmail = null;
         if (course.created_by_id) {
           try {
@@ -723,13 +503,13 @@ Deno.serve(async (req) => {
           } catch (_) {}
         }
         if (!clientEmail && course.expediteur_client_id) {
-          const notifDest = await base44.asServiceRole.entities.ClientExterne.filter({ id: course.expediteur_client_id });
-          clientEmail = notifDest?.[0]?.user_email || null;
+          const dest = await base44.asServiceRole.entities.ClientExterne.filter({ id: course.expediteur_client_id });
+          clientEmail = dest?.[0]?.user_email || null;
         }
         if (clientEmail) {
           await base44.asServiceRole.entities.Notification.create({
             titre: '💰 Prix proposé par le livreur',
-            message: `Le livreur ${livreur.prenom || ''} ${livreur.nom} propose cette course à ${Number(manual_price).toLocaleString()} FCFA. Acceptez-vous ?`,
+            message: `${livreur.prenom || ''} ${livreur.nom} propose cette course à ${Number(manual_price).toLocaleString()} FCFA. Acceptez-vous ?`,
             type: 'course_acceptee',
             course_id: course_id,
             destinataire_email: clientEmail,
@@ -740,84 +520,50 @@ Deno.serve(async (req) => {
         console.warn('[DISPATCH] Erreur notif client prix manuel:', e.message);
       }
 
-      console.log(`[DISPATCH] 💰 Prix manuel ${manual_price} proposé pour course ${course_id} par ${livreur_id} — en attente client`);
-      return Response.json({ success: true, pending_client_validation: true, message: 'Prix proposé au client — en attente de sa validation' });
+      return Response.json({ success: true, pending_client_validation: true });
     }
 
-    // ─── 3. Refuser une course (ou timeout expiré côté livreur) ───────────
+    // ─── 4. Refuser une course ─────────────────────────────────────────────
     if (action === 'refuser_course') {
-      console.log(`[DISPATCH] 🚫 Livreur ${livreur_id} refuse course ${course_id} (raison: ${raison})`);
-
       const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
 
-      // Course déjà acceptée → ne pas redispatcher
-      if (!assertCourseHasCountry(course, 'refuser_course')) {
-        return Response.json({ success: false, error: 'country_code obligatoire absent sur la course' }, { status: 400 });
-      }
-      if (livreur_id) {
-        const livreur = await base44.asServiceRole.entities.Livreur.get(livreur_id);
-        if (!livreur) return Response.json({ error: 'Livreur introuvable' }, { status: 404 });
-        if (!assertSameCountry(course, livreur, 'refuser_course')) {
-          return countryBlockResponse(course, livreur);
-        }
+      // Course déjà verrouillée par un AUTRE livreur → le refus est ignoré
+      if (course.dispatch_status === 'accepte' && course.livreur_id !== livreur_id) {
+        return Response.json({ success: true, message: 'Course déjà prise par un autre' });
       }
 
-      if (course.dispatch_status === 'accepte') {
-        return Response.json({ success: false, message: 'Course déjà acceptée par un autre livreur' });
+      // Si c'est ce livreur qui avait le verrou propose, on le libère
+      const etaitVerrouillee = course.livreur_id === livreur_id;
+      if (etaitVerrouillee) {
+        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+          dispatch_status: 'redispatch',
+          remarque_livreur: raison || 'Refusé',
+          livreur_id: '',
+          livreur_nom: '',
+          livreur_telephone: '',
+        });
+        // Redispatch sans exclure ce livreur (il peut être reproposé)
+        const result = await lancerDispatchMulti(base44, course_id, []);
+        if (result.noLivreur) return Response.json({ success: true, noLivreur: true });
+        return Response.json({ success: true, nb_notifies: result.nb_notifies });
       }
 
-      // Remettre en recherche active
-      await base44.asServiceRole.entities.CourseExterne.update(course_id, {
-        dispatch_status: 'redispatch',
-        remarque_livreur: raison || 'Refusé',
-        livreur_id: '',
-        livreur_nom: '',
-        livreur_telephone: '',
-      });
-
-      // Redispatcher en excluant le livreur qui refuse
-      const result = await lancerDispatch(base44, course_id, [livreur_id]);
-
-      if (result.noLivreur) {
-        console.warn(`[DISPATCH] ⚠️ Aucun autre livreur — course ${course_id} reste en attente`);
-        return Response.json({ success: true, noLivreur: true, message: 'Aucun autre livreur disponible — réessai automatique prévu' });
-      }
-
-      return Response.json({ success: true, message: `Course redispatchée vers ${result.livreur?.nom || 'un autre livreur'}` });
+      // Livreur dans les notifiés mais pas le verrou → juste ignorer
+      return Response.json({ success: true });
     }
 
-    // ─── 4. Vérifier expiration & redispatch automatique ──────────────────
+    // ─── 5. Vérifier expiration & redispatch ─────────────────────────────
     if (action === 'verifier_expiration') {
       const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
 
       const expired = !!(course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date());
 
-      if (expired && course.dispatch_status === 'propose') {
-        console.log(`[DISPATCH] ⏰ Timeout expiré pour course ${course_id} — redispatch`);
-
-        // Envoyer WhatsApp au livreur qui n'a pas répondu (il était dans l'app mais n'a pas vu la notif)
-        if (course.livreur_id) {
-          try {
-            const livreurExpire = await base44.asServiceRole.entities.Livreur.get(course.livreur_id);
-            if (livreurExpire && !assertSameCountry(course, livreurExpire, 'verifier_expiration_rappel')) {
-              console.error('[DISPATCH][CRITICAL_COUNTRY_BLOCK] Rappel timeout non envoye au livreur hors pays');
-            } else if (livreurExpire?.user_email && livreurExpire?.whatsapp_opt_in) {
-              await base44.asServiceRole.entities.Notification.create({
-                titre: '⏰ Course expirée — vous avez manqué une course',
-                message: `La course ${course.adresse_depart} → ${course.adresse_arrivee || '?'} a été attribuée à un autre livreur car vous n'avez pas répondu à temps.`,
-                type: 'rappel_reponse',
-                course_id: course_id,
-                destinataire_email: livreurExpire.user_email,
-                lue: false,
-              });
-              console.log(`[DISPATCH] 📲 Notification rappel envoyée au livreur expiré ${livreurExpire.nom}`);
-            }
-          } catch (err) {
-            console.warn('[DISPATCH] ⚠️ Erreur notif livreur expiré:', err.message);
-          }
-        }
+      // Expiration du verrou (livreur en mode propose qui n'a pas répondu)
+      if (expired && course.dispatch_status === 'propose' && course.livreur_id) {
+        console.log(`[DISPATCH] ⏰ Verrou expiré course ${course_id} — redispatch`);
+        const expiredLivreurId = course.livreur_id;
 
         await base44.asServiceRole.entities.CourseExterne.update(course_id, {
           dispatch_status: 'redispatch',
@@ -826,21 +572,18 @@ Deno.serve(async (req) => {
           livreur_telephone: '',
         });
 
-        // Exclure le livreur qui n'a pas répondu
-        const exclusions = course.livreur_id ? [course.livreur_id] : [];
-        const result = await lancerDispatch(base44, course_id, exclusions);
+        const result = await lancerDispatchMulti(base44, course_id, []);
+        return Response.json({ expired: true, redispatched: !result.noLivreur });
+      }
 
-        if (result.noLivreur) {
-          console.warn(`[DISPATCH] ⚠️ Aucun livreur pour redispatch expiré — course ${course_id} en attente`);
-        }
-
-        return Response.json({
-          expired: true,
-          redispatched: !result.noLivreur,
-          noLivreur: result.noLivreur || false,
-          livreur: result.livreur || null,
-          dispatch_status: course.dispatch_status,
+      // Expiration vague multi : dispatch_status='propose' mais livreur_id vide (vague sans verrou)
+      if (expired && course.dispatch_status === 'propose' && !course.livreur_id) {
+        console.log(`[DISPATCH] ⏰ Vague expirée course ${course_id} — nouvelle sélection`);
+        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+          dispatch_status: 'redispatch',
         });
+        const result = await lancerDispatchMulti(base44, course_id, []);
+        return Response.json({ expired: true, redispatched: !result.noLivreur });
       }
 
       return Response.json({
@@ -850,31 +593,47 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ─── 5b. Fermer courses sans livreur après 4 minutes ─────────────────
-    // Appelé par un scheduled job toutes les minutes
+    // ─── 6. Retry courses en attente ─────────────────────────────────────
+    if (action === 'retry_courses_en_attente') {
+      const { country_code: filterCountry } = body;
+      const filter = { statut: 'recherche_livreur' };
+      if (filterCountry) filter.country_code = filterCountry;
+
+      const courses = await base44.asServiceRole.entities.CourseExterne.filter(filter);
+      const aRetenter = courses.filter(c =>
+        ['en_attente', 'redispatch', 'expire'].includes(c.dispatch_status) ||
+        (c.dispatch_status === 'propose' && c.timeout_expires_at && new Date(c.timeout_expires_at) < new Date(Date.now() - 5000))
+      );
+
+      const resultats = [];
+      for (const course of aRetenter) {
+        // Exclure uniquement le détenteur du verrou actif si expired
+        const exclusions = [];
+        if (course.livreur_id && course.dispatch_status === 'propose') exclusions.push(course.livreur_id);
+        const result = await lancerDispatchMulti(base44, course.id, exclusions);
+        resultats.push({ course_id: course.id, ...result });
+      }
+      return Response.json({ success: true, retried: aRetenter.length, resultats });
+    }
+
+    // ─── 7. Fermer courses sans réponse après délai ───────────────────────
     if (action === 'fermer_courses_expirees') {
-      const DELAI_FERMETURE_MS = 4 * 60 * 1000; // 4 minutes
-      const now = new Date();
-      const limite = new Date(now.getTime() - DELAI_FERMETURE_MS);
+      const config = await chargerConfigDispatch(base44);
+      // Fermeture après max(4 min, 2×timeout)
+      const DELAI_MS = Math.max(4 * 60 * 1000, 2 * config.timeout * 1000);
+      const limite = new Date(Date.now() - DELAI_MS);
 
-      // Chercher toutes les courses encore en recherche
-      const coursesEnRecherche = await base44.asServiceRole.entities.CourseExterne.filter({
-        statut: 'recherche_livreur',
-      });
-
+      const coursesEnRecherche = await base44.asServiceRole.entities.CourseExterne.filter({ statut: 'recherche_livreur' });
       const aFermer = coursesEnRecherche.filter(c => new Date(c.created_date) < limite);
-      console.log(`[DISPATCH] ⏰ Fermeture courses expirées : ${aFermer.length} course(s) à fermer (> 4 min sans livreur)`);
 
       const fermetures = [];
       for (const c of aFermer) {
-        // 1. Passer la course en annulée
         await base44.asServiceRole.entities.CourseExterne.update(c.id, {
           statut: 'annulee',
           dispatch_status: 'expire',
-          remarque_livreur: 'Aucun livreur disponible après 4 minutes — fermée automatiquement',
+          remarque_livreur: 'Aucun livreur disponible — fermée automatiquement',
         });
 
-        // 2. Notifier le client (créateur de la course)
         try {
           let clientEmail = null;
           if (c.created_by_id) {
@@ -890,69 +649,27 @@ Deno.serve(async (req) => {
           if (clientEmail) {
             await base44.asServiceRole.entities.Notification.create({
               titre: '😔 Aucun livreur disponible',
-              message: 'Nous n\'avons pas trouvé de livreur disponible pour votre course. Vous pouvez relancer la recherche ou créer une nouvelle course.',
+              message: 'Nous n\'avons pas trouvé de livreur disponible. Vous pouvez relancer la recherche.',
               type: 'course_annulee',
               course_id: c.id,
               destinataire_email: clientEmail,
               lue: false,
             });
-            console.log(`[DISPATCH] 📩 Client notifié : ${clientEmail} — course ${c.id} fermée après 4 min`);
           }
         } catch (err) {
-          console.warn('[DISPATCH] ⚠️ Erreur notification client fermeture:', err.message);
+          console.warn('[DISPATCH] ⚠️ Erreur notif fermeture:', err.message);
         }
 
-        fermetures.push({ course_id: c.id, created_date: c.created_date });
+        fermetures.push({ course_id: c.id });
       }
-
-      return Response.json({ success: true, fermees: fermetures.length, details: fermetures });
+      return Response.json({ success: true, fermees: fermetures.length });
     }
 
-    // ─── 5. Retry courses en attente (appelé par un scheduled job) ────────
-    // Cherche toutes les courses en recherche sans livreur proposé et les redispatche
-    if (action === 'retry_courses_en_attente') {
-      const { country_code: filterCountry } = body;
-      console.log(`[DISPATCH] 🔄 Retry courses en attente... (pays: ${filterCountry || 'tous'})`);
-
-      const filter = { statut: 'recherche_livreur' };
-      // OBLIGATOIRE : filtrer par pays si fourni, sinon ignorer (sécurité)
-      if (filterCountry) filter.country_code = filterCountry;
-
-      const courses = await base44.asServiceRole.entities.CourseExterne.filter(filter);
-
-      const aRetenter = courses.filter(c =>
-        ['en_attente', 'redispatch', 'expire'].includes(c.dispatch_status) ||
-        // Ou expiré depuis > 30s sans redispatch
-        (c.dispatch_status === 'propose' && c.timeout_expires_at && new Date(c.timeout_expires_at) < new Date(Date.now() - 5000))
-      );
-
-      console.log(`[DISPATCH] 🔄 ${aRetenter.length} courses à retenter`);
-
-      const resultats = [];
-      for (const course of aRetenter) {
-        const exclusions = course.livreur_id ? [course.livreur_id] : [];
-        const result = await lancerDispatch(base44, course.id, exclusions);
-        resultats.push({ course_id: course.id, ...result });
-      }
-
-      return Response.json({ success: true, retried: aRetenter.length, resultats });
-    }
-
-    // ─── 6. Valider le prix manuel côté client ────────────────────────────
+    // ─── 8. Valider le prix manuel côté client ────────────────────────────
     if (action === 'valider_prix_manuel') {
       const { accepted } = body;
       const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
-      if (!assertCourseHasCountry(course, 'valider_prix_manuel')) {
-        return Response.json({ success: false, error: 'country_code obligatoire absent sur la course' }, { status: 400 });
-      }
-      if (course.proposed_by_livreur_id) {
-        const proposedLivreur = await base44.asServiceRole.entities.Livreur.get(course.proposed_by_livreur_id);
-        if (!proposedLivreur) return Response.json({ error: 'Livreur propose introuvable' }, { status: 404 });
-        if (!assertSameCountry(course, proposedLivreur, 'valider_prix_manuel')) {
-          return countryBlockResponse(course, proposedLivreur);
-        }
-      }
 
       const now = new Date().toISOString();
 
@@ -972,68 +689,46 @@ Deno.serve(async (req) => {
           montant_livreur: montantLivreur,
         });
 
-        // Mettre le livreur en_course
         if (course.proposed_by_livreur_id) {
           const livreurId = course.proposed_by_livreur_id;
-          console.log(`[DISPATCH] 💰 Prix accepté pour course ${course_id} — livreur ${livreurId} notifié`);
-          
           await base44.asServiceRole.entities.Livreur.update(livreurId, { statut: 'en_course' });
-
-          // Notifier le livreur : prix accepté
           try {
             const livreurData = await base44.asServiceRole.entities.Livreur.get(livreurId);
             if (livreurData?.user_email) {
-              // 📊 LOG DIAGNOSTIC
-              console.log(`[DISPATCH] 📧 Création notification BDD pour ${livreurData.user_email}`);
-              
               await base44.asServiceRole.entities.Notification.create({
                 titre: '✅ Prix accepté — La course peut commencer !',
-                message: `Le client a accepté votre prix de ${prixManuel.toLocaleString()} ${course.devise || 'FCFA'}. Rendez-vous au point de récupération.`,
-                type: 'course_acceptee',
-                course_id: course_id,
-                destinataire_email: livreurData.user_email,
-                lue: false,
+                message: `Le client a accepté votre prix de ${prixManuel.toLocaleString()} ${course.devise || 'FCFA'}.`,
+                type: 'course_acceptee', course_id: course_id,
+                destinataire_email: livreurData.user_email, lue: false,
               });
-
-              // 📱 Notification push — si app ouverte
               try {
-                console.log(`[DISPATCH] 📲 Envoi notification push à ${livreurData.user_email}`);
                 await base44.functions.invoke('envoiNotificationPush', {
-                  destinataire_email: livreurData.user_email,
-                  livreur_id: livreurId,
+                  destinataire_email: livreurData.user_email, livreur_id: livreurId,
                   titre: '✅ Prix accepté !',
-                  message: `Le client a validé ${prixManuel.toLocaleString()} ${course.devise || 'FCFA'}. Course ${course_id.substr(-8)}.`,
-                  type: 'course_acceptee',
-                  course_id: course_id,
+                  message: `Le client a validé ${prixManuel.toLocaleString()} ${course.devise || 'FCFA'}.`,
+                  type: 'course_acceptee', course_id: course_id,
                 });
-              } catch (err) {
-                console.error('[DISPATCH] ❌ Erreur notif push prix accepté:', err.message);
-              }
-
-              // 📞 Si app fermée → WhatsApp en complément
+              } catch (_) {}
               if (!livreurData.app_active && livreurData.telephone) {
                 try {
-                  console.log(`[DISPATCH] 📱 Envoi WhatsApp à ${livreurData.telephone} (app fermée)`);
                   await base44.functions.invoke('envoyerAlerteWhatsApp', {
                     telephone: livreurData.telephone,
-                    message: `✅ SILGAPP — Prix accepté !\n\nLe client a validé votre prix de ${prixManuel.toLocaleString()} ${course.devise || 'FCFA'}.\n\nRendez-vous au point de récupération pour commencer la course.`,
+                    message: `✅ SILGAPP — Prix accepté !\nLe client a validé ${prixManuel.toLocaleString()} ${course.devise || 'FCFA'}.`,
                   });
-                } catch (err) {
-                  console.warn('[DISPATCH] ⚠️ Erreur WhatsApp prix accepté:', err.message);
-                }
+                } catch (_) {}
               }
             }
           } catch (e) {
-            console.error('[DISPATCH] ❌ Erreur notif livreur prix accepté:', e.message);
+            console.error('[DISPATCH] ❌ Notif livreur prix accepté:', e.message);
           }
         }
 
         await supprimerNotificationsCourse(base44, course_id);
         return Response.json({ success: true, accepted: true });
       } else {
+        // Refus client : libérer le verrou sans blacklister le livreur
         const livreurRefuseId = course.proposed_by_livreur_id;
 
-        // Refus client → redispatch
         await base44.asServiceRole.entities.CourseExterne.update(course_id, {
           manual_price_status: 'refused',
           client_price_refused_at: now,
@@ -1047,21 +742,16 @@ Deno.serve(async (req) => {
           proposed_by_livreur_id: '',
         });
 
-        // Remettre le livreur disponible
         if (livreurRefuseId) {
           await base44.asServiceRole.entities.Livreur.update(livreurRefuseId, { statut: 'disponible' });
-
-          // Notifier le livreur : prix refusé
           try {
             const livreurData = await base44.asServiceRole.entities.Livreur.get(livreurRefuseId);
             if (livreurData?.user_email) {
               await base44.asServiceRole.entities.Notification.create({
                 titre: '❌ Prix refusé — Vous êtes de nouveau disponible',
-                message: `Le client a refusé votre prix. Vous redevenez disponible pour d'autres courses. Cette course peut vous être reproposée plus tard.`,
-                type: 'course_refusee',
-                course_id: course_id,
-                destinataire_email: livreurData.user_email,
-                lue: false,
+                message: 'Le client a refusé votre prix. Vous redevenez disponible.',
+                type: 'course_refusee', course_id: course_id,
+                destinataire_email: livreurData.user_email, lue: false,
               });
             }
           } catch (e) {
@@ -1069,10 +759,40 @@ Deno.serve(async (req) => {
           }
         }
 
-        // ⚠️ Ne pas exclure le livreur du redispatch — il peut être reproposé plus tard
-        const result = await lancerDispatch(base44, course_id, []);
+        // Redispatch sans exclure le livreur (rééligible immédiatement)
+        const result = await lancerDispatchMulti(base44, course_id, []);
         return Response.json({ success: true, accepted: false, redispatched: !result.noLivreur });
       }
+    }
+
+    // ─── 9. Lire la config dispatch ───────────────────────────────────────
+    if (action === 'get_config') {
+      const config = await chargerConfigDispatch(base44);
+      return Response.json({ success: true, config });
+    }
+
+    // ─── 10. Sauvegarder la config dispatch ──────────────────────────────
+    if (action === 'set_config') {
+      const { nb_livreurs, timeout_sec } = body;
+      const configs = await base44.asServiceRole.entities.AppConfig.filter({});
+
+      const upsert = async (cle, valeur, description) => {
+        const existing = configs.find(c => c.cle === cle);
+        if (existing) {
+          await base44.asServiceRole.entities.AppConfig.update(existing.id, { valeur: String(valeur) });
+        } else {
+          await base44.asServiceRole.entities.AppConfig.create({ cle, valeur: String(valeur), description });
+        }
+      };
+
+      if (nb_livreurs !== undefined) {
+        await upsert('DISPATCH_NB_LIVREURS', nb_livreurs, 'Nombre de livreurs notifiés par vague de dispatch');
+      }
+      if (timeout_sec !== undefined) {
+        await upsert('DISPATCH_TIMEOUT_SEC', timeout_sec, 'Délai de réponse par vague (secondes)');
+      }
+
+      return Response.json({ success: true, message: 'Configuration dispatch sauvegardée' });
     }
 
     return Response.json({ error: 'Action inconnue' }, { status: 400 });

@@ -1,7 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Loader2, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
+
+function haversine(lat1, lon1, lat2, lon2) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
 
 function formatHeure(iso) {
   if (!iso) return "—";
@@ -31,7 +40,6 @@ export default function RecapCourseLivreur() {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [retries, setRetries] = useState(0);
 
   const chargerCourse = async () => {
     try {
@@ -40,15 +48,6 @@ export default function RecapCourseLivreur() {
       if (!c) {
         setError("Course introuvable.");
         setLoading(false);
-        return;
-      }
-      // Si les données financières ne sont pas encore prêtes, recharger dans 2s
-      if (!c.prix_final || !c.distance_reelle_km) {
-        setCourse(c);
-        setLoading(false);
-        if (retries < 8) {
-          setTimeout(() => setRetries(r => r + 1), 2000);
-        }
         return;
       }
       setCourse(c);
@@ -60,9 +59,8 @@ export default function RecapCourseLivreur() {
   };
 
   useEffect(() => {
-    setLoading(true);
     chargerCourse();
-  }, [courseId, retries]);
+  }, [courseId]);
 
   const handleTerminer = async () => {
     try {
@@ -103,42 +101,22 @@ export default function RecapCourseLivreur() {
     );
   }
 
-  // ── Données manquantes GPS ──────────────────────────────────────────────
-  // Pour destination_inconnue=true, latitude_livraison peut être null → ne pas bloquer
-  const gpsManquant = !course.destination_inconnue && (!course.latitude_recuperation || !course.latitude_livraison);
-  if (gpsManquant) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-gray-50 p-6">
-        <div className="text-center space-y-4 max-w-sm">
-          <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto" />
-          <p className="text-base font-bold text-gray-900">Données GPS manquantes</p>
-          <p className="text-sm text-gray-500">
-            Les coordonnées GPS de récupération ou de livraison sont absentes. Le prix ne peut pas être calculé.
-          </p>
-          <button
-            className="h-12 px-6 rounded-2xl bg-primary text-white font-bold"
-            onClick={handleTerminer}
-          >
-            Retourner au dashboard
-          </button>
-        </div>
-      </div>
-    );
-  }
 
-  // ── Calcul en cours (données financières pas encore dispo) ──────────────
-  const donneesEnCours = !course.prix_final || !course.distance_reelle_km;
 
-  const dist = Number(course.distance_reelle_km || 0);
+  // ── Calcul avec fallbacks (données parfois manquantes) ──────────────────
+  const dist = Number(course.distance_reelle_km) > 0 
+    ? Number(course.distance_reelle_km)
+    : (course.gps_depart_lat && course.gps_arrivee_lat 
+        ? haversine(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng) 
+        : 0);
 
-  // Prix manuel accepté → priorité absolue, ne jamais recalculer à partir de la distance
+  // Prix manuel accepté → priorité absolue
   const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
 
-  // Règle prix minimum SILGAPP : 1 000 F — appliqué UNIQUEMENT en mode automatique
   const prixBrut = isPrixManuel
     ? Number(course.manual_price)
-    : (course.prix_final ? Number(course.prix_final) : Math.round(dist * 100));
-  const prixFinal = isPrixManuel ? prixBrut : Math.max(1000, prixBrut);
+    : (Number(course.prix_final) > 0 ? Number(course.prix_final) : (dist > 0 ? Math.round(dist * 100) : 0));
+  const prixFinal = Math.max(1000, prixBrut);
   const gainLivreur = Number(course.montant_livreur) > 0 ? Number(course.montant_livreur) : Math.round(prixFinal * 0.7);
   const commissionSilga = Number(course.commission_silga) > 0 ? Number(course.commission_silga) : Math.round(prixFinal * 0.3);
   const duree = dureeMinutes(course.heure_recuperation, course.heure_livraison);
@@ -158,10 +136,20 @@ export default function RecapCourseLivreur() {
       {/* ── CONTENU ── */}
       <div className="flex-1 px-4 py-6 space-y-4 max-w-lg mx-auto w-full">
 
-        {donneesEnCours && (
+        {(!course.prix_final && !course.manual_price) && (
           <div className="bg-amber-900/40 border border-amber-500/40 rounded-2xl p-4 flex items-center gap-3">
-            <Loader2 className="w-5 h-5 text-amber-400 animate-spin flex-shrink-0" />
-            <p className="text-amber-300 text-sm font-medium">Calcul du prix en cours… rechargement automatique.</p>
+            <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-amber-300 text-sm font-medium">Données de prix non disponibles</p>
+              <p className="text-amber-400/70 text-xs mt-0.5">Cela peut arriver si la course n'a pas été finalisée correctement.</p>
+            </div>
+            <button
+              onClick={chargerCourse}
+              className="flex items-center gap-2 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-all"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Réessayer
+            </button>
           </div>
         )}
 
@@ -176,16 +164,22 @@ export default function RecapCourseLivreur() {
             </div>
           ) : (
             <>
-              <div className="space-y-1">
-                <p className="text-gray-400 text-sm">Distance réelle</p>
-                <p className="text-white text-2xl font-black">{dist.toFixed(2)} km</p>
-              </div>
-              <div className="text-gray-500 text-sm">
-                {prixBrut < 1000
-                  ? <span className="text-amber-400 font-semibold">Prix minimum SILGAPP appliqué</span>
-                  : `Calcul : ${dist.toFixed(2)} km × 100 F`
-                }
-              </div>
+              {dist > 0 ? (
+                <>
+                  <div className="space-y-1">
+                    <p className="text-gray-400 text-sm">Distance réelle</p>
+                    <p className="text-white text-2xl font-black">{dist.toFixed(2)} km</p>
+                  </div>
+                  <div className="text-gray-500 text-sm">
+                    {prixBrut < 1000
+                      ? <span className="text-amber-400 font-semibold">Prix minimum SILGAPP appliqué</span>
+                      : `Calcul : ${dist.toFixed(2)} km × 100 F`
+                    }
+                  </div>
+                </>
+              ) : (
+                <p className="text-gray-500 text-sm">Distance non disponible</p>
+              )}
             </>
           )}
 

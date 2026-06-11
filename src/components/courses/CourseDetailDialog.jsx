@@ -57,17 +57,19 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
       }
       return await base44.entities.Course.update(id, data);
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (result, variables) => {
       queryClient.invalidateQueries();
       if (variables.data.statut === "annulee") {
         toast.success("Course annulée avec succès");
         onClose();
       } else {
         toast.success("Statut mis à jour");
+        onClose();
       }
     },
     onError: (error) => {
-      toast.error("Erreur : " + (error?.message || "impossible d'annuler"));
+      console.error("[CourseDetailDialog] Erreur mutation:", error);
+      toast.error("Erreur : " + (error?.message || "impossible de mettre à jour"));
     },
   });
 

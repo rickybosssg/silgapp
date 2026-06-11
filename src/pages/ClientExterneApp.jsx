@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Capacitor } from "@capacitor/core";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -8,14 +7,11 @@ import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useClientNotifications } from "@/hooks/useClientNotifications";
 import { registerPushToken } from "@/lib/notifications";
-import { requestNativeAppPermissions } from "@/lib/nativePermissions";
-import { startNativeBackgroundHeartbeat } from "@/lib/nativeAndroid";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import { useQueryClient } from "@tanstack/react-query";
 import { 
-  MapPin, Navigation, MessageCircle, User, Package,
-  Clock, ChevronRight, TrendingUp,
-  Loader2, ArrowLeft, RefreshCw
+  MapPin, Navigation, MessageCircle, User, Package, 
+  Clock, ChevronRight, TrendingUp, Loader2, ArrowLeft, RefreshCw
 } from "lucide-react";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import CourseAnnuleeRelanceDialog from "@/components/client/CourseAnnuleeRelanceDialog";
@@ -30,8 +26,6 @@ import PubliciteCarousel from "@/components/publicite/PubliciteCarousel";
 import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
 import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
 
-const ACTIVE_GPS_STATUSES = ["nouvelle", "recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison"];
-const ACTIVE_GPS_STATUS_SET = new Set(ACTIVE_GPS_STATUSES);
 
 function haversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -88,12 +82,7 @@ export default function ClientExterneApp() {
   const [userId, setUserId] = useState(null);
   const queryClient = useQueryClient();
   const clientProfilRef = useRef(null);
-  const coursesActivesRef = useRef([]);
-  const userIdRef = useRef(null);
   useEffect(() => { clientProfilRef.current = clientProfil; }, [clientProfil]);
-  useEffect(() => { coursesActivesRef.current = coursesActives; }, [coursesActives]);
-  useEffect(() => { userIdRef.current = userId; }, [userId]);
-  const hasActiveCourseForGps = coursesActives.some((course) => ACTIVE_GPS_STATUS_SET.has(course?.statut));
 
   // Pull-to-refresh
   const { pulling, refreshing } = usePullToRefresh(async () => {
@@ -141,28 +130,6 @@ export default function ClientExterneApp() {
       client_id: clientProfil.id,
     }).catch(() => null);
   }, [clientProfil?.id, clientProfil?.user_email]);
-
-  useEffect(() => {
-    if (!clientProfil?.id || !clientProfil?.user_email || !onboardingDone) return;
-    if (!Capacitor.isNativePlatform()) return;
-
-    let alreadyAsked = false;
-    try { alreadyAsked = localStorage.getItem("client_native_permissions_requested") === "true"; } catch (_) {}
-    if (alreadyAsked) return;
-
-    requestNativeAppPermissions({
-      email: clientProfil.user_email,
-      userType: "client",
-      clientId: clientProfil.id,
-      requestContacts: true,
-    })
-      .then(() => {
-        localStorage.setItem("client_native_permissions_requested", "true");
-      })
-      .catch((error) => {
-        console.warn("[ClientExterneApp] Permissions natives ignorees:", error?.message);
-      });
-  }, [clientProfil?.id, clientProfil?.user_email, onboardingDone]);
 
   useEffect(() => {
     loadProfil();
@@ -273,7 +240,7 @@ export default function ClientExterneApp() {
 
   // Watch GPS continu (15s) — comme les livreurs
   // Met aussi à jour le quartier toutes les 5 min via reverse geocoding
-  // Sync GPS course appele ici (toutes les 15s) au lieu du polling (toutes les 5s)
+  // syncGpsDestinataire appelé ici (toutes les 15s) au lieu du polling (toutes les 5s) → -66% requêtes
   const lastQuartierSync = useRef(0);
   const clientProfilForGps = useRef(null);
   useEffect(() => { clientProfilForGps.current = clientProfil; }, [clientProfil]);
@@ -301,9 +268,9 @@ export default function ClientExterneApp() {
             longitude: pos.coords.longitude,
             ...quartierUpdate,
           }).catch(() => null);
-          // Sync GPS course ici (15s) - pas dans le polling 8s pour reduire les requetes
+          // syncGpsDestinataire ici (15s) — pas dans le polling 8s pour réduire les requêtes
           const profil = clientProfilForGps.current;
-          if (profil) syncGpsCoursesActives(posData, profil);
+          if (profil) syncGpsDestinataire(posData, profil);
         },
         () => setGpsActif(false),
         { enableHighAccuracy: true }
@@ -337,7 +304,7 @@ export default function ClientExterneApp() {
   }, [onboardingDone, clientProfil?.id]);
 
   // Polling automatique des courses actives toutes les 8s
-  // Sync GPS course uniquement dans le watch GPS (15s) pour eviter le rate limit
+  // syncGpsDestinataire est appelé uniquement dans le watch GPS (15s) pour éviter le rate limit
   useEffect(() => {
     if (!onboardingDone || !clientProfil || !position) return;
     const interval = setInterval(() => {
@@ -347,40 +314,6 @@ export default function ClientExterneApp() {
   }, [onboardingDone, clientProfil?.id, position]);
 
   // Forcer une sync GPS manuelle — EXACTEMENT comme les livreurs
-  // GPS natif Android en arriere-plan pour les clients uniquement pendant une course active.
-  // Cela alimente ClientExterne.latitude/longitude meme telephone verrouille,
-  // puis le livreur recupere cette position live via NavigationGPS.
-  useEffect(() => {
-    if (!clientProfil?.id || !onboardingDone || !gpsActif || !hasActiveCourseForGps) return;
-    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "android") return;
-
-    let cleanup = null;
-    let cancelled = false;
-
-    startNativeBackgroundHeartbeat({
-      userType: "client",
-      intervalMs: 10000,
-      distanceFilter: 0,
-    })
-      .then((stop) => {
-        if (cancelled) {
-          stop?.();
-          return;
-        }
-        cleanup = stop;
-        console.info("[ClientGPS] native background heartbeat actif pendant course");
-      })
-      .catch((error) => {
-        console.warn("[ClientGPS] native background heartbeat indisponible:", error?.message || error);
-      });
-
-    return () => {
-      cancelled = true;
-      cleanup?.();
-      console.info("[ClientGPS] native background heartbeat arrete");
-    };
-  }, [clientProfil?.id, onboardingDone, gpsActif, hasActiveCourseForGps]);
-
   const handleForceGPSSync = () => {
     if (!clientProfil?.id || gpsSyncing) return;
     setGpsSyncing(true);
@@ -409,65 +342,7 @@ export default function ClientExterneApp() {
   };
 
   // Synchroniser le GPS du destinataire vers les courses où il est notifié
-  const normalizePhoneForMatch = (phone) => {
-    const digits = String(phone || "").replace(/\D/g, "");
-    if (!digits) return "";
-    return digits.startsWith("226") ? digits.slice(3) : digits;
-  };
-
-  const samePhone = (a, b) => {
-    const aa = normalizePhoneForMatch(a);
-    const bb = normalizePhoneForMatch(b);
-    return !!aa && !!bb && aa === bb;
-  };
-
-  const needsCoordinateUpdate = (oldLat, oldLng, pos) => {
-    if (!oldLat || !oldLng) return true;
-    return Math.abs(Number(oldLat) - pos.latitude) > 0.00005 ||
-      Math.abs(Number(oldLng) - pos.longitude) > 0.00005;
-  };
-
-  const syncGpsCoursesActives = async (pos, profil) => {
-    try {
-      if (!pos?.latitude || !pos?.longitude || !profil?.id) return;
-
-      const uid = userIdRef.current;
-      const courses = (coursesActivesRef.current || []).filter((course) =>
-        course?.id && ACTIVE_GPS_STATUS_SET.has(course?.statut)
-      );
-
-      for (const course of courses) {
-        const isCreator = !!uid && course.created_by_id === uid;
-        const isExpediteur = course.expediteur_client_id === profil.id ||
-          samePhone(course.expediteur_telephone || course.client_telephone, profil.telephone) ||
-          (isCreator && course.type_course === "expedier");
-        const isDestinataire = course.destinataire_client_id === profil.id ||
-          samePhone(course.destinataire_telephone || course.destinataire_phone_normalized, profil.telephone) ||
-          (isCreator && course.type_course === "recevoir");
-
-        const update = {};
-        if (isExpediteur && needsCoordinateUpdate(course.gps_depart_lat, course.gps_depart_lng, pos)) {
-          update.gps_depart_lat = pos.latitude;
-          update.gps_depart_lng = pos.longitude;
-          update.adresse_depart = course.adresse_depart || "Position GPS de l'expediteur";
-        }
-        if (isDestinataire && needsCoordinateUpdate(course.gps_arrivee_lat, course.gps_arrivee_lng, pos)) {
-          update.gps_arrivee_lat = pos.latitude;
-          update.gps_arrivee_lng = pos.longitude;
-          update.adresse_arrivee = course.adresse_arrivee || "Position GPS client";
-        }
-
-        if (Object.keys(update).length > 0) {
-          await base44.entities.CourseExterne.update(course.id, update);
-          Object.assign(course, update);
-        }
-      }
-    } catch (err) {
-      console.error("Erreur sync GPS courses actives:", err);
-    }
-  };
-
-  const syncGpsCoursesActivesLegacy = async (pos, profil) => {
+  const syncGpsDestinataire = async (pos, profil) => {
     try {
       if (!pos?.latitude || !pos?.longitude || !profil?.id) return;
       const user = await base44.auth.me();
@@ -530,7 +405,9 @@ export default function ClientExterneApp() {
           nom: user.full_name || user.email.split('@')[0],
           telephone: "",
           user_email: user.email,
-          actif: true
+          actif: true,
+          // ⚠️ PAS de country_code ici — sera défini par l'onboarding (EtapeProfil)
+          // Mettre BF par défaut causait des courses créées avec le mauvais pays
         });
       }
       setClientProfil(profil);
