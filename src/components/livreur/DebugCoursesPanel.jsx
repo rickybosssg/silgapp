@@ -13,61 +13,32 @@ export default function DebugCoursesPanel({ livreurEmail, livreurId }) {
     setExpanded(true);
     
     try {
-      console.log('[DEBUG] Starting debug for livreur:', livreurId, livreurEmail);
-      
-      // 1. Récupérer TOUTES les courses en dispatch_status="propose" du pays
+      // 1. Récupérer TOUTES les courses en dispatch_status="propose"
       const allCourses = await base44.entities.CourseExterne.filter({
         dispatch_status: "propose",
         statut: "recherche_livreur",
       });
       
-      console.log('[DEBUG] Total courses in "propose" status:', allCourses?.length || 0);
-      
       // 2. Filtrer celles où le livreur est notifié
       const proposees = [];
-      const notNotified = [];
-      
       for (const course of allCourses || []) {
         try {
           const notifiedIds = course.dispatch_notified_ids ? JSON.parse(course.dispatch_notified_ids) : [];
           const isNotifie = notifiedIds.includes(livreurId);
           const isExpired = course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date();
           
-          console.log('[DEBUG] Course', course.id, {
-            client: course.client_nom,
-            country: course.country_code,
-            dispatch_notified_ids: course.dispatch_notified_ids,
-            parsedIds: notifiedIds,
-            livreurId,
-            isNotifie,
-            isExpired,
-            timeout_expires_at: course.timeout_expires_at,
-            now: new Date().toISOString(),
-          });
-          
           if (isNotifie && !isExpired) {
             proposees.push(course);
-          } else {
-            notNotified.push({
-              id: course.id,
-              client: course.client_nom,
-              reason: isNotifie ? 'expired' : 'not_in_notified_ids',
-            });
           }
         } catch (err) {
           console.error('Error course', course.id, err.message);
         }
       }
       
-      console.log('[DEBUG] Courses for this livreur:', proposees.length);
-      console.log('[DEBUG] Courses NOT for this livreur:', notNotified.length);
-      
       setDebugData({
         totalCoursesPropose: allCourses?.length || 0,
         courseCount: proposees.length,
         courses: proposees,
-        notNotified,
-        livreurId,
       });
     } catch (err) {
       console.error('Debug error:', err.message);

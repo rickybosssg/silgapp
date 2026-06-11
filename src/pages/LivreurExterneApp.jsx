@@ -204,7 +204,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     // 1. D'abord vérifier coursesProposees (polling robuste)
     if (coursesProposees && coursesProposees.length > 0) {
       const firstProposee = coursesProposees.find(
-        c => c.dispatch_status === "propose" && c.manual_price_status !== "pending_client_validation"
+        c => c.dispatch_status === "propose"
       );
       if (firstProposee) return firstProposee;
     }
@@ -212,7 +212,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     // 2. Ensuite mesCourses (livreur déjà assigné)
     const directe = mesCourses.find(
       c => c.statut === "recherche_livreur" && c.dispatch_status === "propose"
-        && c.manual_price_status !== "pending_client_validation"
     );
     
     return directe || null;
