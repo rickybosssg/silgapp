@@ -20,6 +20,45 @@ function calculerDistance(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function normalizeCountryCode(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
+async function verifierPaysCourseLivreur(base44, course, livreurId, contexte) {
+  const livreur = await base44.asServiceRole.entities.Livreur.get(livreurId);
+  if (!livreur) {
+    return {
+      ok: false,
+      status: 404,
+      response: { success: false, found: false, error: 'Livreur introuvable' },
+    };
+  }
+
+  const courseCountry = normalizeCountryCode(course?.country_code);
+  const livreurCountry = normalizeCountryCode(livreur.country_code);
+  if (!courseCountry || !livreurCountry || courseCountry !== livreurCountry) {
+    console.error('[DISPATCH][COUNTRY_MISMATCH_BLOCKED]', {
+      contexte,
+      course_id: course?.id,
+      livreur_id: livreurId,
+      course_country_code: courseCountry || 'ABSENT',
+      livreur_country_code: livreurCountry || 'ABSENT',
+    });
+    return {
+      ok: false,
+      status: 403,
+      response: {
+        success: false,
+        found: false,
+        error: 'country_mismatch',
+        blocked_reason: 'country_mismatch',
+      },
+    };
+  }
+
+  return { ok: true, livreur, courseCountry, livreurCountry };
+}
+
 /**
  * Charge la configuration de dispatch depuis AppConfig.
  * Clés : DISPATCH_NB_LIVREURS (défaut: 3), DISPATCH_TIMEOUT_SEC (défaut: 60)
@@ -354,10 +393,13 @@ Deno.serve(async (req) => {
       const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
       if (!course) return Response.json({ found: false });
 
+      const countryGuard = await verifierPaysCourseLivreur(base44, course, livreur_id, 'check_course_pour_livreur');
+      if (!countryGuard.ok) return Response.json(countryGuard.response, { status: countryGuard.status });
+
       // Course annulée ou livrée → plus disponible, nettoyer les notifs du livreur
       if (course.statut === 'annulee' || course.statut === 'livree') {
         try {
-          const livreurData = await base44.asServiceRole.entities.Livreur.get(livreur_id);
+          const livreurData = countryGuard.livreur;
           if (livreurData?.user_email) {
             const notifs = await base44.asServiceRole.entities.Notification.filter({
               course_id: course_id,
@@ -404,6 +446,10 @@ Deno.serve(async (req) => {
       const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
 
+      const countryGuard = await verifierPaysCourseLivreur(base44, course, livreur_id, 'accepter_course');
+      if (!countryGuard.ok) return Response.json(countryGuard.response, { status: countryGuard.status });
+      const livreur = countryGuard.livreur;
+
       // Vérification 1 : Si déjà acceptée par un autre
       if (course.dispatch_status === 'accepte' && course.livreur_id && course.livreur_id !== livreur_id) {
         return Response.json({ success: false, error: 'Course déjà prise', already_taken: true });
@@ -427,9 +473,6 @@ Deno.serve(async (req) => {
       if (course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date()) {
         return Response.json({ success: false, error: 'Course expirée', expired: true });
       }
-
-      const livreur = await base44.asServiceRole.entities.Livreur.get(livreur_id);
-      if (!livreur) return Response.json({ error: 'Livreur introuvable' }, { status: 404 });
 
       const PRIX_MIN = 1000;
       if (pricing_mode === 'manual') {
@@ -527,6 +570,9 @@ Deno.serve(async (req) => {
     if (action === 'refuser_course') {
       const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
+
+      const countryGuard = await verifierPaysCourseLivreur(base44, course, livreur_id, 'refuser_course');
+      if (!countryGuard.ok) return Response.json(countryGuard.response, { status: countryGuard.status });
 
       // Course déjà verrouillée par un AUTRE livreur → le refus est ignoré
       if (course.dispatch_status === 'accepte' && course.livreur_id !== livreur_id) {
