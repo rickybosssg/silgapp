@@ -114,20 +114,17 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // Géré par useHeartbeat hook + heartbeatAuto backend — supprimé pour éviter doublon
 
   // ─── Mes courses ──────────────────────────────────────────────────────────
+  // Utilise getAllCoursesForLivreur pour inclure les courses en dispatch (livreur_id vide mais dispatch_notified_ids contient le livreur)
   const { data: mesCourses = [] } = useQuery({
     queryKey: ["mes-courses-externes", livreurId],
     queryFn: async () => {
-      const courses = await base44.entities.CourseExterne.filter(
-        { livreur_id: livreurId },
-        "-updated_date",
-        50
-      );
-      return courses || [];
+      const res = await base44.functions.invoke('getAllCoursesForLivreur', { livreur_id: livreurId });
+      return res?.data?.courses || [];
     },
     enabled: !!livreurId,
     initialData: [],
-    refetchInterval: 4000,
-    staleTime: 2000,
+    refetchInterval: 3000,
+    staleTime: 1000,
   });
 
 
