@@ -679,6 +679,30 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               {testingNotif ? "Envoi en cours..." : "🧪 Tester Notification Push"}
             </button>
 
+            {/* Bouton test modal course — DÉBOGAGE */}
+            <button
+              onClick={async () => {
+                try {
+                  const res = await base44.functions.invoke("dispatchExterneAuto", {
+                    action: "check_course_pour_livreur",
+                    course_id: "6a2aba23dc2e34f6d9149184",
+                    livreur_id: livreurProfil.id,
+                  });
+                  const d = res?.data;
+                  if (d?.found && d?.course) {
+                    toast.success(`Course trouvée ! Statut: ${d.course.statut}`);
+                  } else {
+                    toast.error(`Course pas trouvée: ${JSON.stringify(d)}`);
+                  }
+                } catch (err) {
+                  toast.error(`Erreur: ${err.message}`);
+                }
+              }}
+              className="w-full h-14 rounded-2xl bg-gradient-to-r from-orange-500 to-red-600 text-white font-black text-base shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+            >
+              🚨 Tester Modal Course
+            </button>
+
             {/* Logs détaillés du test */}
             {testResult && (
               <div className={`rounded-2xl p-4 border-2 ${testResult.success ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
