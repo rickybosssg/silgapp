@@ -647,7 +647,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
             {/* Bannière : en attente validation prix par le client */}
             {courseEnAttenteValidationPrix && (
-              <div className="rounded-2xl bg-blue-50 border-2 border-blue-300 px-4 py-3 space-y-1">
+              <div className="rounded-2xl bg-blue-50 border-2 border-blue-300 px-4 py-3 space-y-2">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                   <p className="text-sm font-black text-blue-800">En attente du client</p>
@@ -655,6 +655,27 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                 <p className="text-xs text-blue-600">
                   Votre prix de <strong>{courseEnAttenteValidationPrix.manual_price?.toLocaleString()} {courseEnAttenteValidationPrix.devise || "FCFA"}</strong> est en cours de validation par le client.
                 </p>
+                <button
+                  onClick={async () => {
+                    if (!confirm("Voulez-vous vraiment annuler cette course ?")) return;
+                    try {
+                      const res = await base44.functions.invoke('annulerCourseExterne', {
+                        course_id: courseEnAttenteValidationPrix.id,
+                      });
+                      if (res.data?.success) {
+                        toast.success("Course annulée");
+                        queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+                      } else {
+                        toast.error(res.data?.error || "Erreur lors de l'annulation");
+                      }
+                    } catch (err) {
+                      toast.error("Erreur: " + (err.message || "inconnue"));
+                    }
+                  }}
+                  className="w-full h-12 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-sm shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                >
+                  Annuler cette course
+                </button>
               </div>
             )}
 
