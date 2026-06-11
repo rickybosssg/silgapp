@@ -134,15 +134,14 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       try {
         console.log('[POLLING] Start check for livreur', livreurId, 'country', livreurProfil?.country_code);
         
-        // 1. Récupérer TOUTES les courses récentes (list() fonctionne en frontend)
-        const allCourses = await base44.entities.CourseExterne.list('-created_date', 100);
+        // 1. Récupérer TOUTES les courses via backend function (frontend-compatible)
+        const result = await base44.functions.invoke('getAllCoursesForLivreur', {
+          livreur_id: livreurId,
+          country_code: livreurProfil?.country_code || "BF",
+        });
         
-        // 2. Filtrer celles en dispatch_status="propose" du pays
-        const coursesEnDispatch = allCourses.filter(c => 
-          c.dispatch_status === "propose" &&
-          c.statut === "recherche_livreur" &&
-          c.country_code === (livreurProfil?.country_code || "BF")
-        );
+        const allCourses = result?.courses || [];
+        const coursesEnDispatch = allCourses.filter(c => c.dispatch_status === "propose");
         
         console.log('[POLLING] Found', coursesEnDispatch.length, 'courses in propose status');
         
@@ -152,38 +151,31 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           return;
         }
         
-        // 3. Filtrer celles où le livreur est dans dispatch_notified_ids
+        // 2. Filtrer celles où le livreur est dans dispatch_notified_ids
         const proposees = [];
         for (const course of coursesEnDispatch) {
-          try {
-            const notifiedIds = course.dispatch_notified_ids ? JSON.parse(course.dispatch_notified_ids) : [];
-            const isNotifie = notifiedIds.includes(livreurId);
-            const isAssignee = course.livreur_id === livreurId;
-            
-            // Vérifier si pas expirée
-            const isExpired = course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date();
-            
-            console.log('[POLLING] Course', course.id, {
-              client: course.client_nom,
-              notifiedIds,
-              isNotifie,
-              isAssignee,
-              isExpired,
-              timeout: course.timeout_expires_at,
-            });
-            
-            if ((isNotifie || isAssignee) && !isExpired) {
-              proposees.push(course);
-            }
-          } catch (err) {
-            console.error('Error checking course:', course.id, err.message);
+          const notifiedIds = course.dispatch_notified_ids ? JSON.parse(course.dispatch_notified_ids) : [];
+          const isNotifie = notifiedIds.includes(livreurId);
+          const isAssignee = course.livreur_id === livreurId;
+          const isExpired = course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date();
+          
+          console.log('[POLLING] Course', course.id, {
+            client: course.client_nom,
+            notifiedIds: notifiedIds.length,
+            isNotifie,
+            isAssignee,
+            isExpired,
+          });
+          
+          if ((isNotifie || isAssignee) && !isExpired) {
+            proposees.push(course);
           }
         }
         
         console.log('[POLLING] Courses for this livreur:', proposees.length);
         setCoursesProposees(proposees);
         
-        // 4. Fallback: si une course est trouvée, l'afficher en bouton
+        // 3. Fallback: si une course est trouvée, l'afficher en bouton
         if (proposees.length > 0) {
           setCourseFallbackVisible(proposees[0]);
           console.log('[POLLING] Setting fallback visible:', proposees[0].id);
