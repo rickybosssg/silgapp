@@ -133,16 +133,16 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       try {
         console.log('[POLLING] Start check for livreur', livreurId, 'country', livreurProfil?.country_code);
         
-        // 1. Récupérer TOUTES les courses en dispatch_status="propose" du pays du livreur
-        const allCourses = await base44.entities.CourseExterne.filter({
+        // 1. Récupérer TOUTES les courses en dispatch_status="propose" du pays
+        const coursesEnDispatch = await base44.entities.CourseExterne.filter({
           dispatch_status: "propose",
           statut: "recherche_livreur",
           country_code: livreurProfil?.country_code || "BF",
         });
         
-        console.log('[POLLING] Found', allCourses?.length || 0, 'courses in propose status');
+        console.log('[POLLING] Found', coursesEnDispatch.length, 'courses in propose status');
         
-        if (!allCourses?.length) {
+        if (coursesEnDispatch.length === 0) {
           setCoursesProposees([]);
           setCourseFallbackVisible(null);
           return;
@@ -150,7 +150,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         
         // 2. Filtrer celles où le livreur est dans dispatch_notified_ids
         const proposees = [];
-        for (const course of allCourses) {
+        for (const course of coursesEnDispatch) {
           try {
             const notifiedIds = course.dispatch_notified_ids ? JSON.parse(course.dispatch_notified_ids) : [];
             const isNotifie = notifiedIds.includes(livreurId);
