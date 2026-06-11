@@ -595,6 +595,34 @@ Deno.serve(async (req) => {
     }
 
     // ─── 2. Accepter une course ────────────────────────────────────────────
+    if (action === 'check_course_pour_livreur') {
+      const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+      if (!course) return Response.json({ found: false });
+
+      if (course.statut === 'annulee' || course.statut === 'livree') {
+        return Response.json({ found: false, already_taken: true });
+      }
+
+      if (course.dispatch_status === 'accepte' && course.livreur_id !== livreur_id) {
+        return Response.json({ found: false, already_taken: true, taken_by: course.livreur_id });
+      }
+
+      let notifiedIds = [];
+      try { notifiedIds = JSON.parse(course.dispatch_notified_ids || '[]'); } catch (_) {}
+      const isNotified = Array.isArray(notifiedIds) && notifiedIds.map(String).includes(String(livreur_id));
+      const isAssigned = String(course.livreur_id || '') === String(livreur_id || '');
+
+      if (!isNotified && !isAssigned) return Response.json({ found: false });
+
+      const expired = !!(course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date());
+      return Response.json({
+        found: true,
+        course,
+        expired,
+        timeout_expires_at: course.timeout_expires_at,
+      });
+    }
+
     if (action === 'accepter_course') {
       console.log(`[DISPATCH] ✅ Livreur ${livreur_id} accepte course ${course_id}`);
 
@@ -609,6 +637,14 @@ Deno.serve(async (req) => {
       }
 
       // Timeout dépassé ?
+      let notifiedIds = [];
+      try { notifiedIds = JSON.parse(course.dispatch_notified_ids || '[]'); } catch (_) {}
+      const isNotified = Array.isArray(notifiedIds) && notifiedIds.map(String).includes(String(livreur_id));
+      const isAssigned = String(course.livreur_id || '') === String(livreur_id || '');
+      if (course.dispatch_notified_ids && !isNotified && !isAssigned) {
+        return Response.json({ success: false, error: "Vous n'etes pas eligible pour cette course", not_eligible: true });
+      }
+
       if (course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date()) {
         return Response.json({ success: false, error: 'Course expirée — un autre livreur sera trouvé', expired: true });
       }

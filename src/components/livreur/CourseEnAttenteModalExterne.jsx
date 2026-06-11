@@ -79,27 +79,25 @@ export default function CourseEnAttenteModalExterne({
     const checkStatus = async () => {
       try {
         const data = await base44.functions.invoke('dispatchExterneAuto', {
-          action: 'verifier_expiration',
+          action: 'check_course_pour_livreur',
           course_id: course.id,
+          livreur_id: livreurId,
         });
         const d = data?.data;
-        if (d?.livreur_id && d.livreur_id !== livreurId && d.dispatch_status === 'accepte') {
+        if (d?.already_taken || (d?.found === false && !d?.expired)) {
           stopUrgentCourseAlert("course-already-taken");
           setCourseDejaPrise(true);
+          return;
         }
-        if (d?.expired && !courseExpireeSentRef.current && !d?.livreur_id) {
+        if (d?.expired && !courseExpireeSentRef.current) {
           courseExpireeSentRef.current = true;
           stopUrgentCourseAlert("course-expired-backend");
           setCourseExpiree(true);
-          base44.functions.invoke('dispatchExterneAuto', {
-            action: 'verifier_expiration',
-            course_id: course.id,
-          }).catch(() => null);
         }
       } catch (_) {}
     };
 
-    const interval = setInterval(checkStatus, 4000);
+    const interval = setInterval(checkStatus, 3000);
     return () => clearInterval(interval);
   }, [course.id, livreurId]);
 

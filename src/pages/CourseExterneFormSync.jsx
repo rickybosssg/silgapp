@@ -522,8 +522,20 @@ export default function CourseExterneFormSync() {
       ? (colis[0]?.destinataire_telephone || "")
       : destinataireTel;
 
-    // country_code obligatoire : utiliser la BDD fraiche pour eviter un dispatch hors pays.
-    const courseCountryCode = clientFromDB?.country_code;
+    // country_code obligatoire : relire le profil client en base pour eviter un dispatch hors pays.
+    let clientFromDB = clientProfil || null;
+    try {
+      if (clientProfil?.id) {
+        clientFromDB = await base44.entities.ClientExterne.get(clientProfil.id);
+      } else if (user?.email) {
+        const clients = await base44.entities.ClientExterne.filter({ user_email: user.email }, "-created_date", 1);
+        clientFromDB = clients?.[0] || clientFromDB;
+      }
+    } catch (err) {
+      console.warn("[CourseForm] Impossible de relire le profil client, fallback local:", err.message);
+    }
+
+    const courseCountryCode = clientFromDB?.country_code || clientProfil?.country_code || "";
     if (!courseCountryCode) {
       console.error("[CourseForm] country_code manquant sur clientFromDB:", clientFromDB);
       toast.error("Erreur : votre profil client n'a pas de pays. Veuillez contacter le support.");
