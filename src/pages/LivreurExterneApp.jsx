@@ -133,12 +133,15 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       try {
         console.log('[POLLING] Start check for livreur', livreurId, 'country', livreurProfil?.country_code);
         
-        // 1. Récupérer TOUTES les courses en dispatch_status="propose" du pays
-        const coursesEnDispatch = await base44.entities.CourseExterne.filter({
-          dispatch_status: "propose",
-          statut: "recherche_livreur",
-          country_code: livreurProfil?.country_code || "BF",
-        });
+        // 1. Récupérer TOUTES les courses récentes (list() fonctionne en frontend)
+        const allCourses = await base44.entities.CourseExterne.list('-created_date', 100);
+        
+        // 2. Filtrer celles en dispatch_status="propose" du pays
+        const coursesEnDispatch = allCourses.filter(c => 
+          c.dispatch_status === "propose" &&
+          c.statut === "recherche_livreur" &&
+          c.country_code === (livreurProfil?.country_code || "BF")
+        );
         
         console.log('[POLLING] Found', coursesEnDispatch.length, 'courses in propose status');
         
@@ -148,7 +151,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           return;
         }
         
-        // 2. Filtrer celles où le livreur est dans dispatch_notified_ids
+        // 3. Filtrer celles où le livreur est dans dispatch_notified_ids
         const proposees = [];
         for (const course of coursesEnDispatch) {
           try {
@@ -179,7 +182,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         console.log('[POLLING] Courses for this livreur:', proposees.length);
         setCoursesProposees(proposees);
         
-        // 3. Fallback: si une course est trouvée, l'afficher en bouton
+        // 4. Fallback: si une course est trouvée, l'afficher en bouton
         if (proposees.length > 0) {
           setCourseFallbackVisible(proposees[0]);
           console.log('[POLLING] Setting fallback visible:', proposees[0].id);
