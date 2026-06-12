@@ -35,8 +35,8 @@ export default function Notifications() {
 
   const markAllReadMutation = useMutation({
     mutationFn: async () => {
-      const unread = notifications.filter(n => !n.lue);
-      await Promise.all(unread.map(n => base44.entities.Notification.update(n.id, { lue: true })));
+      const res = await base44.functions.invoke('marquerToutesNotificationsLues', {});
+      return res.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
