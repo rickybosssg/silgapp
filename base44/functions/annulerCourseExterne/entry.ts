@@ -38,6 +38,22 @@ Deno.serve(async (req) => {
     if (!course) {
       return Response.json({ error: 'Course introuvable' }, { status: 404 });
     }
+    const user = await base44.auth.me().catch(() => null);
+    if (user?.admin_type === 'pays' && user.country_code && course.country_code !== user.country_code) {
+      console.error('[ANNULATION][CRITICAL_COUNTRY_BLOCK]', {
+        course_id,
+        course_country_code: course.country_code || 'ABSENT',
+        admin_email: user.email,
+        admin_country_code: user.country_code,
+      });
+      return Response.json({
+        success: false,
+        error: 'Action interdite : course hors pays admin',
+        blocked_reason: 'country_mismatch',
+        course_country_code: course.country_code || '',
+        admin_country_code: user.country_code,
+      }, { status: 403 });
+    }
 
     console.log(`[ANNULATION] Course trouvée:`, {
       id: course.id,

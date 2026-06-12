@@ -4,8 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
-  Globe, ArrowRight, ToggleLeft, ToggleRight, Users, Package,
-  Truck, TrendingUp, Plus, Settings, LayoutDashboard, Edit, ShieldCheck
+  Globe, ArrowRight, ToggleLeft, ToggleRight, Plus, Settings, LayoutDashboard, ShieldCheck
 } from "lucide-react";
 import { toast } from "sonner";
 import { isToday } from "date-fns";

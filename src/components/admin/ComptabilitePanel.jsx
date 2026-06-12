@@ -12,6 +12,7 @@ import {
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
+import { useAdminContext } from "@/hooks/useAdminContext.js";
 
 // ── Onglets ────────────────────────────────────────────────────────────────────
 const TABS = [
@@ -68,7 +69,7 @@ function DetailPaiementModal({ entry, onClose, onPaiement, onBloquer, onDebloque
             <p className="font-bold text-lg">{entry.prenom} {entry.nom}</p>
             {entry.telephone && <p className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="w-3 h-3" />{entry.telephone}</p>}
           </div>
-          <button onClick={onClose}><XCircle className="w-6 h-6 text-gray-400 hover:text-gray-600" /></button>
+          <button onClick={onClose}><XCircle className="w-6 h-6 text-gray-600 hover:text-gray-600" /></button>
         </div>
         <div className="overflow-y-auto flex-1 p-4 space-y-4">
           <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-xl p-4 border border-orange-200 space-y-2">
@@ -132,17 +133,25 @@ function DusLivreursTab() {
   const queryClient = useQueryClient();
   const [filtre, setFiltre] = useState("aujourd_hui");
   const [detailEntry, setDetailEntry] = useState(null);
+  const { isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
+  const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || "");
+  const coursesLivreesFilter = effectiveCountry
+    ? { statut: "livree", country_code: effectiveCountry }
+    : { statut: "livree" };
+  const livreursFilter = effectiveCountry
+    ? { type_livreur: "externe", country_code: effectiveCountry }
+    : { type_livreur: "externe" };
 
   const { data: courses = [] } = useQuery({
-    queryKey: ["courses-externes-livrees"],
-    queryFn: () => base44.entities.CourseExterne.filter({ statut: "livree" }, "-heure_livraison", 500),
+    queryKey: ["courses-externes-livrees", effectiveCountry],
+    queryFn: () => base44.entities.CourseExterne.filter(coursesLivreesFilter, "-heure_livraison", 500),
     initialData: [],
     refetchInterval: 15000,
   });
 
   const { data: livreurs = [] } = useQuery({
-    queryKey: ["livreurs-externes-all"],
-    queryFn: () => base44.entities.Livreur.filter({ type_livreur: "externe" }, "-created_date", 200),
+    queryKey: ["livreurs-externes-all", effectiveCountry],
+    queryFn: () => base44.entities.Livreur.filter(livreursFilter, "-created_date", 200),
     initialData: [],
     refetchInterval: 15000,
   });
@@ -315,10 +324,15 @@ function DusLivreursTab() {
 function FraisAnnulationTab() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const { isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
+  const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || "");
+  const fraisFilter = effectiveCountry ? { country_code: effectiveCountry } : null;
 
   const { data: frais = [], isLoading, refetch } = useQuery({
-    queryKey: ["frais-annulation"],
-    queryFn: () => base44.entities.FraisAnnulation.list("-created_date", 200),
+    queryKey: ["frais-annulation", effectiveCountry],
+    queryFn: () => fraisFilter
+      ? base44.entities.FraisAnnulation.filter(fraisFilter, "-created_date", 200)
+      : base44.entities.FraisAnnulation.list("-created_date", 200),
     refetchInterval: 30000,
   });
 
@@ -360,17 +374,17 @@ function FraisAnnulationTab() {
 
       {/* Recherche */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
         <Input placeholder="Rechercher par client, livreur..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 rounded-xl" />
       </div>
 
       {/* Liste */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-10 text-gray-400 gap-2">
+        <div className="flex items-center justify-center py-10 text-gray-600 gap-2">
           <RefreshCw className="w-4 h-4 animate-spin" /> Chargement...
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-10 text-gray-400">
+        <div className="text-center py-10 text-gray-600">
           <CreditCard className="w-10 h-10 mx-auto mb-2 opacity-30" />
           <p className="text-sm">Aucun frais d'annulation</p>
         </div>
@@ -407,7 +421,7 @@ function FraisCard({ frais, onPayer, onBloquer, payerLoading, bloquerLoading }) 
             <span className="text-lg font-black text-gray-900">{frais.montant || 0} {frais.devise || "F"}</span>
             {clientBloque && <Badge className="bg-red-100 text-red-800 border border-red-200"><Ban className="w-3 h-3 mr-1 inline" />Client bloqué</Badge>}
           </div>
-          {frais.date_annulation && <span className="text-xs text-gray-400">{format(new Date(frais.date_annulation), "dd/MM/yyyy HH:mm", { locale: fr })}</span>}
+          {frais.date_annulation && <span className="text-xs text-gray-600">{format(new Date(frais.date_annulation), "dd/MM/yyyy HH:mm", { locale: fr })}</span>}
         </div>
         <p className="text-xs text-gray-500">{frais.raison || "Annulation après acceptation livreur"}</p>
         <div className="grid grid-cols-2 gap-2">

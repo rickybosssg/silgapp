@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { Check, X, AlertCircle, Loader2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 
 /**
  * Carte inline affichée à la place du bloc "Recherche en cours"
@@ -93,13 +92,13 @@ export default function PrixManuelInlineCard({ course, devise, onAccepted, onRef
         <div className="bg-gray-50 rounded-2xl px-4 py-3 text-sm">
           <p className="text-gray-500 text-xs uppercase font-semibold mb-1">Trajet</p>
           <p className="font-bold text-gray-800">{course.adresse_depart}</p>
-          <p className="text-gray-400 text-xs my-0.5">→</p>
+          <p className="text-gray-600 text-xs my-0.5">→</p>
           <p className="font-bold text-gray-800">{course.adresse_arrivee || "Destination en cours"}</p>
         </div>
 
         {/* Avertissement */}
         <div className="flex items-start gap-2 bg-gray-50 rounded-xl px-3 py-2.5">
-          <AlertCircle className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+          <AlertCircle className="w-4 h-4 text-gray-600 flex-shrink-0 mt-0.5" />
           <p className="text-xs text-gray-500 leading-relaxed">
             Si vous refusez, la course repart en recherche et un autre livreur sera sollicité au tarif automatique.
           </p>
@@ -135,7 +134,7 @@ export default function PrixManuelInlineCard({ course, devise, onAccepted, onRef
         <button
           onClick={onAnnuler}
           disabled={loading}
-          className="w-full text-xs text-gray-400 underline text-center py-1 disabled:opacity-50"
+          className="w-full text-xs text-gray-600 underline text-center py-1 disabled:opacity-50"
         >
           Annuler la course
         </button>

@@ -6,22 +6,25 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
-  MessageCircle, CheckCircle2, AlertCircle, Clock,
+  MessageCircle, CheckCircle2, AlertCircle,
   RefreshCw, ArrowLeft, Users, Activity, Zap, Bell,
   UserCheck, UserX, Copy, ExternalLink
 } from "lucide-react";
+import { useAdminContext } from "@/hooks/useAdminContext.js";
 
 const SANDBOX_NUMERO = "+14155238886";
 const SANDBOX_CODE = "join rise-bit";
 
 export default function TwilioSandboxMonitor() {
   const navigate = useNavigate();
+  const { isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
+  const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || "");
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
   const [livreurs, setLivreurs] = useState([]);
   const [alertesRecentes, setAlertesRecentes] = useState([]);
 
-  useEffect(() => { chargerDonnees(); }, []);
+  useEffect(() => { chargerDonnees(); }, [effectiveCountry]);
 
   const chargerDonnees = async () => {
     try {
@@ -32,10 +35,22 @@ export default function TwilioSandboxMonitor() {
         alertesFailed,
         alertesAll,
       ] = await Promise.all([
-        base44.entities.Livreur.filter({ type_livreur: 'externe', actif: true }),
-        base44.entities.WhatsAppAlerte.filter({ statut: 'sent' }),
-        base44.entities.WhatsAppAlerte.filter({ statut: 'failed' }),
-        base44.entities.WhatsAppAlerte.list('-created_date', 20),
+        base44.entities.Livreur.filter({
+          type_livreur: 'externe',
+          actif: true,
+          ...(effectiveCountry ? { country_code: effectiveCountry } : {}),
+        }),
+        base44.entities.WhatsAppAlerte.filter({
+          statut: 'sent',
+          ...(effectiveCountry ? { country_code: effectiveCountry } : {}),
+        }),
+        base44.entities.WhatsAppAlerte.filter({
+          statut: 'failed',
+          ...(effectiveCountry ? { country_code: effectiveCountry } : {}),
+        }),
+        effectiveCountry
+          ? base44.entities.WhatsAppAlerte.filter({ country_code: effectiveCountry }, '-created_date', 20)
+          : base44.entities.WhatsAppAlerte.list('-created_date', 20),
       ]);
 
       const inscrits = livreursExternes.filter(l => l.whatsapp_opt_in === true);

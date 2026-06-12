@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { Loader2, CheckCircle2, AlertTriangle, ArrowLeft, RefreshCw } from "lucide-react";
+import { Loader2, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
 
 function haversine(lat1, lon1, lat2, lon2) {
   if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
@@ -36,30 +36,76 @@ const TYPE_COLIS_LABELS = {
 
 export default function RecapCourseLivreur() {
   const { courseId } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
-  const [course, setCourse] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const chargerCourse = async () => {
+  const initialCourse = (() => {
+    if (location.state?.course?.id === courseId) return location.state.course;
     try {
-      const results = await base44.entities.CourseExterne.filter({ id: courseId });
-      const c = Array.isArray(results) ? results[0] : results;
+      const cached = sessionStorage.getItem(`silgapp_recap_course_${courseId}`);
+      const parsed = cached ? JSON.parse(cached) : null;
+      return parsed?.id === courseId ? parsed : null;
+    } catch (_) {
+      return null;
+    }
+  })();
+  const [course, setCourse] = useState(initialCourse);
+  const [loading, setLoading] = useState(!initialCourse);
+  const [error, setError] = useState(null);
+  const inFlightRef = useRef(false);
+
+  const chargerCourse = async ({ silent = false, retries = 2 } = {}) => {
+    if (!courseId || inFlightRef.current) return;
+    inFlightRef.current = true;
+    if (!silent) setLoading(true);
+    setError(null);
+
+    try {
+      let c = null;
+      try {
+        c = await base44.entities.CourseExterne.get(courseId);
+      } catch (_) {
+        const results = await base44.entities.CourseExterne.filter({ id: courseId }, "-updated_date", 1);
+        c = Array.isArray(results) ? results[0] : results;
+      }
+
       if (!c) {
         setError("Course introuvable.");
         setLoading(false);
         return;
       }
       setCourse(c);
+      try {
+        sessionStorage.setItem(`silgapp_recap_course_${courseId}`, JSON.stringify(c));
+      } catch (_) {}
       setLoading(false);
     } catch (err) {
-      setError("Erreur de chargement : " + err.message);
+      const message = err?.message || String(err);
+      const isRateLimit = /rate limit/i.test(message);
+      if (isRateLimit && retries > 0) {
+        setTimeout(() => {
+          inFlightRef.current = false;
+          chargerCourse({ silent, retries: retries - 1 });
+        }, retries === 2 ? 900 : 1800);
+        return;
+      }
+      if (!course) {
+        setError(isRateLimit
+          ? "Le serveur est momentanement surcharge. Le recapitulatif va rester disponible depuis les donnees locales."
+          : `Erreur de chargement : ${message}`);
+      }
       setLoading(false);
+    } finally {
+      if (inFlightRef.current) inFlightRef.current = false;
     }
   };
 
   useEffect(() => {
-    chargerCourse();
+    if (!course) {
+      chargerCourse();
+    } else {
+      chargerCourse({ silent: true, retries: 1 });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseId]);
 
   const handleTerminer = async () => {
@@ -152,19 +198,19 @@ export default function RecapCourseLivreur() {
 
         {/* PRIX DE LA COURSE */}
         <div className="bg-gray-900 rounded-3xl p-6 text-center space-y-3 border border-gray-800">
-          <p className="text-gray-400 text-xs font-semibold uppercase tracking-widest">Prix de la course</p>
+          <p className="text-gray-600 text-xs font-semibold uppercase tracking-widest">Prix de la course</p>
 
           {isPrixManuel ? (
             <div className="space-y-1">
               <p className="text-green-400 text-xs font-semibold uppercase tracking-wide">Prix convenu avec le client</p>
-              <p className="text-gray-400 text-sm">Proposition acceptée par le client</p>
+              <p className="text-gray-600 text-sm">Proposition acceptée par le client</p>
             </div>
           ) : (
             <>
               {dist > 0 ? (
                 <>
                   <div className="space-y-1">
-                    <p className="text-gray-400 text-sm">Distance réelle</p>
+                    <p className="text-gray-600 text-sm">Distance réelle</p>
                     <p className="text-white text-2xl font-black">{dist.toFixed(2)} km</p>
                   </div>
                   <div className="text-gray-500 text-sm">
@@ -181,15 +227,15 @@ export default function RecapCourseLivreur() {
           )}
 
           <div className="border-t border-gray-700 pt-3">
-            <p className="text-gray-400 text-xs mb-1">Montant final</p>
+            <p className="text-gray-600 text-xs mb-1">Montant final</p>
             <p className="text-5xl font-black text-white">{prixFinal.toLocaleString()}</p>
-            <p className="text-gray-400 text-lg font-semibold">FCFA</p>
+            <p className="text-gray-600 text-lg font-semibold">FCFA</p>
           </div>
         </div>
 
         {/* RÉPARTITION */}
         <div className="bg-gray-900 rounded-3xl p-5 border border-gray-800 space-y-3">
-          <p className="text-gray-400 text-xs font-semibold uppercase tracking-widest mb-2">Répartition</p>
+          <p className="text-gray-600 text-xs font-semibold uppercase tracking-widest mb-2">Répartition</p>
           <div className="flex items-center justify-between py-2 border-b border-gray-800">
             <div>
               <p className="text-green-400 font-bold text-sm">Ton gain (70%)</p>
@@ -208,7 +254,7 @@ export default function RecapCourseLivreur() {
 
         {/* DÉTAILS DE LA COURSE */}
         <div className="bg-gray-900 rounded-3xl p-5 border border-gray-800 space-y-3">
-          <p className="text-gray-400 text-xs font-semibold uppercase tracking-widest mb-2">Détails</p>
+          <p className="text-gray-600 text-xs font-semibold uppercase tracking-widest mb-2">Détails</p>
 
           {course.delivery_confirmed_by === 'pin_secours' && (
             <div className="bg-amber-900/40 border border-amber-500/40 rounded-2xl p-3 flex items-center gap-2.5">

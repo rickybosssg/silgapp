@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Truck, Phone, MapPin, Check, X, Clock, UserCheck, Copy, Banknote, Pencil, UserX, Trash2, BatteryWarning, KeyRound } from "lucide-react";
+import { Truck, Phone, MapPin, Check, X, Clock, UserCheck, Banknote, Pencil, UserX, Trash2, BatteryWarning, KeyRound } from "lucide-react";
 import CreateLivreurDialog from "@/components/livreurs/CreateLivreurDialog";
 import LivreurFormDialog from "@/components/livreurs/LivreurFormDialog";
 import { toast } from "sonner";

@@ -189,6 +189,17 @@ function AppContent() {
       <Suspense fallback={<LoadingScreen />}>
         <Routes>
           <Route
+            path="/diagnostic-push-complet"
+            element={
+              <AuthGate
+                onLivreur={setLivreurProfil}
+                onClient={() => setIsClient(true)}
+              >
+                <DiagnosticPushComplet />
+              </AuthGate>
+            }
+          />
+          <Route
             path="*"
             element={
               <AuthGate 
@@ -227,6 +238,7 @@ function AppContent() {
               <Route path="/admin/publicites" element={<AnimatedRoutes><GestionPublicites /></AnimatedRoutes>} />
               <Route path="/admin/frais-annulation" element={<AnimatedRoutes><FraisAnnulationAdmin /></AnimatedRoutes>} />
               <Route path="/maintenance" element={<AnimatedRoutes><Maintenance /></AnimatedRoutes>} />
+              <Route path="/diagnostic-push-complet" element={<AnimatedRoutes><DiagnosticPushComplet /></AnimatedRoutes>} />
             </>
           ) : (
             <>
@@ -248,6 +260,7 @@ function AppContent() {
               <Route path="/admin/venus-rapports" element={<AnimatedRoutes><VenusRapportsPage /></AnimatedRoutes>} />
               <Route path="/admin/externe" element={<AnimatedRoutes><DashboardAdminExterne /></AnimatedRoutes>} />
               <Route path="/maintenance" element={<AnimatedRoutes><Maintenance /></AnimatedRoutes>} />
+              <Route path="/diagnostic-push-complet" element={<AnimatedRoutes><DiagnosticPushComplet /></AnimatedRoutes>} />
             </>
           )}
           <Route path="/notifications" element={<AnimatedRoutes><Notifications /></AnimatedRoutes>} />

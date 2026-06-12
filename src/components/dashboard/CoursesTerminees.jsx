@@ -1,9 +1,8 @@
 import React, { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, ArrowRight, Clock, User, ChevronDown, ChevronUp } from "lucide-react";
+import { MapPin, ArrowRight, ChevronDown, ChevronUp } from "lucide-react";
 import { format } from "date-fns";
-import { fr } from "date-fns/locale";
 import CourseStatusBadge from "@/components/courses/CourseStatusBadge";
 
 function CourseItem({ course, onView }) {

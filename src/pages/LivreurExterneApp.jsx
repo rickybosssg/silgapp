@@ -1,13 +1,20 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Truck } from "lucide-react";
+import { AlertTriangle, Check, Truck, X } from "lucide-react";
 import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 
 import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
+import { requestNativeAppPermissions } from "@/lib/nativePermissions";
+import { startNativeBackgroundHeartbeat } from "@/lib/nativeAndroid";
+import {
+  normalizeLivreurAlertConfig,
+  saveLivreurAlertConfig,
+  stopUrgentCourseAlert,
+} from "@/lib/livreurUrgentAlert";
 import LivreurHeader from "@/components/livreur/LivreurHeader";
 import LivreurStatsBanner from "@/components/livreur/LivreurStatsBanner";
 import LivreurStatutCard from "@/components/livreur/LivreurStatutCard";
@@ -23,8 +30,6 @@ import PubliciteCarousel from "@/components/publicite/PubliciteCarousel";
 import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
 import PricingModeSelector from "@/components/livreur/PricingModeSelector";
 import PrixManuelReponseAlert from "@/components/livreur/PrixManuelReponseAlert";
-import DebugCoursesPanel from "@/components/livreur/DebugCoursesPanel";
-import { Bell } from "lucide-react";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -39,6 +44,74 @@ function calculerDistance(lat1, lng1, lat2, lng2) {
 
 const saveLivreur = (id, data) => base44.functions.invoke('updateLivreur', { id, data });
 
+const PROPOSED_DISPATCH_STATUSES = new Set(["propose", "assigne_manuel", "en_attente_reponse"]);
+const PROPOSED_COURSE_STATUSES = new Set(["nouvelle", "recherche_livreur", "en_attente_livreur", "en_attente"]);
+const FINAL_COURSE_STATUSES = new Set(["livree", "annulee", "completed", "delivered", "canceled"]);
+
+function uniqById(items = []) {
+  const map = new Map();
+  items.filter(Boolean).forEach((item) => {
+    if (item?.id && !map.has(item.id)) map.set(item.id, item);
+  });
+  return [...map.values()];
+}
+
+function listIncludesLivreur(value, livreurId) {
+  if (!value || !livreurId) return false;
+  if (Array.isArray(value)) return value.map(String).includes(String(livreurId));
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed.map(String).includes(String(livreurId));
+    } catch (_) {}
+    return value.split(/[,\s]+/).includes(String(livreurId));
+  }
+  return false;
+}
+
+function sameLivreurId(value, livreurId) {
+  return !!value && !!livreurId && String(value) === String(livreurId);
+}
+
+function isCourseTargetingLivreur(course, livreurId) {
+  if (!course || !livreurId) return false;
+  return (
+    course.__notifiedForCurrentLivreur === true ||
+    sameLivreurId(course.livreur_id, livreurId) ||
+    sameLivreurId(course.proposed_by_livreur_id, livreurId) ||
+    sameLivreurId(course.proposed_livreur_id, livreurId) ||
+    listIncludesLivreur(course.dispatch_notified_ids, livreurId) ||
+    listIncludesLivreur(course.notified_livreur_ids, livreurId)
+  );
+}
+
+function isCourseWaitingForLivreur(course, livreurId) {
+  if (!isCourseTargetingLivreur(course, livreurId)) return false;
+  if (course.manual_price_status === "pending_client_validation") return false;
+  if (FINAL_COURSE_STATUSES.has(course.statut)) return false;
+  return (
+    PROPOSED_DISPATCH_STATUSES.has(course.dispatch_status) &&
+    PROPOSED_COURSE_STATUSES.has(course.statut)
+  );
+}
+
+function isCourseOwnedByLivreur(course, livreurId) {
+  if (!course || !livreurId) return false;
+  return (
+    sameLivreurId(course.livreur_id, livreurId) ||
+    sameLivreurId(course.proposed_by_livreur_id, livreurId) ||
+    sameLivreurId(course.proposed_livreur_id, livreurId)
+  );
+}
+
+function logAcceptationLivreur(event, details = {}) {
+  try {
+    if (localStorage.getItem("silgapp_livreur_acceptation_debug") === "true") {
+      console.info(`[LivreurAcceptation] ${event}`, details);
+    }
+  } catch (_) {}
+}
+
 export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("courses");
@@ -50,11 +123,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   });
   // Réponse du client à une proposition de prix manuel
   const [prixManuelReponse, setPrixManuelReponse] = useState(null); // { accepted, prix, devise }
-  // Test notification
-  const [testingNotif, setTestingNotif] = useState(false);
-  const [testResult, setTestResult] = useState(null);
-  // Test modal
-  const [showTestModal, setShowTestModal] = useState(false);
   const prixManuelWatchedRef = useRef({}); // track les course_id déjà notifiés
 
   // Pull-to-refresh
@@ -88,113 +156,372 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     user_type: "livreur",
     position: livreurProfil?.latitude && livreurProfil?.longitude ? { latitude: livreurProfil.latitude, longitude: livreurProfil.longitude } : null,
     enabled: onboardingTermine && gpsActif && livreurProfil?.statut !== "hors_ligne",
+    debugLabel: "LivreurExterneGPS",
   });
+
+  const { data: dispatchConfigs = [] } = useQuery({
+    queryKey: ["dispatch-config"],
+    queryFn: () => base44.entities.DispatchConfig.list(),
+    initialData: [],
+    refetchInterval: 30000,
+  });
+
+  const livreurAlertConfig = useMemo(() => {
+    const config = normalizeLivreurAlertConfig(dispatchConfigs?.[0] || {});
+    saveLivreurAlertConfig(config);
+    return config;
+  }, [dispatchConfigs]);
+
+  useEffect(() => {
+    if (!onboardingTermine || !gpsActif || livreurProfil?.statut === "hors_ligne") return;
+    let stopNativeHeartbeat = null;
+    let cancelled = false;
+
+    startNativeBackgroundHeartbeat({
+      userType: "livreur",
+      intervalMs: 5000,
+      distanceFilter: 0,
+    }).then((stop) => {
+      if (cancelled) stop?.();
+      else stopNativeHeartbeat = stop;
+    }).catch((error) => {
+      console.warn("[LivreurExterneGPS] native background heartbeat unavailable:", error?.message);
+    });
+
+    return () => {
+      cancelled = true;
+      stopNativeHeartbeat?.();
+    };
+  }, [onboardingTermine, gpsActif, livreurProfil?.statut]);
 
   // ─── Notifications push ───────────────────────────────────────────────────
   const livreurId = livreurProfil?.id;
   const livreurEmail = livreurProfil?.user_email;
+  const [notificationCourseId, setNotificationCourseId] = useState(null);
+  const [notificationCourseCandidate, setNotificationCourseCandidate] = useState(null);
+  const [courseProposeeDirecte, setCourseProposeeDirecte] = useState(null);
   useEffect(() => {
     if (!livreurId || !livreurEmail) return;
-    registerPushToken(livreurId, { email: livreurEmail, livreur_id: livreurId }).catch(() => null);
+    registerPushToken(livreurId, {
+      email: livreurEmail,
+      user_email: livreurEmail,
+      user_type: "livreur",
+      livreur_id: livreurId,
+    }).catch(() => null);
     const unsub = subscribeToNotifications(
       (n) => {
         toast.info(n.titre, { description: n.message });
-        // Si notification de nouvelle course → refresh immédiat + affichage modal
-        if (n.type === "nouvelle_course" && n.course_id) {
+        if ((n.type === "nouvelle_course" || n.type === "course_assignee") && n.course_id) {
+          setNotificationCourseId(n.course_id);
+          setActiveTab("courses");
           queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-          queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
+          logAcceptationLivreur("realtime-notification-course", {
+            course_id: n.course_id,
+            current_livreur_id: livreurId,
+          });
         }
       },
-      livreurEmail
+      livreurEmail,
+      { userType: "livreur", livreurId }
     );
     return () => unsub?.();
   }, [livreurId, livreurEmail, queryClient]);
+
+  useEffect(() => {
+    const handleNotificationOpened = (event) => {
+      const data = event?.detail || {};
+      if (data.type !== "nouvelle_course" && data.type !== "course_assignee") return;
+      stopUrgentCourseAlert("app-opened");
+      if (data.course_id) setNotificationCourseId(data.course_id);
+      setActiveTab("courses");
+      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+      logAcceptationLivreur("notification-opened", {
+        course_id: data.course_id || null,
+        livreur_id: data.livreur_id || null,
+        current_livreur_id: livreurId || null,
+      });
+      toast.info("Course proposee", { description: "Ouverture de la course en attente..." });
+    };
+    window.addEventListener("silgapp:notification-opened", handleNotificationOpened);
+    return () => window.removeEventListener("silgapp:notification-opened", handleNotificationOpened);
+  }, [queryClient, livreurId]);
+
+  useEffect(() => {
+    const handleUrgentAlertStarted = (event) => {
+      const courseId = event?.detail?.courseId;
+      if (!courseId) return;
+      setNotificationCourseId(courseId);
+      setActiveTab("courses");
+      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      logAcceptationLivreur("urgent-alert-started", {
+        course_id: courseId,
+        source: event?.detail?.source || null,
+        current_livreur_id: livreurId || null,
+      });
+    };
+    window.addEventListener("silgapp:livreur-urgent-alert-started", handleUrgentAlertStarted);
+    return () => window.removeEventListener("silgapp:livreur-urgent-alert-started", handleUrgentAlertStarted);
+  }, [queryClient, livreurId]);
+
+  useEffect(() => {
+    if (!notificationCourseId) {
+      setNotificationCourseCandidate(null);
+      return;
+    }
+
+    let cancelled = false;
+    base44.entities.CourseExterne.get(notificationCourseId)
+      .then((course) => {
+        if (!cancelled) {
+          const isUsableForCurrentLivreur = course && (
+            isCourseOwnedByLivreur(course, livreurId) ||
+            isCourseWaitingForLivreur({ ...course, __notifiedForCurrentLivreur: true }, livreurId)
+          );
+          setNotificationCourseCandidate(
+            isUsableForCurrentLivreur ? { ...course, __notifiedForCurrentLivreur: true } : null
+          );
+        }
+      })
+      .catch((error) => {
+        logAcceptationLivreur("notification-course-direct-fetch-error", {
+          course_id: notificationCourseId,
+          error: error?.message || String(error),
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [notificationCourseId, livreurId]);
+
+  useEffect(() => {
+    const refreshCourses = () => {
+      if (!livreurId) return;
+      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") refreshCourses();
+    };
+    window.addEventListener("focus", refreshCourses);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("focus", refreshCourses);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [queryClient, livreurId]);
+
+  useEffect(() => {
+    if (!livreurId || !livreurEmail || !onboardingTermine) return;
+
+    let alreadyAsked = false;
+    try { alreadyAsked = localStorage.getItem(`livreur_native_permissions_requested_${livreurId}`) === "true"; } catch (_) {}
+    if (alreadyAsked) return;
+
+    requestNativeAppPermissions({
+      email: livreurEmail,
+      userType: "livreur",
+      livreurId,
+      requestContacts: true,
+    }).then(() => {
+      localStorage.setItem(`livreur_native_permissions_requested_${livreurId}`, "true");
+    }).catch((error) => {
+      console.warn("[LivreurExterneApp] Permissions natives ignorees:", error?.message);
+    });
+  }, [livreurId, livreurEmail, onboardingTermine]);
 
   // ─── Heartbeat app_active ─────────────────────────────────────────────────
   // Géré par useHeartbeat hook + heartbeatAuto backend — supprimé pour éviter doublon
 
   // ─── Mes courses ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!livreurId) {
+      setCourseProposeeDirecte(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const checkCourseProposee = async () => {
+      try {
+        const allCourses = await base44.entities.CourseExterne.list("-created_date", 50);
+        if (cancelled) return;
+
+        const found = (allCourses || []).find((course) => (
+          course.dispatch_status === "propose" &&
+          !course.livreur_id &&
+          !course.accepted_by_livreur_id &&
+          !FINAL_COURSE_STATUSES.has(course.statut) &&
+          course.manual_price_status !== "pending_client_validation" &&
+          (!livreurProfil?.country_code || course.country_code === livreurProfil.country_code) &&
+          listIncludesLivreur(course.dispatch_notified_ids, livreurId)
+        )) || null;
+
+        setCourseProposeeDirecte(
+          found ? { ...found, __notifiedForCurrentLivreur: true } : null
+        );
+      } catch (error) {
+        logAcceptationLivreur("direct-proposed-course-poll-error", {
+          error: error?.message || String(error),
+        });
+      }
+    };
+
+    checkCourseProposee();
+    const interval = setInterval(checkCourseProposee, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [livreurId, livreurProfil?.country_code]);
+
   const { data: mesCourses = [] } = useQuery({
-    queryKey: ["mes-courses-externes", livreurId],
+    queryKey: ["mes-courses-externes", livreurId, livreurEmail, notificationCourseId],
     queryFn: async () => {
-      const res = await base44.functions.invoke('getAllCoursesForLivreur', { livreur_id: livreurId });
-      return res?.data?.courses || [];
+      const results = [];
+      const allCoursesForLivreur = await base44.functions.invoke("getAllCoursesForLivreur", {
+        livreur_id: livreurId,
+      }).then((res) => res?.data?.courses || []).catch((error) => {
+        logAcceptationLivreur("get-all-courses-for-livreur-error", {
+          error: error?.message || String(error),
+        });
+        return [];
+      });
+
+      const [assigned, proposedByLivreur, proposedLivreur, notificationsNouvelleCourse, notificationsCourseAssignee] = await Promise.all([
+        base44.entities.CourseExterne.filter({ livreur_id: livreurId }, "-updated_date", 50).catch((error) => {
+          logAcceptationLivreur("query-assigned-error", { error: error?.message || String(error) });
+          return [];
+        }),
+        base44.entities.CourseExterne.filter({ proposed_by_livreur_id: livreurId }, "-updated_date", 20).catch((error) => {
+          logAcceptationLivreur("query-proposed-error", { error: error?.message || String(error) });
+          return [];
+        }),
+        base44.entities.CourseExterne.filter({ proposed_livreur_id: livreurId }, "-updated_date", 20).catch((error) => {
+          logAcceptationLivreur("query-proposed-livreur-error", { error: error?.message || String(error) });
+          return [];
+        }),
+        livreurEmail
+          ? base44.entities.Notification.filter({
+              destinataire_email: livreurEmail,
+              type: "nouvelle_course",
+            }, "-created_date", 20).catch((error) => {
+              logAcceptationLivreur("query-notifications-nouvelle-course-error", { error: error?.message || String(error) });
+              return [];
+            })
+          : Promise.resolve([]),
+        livreurEmail
+          ? base44.entities.Notification.filter({
+              destinataire_email: livreurEmail,
+              type: "course_assignee",
+            }, "-created_date", 20).catch((error) => {
+              logAcceptationLivreur("query-notifications-course-assignee-error", { error: error?.message || String(error) });
+              return [];
+            })
+          : Promise.resolve([]),
+      ]);
+
+      results.push(
+        ...(allCoursesForLivreur || []),
+        ...(assigned || []),
+        ...(proposedByLivreur || []),
+        ...(proposedLivreur || [])
+      );
+
+      const notificationCourseIds = [
+        notificationCourseId,
+        ...(notificationsNouvelleCourse || []).map((n) => n.course_id),
+        ...(notificationsCourseAssignee || []).map((n) => n.course_id),
+      ].filter(Boolean);
+
+      if (notificationCourseIds.length > 0) {
+        const fromNotifications = await Promise.all(
+          [...new Set(notificationCourseIds)].slice(0, 10).map((courseId) =>
+            base44.entities.CourseExterne.get(courseId)
+              .then((course) => course ? { ...course, __notifiedForCurrentLivreur: true } : null)
+              .catch((error) => {
+                logAcceptationLivreur("query-course-by-notification-error", {
+                  course_id: courseId,
+                  error: error?.message || String(error),
+                });
+                return null;
+              })
+          )
+        );
+        results.push(...fromNotifications.filter(Boolean));
+      }
+
+      const merged = uniqById(results);
+      const scopedCourses = merged.filter((course) => (
+        isCourseOwnedByLivreur(course, livreurId) ||
+        isCourseWaitingForLivreur(course, livreurId)
+      ));
+      logAcceptationLivreur("courses-detected", {
+        livreur_id: livreurId,
+        all_courses_for_livreur: allCoursesForLivreur?.length || 0,
+        assigned: assigned?.length || 0,
+        proposed_by_livreur: proposedByLivreur?.length || 0,
+        proposed_livreur: proposedLivreur?.length || 0,
+        notification_courses: notificationCourseIds.length,
+        merged: merged.length,
+        scoped: scopedCourses.length,
+        ignored_not_owned: merged.length - scopedCourses.length,
+        waiting: scopedCourses.filter((course) => isCourseWaitingForLivreur(course, livreurId)).map((course) => ({
+          id: course.id,
+          statut: course.statut,
+          dispatch_status: course.dispatch_status,
+          livreur_id: course.livreur_id || "",
+          proposed_by_livreur_id: course.proposed_by_livreur_id || "",
+        })),
+      });
+
+      return scopedCourses;
     },
     enabled: !!livreurId,
     initialData: [],
-    refetchInterval: 3000,
-    staleTime: 1000,
+    refetchInterval: 4000, // ⚡ 1s → 4s : évite le rate limit (était 60 req/min)
+    staleTime: 2000,
   });
 
-  // ─── POLLING DIRECT: Course en dispatch pour ce livreur ───────────────────
-  const [courseProposee, setCourseProposee] = useState(null);
-  const [debugInfo, setDebugInfo] = useState({ total: 0, dispatch: 0, notifie: 0, error: null });
-  
-  useEffect(() => {
-    if (!livreurId) return;
-    
-    const checkCourseDispo = async () => {
-      try {
-        // Récupère TOUTES les courses - utilise list() qui marche en frontend
-        const allCourses = await base44.entities.CourseExterne.list('-created_date', 50);
-        setDebugInfo(d => ({ ...d, total: allCourses.length }));
-        
-        // Filtrer dispatch_status="propose"
-        const coursesEnDispatch = allCourses.filter(c => c.dispatch_status === 'propose');
-        setDebugInfo(d => ({ ...d, dispatch: coursesEnDispatch.length }));
-        
-        // Trouver celle où ce livreur est notifié
-        let found = null;
-        for (const course of coursesEnDispatch) {
-          // Vérifier expiration
-          if (course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date()) {
-            continue;
-          }
-          
-          // Vérifier dispatch_notified_ids
-          try {
-            const notifiedIds = course.dispatch_notified_ids ? JSON.parse(course.dispatch_notified_ids) : [];
-            if (notifiedIds.includes(livreurId)) {
-              found = course;
-              setDebugInfo(d => ({ ...d, notifie: 1, course: course.id }));
-              break;
-            }
-          } catch (e) {
-            console.error('Error parse IDs:', e.message);
-          }
-        }
-        
-        setCourseProposee(found);
-        if (!found) {
-          setDebugInfo(d => ({ ...d, notifie: 0 }));
-        }
-      } catch (err) {
-        console.error('Erreur polling:', err.message);
-        setDebugInfo({ error: err.message, total: 0, dispatch: 0, notifie: 0 });
-        setCourseProposee(null);
-      }
-    };
-    
-    const interval = setInterval(checkCourseDispo, 2000);
-    checkCourseDispo();
-    
-    return () => clearInterval(interval);
-  }, [livreurId]);
-
-
-
-  // ─── Course en attente de réponse du livreur ───────────────────────────────
-  const courseEnAttente = useMemo(
-    () => mesCourses.find(
-      c => c.statut === "recherche_livreur" && c.dispatch_status === "propose"
-    ) || null,
-    [mesCourses]
+  // ─── Course en attente de réponse du livreur ──────────────────────────────
+  const courseCandidates = useMemo(
+    () => uniqById([...(mesCourses || []), notificationCourseCandidate, courseProposeeDirecte].filter(Boolean)),
+    [mesCourses, notificationCourseCandidate, courseProposeeDirecte]
   );
+
+  const courseEnAttente = useMemo(() => {
+    const waiting = courseCandidates.find((course) => isCourseWaitingForLivreur(course, livreurId)) || null;
+    if (waiting) {
+      logAcceptationLivreur("modal-triggered", {
+        course_id: waiting.id,
+        statut: waiting.statut,
+        dispatch_status: waiting.dispatch_status,
+        livreur_id: waiting.livreur_id || "",
+        proposed_by_livreur_id: waiting.proposed_by_livreur_id || "",
+      });
+    } else if (courseCandidates.length > 0 && livreurId) {
+      logAcceptationLivreur("modal-blocked-no-waiting-course", {
+        livreur_id: livreurId,
+        courses: courseCandidates.slice(0, 8).map((course) => ({
+          id: course.id,
+          statut: course.statut,
+          dispatch_status: course.dispatch_status,
+          livreur_id: course.livreur_id || "",
+          proposed_by_livreur_id: course.proposed_by_livreur_id || "",
+          manual_price_status: course.manual_price_status || "",
+          targets_livreur: isCourseTargetingLivreur(course, livreurId),
+        })),
+      });
+    }
+    return waiting;
+  }, [courseCandidates, livreurId]);
 
   // ─── Course en attente de validation prix par le client ───────────────────
   const courseEnAttenteValidationPrix = useMemo(() => {
     return mesCourses.find(
       c => c.pricing_mode === "manual" && c.manual_price_status === "pending_client_validation"
+        && !FINAL_COURSE_STATUSES.has(c.statut)
         && c.proposed_by_livreur_id === livreurProfil?.id
         && c.statut !== "annulee" && c.statut !== "livree"
     ) || null;
@@ -202,8 +529,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   // ─── Courses actives ──────────────────────────────────────────────────────
   const coursesActives = useMemo(
-    () => mesCourses.filter(c => ["livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut)),
-    [mesCourses]
+    () => mesCourses.filter(c =>
+      sameLivreurId(c.livreur_id, livreurProfil?.id) &&
+      ["livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut)
+    ),
+    [mesCourses, livreurProfil?.id]
   );
 
   // Détecter la réponse du client sur une proposition de prix manuel
@@ -329,6 +659,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
           derniere_position_date: new Date().toISOString(),
+          last_seen_at: new Date().toISOString(),
+          app_active: true,
         }).then(() => {
           queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
           toast.success("GPS activé");
@@ -344,12 +676,16 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     if (!livreurId || livreurProfil?.statut === "hors_ligne" || !gpsActif) return;
     const interval = setInterval(() => {
       navigator.geolocation?.getCurrentPosition(
-        (pos) => saveLivreur(livreurId, {
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          derniere_position_date: new Date().toISOString(),
-        }).catch(() => null),
-        () => {}, // Ne PAS désactiver le GPS sur erreur temporaire (tunnel, etc.)
+        (pos) => {
+          saveLivreur(livreurId, {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            derniere_position_date: new Date().toISOString(),
+            last_seen_at: new Date().toISOString(),
+            app_active: true,
+          }).catch(() => null);
+        },
+        (error) => console.warn("[LivreurExterneApp] GPS update skipped:", error?.message),
         { enableHighAccuracy: true }
       );
     }, 15000);
@@ -365,6 +701,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   });
 
   const handleAccepter = (isPendingPrixManuel = false) => {
+    setNotificationCourseCandidate(null);
+    setNotificationCourseId(null);
+    setCourseProposeeDirecte(null);
     queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
     queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
     if (!isPendingPrixManuel) {
@@ -376,9 +715,168 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   };
 
   const handleRefuser = () => {
+    setNotificationCourseCandidate(null);
+    setNotificationCourseId(null);
+    setCourseProposeeDirecte(null);
     queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
     queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
     toast("Course refusée – recherche du prochain livreur...");
+  };
+
+  const handleCourseDejaPrise = (source = "accept") => {
+    setNotificationCourseCandidate(null);
+    setNotificationCourseId(null);
+    setCourseProposeeDirecte(null);
+    stopUrgentCourseAlert(`${source}-already-taken`);
+    queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+    queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
+    queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+    logAcceptationLivreur("frontend-already-taken-cleared", {
+      source,
+      livreur_id: livreurProfil?.id || "",
+    });
+    toast.error("Cette course a deja ete prise par un autre livreur.");
+  };
+
+  const handleFallbackAccepter = async (course) => {
+    if (!course?.id || !livreurProfil?.id) return;
+    try {
+      let payload = {
+        action: "accepter_course",
+        course_id: course.id,
+        livreur_id: livreurProfil.id,
+      };
+
+      if (pricingMode === "manual") {
+        const montant = window.prompt("Montant propose au client (FCFA)");
+        if (!montant) return;
+        payload = {
+          ...payload,
+          pricing_mode: "manual",
+          manual_price: Number(montant),
+        };
+      }
+
+      logAcceptationLivreur("fallback-accept-clicked", {
+        course_id: course.id,
+        livreur_id: livreurProfil.id,
+        pricing_mode: payload.pricing_mode || "automatic",
+      });
+
+      const res = await base44.functions.invoke("dispatchExterneAuto", payload);
+      const data = res?.data;
+      if (data?.success && data?.accepted !== false) {
+        stopUrgentCourseAlert("fallback-accepted");
+        handleAccepter(data?.pending_client_validation === true);
+      } else if (data?.already_taken || data?.reason === "already_taken" || data?.accepted === false) {
+        handleCourseDejaPrise("fallback");
+      } else if (data?.expired) {
+        stopUrgentCourseAlert("fallback-expired");
+        toast.error("Course expiree");
+      } else {
+        toast.error(data?.error || "Erreur lors de l'acceptation");
+      }
+    } catch (error) {
+      logAcceptationLivreur("fallback-accept-error", {
+        course_id: course?.id,
+        error: error?.message || String(error),
+      });
+      toast.error("Erreur reseau lors de l'acceptation");
+    }
+  };
+
+  const handleFallbackRefuser = async (course) => {
+    if (!course?.id || !livreurProfil?.id) return;
+    try {
+      logAcceptationLivreur("fallback-refuse-clicked", {
+        course_id: course.id,
+        livreur_id: livreurProfil.id,
+      });
+      const res = await base44.functions.invoke("dispatchExterneAuto", {
+        action: "refuser_course",
+        course_id: course.id,
+        livreur_id: livreurProfil.id,
+        raison: "Refuse depuis fallback dashboard",
+      });
+      const data = res?.data;
+      if (data?.success) {
+        stopUrgentCourseAlert("fallback-refused");
+        handleRefuser();
+      } else {
+        toast.error(data?.error || "Erreur lors du refus");
+      }
+    } catch (error) {
+      logAcceptationLivreur("fallback-refuse-error", {
+        course_id: course?.id,
+        error: error?.message || String(error),
+      });
+      toast.error("Erreur reseau lors du refus");
+    }
+  };
+
+  const finaliserAnnulationLocale = async (course) => {
+    await base44.entities.CourseExterne.update(course.id, {
+      statut: "annulee",
+      manual_price_status: "refused",
+      notes: "Annulation directe livreur - proposition prix manuel en attente client",
+      date_annulation: new Date().toISOString(),
+    });
+    if (livreurProfil?.id) {
+      await saveLivreur(livreurProfil.id, { statut: "disponible" }).catch(() => null);
+    }
+    stopUrgentCourseAlert("pending-price-cancelled-fallback");
+    queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+    queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+    logAcceptationLivreur("cancel-pending-price-fallback-updated", { course_id: course.id });
+    toast.success("Course annulee");
+    return true;
+  };
+
+  const handleAnnulerPropositionPrix = async (course) => {
+    if (!course?.id) return false;
+    try {
+      logAcceptationLivreur("cancel-pending-price-clicked", {
+        course_id: course.id,
+        livreur_id: livreurProfil?.id || "",
+        manual_price: course.manual_price || 0,
+      });
+      const res = await base44.functions.invoke("annulerCourseExterne", {
+        course_id: course.id,
+        motif: "Annulation demande livreur - proposition prix manuel en attente client",
+      });
+      const data = res?.data;
+      logAcceptationLivreur("cancel-pending-price-result", {
+        course_id: course.id,
+        success: data?.success === true,
+        error: data?.error || null,
+        status: data?.statut_final || null,
+      });
+      if (data?.success) {
+        stopUrgentCourseAlert("pending-price-cancelled");
+        toast.success("Course annulée");
+        queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+        queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+        return true;
+      } else {
+        return await finaliserAnnulationLocale(course);
+      }
+    } catch (error) {
+      logAcceptationLivreur("cancel-pending-price-error", {
+        course_id: course?.id,
+        error: error?.message || String(error),
+      });
+      try {
+        return await finaliserAnnulationLocale(course);
+      } catch (fallbackError) {
+        logAcceptationLivreur("cancel-pending-price-fallback-error", {
+          course_id: course?.id,
+          error: fallbackError?.message || String(fallbackError),
+        });
+        toast.error("Erreur reseau lors de l'annulation");
+        return false;
+      }
+      toast.error("Erreur réseau lors de l'annulation");
+    }
   };
 
   // handleColisRecupere — pour le réseau externe, la récupération se fait via QR (GPS déjà capturé par validateQRCode).
@@ -460,32 +958,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     setTimeout(() => window.location.reload(), 300);
   };
 
-  const handleTestNotification = async () => {
-    setTestingNotif(true);
-    setTestResult(null);
-    try {
-      const response = await base44.functions.invoke("envoiNotificationPush", {
-        destinataire_email: livreurProfil.user_email,
-        titre: "🧪 Test Notification SILGAPP",
-        message: "Si vous voyez ceci, les notifications push fonctionnent ! ✅",
-        type: "test",
-      });
-      
-      setTestResult(response);
-      
-      if (response.data?.success) {
-        toast.success(`Notification envoyée ! Tokens: ${response.data.tokens_found || 0}`);
-      } else {
-        toast.error(response.data?.error || "Échec de l'envoi");
-      }
-    } catch (err) {
-      setTestResult({ error: err.message, details: err.toString() });
-      toast.error("Erreur: " + (err.message || "inconnue"));
-    } finally {
-      setTestingNotif(false);
-    }
-  };
-
   // ─── Onboarding externe obligatoire ──────────────────────────────────────
   if (!onboardingTermine) {
     return (
@@ -558,52 +1030,28 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         userType="livreur"
       />
 
-      {/* Modal plein écran si course en attente — utilise courseProposee (polling direct) */}
-      {courseProposee && (
+      {/* Modal plein écran si course en attente */}
+      {courseEnAttente && (
         <CourseEnAttenteModalExterne
-          course={courseProposee}
+          course={courseEnAttente}
           livreurId={livreurProfil.id}
           pricingMode={pricingMode}
+          alertDurationSeconds={livreurAlertConfig.durationSeconds}
+          alertIntervalSeconds={livreurAlertConfig.intervalSeconds}
           onAccepter={handleAccepter}
           onRefuser={handleRefuser}
           onExpire={() => {
+            setNotificationCourseCandidate(null);
+            setNotificationCourseId(null);
+            setCourseProposeeDirecte(null);
             if (coursesActives.length === 0 && livreurProfil?.statut !== "hors_ligne") {
               saveLivreur(livreurProfil.id, { statut: "disponible" }).catch(() => null);
             }
-            setCourseProposee(null);
             queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
             queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
             queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
           }}
         />
-      )}
-
-      {/* Modal TEST pour Aissam */}
-      {showTestModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(6px)" }}>
-          <div className="w-full max-w-sm bg-white rounded-3xl overflow-hidden shadow-2xl">
-            <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-5 pt-5 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-2xl">✅</div>
-                <div>
-                  <p className="text-white font-black text-xl leading-tight">MODAL TEST</p>
-                  <p className="text-white/70 text-xs">Pour Aissam uniquement</p>
-                </div>
-              </div>
-            </div>
-            <div className="p-5 space-y-4">
-              <p className="text-sm text-gray-600">
-                Si tu vois ce modal, alors l'affichage des modals fonctionne correctement sur ton appareil ! 🎉
-              </p>
-              <button
-                onClick={() => setShowTestModal(false)}
-                className="w-full h-14 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-black text-base shadow-lg active:scale-[0.98] transition-all"
-              >
-                Fermer le test
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* ── Navigation sticky en haut ──────────────── */}
@@ -616,7 +1064,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                 activeTab === tab.id
                   ? "bg-gradient-to-br from-slate-800 to-slate-900 text-white shadow-md"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                  : "text-gray-500 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-500"
               }`}
             >
               <span>{tab.emoji}</span>
@@ -663,9 +1111,46 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               </div>
             )}
 
+            {courseEnAttente && (
+              <div className="rounded-3xl bg-red-600 text-white p-5 shadow-xl border-4 border-red-800 space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                    <AlertTriangle className="w-7 h-7" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-black text-lg leading-tight">NOUVELLE COURSE DISPONIBLE</p>
+                    <p className="text-sm text-white/85 mt-1">
+                      {courseEnAttente.adresse_depart || "Depart a confirmer"} → {courseEnAttente.adresse_arrivee || "Destination a confirmer"}
+                    </p>
+                    <p className="text-xs text-white/70 mt-2">
+                      Répondez rapidement pour prendre ou refuser cette course.
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleFallbackAccepter(courseEnAttente)}
+                    className="h-14 rounded-2xl bg-white text-red-700 font-black flex items-center justify-center gap-2 active:scale-95 transition-all"
+                  >
+                    <Check className="w-5 h-5" />
+                    Accepter
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleFallbackRefuser(courseEnAttente)}
+                    className="h-14 rounded-2xl bg-red-950/50 text-white font-black border border-white/20 flex items-center justify-center gap-2 active:scale-95 transition-all"
+                  >
+                    <X className="w-5 h-5" />
+                    Refuser
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Bannière : en attente validation prix par le client */}
             {courseEnAttenteValidationPrix && (
-              <div className="rounded-2xl bg-blue-50 border-2 border-blue-300 px-4 py-3 space-y-2">
+              <div className="rounded-2xl bg-blue-50 border-2 border-blue-300 px-4 py-3 space-y-1">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                   <p className="text-sm font-black text-blue-800">En attente du client</p>
@@ -674,23 +1159,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                   Votre prix de <strong>{courseEnAttenteValidationPrix.manual_price?.toLocaleString()} {courseEnAttenteValidationPrix.devise || "FCFA"}</strong> est en cours de validation par le client.
                 </p>
                 <button
-                  onClick={async () => {
-                    if (!confirm("Voulez-vous vraiment annuler cette course ?")) return;
-                    try {
-                      const res = await base44.functions.invoke('annulerCourseExterne', {
-                        course_id: courseEnAttenteValidationPrix.id,
-                      });
-                      if (res.data?.success) {
-                        toast.success("Course annulée");
-                        queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-                      } else {
-                        toast.error(res.data?.error || "Erreur lors de l'annulation");
-                      }
-                    } catch (err) {
-                      toast.error("Erreur: " + (err.message || "inconnue"));
-                    }
-                  }}
-                  className="w-full h-12 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-sm shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  type="button"
+                  onClick={() => handleAnnulerPropositionPrix(courseEnAttenteValidationPrix)}
+                  className="mt-3 w-full h-11 rounded-xl bg-red-600 text-white text-sm font-black active:scale-[0.98] transition-all"
                 >
                   Annuler cette course
                 </button>
@@ -708,59 +1179,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             />
 
             <LivreurStatutCard statut={livreurProfil.statut} livreur={livreurProfil} isExterne={true} />
-
-            {/* Bouton test notification */}
-            <button
-              onClick={handleTestNotification}
-              disabled={testingNotif}
-              className="w-full h-14 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-black text-base shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 disabled:opacity-60"
-            >
-              <Bell className={`w-5 h-5 ${testingNotif ? "animate-bounce" : ""}`} />
-              {testingNotif ? "Envoi en cours..." : "🧪 Tester Notification Push"}
-            </button>
-
-            {/* Bouton test modal */}
-            <button
-              onClick={() => setShowTestModal(true)}
-              className="w-full h-14 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-black text-base shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2.5"
-            >
-              🧪 TEST MODAL (Aissam)
-            </button>
-
-            {/* DEBUG PANEL - NOUVEAU */}
-            <div className="rounded-2xl bg-slate-900 text-white p-4 space-y-2 text-xs">
-              <p className="font-black text-green-400">🔍 DEBUG POLLING TEMPS RÉEL</p>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="bg-slate-800 rounded-lg p-2 text-center">
-                  <p className="text-slate-400 text-[10px]">Total courses</p>
-                  <p className="text-lg font-black">{debugInfo.total || 0}</p>
-                </div>
-                <div className="bg-slate-800 rounded-lg p-2 text-center">
-                  <p className="text-slate-400 text-[10px]">En dispatch</p>
-                  <p className="text-lg font-black text-amber-400">{debugInfo.dispatch || 0}</p>
-                </div>
-                <div className="bg-slate-800 rounded-lg p-2 text-center">
-                  <p className="text-slate-400 text-[10px]">Pour VOUS</p>
-                  <p className="text-lg font-black text-green-400">{debugInfo.notifie || 0}</p>
-                </div>
-              </div>
-              {debugInfo.course && (
-                <div className="bg-green-900/30 border border-green-700 rounded-lg p-2">
-                  <p className="text-green-400 font-bold">✅ Course trouvée !</p>
-                  <p className="text-[10px] text-slate-300 font-mono">ID: {debugInfo.course}</p>
-                </div>
-              )}
-              {debugInfo.error && (
-                <div className="bg-red-900/30 border border-red-700 rounded-lg p-2">
-                  <p className="text-red-400 font-bold">❌ Erreur</p>
-                  <p className="text-[10px] text-red-300">{debugInfo.error}</p>
-                </div>
-              )}
-              <p className="text-[10px] text-slate-500 text-center">Polling: 2s</p>
-            </div>
-
-            {/* DEBUG PANEL - ANCIEN */}
-            <DebugCoursesPanel livreurEmail={livreurEmail} livreurId={livreurId} />
 
             {coursesActives.length > 0 && (
               <div className="space-y-3">

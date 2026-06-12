@@ -1,12 +1,30 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { getNativePushDebugState, openNativeNotificationSettings, registerPushToken } from "@/lib/notifications";
 import { 
   Smartphone, Bell, CheckCircle2, AlertCircle, Clock, 
   RefreshCw, Send, Search, ChevronDown, ChevronUp, Wifi, WifiOff
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} timeout apres ${ms / 1000}s`)), ms);
+    }),
+  ]);
+}
+
+function readPushDebugEvents() {
+  try {
+    return JSON.parse(localStorage.getItem("silgapp_push_debug") || "[]").slice(-12);
+  } catch (_) {
+    return [];
+  }
+}
 
 function StatutBadge({ statut }) {
   const map = {
@@ -160,9 +178,13 @@ function TokenRow({ token }) {
   );
 }
 
-export default function DiagnosticPushPanel() {
-  const [searchEmail, setSearchEmail] = useState("");
+export default function DiagnosticPushPanel({ defaultSearchEmail = "" }) {
+  const [searchEmail, setSearchEmail] = useState(defaultSearchEmail);
   const [filterType, setFilterType] = useState("tous");
+  const [firebaseDiag, setFirebaseDiag] = useState(null);
+  const [firebaseDiagLoading, setFirebaseDiagLoading] = useState(false);
+  const [nativeDiag, setNativeDiag] = useState(null);
+  const [nativeDiagLoading, setNativeDiagLoading] = useState(false);
 
   const { data: tokens = [], isLoading, refetch } = useQuery({
     queryKey: ["notification-tokens-diag"],
@@ -183,6 +205,91 @@ export default function DiagnosticPushPanel() {
     clients: tokens.filter(t => t.user_type === "client").length,
     livreurs: tokens.filter(t => t.user_type === "livreur").length,
     echecs: tokens.filter(t => t.derniere_notif_statut === "failed").length,
+  };
+
+  const handleFirebaseDiagnostic = async () => {
+    setFirebaseDiagLoading(true);
+    setFirebaseDiag(null);
+    try {
+      const res = await base44.functions.invoke("diagnosticFirebasePush", {});
+      setFirebaseDiag(res.data || res);
+    } catch (error) {
+      setFirebaseDiag({ success: false, error: error.message });
+    } finally {
+      setFirebaseDiagLoading(false);
+    }
+  };
+
+  const handleNativeDiagnostic = async () => {
+    setNativeDiagLoading(true);
+    setNativeDiag({
+      success: false,
+      status: "demarrage",
+      message: "Diagnostic APK local lance...",
+      started_at: new Date().toISOString(),
+    });
+    try {
+      setNativeDiag((current) => ({ ...current, status: "etat_initial" }));
+      const before = await withTimeout(getNativePushDebugState(), 4000, "Etat initial Push");
+
+      setNativeDiag((current) => ({ ...current, status: "session_utilisateur", before }));
+      const user = await withTimeout(
+        base44.auth.me().catch(() => null),
+        5000,
+        "Lecture utilisateur Base44"
+      );
+
+      let token = null;
+      let registerError = null;
+
+      try {
+        setNativeDiag((current) => ({
+          ...current,
+          status: "demande_permission_fcm",
+          user_email: user?.email || null,
+        }));
+        token = await withTimeout(
+          registerPushToken(null, {
+            email: user?.email || "",
+            user_email: user?.email || "",
+            user_type: user?.role === "admin" ? "admin" : "client",
+          }),
+          15000,
+          "Generation token FCM"
+        );
+      } catch (error) {
+        registerError = error?.message || String(error);
+      }
+
+      const after = await withTimeout(getNativePushDebugState(), 4000, "Etat final Push").catch((error) => ({
+        error: error?.message || String(error),
+      }));
+
+      setNativeDiag({
+        success: !!token || !!after.lastNativeToken,
+        status: "termine",
+        user_email: user?.email || null,
+        token_prefix: token ? token.slice(0, 24) : after.lastNativeToken ? after.lastNativeToken.slice(0, 24) : null,
+        register_error: registerError,
+        environment: after.env,
+        permissions: after.permissions,
+        has_push_plugin: after.hasPushPlugin,
+        last_registration_error: after.lastNativeRegistrationError,
+        debug_events: readPushDebugEvents(),
+        before,
+        after,
+      });
+      refetch().catch(() => null);
+    } catch (error) {
+      setNativeDiag({
+        success: false,
+        status: "erreur",
+        error: error?.message || String(error),
+        debug_events: readPushDebugEvents(),
+      });
+    } finally {
+      setNativeDiagLoading(false);
+    }
   };
 
   return (
@@ -221,6 +328,62 @@ export default function DiagnosticPushPanel() {
             <p className="text-[9px] text-gray-400 mt-0.5">{s.label}</p>
           </div>
         ))}
+      </div>
+
+      <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-black text-blue-900">Diagnostic Firebase</p>
+            <p className="text-[10px] text-blue-700">VÃ©rifie les secrets Base44 et l'accÃ¨s FCM</p>
+          </div>
+          <button
+            onClick={handleFirebaseDiagnostic}
+            disabled={firebaseDiagLoading}
+            className="px-3 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold disabled:opacity-50"
+          >
+            {firebaseDiagLoading ? "Test..." : "Tester"}
+          </button>
+        </div>
+        {firebaseDiag && (
+          <pre className={`text-[10px] whitespace-pre-wrap break-all rounded-xl p-2 border ${
+            firebaseDiag.success ? "bg-green-50 border-green-100 text-green-800" : "bg-red-50 border-red-100 text-red-700"
+          }`}>
+            {JSON.stringify(firebaseDiag, null, 2)}
+          </pre>
+        )}
+      </div>
+
+      <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3 space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-black text-emerald-900">Diagnostic APK local</p>
+            <p className="text-[10px] text-emerald-700">Teste Capacitor, permission notification et token FCM sur ce téléphone</p>
+          </div>
+          <button
+            onClick={handleNativeDiagnostic}
+            disabled={nativeDiagLoading}
+            className="px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold disabled:opacity-50"
+          >
+            {nativeDiagLoading ? "Test..." : "Tester APK"}
+          </button>
+        </div>
+        {nativeDiag && (
+          <>
+            <pre className={`text-[10px] whitespace-pre-wrap break-all rounded-xl p-2 border ${
+              nativeDiag.success ? "bg-green-50 border-green-100 text-green-800" : "bg-red-50 border-red-100 text-red-700"
+            }`}>
+              {JSON.stringify(nativeDiag, null, 2)}
+            </pre>
+            {!nativeDiag.success && (
+              <button
+                onClick={() => openNativeNotificationSettings().catch(() => null)}
+                className="w-full rounded-xl bg-emerald-700 px-3 py-2 text-xs font-bold text-white"
+              >
+                Ouvrir les reglages notifications
+              </button>
+            )}
+          </>
+        )}
       </div>
 
       {/* Filtres */}

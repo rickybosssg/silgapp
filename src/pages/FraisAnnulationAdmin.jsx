@@ -12,14 +12,20 @@ import {
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { useAdminContext } from "@/hooks/useAdminContext.js";
 
 export default function FraisAnnulationAdmin() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const { isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
+  const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || "");
+  const fraisFilter = effectiveCountry ? { country_code: effectiveCountry } : null;
 
   const { data: frais = [], isLoading, refetch } = useQuery({
-    queryKey: ["frais-annulation"],
-    queryFn: () => base44.entities.FraisAnnulation.list("-created_date", 200),
+    queryKey: ["frais-annulation", effectiveCountry],
+    queryFn: () => fraisFilter
+      ? base44.entities.FraisAnnulation.filter(fraisFilter, "-created_date", 200)
+      : base44.entities.FraisAnnulation.list("-created_date", 200),
     refetchInterval: 30000,
   });
 

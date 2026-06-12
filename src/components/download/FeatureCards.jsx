@@ -1,7 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
-import { User, Truck, CheckCircle, AlertCircle } from "lucide-react";
+import { User, Truck, CheckCircle } from "lucide-react";
 
 const features = {
   client: [

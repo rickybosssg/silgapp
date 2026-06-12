@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { LogOut, Wifi, WifiOff, MapPin, MapPinOff, Power, Navigation, Package } from "lucide-react";
+import { LogOut, Wifi, WifiOff, MapPin, MapPinOff, Power, Navigation } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { base44 } from "@/api/base44Client";
 
@@ -107,7 +107,7 @@ export default function LivreurHeader({
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-2xl font-black tracking-tight tabular-nums leading-none">{heureStr}</p>
-            <p className="text-[11px] text-white/35 capitalize mt-0.5">{dateStr}</p>
+            <p className="text-[11px] text-white/75 capitalize mt-0.5">{dateStr}</p>
           </div>
           <div className="flex items-center gap-2">
             <div className={cn(
@@ -155,11 +155,11 @@ export default function LivreurHeader({
             {livreur.note_moyenne > 0 && (
               <p className="text-[11px] text-yellow-300/80 mt-0.5">
                 ⭐ {livreur.note_moyenne.toFixed(1)}
-                <span className="text-white/30 ml-1">({livreur.nombre_avis || 0})</span>
+                <span className="text-white/75 ml-1">({livreur.nombre_avis || 0})</span>
               </p>
             )}
             {(livreur.quartier || (livreur.latitude && livreur.longitude)) && (
-              <p className="text-[10px] text-white/40 flex items-center gap-0.5 mt-0.5">
+              <p className="text-[10px] text-white/80 flex items-center gap-0.5 mt-0.5">
                 <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
                 <span className="truncate">{livreur.quartier || `${livreur.latitude?.toFixed(3)}, ${livreur.longitude?.toFixed(3)}`}</span>
               </p>
@@ -192,7 +192,7 @@ export default function LivreurHeader({
                 "active:scale-95",
                 gpsActif
                   ? "bg-blue-500/20 text-blue-300 border-blue-400/30 shadow-sm shadow-blue-500/15"
-                  : "bg-white/8 text-white/45 border-white/12 hover:bg-white/15"
+                  : "bg-white/8 text-white/75 border-white/20 hover:bg-white/15"
               )}
             >
               {gpsActif
@@ -223,7 +223,7 @@ export default function LivreurHeader({
               ? "bg-emerald-500/18 text-emerald-300 border border-emerald-400/25"
               : isEnCourse
                 ? "bg-blue-500/18 text-blue-300 border border-blue-400/25"
-                : "bg-white/8 text-white/35 border border-white/10"
+                : "bg-white/8 text-white/75 border border-white/20"
           )}>
             {isLibre ? "🚚 Libre" : isEnCourse ? "🔵 En course" : "⚪ En pause"}
           </span>
@@ -246,7 +246,7 @@ export default function LivreurHeader({
               <p className="text-base font-black tabular-nums leading-none text-white">
                 {clientsEnLigne ?? "—"}
               </p>
-              <p className="text-[10px] text-white/45 leading-tight mt-0.5">
+              <p className="text-[10px] text-white/75 leading-tight mt-0.5">
                 {clientsEnLigne === 1 ? "client en ligne" : "clients en ligne"}
               </p>
             </div>
@@ -267,7 +267,7 @@ export default function LivreurHeader({
               )}>
                 {coursesEnAttente ?? "—"}
               </p>
-              <p className="text-[10px] text-white/45 leading-tight mt-0.5">
+              <p className="text-[10px] text-white/75 leading-tight mt-0.5">
                 {coursesEnAttente === 1 ? "course en attente" : "courses en attente"}
               </p>
             </div>

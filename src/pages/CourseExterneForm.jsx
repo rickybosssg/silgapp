@@ -104,6 +104,12 @@ export default function CourseExterneForm() {
     }
 
     // Calcul distance estimée (Haversine)
+    const courseCountryCode = clientProfil?.country_code;
+    if (!courseCountryCode) {
+      toast.error("Erreur : votre profil client n'a pas de pays. Veuillez contacter le support.");
+      return;
+    }
+
     const R = 6371;
     const dLat = ((formData.gps_arrivee_lat - formData.gps_depart_lat) * Math.PI) / 180;
     const dLon = ((formData.gps_arrivee_lng - formData.gps_depart_lng) * Math.PI) / 180;
@@ -118,6 +124,7 @@ export default function CourseExterneForm() {
 
     createMutation.mutate({
       ...formData,
+      country_code: courseCountryCode,
       type_course: typeCourse,
       prix_estimate: prixEstime,
       statut: "recherche_livreur",

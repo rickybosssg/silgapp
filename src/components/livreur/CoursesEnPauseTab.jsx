@@ -1,5 +1,5 @@
 import React from "react";
-import { MapPin, Phone, Clock, Play, AlertTriangle, Calendar } from "lucide-react";
+import { MapPin, Phone, Clock, Play, AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";

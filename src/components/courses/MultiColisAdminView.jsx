@@ -99,7 +99,7 @@ export default function MultiColisAdminView({ course }) {
                         </p>
                       )}
                       {estAnnule && (
-                        <p className="text-[10px] text-gray-400 font-semibold">0 {devise}</p>
+                        <p className="text-[10px] text-gray-600 font-semibold">0 {devise}</p>
                       )}
                     </div>
                   </div>
@@ -107,7 +107,7 @@ export default function MultiColisAdminView({ course }) {
                   {/* Adresse */}
                   {c.adresse_livraison && (
                     <div className="flex items-center gap-1.5 ml-9">
-                      <MapPin className="w-2.5 h-2.5 text-gray-400 flex-shrink-0" />
+                      <MapPin className="w-2.5 h-2.5 text-gray-600 flex-shrink-0" />
                       <p className="text-[10px] text-gray-500 truncate">{c.adresse_livraison}</p>
                     </div>
                   )}
@@ -135,16 +135,16 @@ export default function MultiColisAdminView({ course }) {
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <div className="bg-white rounded-xl p-2 text-center border border-purple-100">
-                  <p className="text-[9px] text-gray-400 font-bold uppercase">Total encaissé</p>
+                  <p className="text-[9px] text-gray-600 font-bold uppercase">Total encaissé</p>
                   <p className="text-sm font-black text-gray-800">{totalEncaisse.toLocaleString()} {devise}</p>
                 </div>
                 <div className="bg-white rounded-xl p-2 text-center border border-green-100">
-                  <p className="text-[9px] text-gray-400 font-bold uppercase">Gain livreur</p>
+                  <p className="text-[9px] text-gray-600 font-bold uppercase">Gain livreur</p>
                   <p className="text-sm font-black text-green-700">{gainLivreur.toLocaleString()} {devise}</p>
                   <p className="text-[8px] text-green-500">70%</p>
                 </div>
                 <div className="bg-white rounded-xl p-2 text-center border border-orange-100">
-                  <p className="text-[9px] text-gray-400 font-bold uppercase">Commission</p>
+                  <p className="text-[9px] text-gray-600 font-bold uppercase">Commission</p>
                   <p className="text-sm font-black text-orange-600">{commissionSilga.toLocaleString()} {devise}</p>
                   <p className="text-[8px] text-orange-400">30%</p>
                 </div>

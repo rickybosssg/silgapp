@@ -32,7 +32,6 @@
         "GN",
         "NE"
       ],
-      "default": "BF",
       "description": "Code pays ISO du livreur"
     },
     "prenom": {

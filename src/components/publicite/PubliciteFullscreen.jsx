@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { CheckCircle, MessageCircle, Phone, ExternalLink, X } from "lucide-react";
+import { CheckCircle, MessageCircle, Phone, ExternalLink } from "lucide-react";
 
 async function trackAction(pubId, userType, userId, action) {
   try {

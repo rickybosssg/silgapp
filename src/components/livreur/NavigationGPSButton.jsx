@@ -1,10 +1,6 @@
 import React from "react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
-import { fr } from "date-fns/locale";
-import { MapPin, Navigation, Phone } from "lucide-react";
+import { Navigation } from "lucide-react";
 
 /**
  * Navigation GPS intelligente pour livreurs

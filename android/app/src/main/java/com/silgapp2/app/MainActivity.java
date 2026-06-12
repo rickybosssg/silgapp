@@ -3,6 +3,7 @@ package com.silgapp2.app;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
 
@@ -13,8 +14,24 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(SilgappPushPlugin.class);
+        registerPlugin(SilgappNativePlugin.class);
         createDefaultNotificationChannel();
         super.onCreate(savedInstanceState);
+        SilgappFirebaseMessagingService.stopUrgentCourseAlert();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        SilgappFirebaseMessagingService.stopUrgentCourseAlert();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        SilgappFirebaseMessagingService.stopUrgentCourseAlert();
     }
 
     private void createDefaultNotificationChannel() {

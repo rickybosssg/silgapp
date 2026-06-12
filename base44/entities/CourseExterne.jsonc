@@ -14,7 +14,6 @@
         "GN",
         "NE"
       ],
-      "default": "BF",
       "description": "Code pays de la course"
     },
     "client_nom": {
@@ -422,6 +421,7 @@
     }
   },
   "required": [
+    "country_code",
     "client_telephone",
     "type_course",
     "adresse_depart"

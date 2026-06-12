@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   MessageSquare, Users, TrendingUp, AlertTriangle, BarChart2,
-  RefreshCw, Loader2, ChevronDown, ChevronUp, Globe, Star,
+  RefreshCw, Loader2, Globe, Star,
   FileText, Lightbulb, HelpCircle, CheckCircle2, XCircle, Calendar
 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from "recharts";
 import { toast } from "sonner";
 import { useAdminContext } from "@/hooks/useAdminContext";
 

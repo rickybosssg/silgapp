@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import {
-  Package, MapPin, Clock, CheckCircle2, XCircle,
-  Star, ChevronRight, Truck, CreditCard, AlertTriangle
+  Package, Clock,
+  Star, ChevronRight, Truck, AlertTriangle
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -113,7 +113,7 @@ function CourseHistoriqueCard({ course, fraisAnnulation, onSelect }) {
                 {frais.montant || 250} {course.devise || "F"} dû
               </span>
             )}
-            <ChevronRight className="w-4 h-4 text-gray-300" />
+            <ChevronRight className="w-4 h-4 text-gray-500" />
           </div>
         </div>
       </Card>
@@ -150,7 +150,7 @@ export default function HistoriqueCoursesClient({ courses = [], fraisAnnulation 
     return (
       <div className="py-12 text-center space-y-3">
         <Package className="w-12 h-12 mx-auto text-gray-200" />
-        <p className="text-sm text-gray-400">Aucune course dans l'historique</p>
+        <p className="text-sm text-gray-600">Aucune course dans l'historique</p>
       </div>
     );
   }

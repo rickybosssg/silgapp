@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
@@ -55,31 +55,10 @@ export default function CourseExterneFormSync() {
   const navigate = useNavigate();
   const typeCourse = location.pathname.includes("expedier") ? "expedier" : "recevoir";
   const position = location.state?.position || JSON.parse(localStorage.getItem("client_gps_position") || "null");
-  const locationClientProfil = location.state?.clientProfil;
+  const clientProfil = location.state?.clientProfil;
   // Coords sauvegardées en DB — utilisées comme fallback si getCurrentPosition timeout
-  const savedLat = locationClientProfil?.latitude || position?.latitude || null;
-  const savedLng = locationClientProfil?.longitude || position?.longitude || null;
-
-  // 🛡️ CHARGEMENT SÉCURISÉ DU PROFIL CLIENT — TOUJOURS charger depuis BDD
-  const [clientProfil, setClientProfil] = useState(locationClientProfil || null);
-  const { data: clientFromDB, isLoading: clientLoading } = useQuery({
-    queryKey: ['client-profil-course'],
-    queryFn: async () => {
-      const user = await base44.auth.me();
-      if (!user) return null;
-      const clients = await base44.entities.ClientExterne.filter({ user_email: user.email }, 'created_date', 1);
-      return clients?.[0] || null;
-    },
-    initialData: null,
-    enabled: true, // ✅ TOUJOURS activer pour garantir country_code correct
-  });
-
-  useEffect(() => {
-    if (clientFromDB) {
-      setClientProfil(clientFromDB); // ✅ Toujours mettre à jour avec BDD
-      setIsBddReady(true); // ✅ BDD chargée et prête
-    }
-  }, [clientFromDB]);
+  const savedLat = clientProfil?.latitude || position?.latitude || null;
+  const savedLng = clientProfil?.longitude || position?.longitude || null;
 
   // Restaurer l'étape depuis localStorage si disponible
   const savedStep = parseInt(localStorage.getItem(STEP_KEY) || "0", 10);
@@ -88,7 +67,6 @@ export default function CourseExterneFormSync() {
   const [createdCourse, setCreatedCourse] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false); // verrou anti-double-clic
   const [invitationModal, setInvitationModal] = useState(null); // { telephone, nom } ou null
-  const [isBddReady, setIsBddReady] = useState(false); // 🛡️ Bloquer tant que BDD pas chargée
 
   // Lire brouillon (données pures, sans fonctions)
   const getDraftFromStorage = () => {
@@ -258,7 +236,7 @@ export default function CourseExterneFormSync() {
       let finalData = { ...data };
 
       // ─── OPTIMISTIC UI: Créer un brouillon temporaire pour affichage immédiat ──
-      const tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const tempId = `temp_${Date.now()}`;
       const tempCourse = {
         ...data,
         id: tempId,
@@ -323,24 +301,24 @@ export default function CourseExterneFormSync() {
       }
       // Génération QR/codes dès la création
       // Pour "recevoir" : pickup = chez l'expéditeur, delivery = chez le destinataire
-      const pickupQrToken = crypto.randomUUID().replace(/-/g, "");
-      const deliveryQrToken = crypto.randomUUID().replace(/-/g, "");
-      const pickupCode4 = String(Math.floor(1000 + Math.random() * 9000));
-      const deliveryCode4 = String(Math.floor(1000 + Math.random() * 9000));
-      finalData.pickup_qr_token = pickupQrToken;
-      finalData.pickup_code_4_digits = pickupCode4;
-      finalData.delivery_qr_token = deliveryQrToken;
-      finalData.delivery_code_4_digits = deliveryCode4;
-      finalData.pickup_confirmed_at = null;
-      finalData.delivery_confirmed_at = null;
+      if (!finalData.is_multi_colis) {
+        const pickupQrToken = crypto.randomUUID().replace(/-/g, "");
+        const deliveryQrToken = crypto.randomUUID().replace(/-/g, "");
+        const pickupCode4 = String(Math.floor(1000 + Math.random() * 9000));
+        const deliveryCode4 = String(Math.floor(1000 + Math.random() * 9000));
+        finalData.pickup_qr_token = pickupQrToken;
+        finalData.pickup_code_4_digits = pickupCode4;
+        finalData.delivery_qr_token = deliveryQrToken;
+        finalData.delivery_code_4_digits = deliveryCode4;
+        finalData.pickup_confirmed_at = null;
+        finalData.delivery_confirmed_at = null;
+      }
 
       const course = await base44.entities.CourseExterne.create(finalData);
 
       // ── Créer les sous-colis si mode multi-colis ──────────────────────────
       if (finalData.is_multi_colis && finalData._colisData?.length > 1) {
         const colisPromises = finalData._colisData.map((c) => {
-          const deliveryQrToken = crypto.randomUUID().replace(/-/g, "");
-          const deliveryCode4 = String(Math.floor(1000 + Math.random() * 9000));
           return base44.entities.ColisExterne.create({
             course_id: course.id,
             colis_uid: c.colis_uid,
@@ -359,8 +337,6 @@ export default function CourseExterneFormSync() {
             statut: "en_attente",
             montant_a_encaisser: 0,
             mode_paiement: "especes",
-            delivery_qr_token: deliveryQrToken,
-            delivery_code_4_digits: deliveryCode4,
             ordre_livraison: c.ordre_livraison || c.numero_ordre,
           });
         });
@@ -384,9 +360,9 @@ export default function CourseExterneFormSync() {
       return course;
     },
     onSuccess: (response) => {
-      // OPTIMISTIC UI: Retirer tous les brouillons temporaires + ajouter la vraie course
+      // OPTIMISTIC UI: Remplacer le brouillon temporaire par la vraie course
       queryClient.setQueryData(['courses-externes-client'], (old) => 
-        (old || []).filter(c => !c.id?.startsWith('temp_')).concat(response)
+        (old || []).filter(c => c.id !== `temp_${Date.now()}`).concat(response)
       );
       toast.success("Course créée ! Recherche d'un livreur en cours...");
       setCreatedCourse(response);
@@ -425,25 +401,11 @@ export default function CourseExterneFormSync() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // 🛡️ BLOQUER si BDD pas chargée — ÉVITE country_code incorrect
-    if (!isBddReady || !clientFromDB?.country_code) {
-      toast.error("Chargement du profil en cours... Veuillez patienter.");
-      return;
-    }
-
     // ─── Verrou anti-double-soumission (double-clic, re-render) ─────────────
     if (isSubmitting || createMutation.isPending) return;
     setIsSubmitting(true);
 
     // 🛡️ country_code DOIT être déclaré AVANT toute utilisation dans normalizePhone()
-    const courseCountryCode = clientFromDB.country_code;
-    if (!courseCountryCode) {
-      console.error("[CourseForm] country_code manquant");
-      toast.error("Erreur : profil sans pays. Contactez le support.");
-      setIsSubmitting(false);
-      return;
-    }
-
     // ─── Validation des champs obligatoires ───────────────────────────────────
     const isExpedie = formData.type_course === "expedier";
     const isRecevoir = formData.type_course === "recevoir";
@@ -477,10 +439,30 @@ export default function CourseExterneFormSync() {
       return;
     }
 
+    // country_code obligatoire : relire le profil client avant toute utilisation.
+    let clientFromDB = clientProfil || null;
+    try {
+      if (clientProfil?.id) {
+        clientFromDB = await base44.entities.ClientExterne.get(clientProfil.id);
+      } else if (user?.email) {
+        const clients = await base44.entities.ClientExterne.filter({ user_email: user.email }, "-created_date", 1);
+        clientFromDB = clients?.[0] || clientFromDB;
+      }
+    } catch (err) {
+      console.warn("[CourseForm] Impossible de relire le profil client, fallback local:", err.message);
+    }
+
+    const courseCountryCode = clientFromDB?.country_code || clientProfil?.country_code || "";
+    if (!courseCountryCode) {
+      console.error("[CourseForm] country_code manquant sur clientFromDB:", clientFromDB);
+      toast.error("Erreur : votre profil client n'a pas de pays. Veuillez contacter le support.");
+      setIsSubmitting(false);
+      return;
+    }
+
     let expediteurNom, expediteurTel, expediteurClientId, expediteurPhoneNormalized;
     let destinataireNom, destinataireTel, destinataireClientId, destinatairePhoneNormalized;
 
-    // 🛡️ UTILISER country_code CORRIGÉ (après fallback BDD)
     if (isExpedie) {
       expediteurNom = formData.client_nom;
       expediteurTel = formData.client_telephone;
@@ -498,7 +480,7 @@ export default function CourseExterneFormSync() {
       expediteurNom = formData.expediteur_nom;
       expediteurTel = formData.expediteur_telephone;
       expediteurClientId = formData.expediteur_client_id || null;
-      expediteurPhoneNormalized = normalizePhone(formData.expediteur_telephone, courseCountryCode); // ✅
+      expediteurPhoneNormalized = normalizePhone(formData.expediteur_telephone, courseCountryCode);
     }
 
     console.log("[CourseForm] Soumission :", {
@@ -594,7 +576,7 @@ export default function CourseExterneFormSync() {
       gps_arrivee_lat: isMulti ? null : gpsArriveLat,
       gps_arrivee_lng: isMulti ? null : gpsArriveLng,
       destination_inconnue: destInconnue,
-      prix_estimate: prixEstime,
+      prix_estimate: isMulti ? 0 : prixEstime,
       statut: "recherche_livreur",
       dispatch_status: "en_attente",
       // Champs multi-colis
@@ -616,25 +598,15 @@ export default function CourseExterneFormSync() {
     navigate("/client");
   };
 
-  const handleRelancer = () => {
-    // Réinitialiser pour permettre une nouvelle soumission
-    setCourseCreated(false);
-    setCreatedCourse(null);
-    setIsSubmitting(false);
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(STEP_KEY);
-    setCurrentStep(0);
-  };
-
   if (courseCreated && createdCourse) {
-    return <LivreurRechercheAnimation course={createdCourse} onRelancer={handleRelancer} />;
+    return <LivreurRechercheAnimation course={createdCourse} />;
   }
 
   // Modal invitation WhatsApp — affiché après création réussie si contact hors SILGAPP
   if (invitationModal && createdCourse) {
     return (
       <>
-        <LivreurRechercheAnimation course={createdCourse} onRelancer={handleRelancer} />
+        <LivreurRechercheAnimation course={createdCourse} />
         <InvitationWhatsAppModal
           telephone={invitationModal.telephone}
           nomContact={invitationModal.nom}
@@ -643,25 +615,6 @@ export default function CourseExterneFormSync() {
           onSend={() => { setInvitationModal(null); setCourseCreated(true); }}
         />
       </>
-    );
-  }
-
-  // 🛡️ BLOQUER le formulaire tant que BDD pas chargée
-  if (!isBddReady || clientLoading) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
-        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center space-y-5">
-          <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center mx-auto animate-pulse">
-            <span className="text-4xl">⏳</span>
-          </div>
-          <div>
-            <h2 className="text-xl font-black text-gray-900">Chargement...</h2>
-            <p className="text-sm text-gray-600 mt-3 leading-relaxed">
-              Vérification de votre profil en cours.
-            </p>
-          </div>
-        </div>
-      </div>
     );
   }
 

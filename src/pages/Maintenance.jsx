@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   Shield, Play, Clock, CheckCircle2, AlertTriangle,
   XCircle, RefreshCw, ChevronDown, ChevronUp, Wrench,
-  Bug, Zap, ClipboardList, Bell
+  Bug, Zap, ClipboardList
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";

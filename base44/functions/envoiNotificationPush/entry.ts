@@ -4,6 +4,7 @@ const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const APP_URL = 'https://silga-dispatch-go.base44.app';
 const ANDROID_CHANNEL_ID = 'silgapp_default';
+const ANDROID_CLICK_ACTION = 'OPEN_SILGAPP';
 
 function base64UrlEncode(input) {
   const bytes = typeof input === 'string'
@@ -52,8 +53,18 @@ function getFirebaseConfig() {
   const serviceAccountJson = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_JSON');
   if (serviceAccountJson) {
     const sa = JSON.parse(serviceAccountJson);
+    console.log('[envoiNotificationPush] Firebase config: FIREBASE_SERVICE_ACCOUNT_JSON present', {
+      projectId: sa.project_id,
+      clientEmailPresent: !!sa.client_email,
+      privateKeyPresent: !!sa.private_key,
+    });
     return { projectId: sa.project_id, clientEmail: sa.client_email, privateKey: sa.private_key };
   }
+  console.log('[envoiNotificationPush] Firebase config: using split env vars', {
+    projectIdPresent: !!Deno.env.get('FIREBASE_PROJECT_ID'),
+    clientEmailPresent: !!Deno.env.get('FIREBASE_CLIENT_EMAIL'),
+    privateKeyPresent: !!Deno.env.get('FIREBASE_PRIVATE_KEY'),
+  });
   return {
     projectId: Deno.env.get('FIREBASE_PROJECT_ID'),
     clientEmail: Deno.env.get('FIREBASE_CLIENT_EMAIL'),
@@ -83,6 +94,108 @@ async function sendFcmMessage(projectId, accessToken, token, payload) {
   return { ok: response.ok, status: response.status, result };
 }
 
+function tokenDateValue(item) {
+  const raw = item.derniere_utilisation || item.updated_date || item.created_date || '';
+  const value = Date.parse(raw);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function selectLatestNativeTokens(tokens) {
+  const latestByPlatform = new Map();
+  for (const item of tokens) {
+    const token = String(item.token || '');
+    if (!token || token.startsWith('web_')) continue;
+    const platform = String(item.platform || 'native').toLowerCase();
+    const current = latestByPlatform.get(platform);
+    if (!current || tokenDateValue(item) >= tokenDateValue(current)) {
+      latestByPlatform.set(platform, item);
+    }
+  }
+  return [...latestByPlatform.values()];
+}
+
+function normalizeCountryCode(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
+function countryMismatchPayload(course, target, context) {
+  const courseCountry = normalizeCountryCode(course?.country_code);
+  const targetCountry = normalizeCountryCode(target?.country_code);
+  console.error('[envoiNotificationPush][CRITICAL_COUNTRY_BLOCK]', {
+    context,
+    course_id: course?.id || '',
+    course_country_code: courseCountry || 'ABSENT',
+    target_id: target?.id || '',
+    target_email: target?.user_email || '',
+    target_country_code: targetCountry || 'ABSENT',
+  });
+  return {
+    success: false,
+    error: 'Notification inter-pays interdite',
+    blocked_reason: 'country_mismatch',
+    course_country_code: courseCountry || '',
+    target_country_code: targetCountry || '',
+  };
+}
+
+async function assertNotificationCountry(base44, { course_id, livreur_id, client_id, targetEmail, type }) {
+  if (!course_id) return { ok: true };
+
+  const course = await base44.asServiceRole.entities.CourseExterne.get(course_id).catch(() => null);
+  if (!course) return { ok: true };
+
+  const courseCountry = normalizeCountryCode(course.country_code);
+  if (!courseCountry) {
+    console.error('[envoiNotificationPush][CRITICAL_COUNTRY_MISSING]', {
+      course_id,
+      targetEmail,
+      type,
+    });
+    return {
+      ok: false,
+      status: 400,
+      payload: {
+        success: false,
+        error: 'country_code obligatoire absent sur la course',
+        blocked_reason: 'missing_course_country_code',
+      },
+    };
+  }
+
+  const targets = [];
+  if (livreur_id) {
+    const livreur = await base44.asServiceRole.entities.Livreur.get(livreur_id).catch(() => null);
+    if (livreur) targets.push({ entity: livreur, context: 'livreur_id' });
+  }
+  if (client_id) {
+    const client = await base44.asServiceRole.entities.ClientExterne.get(client_id).catch(() => null);
+    if (client) targets.push({ entity: client, context: 'client_id' });
+  }
+
+  if (targetEmail && String(type || '') === 'nouvelle_course') {
+    const livreurs = await base44.asServiceRole.entities.Livreur.filter({
+      user_email: targetEmail,
+      actif: true,
+    }).catch(() => []);
+    for (const livreur of livreurs || []) {
+      targets.push({ entity: livreur, context: 'destinataire_email_livreur' });
+    }
+  }
+
+  for (const target of targets) {
+    const targetCountry = normalizeCountryCode(target.entity?.country_code);
+    if (!targetCountry || targetCountry !== courseCountry) {
+      return {
+        ok: false,
+        status: 403,
+        payload: countryMismatchPayload(course, target.entity, target.context),
+      };
+    }
+  }
+
+  return { ok: true };
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -92,11 +205,33 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { titre, message, type, destinataire_email, livreur_id, client_id, course_id } = body;
+    const {
+      titre,
+      message,
+      type,
+      destinataire_email,
+      livreur_id,
+      client_id,
+      course_id,
+      user_type,
+      alert_duration_seconds,
+      alert_interval_seconds,
+    } = body;
     const targetEmail = String(destinataire_email || '').trim().toLowerCase();
 
     if (!titre || !message || !targetEmail) {
       return Response.json({ error: 'Missing required fields: titre, message, destinataire_email' }, { status: 400 });
+    }
+
+    const countryGuard = await assertNotificationCountry(base44, {
+      course_id,
+      livreur_id,
+      client_id,
+      targetEmail,
+      type,
+    });
+    if (!countryGuard.ok) {
+      return Response.json(countryGuard.payload, { status: countryGuard.status });
     }
 
     // Chercher les tokens par email (livreurs + clients)
@@ -115,6 +250,19 @@ Deno.serve(async (req) => {
       tokenMap.set(item.token, item);
     }
     const tokens = [...tokenMap.values()];
+    const nativeTokens = tokens.filter(item => !String(item.token).startsWith('web_'));
+    const pushableTokensPreview = selectLatestNativeTokens(tokens);
+    console.log('[envoiNotificationPush] Tokens resolved', {
+      targetEmail,
+      livreur_id: livreur_id || '',
+      client_id: client_id || '',
+      tokensFound: tokens.length,
+      pushableTokens: pushableTokensPreview.length,
+      nativeTokens: nativeTokens.length,
+      dedupedNativeTokens: nativeTokens.length - pushableTokensPreview.length,
+      webTokens: tokens.length - nativeTokens.length,
+      platforms: [...new Set(tokens.map(t => t.platform || 'unknown'))],
+    });
 
     // Créer la notification en BDD
     const notification = await base44.asServiceRole.entities.Notification.create({
@@ -134,25 +282,31 @@ Deno.serve(async (req) => {
       }, { status: 404 });
     }
 
-    // Tokens web (notifications via subscription temps réel) + tokens natifs (FCM)
+    // Exclure les tokens web (pas de FCM natif)
     const webTokens = tokens.filter(item => String(item.token).startsWith('web_'));
-    const nativeTokens = tokens.filter(item => !String(item.token).startsWith('web_'));
-    
-    // Si uniquement des tokens web → notification enregistrée, sera affichée via subscription
-    if (nativeTokens.length === 0 && webTokens.length > 0) {
+    const nativeTokensForStats = tokens.filter(item => !String(item.token).startsWith('web_'));
+    const pushableTokens = pushableTokensPreview;
+    if (pushableTokens.length === 0) {
+      console.warn('[envoiNotificationPush] No native FCM token available', {
+        targetEmail,
+        tokensFound: tokens.length,
+        nativeTokens: nativeTokensForStats.length,
+        webTokens: webTokens.length,
+      });
       return Response.json({
         success: true,
         notification_id: notification.id,
-        tokens_found: tokens.length,
-        web_tokens: webTokens.length,
-        message: 'Notification enregistree en base de donnees. Elle sera affichee via la subscription temps reel sur l\'application web.',
+        warning: 'Only web fallback tokens found — notification saved but no native FCM push sent',
       });
     }
-    
-    const pushableTokens = nativeTokens;
 
     const { projectId, clientEmail, privateKey } = getFirebaseConfig();
     if (!projectId || !clientEmail || !privateKey) {
+      console.warn('[envoiNotificationPush] Firebase credentials missing', {
+        projectIdPresent: !!projectId,
+        clientEmailPresent: !!clientEmail,
+        privateKeyPresent: !!privateKey,
+      });
       return Response.json({
         success: true,
         notification_id: notification.id,
@@ -161,22 +315,30 @@ Deno.serve(async (req) => {
     }
 
     const accessToken = await getAccessToken(clientEmail, privateKey);
+    const notificationTag = String(course_id || notification.id || `${type || 'generic'}-${targetEmail}`).slice(0, 64);
+    const isUrgentLivreurCourse = String(type || '') === 'nouvelle_course' && !!livreur_id;
+    const dataPayload = {
+      type: String(type || 'generic'),
+      user_type: String(user_type || (livreur_id ? 'livreur' : client_id ? 'client' : '')),
+      livreur_id: String(livreur_id || ''),
+      client_id: String(client_id || ''),
+      course_id: String(course_id || ''),
+      notification_id: String(notification.id),
+      click_action: ANDROID_CLICK_ACTION,
+      alert_duration_seconds: String(alert_duration_seconds || 60),
+      alert_interval_seconds: String(alert_interval_seconds || 5),
+    };
 
     // Payload FCM — notification visible écran verrouillé + son + vibration
     const fcmPayload = {
       notification: { title: titre, body: message },
-      data: {
-        type: String(type || 'generic'),
-        livreur_id: String(livreur_id || ''),
-        client_id: String(client_id || ''),
-        course_id: String(course_id || ''),
-        notification_id: String(notification.id),
-        click_action: APP_URL,
-      },
+      data: dataPayload,
       android: {
+        collapse_key: notificationTag,
         priority: 'HIGH',
         ttl: '86400s',
         notification: {
+          tag: notificationTag,
           channel_id: ANDROID_CHANNEL_ID,
           sound: 'default',
           vibrate_timings: ['0s', '0.2s', '0.1s', '0.2s', '0.1s', '0.4s'],
@@ -184,7 +346,7 @@ Deno.serve(async (req) => {
           default_vibrate_timings: false,
           notification_priority: 'PRIORITY_HIGH',
           visibility: 'PUBLIC',
-          click_action: APP_URL,
+          click_action: ANDROID_CLICK_ACTION,
         },
       },
       webpush: {
@@ -192,8 +354,25 @@ Deno.serve(async (req) => {
       },
     };
 
+    const urgentAndroidPayload = {
+      data: {
+        ...dataPayload,
+        title: String(titre),
+        body: String(message),
+      },
+      android: {
+        collapse_key: notificationTag,
+        priority: 'HIGH',
+        ttl: `${Math.max(60, Number(alert_duration_seconds || 60) + 30)}s`,
+      },
+    };
+
     const sendResults = await Promise.all(pushableTokens.map(async (item) => {
-      const response = await sendFcmMessage(projectId, accessToken, item.token, fcmPayload);
+      const platform = String(item.platform || '').toLowerCase();
+      const payload = isUrgentLivreurCourse && platform.includes('android')
+        ? urgentAndroidPayload
+        : fcmPayload;
+      const response = await sendFcmMessage(projectId, accessToken, item.token, payload);
       const nowIso = new Date().toISOString();
 
       if (!response.ok) {
@@ -231,6 +410,13 @@ Deno.serve(async (req) => {
     }));
 
     const sent = sendResults.filter(r => r.ok).length;
+    console.log('[envoiNotificationPush] FCM send completed', {
+      targetEmail,
+      projectId,
+      sent,
+      attempted: pushableTokens.length,
+      failed: sendResults.filter(r => !r.ok).length,
+    });
 
     return Response.json({
       success: sent > 0,

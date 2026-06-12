@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { MapPin, Navigation, Clock, Check, X } from "lucide-react";
+import { MapPin, Navigation, Clock, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { fr } from "date-fns/locale";
 
 /**
  * Calcule la distance entre 2 points GPS (formule Haversine)

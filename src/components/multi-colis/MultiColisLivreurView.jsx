@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Phone, Copy, MapPin, CheckCircle, Lock, Package, ChevronDown, ChevronUp } from "lucide-react";
+import { Phone, Copy, MapPin, CheckCircle, Lock, Package, ChevronDown, ChevronUp, XCircle } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -20,13 +20,13 @@ function ConfirmMontantDialog({ colis, devise, onConfirm, onCancel, isPending })
 
   const handleSubmit = () => {
     const val = parseFloat(montant);
-    if (!montant || isNaN(val) || val < 0) {
+    if (!montant || isNaN(val) || val <= 0) {
       return; // bouton désactivé si invalide
     }
     onConfirm(val);
   };
 
-  const isValid = montant !== "" && !isNaN(parseFloat(montant)) && parseFloat(montant) >= 0;
+  const isValid = montant !== "" && !isNaN(parseFloat(montant)) && parseFloat(montant) > 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -43,7 +43,7 @@ function ConfirmMontantDialog({ colis, devise, onConfirm, onCancel, isPending })
             <strong>{colis.colis_uid || "Colis"}</strong> — {colis.destinataire_nom || "Destinataire"}
           </p>
           {colis.adresse_livraison && (
-            <p className="text-xs text-gray-400 mt-0.5">{colis.adresse_livraison}</p>
+            <p className="text-xs text-gray-600 mt-0.5">{colis.adresse_livraison}</p>
           )}
         </div>
 
@@ -62,11 +62,11 @@ function ConfirmMontantDialog({ colis, devise, onConfirm, onCancel, isPending })
               autoFocus
               min="0"
             />
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-600">
               {devise || "F"}
             </span>
           </div>
-          <p className="text-[10px] text-gray-400 text-center mt-1">
+          <p className="text-[10px] text-gray-600 text-center mt-1">
             Entrez 0 si aucun montant n'est à encaisser
           </p>
         </div>
@@ -128,8 +128,8 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
         montant_a_encaisser: montantEncaisse,
       });
 
-      // 2. Relire les colis depuis l'API pour éviter la stale closure
-      const colisActuel = await base44.entities.ColisExterne.filter({ course_id: course.id }, "numero_ordre", 20);
+      // 2. Recalculer les totaux sur la course parente
+      const colisActuel = colis;
       const montantTotal = colisActuel.reduce((sum, c) => {
         if (c.id === colisItem.id) return sum + montantEncaisse;
         if (c.statut === "livre") return sum + (c.montant_a_encaisser || 0);
@@ -158,25 +158,109 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
       }
 
       await base44.entities.CourseExterne.update(course.id, updateData);
-      return { nbLivres, tousTermines, montantTotal, gainLivreur };
+      return {
+        nbLivres,
+        tousTermines,
+        montantTotal,
+        gainLivreur,
+        courseData: {
+          ...course,
+          ...updateData,
+          id: course.id,
+          colis_livre_at: updateData.colis_livre_at || course.colis_livre_at,
+          heure_livraison: updateData.heure_livraison || course.heure_livraison,
+        },
+      };
     },
-    onSuccess: ({ tousTermines, montantTotal, gainLivreur }) => {
-      queryClient.invalidateQueries({ queryKey: ["colis-externes", course.id] });
-      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+    onSuccess: ({ tousTermines, montantTotal, gainLivreur, courseData }) => {
       setConfirmColis(null);
       if (tousTermines) {
         toast.success(`🎉 Tournée terminée ! Total : ${montantTotal.toLocaleString()} ${course.devise || "F"}`);
-        onAllLivres?.();
+        onAllLivres?.(courseData);
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ["colis-externes", course.id] });
+          queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+        }, 1200);
       } else {
+        queryClient.invalidateQueries({ queryKey: ["colis-externes", course.id] });
+        queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
         toast.success(`Colis livré ✅ — +${gainLivreur.toLocaleString()} ${course.devise || "F"} (70%)`);
       }
     },
     onError: () => toast.error("Erreur lors de la mise à jour"),
   });
 
+  const annulerColisMutation = useMutation({
+    mutationFn: async (colisItem) => {
+      const now = new Date().toISOString();
+      await base44.entities.ColisExterne.update(colisItem.id, {
+        statut: "annule",
+        montant_a_encaisser: 0,
+      });
+
+      const montantTotal = colis.reduce((sum, c) => {
+        if (c.id === colisItem.id) return sum;
+        if (c.statut === "livre") return sum + (c.montant_a_encaisser || 0);
+        return sum;
+      }, 0);
+      const nbLivres = colis.filter(c => c.statut === "livre").length;
+      const nbAnnules = colis.filter(c => c.id === colisItem.id || c.statut === "annule").length;
+      const nbTotal = course.nb_colis || 1;
+      const tousTermines = nbLivres + nbAnnules >= nbTotal;
+      const gainLivreur = Math.round(montantTotal * 0.7);
+      const commissionSilga = Math.round(montantTotal * 0.3);
+
+      const updateData = {
+        nb_colis_livres: nbLivres,
+        nb_colis_annules: nbAnnules,
+        prix_final: montantTotal,
+        montant_livreur: gainLivreur,
+        commission_silga: commissionSilga,
+      };
+
+      if (tousTermines) {
+        updateData.statut = nbLivres > 0 ? "livree" : "annulee";
+        updateData.heure_livraison = now;
+        updateData.colis_livre_at = now;
+      }
+
+      await base44.entities.CourseExterne.update(course.id, updateData);
+      return {
+        tousTermines,
+        courseData: {
+          ...course,
+          ...updateData,
+          id: course.id,
+          colis_livre_at: updateData.colis_livre_at || course.colis_livre_at,
+          heure_livraison: updateData.heure_livraison || course.heure_livraison,
+        },
+      };
+    },
+    onSuccess: ({ tousTermines, courseData }) => {
+      toast.success("Colis annule");
+      if (tousTermines) {
+        onAllLivres?.(courseData);
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ["colis-externes", course.id] });
+          queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+        }, 1200);
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["colis-externes", course.id] });
+        queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      }
+    },
+    onError: () => toast.error("Erreur lors de l'annulation"),
+  });
+
   const handleLivrer = (colisItem) => {
     if (colisItem.statut === "livre" || colisItem.statut === "annule") return;
     setConfirmColis(colisItem);
+  };
+
+  const handleAnnuler = (colisItem) => {
+    if (colisItem.statut === "livre" || colisItem.statut === "annule") return;
+    if (!window.confirm("Annuler ce colis ? Le montant sera fixe a 0 F.")) return;
+    annulerColisMutation.mutate(colisItem);
   };
 
   const handleConfirmer = (montant) => {
@@ -294,7 +378,7 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
                   {/* Adresse */}
                   {colisItem.adresse_livraison && (
                     <div className="flex items-start gap-2 bg-gray-50 rounded-xl p-2.5">
-                      <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5" />
+                      <MapPin className="w-3.5 h-3.5 text-gray-600 flex-shrink-0 mt-0.5" />
                       <p className="text-xs text-gray-700 font-medium leading-tight">{colisItem.adresse_livraison}</p>
                     </div>
                   )}
@@ -355,10 +439,18 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
                       <button
                         className="flex-1 h-11 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-black text-xs shadow-sm active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
                         onClick={() => handleLivrer(colisItem)}
-                        disabled={livrerColisMutation.isPending}
+                        disabled={livrerColisMutation.isPending || annulerColisMutation.isPending}
                       >
                         <CheckCircle className="w-4 h-4" />
                         ✅ Colis {colisItem.colis_uid || idx + 1} livré
+                      </button>
+                      <button
+                        className="flex-none h-11 px-3 rounded-xl bg-red-50 border border-red-200 text-red-600 font-black text-xs active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-1"
+                        onClick={() => handleAnnuler(colisItem)}
+                        disabled={livrerColisMutation.isPending || annulerColisMutation.isPending}
+                      >
+                        <XCircle className="w-4 h-4" />
+                        Annuler
                       </button>
                     </div>
                   )}
@@ -380,15 +472,15 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
           {totalEncaisse > 0 && (
             <div className="grid grid-cols-3 gap-2 pt-1">
               <div className="bg-white rounded-xl p-2 text-center border border-purple-100">
-                <p className="text-[9px] text-gray-400 font-bold uppercase">Total</p>
+                <p className="text-[9px] text-gray-600 font-bold uppercase">Total</p>
                 <p className="text-xs font-black text-gray-800">{totalEncaisse.toLocaleString()} {course.devise || "F"}</p>
               </div>
               <div className="bg-white rounded-xl p-2 text-center border border-green-100">
-                <p className="text-[9px] text-gray-400 font-bold uppercase">Ton gain (70%)</p>
+                <p className="text-[9px] text-gray-600 font-bold uppercase">Ton gain (70%)</p>
                 <p className="text-xs font-black text-green-700">+{gainLivreur.toLocaleString()} {course.devise || "F"}</p>
               </div>
               <div className="bg-white rounded-xl p-2 text-center border border-gray-100">
-                <p className="text-[9px] text-gray-400 font-bold uppercase">Commission</p>
+                <p className="text-[9px] text-gray-600 font-bold uppercase">Commission</p>
                 <p className="text-xs font-black text-gray-500">{commission.toLocaleString()} {course.devise || "F"}</p>
               </div>
             </div>

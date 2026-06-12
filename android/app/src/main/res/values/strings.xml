@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">SILGAPP 2</string>
-    <string name="title_activity_main">SILGAPP 2</string>
+    <string name="app_name">SILGAPP</string>
+    <string name="title_activity_main">SILGAPP</string>
     <string name="package_name">com.silgapp2.app</string>
     <string name="custom_url_scheme">com.silgapp2.app</string>
 </resources>

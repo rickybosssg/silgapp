@@ -221,8 +221,8 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Recharger la course complète pour renvoyer toutes les données persistées
-      const courseFinale = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+      // Construire la réponse sans relecture DB supplémentaire
+      const courseFinale = { ...course, ...updateData, id: course_id };
 
       return Response.json({
         success: true,

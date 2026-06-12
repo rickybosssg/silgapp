@@ -1,5 +1,5 @@
 import React from "react";
-import { AlertTriangle, CreditCard } from "lucide-react";
+import { CreditCard } from "lucide-react";
 
 export default function FraisAnnulationBannerClient({ fraisImpayes = [] }) {
   if (fraisImpayes.length === 0) return null;

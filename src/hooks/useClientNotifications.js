@@ -44,7 +44,11 @@ export function useClientNotifications(userEmail, onNotification) {
     subscribedRef.current = true;
 
     // Enregistrer le token push (même logique que livreur)
-    registerPushToken(null, { email: userEmail }).catch(() => null);
+    registerPushToken(null, {
+      email: userEmail,
+      user_email: userEmail,
+      user_type: "client",
+    }).catch(() => null);
 
     // S'abonner aux notifications temps réel
     // Note : subscribeToNotifications appelle déjà showLocalNotification en interne

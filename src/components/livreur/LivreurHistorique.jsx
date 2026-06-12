@@ -2,8 +2,8 @@ import React, { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle2, XCircle, Clock, MapPin, Banknote, Calendar, AlertCircle } from "lucide-react";
-import { format, subDays, startOfWeek, startOfMonth, isWithinInterval } from "date-fns";
+import { CheckCircle2, XCircle, Clock, MapPin, Banknote, Calendar } from "lucide-react";
+import { format, subDays, startOfWeek, startOfMonth } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 

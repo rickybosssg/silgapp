@@ -134,7 +134,7 @@
   }
   input::placeholder,
   textarea::placeholder {
-    color: #9ca3af; /* gray-400 — assez visible */
+    color: #475569; /* slate-600 */
     opacity: 1;
   }
   /* Empêcher texte blanc sur fond clair dans les cartes */
@@ -147,5 +147,62 @@
   .text-muted-foreground {
     color: hsl(var(--muted-foreground));
     /* minimum contrast garantit */
+  }
+
+  .bg-white.text-gray-300,
+  .bg-white .text-gray-300,
+  .bg-gray-50.text-gray-300,
+  .bg-gray-50 .text-gray-300 {
+    color: #6b7280 !important; /* gray-500 */
+  }
+
+  .bg-white.text-gray-400,
+  .bg-white .text-gray-400,
+  .bg-gray-50.text-gray-400,
+  .bg-gray-50 .text-gray-400,
+  .border-gray-100.text-gray-400,
+  .border-gray-100 .text-gray-400,
+  .border-gray-200.text-gray-400,
+  .border-gray-200 .text-gray-400 {
+    color: #4b5563 !important; /* gray-600 */
+  }
+
+  .bg-white .text-white\/40,
+  .bg-white .text-white\/50,
+  .bg-white .text-white\/60,
+  .bg-gray-50 .text-white\/40,
+  .bg-gray-50 .text-white\/50,
+  .bg-gray-50 .text-white\/60 {
+    color: #374151 !important; /* gray-700 */
+  }
+
+  .text-white\/30,
+  .text-white\/35,
+  .text-white\/40,
+  .text-white\/50,
+  .text-white\/60 {
+    color: rgb(255 255 255 / 0.8) !important;
+  }
+
+  .silgapp-auth-screen input:not([type="checkbox"]):not([type="radio"]) {
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+    caret-color: #ffffff !important;
+    background-color: #0f0f0f !important;
+  }
+
+  .silgapp-auth-screen input::placeholder {
+    color: #a1a1aa !important; /* zinc-400 */
+    -webkit-text-fill-color: #a1a1aa !important;
+    opacity: 1;
+  }
+
+  .silgapp-auth-screen input:-webkit-autofill,
+  .silgapp-auth-screen input:-webkit-autofill:hover,
+  .silgapp-auth-screen input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #ffffff !important;
+    caret-color: #ffffff !important;
+    box-shadow: 0 0 0 1000px #0f0f0f inset !important;
+    transition: background-color 9999s ease-out 0s;
   }
 }

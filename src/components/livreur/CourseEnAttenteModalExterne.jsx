@@ -3,6 +3,7 @@ import { MapPin, Phone, Navigation, Check, X, Package, Clock, MessageCircle, Rul
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
 import ManualPriceModal from "./ManualPriceModal";
+import { stopUrgentCourseAlert, useUrgentCourseAlert } from "@/lib/livreurUrgentAlert";
 
 function haversine(lat1, lon1, lat2, lon2) {
   if (!lat1 || !lon1 || !lat2 || !lon2) return null;
@@ -11,53 +12,6 @@ function haversine(lat1, lon1, lat2, lon2) {
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-// Vibration continue
-function useVibration(active) {
-  const intervalRef = useRef(null);
-  useEffect(() => {
-    if (active && navigator.vibrate) {
-      navigator.vibrate([500, 150, 500, 150, 500]);
-      intervalRef.current = setInterval(() => {
-        navigator.vibrate([500, 150, 500, 150, 500]);
-      }, 3000);
-    }
-    return () => {
-      navigator.vibrate?.(0);
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [active]);
-}
-
-let sharedAudioCtx = null;
-function getAudioCtx() {
-  if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
-    sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  if (sharedAudioCtx.state === 'suspended') {
-    sharedAudioCtx.resume();
-  }
-  return sharedAudioCtx;
-}
-
-function playNotificationSound() {
-  try {
-    const ctx = getAudioCtx();
-    const notes = [880, 1100, 880, 1100];
-    notes.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = freq;
-      osc.type = "sine";
-      gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.15);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.15 + 0.12);
-      osc.start(ctx.currentTime + i * 0.15);
-      osc.stop(ctx.currentTime + i * 0.15 + 0.13);
-    });
-  } catch (_) {}
 }
 
 const typeColisLabel = {
@@ -76,26 +30,17 @@ export default function CourseEnAttenteModalExterne({
   onRefuser,
   onExpire,
   pricingMode = "automatic", // "automatic" | "manual"
+  alertDurationSeconds = 60,
+  alertIntervalSeconds = 5,
 }) {
-  useVibration(true);
+  useUrgentCourseAlert(true, {
+    courseId: course?.id,
+    source: "course-modal",
+    durationSeconds: alertDurationSeconds,
+    intervalSeconds: alertIntervalSeconds,
+  });
 
-  // Calculer le temps restant depuis timeout_expires_at de la course (dynamique)
-  const getTempsInitial = () => {
-    if (course.timeout_expires_at) {
-      const remaining = Math.round((new Date(course.timeout_expires_at) - Date.now()) / 1000);
-      return Math.max(0, remaining);
-    }
-    return 60;
-  };
-
-  const totalTimeout = (() => {
-    if (course.timeout_expires_at && course.heure_sollicitation) {
-      return Math.round((new Date(course.timeout_expires_at) - new Date(course.heure_sollicitation)) / 1000);
-    }
-    return 60;
-  })();
-
-  const [tempsRestant, setTempsRestant] = useState(getTempsInitial);
+  const [tempsRestant, setTempsRestant] = useState(alertDurationSeconds);
   const [courseDejaPrise, setCourseDejaPrise] = useState(false);
   const [courseExpiree, setCourseExpiree] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -103,34 +48,32 @@ export default function CourseEnAttenteModalExterne({
 
   // Sonnerie répétée
   useEffect(() => {
-    playNotificationSound();
-    const t = setInterval(playNotificationSound, 5000);
-    return () => clearInterval(t);
-  }, []);
+    setTempsRestant(alertDurationSeconds);
+    setCourseDejaPrise(false);
+    setCourseExpiree(false);
+  }, [course?.id, alertDurationSeconds]);
 
+  // Timer 60 secondes
   const onExpireRef = useRef(onExpire);
   useEffect(() => { onExpireRef.current = onExpire; }, [onExpire]);
 
-  // Timer basé sur timeout_expires_at
   useEffect(() => {
-    if (tempsRestant <= 0) {
-      setCourseExpiree(true);
-      return;
-    }
     const timer = setInterval(() => {
-      const remaining = Math.round((new Date(course.timeout_expires_at || Date.now()) - Date.now()) / 1000);
-      if (remaining <= 0) {
-        clearInterval(timer);
-        setCourseExpiree(true);
-        setTempsRestant(0);
-      } else {
-        setTempsRestant(remaining);
-      }
+      setTempsRestant(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setCourseExpiree(true);
+          stopUrgentCourseAlert("course-expired");
+          // Ne pas appeler onExpire ici — le useEffect dédié ci-dessous gère le délai 3s
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
     return () => clearInterval(timer);
-  }, [course.timeout_expires_at]);
+  }, [course?.id]);
 
-  // Vérifier le verrou toutes les 3s — si un autre livreur a pris la course → "déjà prise"
+  // Vérifier expiration backend
   const courseExpireeSentRef = useRef(false);
   useEffect(() => {
     const checkStatus = async () => {
@@ -141,14 +84,14 @@ export default function CourseEnAttenteModalExterne({
           livreur_id: livreurId,
         });
         const d = data?.data;
-        // Un autre livreur a verrouillé la course
         if (d?.already_taken || (d?.found === false && !d?.expired)) {
+          stopUrgentCourseAlert("course-already-taken");
           setCourseDejaPrise(true);
           return;
         }
-        // Course expirée côté backend
         if (d?.expired && !courseExpireeSentRef.current) {
           courseExpireeSentRef.current = true;
+          stopUrgentCourseAlert("course-expired-backend");
           setCourseExpiree(true);
         }
       } catch (_) {}
@@ -179,9 +122,10 @@ export default function CourseEnAttenteModalExterne({
       });
       const data = res?.data;
 
-      if (data?.already_taken) { setCourseDejaPrise(true); return; }
-      if (data?.expired) { setCourseExpiree(true); return; }
-      if (data?.success) {
+      if (data?.already_taken || data?.reason === "already_taken") { stopUrgentCourseAlert("course-already-taken"); setCourseDejaPrise(true); return; }
+      if (data?.expired) { stopUrgentCourseAlert("course-expired"); setCourseExpiree(true); return; }
+      if (data?.success && data?.accepted !== false) {
+        stopUrgentCourseAlert("course-accepted");
         onAccepter();
       } else {
         alert(data?.error || "Erreur lors de l'acceptation");
@@ -208,9 +152,10 @@ export default function CourseEnAttenteModalExterne({
       });
       const data = res?.data;
 
-      if (data?.already_taken) { setCourseDejaPrise(true); return; }
-      if (data?.expired) { setCourseExpiree(true); return; }
-      if (data?.success) {
+      if (data?.already_taken || data?.reason === "already_taken") { stopUrgentCourseAlert("course-already-taken"); setCourseDejaPrise(true); return; }
+      if (data?.expired) { stopUrgentCourseAlert("course-expired"); setCourseExpiree(true); return; }
+      if (data?.success && data?.accepted !== false) {
+        stopUrgentCourseAlert("course-accepted-manual");
         setShowManualPriceModal(false);
         onAccepter(data?.pending_client_validation === true);
       } else {
@@ -235,6 +180,7 @@ export default function CourseEnAttenteModalExterne({
       });
       const data = res?.data;
       if (data?.success) {
+        stopUrgentCourseAlert("course-refused");
         onRefuser();
       }
     } catch (err) {
@@ -347,13 +293,13 @@ export default function CourseEnAttenteModalExterne({
             className={`h-full transition-all duration-1000 ${
               tempsRestant <= 10 ? 'bg-red-500' : tempsRestant <= 30 ? 'bg-amber-500' : 'bg-green-500'
             }`}
-            style={{ width: `${(tempsRestant / Math.max(totalTimeout, 1)) * 100}%` }}
+            style={{ width: `${(tempsRestant / alertDurationSeconds) * 100}%` }}
           />
         </div>
 
         <div className="px-5 py-2 bg-gray-50 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Clock className={`w-4 h-4 ${tempsRestant <= 10 ? 'text-red-500 animate-pulse' : 'text-gray-400'}`} />
+            <Clock className={`w-4 h-4 ${tempsRestant <= 10 ? 'text-red-500 animate-pulse' : 'text-gray-600'}`} />
             <span className={`text-sm font-bold ${tempsRestant <= 10 ? 'text-red-500' : 'text-gray-600'}`}>
               {tempsRestant}s restantes
             </span>
@@ -364,7 +310,7 @@ export default function CourseEnAttenteModalExterne({
           {/* Client */}
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Client</p>
+              <p className="text-xs text-gray-600 font-medium uppercase tracking-wide">Client</p>
               <p className="text-lg font-black text-gray-900">{course.expediteur_nom || "Client"}</p>
             </div>
             <div className="flex gap-2">
@@ -388,7 +334,7 @@ export default function CourseEnAttenteModalExterne({
                 <MapPin className="w-4 h-4 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wide">Récupérer</p>
+                <p className="text-[10px] text-gray-600 uppercase font-semibold tracking-wide">Récupérer</p>
                 <p className="text-sm font-bold text-gray-800 leading-tight">{course.adresse_depart}</p>
               </div>
               {course.gps_depart_lat && (
@@ -409,7 +355,7 @@ export default function CourseEnAttenteModalExterne({
                 <MapPin className="w-4 h-4 text-green-600" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wide">Livrer</p>
+                <p className="text-[10px] text-gray-600 uppercase font-semibold tracking-wide">Livrer</p>
                 <p className="text-sm font-bold text-gray-800 leading-tight">{course.adresse_arrivee || "Destination inconnue"}</p>
               </div>
             </div>
@@ -429,7 +375,7 @@ export default function CourseEnAttenteModalExterne({
                         ? `${prixBase.toLocaleString()} `
                         : `~${prixBase.toLocaleString()} `
                       }
-                      <span className={cn("text-base font-semibold", isPrixManuel ? "text-green-600" : "text-gray-400")}>FCFA</span>
+                      <span className={cn("text-base font-semibold", isPrixManuel ? "text-green-600" : "text-gray-600")}>FCFA</span>
                     </p>
                     {isPrixManuel && (
                       <div className="flex items-center gap-1 mt-0.5">
@@ -439,7 +385,7 @@ export default function CourseEnAttenteModalExterne({
                     )}
                     {course.type_colis && !isPrixManuel && (
                       <div className="flex items-center gap-1 mt-0.5">
-                        <Package className="w-3.5 h-3.5 text-gray-400" />
+                        <Package className="w-3.5 h-3.5 text-gray-600" />
                         <span className="text-xs text-gray-500">{typeColisLabel[course.type_colis] || course.type_colis}</span>
                       </div>
                     )}
@@ -458,7 +404,7 @@ export default function CourseEnAttenteModalExterne({
                     <Clock className="w-3.5 h-3.5 text-blue-600" />
                     <span className="text-sm font-black text-blue-900">~ {etaMin} min</span>
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-gray-400">
+                  <div className="flex items-center gap-1 text-xs text-gray-600">
                     <Ruler className="w-3 h-3" />
                     {distLabel}
                   </div>

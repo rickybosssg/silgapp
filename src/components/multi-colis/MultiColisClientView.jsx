@@ -1,7 +1,7 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { MapPin, CheckCircle, Clock, Package, Banknote } from "lucide-react";
+import { MapPin, Clock, Package, Banknote } from "lucide-react";
 import MultiColisProgressBadge from "./MultiColisProgressBadge";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -106,7 +106,7 @@ export default function MultiColisClientView({ course }) {
                   </p>
                   {colisItem.adresse_livraison && (
                     <div className="flex items-center gap-1 mt-0.5">
-                      <MapPin className="w-2.5 h-2.5 text-gray-400 flex-shrink-0" />
+                      <MapPin className="w-2.5 h-2.5 text-gray-600 flex-shrink-0" />
                       <p className="text-[10px] text-gray-500 truncate max-w-[140px]">{colisItem.adresse_livraison}</p>
                     </div>
                   )}
@@ -147,16 +147,16 @@ export default function MultiColisClientView({ course }) {
         {totalEncaisse > 0 && (
           <div className="grid grid-cols-3 gap-2 pt-1">
             <div className="bg-white rounded-xl p-2 text-center border border-purple-100">
-              <Banknote className="w-3 h-3 mx-auto mb-0.5 text-gray-400" />
-              <p className="text-[9px] text-gray-400 font-bold uppercase">Total encaissé</p>
+              <Banknote className="w-3 h-3 mx-auto mb-0.5 text-gray-600" />
+              <p className="text-[9px] text-gray-600 font-bold uppercase">Total encaissé</p>
               <p className="text-xs font-black text-gray-800">{totalEncaisse.toLocaleString()} {course.devise || "F"}</p>
             </div>
             <div className="bg-white rounded-xl p-2 text-center border border-green-100">
-              <p className="text-[9px] text-gray-400 font-bold uppercase">Gain livreur</p>
+              <p className="text-[9px] text-gray-600 font-bold uppercase">Gain livreur</p>
               <p className="text-xs font-black text-green-700">{gainLivreur.toLocaleString()} {course.devise || "F"}</p>
             </div>
             <div className="bg-white rounded-xl p-2 text-center border border-gray-100">
-              <p className="text-[9px] text-gray-400 font-bold uppercase">Commission</p>
+              <p className="text-[9px] text-gray-600 font-bold uppercase">Commission</p>
               <p className="text-xs font-black text-gray-500">{commission.toLocaleString()} {course.devise || "F"}</p>
             </div>
           </div>

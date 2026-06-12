@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, MapPin, Package, Truck, Menu, X, LogOut, Bell } from "lucide-react";
+import { Menu, X, LogOut, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -79,7 +79,7 @@ export default function MobileNav({ notificationCount = 0, reseau }) {
             <span className="text-primary-foreground font-black text-sm">S</span>
           </div>
           <div>
-            <h1 className="font-extrabold text-sm text-foreground leading-tight">SILGAPP 2</h1>
+            <h1 className="font-extrabold text-sm text-foreground leading-tight">SILGAPP</h1>
             <p className="text-[9px] text-muted-foreground leading-tight">Silga Livraison</p>
           </div>
         </div>

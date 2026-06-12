@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Loader2, Navigation } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 export default function ModernMap({ 
   position, 

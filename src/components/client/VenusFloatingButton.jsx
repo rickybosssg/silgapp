@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Sparkles, Move } from "lucide-react";
+import { Sparkles, Move } from "lucide-react";
 import VenusChat from "./VenusChat";
 import { useAdminContext } from "@/hooks/useAdminContext";
 import { base44 } from "@/api/base44Client";

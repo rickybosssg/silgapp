@@ -1,14 +1,96 @@
 import { base44 } from "@/api/base44Client";
+import { Capacitor, registerPlugin } from "@capacitor/core";
+import { LocalNotifications } from "@capacitor/local-notifications";
+import { PushNotifications } from "@capacitor/push-notifications";
+import {
+  isLivreurNewCourseNotification,
+  saveLivreurAlertConfig,
+  startUrgentCourseAlert,
+  stopUrgentCourseAlert,
+} from "@/lib/livreurUrgentAlert";
 
 const ANDROID_CHANNEL_ID = "silgapp_default";
+const SilgappPush = registerPlugin("SilgappPush");
 let nativeListenersReady = false;
+let nativeRegistrationListenersReady = false;
+let pendingNativeRegistration = null;
+let lastNativeToken = null;
+let lastNativeTokenPlatform = null;
+let lastNativeRegistrationError = null;
+const recentNativeNotifications = new Map();
+
+function getNotificationDedupeKey(data = {}) {
+  return String(
+    data.notification_id ||
+    (data.course_id && data.type ? `${data.type}:${data.course_id}` : "") ||
+    data.course_id ||
+    ""
+  );
+}
+
+function shouldSkipDuplicateNotification(data = {}, ttlMs = 120000) {
+  const key = getNotificationDedupeKey(data);
+  if (!key) return false;
+  const now = Date.now();
+  const previous = recentNativeNotifications.get(key) || 0;
+  recentNativeNotifications.set(key, now);
+  for (const [entryKey, at] of recentNativeNotifications) {
+    if (now - at > ttlMs) recentNativeNotifications.delete(entryKey);
+  }
+  return now - previous < ttlMs;
+}
+
+function withNativeTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} timeout apres ${ms / 1000}s`)), ms);
+    }),
+  ]);
+}
+
+function savePushDebug(event, details = {}) {
+  const entry = {
+    event,
+    details,
+    at: new Date().toISOString(),
+  };
+  try {
+    const previous = JSON.parse(localStorage.getItem("silgapp_push_debug") || "[]");
+    localStorage.setItem("silgapp_push_debug", JSON.stringify([...previous.slice(-24), entry]));
+  } catch (_) {}
+  console.log(`[SILGAPP Push] ${event}`, details);
+}
+
+function dispatchNotificationOpened(data = {}, source = "push") {
+  stopUrgentCourseAlert("notification-opened");
+  const detail = { ...(data || {}), source };
+  try {
+    localStorage.setItem("silgapp_last_opened_notification", JSON.stringify({
+      ...detail,
+      opened_at: new Date().toISOString(),
+    }));
+  } catch (_) {}
+  window.dispatchEvent(new CustomEvent("silgapp:notification-opened", { detail }));
+}
+
+function maybeStartLivreurCourseAlert(data = {}, source = "push") {
+  if (!isLivreurNewCourseNotification(data)) return;
+  const config = saveLivreurAlertConfig(data);
+  startUrgentCourseAlert({
+    courseId: data.course_id || "",
+    notificationId: data.notification_id || "",
+    source,
+    ...config,
+  });
+}
 
 export function detectEnvironment() {
-  if (typeof window !== "undefined" && window.Capacitor) {
+  if (Capacitor.isNativePlatform()) {
     return {
       platform: "capacitor",
       isNative: true,
-      os: window.Capacitor.getPlatform(),
+      os: Capacitor.getPlatform(),
     };
   }
 
@@ -19,36 +101,81 @@ export function detectEnvironment() {
   };
 }
 
-async function getCapacitorPlugin(pluginName, packageName) {
-  if (typeof window === "undefined" || !window.Capacitor) return null;
+function getCapacitorPlugin(pluginName, packageName) {
+  if (!Capacitor.isNativePlatform()) return null;
+
+  const plugins = {
+    "@capacitor/local-notifications": { LocalNotifications },
+    "@capacitor/push-notifications": { PushNotifications },
+  };
+  const plugin = plugins[packageName]?.[pluginName];
+
+  if (!plugin) {
+    console.warn(`Plugin ${packageName} non disponible`);
+  }
+  return plugin || null;
+}
+
+export async function getNativePushDebugState() {
+  const env = detectEnvironment();
+  const state = {
+    env,
+    isNative: env.isNative,
+    platform: env.os,
+    hasPushPlugin: false,
+    permissions: null,
+    lastNativeToken,
+    lastNativeTokenPlatform,
+    lastNativeRegistrationError,
+  };
+
+  if (!env.isNative) return state;
 
   try {
-    const module = await import(/* @vite-ignore */ packageName);
-    return module[pluginName];
+    const NativePush = getCapacitorPlugin("PushNotifications", "@capacitor/push-notifications");
+    state.hasPushPlugin = !!NativePush;
+    state.hasSilgappPushPlugin = true;
+    try {
+      state.permissions = await withNativeTimeout(
+        SilgappPush.checkNotificationPermission(),
+        2500,
+        "SilgappPush.checkNotificationPermission"
+      );
+    } catch (permissionError) {
+      state.permissionError = permissionError?.message || String(permissionError);
+    }
   } catch (error) {
-    console.warn(`Plugin ${packageName} non disponible:`, error.message);
-    return null;
+    state.error = error?.message || String(error);
   }
+
+  return state;
 }
 
 function resolveNotificationIdentity(livreurId = null, currentUser = null) {
-  const userType = currentUser?.role === "admin" ? "admin" : "livreur";
+  const userType =
+    currentUser?.user_type === "client" ? "client" :
+    currentUser?.user_type === "admin" || currentUser?.role === "admin" ? "admin" :
+    "livreur";
   const resolvedLivreurId = livreurId || currentUser?.livreur_id || currentUser?.livreur?.id || null;
+  const resolvedClientId = currentUser?.client_id || currentUser?.client?.id || null;
   const fallbackEmail = userType === "admin"
     ? "admin@silgapp2.local"
-    : `livreur-${resolvedLivreurId || "unknown"}@silgapp2.local`;
+    : userType === "client"
+      ? `client-${resolvedClientId || "unknown"}@silgapp2.local`
+      : `livreur-${resolvedLivreurId || "unknown"}@silgapp2.local`;
 
   return {
     user_email: (currentUser?.email || currentUser?.user_email || currentUser?.livreur?.user_email || fallbackEmail).trim().toLowerCase(),
     user_type: userType,
     livreur_id: resolvedLivreurId,
+    client_id: resolvedClientId,
   };
 }
 
 async function ensureNativePushListeners() {
   if (nativeListenersReady) return;
 
-  const PushNotifications = await getCapacitorPlugin("PushNotifications", "@capacitor/push-notifications");
+  const PushNotifications = getCapacitorPlugin("PushNotifications", "@capacitor/push-notifications");
   if (!PushNotifications) return;
 
   nativeListenersReady = true;
@@ -71,10 +198,43 @@ async function ensureNativePushListeners() {
     await PushNotifications.addListener("pushNotificationReceived", (notification) => {
       const title = notification.title || notification.notification?.title || "SILGAPP";
       const body = notification.body || notification.notification?.body || "";
-      showLocalNotification(title, body, { data: notification.data || {} });
+      const data = notification.data || {};
+      if (shouldSkipDuplicateNotification(data)) {
+        savePushDebug("duplicate-push-skipped", { data });
+        return;
+      }
+      maybeStartLivreurCourseAlert(data, "push-received");
+      showLocalNotification(title, body, { data });
+    });
+    await PushNotifications.addListener("pushNotificationActionPerformed", (event) => {
+      savePushDebug("notification-click", {
+        source: "push",
+        actionId: event?.actionId,
+        data: event?.notification?.data || {},
+      });
+      window.focus?.();
+      dispatchNotificationOpened(event?.notification?.data || {}, "push");
     });
   } catch (error) {
     console.warn("[Notifications] pushNotificationReceived listener failed:", error?.message);
+  }
+
+  try {
+    const LocalNotifications = getCapacitorPlugin("LocalNotifications", "@capacitor/local-notifications");
+    await LocalNotifications?.addListener?.("localNotificationActionPerformed", (event) => {
+      savePushDebug("notification-click", {
+        source: "local",
+        actionId: event?.actionId,
+        data: event?.notification?.extra || event?.notification?.data || {},
+      });
+      window.focus?.();
+      dispatchNotificationOpened(
+        event?.notification?.extra || event?.notification?.data || {},
+        "local"
+      );
+    });
+  } catch (error) {
+    console.warn("[Notifications] notification click listener failed:", error?.message);
   }
 }
 
@@ -82,7 +242,7 @@ export async function checkNotificationSupport() {
   const env = detectEnvironment();
 
   if (env.isNative && env.os === "android") {
-    const PushNotifications = await getCapacitorPlugin("PushNotifications", "@capacitor/push-notifications");
+    const PushNotifications = getCapacitorPlugin("PushNotifications", "@capacitor/push-notifications");
     if (!PushNotifications) {
       return {
         supported: false,
@@ -122,7 +282,7 @@ export async function requestNotificationPermission() {
   const env = detectEnvironment();
 
   if (env.isNative && env.os === "android") {
-    const PushNotifications = await getCapacitorPlugin("PushNotifications", "@capacitor/push-notifications");
+    const PushNotifications = getCapacitorPlugin("PushNotifications", "@capacitor/push-notifications");
     if (!PushNotifications) {
       return { granted: false, type: "native", error: "Plugin non disponible" };
     }
@@ -229,12 +389,12 @@ export function showLocalNotification(titre, message, options = {}) {
 }
 
 async function showNativeNotification(titre, message, options = {}) {
-  const LocalNotifications = await getCapacitorPlugin("LocalNotifications", "@capacitor/local-notifications");
+  const LocalNotifications = getCapacitorPlugin("LocalNotifications", "@capacitor/local-notifications");
   if (!LocalNotifications) return;
 
   // Vibration native Capacitor
   if (isImportant(options)) {
-    const Haptics = await getCapacitorPlugin("Haptics", "@capacitor/haptics");
+    const Haptics = getCapacitorPlugin("Haptics", "@capacitor/haptics");
     if (Haptics) {
       Haptics.vibrate?.({ duration: 500 }).catch(() => null);
     } else if (typeof navigator !== "undefined" && navigator.vibrate) {
@@ -278,6 +438,7 @@ async function saveTokenDirectly({ token, platform, livreurId, currentUser }) {
     platform,
     user_type: identity.user_type,
     livreur_id: identity.livreur_id || "",
+    client_id: identity.client_id || "",
     actif: true,
     derniere_utilisation: new Date().toISOString(),
   };
@@ -292,11 +453,30 @@ async function saveTokenDirectly({ token, platform, livreurId, currentUser }) {
   return { success: true, action: "created-direct", ...payload };
 }
 
+async function cleanupDuplicateNativeTokens({ token, userEmail, userType }) {
+  const normalizedEmail = String(userEmail || "").trim().toLowerCase();
+  if (!normalizedEmail || !token || String(token).startsWith("web_")) return;
+
+  try {
+    const tokens = await base44.entities.NotificationToken.filter({
+      user_email: normalizedEmail,
+      user_type: userType || "livreur",
+      actif: true,
+    });
+
+    await Promise.all((tokens || [])
+      .filter((item) => item.token !== token && !String(item.token || "").startsWith("web_"))
+      .map((item) => base44.entities.NotificationToken.update(item.id, { actif: false })));
+  } catch (error) {
+    savePushDebug("token-cleanup-skipped", { error: error?.message || String(error) });
+  }
+}
+
 async function persistPushToken({ token, platform, livreurId, clientId, currentUser }) {
   const identity = resolveNotificationIdentity(livreurId, currentUser);
   // Supporter user_type='client' passé explicitement
   const resolvedUserType = currentUser?.user_type || identity.user_type;
-  const resolvedClientId = clientId || currentUser?.client_id || null;
+  const resolvedClientId = clientId || identity.client_id || currentUser?.client_id || null;
   const payload = {
     token,
     platform,
@@ -309,83 +489,204 @@ async function persistPushToken({ token, platform, livreurId, clientId, currentU
   try {
     const result = await base44.functions.invoke("enregistrerTokenPush", payload);
     if (result?.error) throw new Error(result.error);
+    await cleanupDuplicateNativeTokens({
+      token,
+      userEmail: identity.user_email,
+      userType: resolvedUserType,
+    });
     return result;
   } catch (error) {
     console.warn("[registerPushToken] Backend function failed, using entity fallback:", error?.message);
-    return saveTokenDirectly({ token, platform, livreurId: identity.livreur_id, currentUser });
+    const directResult = await saveTokenDirectly({ token, platform, livreurId: identity.livreur_id, currentUser });
+    await cleanupDuplicateNativeTokens({
+      token,
+      userEmail: identity.user_email,
+      userType: resolvedUserType,
+    });
+    return directResult;
   }
+}
+
+async function getDirectNativeFcmToken() {
+  const env = detectEnvironment();
+  if (!env.isNative || env.os !== "android") return null;
+
+  savePushDebug("direct-native-start", { platform: env.os });
+
+  const permission = await withNativeTimeout(
+    SilgappPush.requestNotificationPermission(),
+    12000,
+    "SilgappPush.requestNotificationPermission"
+  );
+  savePushDebug("direct-native-permission", permission);
+
+  if (permission?.receive !== "granted") {
+    lastNativeRegistrationError = { error: "Permission notification refusee", permission };
+    savePushDebug("direct-native-permission-refused", permission);
+    return null;
+  }
+
+  const result = await withNativeTimeout(
+    SilgappPush.getToken(),
+    20000,
+    "SilgappPush.getToken"
+  );
+
+  if (!result?.token) {
+    throw new Error("SilgappPush.getToken a repondu sans token");
+  }
+
+  lastNativeToken = result.token;
+  lastNativeTokenPlatform = result.platform || env.os;
+  lastNativeRegistrationError = null;
+  savePushDebug("direct-native-token", {
+    tokenPrefix: result.token.slice(0, 24),
+    tokenLength: result.token.length,
+    platform: lastNativeTokenPlatform,
+  });
+  return result.token;
+}
+
+async function persistLastNativeToken() {
+  if (!lastNativeToken || !pendingNativeRegistration) return null;
+
+  const { platform, livreurId, clientId, currentUser } = pendingNativeRegistration;
+  await persistPushToken({
+    token: lastNativeToken,
+    platform: platform || lastNativeTokenPlatform || "android",
+    livreurId,
+    clientId,
+    currentUser,
+  });
+  return lastNativeToken;
+}
+
+async function ensureNativeRegistrationListeners() {
+  if (nativeRegistrationListenersReady) return;
+
+  const NativePush = getCapacitorPlugin("PushNotifications", "@capacitor/push-notifications");
+  if (!NativePush) return;
+
+  nativeRegistrationListenersReady = true;
+
+  await NativePush.addListener("registration", async (data) => {
+    const token = data?.value;
+    if (!token) return;
+
+    lastNativeToken = token;
+    lastNativeTokenPlatform = Capacitor.getPlatform();
+    lastNativeRegistrationError = null;
+    savePushDebug("registration", {
+      platform: lastNativeTokenPlatform,
+      tokenPrefix: token.slice(0, 24),
+      tokenLength: token.length,
+    });
+
+    try {
+      await persistLastNativeToken();
+      savePushDebug("token-persisted", { platform: lastNativeTokenPlatform });
+    } catch (error) {
+      savePushDebug("token-persist-failed", { error: error?.message || String(error) });
+      console.error("[registerPushToken] Erreur sauvegarde token FCM:", error);
+    }
+  });
+
+  await NativePush.addListener("registrationError", (error) => {
+    lastNativeRegistrationError = error;
+    savePushDebug("registration-error", error);
+    console.error("[registerPushToken] Erreur registration FCM:", error);
+  });
 }
 
 export async function registerPushToken(livreurId = null, currentUser = null) {
   const clientId = currentUser?.client_id || null;
   try {
     const env = detectEnvironment();
-    console.log("[registerPushToken] Environment:", env);
+    savePushDebug("register-start", { env, livreurId, user_type: currentUser?.user_type });
 
-    if (env.isNative && env.os === "android") {
-      const PushNotifications = await getCapacitorPlugin("PushNotifications", "@capacitor/push-notifications");
+    if (env.isNative && (env.os === "android" || env.os === "ios")) {
+      const PushNotifications = getCapacitorPlugin("PushNotifications", "@capacitor/push-notifications");
       if (!PushNotifications) {
         console.warn("[registerPushToken] PushNotifications non disponible");
         return null;
       }
 
       try {
+        if (env.os === "android") {
+          try {
+            pendingNativeRegistration = {
+              platform: env.os,
+              livreurId,
+              clientId,
+              currentUser,
+            };
+            const directToken = await getDirectNativeFcmToken();
+            if (directToken) {
+              await persistLastNativeToken();
+              savePushDebug("direct-native-token-persisted", { platform: lastNativeTokenPlatform });
+              return directToken;
+            }
+          } catch (directError) {
+            lastNativeRegistrationError = { error: directError?.message || String(directError) };
+            savePushDebug("direct-native-error", lastNativeRegistrationError);
+          }
+        }
+
         await ensureNativePushListeners();
+        await ensureNativeRegistrationListeners();
+
+        pendingNativeRegistration = {
+          platform: env.os,
+          livreurId,
+          clientId,
+          currentUser,
+        };
+
         const permResult = await PushNotifications.requestPermissions();
-        console.log("[registerPushToken] Permission:", permResult);
+        savePushDebug("permission-result", permResult);
 
         if (permResult.receive !== "granted" && permResult.display !== "granted") {
           console.warn("[registerPushToken] Permission refusee");
           return null;
         }
 
-        return new Promise(async (resolve, reject) => {
-          let settled = false;
-          let registrationHandle = null;
-          let errorHandle = null;
+        if (lastNativeToken) {
+          await persistLastNativeToken();
+          return lastNativeToken;
+        }
 
-          const finish = async (value, isError = false) => {
-            if (settled) return;
-            settled = true;
-            try { await registrationHandle?.remove?.(); } catch (_) {}
-            try { await errorHandle?.remove?.(); } catch (_) {}
-            isError ? reject(value) : resolve(value);
-          };
+        await PushNotifications.register();
+        savePushDebug("fcm-register-called", { platform: env.os });
 
-          registrationHandle = await PushNotifications.addListener("registration", async (data) => {
-            const token = data.value;
-            console.log("[registerPushToken] Token FCM recu:", token);
-
-            try {
-              await persistPushToken({ token, platform: "android", livreurId, clientId, currentUser });
-              console.log("[registerPushToken] Token enregistre en DB");
-              finish(token);
-            } catch (err) {
-              console.error("[registerPushToken] Erreur sauvegarde token:", err);
-              finish(err, true);
+        return new Promise((resolve) => {
+          const startedAt = Date.now();
+          const interval = setInterval(async () => {
+            if (lastNativeToken) {
+              clearInterval(interval);
+              try {
+                await persistLastNativeToken();
+              } catch (error) {
+                console.error("[registerPushToken] Erreur sauvegarde token apres attente:", error);
+              }
+              resolve(lastNativeToken);
+              return;
             }
-          });
 
-          errorHandle = await PushNotifications.addListener("registrationError", (error) => {
-            console.error("[registerPushToken] Erreur registration:", error);
-            finish(error, true);
-          });
-
-          await PushNotifications.register();
-          console.log("[registerPushToken] Enregistre aupres de FCM");
-
-          setTimeout(() => {
-            console.warn("[registerPushToken] Timeout - aucun token recu");
-            finish(null);
-          }, 30000);
+            if (Date.now() - startedAt > 30000) {
+              clearInterval(interval);
+              savePushDebug("registration-timeout", await getNativePushDebugState());
+              resolve(null);
+            }
+          }, 500);
         });
       } catch (error) {
+        savePushDebug("register-exception", { error: error?.message || String(error) });
         console.error("[registerPushToken] Erreur FCM (non bloquante):", error);
         return null;
       }
     }
 
-    console.log("[registerPushToken] Mode web");
+    savePushDebug("web-mode", { env });
     if (typeof window === "undefined" || !("Notification" in window)) {
       console.warn("[registerPushToken] Notifications web non supportees");
       return null;
@@ -412,30 +713,47 @@ export async function getCurrentFCMToken() {
   return null;
 }
 
-export function subscribeToNotifications(onNotification, userEmail) {
-  // Garde-fou anti-doublon : IDs déjà traités dans cette session
+export async function openNativeNotificationSettings() {
+  const env = detectEnvironment();
+  if (!env.isNative || env.os !== "android") return false;
+  await SilgappPush.openNotificationSettings();
+  return true;
+}
+
+export function subscribeToNotifications(onNotification, userEmail, options = {}) {
   const processedIds = new Set();
+  const normalizedEmail = String(userEmail || "").trim().toLowerCase();
 
   const unsubscribe = base44.entities.Notification.subscribe((event) => {
-    if (event.type === "create" && event.data?.destinataire_email === userEmail) {
-      const notification = event.data;
+    const notification = event.data;
+    const targetEmail = String(notification?.destinataire_email || "").trim().toLowerCase();
+    if (event.type !== "create" || !notification || targetEmail !== normalizedEmail) return;
 
-      // Anti-doublon : ignorer si déjà traité
-      if (processedIds.has(notification.id)) return;
-      processedIds.add(notification.id);
+    if (processedIds.has(notification.id)) return;
+    processedIds.add(notification.id);
 
-      // Notification système locale (barre de statut)
+    const data = {
+      type: notification.type,
+      course_id: notification.course_id,
+      notification_id: notification.id,
+      user_type: options.userType || "",
+      livreur_id: options.livreurId || "",
+    };
+
+    if (!Capacitor.isNativePlatform()) {
       showLocalNotification(notification.titre, notification.message, {
-        tag: `silgapp-${notification.id}`, // tag unique → évite doublon système
-        data: {
-          type: notification.type,
-          course_id: notification.course_id,
-        },
+        tag: `silgapp-${notification.id}`,
+        data,
       });
-
-      // Callback (pour afficher toast ou mettre à jour l'UI)
-      if (onNotification) onNotification(notification);
+    } else {
+      shouldSkipDuplicateNotification(data);
     }
+
+    if (options.userType === "livreur") {
+      maybeStartLivreurCourseAlert(data, "realtime");
+    }
+
+    if (onNotification) onNotification(notification);
   });
 
   return unsubscribe;

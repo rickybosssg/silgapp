@@ -2,6 +2,20 @@
   "name": "WhatsAppAlerte",
   "type": "object",
   "properties": {
+    "country_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE"
+      ],
+      "description": "Pays cible de l'alerte WhatsApp/SMS"
+    },
     "livreur_id": {
       "type": "string",
       "description": "ID du livreur concern\u00e9"

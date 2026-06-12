@@ -20,6 +20,60 @@ function calculerDistance(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function normalizeCountryCode(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
+async function verifierPaysCourseLivreur(base44, course, livreurId, contexte) {
+  const livreur = await base44.asServiceRole.entities.Livreur.get(livreurId);
+  if (!livreur) {
+    return {
+      ok: false,
+      status: 404,
+      response: { success: false, found: false, error: 'Livreur introuvable' },
+    };
+  }
+
+  const courseCountry = normalizeCountryCode(course?.country_code);
+  const livreurCountry = normalizeCountryCode(livreur.country_code);
+  if (!courseCountry || !livreurCountry || courseCountry !== livreurCountry) {
+    console.error('[DISPATCH][COUNTRY_MISMATCH_BLOCKED]', {
+      contexte,
+      course_id: course?.id,
+      livreur_id: livreurId,
+      course_country_code: courseCountry || 'ABSENT',
+      livreur_country_code: livreurCountry || 'ABSENT',
+    });
+    return {
+      ok: false,
+      status: 403,
+      response: {
+        success: false,
+        found: false,
+        error: 'country_mismatch',
+        blocked_reason: 'country_mismatch',
+      },
+    };
+  }
+
+  return { ok: true, livreur, courseCountry, livreurCountry };
+}
+
+function reponseDejaPrise(reason, course, details = {}) {
+  return {
+    success: false,
+    accepted: false,
+    reason: 'already_taken',
+    already_taken: true,
+    error: 'Cette course a deja ete prise par un autre livreur',
+    dispatch_status: course?.dispatch_status || '',
+    existing_livreur_id: course?.livreur_id || '',
+    accepted_by_livreur_id: course?.accepted_by_livreur_id || course?.livreur_id || '',
+    details: reason,
+    ...details,
+  };
+}
+
 /**
  * Charge la configuration de dispatch depuis AppConfig.
  * Clés : DISPATCH_NB_LIVREURS (défaut: 3), DISPATCH_TIMEOUT_SEC (défaut: 60)
@@ -354,10 +408,13 @@ Deno.serve(async (req) => {
       const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
       if (!course) return Response.json({ found: false });
 
+      const countryGuard = await verifierPaysCourseLivreur(base44, course, livreur_id, 'check_course_pour_livreur');
+      if (!countryGuard.ok) return Response.json(countryGuard.response, { status: countryGuard.status });
+
       // Course annulée ou livrée → plus disponible, nettoyer les notifs du livreur
       if (course.statut === 'annulee' || course.statut === 'livree') {
         try {
-          const livreurData = await base44.asServiceRole.entities.Livreur.get(livreur_id);
+          const livreurData = countryGuard.livreur;
           if (livreurData?.user_email) {
             const notifs = await base44.asServiceRole.entities.Notification.filter({
               course_id: course_id,
@@ -404,14 +461,37 @@ Deno.serve(async (req) => {
       const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
 
+      const countryGuard = await verifierPaysCourseLivreur(base44, course, livreur_id, 'accepter_course');
+      if (!countryGuard.ok) return Response.json(countryGuard.response, { status: countryGuard.status });
+      const livreur = countryGuard.livreur;
+
+      console.log('[DISPATCH][ACCEPT_ATTEMPT]', {
+        course_id,
+        livreur_id,
+        course_status: course.statut || '',
+        dispatch_status: course.dispatch_status || '',
+        existing_livreur_id: course.livreur_id || '',
+        accepted_by_livreur_id: course.accepted_by_livreur_id || '',
+      });
+
       // Vérification 1 : Si déjà acceptée par un autre
-      if (course.dispatch_status === 'accepte' && course.livreur_id && course.livreur_id !== livreur_id) {
-        return Response.json({ success: false, error: 'Course déjà prise', already_taken: true });
+      if (course.dispatch_status === 'accepte' || course.dispatch_status === 'accepted') {
+        return Response.json(reponseDejaPrise('dispatch_already_accepted', course));
       }
 
       // Vérification 2 : Si livreur_id est déjà fixé (même en propose)
-      if (course.livreur_id && course.livreur_id !== livreur_id && course.dispatch_status === 'propose') {
-        return Response.json({ success: false, error: 'Course déjà prise par un autre livreur', already_taken: true });
+      if (course.livreur_id || course.accepted_by_livreur_id) {
+        return Response.json(reponseDejaPrise('livreur_lock_already_set', course));
+      }
+
+      if (course.dispatch_status !== 'propose') {
+        return Response.json({
+          success: false,
+          accepted: false,
+          reason: 'not_available',
+          error: "Cette course n'est plus disponible",
+          dispatch_status: course.dispatch_status || '',
+        });
       }
 
       // Vérifier que ce livreur fait partie des notifiés
@@ -427,9 +507,6 @@ Deno.serve(async (req) => {
       if (course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date()) {
         return Response.json({ success: false, error: 'Course expirée', expired: true });
       }
-
-      const livreur = await base44.asServiceRole.entities.Livreur.get(livreur_id);
-      if (!livreur) return Response.json({ error: 'Livreur introuvable' }, { status: 404 });
 
       const PRIX_MIN = 1000;
       if (pricing_mode === 'manual') {
@@ -448,8 +525,20 @@ Deno.serve(async (req) => {
 
       // Re-vérification finale AVANT de verrouiller (double-check locking)
       const courseFinal = await base44.asServiceRole.entities.CourseExterne.get(course_id);
-      if (courseFinal.dispatch_status === 'accepte' && courseFinal.livreur_id && courseFinal.livreur_id !== livreur_id) {
-        return Response.json({ success: false, error: 'Course déjà prise pendant votre attente', already_taken: true });
+      console.log('[DISPATCH][ACCEPT_FINAL_CHECK]', {
+        course_id,
+        livreur_id,
+        course_status: courseFinal.statut || '',
+        dispatch_status: courseFinal.dispatch_status || '',
+        existing_livreur_id: courseFinal.livreur_id || '',
+        accepted_by_livreur_id: courseFinal.accepted_by_livreur_id || '',
+      });
+      if (
+        courseFinal.dispatch_status !== 'propose' ||
+        courseFinal.livreur_id ||
+        courseFinal.accepted_by_livreur_id
+      ) {
+        return Response.json(reponseDejaPrise('final_check_already_taken', courseFinal));
       }
 
       // Générer tokens QR/PIN
@@ -470,6 +559,8 @@ Deno.serve(async (req) => {
         livreur_vehicule: livreur.vehicule || livreur.type_vehicule || 'moto',
         livreur_note_moyenne: livreur.note_moyenne || 0,
         livreur_nombre_avis: livreur.nombre_avis || 0,
+        accepted_by_livreur_id: livreur_id,
+        accepted_at: isManual ? null : new Date().toISOString(),
         pickup_qr_token: pickupToken,
         pickup_code_4_digits: pickupPIN,
         delivery_qr_token: deliveryToken,
@@ -490,7 +581,7 @@ Deno.serve(async (req) => {
         await base44.asServiceRole.entities.Livreur.update(livreur_id, { statut: 'en_course' });
         await supprimerNotificationsCourse(base44, course_id);
         console.log(`[DISPATCH] 🎉 Course ${course_id} verrouillée (auto) par ${livreur_id}`);
-        return Response.json({ success: true });
+        return Response.json({ success: true, accepted: true, course_id, livreur_id });
       }
 
       // Mode manuel : notifier le créateur de la course
@@ -510,7 +601,7 @@ Deno.serve(async (req) => {
           await base44.asServiceRole.entities.Notification.create({
             titre: '💰 Prix proposé par le livreur',
             message: `${livreur.prenom || ''} ${livreur.nom} propose cette course à ${Number(manual_price).toLocaleString()} FCFA. Acceptez-vous ?`,
-            type: 'course_acceptee',
+            type: 'generic',
             course_id: course_id,
             destinataire_email: clientEmail,
             lue: false,
@@ -520,13 +611,16 @@ Deno.serve(async (req) => {
         console.warn('[DISPATCH] Erreur notif client prix manuel:', e.message);
       }
 
-      return Response.json({ success: true, pending_client_validation: true });
+      return Response.json({ success: true, accepted: true, pending_client_validation: true, course_id, livreur_id });
     }
 
     // ─── 4. Refuser une course ─────────────────────────────────────────────
     if (action === 'refuser_course') {
       const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
+
+      const countryGuard = await verifierPaysCourseLivreur(base44, course, livreur_id, 'refuser_course');
+      if (!countryGuard.ok) return Response.json(countryGuard.response, { status: countryGuard.status });
 
       // Course déjà verrouillée par un AUTRE livreur → le refus est ignoré
       if (course.dispatch_status === 'accepte' && course.livreur_id !== livreur_id) {

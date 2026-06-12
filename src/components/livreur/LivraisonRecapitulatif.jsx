@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { CheckCircle2, MapPin, Banknote, Clock, TrendingUp, Star } from "lucide-react";
 
 /**

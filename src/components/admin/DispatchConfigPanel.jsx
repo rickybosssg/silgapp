@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
-import { Zap, Save, Loader2, Users, Clock, Info } from "lucide-react";
+import { Save, Loader2, Users, Clock, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const NB_OPTIONS = [

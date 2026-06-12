@@ -1,7 +1,6 @@
 import React from "react";
 import { X, MapPin, Clock, Wifi, WifiOff, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow, format } from "date-fns";
 import { fr } from "date-fns/locale";
 

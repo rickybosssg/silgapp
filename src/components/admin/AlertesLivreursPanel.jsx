@@ -2,14 +2,13 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { 
-  Bell, Plus, Trash2, CheckCircle, Users, Eye, EyeOff,
-  AlertTriangle, Info, Loader2, X, ChevronDown, ChevronUp
+  Bell, Plus, Trash2, Loader2, X, ChevronDown, ChevronUp
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
+import { useAdminContext } from "@/hooks/useAdminContext.js";
 
 const NIVEAU_CONFIG = {
   information: { emoji: "🟢", label: "Information", color: "bg-green-100 text-green-700 border-green-200", dot: "bg-green-500" },
@@ -17,7 +16,7 @@ const NIVEAU_CONFIG = {
   urgent:      { emoji: "🔴", label: "Urgent",      color: "bg-red-100 text-red-700 border-red-200", dot: "bg-red-500" },
 };
 
-function NouvelleAlerteForm({ onClose, onCreated }) {
+function NouvelleAlerteForm({ onClose, onCreated, countryCode }) {
   const [form, setForm] = useState({
     titre: "",
     message: "",
@@ -39,6 +38,7 @@ function NouvelleAlerteForm({ onClose, onCreated }) {
       const user = await base44.auth.me();
       const data = {
         ...form,
+        country_code: countryCode || "",
         actif: true,
         nb_lectures: 0,
         cree_par: user?.full_name || user?.email || "Admin",
@@ -108,7 +108,7 @@ function NouvelleAlerteForm({ onClose, onCreated }) {
                   className={`py-2.5 rounded-xl border-2 text-center transition-all text-xs font-bold ${
                     form.reseau === opt.val
                       ? "border-slate-700 bg-slate-50 text-slate-800"
-                      : "border-gray-200 bg-white text-gray-400"
+                      : "border-gray-200 bg-white text-gray-600"
                   }`}
                 >
                   <div>{opt.emoji}</div>
@@ -215,13 +215,13 @@ function AlerteStatsRow({ alerte, totalLivreurs, onArchiver }) {
                 </span>
               )}
               {alerte.reseau !== "tous" && (
-                <span className="text-[10px] font-semibold text-gray-400">{alerte.reseau === "interne" ? "🏠 Interne" : "🌍 Externe"}</span>
+                <span className="text-[10px] font-semibold text-gray-600">{alerte.reseau === "interne" ? "🏠 Interne" : "🌍 Externe"}</span>
               )}
             </div>
             <p className="font-bold text-gray-900 mt-1 text-sm leading-snug">{alerte.titre}</p>
             <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{alerte.message}</p>
           </div>
-          <button onClick={() => setExpanded(!expanded)} className="text-gray-400 flex-shrink-0 mt-1">
+          <button onClick={() => setExpanded(!expanded)} className="text-gray-600 flex-shrink-0 mt-1">
             {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
         </div>
@@ -256,13 +256,13 @@ function AlerteStatsRow({ alerte, totalLivreurs, onArchiver }) {
         <div className="border-t border-gray-100 bg-gray-50 px-4 py-3 space-y-2">
           <p className="text-xs font-bold text-gray-600">Livreurs ayant confirmé :</p>
           {lectures.length === 0 ? (
-            <p className="text-xs text-gray-400 italic">Aucune lecture enregistrée</p>
+            <p className="text-xs text-gray-600 italic">Aucune lecture enregistrée</p>
           ) : (
             <div className="space-y-1 max-h-40 overflow-y-auto">
               {lectures.map(l => (
                 <div key={l.id} className="flex items-center justify-between text-xs bg-white rounded-lg px-3 py-1.5 border border-gray-100">
                   <span className="font-semibold text-gray-700">{l.livreur_nom || l.livreur_id?.slice(-6)}</span>
-                  <span className="text-gray-400">{new Date(l.lue_at).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                  <span className="text-gray-600">{new Date(l.lue_at).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
                 </div>
               ))}
             </div>
@@ -286,11 +286,21 @@ export default function AlertesLivreursPanel() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [filtreActif, setFiltreActif] = useState(true);
+  const { isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
+  const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || "");
+  const alertesFilter = {
+    ...(filtreActif ? { actif: true } : {}),
+    ...(effectiveCountry ? { country_code: effectiveCountry } : {}),
+  };
+  const livreursFilter = {
+    actif: true,
+    ...(effectiveCountry ? { country_code: effectiveCountry } : {}),
+  };
 
   const { data: alertes = [], isLoading } = useQuery({
-    queryKey: ["alertes-livreurs-admin", filtreActif],
+    queryKey: ["alertes-livreurs-admin", filtreActif, effectiveCountry],
     queryFn: () => base44.entities.AlerteLivreur.filter(
-      filtreActif ? { actif: true } : {},
+      alertesFilter,
       "-created_date",
       100
     ),
@@ -298,8 +308,8 @@ export default function AlertesLivreursPanel() {
   });
 
   const { data: livreurs = [] } = useQuery({
-    queryKey: ["livreurs-actifs-alertes"],
-    queryFn: () => base44.entities.Livreur.filter({ actif: true }, "-created_date", 500),
+    queryKey: ["livreurs-actifs-alertes", effectiveCountry],
+    queryFn: () => base44.entities.Livreur.filter(livreursFilter, "-created_date", 500),
   });
 
   const archiverMutation = useMutation({
@@ -352,13 +362,13 @@ export default function AlertesLivreursPanel() {
       {/* Liste alertes */}
       {isLoading ? (
         <div className="text-center py-8">
-          <Loader2 className="w-6 h-6 animate-spin text-gray-400 mx-auto" />
+          <Loader2 className="w-6 h-6 animate-spin text-gray-600 mx-auto" />
         </div>
       ) : alertes.length === 0 ? (
         <div className="text-center py-10 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-          <Bell className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-          <p className="text-sm text-gray-400 font-semibold">Aucune alerte active</p>
-          <p className="text-xs text-gray-300 mt-1">Créez une alerte pour contacter vos livreurs</p>
+          <Bell className="w-8 h-8 text-gray-500 mx-auto mb-2" />
+          <p className="text-sm text-gray-600 font-semibold">Aucune alerte active</p>
+          <p className="text-xs text-gray-500 mt-1">Créez une alerte pour contacter vos livreurs</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -377,6 +387,7 @@ export default function AlertesLivreursPanel() {
       {showForm && (
         <NouvelleAlerteForm
           onClose={() => setShowForm(false)}
+          countryCode={effectiveCountry}
           onCreated={() => {
             queryClient.invalidateQueries({ queryKey: ["alertes-livreurs-admin"] });
           }}

@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import React, { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import {
-  Megaphone, Send, Image as ImageIcon, CheckCircle2, XCircle,
+  Megaphone, Send, CheckCircle2, XCircle,
   Clock, Loader2, Users, Truck, Globe, MapPin, History, Trash2,
-  AlertTriangle
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";

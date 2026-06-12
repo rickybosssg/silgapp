@@ -1,5 +1,5 @@
 import React from "react";
-import { Phone, MessageCircle, Star, Bike, Car } from "lucide-react";
+import { Phone, MessageCircle, Star } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
 function openWhatsApp(phone) {
@@ -95,12 +95,12 @@ export default function LivreurAssigneCard({ course }) {
                   <span className="text-sm font-bold text-gray-700">
                     {noteMoyenne.toFixed(1)}
                   </span>
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-gray-600">
                     ({nombreAvis} avis)
                   </span>
                 </>
               ) : (
-                <span className="text-xs text-gray-400 italic">Nouveau livreur</span>
+                <span className="text-xs text-gray-600 italic">Nouveau livreur</span>
               )}
             </div>
 

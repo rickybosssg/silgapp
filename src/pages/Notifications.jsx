@@ -11,6 +11,8 @@ const typeConfig = {
   course_assignee:  { color: "bg-amber-100 text-amber-700",   dot: "bg-amber-500",   label: "Assignée" },
   course_acceptee:  { color: "bg-green-100 text-green-700",   dot: "bg-green-500",   label: "Acceptée" },
   course_refusee:   { color: "bg-red-100 text-red-700",       dot: "bg-red-500",     label: "Refusée" },
+  colis_recupere:   { color: "bg-indigo-100 text-indigo-700", dot: "bg-indigo-500",  label: "Colis recupere" },
+  en_livraison:     { color: "bg-blue-100 text-blue-700",     dot: "bg-blue-500",    label: "En livraison" },
   course_livree:    { color: "bg-emerald-100 text-emerald-700",dot: "bg-emerald-500", label: "Livrée" },
   course_bloquee:   { color: "bg-orange-100 text-orange-700", dot: "bg-orange-500",  label: "Bloquée" },
   course_annulee:   { color: "bg-red-100 text-red-700",       dot: "bg-red-400",     label: "Annulée" },
@@ -84,15 +86,6 @@ export default function Notifications() {
               <span className="hidden sm:inline">Tout marquer lu</span>
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 text-white hover:bg-white/20 border border-white/30 text-xs"
-            onClick={() => window.location.href = '/admin/test-notifications'}
-          >
-            <Bell className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Tester</span>
-          </Button>
         </div>
       </div>
 
@@ -105,7 +98,7 @@ export default function Notifications() {
       {!isLoading && notifications.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-            <BellOff className="w-7 h-7 text-gray-300" />
+            <BellOff className="w-7 h-7 text-gray-500" />
           </div>
           <p className="font-semibold text-foreground">Aucune notification</p>
           <p className="text-xs text-muted-foreground mt-1">Vous êtes à jour !</p>

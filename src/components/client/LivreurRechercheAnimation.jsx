@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Truck, MapPin, Package, User, CheckCircle2, Loader2, Navigation, XCircle, RefreshCw, AlertCircle } from "lucide-react";
+import { Truck, MapPin, Package, User, CheckCircle2, Loader2, Navigation, XCircle, RefreshCw } from "lucide-react";
 import AnnulerCourseDialog from "./AnnulerCourseDialog";
 import PrixManuelInlineCard from "./PrixManuelInlineCard";
 

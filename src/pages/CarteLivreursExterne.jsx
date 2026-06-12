@@ -1,15 +1,12 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
-import { MapPin, Truck, Wifi, WifiOff, X, Clock, Users, Flame, Wrench } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { MapPin, Truck, Wifi, WifiOff, X, Clock, Users, Wrench } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import DispatchMap from "@/components/carte/DispatchMap";
 import MarkerInfoPanel from "@/components/carte/MarkerInfoPanel";
 import NetworkHealthBanner from "@/components/carte/NetworkHealthBanner";
-import GPSHealthBadge from "@/components/carte/GPSHealthBadge";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
@@ -25,10 +22,8 @@ import {
   isEnCourse,
   isON,
   isAppActive,
-  isGPSRecent,
   hasValidGPS,
   isClientGPSRecent,
-  isClientNoir,
 } from "@/lib/dispatchRules.js";
 import { isLivreurNoir } from "@/lib/livreurCounters.js";
 
@@ -68,7 +63,7 @@ function ONBadge({ livreur }) {
       <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />ON
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400">
+    <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-600">
       <span className="w-2 h-2 rounded-full bg-gray-300 inline-block" />OFF
     </span>
   );
@@ -94,7 +89,7 @@ function AppBadge({ entity }) {
       <Wifi className="w-3 h-3" />App ouverte
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+    <span className="inline-flex items-center gap-1 text-xs text-gray-600">
       <WifiOff className="w-3 h-3" />App fermée
     </span>
   );
@@ -159,7 +154,7 @@ export default function CarteLivreursExterne() {
     queryKey: ["livreurs-externes-carte", effectiveCountry],
     queryFn: () => base44.entities.Livreur.filter(livreurFilter),
     initialData: [],
-    refetchInterval: 15000,
+    refetchInterval: 5000,
   });
 
   const { data: clients = [] } = useQuery({
@@ -493,7 +488,7 @@ export default function CarteLivreursExterne() {
 
         {/* ── Légende compacte ──────────────────────────────────────────── */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2.5">Légende couleurs</p>
+          <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2.5">Légende couleurs</p>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             {[
               { dot: "bg-gray-800",   label: "Hors ligne" },
@@ -538,7 +533,7 @@ export default function CarteLivreursExterne() {
               </div>
               <div>
                 <p className="font-bold text-sm text-gray-900">Livreurs</p>
-                <p className="text-[10px] text-gray-400">{livreursAffiches.length} affiché{livreursAffiches.length > 1 ? "s" : ""} / {compteursLivreurs.total} total</p>
+                <p className="text-[10px] text-gray-600">{livreursAffiches.length} affiché{livreursAffiches.length > 1 ? "s" : ""} / {compteursLivreurs.total} total</p>
               </div>
             </div>
           </div>
@@ -564,8 +559,8 @@ export default function CarteLivreursExterne() {
           {/* Items */}
           {livreursAffiches.length === 0 ? (
             <div className="py-12 text-center">
-              <Truck className="w-10 h-10 mx-auto mb-2 text-gray-300" />
-              <p className="text-sm text-gray-400">Aucun livreur dans cette catégorie</p>
+              <Truck className="w-10 h-10 mx-auto mb-2 text-gray-500" />
+              <p className="text-sm text-gray-600">Aucun livreur dans cette catégorie</p>
             </div>
           ) : (
             <div className="divide-y divide-gray-50">
@@ -598,7 +593,7 @@ export default function CarteLivreursExterne() {
                           {estVert ? "Libre" : estOrange ? "En mission" : "Hors ligne"}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 mt-0.5 text-[11px] text-gray-400">
+                      <div className="flex items-center gap-2 mt-0.5 text-[11px] text-gray-600">
                         <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{getZone(livreur)}</span>
                         {getLastGPS(livreur) && (
                           <span className={`flex items-center gap-1 ${hasValidGPS(livreur) ? "text-teal-500" : "text-red-400"}`}>
@@ -627,14 +622,14 @@ export default function CarteLivreursExterne() {
             </div>
             <div>
               <p className="font-bold text-sm text-gray-900">Clients</p>
-              <p className="text-[10px] text-gray-400">{compteursClients.bleus} avec GPS récent · {compteursClients.total} total</p>
+              <p className="text-[10px] text-gray-600">{compteursClients.bleus} avec GPS récent · {compteursClients.total} total</p>
             </div>
           </div>
 
           {clientsSurCarte.length === 0 ? (
             <div className="py-12 text-center">
-              <MapPin className="w-10 h-10 mx-auto mb-2 text-gray-300" />
-              <p className="text-sm text-gray-400">Aucun client enregistré</p>
+              <MapPin className="w-10 h-10 mx-auto mb-2 text-gray-500" />
+              <p className="text-sm text-gray-600">Aucun client enregistré</p>
             </div>
           ) : (
             <div className="divide-y divide-gray-50">
@@ -657,10 +652,10 @@ export default function CarteLivreursExterne() {
                           {gpsRecent ? "GPS récent" : "GPS ancien"}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 mt-0.5 text-[11px] text-gray-400">
+                      <div className="flex items-center gap-2 mt-0.5 text-[11px] text-gray-600">
                         <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{getZone(client)}</span>
                         {getLastGPS(client) && (
-                          <span className={`flex items-center gap-1 ${gpsRecent ? "text-teal-500" : "text-gray-400"}`}>
+                          <span className={`flex items-center gap-1 ${gpsRecent ? "text-teal-500" : "text-gray-600"}`}>
                             <Clock className="w-3 h-3" />{getLastGPS(client)}
                           </span>
                         )}

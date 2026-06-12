@@ -2,9 +2,7 @@ import { base44 } from "@/api/base44Client";
 import { useEffect, useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, Clock, AlertTriangle, Smartphone, Wifi, Database, FileText, Key, Package, Shield, RefreshCw } from "lucide-react";
-import { toast } from "sonner";
+import { CheckCircle2, Clock, Smartphone, Wifi, Database, RefreshCw } from "lucide-react";
 
 const LOG_COLORS = {
   info: "text-blue-700 bg-blue-50 border-blue-200",

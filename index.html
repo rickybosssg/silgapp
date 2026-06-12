@@ -34,6 +34,20 @@
     </script>
     <script>
       (function() {
+        try {
+          var isAuthCallback = window.location.pathname === '/auth-callback';
+          var hasToken = window.location.search && window.location.search.indexOf('access_token=') !== -1;
+          var isNativeWebView = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+          if (isAuthCallback && hasToken && !isNativeWebView) {
+            window.location.replace('silgapp://auth-callback' + window.location.search);
+          }
+        } catch(e) {
+          console.error('[AUTH CALLBACK] Erreur redirection app:', e);
+        }
+      })();
+    </script>
+    <script>
+      (function() {
         console.log('[TOKEN] Début capture token');
         try {
           var search = window.location.search;

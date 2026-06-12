@@ -1,7 +1,7 @@
 import React from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, AlertTriangle, Play, MapPin, Phone, User, Calendar } from "lucide-react";
+import { Clock, AlertTriangle, Play, MapPin, Phone, User } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 

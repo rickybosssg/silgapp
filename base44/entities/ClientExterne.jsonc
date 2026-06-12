@@ -30,7 +30,6 @@
         "GN",
         "NE"
       ],
-      "default": "BF",
       "description": "Code pays ISO du client"
     },
     "ville": {

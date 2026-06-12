@@ -3,14 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { MapPin, Package, Truck, Clock, CheckCircle2, XCircle, TrendingUp, ArrowLeft, Globe, Users, Activity, Zap, ChevronRight } from "lucide-react";
+import { MapPin, Package, Truck, Clock, CheckCircle2, XCircle, TrendingUp, ArrowLeft, Globe, Users, Zap, ChevronRight, Bell } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
-import CountrySelector, { usePaysActifs } from "@/components/international/CountrySelector.jsx";
+import { usePaysActifs } from "@/components/international/CountrySelector.jsx";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import LivreursEnLigne from "@/components/dashboard/LivreursEnLigne";
 import ClientsEnLigne from "@/components/dashboard/ClientsEnLigne";
-import { isON, isClientEligibleCarte } from "@/lib/dispatchRules.js";
+import { isClientEligibleCarte } from "@/lib/dispatchRules.js";
 import { calculateLivreurCounters, calculateClientCounters } from "@/lib/livreurCounters.js";
 import CoursesEnTraitement from "@/components/dashboard/CoursesEnTraitement";
 import CoursesTerminees from "@/components/dashboard/CoursesTerminees";
@@ -48,43 +48,40 @@ function KpiCard({ label, value, icon: Icon, color, suffix, onClick }) {
 export default function DashboardExterne() {
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [statModal, setStatModal] = useState(null);
-  const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
+  const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
   const paysActifs = usePaysActifs();
   const defaultCountry = paysActifs.length === 1 ? paysActifs[0].code : null;
   const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || defaultCountry);
 
   const { data: courses = [] } = useQuery({
-    queryKey: ["courses-externes-dashboard", effectiveCountry],
+    queryKey: ["courses-externes-dashboard", effectiveCountry || "all"],
     queryFn: () => effectiveCountry
       ? base44.entities.CourseExterne.filter({ country_code: effectiveCountry }, "-created_date")
-      : Promise.resolve([]),
+      : base44.entities.CourseExterne.list("-created_date", 300),
     initialData: [],
-    refetchInterval: effectiveCountry ? 5000 : false,
-    enabled: !!effectiveCountry,
+    refetchInterval: 5000,
   });
 
   const { data: livreurs = [] } = useQuery({
-    queryKey: ["livreurs-externes", effectiveCountry],
-    queryFn: () => effectiveCountry
-      ? base44.entities.Livreur.filter({ type_livreur: "externe", country_code: effectiveCountry })
-      : Promise.resolve([]),
+    queryKey: ["livreurs-externes", effectiveCountry || "all"],
+    queryFn: () => base44.entities.Livreur.filter(
+      effectiveCountry ? { type_livreur: "externe", country_code: effectiveCountry } : { type_livreur: "externe" }
+    ),
     initialData: [],
-    refetchInterval: effectiveCountry ? 5000 : false,
-    enabled: !!effectiveCountry,
+    refetchInterval: 5000,
   });
 
   const { data: clients = [] } = useQuery({
-    queryKey: ["clients-externes", effectiveCountry],
-    queryFn: () => effectiveCountry
-      ? base44.entities.ClientExterne.filter({ actif: true, country_code: effectiveCountry })
-      : Promise.resolve([]),
+    queryKey: ["clients-externes", effectiveCountry || "all"],
+    queryFn: () => base44.entities.ClientExterne.filter(
+      effectiveCountry ? { actif: true, country_code: effectiveCountry } : { actif: true }
+    ),
     initialData: [],
-    refetchInterval: effectiveCountry ? 10000 : false,
-    enabled: !!effectiveCountry,
+    refetchInterval: 10000,
   });
 
   const coursesFiltrees = useMemo(
-    () => effectiveCountry ? courses.filter(c => c.country_code === effectiveCountry) : courses,
+    () => effectiveCountry ? courses.filter(c => (c.country_code || "BF") === effectiveCountry) : courses,
     [courses, effectiveCountry]
   );
 
@@ -145,25 +142,6 @@ export default function DashboardExterne() {
 
   const taux = stats.total > 0 ? Math.round((stats.livrees / stats.total) * 100) : 0;
 
-  // Aucun pays sélectionné → message d'invite
-  if (!effectiveCountry) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6">
-        <div className="max-w-sm w-full text-center space-y-4">
-          <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-primary to-red-600 flex items-center justify-center mx-auto shadow-xl shadow-red-200">
-            <Globe className="w-8 h-8 text-white" />
-          </div>
-          <h2 className="text-2xl font-black text-gray-900">Sélectionnez un pays</h2>
-          <p className="text-gray-500 text-sm">Choisissez un pays dans le menu à gauche pour accéder au tableau de bord.</p>
-          <div className="flex items-center gap-2 justify-center text-gray-400 text-xs">
-            <span>←</span>
-            <span>Utilisez le sélecteur de pays dans la sidebar</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="px-4 py-4 lg:px-6 lg:py-6 space-y-5 max-w-7xl mx-auto">
@@ -217,7 +195,12 @@ export default function DashboardExterne() {
                   </Button>
                 </Link>
               )}
-              {/* Sélecteur de pays déplacé dans la sidebar */}
+              <Link to="/diagnostic-push-complet?email=eric.nongbzanga@yahoo.fr">
+                <Button size="sm" variant="ghost" className="gap-1.5 text-white/70 hover:text-white hover:bg-white/10 border border-white/10 rounded-xl text-xs">
+                  <Bell className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Push</span>
+                </Button>
+              </Link>
               <AppToggleButton />
               <Link to="/carte">
                 <Button size="sm" className="gap-1.5 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs shadow-lg shadow-primary/30">
@@ -308,7 +291,6 @@ export default function DashboardExterne() {
         course={selectedCourse}
         open={!!selectedCourse}
         onClose={() => setSelectedCourse(null)}
-        reseau="externe"
       />
       <StatDetailModal
         open={!!statModal}

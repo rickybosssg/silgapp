@@ -109,19 +109,9 @@
       "default": "especes",
       "description": "Mode de paiement pour ce colis (pr\u00e9vu Phase 2)"
     },
-    "delivery_qr_token": {
-      "type": "string",
-      "description": "Token QR unique pour validation de livraison de ce colis"
-    },
-    "delivery_code_4_digits": {
-      "type": "string",
-      "description": "Code 4 chiffres pour validation manuelle de livraison de ce colis"
-    },
     "delivery_confirmed_by": {
       "type": "string",
       "enum": [
-        "qr",
-        "manual_code",
         "livreur",
         "admin"
       ],

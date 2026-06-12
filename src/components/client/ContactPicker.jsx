@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Preferences } from "@capacitor/preferences";
 import { Capacitor } from "@capacitor/core";
 import { Contacts } from "@capacitor-community/contacts";
+import { pickNativeContact } from "@/lib/nativeAndroid";
 
 const FREQUENT_CONTACTS_KEY = "silgapp_frequent_contacts";
 
@@ -107,6 +108,33 @@ export default function ContactPicker({ type = "destinataire", onSelect }) {
     setLoading(true);
     setPermissionDenied(false);
     let lastError = null;
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const picked = await pickNativeContact();
+        const formatted = [{
+          nom: picked?.nom || picked?.name || "Contact",
+          telephone: formatPhone(picked?.telephone || picked?.phone || ""),
+        }].filter(c => c.telephone);
+        setDiagInfo({ ...platform, method: "SilgappNative.pickContact", count: formatted.length, error: null });
+        if (formatted.length > 0) {
+          setPhoneContacts(formatted);
+          setActiveTab("phone");
+          toast.success("Contact selectionne depuis le repertoire Android");
+        }
+        setLoading(false);
+        return;
+      } catch (err) {
+        lastError = err;
+        setDiagInfo({ ...platform, method: "SilgappNative.pickContact_FAILED", count: 0, error: err?.message || String(err) });
+        if (!/annule/i.test(err?.message || "")) {
+          setPermissionDenied(true);
+          toast.error("Impossible d'ouvrir le repertoire Android");
+        }
+        setLoading(false);
+        return;
+      }
+    }
 
     // ── Méthode 1 : Contact Picker API Web (navigator.contacts) ──────────────
     // Fonctionne dans Chrome Android 80+ et WebView Android Capacitor

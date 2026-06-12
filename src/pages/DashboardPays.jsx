@@ -3,11 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  ArrowLeft, Globe, MapPin, Package, Truck, Clock,
-  CheckCircle2, XCircle, TrendingUp, Users, ShieldCheck, RefreshCw
+  ArrowLeft, MapPin, Package, Truck, Clock,
+  CheckCircle2, XCircle, TrendingUp, Users
 } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
