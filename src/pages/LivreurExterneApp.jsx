@@ -196,6 +196,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     return mesCourses.find(
       c => c.pricing_mode === "manual" && c.manual_price_status === "pending_client_validation"
         && c.proposed_by_livreur_id === livreurProfil?.id
+        && c.statut !== "annulee" && c.statut !== "livree"
     ) || null;
   }, [mesCourses, livreurProfil?.id]);
 
