@@ -19,6 +19,8 @@
         "course_assignee",
         "course_acceptee",
         "course_refusee",
+        "colis_recupere",
+        "en_livraison",
         "course_livree",
         "course_bloquee",
         "course_annulee",

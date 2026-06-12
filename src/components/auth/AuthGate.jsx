@@ -362,7 +362,7 @@ export default function AuthGate({ children, onLivreur, onClient }) {
 
   if (state === "unauthenticated") {
     return (
-      <div className="min-h-screen bg-background px-5 py-8 flex items-center justify-center">
+      <div className="silgapp-auth-screen min-h-screen bg-background px-5 py-8 flex items-center justify-center">
         <div className="w-full max-w-sm space-y-6">
           <div className="text-center space-y-3">
             <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
@@ -386,14 +386,14 @@ export default function AuthGate({ children, onLivreur, onClient }) {
             <label className="block">
               <span className="sr-only">Email</span>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                 <input
                   type="email"
                   autoComplete="email"
                   required
                   value={loginForm.email}
                   onChange={(event) => setLoginForm((form) => ({ ...form, email: event.target.value }))}
-                  className="w-full h-12 rounded-lg border border-border bg-background pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full h-12 rounded-lg border border-zinc-700 bg-[#0f0f0f] pl-10 pr-3 text-sm text-white caret-white placeholder:text-zinc-400 outline-none focus:border-primary focus:ring-2 focus:ring-primary/40"
                   placeholder="Email"
                 />
               </div>
@@ -402,14 +402,14 @@ export default function AuthGate({ children, onLivreur, onClient }) {
             <label className="block">
               <span className="sr-only">Mot de passe</span>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                 <input
                   type="password"
                   autoComplete="current-password"
                   required
                   value={loginForm.password}
                   onChange={(event) => setLoginForm((form) => ({ ...form, password: event.target.value }))}
-                  className="w-full h-12 rounded-lg border border-border bg-background pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full h-12 rounded-lg border border-zinc-700 bg-[#0f0f0f] pl-10 pr-3 text-sm text-white caret-white placeholder:text-zinc-400 outline-none focus:border-primary focus:ring-2 focus:ring-primary/40"
                   placeholder="Mot de passe"
                 />
               </div>
@@ -419,14 +419,14 @@ export default function AuthGate({ children, onLivreur, onClient }) {
               <label className="block">
                 <span className="sr-only">Confirmer le mot de passe</span>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                   <input
                     type="password"
                     autoComplete="new-password"
                     required
                     value={loginForm.confirmPassword}
                     onChange={(event) => setLoginForm((form) => ({ ...form, confirmPassword: event.target.value }))}
-                    className="w-full h-12 rounded-lg border border-border bg-background pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                    className="w-full h-12 rounded-lg border border-zinc-700 bg-[#0f0f0f] pl-10 pr-3 text-sm text-white caret-white placeholder:text-zinc-400 outline-none focus:border-primary focus:ring-2 focus:ring-primary/40"
                     placeholder="Confirmer le mot de passe"
                   />
                 </div>
@@ -443,7 +443,7 @@ export default function AuthGate({ children, onLivreur, onClient }) {
                   required
                   value={loginForm.otpCode}
                   onChange={(event) => setLoginForm((form) => ({ ...form, otpCode: event.target.value }))}
-                  className="w-full h-12 rounded-lg border border-border bg-background px-3 text-sm text-center tracking-widest outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-full h-12 rounded-lg border border-zinc-700 bg-[#0f0f0f] px-3 text-sm text-center text-white caret-white placeholder:text-zinc-400 tracking-widest outline-none focus:border-primary focus:ring-2 focus:ring-primary/40"
                   placeholder="Code email"
                 />
               </label>

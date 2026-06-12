@@ -13,66 +13,55 @@ function buildNotificationContent(course, recipientRole) {
   const livreurNom = course.livreur_nom || "Le livreur";
   const statut = course.statut;
 
-  // Nouvelle course créée → notifier le destinataire
   if (recipientRole === "destinataire" && statut === "recherche_livreur") {
     return {
-      titre: `📦 ${expediteurNom} vous envoie un colis`,
-      message: `Appuyez pour voir les détails de la livraison.`,
+      titre: `Colis de ${expediteurNom}`,
+      message: `Appuyez pour voir les details de la livraison.`,
       type: "nouvelle_course",
     };
   }
 
-  // Nouvelle course "recevoir" → notifier l'expéditeur
   if (recipientRole === "expediteur" && statut === "recherche_livreur") {
     return {
-      titre: `📦 Une demande de récupération vous concerne`,
+      titre: `Demande de recuperation`,
       message: `${destinataireNom} attend un colis de votre part via SILGAPP.`,
       type: "nouvelle_course",
     };
   }
 
-  // Course acceptée par un livreur
   if (statut === "livreur_en_route") {
     return {
-      titre: `🛵 Votre course a été acceptée`,
-      message: `${livreurNom} est en route pour récupérer le colis.`,
-      type: "course_acceptee",
+      titre: `Livreur trouve`,
+      message: `${livreurNom} est en route pour recuperer le colis.`,
+      type: "course_assignee",
     };
   }
 
-  // Colis récupéré → livreur parti vers destination
   if (statut === "colis_recupere" || statut === "en_livraison") {
     return {
-      titre: `📦 ${livreurNom} récupère votre colis`,
-      message: `La livraison est en cours. Appuyez pour suivre en temps réel.`,
-      type: "course_livree",
+      titre: `Colis recupere`,
+      message: `${livreurNom} a recupere le colis. La livraison est en cours.`,
+      type: "colis_recupere",
     };
   }
 
-  // Course livrée
   if (statut === "livree") {
     return {
-      titre: `✅ Colis livré avec succès`,
-      message: `${livreurNom} a livré votre colis. Appuyez pour voir le récapitulatif.`,
+      titre: `Colis livre avec succes`,
+      message: `${livreurNom} a livre votre colis. Appuyez pour voir le recapitulatif.`,
       type: "course_livree",
     };
   }
 
-  // Annulée
   if (statut === "annulee") {
     return {
-      titre: `❌ Course annulée`,
-      message: `La course a été annulée. Appuyez pour voir les détails.`,
+      titre: `Course annulee`,
+      message: `La course a ete annulee. Appuyez pour voir les details.`,
       type: "course_annulee",
     };
   }
 
-  // Fallback minimal
-  return {
-    titre: `📦 Mise à jour de votre course`,
-    message: `Appuyez pour voir les détails.`,
-    type: "nouvelle_course",
-  };
+  return null;
 }
 
 Deno.serve(async (req) => {
@@ -143,6 +132,10 @@ Deno.serve(async (req) => {
     // Anti-doublon strict : une seule notif par course + email + type
     const createNotifIfNotExists = async (userEmail, recipientRole) => {
       const content = buildNotificationContent(course, recipientRole);
+      if (!content) {
+        console.log(`[notifyClientSync] Statut ignore pour ${userEmail} (statut=${course.statut}, course=${course.id})`);
+        return null;
+      }
 
       // Chercher une notif existante avec la même course + email + type (doublon exact)
       const existing = await base44.asServiceRole.entities.Notification.filter({

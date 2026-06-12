@@ -69,7 +69,7 @@ function DetailPaiementModal({ entry, onClose, onPaiement, onBloquer, onDebloque
             <p className="font-bold text-lg">{entry.prenom} {entry.nom}</p>
             {entry.telephone && <p className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="w-3 h-3" />{entry.telephone}</p>}
           </div>
-          <button onClick={onClose}><XCircle className="w-6 h-6 text-gray-400 hover:text-gray-600" /></button>
+          <button onClick={onClose}><XCircle className="w-6 h-6 text-gray-600 hover:text-gray-600" /></button>
         </div>
         <div className="overflow-y-auto flex-1 p-4 space-y-4">
           <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-xl p-4 border border-orange-200 space-y-2">
@@ -374,17 +374,17 @@ function FraisAnnulationTab() {
 
       {/* Recherche */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
         <Input placeholder="Rechercher par client, livreur..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 rounded-xl" />
       </div>
 
       {/* Liste */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-10 text-gray-400 gap-2">
+        <div className="flex items-center justify-center py-10 text-gray-600 gap-2">
           <RefreshCw className="w-4 h-4 animate-spin" /> Chargement...
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-10 text-gray-400">
+        <div className="text-center py-10 text-gray-600">
           <CreditCard className="w-10 h-10 mx-auto mb-2 opacity-30" />
           <p className="text-sm">Aucun frais d'annulation</p>
         </div>
@@ -421,7 +421,7 @@ function FraisCard({ frais, onPayer, onBloquer, payerLoading, bloquerLoading }) 
             <span className="text-lg font-black text-gray-900">{frais.montant || 0} {frais.devise || "F"}</span>
             {clientBloque && <Badge className="bg-red-100 text-red-800 border border-red-200"><Ban className="w-3 h-3 mr-1 inline" />Client bloqué</Badge>}
           </div>
-          {frais.date_annulation && <span className="text-xs text-gray-400">{format(new Date(frais.date_annulation), "dd/MM/yyyy HH:mm", { locale: fr })}</span>}
+          {frais.date_annulation && <span className="text-xs text-gray-600">{format(new Date(frais.date_annulation), "dd/MM/yyyy HH:mm", { locale: fr })}</span>}
         </div>
         <p className="text-xs text-gray-500">{frais.raison || "Annulation après acceptation livreur"}</p>
         <div className="grid grid-cols-2 gap-2">

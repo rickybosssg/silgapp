@@ -43,7 +43,7 @@ function ConfirmMontantDialog({ colis, devise, onConfirm, onCancel, isPending })
             <strong>{colis.colis_uid || "Colis"}</strong> — {colis.destinataire_nom || "Destinataire"}
           </p>
           {colis.adresse_livraison && (
-            <p className="text-xs text-gray-400 mt-0.5">{colis.adresse_livraison}</p>
+            <p className="text-xs text-gray-600 mt-0.5">{colis.adresse_livraison}</p>
           )}
         </div>
 
@@ -62,11 +62,11 @@ function ConfirmMontantDialog({ colis, devise, onConfirm, onCancel, isPending })
               autoFocus
               min="0"
             />
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-600">
               {devise || "F"}
             </span>
           </div>
-          <p className="text-[10px] text-gray-400 text-center mt-1">
+          <p className="text-[10px] text-gray-600 text-center mt-1">
             Entrez 0 si aucun montant n'est à encaisser
           </p>
         </div>
@@ -158,16 +158,32 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
       }
 
       await base44.entities.CourseExterne.update(course.id, updateData);
-      return { nbLivres, tousTermines, montantTotal, gainLivreur };
+      return {
+        nbLivres,
+        tousTermines,
+        montantTotal,
+        gainLivreur,
+        courseData: {
+          ...course,
+          ...updateData,
+          id: course.id,
+          colis_livre_at: updateData.colis_livre_at || course.colis_livre_at,
+          heure_livraison: updateData.heure_livraison || course.heure_livraison,
+        },
+      };
     },
-    onSuccess: ({ tousTermines, montantTotal, gainLivreur }) => {
-      queryClient.invalidateQueries({ queryKey: ["colis-externes", course.id] });
-      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+    onSuccess: ({ tousTermines, montantTotal, gainLivreur, courseData }) => {
       setConfirmColis(null);
       if (tousTermines) {
         toast.success(`🎉 Tournée terminée ! Total : ${montantTotal.toLocaleString()} ${course.devise || "F"}`);
-        onAllLivres?.();
+        onAllLivres?.(courseData);
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ["colis-externes", course.id] });
+          queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+        }, 1200);
       } else {
+        queryClient.invalidateQueries({ queryKey: ["colis-externes", course.id] });
+        queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
         toast.success(`Colis livré ✅ — +${gainLivreur.toLocaleString()} ${course.devise || "F"} (70%)`);
       }
     },
@@ -209,13 +225,29 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
       }
 
       await base44.entities.CourseExterne.update(course.id, updateData);
-      return { tousTermines };
+      return {
+        tousTermines,
+        courseData: {
+          ...course,
+          ...updateData,
+          id: course.id,
+          colis_livre_at: updateData.colis_livre_at || course.colis_livre_at,
+          heure_livraison: updateData.heure_livraison || course.heure_livraison,
+        },
+      };
     },
-    onSuccess: ({ tousTermines }) => {
-      queryClient.invalidateQueries({ queryKey: ["colis-externes", course.id] });
-      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+    onSuccess: ({ tousTermines, courseData }) => {
       toast.success("Colis annule");
-      if (tousTermines) onAllLivres?.();
+      if (tousTermines) {
+        onAllLivres?.(courseData);
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ["colis-externes", course.id] });
+          queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+        }, 1200);
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["colis-externes", course.id] });
+        queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      }
     },
     onError: () => toast.error("Erreur lors de l'annulation"),
   });
@@ -346,7 +378,7 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
                   {/* Adresse */}
                   {colisItem.adresse_livraison && (
                     <div className="flex items-start gap-2 bg-gray-50 rounded-xl p-2.5">
-                      <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5" />
+                      <MapPin className="w-3.5 h-3.5 text-gray-600 flex-shrink-0 mt-0.5" />
                       <p className="text-xs text-gray-700 font-medium leading-tight">{colisItem.adresse_livraison}</p>
                     </div>
                   )}
@@ -440,15 +472,15 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
           {totalEncaisse > 0 && (
             <div className="grid grid-cols-3 gap-2 pt-1">
               <div className="bg-white rounded-xl p-2 text-center border border-purple-100">
-                <p className="text-[9px] text-gray-400 font-bold uppercase">Total</p>
+                <p className="text-[9px] text-gray-600 font-bold uppercase">Total</p>
                 <p className="text-xs font-black text-gray-800">{totalEncaisse.toLocaleString()} {course.devise || "F"}</p>
               </div>
               <div className="bg-white rounded-xl p-2 text-center border border-green-100">
-                <p className="text-[9px] text-gray-400 font-bold uppercase">Ton gain (70%)</p>
+                <p className="text-[9px] text-gray-600 font-bold uppercase">Ton gain (70%)</p>
                 <p className="text-xs font-black text-green-700">+{gainLivreur.toLocaleString()} {course.devise || "F"}</p>
               </div>
               <div className="bg-white rounded-xl p-2 text-center border border-gray-100">
-                <p className="text-[9px] text-gray-400 font-bold uppercase">Commission</p>
+                <p className="text-[9px] text-gray-600 font-bold uppercase">Commission</p>
                 <p className="text-xs font-black text-gray-500">{commission.toLocaleString()} {course.devise || "F"}</p>
               </div>
             </div>

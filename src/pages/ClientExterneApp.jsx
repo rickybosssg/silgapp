@@ -651,7 +651,7 @@ export default function ClientExterneApp() {
                     </div>
                   )}
                 </div>
-                <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                <ChevronRight className="w-4 h-4 text-gray-600 flex-shrink-0" />
               </div>
             </div>
           ))}
@@ -766,7 +766,7 @@ export default function ClientExterneApp() {
                     <Package className="w-6 h-6 text-white" />
                   </div>
                   <p className="font-black text-gray-900 text-sm">Expédier</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Envoyer un colis</p>
+                  <p className="text-xs text-gray-600 mt-0.5">Envoyer un colis</p>
                   <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
                     <ChevronRight className="w-3.5 h-3.5 text-primary" />
                   </div>
@@ -780,7 +780,7 @@ export default function ClientExterneApp() {
                     <span className="text-2xl">📥</span>
                   </div>
                   <p className="font-black text-gray-900 text-sm">Recevoir</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Attendre un colis</p>
+                  <p className="text-xs text-gray-600 mt-0.5">Attendre un colis</p>
                   <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-green-50 flex items-center justify-center">
                     <ChevronRight className="w-3.5 h-3.5 text-green-600" />
                   </div>
@@ -801,13 +801,13 @@ export default function ClientExterneApp() {
                       ? "📍 Voir le livreur en temps réel"
                       : "🗺️ Voir la carte"}
                   </p>
-                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                  <ChevronRight className="w-4 h-4 text-gray-600" />
                 </button>
               )}
 
               {/* ── RACCOURCIS ────────────────────── */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Accès rapide</p>
+                <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-3">Accès rapide</p>
                 <div className="grid grid-cols-4 gap-2">
                   {[
                     { icon: <Package className="w-5 h-5" />, label: "Courses",   color: "text-blue-600",   bg: "bg-blue-50",   action: () => navigate("/client/suivi") },

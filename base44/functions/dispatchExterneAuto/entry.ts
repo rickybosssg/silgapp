@@ -601,7 +601,7 @@ Deno.serve(async (req) => {
           await base44.asServiceRole.entities.Notification.create({
             titre: '💰 Prix proposé par le livreur',
             message: `${livreur.prenom || ''} ${livreur.nom} propose cette course à ${Number(manual_price).toLocaleString()} FCFA. Acceptez-vous ?`,
-            type: 'course_acceptee',
+            type: 'generic',
             course_id: course_id,
             destinataire_email: clientEmail,
             lue: false,

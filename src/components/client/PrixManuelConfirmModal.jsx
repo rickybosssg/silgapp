@@ -85,7 +85,7 @@ export default function PrixManuelConfirmModal({ course, onAccepted, onRefused }
           <div className="bg-gray-50 rounded-2xl px-4 py-3 text-sm">
             <p className="text-gray-500 text-xs uppercase font-semibold mb-1">Course</p>
             <p className="font-bold text-gray-800">{course.adresse_depart}</p>
-            <p className="text-gray-400 text-xs my-0.5">→</p>
+            <p className="text-gray-600 text-xs my-0.5">→</p>
             <p className="font-bold text-gray-800">{course.adresse_arrivee || "Destination en cours"}</p>
           </div>
 
@@ -104,7 +104,7 @@ export default function PrixManuelConfirmModal({ course, onAccepted, onRefused }
 
           {/* Avertissement */}
           <div className="flex items-start gap-2 bg-gray-50 rounded-xl px-3 py-2.5">
-            <AlertCircle className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+            <AlertCircle className="w-4 h-4 text-gray-600 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-gray-500 leading-relaxed">
               Si vous refusez, la course sera proposée à un autre livreur avec tarif automatique.
             </p>

@@ -93,11 +93,11 @@ function ProgressBar({ statut }) {
           )}>
             <div className={cn(
               "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all",
-              i <= current ? "bg-primary text-white shadow-md shadow-primary/30" : "bg-gray-100 text-gray-400"
+              i <= current ? "bg-primary text-white shadow-md shadow-primary/30" : "bg-gray-100 text-gray-600"
             )}>
               {i <= current ? step.icon : <span className="text-xs">{i + 1}</span>}
             </div>
-            <p className={cn("text-[9px] font-semibold", i <= current ? "text-primary" : "text-gray-300")}>
+            <p className={cn("text-[9px] font-semibold", i <= current ? "text-primary" : "text-gray-500")}>
               {step.label}
             </p>
           </div>
@@ -128,6 +128,26 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const [optimisticStatut, setOptimisticStatut] = useState(null);
 
   const effectiveStatut = optimisticStatut || course.statut;
+
+  const navigateToRecap = (courseData = {}) => {
+    const courseId = courseData?.id || course.id;
+    const recapCourse = {
+      ...course,
+      ...courseData,
+      id: courseId,
+      statut: "livree",
+      heure_livraison: courseData?.heure_livraison || courseData?.colis_livre_at || course.heure_livraison || new Date().toISOString(),
+    };
+
+    try {
+      sessionStorage.setItem(`silgapp_recap_course_${courseId}`, JSON.stringify(recapCourse));
+    } catch (_) {}
+
+    navigate(`/livreur/recap-course/${courseId}`, {
+      replace: true,
+      state: { course: recapCourse },
+    });
+  };
 
   // OPTIMISTIC UI helper for status updates
   const updateOptimisticStatut = (newStatut, courseData = {}) => {
@@ -185,10 +205,11 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       heure_livraison: new Date().toISOString(),
       ...courseData
     });
-    queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-    queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
-    const courseId = courseData?.id || course.id;
-    navigate(`/livreur/recap-course/${courseId}`);
+    navigateToRecap(courseData);
+    setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+    }, 1200);
   };
 
   const handlePauseSubmit = () => {
@@ -329,7 +350,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 className="text-center text-2xl font-black h-16 rounded-2xl border-2 border-gray-100 focus:border-primary pr-16"
                 autoFocus
               />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400">FCFA</span>
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-600">FCFA</span>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <button
@@ -418,7 +439,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 colisRecupere ? "bg-green-50 border border-green-200" : "bg-gray-50"
               )}>
                 <div>
-                  <p className="text-[10px] text-gray-400 font-semibold uppercase">{contactRole}</p>
+                  <p className="text-[10px] text-gray-600 font-semibold uppercase">{contactRole}</p>
                   <p className="font-black text-gray-900 text-base">{contactNom}</p>
                   <p className="text-xs text-gray-500">{contactTel}</p>
                 </div>
@@ -455,11 +476,11 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0",
                 colisRecupere ? "bg-gray-200" : "bg-primary/10"
               )}>
-                <MapPin className={cn("w-4 h-4", colisRecupere ? "text-gray-400" : "text-primary")} />
+                <MapPin className={cn("w-4 h-4", colisRecupere ? "text-gray-600" : "text-primary")} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] text-gray-400 font-semibold uppercase">Récupérer</p>
-                <p className={cn("text-sm font-bold", colisRecupere ? "line-through text-gray-400" : "text-gray-800")}>
+                <p className="text-[10px] text-gray-600 font-semibold uppercase">Récupérer</p>
+                <p className={cn("text-sm font-bold", colisRecupere ? "line-through text-gray-600" : "text-gray-800")}>
                   {course.adresse_depart}
                 </p>
               </div>
@@ -477,10 +498,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0",
                 colisRecupere ? "bg-green-100" : "bg-gray-200"
               )}>
-                <MapPin className={cn("w-4 h-4", colisRecupere ? "text-green-600" : "text-gray-400")} />
+                <MapPin className={cn("w-4 h-4", colisRecupere ? "text-green-600" : "text-gray-600")} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] text-gray-400 font-semibold uppercase">Livrer</p>
+                <p className="text-[10px] text-gray-600 font-semibold uppercase">Livrer</p>
                 <p className="text-sm font-bold text-gray-800">
                   {colisRecupere && course.destination_inconnue
                     ? "📍 GPS du destinataire requis"
@@ -541,7 +562,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             course.prix > 0 && (
               <div className="flex items-center justify-between px-1">
                 <span className="text-gray-500 text-sm">Prix estimé</span>
-                <span className="text-xl font-black text-gray-900">{course.prix.toLocaleString()} <span className="text-sm font-semibold text-gray-400">FCFA</span></span>
+                <span className="text-xl font-black text-gray-900">{course.prix.toLocaleString()} <span className="text-sm font-semibold text-gray-600">FCFA</span></span>
               </div>
             )
           )}
@@ -557,7 +578,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             <MultiColisLivreurView
               course={course}
               colisRecupere={colisRecupere}
-              onAllLivres={() => onColisLivre(course, null)}
+              onAllLivres={(courseData) => {
+                onColisLivre({ ...course, ...(courseData || {}), statut: "livree" }, null);
+                navigateToRecap(courseData);
+              }}
             />
           )}
 
@@ -701,7 +725,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
               {!showRemarque ? (
                 <button
-                  className="w-full text-xs text-gray-400 flex items-center justify-center gap-1.5 py-1 hover:text-gray-600 transition-colors"
+                  className="w-full text-xs text-gray-600 flex items-center justify-center gap-1.5 py-1 hover:text-gray-600 transition-colors"
                   onClick={() => setShowRemarque(true)}
                 >
                   <AlertTriangle className="w-3.5 h-3.5" /> Signaler un problème
@@ -740,15 +764,15 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
-                      <p className="text-[10px] text-gray-400 font-semibold uppercase">Total</p>
+                      <p className="text-[10px] text-gray-600 font-semibold uppercase">Total</p>
                       <p className="text-sm font-black text-gray-800">{total.toLocaleString()} {course.devise || "F"}</p>
                     </div>
                     <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
-                      <p className="text-[10px] text-gray-400 font-semibold uppercase">Ton gain</p>
+                      <p className="text-[10px] text-gray-600 font-semibold uppercase">Ton gain</p>
                       <p className="text-sm font-black text-green-700">+{gain.toLocaleString()} {course.devise || "F"}</p>
                     </div>
                     <div className="bg-white rounded-xl p-2.5 text-center border border-gray-100">
-                      <p className="text-[10px] text-gray-400 font-semibold uppercase">Commission</p>
+                      <p className="text-[10px] text-gray-600 font-semibold uppercase">Commission</p>
                       <p className="text-sm font-black text-gray-500">{commission.toLocaleString()} {course.devise || "F"}</p>
                     </div>
                   </div>
@@ -774,12 +798,12 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   <div className="grid grid-cols-3 gap-2">
                     {dist !== null && (
                       <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
-                        <p className="text-[10px] text-gray-400 font-semibold uppercase">Distance</p>
+                        <p className="text-[10px] text-gray-600 font-semibold uppercase">Distance</p>
                         <p className="text-sm font-black text-gray-800">{dist.toFixed(1)} km</p>
                       </div>
                     )}
                     <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
-                      <p className="text-[10px] text-gray-400 font-semibold uppercase">
+                      <p className="text-[10px] text-gray-600 font-semibold uppercase">
                         Prix final {isPrixManuel && "✓"}
                       </p>
                       <p className="text-sm font-black text-blue-700">
@@ -790,7 +814,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                       )}
                     </div>
                     <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
-                      <p className="text-[10px] text-gray-400 font-semibold uppercase">Ton gain</p>
+                      <p className="text-[10px] text-gray-600 font-semibold uppercase">Ton gain</p>
                       <p className="text-sm font-black text-green-700">
                         {gain !== null ? `+${gain.toLocaleString()} ${course.devise || "F"}` : "—"}
                       </p>
@@ -804,7 +828,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   )
                 )}
                 {isExterne && commission !== null && (
-                  <p className="text-center text-xs text-gray-400">
+                  <p className="text-center text-xs text-gray-600">
                     Commission Silga : {commission.toLocaleString()} {course.devise || "F"}
                   </p>
                 )}

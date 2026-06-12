@@ -108,7 +108,7 @@ function NouvelleAlerteForm({ onClose, onCreated, countryCode }) {
                   className={`py-2.5 rounded-xl border-2 text-center transition-all text-xs font-bold ${
                     form.reseau === opt.val
                       ? "border-slate-700 bg-slate-50 text-slate-800"
-                      : "border-gray-200 bg-white text-gray-400"
+                      : "border-gray-200 bg-white text-gray-600"
                   }`}
                 >
                   <div>{opt.emoji}</div>
@@ -215,13 +215,13 @@ function AlerteStatsRow({ alerte, totalLivreurs, onArchiver }) {
                 </span>
               )}
               {alerte.reseau !== "tous" && (
-                <span className="text-[10px] font-semibold text-gray-400">{alerte.reseau === "interne" ? "🏠 Interne" : "🌍 Externe"}</span>
+                <span className="text-[10px] font-semibold text-gray-600">{alerte.reseau === "interne" ? "🏠 Interne" : "🌍 Externe"}</span>
               )}
             </div>
             <p className="font-bold text-gray-900 mt-1 text-sm leading-snug">{alerte.titre}</p>
             <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{alerte.message}</p>
           </div>
-          <button onClick={() => setExpanded(!expanded)} className="text-gray-400 flex-shrink-0 mt-1">
+          <button onClick={() => setExpanded(!expanded)} className="text-gray-600 flex-shrink-0 mt-1">
             {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
         </div>
@@ -256,13 +256,13 @@ function AlerteStatsRow({ alerte, totalLivreurs, onArchiver }) {
         <div className="border-t border-gray-100 bg-gray-50 px-4 py-3 space-y-2">
           <p className="text-xs font-bold text-gray-600">Livreurs ayant confirmé :</p>
           {lectures.length === 0 ? (
-            <p className="text-xs text-gray-400 italic">Aucune lecture enregistrée</p>
+            <p className="text-xs text-gray-600 italic">Aucune lecture enregistrée</p>
           ) : (
             <div className="space-y-1 max-h-40 overflow-y-auto">
               {lectures.map(l => (
                 <div key={l.id} className="flex items-center justify-between text-xs bg-white rounded-lg px-3 py-1.5 border border-gray-100">
                   <span className="font-semibold text-gray-700">{l.livreur_nom || l.livreur_id?.slice(-6)}</span>
-                  <span className="text-gray-400">{new Date(l.lue_at).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                  <span className="text-gray-600">{new Date(l.lue_at).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
                 </div>
               ))}
             </div>
@@ -362,13 +362,13 @@ export default function AlertesLivreursPanel() {
       {/* Liste alertes */}
       {isLoading ? (
         <div className="text-center py-8">
-          <Loader2 className="w-6 h-6 animate-spin text-gray-400 mx-auto" />
+          <Loader2 className="w-6 h-6 animate-spin text-gray-600 mx-auto" />
         </div>
       ) : alertes.length === 0 ? (
         <div className="text-center py-10 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-          <Bell className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-          <p className="text-sm text-gray-400 font-semibold">Aucune alerte active</p>
-          <p className="text-xs text-gray-300 mt-1">Créez une alerte pour contacter vos livreurs</p>
+          <Bell className="w-8 h-8 text-gray-500 mx-auto mb-2" />
+          <p className="text-sm text-gray-600 font-semibold">Aucune alerte active</p>
+          <p className="text-xs text-gray-500 mt-1">Créez une alerte pour contacter vos livreurs</p>
         </div>
       ) : (
         <div className="space-y-3">

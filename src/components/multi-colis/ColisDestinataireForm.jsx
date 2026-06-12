@@ -144,7 +144,7 @@ export default function ColisDestinataireForm({
         <div className="flex items-center gap-2 flex-shrink-0">
           {hasGPS && <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">📍 GPS</span>}
           {colisData.recipient_has_app && <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">SILGAPP</span>}
-          {expanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+          {expanded ? <ChevronUp className="w-4 h-4 text-gray-600" /> : <ChevronDown className="w-4 h-4 text-gray-600" />}
         </div>
       </button>
 
@@ -287,7 +287,7 @@ export default function ColisDestinataireForm({
                 >
                   <div className="text-xl">{t.icon}</div>
                   <div className="text-[10px] font-bold text-gray-800 mt-0.5">{t.label}</div>
-                  <div className="text-[9px] text-gray-400">{t.desc}</div>
+                  <div className="text-[9px] text-gray-600">{t.desc}</div>
                 </button>
               ))}
             </div>
@@ -296,7 +296,7 @@ export default function ColisDestinataireForm({
           {/* Description */}
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold text-gray-600">
-              Description du colis <span className="text-gray-400 font-normal">(optionnel)</span>
+              Description du colis <span className="text-gray-600 font-normal">(optionnel)</span>
             </Label>
             <Input
               value={colisData.description_colis || ""}
@@ -309,7 +309,7 @@ export default function ColisDestinataireForm({
           {/* Instructions */}
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold text-gray-600">
-              Instructions particulières <span className="text-gray-400 font-normal">(optionnel)</span>
+              Instructions particulières <span className="text-gray-600 font-normal">(optionnel)</span>
             </Label>
             <Textarea
               value={colisData.instructions || ""}

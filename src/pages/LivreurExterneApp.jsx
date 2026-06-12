@@ -1063,7 +1063,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                 activeTab === tab.id
                   ? "bg-gradient-to-br from-slate-800 to-slate-900 text-white shadow-md"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                  : "text-gray-500 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-500"
               }`}
             >
               <span>{tab.emoji}</span>

@@ -284,7 +284,7 @@ export default function DashboardAdminExterne() {
                   <p className="font-bold text-sm text-foreground truncate">{link.label}</p>
                   <p className="text-[11px] text-muted-foreground truncate">{link.sub}</p>
                 </div>
-                <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-400 flex-shrink-0" />
+                <ChevronRight className="w-4 h-4 text-gray-500 group-hover:text-gray-600 flex-shrink-0" />
               </div>
             );
             if (link.scroll) {
@@ -521,7 +521,7 @@ function DiagnosticInterne() {
                   { label: "Code 4 chiffres", value: result.diagnostics.delivery_code_4_digits || "❌ Manquant", ok: result.checks.delivery_code_exists },
                 ].map(item => (
                   <div key={item.label} className="bg-gray-50 border border-gray-100 p-2.5 rounded-xl">
-                    <p className="text-gray-400 mb-0.5">{item.label}</p>
+                    <p className="text-gray-600 mb-0.5">{item.label}</p>
                     <p className={`font-bold ${item.ok === false ? "text-red-600" : item.ok === true ? "text-green-600" : ""}`}>{item.value}</p>
                   </div>
                 ))}

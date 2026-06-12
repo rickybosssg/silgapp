@@ -299,7 +299,7 @@ export default function CourseEnAttenteModalExterne({
 
         <div className="px-5 py-2 bg-gray-50 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Clock className={`w-4 h-4 ${tempsRestant <= 10 ? 'text-red-500 animate-pulse' : 'text-gray-400'}`} />
+            <Clock className={`w-4 h-4 ${tempsRestant <= 10 ? 'text-red-500 animate-pulse' : 'text-gray-600'}`} />
             <span className={`text-sm font-bold ${tempsRestant <= 10 ? 'text-red-500' : 'text-gray-600'}`}>
               {tempsRestant}s restantes
             </span>
@@ -310,7 +310,7 @@ export default function CourseEnAttenteModalExterne({
           {/* Client */}
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Client</p>
+              <p className="text-xs text-gray-600 font-medium uppercase tracking-wide">Client</p>
               <p className="text-lg font-black text-gray-900">{course.expediteur_nom || "Client"}</p>
             </div>
             <div className="flex gap-2">
@@ -334,7 +334,7 @@ export default function CourseEnAttenteModalExterne({
                 <MapPin className="w-4 h-4 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wide">Récupérer</p>
+                <p className="text-[10px] text-gray-600 uppercase font-semibold tracking-wide">Récupérer</p>
                 <p className="text-sm font-bold text-gray-800 leading-tight">{course.adresse_depart}</p>
               </div>
               {course.gps_depart_lat && (
@@ -355,7 +355,7 @@ export default function CourseEnAttenteModalExterne({
                 <MapPin className="w-4 h-4 text-green-600" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wide">Livrer</p>
+                <p className="text-[10px] text-gray-600 uppercase font-semibold tracking-wide">Livrer</p>
                 <p className="text-sm font-bold text-gray-800 leading-tight">{course.adresse_arrivee || "Destination inconnue"}</p>
               </div>
             </div>
@@ -375,7 +375,7 @@ export default function CourseEnAttenteModalExterne({
                         ? `${prixBase.toLocaleString()} `
                         : `~${prixBase.toLocaleString()} `
                       }
-                      <span className={cn("text-base font-semibold", isPrixManuel ? "text-green-600" : "text-gray-400")}>FCFA</span>
+                      <span className={cn("text-base font-semibold", isPrixManuel ? "text-green-600" : "text-gray-600")}>FCFA</span>
                     </p>
                     {isPrixManuel && (
                       <div className="flex items-center gap-1 mt-0.5">
@@ -385,7 +385,7 @@ export default function CourseEnAttenteModalExterne({
                     )}
                     {course.type_colis && !isPrixManuel && (
                       <div className="flex items-center gap-1 mt-0.5">
-                        <Package className="w-3.5 h-3.5 text-gray-400" />
+                        <Package className="w-3.5 h-3.5 text-gray-600" />
                         <span className="text-xs text-gray-500">{typeColisLabel[course.type_colis] || course.type_colis}</span>
                       </div>
                     )}
@@ -404,7 +404,7 @@ export default function CourseEnAttenteModalExterne({
                     <Clock className="w-3.5 h-3.5 text-blue-600" />
                     <span className="text-sm font-black text-blue-900">~ {etaMin} min</span>
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-gray-400">
+                  <div className="flex items-center gap-1 text-xs text-gray-600">
                     <Ruler className="w-3 h-3" />
                     {distLabel}
                   </div>

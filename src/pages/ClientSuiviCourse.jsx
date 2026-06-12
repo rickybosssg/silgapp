@@ -760,21 +760,21 @@ export default function ClientSuiviCourse() {
                           <p className="text-sm font-black text-gray-900">
                             {distFinal ? `${Number(distFinal).toFixed(1)} km` : "—"}
                           </p>
-                          <p className="text-[9px] text-gray-400 font-semibold uppercase">Distance</p>
+                          <p className="text-[9px] text-gray-600 font-semibold uppercase">Distance</p>
                         </div>
                         <div className="bg-white rounded-xl p-3 text-center shadow-sm">
                           <Clock className="w-4 h-4 mx-auto mb-1 text-purple-500" />
                           <p className="text-sm font-black text-gray-900">
                             {dureeMin ? `${dureeMin} min` : "—"}
                           </p>
-                          <p className="text-[9px] text-gray-400 font-semibold uppercase">Durée</p>
+                          <p className="text-[9px] text-gray-600 font-semibold uppercase">Durée</p>
                         </div>
                         <div className="bg-white rounded-xl p-3 text-center shadow-sm">
                           <Banknote className="w-4 h-4 mx-auto mb-1 text-green-600" />
                           <p className="text-sm font-black text-green-700">
                            {prixFinal > 0 ? `${prixFinal.toLocaleString()} ${maCourse.devise || countries.find(c => c.code === maCourse.country_code)?.devise || "F"}` : "—"}
                           </p>
-                          <p className="text-[9px] text-gray-400 font-semibold uppercase">Prix final</p>
+                          <p className="text-[9px] text-gray-600 font-semibold uppercase">Prix final</p>
                         </div>
                       </div>
                     );
@@ -814,7 +814,7 @@ export default function ClientSuiviCourse() {
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1">
                       {[...Array(5)].map((_, i) => (
-                        <Star key={i} className={`w-5 h-5 ${i < maCourse.note_livreur ? "fill-yellow-400 text-yellow-400" : "fill-gray-200 text-gray-300"}`} />
+                        <Star key={i} className={`w-5 h-5 ${i < maCourse.note_livreur ? "fill-yellow-400 text-yellow-400" : "fill-gray-200 text-gray-500"}`} />
                       ))}
                     </div>
                     <p className="text-sm font-bold text-green-900">{maCourse.note_livreur}/5 — Merci !</p>
@@ -825,7 +825,7 @@ export default function ClientSuiviCourse() {
               {/* 👍/👎 Feedback destinataire */}
               {isDestinataire && (
                 <div className="space-y-3">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">👍/👎 Votre avis sur la livraison</p>
+                  <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-1">👍/👎 Votre avis sur la livraison</p>
                   <DestinataireReactionButton
                     course={maCourse}
                     onDone={() => navigate("/", { replace: true })}
