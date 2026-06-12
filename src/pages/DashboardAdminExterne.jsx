@@ -172,6 +172,14 @@ export default function DashboardAdminExterne() {
       shadow: "shadow-slate-100",
     },
     {
+      to: "/admin/centre-notifications",
+      label: "Notifications Push",
+      sub: "Campagnes push ciblées",
+      icon: Megaphone,
+      grad: "from-purple-600 to-indigo-700",
+      shadow: "shadow-purple-100",
+    },
+    {
       scroll: "codes-promo",
       label: "Codes Promo",
       sub: "Ambassadeurs & parrainages",
