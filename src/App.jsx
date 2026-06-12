@@ -56,6 +56,7 @@ const PolitiqueConfidentialite = lazy(() => import('./pages/PolitiqueConfidentia
 const TestNotifications = lazy(() => import('./pages/TestNotifications.jsx'));
 const DiagnosticPushComplet = lazy(() => import('./pages/DiagnosticPushComplet.jsx'));
 const TestDispatchLivreur = lazy(() => import('./pages/TestDispatchLivreur.jsx'));
+const CentreNotificationsPush = lazy(() => import('./pages/CentreNotificationsPush.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -253,6 +254,7 @@ function AppContent() {
           <Route path="/admin/test-notifications" element={<AnimatedRoutes><TestNotifications /></AnimatedRoutes>} />
           <Route path="/diagnostic-push-complet" element={<AnimatedRoutes><DiagnosticPushComplet /></AnimatedRoutes>} />
           <Route path="/admin/test-dispatch-livreur" element={<AnimatedRoutes><TestDispatchLivreur /></AnimatedRoutes>} />
+          <Route path="/admin/centre-notifications" element={<AnimatedRoutes><CentreNotificationsPush /></AnimatedRoutes>} />
         </Route>
         <Route path="*" element={<PageNotFound />} />
       </Routes>
