@@ -210,6 +210,16 @@ export default function RecapCourseLivreur() {
         <div className="bg-gray-900 rounded-3xl p-5 border border-gray-800 space-y-3">
           <p className="text-gray-400 text-xs font-semibold uppercase tracking-widest mb-2">Détails</p>
 
+          {course.delivery_confirmed_by === 'pin_secours' && (
+            <div className="bg-amber-900/40 border border-amber-500/40 rounded-2xl p-3 flex items-center gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-amber-300">Livraison validée avec PIN secours 0000</p>
+                <p className="text-xs text-amber-400/70">Le destinataire ne possédait pas SILGAPP</p>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-gray-800 rounded-2xl p-3 text-center">
               <p className="text-gray-500 text-[10px] uppercase mb-1">Récupération</p>

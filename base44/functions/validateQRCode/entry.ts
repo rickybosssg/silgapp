@@ -71,8 +71,11 @@ Deno.serve(async (req) => {
         return Response.json({ success: false, error: 'GPS requis pour valider cette étape — coordonnées manquantes' });
       }
 
-      // Vérifier la valeur
-      const isValid = method === 'qr' ? value === expectedQR : value === expectedPIN;
+      // ── PIN SECOURS 0000 (livraison uniquement) ──────────────────────
+      const isBackupPin = !isPickup && method === 'manual_code' && value === '0000';
+      
+      // Vérifier la valeur (sauf PIN secours qui bypass)
+      const isValid = isBackupPin || (method === 'qr' ? value === expectedQR : value === expectedPIN);
       if (!isValid) {
         return Response.json({ success: false, error: 'Code invalide' });
       }
@@ -97,7 +100,7 @@ Deno.serve(async (req) => {
         heure_livraison: now,
         latitude_livraison: latitude || null,
         longitude_livraison: longitude || null,
-        delivery_confirmed_by: method,
+        delivery_confirmed_by: isBackupPin ? 'pin_secours' : method,
         delivery_confirmed_at: now,
         // Sauvegarder aussi dans les champs standards de suivi
         latitude_arrivee_livraison: latitude || null,
