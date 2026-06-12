@@ -8,7 +8,7 @@ import {
   Users, Package, ArrowLeft,
   AlertCircle, AlertTriangle, Eye, MapPin, CreditCard, Download,
   Save, ExternalLink, Bug, Search, CheckCircle2, XCircle,
-  Loader2, MessageCircle, Tag, Globe, Zap, ChevronRight, Bell, Flame
+  Loader2, MessageCircle, Tag, Globe, Zap, ChevronRight, Bell, Flame, Megaphone
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
