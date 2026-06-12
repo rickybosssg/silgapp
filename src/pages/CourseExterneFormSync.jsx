@@ -458,7 +458,15 @@ export default function CourseExterneFormSync() {
     }
 
     // Récupérer l'utilisateur connecté
-    const user = await base44.auth.me();
+    let user;
+    try {
+      user = await base44.auth.me();
+    } catch (err) {
+      console.error("[CourseForm] Erreur auth:", err);
+      toast.error("Session expirée ou problème de connexion. Rafraîchissez la page.");
+      setIsSubmitting(false);
+      return;
+    }
 
     let expediteurNom, expediteurTel, expediteurClientId, expediteurPhoneNormalized;
     let destinataireNom, destinataireTel, destinataireClientId, destinatairePhoneNormalized;
