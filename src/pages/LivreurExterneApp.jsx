@@ -348,7 +348,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           longitude: pos.coords.longitude,
           derniere_position_date: new Date().toISOString(),
         }).catch(() => null),
-        () => setGpsActif(false),
+        () => {}, // Ne PAS désactiver le GPS sur erreur temporaire (tunnel, etc.)
         { enableHighAccuracy: true }
       );
     }, 15000);
@@ -472,10 +472,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       
       setTestResult(response);
       
-      if (response.success) {
-        toast.success(`Notification envoyée ! Tokens: ${response.tokens_found || 0}`);
+      if (response.data?.success) {
+        toast.success(`Notification envoyée ! Tokens: ${response.data.tokens_found || 0}`);
       } else {
-        toast.error(response.error || "Échec de l'envoi");
+        toast.error(response.data?.error || "Échec de l'envoi");
       }
     } catch (err) {
       setTestResult({ error: err.message, details: err.toString() });

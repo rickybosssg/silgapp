@@ -63,9 +63,6 @@ export default function RecapCourseLivreur() {
   }, [courseId]);
 
   const handleTerminer = async () => {
-    try {
-      await base44.entities.CourseExterne.update(courseId, { recap_livreur_vu: true });
-    } catch (_) {}
     // Retourner au dashboard livreur (reload propre)
     navigate("/", { replace: true });
     setTimeout(() => window.location.reload(), 100);

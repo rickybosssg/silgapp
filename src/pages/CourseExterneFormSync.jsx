@@ -435,6 +435,15 @@ export default function CourseExterneFormSync() {
     if (isSubmitting || createMutation.isPending) return;
     setIsSubmitting(true);
 
+    // 🛡️ country_code DOIT être déclaré AVANT toute utilisation dans normalizePhone()
+    const courseCountryCode = clientFromDB.country_code;
+    if (!courseCountryCode) {
+      console.error("[CourseForm] country_code manquant");
+      toast.error("Erreur : profil sans pays. Contactez le support.");
+      setIsSubmitting(false);
+      return;
+    }
+
     // ─── Validation des champs obligatoires ───────────────────────────────────
     const isExpedie = formData.type_course === "expedier";
     const isRecevoir = formData.type_course === "recevoir";
@@ -475,17 +484,17 @@ export default function CourseExterneFormSync() {
     if (isExpedie) {
       expediteurNom = formData.client_nom;
       expediteurTel = formData.client_telephone;
-      expediteurClientId = clientProfil?.id || null;
-      expediteurPhoneNormalized = normalizePhone(formData.client_telephone, courseCountryCode); // ✅ Utiliser courseCountryCode garanti
+      expediteurClientId = clientFromDB?.id || null;
+      expediteurPhoneNormalized = normalizePhone(formData.client_telephone, courseCountryCode);
       destinataireNom = formData.destinataire_nom;
       destinataireTel = formData.destinataire_telephone;
       destinataireClientId = formData.destinataire_client_id || null;
-      destinatairePhoneNormalized = normalizePhone(formData.destinataire_telephone, courseCountryCode); // ✅
+      destinatairePhoneNormalized = normalizePhone(formData.destinataire_telephone, courseCountryCode);
     } else {
       destinataireNom = formData.client_nom;
       destinataireTel = formData.client_telephone;
-      destinataireClientId = clientProfil?.id || null;
-      destinatairePhoneNormalized = normalizePhone(formData.client_telephone, courseCountryCode); // ✅
+      destinataireClientId = clientFromDB?.id || null;
+      destinatairePhoneNormalized = normalizePhone(formData.client_telephone, courseCountryCode);
       expediteurNom = formData.expediteur_nom;
       expediteurTel = formData.expediteur_telephone;
       expediteurClientId = formData.expediteur_client_id || null;
@@ -560,18 +569,6 @@ export default function CourseExterneFormSync() {
     const destinataireTelFinal = isMulti
       ? (colis[0]?.destinataire_telephone || "")
       : destinataireTel;
-
-    // 🛡️ country_code OBLIGATOIRE : Utiliser UNIQUEMENT clientFromDB (BDD fraîche)
-    // IMPORTANT : NE PAS utiliser clientProfil (state React potentiellement obsolète)
-    const courseCountryCode = clientFromDB.country_code;
-    
-    if (!courseCountryCode) {
-      console.error("[CourseForm] ❌ country_code manquant — clientFromDB:", clientFromDB);
-      toast.error("Erreur : votre profil client n'a pas de pays. Veuillez contacter le support.");
-      setIsSubmitting(false);
-      return;
-    }
-    console.log("[CourseForm] ✅ country_code confirmé (BDD fraîche):", courseCountryCode);
 
     createMutation.mutate({
       country_code: courseCountryCode,
