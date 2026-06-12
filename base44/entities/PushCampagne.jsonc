@@ -1,0 +1,75 @@
+{
+  "name": "PushCampagne",
+  "type": "object",
+  "properties": {
+    "titre": {
+      "type": "string",
+      "description": "Titre de la notification push"
+    },
+    "message": {
+      "type": "string",
+      "description": "Contenu du message push"
+    },
+    "image_url": {
+      "type": "string",
+      "description": "URL d'image optionnelle dans la notification"
+    },
+    "pays_cible": {
+      "type": "string",
+      "description": "Code pays cibl\u00e9 (BF, CI, TG...) ou 'ALL' pour tous les pays"
+    },
+    "type_destinataires": {
+      "type": "string",
+      "enum": [
+        "tous_clients",
+        "tous_livreurs",
+        "tous_utilisateurs"
+      ],
+      "description": "Type de destinataires cibl\u00e9s"
+    },
+    "admin_email": {
+      "type": "string",
+      "description": "Email de l'administrateur ayant envoy\u00e9 la campagne"
+    },
+    "admin_nom": {
+      "type": "string",
+      "description": "Nom de l'administrateur"
+    },
+    "nb_envoyes": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre total de tokens push cibl\u00e9s"
+    },
+    "nb_succes": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre d'envois FCM r\u00e9ussis"
+    },
+    "nb_echecs": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre d'envois FCM \u00e9chou\u00e9s"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "en_cours",
+        "termine",
+        "echoue"
+      ],
+      "default": "en_cours",
+      "description": "Statut de la campagne d'envoi"
+    },
+    "date_envoi": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date et heure de d\u00e9but d'envoi"
+    }
+  },
+  "required": [
+    "titre",
+    "message",
+    "type_destinataires",
+    "pays_cible"
+  ]
+}

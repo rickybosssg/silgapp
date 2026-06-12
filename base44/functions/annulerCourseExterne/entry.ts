@@ -166,6 +166,14 @@ Deno.serve(async (req) => {
       // Ne pas effacer livreur_id/livreur_nom pour tracer qui était assigné
     };
 
+    // ─── Nettoyer prix manuel si applicable ────────────────────────────────
+    if (course.pricing_mode === 'manual' && course.manual_price_status === 'pending_client_validation') {
+      updateData.manual_price_status = null;
+      updateData.manual_price = null;
+      updateData.pricing_mode = 'automatic'; // reset pour éviter affichage bloqué
+      console.log(`[ANNULATION] 🧹 Prix manuel nettoyé (était en attente de validation)`);
+    }
+
     // Ajouter le motif si fourni
     if (motif) {
       updateData.notes = motif;

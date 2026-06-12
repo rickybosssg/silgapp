@@ -49,6 +49,9 @@ export default function CourseListItem({ course, onAssign, onView }) {
             {course.urgence && course.urgence !== "normale" && (
               <UrgenceBadge urgence={course.urgence} />
             )}
+            {course.delivery_confirmed_by === 'pin_secours' && (
+              <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold">🔑 PIN secours</span>
+            )}
             <MultiColisProgressBadge
               nbColis={course.nb_colis || 1}
               nbLivres={course.nb_colis_livres || 0}

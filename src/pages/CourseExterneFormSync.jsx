@@ -405,6 +405,7 @@ export default function CourseExterneFormSync() {
     if (isSubmitting || createMutation.isPending) return;
     setIsSubmitting(true);
 
+    // 🛡️ country_code DOIT être déclaré AVANT toute utilisation dans normalizePhone()
     // ─── Validation des champs obligatoires ───────────────────────────────────
     const isExpedie = formData.type_course === "expedier";
     const isRecevoir = formData.type_course === "recevoir";
@@ -428,7 +429,36 @@ export default function CourseExterneFormSync() {
     }
 
     // Récupérer l'utilisateur connecté
-    const user = await base44.auth.me();
+    let user;
+    try {
+      user = await base44.auth.me();
+    } catch (err) {
+      console.error("[CourseForm] Erreur auth:", err);
+      toast.error("Session expirée ou problème de connexion. Rafraîchissez la page.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    // country_code obligatoire : relire le profil client avant toute utilisation.
+    let clientFromDB = clientProfil || null;
+    try {
+      if (clientProfil?.id) {
+        clientFromDB = await base44.entities.ClientExterne.get(clientProfil.id);
+      } else if (user?.email) {
+        const clients = await base44.entities.ClientExterne.filter({ user_email: user.email }, "-created_date", 1);
+        clientFromDB = clients?.[0] || clientFromDB;
+      }
+    } catch (err) {
+      console.warn("[CourseForm] Impossible de relire le profil client, fallback local:", err.message);
+    }
+
+    const courseCountryCode = clientFromDB?.country_code || clientProfil?.country_code || "";
+    if (!courseCountryCode) {
+      console.error("[CourseForm] country_code manquant sur clientFromDB:", clientFromDB);
+      toast.error("Erreur : votre profil client n'a pas de pays. Veuillez contacter le support.");
+      setIsSubmitting(false);
+      return;
+    }
 
     let expediteurNom, expediteurTel, expediteurClientId, expediteurPhoneNormalized;
     let destinataireNom, destinataireTel, destinataireClientId, destinatairePhoneNormalized;
@@ -436,21 +466,21 @@ export default function CourseExterneFormSync() {
     if (isExpedie) {
       expediteurNom = formData.client_nom;
       expediteurTel = formData.client_telephone;
-      expediteurClientId = clientProfil?.id || null;
-      expediteurPhoneNormalized = normalizePhone(formData.client_telephone, clientProfil?.country_code);
+      expediteurClientId = clientFromDB?.id || null;
+      expediteurPhoneNormalized = normalizePhone(formData.client_telephone, courseCountryCode);
       destinataireNom = formData.destinataire_nom;
       destinataireTel = formData.destinataire_telephone;
       destinataireClientId = formData.destinataire_client_id || null;
-      destinatairePhoneNormalized = normalizePhone(formData.destinataire_telephone);
+      destinatairePhoneNormalized = normalizePhone(formData.destinataire_telephone, courseCountryCode);
     } else {
       destinataireNom = formData.client_nom;
       destinataireTel = formData.client_telephone;
-      destinataireClientId = clientProfil?.id || null;
-      destinatairePhoneNormalized = normalizePhone(formData.client_telephone, clientProfil?.country_code);
+      destinataireClientId = clientFromDB?.id || null;
+      destinatairePhoneNormalized = normalizePhone(formData.client_telephone, courseCountryCode);
       expediteurNom = formData.expediteur_nom;
       expediteurTel = formData.expediteur_telephone;
       expediteurClientId = formData.expediteur_client_id || null;
-      expediteurPhoneNormalized = normalizePhone(formData.expediteur_telephone);
+      expediteurPhoneNormalized = normalizePhone(formData.expediteur_telephone, courseCountryCode);
     }
 
     console.log("[CourseForm] Soumission :", {
@@ -521,27 +551,6 @@ export default function CourseExterneFormSync() {
     const destinataireTelFinal = isMulti
       ? (colis[0]?.destinataire_telephone || "")
       : destinataireTel;
-
-    // country_code obligatoire : relire le profil client en base pour eviter un dispatch hors pays.
-    let clientFromDB = clientProfil || null;
-    try {
-      if (clientProfil?.id) {
-        clientFromDB = await base44.entities.ClientExterne.get(clientProfil.id);
-      } else if (user?.email) {
-        const clients = await base44.entities.ClientExterne.filter({ user_email: user.email }, "-created_date", 1);
-        clientFromDB = clients?.[0] || clientFromDB;
-      }
-    } catch (err) {
-      console.warn("[CourseForm] Impossible de relire le profil client, fallback local:", err.message);
-    }
-
-    const courseCountryCode = clientFromDB?.country_code || clientProfil?.country_code || "";
-    if (!courseCountryCode) {
-      console.error("[CourseForm] country_code manquant sur clientFromDB:", clientFromDB);
-      toast.error("Erreur : votre profil client n'a pas de pays. Veuillez contacter le support.");
-      setIsSubmitting(false);
-      return;
-    }
 
     createMutation.mutate({
       country_code: courseCountryCode,
@@ -659,7 +668,7 @@ export default function CourseExterneFormSync() {
           </div>
         </div>
 
-        <Card className="p-6">
+        <Card className="p-6" style={{ background: "#ffffff" }}>
           <form onSubmit={handleSubmit}>
             <CourseStepForm
               step={currentStep}

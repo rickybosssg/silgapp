@@ -747,6 +747,17 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             </div>
           )}
 
+          {/* ── Indicateur PIN secours ── */}
+          {colisLivre && course.delivery_confirmed_by === 'pin_secours' && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex items-center gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-amber-800">Livraison validée avec PIN secours 0000</p>
+                <p className="text-xs text-amber-600">Le destinataire ne possédait pas SILGAPP</p>
+              </div>
+            </div>
+          )}
+
           {colisLivre && (() => {
             const isMulti = isExterne && course.is_multi_colis && (course.nb_colis || 1) > 1;
 

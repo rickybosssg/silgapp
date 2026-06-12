@@ -523,6 +523,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       c => c.pricing_mode === "manual" && c.manual_price_status === "pending_client_validation"
         && !FINAL_COURSE_STATUSES.has(c.statut)
         && c.proposed_by_livreur_id === livreurProfil?.id
+        && c.statut !== "annulee" && c.statut !== "livree"
     ) || null;
   }, [mesCourses, livreurProfil?.id]);
 

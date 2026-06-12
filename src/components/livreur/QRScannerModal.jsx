@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { X, Camera, Keyboard, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { X, Camera, Keyboard, CheckCircle2, XCircle, Loader2, AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { base44 } from "@/api/base44Client";
@@ -10,7 +10,8 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
   const [code4, setCode4] = useState("");
   const [scanning, setScanning] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState(null); // "success" | "error"
+  const [showBackupPinConfirm, setShowBackupPinConfirm] = useState(false); // confirmation avant PIN 0000
 
   useEffect(() => {
     if (mode === "camera") {
@@ -122,6 +123,11 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
       toast.error("Entrez un code a 4 chiffres");
       return;
     }
+    // ── PIN SECOURS : confirmation préalable pour la livraison ──
+    if (type === "delivery" && code4 === "0000") {
+      setShowBackupPinConfirm(true);
+      return;
+    }
     await verifyCode(code4, "manual_code");
   };
 
@@ -165,7 +171,7 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
           </div>
         )}
 
-        {!result && (
+        {!result && !showBackupPinConfirm && (
           <>
             <div className="flex border-b">
               <button
@@ -236,6 +242,43 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
               </div>
             )}
           </>
+        )}
+
+        {/* ── Confirmation PIN secours 0000 ── */}
+        {showBackupPinConfirm && (
+          <div className="p-6 space-y-5">
+            <div className="text-center space-y-2">
+              <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto">
+                <AlertTriangle className="w-8 h-8 text-amber-600" />
+              </div>
+              <p className="text-lg font-black text-gray-900">PIN de secours 0000</p>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                Vous utilisez le PIN de secours 0000. Confirmez que le colis a bien été remis au destinataire.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                className="h-12 rounded-2xl border border-gray-200 text-gray-600 font-bold text-sm active:bg-gray-50 transition-colors"
+                onClick={() => { setShowBackupPinConfirm(false); setCode4(""); }}
+              >
+                Annuler
+              </button>
+              <button
+                className="h-12 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-sm shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                onClick={async () => {
+                  setShowBackupPinConfirm(false);
+                  await verifyCode(code4, "manual_code");
+                }}
+                disabled={verifying}
+              >
+                {verifying ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>Confirmer la livraison</>
+                )}
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>

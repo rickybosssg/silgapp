@@ -116,6 +116,9 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
             <CourseStatusBadge statut={course.statut} />
             {course.urgence && <UrgenceBadge urgence={course.urgence} />}
             {course.prix && <span className="text-sm font-bold">{course.prix.toLocaleString()} FCFA</span>}
+            {course.delivery_confirmed_by === 'pin_secours' && (
+              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">🔑 PIN secours</span>
+            )}
           </div>
 
           {/* Client */}
