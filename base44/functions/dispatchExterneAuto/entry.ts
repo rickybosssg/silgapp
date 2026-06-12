@@ -59,6 +59,21 @@ async function verifierPaysCourseLivreur(base44, course, livreurId, contexte) {
   return { ok: true, livreur, courseCountry, livreurCountry };
 }
 
+function reponseDejaPrise(reason, course, details = {}) {
+  return {
+    success: false,
+    accepted: false,
+    reason: 'already_taken',
+    already_taken: true,
+    error: 'Cette course a deja ete prise par un autre livreur',
+    dispatch_status: course?.dispatch_status || '',
+    existing_livreur_id: course?.livreur_id || '',
+    accepted_by_livreur_id: course?.accepted_by_livreur_id || course?.livreur_id || '',
+    details: reason,
+    ...details,
+  };
+}
+
 /**
  * Charge la configuration de dispatch depuis AppConfig.
  * Clés : DISPATCH_NB_LIVREURS (défaut: 3), DISPATCH_TIMEOUT_SEC (défaut: 60)
@@ -450,14 +465,33 @@ Deno.serve(async (req) => {
       if (!countryGuard.ok) return Response.json(countryGuard.response, { status: countryGuard.status });
       const livreur = countryGuard.livreur;
 
+      console.log('[DISPATCH][ACCEPT_ATTEMPT]', {
+        course_id,
+        livreur_id,
+        course_status: course.statut || '',
+        dispatch_status: course.dispatch_status || '',
+        existing_livreur_id: course.livreur_id || '',
+        accepted_by_livreur_id: course.accepted_by_livreur_id || '',
+      });
+
       // Vérification 1 : Si déjà acceptée par un autre
-      if (course.dispatch_status === 'accepte' && course.livreur_id && course.livreur_id !== livreur_id) {
-        return Response.json({ success: false, error: 'Course déjà prise', already_taken: true });
+      if (course.dispatch_status === 'accepte' || course.dispatch_status === 'accepted') {
+        return Response.json(reponseDejaPrise('dispatch_already_accepted', course));
       }
 
       // Vérification 2 : Si livreur_id est déjà fixé (même en propose)
-      if (course.livreur_id && course.livreur_id !== livreur_id && course.dispatch_status === 'propose') {
-        return Response.json({ success: false, error: 'Course déjà prise par un autre livreur', already_taken: true });
+      if (course.livreur_id || course.accepted_by_livreur_id) {
+        return Response.json(reponseDejaPrise('livreur_lock_already_set', course));
+      }
+
+      if (course.dispatch_status !== 'propose') {
+        return Response.json({
+          success: false,
+          accepted: false,
+          reason: 'not_available',
+          error: "Cette course n'est plus disponible",
+          dispatch_status: course.dispatch_status || '',
+        });
       }
 
       // Vérifier que ce livreur fait partie des notifiés
@@ -491,8 +525,20 @@ Deno.serve(async (req) => {
 
       // Re-vérification finale AVANT de verrouiller (double-check locking)
       const courseFinal = await base44.asServiceRole.entities.CourseExterne.get(course_id);
-      if (courseFinal.dispatch_status === 'accepte' && courseFinal.livreur_id && courseFinal.livreur_id !== livreur_id) {
-        return Response.json({ success: false, error: 'Course déjà prise pendant votre attente', already_taken: true });
+      console.log('[DISPATCH][ACCEPT_FINAL_CHECK]', {
+        course_id,
+        livreur_id,
+        course_status: courseFinal.statut || '',
+        dispatch_status: courseFinal.dispatch_status || '',
+        existing_livreur_id: courseFinal.livreur_id || '',
+        accepted_by_livreur_id: courseFinal.accepted_by_livreur_id || '',
+      });
+      if (
+        courseFinal.dispatch_status !== 'propose' ||
+        courseFinal.livreur_id ||
+        courseFinal.accepted_by_livreur_id
+      ) {
+        return Response.json(reponseDejaPrise('final_check_already_taken', courseFinal));
       }
 
       // Générer tokens QR/PIN
@@ -513,6 +559,8 @@ Deno.serve(async (req) => {
         livreur_vehicule: livreur.vehicule || livreur.type_vehicule || 'moto',
         livreur_note_moyenne: livreur.note_moyenne || 0,
         livreur_nombre_avis: livreur.nombre_avis || 0,
+        accepted_by_livreur_id: livreur_id,
+        accepted_at: isManual ? null : new Date().toISOString(),
         pickup_qr_token: pickupToken,
         pickup_code_4_digits: pickupPIN,
         delivery_qr_token: deliveryToken,
@@ -533,7 +581,7 @@ Deno.serve(async (req) => {
         await base44.asServiceRole.entities.Livreur.update(livreur_id, { statut: 'en_course' });
         await supprimerNotificationsCourse(base44, course_id);
         console.log(`[DISPATCH] 🎉 Course ${course_id} verrouillée (auto) par ${livreur_id}`);
-        return Response.json({ success: true });
+        return Response.json({ success: true, accepted: true, course_id, livreur_id });
       }
 
       // Mode manuel : notifier le créateur de la course
@@ -563,7 +611,7 @@ Deno.serve(async (req) => {
         console.warn('[DISPATCH] Erreur notif client prix manuel:', e.message);
       }
 
-      return Response.json({ success: true, pending_client_validation: true });
+      return Response.json({ success: true, accepted: true, pending_client_validation: true, course_id, livreur_id });
     }
 
     // ─── 4. Refuser une course ─────────────────────────────────────────────

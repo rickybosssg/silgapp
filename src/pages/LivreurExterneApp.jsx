@@ -95,6 +95,15 @@ function isCourseWaitingForLivreur(course, livreurId) {
   );
 }
 
+function isCourseOwnedByLivreur(course, livreurId) {
+  if (!course || !livreurId) return false;
+  return (
+    sameLivreurId(course.livreur_id, livreurId) ||
+    sameLivreurId(course.proposed_by_livreur_id, livreurId) ||
+    sameLivreurId(course.proposed_livreur_id, livreurId)
+  );
+}
+
 function logAcceptationLivreur(event, details = {}) {
   try {
     if (localStorage.getItem("silgapp_livreur_acceptation_debug") === "true") {
@@ -265,8 +274,12 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     base44.entities.CourseExterne.get(notificationCourseId)
       .then((course) => {
         if (!cancelled) {
+          const isUsableForCurrentLivreur = course && (
+            isCourseOwnedByLivreur(course, livreurId) ||
+            isCourseWaitingForLivreur({ ...course, __notifiedForCurrentLivreur: true }, livreurId)
+          );
           setNotificationCourseCandidate(
-            course ? { ...course, __notifiedForCurrentLivreur: true } : null
+            isUsableForCurrentLivreur ? { ...course, __notifiedForCurrentLivreur: true } : null
           );
         }
       })
@@ -280,7 +293,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     return () => {
       cancelled = true;
     };
-  }, [notificationCourseId]);
+  }, [notificationCourseId, livreurId]);
 
   useEffect(() => {
     const refreshCourses = () => {
@@ -337,8 +350,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
         const found = (allCourses || []).find((course) => (
           course.dispatch_status === "propose" &&
+          !course.livreur_id &&
+          !course.accepted_by_livreur_id &&
           !FINAL_COURSE_STATUSES.has(course.statut) &&
           course.manual_price_status !== "pending_client_validation" &&
+          (!livreurProfil?.country_code || course.country_code === livreurProfil.country_code) &&
           listIncludesLivreur(course.dispatch_notified_ids, livreurId)
         )) || null;
 
@@ -358,7 +374,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [livreurId]);
+  }, [livreurId, livreurProfil?.country_code]);
 
   const { data: mesCourses = [] } = useQuery({
     queryKey: ["mes-courses-externes", livreurId, livreurEmail, notificationCourseId],
@@ -437,6 +453,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       }
 
       const merged = uniqById(results);
+      const scopedCourses = merged.filter((course) => (
+        isCourseOwnedByLivreur(course, livreurId) ||
+        isCourseWaitingForLivreur(course, livreurId)
+      ));
       logAcceptationLivreur("courses-detected", {
         livreur_id: livreurId,
         all_courses_for_livreur: allCoursesForLivreur?.length || 0,
@@ -445,7 +465,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         proposed_livreur: proposedLivreur?.length || 0,
         notification_courses: notificationCourseIds.length,
         merged: merged.length,
-        waiting: merged.filter((course) => isCourseWaitingForLivreur(course, livreurId)).map((course) => ({
+        scoped: scopedCourses.length,
+        ignored_not_owned: merged.length - scopedCourses.length,
+        waiting: scopedCourses.filter((course) => isCourseWaitingForLivreur(course, livreurId)).map((course) => ({
           id: course.id,
           statut: course.statut,
           dispatch_status: course.dispatch_status,
@@ -454,7 +476,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         })),
       });
 
-      return merged;
+      return scopedCourses;
     },
     enabled: !!livreurId,
     initialData: [],
@@ -506,8 +528,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   // ─── Courses actives ──────────────────────────────────────────────────────
   const coursesActives = useMemo(
-    () => mesCourses.filter(c => ["livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut)),
-    [mesCourses]
+    () => mesCourses.filter(c =>
+      sameLivreurId(c.livreur_id, livreurProfil?.id) &&
+      ["livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut)
+    ),
+    [mesCourses, livreurProfil?.id]
   );
 
   // Détecter la réponse du client sur une proposition de prix manuel
@@ -697,6 +722,21 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     toast("Course refusée – recherche du prochain livreur...");
   };
 
+  const handleCourseDejaPrise = (source = "accept") => {
+    setNotificationCourseCandidate(null);
+    setNotificationCourseId(null);
+    setCourseProposeeDirecte(null);
+    stopUrgentCourseAlert(`${source}-already-taken`);
+    queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+    queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
+    queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+    logAcceptationLivreur("frontend-already-taken-cleared", {
+      source,
+      livreur_id: livreurProfil?.id || "",
+    });
+    toast.error("Cette course a deja ete prise par un autre livreur.");
+  };
+
   const handleFallbackAccepter = async (course) => {
     if (!course?.id || !livreurProfil?.id) return;
     try {
@@ -724,12 +764,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
       const res = await base44.functions.invoke("dispatchExterneAuto", payload);
       const data = res?.data;
-      if (data?.success) {
+      if (data?.success && data?.accepted !== false) {
         stopUrgentCourseAlert("fallback-accepted");
         handleAccepter(data?.pending_client_validation === true);
-      } else if (data?.already_taken) {
-        stopUrgentCourseAlert("fallback-already-taken");
-        toast.error("Course deja prise par un autre livreur");
+      } else if (data?.already_taken || data?.reason === "already_taken" || data?.accepted === false) {
+        handleCourseDejaPrise("fallback");
       } else if (data?.expired) {
         stopUrgentCourseAlert("fallback-expired");
         toast.error("Course expiree");
@@ -1001,6 +1040,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           onAccepter={handleAccepter}
           onRefuser={handleRefuser}
           onExpire={() => {
+            setNotificationCourseCandidate(null);
+            setNotificationCourseId(null);
+            setCourseProposeeDirecte(null);
             if (coursesActives.length === 0 && livreurProfil?.statut !== "hors_ligne") {
               saveLivreur(livreurProfil.id, { statut: "disponible" }).catch(() => null);
             }

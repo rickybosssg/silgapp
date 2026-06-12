@@ -122,9 +122,9 @@ export default function CourseEnAttenteModalExterne({
       });
       const data = res?.data;
 
-      if (data?.already_taken) { stopUrgentCourseAlert("course-already-taken"); setCourseDejaPrise(true); return; }
+      if (data?.already_taken || data?.reason === "already_taken") { stopUrgentCourseAlert("course-already-taken"); setCourseDejaPrise(true); return; }
       if (data?.expired) { stopUrgentCourseAlert("course-expired"); setCourseExpiree(true); return; }
-      if (data?.success) {
+      if (data?.success && data?.accepted !== false) {
         stopUrgentCourseAlert("course-accepted");
         onAccepter();
       } else {
@@ -152,9 +152,9 @@ export default function CourseEnAttenteModalExterne({
       });
       const data = res?.data;
 
-      if (data?.already_taken) { stopUrgentCourseAlert("course-already-taken"); setCourseDejaPrise(true); return; }
+      if (data?.already_taken || data?.reason === "already_taken") { stopUrgentCourseAlert("course-already-taken"); setCourseDejaPrise(true); return; }
       if (data?.expired) { stopUrgentCourseAlert("course-expired"); setCourseExpiree(true); return; }
-      if (data?.success) {
+      if (data?.success && data?.accepted !== false) {
         stopUrgentCourseAlert("course-accepted-manual");
         setShowManualPriceModal(false);
         onAccepter(data?.pending_client_validation === true);
