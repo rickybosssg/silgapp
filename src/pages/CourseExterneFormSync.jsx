@@ -718,7 +718,7 @@ export default function CourseExterneFormSync() {
           </div>
         </div>
 
-        <Card className="p-6">
+        <Card className="p-6" style={{ background: "#ffffff" }}>
           <form onSubmit={handleSubmit}>
             <CourseStepForm
               step={currentStep}
