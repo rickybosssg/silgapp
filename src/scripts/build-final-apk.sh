@@ -57,7 +57,7 @@ echo ""
 
 # 7. Désinstallation ancienne APK
 echo "📱 7. Désinstallation ancienne APK..."
-adb uninstall com.silgapp2.app || echo "⚠️ APK déjà désinstallée"
+adb uninstall com.base6a0ec08f3af5e1d1284254c1.app || echo "⚠️ APK déjà désinstallée"
 echo "✅ Désinstallation terminée"
 echo ""
 
@@ -69,7 +69,7 @@ echo ""
 
 # 9. Lancement app
 echo "🚀 9. Lancement application..."
-adb shell am start -n com.silgapp2.app/.MainActivity
+adb shell am start -n com.base6a0ec08f3af5e1d1284254c1.app/.MainActivity
 echo "✅ Application lancée"
 echo ""
 
@@ -77,7 +77,7 @@ echo "========================================="
 echo "✅ BUILD ET INSTALLATION TERMINÉS"
 echo "========================================="
 echo ""
-echo "📱 APK installée: com.silgapp2.app"
+echo "📱 APK installée: com.base6a0ec08f3af5e1d1284254c1.app"
 echo "📍 Location: android/app/build/outputs/apk/debug/app-debug.apk"
 echo ""
 echo "🧪 PROCHAINES ÉTAPES (À FAIRE MANUELLEMENT):"

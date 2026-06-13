@@ -53,7 +53,7 @@ if [ -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
     echo "📍 Chemin: android/app/build/outputs/apk/debug/app-debug.apk"
     echo ""
     echo "⚠️  IMPORTANT: Désinstaller l'ancienne APK avant d'installer la nouvelle"
-    echo "   adb uninstall com.silgapp2.app"
+    echo "   adb uninstall com.base6a0ec08f3af5e1d1284254c1.app"
     echo ""
     echo "📲 Pour installer:"
     echo "   adb install app/build/outputs/apk/debug/app-debug.apk"

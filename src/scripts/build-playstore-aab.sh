@@ -13,12 +13,12 @@ echo "╚═══════════════════════�
 echo ""
 
 # ─── CONFIG ─────────────────────────────────────────────────
-APP_ID="com.silgapp.app"
+APP_ID="com.base6a0ec08f3af5e1d1284254c1.app"
 VERSION_NAME="1.0.0"
 VERSION_CODE="1"
-KEYSTORE_FILE="silgapp-release.keystore"
+KEYSTORE_FILE="release-key.keystore"
 KEYSTORE_ALIAS="silgapp"
-KEYSTORE_PASSWORD="silgapp2024secure"
+KEYSTORE_PASSWORD="silgapp2024"
 AAB_OUTPUT="app/build/outputs/bundle/release/app-release.aab"
 
 # ─── ÉTAPE 1 : Vérification de l'environnement ──────────────
@@ -73,29 +73,20 @@ else
 fi
 echo ""
 
-# ─── ÉTAPE 6 : Génération du Keystore (si absent) ───────────
-echo "🔐 Étape 6/7 : Génération du keystore de signature..."
+# ─── ÉTAPE 6 : Vérification du Keystore ──────────────────────
+echo "🔐 Étape 6/7 : Vérification du keystore de signature..."
 
 if [ ! -f "$KEYSTORE_FILE" ]; then
-  echo "   Génération d'un nouveau keystore..."
-  keytool -genkeypair \
-    -v \
-    -storetype PKCS12 \
-    -keystore "$KEYSTORE_FILE" \
-    -alias "$KEYSTORE_ALIAS" \
-    -keyalg RSA \
-    -keysize 2048 \
-    -validity 10000 \
-    -storepass "$KEYSTORE_PASSWORD" \
-    -keypass "$KEYSTORE_PASSWORD" \
-    -dname "CN=SILGAPP, OU=Mobile, O=SILGAPP Burkina Faso, L=Ouagadougou, ST=Centre, C=BF" \
-    2>/dev/null || true
-  echo "   ✅ Keystore généré : $KEYSTORE_FILE"
+  echo "   ❌ ERREUR : Keystore '$KEYSTORE_FILE' introuvable !"
+  echo "   ⚠️  Ce fichier contient votre clé d'upload Google Play."
+  echo "   ⚠️  NE GÉNÉREZ PAS de nouveau keystore — utilisez celui"
+  echo "   ⚠️  déjà enregistré auprès de Google Play."
   echo ""
-  echo "   ⚠️  IMPORTANT : Sauvegardez ce fichier keystore en lieu sûr !"
-  echo "   ⚠️  Mot de passe : $KEYSTORE_PASSWORD"
+  echo "   Pour extraire le certificat au format PEM :"
+  echo "   keytool -export -rfc -keystore $KEYSTORE_FILE -alias $KEYSTORE_ALIAS -file codex-upload-certificate.pem"
+  exit 1
 else
-  echo "   ✅ Keystore existant trouvé"
+  echo "   ✅ Keystore trouvé : $KEYSTORE_FILE"
 fi
 echo ""
 
