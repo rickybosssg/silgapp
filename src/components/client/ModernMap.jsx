@@ -146,7 +146,7 @@ export default function ModernMap({
 
       livreurMarkersRef.current[personne.id] = marker;
     });
-  }, [livreursProches, mapLoaded]);
+  }, [livreursProches]);
 
   const initMap = () => {
     if (!window.L || !mapRef.current) return;

@@ -10,7 +10,7 @@ import {
   Ban, CheckCircle2, RefreshCw, Bike, Car, Truck,
   XCircle, Banknote, Star, Wifi, WifiOff, Power, PowerOff
 } from "lucide-react";
-// CreateLivreurDialog — supprimé (réseau interne)
+import CreateLivreurDialog from "@/components/livreurs/CreateLivreurDialog";
 import NotationLivreurPanel from "@/components/admin/NotationLivreurPanel";
 import LivreurPhotoUploader from "@/components/livreur/LivreurPhotoUploader";
 import AdminStatutLivreurPanel from "@/components/livreurs/AdminStatutLivreurPanel";
@@ -461,8 +461,28 @@ export default function LivreursExternes() {
           </div>
         </div>
         <div className="flex gap-2">
-
-
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs"
+            onClick={async () => {
+              try {
+                const res = await base44.functions.invoke("resyncLivreurStatut", {});
+                if (res.data?.resynchronises > 0) {
+                  toast.success(`${res.data.resynchronises} livreur(s) resynchronisé(s) ✓`);
+                  queryClient.invalidateQueries({ queryKey: ["livreurs-externes"] });
+                } else {
+                  toast.info("Tous les statuts sont déjà corrects.");
+                }
+              } catch (e) {
+                toast.error("Erreur : " + e.message);
+              }
+            }}
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Resync tous</span>
+          </Button>
+          <CreateLivreurDialog reseau="externe" countryCode={effectiveCountry} />
         </div>
       </div>
 

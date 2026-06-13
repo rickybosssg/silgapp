@@ -1,0 +1,522 @@
+import React, { useState, useEffect, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
+import { Truck } from "lucide-react";
+import { toast } from "sonner";
+import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
+import { requestNativeAppPermissions } from "@/lib/nativePermissions";
+import GPSIndicateur from "@/components/livreur/GPSIndicateur";
+import LivreurHeader from "@/components/livreur/LivreurHeader";
+import LivreurStatsBanner from "@/components/livreur/LivreurStatsBanner";
+import LivreurStatutCard from "@/components/livreur/LivreurStatutCard";
+import EmptyStateAttente from "@/components/livreur/EmptyStateAttente";
+import CourseEnAttenteModal from "@/components/livreur/CourseEnAttenteModal";
+import CourseActiveCard from "@/components/livreur/CourseActiveCard";
+import LivreurHistorique from "@/components/livreur/LivreurHistorique";
+import CoursesEnPauseTab from "@/components/livreur/CoursesEnPauseTab";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
+import VenusFloatingButton from "@/components/client/VenusFloatingButton";
+import AlertesLivreurModal from "@/components/livreur/AlertesLivreurModal";
+
+const saveLivreur = (id, data) => base44.functions.invoke('updateLivreur', { id, data });
+
+/**
+ * LivreurApp — reçoit livreurProfil directement depuis AuthGate via App.jsx
+ * Plus de sélecteur localStorage, plus de codes livreur
+ */
+export default function LivreurApp({ livreurProfil: initialProfil }) {
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState("courses");
+  const [gpsActif, setGpsActif] = useState(false);
+  const [gpsRequis, setGpsRequis] = useState(true);
+  const [gpsLastUpdate, setGpsLastUpdate] = useState(null);
+
+  // Recharger le profil livreur en temps réel
+  const { data: livreurProfil } = useQuery({
+    queryKey: ["livreur-profil", initialProfil?.id],
+    queryFn: () => base44.entities.Livreur.filter({ id: initialProfil.id }),
+    select: (data) => Array.isArray(data) ? (data[0] || initialProfil) : initialProfil,
+    initialData: [initialProfil],
+    enabled: !!initialProfil?.id,
+    refetchInterval: 10000,
+  });
+
+  // Notifications push
+  useEffect(() => {
+    if (!livreurProfil?.id || !livreurProfil?.user_email) return;
+    registerPushToken(livreurProfil.id, {
+      email: livreurProfil.user_email,
+      user_email: livreurProfil.user_email,
+      user_type: "livreur",
+      livreur_id: livreurProfil.id,
+    }).catch(() => null);
+    const unsub = subscribeToNotifications(
+      (n) => toast.info(`${n.titre}: ${n.message}`),
+      livreurProfil.user_email
+    );
+    return () => unsub?.();
+  }, [livreurProfil?.id, livreurProfil?.user_email]);
+
+  // ── Heartbeat app_active ──────────────────────────────────────────────────
+  // Marque le livreur comme actif dans l'app et met à jour last_seen_at
+  useEffect(() => {
+    if (!initialProfil?.id) return;
+    const id = initialProfil.id;
+
+    const pingActif = () =>
+      saveLivreur(id, { app_active: true, last_seen_at: new Date().toISOString() }).catch(() => null);
+
+    const pingInactif = () =>
+      saveLivreur(id, { app_active: false }).catch(() => null);
+
+    // Ping immédiat à l'ouverture
+    pingActif();
+
+    // Heartbeat toutes les 60 secondes
+    const interval = setInterval(pingActif, 60 * 1000);
+
+    // Inactif quand l'onglet/app passe en arrière-plan
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        pingInactif();
+      } else {
+        pingActif();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // Inactif à la fermeture de la fenêtre (best-effort)
+    window.addEventListener('beforeunload', pingInactif);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('beforeunload', pingInactif);
+      pingInactif();
+    };
+  }, [initialProfil?.id]);
+
+  // Courses - filtrer par type_livreur pour séparation stricte
+  const { data: mesCourses = [] } = useQuery({
+    queryKey: ["mes-courses", livreurProfil?.id],
+    queryFn: () => base44.entities.Course.filter({ 
+      livreur_id: livreurProfil.id,
+      reseau: livreurProfil.type_livreur || "interne" 
+    }, "-created_date", 50),
+    enabled: !!livreurProfil?.id,
+    initialData: [],
+    refetchInterval: 5000,
+  });
+
+  const courseEnAttente = useMemo(() => mesCourses.find(c => c.statut === "en_attente_livreur"), [mesCourses]);
+  const coursesActives = useMemo(() => mesCourses.filter(c => ["acceptee", "colis_recupere", "en_livraison"].includes(c.statut)), [mesCourses]);
+  const coursesEnPause = useMemo(() => mesCourses.filter(c => c.statut === "pause"), [mesCourses]);
+
+  const totalEncaisse = useMemo(() => {
+    const today = new Date().toDateString();
+    return mesCourses
+      .filter(c => c.statut === "livree" && c.prix_reel && new Date(c.heure_livraison || c.updated_date).toDateString() === today)
+      .reduce((sum, c) => sum + (c.prix_reel || 0), 0);
+  }, [mesCourses]);
+
+  // Mutation statut livreur
+  const statutMutation = useMutation({
+    mutationFn: (newStatut) => saveLivreur(livreurProfil.id, { statut: newStatut }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
+      toast.success("Statut mis à jour");
+    },
+    onError: (err) => toast.error("Erreur : " + (err?.message || "inconnue")),
+  });
+
+  const handleToggleLigne = () => {
+    const estHorsLigne = livreurProfil.statut === "hors_ligne";
+    statutMutation.mutate(estHorsLigne ? "disponible" : "hors_ligne");
+  };
+
+  const handleActiverGPS = async () => {
+    if (!navigator.geolocation) {
+      toast.error("GPS non disponible sur cet appareil");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGpsActif(true);
+        setGpsRequis(false);
+        setGpsLastUpdate(Date.now());
+        saveLivreur(livreurProfil.id, {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          derniere_position_date: new Date().toISOString(),
+        }).then(() => {
+          queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
+          requestNativeAppPermissions({
+            email: livreurProfil.user_email,
+            userType: "livreur",
+            livreurId: livreurProfil.id,
+            requestContacts: true,
+          }).catch(() => null);
+          toast.success("GPS activé ✓");
+        }).catch(() => toast.error("Position GPS non enregistrée"));
+      },
+      () => { setGpsActif(false); toast.error("Permission GPS refusée – obligatoire"); },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  // GPS tracking périodique (10 secondes)
+  useEffect(() => {
+    if (!livreurProfil?.id || livreurProfil.statut === "hors_ligne" || !gpsActif) return;
+    const interval = setInterval(() => {
+      navigator.geolocation?.getCurrentPosition(
+        (pos) => {
+          setGpsLastUpdate(Date.now());
+          saveLivreur(livreurProfil.id, {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            derniere_position_date: new Date().toISOString(),
+          }).catch(() => null);
+        },
+        () => setGpsActif(false),
+        { enableHighAccuracy: true }
+      );
+    }, 10000); // 10 secondes au lieu de 30s
+    return () => clearInterval(interval);
+  }, [livreurProfil?.id, livreurProfil?.statut, gpsActif]);
+
+  const { pulling, refreshing } = usePullToRefresh(async () => {
+    await queryClient.invalidateQueries({ queryKey: ["mes-courses"] });
+    await queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
+  });
+
+  // Mutation courses
+  const updateCourseMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.Course.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mes-courses"] });
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+    },
+  });
+
+  const handleAccepter = (course) => {
+    // Enregistrer l'heure de début de sollicitation pour le timer
+    updateCourseMutation.mutate({ 
+      id: course.id, 
+      data: { 
+        statut: "acceptee", 
+        heure_acceptation: new Date().toISOString(),
+        dispatch_status: "accepte"
+      } 
+    });
+    saveLivreur(livreurProfil.id, { statut: "en_course" }).then(() =>
+      queryClient.invalidateQueries({ queryKey: ["livreur-profil"] })
+    );
+    toast.success("Course acceptée ! 🚀");
+  };
+
+  const handleRefuser = async (course, raison) => {
+    const remarque = raison 
+      ? `Livreur occupé : ${raison === "en_course" ? "déjà en cours de livraison" : "indisponible"}`
+      : "Course refusée";
+    
+    console.log("🔴 REFUS:", course.id, "Raison:", raison);
+    
+    try {
+      // Si dispatch automatique → appeler le moteur pour redispatch
+      if (course.dispatch_mode === "automatique") {
+        console.log("🤖 Dispatch auto → appel dispatchMoteur pour redispatch");
+        await base44.functions.invoke("dispatchMoteur", {
+          action: "refuser_course",
+          course_id: course.id,
+          livreur_id: livreurProfil.id,
+          raison: raison,
+        });
+      } else {
+        // Dispatch manuel → retour à l'admin
+        const updateData = { 
+          statut: "nouvelle", 
+          livreur_id: "", 
+          livreur_nom: "",
+          remarque_livreur: remarque,
+          dispatch_status: "en_attente_admin",
+        };
+        await base44.entities.Course.update(course.id, updateData);
+      }
+      
+      console.log("✅ Course mise à jour, invalidation...");
+      
+      // Invalider TOUTES les queries courses immédiatement
+      await queryClient.invalidateQueries({ queryKey: ["courses"] });
+      await queryClient.invalidateQueries({ queryKey: ["mes-courses"] });
+      
+      console.log("✅ Invalidation terminée");
+      toast("Course renvoyée à l'admin");
+    } catch (err) {
+      console.error("❌ Erreur refus:", err);
+      toast.error("Erreur : " + err.message);
+    }
+  };
+
+  const handleColisRecupere = (course) => {
+    if (!navigator.geolocation) {
+      toast.error("GPS non disponible");
+      updateCourseMutation.mutate({ id: course.id, data: { statut: "colis_recupere", heure_recuperation: new Date().toISOString(), colis_recupere_at: new Date().toISOString() } });
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        updateCourseMutation.mutate({
+          id: course.id,
+          data: {
+            statut: "colis_recupere",
+            heure_recuperation: new Date().toISOString(),
+            colis_recupere_at: new Date().toISOString(),
+            latitude_depart_livraison: pos.coords.latitude,
+            longitude_depart_livraison: pos.coords.longitude,
+          },
+        });
+        toast.success("Colis récupéré ! 📦 Position GPS enregistrée");
+      },
+      (err) => {
+        console.error("Erreur GPS:", err);
+        updateCourseMutation.mutate({
+          id: course.id,
+          data: {
+            statut: "colis_recupere",
+            heure_recuperation: new Date().toISOString(),
+            colis_recupere_at: new Date().toISOString(),
+          },
+        });
+        toast.warning("Colis récupéré (GPS non disponible)");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  const handleColisLivre = (course, prixReel) => {
+    const updateData = {
+      statut: "livree",
+      heure_livraison: new Date().toISOString(),
+      colis_livre_at: new Date().toISOString(),
+      prix_reel: prixReel,
+    };
+
+    updateCourseMutation.mutate({ id: course.id, data: updateData });
+
+    saveLivreur(livreurProfil.id, { statut: "disponible" }).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
+      queryClient.invalidateQueries({ queryKey: ["mes-courses"] });
+    });
+
+    toast.success("Livraison terminée ! 🎉");
+  };
+
+  const handleClientAnnule = (course) => {
+    updateCourseMutation.mutate({ id: course.id, data: { statut: "annulee", remarque_livreur: "Annulé par le client" } });
+    saveLivreur(livreurProfil.id, { statut: "disponible" }).then(() =>
+      queryClient.invalidateQueries({ queryKey: ["livreur-profil"] })
+    );
+    toast("Course annulée par le client");
+  };
+
+  // Gestion pause/reprise des courses
+  const handleMettrePause = (course, motif) => {
+    base44.functions.invoke("gestionPauseCourse", {
+      action: "mettre_pause",
+      course_id: course.id,
+      livreur_id: livreurProfil.id,
+      motif: motif,
+    }).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["mes-courses"] });
+      queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
+      toast.success("Course mise en pause");
+    }).catch(err => toast.error("Erreur : " + err.message));
+  };
+
+  const handleReprendreCourse = (course) => {
+    base44.functions.invoke("gestionPauseCourse", {
+      action: "reprendre_course",
+      course_id: course.id,
+      livreur_id: livreurProfil.id,
+    }).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["mes-courses"] });
+      queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
+      toast.success("Course reprise !");
+    }).catch(err => toast.error("Erreur : " + err.message));
+  };
+
+  const handleLogout = () => {
+    // Marquer inactif avant déconnexion
+    if (livreurProfil?.id) {
+      saveLivreur(livreurProfil.id, { app_active: false }).catch(() => null);
+    }
+    ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
+      try { localStorage.removeItem(k); } catch(_) {}
+    });
+    base44.auth.logout();
+    setTimeout(() => window.location.reload(), 300);
+  };
+
+  if (!livreurProfil) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+            <Truck className="w-8 h-8 text-primary animate-pulse" />
+          </div>
+          <p className="text-sm text-muted-foreground">Chargement du profil...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Écran GPS obligatoire
+  if (gpsRequis && !gpsActif) {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-br from-primary/10 to-red-50 flex items-center justify-center p-6">
+        <div className="max-w-sm w-full bg-white rounded-3xl shadow-2xl p-6 space-y-6 text-center">
+          <div className="w-20 h-20 rounded-2xl bg-red-50 flex items-center justify-center mx-auto">
+            <span className="text-4xl">📍</span>
+          </div>
+          <div>
+            <p className="text-xl font-black text-gray-900 mb-2">GPS Obligatoire</p>
+            <p className="text-sm text-gray-600 leading-relaxed">
+              Pour des raisons de sécurité et de suivi, l'activation du GPS est requise pour accéder à votre tableau de bord.
+            </p>
+          </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+            <p className="text-xs text-amber-700 font-semibold">
+              ⚠️ Sans GPS, vous ne pourrez pas recevoir de courses ni être visible sur la carte.
+            </p>
+          </div>
+          <button
+            className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-95 transition-all"
+            onClick={handleActiverGPS}
+          >
+            Activer le GPS
+          </button>
+          <p className="text-xs text-gray-400">
+            Appuyez sur "Autoriser" lorsque votre appareil vous demande la permission
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const isEnLigne = livreurProfil.statut !== "hors_ligne";
+  const livreurVisible = isEnLigne && gpsActif && livreurProfil.latitude && livreurProfil.longitude;
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <AlertesLivreurModal
+        livreurId={livreurProfil?.id}
+        livreurNom={`${livreurProfil?.prenom || ""} ${livreurProfil?.nom || ""}`.trim()}
+        livreurReseau="interne"
+      />
+      <VenusFloatingButton />
+      <PullToRefreshIndicator pulling={pulling} refreshing={refreshing} />
+
+      {courseEnAttente && (
+        <CourseEnAttenteModal
+          course={courseEnAttente}
+          livreurId={livreurProfil.id}
+          onAccepter={handleAccepter}
+          onRefuser={handleRefuser}
+          isPending={updateCourseMutation.isPending}
+        />
+      )}
+
+      <div className="max-w-lg mx-auto p-4 pb-12">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
+          <TabsList className="w-full">
+            <TabsTrigger value="courses" className="flex-1 text-xs">Courses</TabsTrigger>
+            <TabsTrigger value="pause" className="flex-1 text-xs">En pause</TabsTrigger>
+            <TabsTrigger value="historique" className="flex-1 text-xs">Historique</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {activeTab === "courses" && (
+          <div className="space-y-4">
+            <LivreurHeader
+              livreur={livreurProfil}
+              isEnLigne={isEnLigne}
+              isUpdatingStatut={statutMutation.isPending}
+              gpsActif={gpsActif}
+              onToggleLigne={handleToggleLigne}
+              onActiverGps={handleActiverGPS}
+              onLogout={handleLogout}
+            />
+
+            {/* Indicateur GPS */}
+            {gpsActif && (
+              <div className="flex items-center justify-between">
+                <GPSIndicateur
+                  indicateur={
+                    !gpsLastUpdate ? null
+                    : (Date.now() - gpsLastUpdate) < 2 * 60000 ? "recent"
+                    : (Date.now() - gpsLastUpdate) < 10 * 60000 ? "ancien"
+                    : "perdu"
+                  }
+                  ageMinutes={gpsLastUpdate ? (Date.now() - gpsLastUpdate) / 60000 : null}
+                  onActualiser={handleActiverGPS}
+                />
+              </div>
+            )}
+
+            {isEnLigne && !livreurVisible && (
+              <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-center gap-3">
+                <span className="text-xl">📍</span>
+                <p className="text-sm text-amber-700 font-medium leading-tight">
+                  Activez votre GPS pour être visible sur la carte
+                </p>
+              </div>
+            )}
+
+            <LivreurStatsBanner mesCourses={mesCourses} totalEncaisse={totalEncaisse} />
+            <LivreurStatutCard statut={livreurProfil.statut} livreur={livreurProfil} />
+
+            {coursesActives.length > 0 && (
+              <div className="space-y-3">
+                {coursesActives.map(course => (
+                  <CourseActiveCard
+                    key={course.id}
+                    course={course}
+                    onColisRecupere={handleColisRecupere}
+                    onColisLivre={handleColisLivre}
+                    onClientAnnule={handleClientAnnule}
+                    onMettrePause={handleMettrePause}
+                    isPending={updateCourseMutation.isPending}
+                  />
+                ))}
+              </div>
+            )}
+
+            {coursesActives.length === 0 && isEnLigne && <EmptyStateAttente />}
+          </div>
+        )}
+
+        {activeTab === "pause" && (
+          <CoursesEnPauseTab
+            courses={coursesEnPause}
+            onReprendre={handleReprendreCourse}
+          />
+        )}
+
+        {activeTab === "historique" && (
+          <LivreurHistorique mesCourses={mesCourses} livreurProfil={livreurProfil} />
+        )}
+      </div>
+
+      {/* Bilan du jour - visible sur tous les onglets */}
+      {totalEncaisse > 0 && activeTab === "courses" && (
+        <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-3xl p-5 border border-amber-100 shadow-sm mt-4 max-w-lg mx-auto">
+          <p className="text-xs text-amber-600 font-bold uppercase tracking-wide mb-1">Bilan du jour</p>
+          <p className="text-3xl font-black text-amber-700">{totalEncaisse.toLocaleString()} <span className="text-base font-semibold text-amber-500">FCFA</span></p>
+          <p className="text-xs text-amber-500 mt-1">Montant à reverser à Silga Livraison</p>
+        </div>
+      )}
+    </div>
+  );
+}

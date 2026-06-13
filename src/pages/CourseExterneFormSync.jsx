@@ -518,7 +518,25 @@ export default function CourseExterneFormSync() {
       : (formData.gps_arrivee_lng || null);
     const destInconnue = false; // supprimé — les adresses sont simplement optionnelles
 
-
+    // Validation des rôles — ne bloque PAS si le destinataire est hors SILGAPP
+    try {
+      const validationRes = await base44.functions.invoke('validateCourseRoles', {
+        type_course: formData.type_course,
+        expediteur_client_id: expediteurClientId,
+        destinataire_client_id: destinataireClientId,
+        created_by_id: user?.id
+      });
+      if (validationRes.data?.valid === false) {
+        const errMsg = validationRes.data.errors?.[0] || "Incohérence détectée dans les rôles";
+        console.warn("[CourseForm] Validation rôles échouée :", errMsg);
+        toast.error(errMsg);
+        setIsSubmitting(false);
+        return;
+      }
+    } catch (err) {
+      // En cas d'erreur réseau ou serveur, on continue quand même — ne pas bloquer la création
+      console.warn("[CourseForm] validateCourseRoles indisponible, on continue :", err.message);
+    }
 
     const nbColis = (formData.nb_colis || 1);
     const isMulti = isExpedie && nbColis > 1;

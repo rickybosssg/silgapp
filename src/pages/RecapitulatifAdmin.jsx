@@ -8,7 +8,7 @@ import LivreurPerformanceCard from "@/components/livreurs/LivreurPerformanceCard
 import LivreurDetailDialog from "@/components/livreurs/LivreurDetailDialog";
 import { toast } from "sonner";
 import { useSilgappAuth } from "@/lib/silgappAuth";
-
+import ReseauInternePremiumCard from "@/components/recap/ReseauInternePremiumCard";
 
 const periodFilters = [
   { value: "today", label: "Aujourd'hui" },
@@ -81,27 +81,43 @@ export default function RecapitulatifAdmin({ reseau }) {
   const queryClient = useQueryClient();
   const [period, setPeriod] = useState("today");
   const [selectedLivreur, setSelectedLivreur] = useState(null);
+  const [activeTab, setActiveTab] = useState(reseau || "interne");
   const { user: currentUser } = useSilgappAuth();
-  const isExterne = reseau === "externe";
 
-  // Charger UNIQUEMENT les livreurs du réseau concerné
-  const { data: livreurs = [], isLoading: loadingLivreurs } = useQuery({
-    queryKey: ["livreurs-recap", reseau],
-    queryFn: () => isExterne
-      ? base44.entities.Livreur.filter({ type_livreur: "externe" }, "-created_date", 500)
-      : base44.entities.Livreur.filter({ type_livreur: "interne" }, "-created_date", 500),
+  // Charger TOUS les livreurs (on filtre ensuite par type)
+  const { data: allLivreurs = [], isLoading: loadingLivreurs } = useQuery({
+    queryKey: ["livreurs-all"],
+    queryFn: () => base44.entities.Livreur.list("-created_date", 500),
     initialData: [],
   });
 
-  // Charger UNIQUEMENT les courses du réseau concerné
-  const { data: courses = [] } = useQuery({
-    queryKey: ["courses-recap", reseau],
-    queryFn: () => isExterne
-      ? base44.entities.CourseExterne.list("-created_date", 500)
-      : base44.entities.Course.list("-created_date", 500),
+  // Courses internes (entité Course)
+  const { data: coursesInternes = [] } = useQuery({
+    queryKey: ["courses-internes-recap"],
+    queryFn: () => base44.entities.Course.list("-created_date", 500),
     initialData: [],
     refetchInterval: 30000,
+    enabled: !reseau || reseau === "interne",
   });
+
+  // Courses externes (entité CourseExterne)
+  const { data: coursesExternes = [] } = useQuery({
+    queryKey: ["courses-externes-recap"],
+    queryFn: () => base44.entities.CourseExterne.list("-created_date", 500),
+    initialData: [],
+    refetchInterval: 30000,
+    enabled: !reseau || reseau === "externe",
+  });
+
+  // Filtrer livreurs par type
+  const livreursInternes = useMemo(
+    () => allLivreurs.filter(l => l.type_livreur === "interne" || (!l.type_livreur && l.reseau === "interne") || (!l.type_livreur && !l.reseau)),
+    [allLivreurs]
+  );
+  const livreursExternes = useMemo(
+    () => allLivreurs.filter(l => l.type_livreur === "externe" || l.reseau === "externe"),
+    [allLivreurs]
+  );
 
   // Période
   const dateRange = useMemo(() => {
@@ -122,15 +138,19 @@ export default function RecapitulatifAdmin({ reseau }) {
     return isWithinInterval(d, { start: dateRange.start, end: dateRange.end });
   };
 
-  const coursesLivrees = useMemo(
-    () => courses.filter(c => c.statut === "livree" && inPeriod(c)),
-    [courses, dateRange]
+  const coursesInterneLivrees = useMemo(
+    () => coursesInternes.filter(c => c.statut === "livree" && inPeriod(c)),
+    [coursesInternes, dateRange]
+  );
+  const coursesExterneLivrees = useMemo(
+    () => coursesExternes.filter(c => c.statut === "livree" && inPeriod(c)),
+    [coursesExternes, dateRange]
   );
 
   // Mutation validation paiement
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Livreur.update(id, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["livreurs-recap"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["livreurs-all"] }),
   });
 
   const handleValiderPaiement = (livreur, montant) => {
@@ -147,9 +167,12 @@ export default function RecapitulatifAdmin({ reseau }) {
     toast.success(`Paiement de ${montant.toLocaleString()} FCFA validé ✅ — Compteur remis à zéro`);
   };
 
-  // Données du réseau en cours
-  const livreursActifs = livreurs;
-  const coursesActives = courses;
+  // Livreurs et courses selon l'onglet actif
+  const livreursActifs = activeTab === "interne" ? livreursInternes : livreursExternes;
+  const coursesActives = activeTab === "interne" ? coursesInternes : coursesExternes;
+
+  // Si reseau est forcé (prop), afficher uniquement ce réseau sans onglets
+  const showTabs = !reseau;
 
   return (
     <div className="p-4 space-y-5 max-w-7xl mx-auto">
@@ -188,24 +211,74 @@ export default function RecapitulatifAdmin({ reseau }) {
         ))}
       </div>
 
-      {/* Carte résumé du réseau */}
-      <ReseauCard
-        title="SILGAPP Externe"
-        icon={Globe}
-        color="border-primary/20 bg-primary/5"
-        livreurs={livreurs}
-        coursesLivrees={coursesLivrees}
-        isExterne={true}
-      />
+      {/* Cartes résumé */}
+      {!reseau ? (
+        <div className="space-y-4">
+          <ReseauInternePremiumCard
+            livreurs={livreursInternes}
+            coursesLivrees={coursesInterneLivrees}
+          />
+          <ReseauCard
+            title="SILGAPP Externe"
+            icon={Globe}
+            color="border-primary/20 bg-primary/5"
+            livreurs={livreursExternes}
+            coursesLivrees={coursesExterneLivrees}
+            isExterne={true}
+          />
+        </div>
+      ) : reseau === "interne" ? (
+        <ReseauInternePremiumCard
+          livreurs={livreursInternes}
+          coursesLivrees={coursesInterneLivrees}
+        />
+      ) : (
+        <ReseauCard
+          title="SILGAPP Externe"
+          icon={Globe}
+          color="border-primary/20 bg-primary/5"
+          livreurs={livreursExternes}
+          coursesLivrees={coursesExterneLivrees}
+          isExterne={true}
+        />
+      )}
+
+      {/* ── ONGLETS LIVREURS ─────────────────────────── */}
+      {showTabs && (
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => setActiveTab("interne")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
+              activeTab === "interne"
+                ? "bg-blue-600 text-white border-blue-600"
+                : "bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-blue-700"
+            }`}
+          >
+            <Building2 className="w-4 h-4" />
+            Internes ({livreursInternes.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("externe")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
+              activeTab === "externe"
+                ? "bg-primary text-white border-primary"
+                : "bg-white text-gray-600 border-gray-200 hover:border-primary/50 hover:text-primary"
+            }`}
+          >
+            <Globe className="w-4 h-4" />
+            Externes ({livreursExternes.length})
+          </button>
+        </div>
+      )}
 
       {/* ── PERFORMANCES LIVREURS ────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5">
         <div className="flex items-center gap-3 mb-4">
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-sm ${isExterne ? "bg-gradient-to-br from-primary to-red-600" : "bg-gradient-to-br from-blue-500 to-indigo-600"}`}>
-            {isExterne ? <Globe className="w-4 h-4 text-white" /> : <Building2 className="w-4 h-4 text-white" />}
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-sm ${activeTab === "interne" ? "bg-gradient-to-br from-blue-500 to-indigo-600" : "bg-gradient-to-br from-primary to-red-600"}`}>
+            {activeTab === "interne" ? <Building2 className="w-4 h-4 text-white" /> : <Globe className="w-4 h-4 text-white" />}
           </div>
           <div>
-            <p className="font-bold text-foreground">Performances — {isExterne ? "SILGAPP Externe" : "SILGAPP Interne"}</p>
+            <p className="font-bold text-foreground">Performances — {activeTab === "interne" ? "SILGAPP Interne" : "SILGAPP Externe"}</p>
             <p className="text-xs text-muted-foreground">{livreursActifs.length} livreur{livreursActifs.length > 1 ? "s" : ""}</p>
           </div>
         </div>
@@ -214,7 +287,7 @@ export default function RecapitulatifAdmin({ reseau }) {
         ) : livreursActifs.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3 text-2xl">👤</div>
-            <p className="text-sm font-semibold">Aucun livreur {isExterne ? "externe" : "interne"} trouvé</p>
+            <p className="text-sm font-semibold">Aucun livreur {activeTab} trouvé</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

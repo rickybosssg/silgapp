@@ -5,7 +5,7 @@ import HeatmapControls from "./HeatmapControls";
 import HeatmapLegend from "./HeatmapLegend";
 import CountrySelector from "@/components/international/CountrySelector";
 import { useZonesChaudesHalos } from "./ZonesChaudes";
-import { GPS_DISPATCH_SEUIL_MIN } from "@/lib/dispatchRules";
+import { isLibre, GPS_DISPATCH_SEUIL_MIN } from "@/lib/dispatchRules";
 
 /**
  * DispatchMap — Carte dédiée au dispatch temps réel
@@ -342,8 +342,9 @@ function buildStyles() {
 
 function buildLivreurIcon(livreur, livreurIdsEnCourseReelle) {
   const estNoir = isLivreurNoir(livreur, livreurIdsEnCourseReelle);
+  // 🎯 CORRECTION : Libre = disponible + GPS < 10 min, En course = course active réelle
+  const libre = isLibre(livreur);
   const estEnCourse = livreurIdsEnCourseReelle?.has(livreur.id);
-  // VERT = pas noir ET pas en course
   const cssClass = estNoir ? "dmap-livreur-noir" : (estEnCourse ? "dmap-livreur-course" : "dmap-livreur-libre");
   const initial = livreur.nom?.charAt(0)?.toUpperCase() || "L";
   const photoHtml = livreur.photo_url
@@ -383,7 +384,9 @@ function buildClientIcon(client) {
 
 function buildLivreurPopup(livreur, livreurIdsEnCourseReelle) {
   const estNoir = isLivreurNoir(livreur, livreurIdsEnCourseReelle);
+  // 🎯 CORRECTION : Statut basé sur course active réelle
   const estEnCourse = livreurIdsEnCourseReelle?.has(livreur.id);
+  const libre = isLibre(livreur);
   const statutLabel = estNoir
     ? "⚫ Hors ligne — non dispatchable"
     : estEnCourse ? "🟠 En course" : "🟢 Libre — disponible";
@@ -707,11 +710,9 @@ export default function DispatchMap({
     }
   }, [livreurs, clients, courses, mapLoaded, masquerInactifs, showClients, showLivreurs, livreurIdsEnCourseReelle]);
 
-  // 🎯 Compteurs — alignés avec la logique visuelle des marqueurs
-  // VERT = pas noir ET pas en course (même logique que buildLivreurIcon)
-  const nbLibres = livreurs.filter(l => !isLivreurNoir(l, livreurIdsEnCourseReelle) && !livreurIdsEnCourseReelle?.has(l.id)).length;
-  // ORANGE = pas noir ET en course active
-  const nbCourse = livreurs.filter(l => !isLivreurNoir(l, livreurIdsEnCourseReelle) && livreurIdsEnCourseReelle?.has(l.id)).length;
+  // 🎯 Compteurs — utilise livreurIdsEnCourseReelle pour "en course"
+  const nbLibres = livreurs.filter(l => isLibre(l)).length;
+  const nbCourse = livreurs.filter(l => livreurIdsEnCourseReelle?.has(l.id) && !isLivreurNoir(l, livreurIdsEnCourseReelle)).length;
   const nbLivreursInactifs = livreurs.filter(l => isLivreurNoir(l, livreurIdsEnCourseReelle)).length;
   const nbClientsActifs = clients.filter(c => getClientStatut(c) === "actif").length;
   const nbClientsRecents = clients.filter(c => getClientStatut(c) === "recent").length;

@@ -15,13 +15,13 @@ import { useAdminContext } from "@/hooks/useAdminContext.js";
 import CountrySelector, { usePaysActifs } from "@/components/international/CountrySelector.jsx";
 import StatCard from "@/components/dashboard/StatCard";
 import StatDetailModal from "@/components/dashboard/StatDetailModal";
-// CoursesEnTraitement — supprimé (réseau interne)
+import CoursesEnTraitement from "@/components/dashboard/CoursesEnTraitement";
 import CoursesTerminees from "@/components/dashboard/CoursesTerminees";
 import LivreursEnLigne from "@/components/dashboard/LivreursEnLigne";
 import ClientsEnLigne from "@/components/dashboard/ClientsEnLigne";
 import CourseDetailDialog from "@/components/courses/CourseDetailDialog";
 import BatterieAlertesPanel from "@/components/admin/BatterieAlertesPanel";
-// DispatchMonitor — supprimé (réseau interne)
+import DispatchMonitor from "@/components/dispatch/DispatchMonitor";
 
 export default function DashboardPays() {
   const { code: codeParam } = useParams();
@@ -151,8 +151,9 @@ export default function DashboardPays() {
         </div>
       </div>
 
-      {/* Alertes */}
+      {/* Alertes & dispatch */}
       <BatterieAlertesPanel currentUser={null} />
+      <DispatchMonitor />
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
@@ -173,25 +174,11 @@ export default function DashboardPays() {
       <LivreursEnLigne livreurs={livreursEnLigne} />
 
       {/* Courses en traitement */}
-      <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-        {coursesEnTraitement.length === 0 ? (
-          <div className="py-12 text-center text-muted-foreground text-sm">Aucune course en cours</div>
-        ) : (
-          <div className="divide-y divide-gray-50">
-            {coursesEnTraitement.map(c => (
-              <div key={c.id} onClick={() => setSelectedCourse(c)} className="px-4 py-3 hover:bg-gray-50 cursor-pointer flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-sm">{c.client_nom}</p>
-                  <p className="text-xs text-gray-500">{c.adresse_depart} → {c.adresse_arrivee}</p>
-                </div>
-                <div className="text-xs font-medium px-2 py-1 rounded-full bg-blue-50 text-blue-700 capitalize">
-                  {c.statut?.replace(/_/g, " ")}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <CoursesEnTraitement
+        courses={coursesEnTraitement}
+        onView={setSelectedCourse}
+        isExterne={true}
+      />
 
       {/* Historique du jour */}
       <CoursesTerminees

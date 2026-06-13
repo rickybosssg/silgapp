@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
-import { MapPin, Truck, Wifi, WifiOff, X, Clock, Users } from "lucide-react";
+import { MapPin, Truck, Wifi, WifiOff, X, Clock, Users, Wrench } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import DispatchMap from "@/components/carte/DispatchMap";
@@ -107,6 +107,27 @@ export default function CarteLivreursExterne() {
   const [masquerInactifs, setMasquerInactifs] = useState(false);
   const [showClients, setShowClients] = useState(true);
   const [showLivreurs, setShowLivreurs] = useState(true);
+  const [correctionEnCours, setCorrectionEnCours] = useState(false);
+
+  const handleCorrectionEnCourse = async () => {
+    if (!confirm('Corriger les livreurs "en course" sans course active ?')) return;
+    setCorrectionEnCours(true);
+    try {
+      const res = await base44.functions.invoke('correctionEnCourse', {});
+      if (res.data?.success) {
+        alert(`✅ ${res.data.corriges} livreur(s) corrigé(s) !`);
+        // Rafraîchir les données
+        await refetchLivreurs();
+      } else {
+        alert('❌ Erreur: ' + (res.data?.error || 'Inconnue'));
+      }
+    } catch (err) {
+      alert('❌ Erreur: ' + err.message);
+    } finally {
+      setCorrectionEnCours(false);
+    }
+  };
+
   const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
   const paysActifs = usePaysActifs();
   const defaultCountry = paysActifs.length === 1 ? paysActifs[0].code : null;
@@ -405,7 +426,14 @@ export default function CarteLivreursExterne() {
                   />
                 </div>
               )}
-
+              <button
+                onClick={handleCorrectionEnCourse}
+                disabled={correctionEnCours}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-colors"
+              >
+                <Wrench className="w-3.5 h-3.5" />
+                {correctionEnCours ? 'Correction...' : 'Corriger en_course'}
+              </button>
             </div>
           </div>
 
