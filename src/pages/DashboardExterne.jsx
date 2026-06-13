@@ -291,6 +291,7 @@ export default function DashboardExterne() {
         course={selectedCourse}
         open={!!selectedCourse}
         onClose={() => setSelectedCourse(null)}
+        reseau="externe"
       />
       <StatDetailModal
         open={!!statModal}
