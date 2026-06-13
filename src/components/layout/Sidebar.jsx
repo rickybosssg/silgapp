@@ -7,8 +7,8 @@ import {
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { useAdminContext } from "@/hooks/useAdminContext.js";
-import { PAYS_SILGAPP } from "@/components/international/CountrySelector.jsx";
+import { useAdminContext } from "@/hooks/useAdminContext";
+import { PAYS_SILGAPP } from "@/components/international/CountrySelector";
 
 const doLogout = () => {
   ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
