@@ -11,7 +11,18 @@ import AppMaintenanceGate from './components/admin/AppMaintenanceGate.jsx';
 
 // LoadingScreen défini IMMÉDIATEMENT avant lazy loading
 const LoadingScreen = () => <SplashScreen />;
-import AppLayout from './components/layout/AppLayout';
+
+// Retry wrapper pour les imports dynamiques instables
+function retryImport(importFn, retries = 3, delay = 1500) {
+  return importFn().catch((err) => {
+    if (retries <= 0) throw err;
+    console.warn(`[Retry] Module import failed, retrying... (${retries} left)`, err.message);
+    return new Promise((resolve) => setTimeout(resolve, delay))
+      .then(() => retryImport(importFn, retries - 1, delay));
+  });
+}
+
+const AppLayout = lazy(() => retryImport(() => import('./components/layout/AppLayout')));
 const DashboardExterne = lazy(() => import('./pages/DashboardExterne.jsx'));
 
 const CarteLivreursExterne = lazy(() => import('./pages/CarteLivreursExterne'));
