@@ -15,10 +15,12 @@ const notifyBase44Mounted = () => {
 };
 
 // ErrorBoundary global — évite l'écran blanc si une erreur JS non gérée survient
+// Utilise un "retry key" pour forcer React à remonter les enfants et réessayer les lazy imports
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
+    this.state = { hasError: false, error: null, errorInfo: null, retryCount: 0, retryKey: 0 };
+    this.maxRetries = 3;
   }
 
   static getDerivedStateFromError(error) {
@@ -29,10 +31,8 @@ class ErrorBoundary extends React.Component {
   componentDidCatch(error, info) {
     console.error('[ErrorBoundary] componentDidCatch:', error);
     console.error('[ErrorBoundary] ComponentStack:', info?.componentStack);
-    console.error('[ErrorBoundary] Stack trace:', error.stack);
     this.setState({ errorInfo: info });
-    
-    // Log complet pour diagnostic
+
     try {
       const errorData = {
         message: error?.message,
@@ -43,13 +43,62 @@ class ErrorBoundary extends React.Component {
         userAgent: navigator.userAgent,
       };
       console.error('[ErrorBoundary] DIAGNOSTIC COMPLET:', JSON.stringify(errorData, null, 2));
-    } catch (e) {
-      console.error('[ErrorBoundary] Erreur lors du log:', e);
+    } catch (e) {}
+
+    // Auto-retry for dynamic import failures — incrémente retryKey pour forcer remount
+    const isDynamicImportError = error?.message?.includes('Failed to fetch dynamically imported module');
+    if (isDynamicImportError && this.state.retryCount < this.maxRetries) {
+      const nextRetry = this.state.retryCount + 1;
+      console.warn(`[ErrorBoundary] Auto-retry ${nextRetry}/${this.maxRetries} dans 2s (key: ${this.state.retryKey + 1})...`);
+      setTimeout(() => {
+        this.setState({
+          hasError: false,
+          error: null,
+          errorInfo: null,
+          retryCount: nextRetry,
+          retryKey: this.state.retryKey + 1
+        });
+      }, 2000);
     }
   }
 
+  handleManualReload = () => {
+    localStorage.clear();
+    window.location.reload();
+  };
+
   render() {
     if (this.state.hasError) {
+      const isRetrying = this.state.error?.message?.includes('Failed to fetch dynamically imported module') && this.state.retryCount < this.maxRetries;
+
+      if (isRetrying) {
+        return (
+          <div style={{
+            position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            background: '#0f172a', padding: '2rem', textAlign: 'center', gap: '1rem',
+            fontFamily: 'system-ui, sans-serif'
+          }}>
+            <div style={{ width: 56, height: 56, borderRadius: 16, background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <img src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/2c20ad136_SILGAPPLOGO2.jpg" alt="" style={{ width: 40, height: 40, borderRadius: 10 }} />
+            </div>
+            <p style={{ fontWeight: 800, fontSize: 18, margin: 0, color: '#f8fafc' }}>SILGAPP</p>
+            <p style={{ color: '#94a3b8', fontSize: 13, marginTop: 4 }}>
+              Connexion en cours... ({this.state.retryCount}/{this.maxRetries})
+            </p>
+            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+              {[0, 1, 2].map(i => (
+                <div key={i} style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: i < this.state.retryCount ? '#22c55e' : '#334155',
+                  transition: 'background 0.3s'
+                }} />
+              ))}
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div style={{
           position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column',
@@ -98,7 +147,7 @@ class ErrorBoundary extends React.Component {
         </div>
       );
     }
-    return this.props.children;
+    return <React.Fragment key={this.state.retryKey}>{this.props.children}</React.Fragment>;
   }
 }
 
