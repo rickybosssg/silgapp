@@ -11,7 +11,7 @@ import AppMaintenanceGate from './components/admin/AppMaintenanceGate.jsx';
 
 // LoadingScreen défini IMMÉDIATEMENT avant lazy loading
 const LoadingScreen = () => <SplashScreen />;
-const AppLayout = lazy(() => import('./components/layout/AppLayout'));
+import AppLayout from './components/layout/AppLayout';
 const DashboardExterne = lazy(() => import('./pages/DashboardExterne.jsx'));
 
 const CarteLivreursExterne = lazy(() => import('./pages/CarteLivreursExterne'));
