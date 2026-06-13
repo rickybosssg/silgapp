@@ -28,12 +28,13 @@ export function isGPSRecent(livreur) {
   return (Date.now() - new Date(dt).getTime()) / 60000 < GPS_DISPATCH_SEUIL_MIN;
 }
 
-/** Livreur libre = disponible + validé + actif + GPS récent */
+/** Livreur libre = disponible + validé + actif + a des coordonnées GPS (peu importe l'ancienneté) */
 export function isLibre(livreur) {
   if (livreur.statut !== "disponible") return false;
   if (livreur.validation !== "valide") return false;
   if (livreur.actif === false) return false;
-  return isGPSRecent(livreur);
+  if (!livreur.latitude || !livreur.longitude) return false;
+  return true;
 }
 
 /** Livreur en course = statut "en_course" */
