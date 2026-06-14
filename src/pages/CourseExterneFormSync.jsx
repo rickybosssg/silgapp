@@ -53,7 +53,7 @@ const STEP_KEY = "silgapp_course_step";
 export default function CourseExterneFormSync() {
   const location = useLocation();
   const navigate = useNavigate();
-  const typeCourse = location.pathname.includes("expedier") ? "expedier" : "recevoir";
+  const typeCourse = location.pathname.includes("expedier") ? "expedier" : location.pathname.includes("deplacement") ? "deplacement" : "recevoir";
   const position = location.state?.position || JSON.parse(localStorage.getItem("client_gps_position") || "null");
   const clientProfil = location.state?.clientProfil;
   // Coords sauvegardées en DB — utilisées comme fallback si getCurrentPosition timeout
@@ -369,25 +369,21 @@ export default function CourseExterneFormSync() {
       setIsSubmitting(false);
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(STEP_KEY);
-      // Sauvegarde contacts en base de données
+      // Sauvegarde contacts en base de données (sauf déplacement)
       const cid = clientProfil?.id;
       const ctel = clientProfil?.telephone;
       if (formData.type_course === "expedier") {
         sauvegarderContactDB(cid, ctel, formData.destinataire_nom, formData.destinataire_telephone, "destinataire").catch(() => {});
-        // Proposer invitation si destinataire non trouvé dans SILGAPP
         if (!formData.destinataire_client_id && formData.destinataire_telephone) {
           setInvitationModal({ telephone: formData.destinataire_telephone, nom: formData.destinataire_nom });
-        } else {
-          setCourseCreated(true);
-        }
-      } else {
+        } else { setCourseCreated(true); }
+      } else if (formData.type_course === "recevoir") {
         sauvegarderContactDB(cid, ctel, formData.expediteur_nom, formData.expediteur_telephone, "expediteur").catch(() => {});
-        // Proposer invitation si expéditeur non trouvé dans SILGAPP
         if (!formData.expediteur_client_id && formData.expediteur_telephone) {
           setInvitationModal({ telephone: formData.expediteur_telephone, nom: formData.expediteur_nom });
-        } else {
-          setCourseCreated(true);
-        }
+        } else { setCourseCreated(true); }
+      } else {
+        setCourseCreated(true);
       }
     },
     onError: (err) => {
@@ -409,17 +405,20 @@ export default function CourseExterneFormSync() {
     // ─── Validation des champs obligatoires ───────────────────────────────────
     const isExpedie = formData.type_course === "expedier";
     const isRecevoir = formData.type_course === "recevoir";
+    const isDeplacementValid = formData.type_course === "deplacement";
     const missingFields = [];
 
     if (!formData.type_course) missingFields.push("type de course");
-    // adresse_depart et adresse_arrivee sont optionnelles
     if (isExpedie) {
       if (!formData.destinataire_telephone) missingFields.push("téléphone du destinataire");
     }
     if (isRecevoir) {
       if (!formData.expediteur_telephone) missingFields.push("téléphone de l'expéditeur");
     }
-    if (!formData.type_colis) missingFields.push("type de colis");
+    if (isDeplacementValid) {
+      if (!formData.passager_telephone) missingFields.push("téléphone du passager");
+    }
+    if (!isDeplacementValid && !formData.type_colis) missingFields.push("type de colis");
 
     if (missingFields.length > 0) {
       console.warn("[CourseForm] Champs manquants :", missingFields);
@@ -472,6 +471,15 @@ export default function CourseExterneFormSync() {
       destinataireTel = formData.destinataire_telephone;
       destinataireClientId = formData.destinataire_client_id || null;
       destinatairePhoneNormalized = normalizePhone(formData.destinataire_telephone, courseCountryCode);
+    } else if (isDeplacementValid) {
+      expediteurNom = formData.client_nom;
+      expediteurTel = formData.client_telephone;
+      expediteurClientId = clientFromDB?.id || null;
+      expediteurPhoneNormalized = normalizePhone(formData.client_telephone, courseCountryCode);
+      destinataireNom = formData.passager_nom || formData.client_nom;
+      destinataireTel = formData.passager_telephone || formData.client_telephone;
+      destinataireClientId = null;
+      destinatairePhoneNormalized = normalizePhone(destinataireTel, courseCountryCode);
     } else {
       destinataireNom = formData.client_nom;
       destinataireTel = formData.client_telephone;
@@ -519,37 +527,41 @@ export default function CourseExterneFormSync() {
     const destInconnue = false; // supprimé — les adresses sont simplement optionnelles
 
     // Validation des rôles — ne bloque PAS si le destinataire est hors SILGAPP
-    try {
-      const validationRes = await base44.functions.invoke('validateCourseRoles', {
-        type_course: formData.type_course,
-        expediteur_client_id: expediteurClientId,
-        destinataire_client_id: destinataireClientId,
-        created_by_id: user?.id
-      });
-      if (validationRes.data?.valid === false) {
-        const errMsg = validationRes.data.errors?.[0] || "Incohérence détectée dans les rôles";
-        console.warn("[CourseForm] Validation rôles échouée :", errMsg);
-        toast.error(errMsg);
-        setIsSubmitting(false);
-        return;
+    const isDeplacement = formData.type_course === "deplacement";
+    if (!isDeplacement) {
+      try {
+        const validationRes = await base44.functions.invoke('validateCourseRoles', {
+          type_course: formData.type_course,
+          expediteur_client_id: expediteurClientId,
+          destinataire_client_id: destinataireClientId,
+          created_by_id: user?.id
+        });
+        if (validationRes.data?.valid === false) {
+          const errMsg = validationRes.data.errors?.[0] || "Incohérence détectée dans les rôles";
+          console.warn("[CourseForm] Validation rôles échouée :", errMsg);
+          toast.error(errMsg);
+          setIsSubmitting(false);
+          return;
+        }
+      } catch (err) {
+        console.warn("[CourseForm] validateCourseRoles indisponible, on continue :", err.message);
       }
-    } catch (err) {
-      // En cas d'erreur réseau ou serveur, on continue quand même — ne pas bloquer la création
-      console.warn("[CourseForm] validateCourseRoles indisponible, on continue :", err.message);
     }
 
-    const nbColis = (formData.nb_colis || 1);
+    const nbColis = isDeplacement ? 1 : (formData.nb_colis || 1);
     const isMulti = isExpedie && nbColis > 1;
 
     // Pour multi-colis : résumé des destinataires
     const adresseArriveeFinale = isMulti
       ? "Tournée multi-colis"
-      : adresseArrivee;
+      : isDeplacement ? (formData.adresse_arrivee || "") : adresseArrivee;
     const destinataireNomFinal = isMulti
       ? `${nbColis} destinataires`
+      : isDeplacement ? (formData.passager_nom || "Passager")
       : (destinataireNom || "Destinataire");
     const destinataireTelFinal = isMulti
       ? (colis[0]?.destinataire_telephone || "")
+      : isDeplacement ? (formData.passager_telephone || "")
       : destinataireTel;
 
     createMutation.mutate({
@@ -567,9 +579,9 @@ export default function CourseExterneFormSync() {
       destinataire_client_id: isMulti ? null : destinataireClientId,
       recipient_has_app: false,
       expediteur_has_app: false,
-      adresse_depart: formData.adresse_depart || (formData.recuperationGPS ? "Position GPS" : "À définir"),
+      adresse_depart: isDeplacement ? (formData.adresse_depart || (formData.recuperationGPS ? "Position GPS" : "À définir")) : (formData.adresse_depart || (formData.recuperationGPS ? "Position GPS" : "À définir")),
       adresse_arrivee: adresseArriveeFinale,
-      type_colis: isMulti ? (colis[0]?.type_colis || "petit_colis") : formData.type_colis,
+      type_colis: isDeplacement ? "autre" : (isMulti ? (colis[0]?.type_colis || "petit_colis") : formData.type_colis),
       notes: formData.notes,
       gps_depart_lat: formData.gps_depart_lat,
       gps_depart_lng: formData.gps_depart_lng,
@@ -579,6 +591,10 @@ export default function CourseExterneFormSync() {
       prix_estimate: isMulti ? 0 : prixEstime,
       statut: "recherche_livreur",
       dispatch_status: "en_attente",
+      // Champs déplacement
+      passager_nom: isDeplacement ? (formData.passager_nom || "") : "",
+      passager_telephone: isDeplacement ? (formData.passager_telephone || "") : "",
+      nb_passagers: isDeplacement ? (formData.nb_passagers || 1) : 1,
       // Champs multi-colis
       is_multi_colis: isMulti,
       nb_colis: nbColis,
@@ -651,7 +667,7 @@ export default function CourseExterneFormSync() {
     );
   }
 
-  const totalSteps = 7;
+  const totalSteps = typeCourse === "deplacement" ? 6 : 7;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white p-4">
@@ -662,7 +678,7 @@ export default function CourseExterneFormSync() {
           </Button>
           <div>
             <h1 className="text-xl font-bold text-foreground">
-              {formData.type_course === "expedier" ? "Expédier un colis" : "Recevoir un colis"}
+              {formData.type_course === "expedier" ? "Expédier un colis" : formData.type_course === "deplacement" ? "Déplacement" : "Recevoir un colis"}
             </h1>
             <p className="text-xs text-muted-foreground">Formulaire étape par étape</p>
           </div>

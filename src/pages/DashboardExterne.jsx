@@ -97,6 +97,13 @@ export default function DashboardExterne() {
     [todayCourses]
   );
 
+  const [filtreTypeDashboard, setFiltreTypeDashboard] = useState("tous");
+
+  const coursesFiltreesDashboard = useMemo(() => {
+    if (filtreTypeDashboard === "tous") return coursesFiltrees;
+    return coursesFiltrees.filter(c => c.type_course === filtreTypeDashboard);
+  }, [coursesFiltrees, filtreTypeDashboard]);
+
   const coursesTerminees = useMemo(
     () => coursesFiltrees.filter(c =>
       ["livree", "annulee"].includes(c.statut) &&
@@ -211,8 +218,30 @@ export default function DashboardExterne() {
             </div>
           </div>
 
+          {/* Filtres type de course */}
+          <div className="relative mt-4 flex gap-2 flex-wrap">
+            {[
+              { key: "tous", label: "Tous" },
+              { key: "expedier", label: "📦 Expédition" },
+              { key: "recevoir", label: "📥 Réception" },
+              { key: "deplacement", label: "👤 Déplacement" },
+            ].map(f => (
+              <button
+                key={f.key}
+                onClick={() => setFiltreTypeDashboard(f.key)}
+                className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all ${
+                  filtreTypeDashboard === f.key
+                    ? "bg-white/25 text-white border-white/40"
+                    : "bg-white/5 text-white/50 border-white/10 hover:bg-white/15"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
           {/* Mini KPIs dans le hero */}
-          <div className="relative mt-5 grid grid-cols-4 gap-3">
+          <div className="relative mt-4 grid grid-cols-4 gap-3">
             {[
               { label: "Aujourd'hui", value: stats.total, color: "text-white" },
               { label: "En cours", value: stats.enCours, color: "text-blue-300" },
@@ -266,7 +295,7 @@ export default function DashboardExterne() {
           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">Courses en cours</p>
           <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
             <CoursesEnTraitement
-              courses={coursesEnTraitement}
+              courses={filtreTypeDashboard === "tous" ? coursesEnTraitement : coursesEnTraitement.filter(c => c.type_course === filtreTypeDashboard)}
               onView={setSelectedCourse}
               isExterne={true}
             />

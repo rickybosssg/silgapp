@@ -172,9 +172,11 @@ export default function PublicSuiviCourse({ token }) {
     nouvelle: "Course créée",
     recherche_livreur: "Recherche de livreur",
     livreur_en_route: "Livreur en route",
+    arrive_prise_en_charge: "Arrivé prise en charge",
     colis_recupere: "Colis récupéré",
+    passager_embarque: "Passager embarqué",
     en_livraison: "En livraison",
-    livree: "Livré",
+    livree: "Livré / Terminé",
     annulee: "Annulée"
   };
 

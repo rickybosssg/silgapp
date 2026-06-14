@@ -23,109 +23,104 @@
     },
     "client_telephone": {
       "type": "string",
-      "description": "T\u00e9l\u00e9phone du client"
+      "description": "Telephone du client"
     },
     "type_course": {
       "type": "string",
       "enum": [
         "expedier",
-        "recevoir"
+        "recevoir",
+        "deplacement"
       ],
-      "description": "Type de course : exp\u00e9dier ou recevoir un colis"
+      "description": "Type de course : expedier, recevoir, ou deplacement (transport de personne)"
     },
     "is_multi_colis": {
       "type": "boolean",
       "default": false,
-      "description": "TRUE si la course contient plusieurs colis (mode multi-colis)"
+      "description": "TRUE si la course contient plusieurs colis"
     },
     "nb_colis": {
       "type": "number",
-      "default": 1,
-      "description": "Nombre total de colis dans cette course"
+      "default": 1
     },
     "nb_colis_livres": {
       "type": "number",
-      "default": 0,
-      "description": "Nombre de colis effectivement livr\u00e9s"
+      "default": 0
     },
     "nb_colis_annules": {
       "type": "number",
-      "default": 0,
-      "description": "Nombre de colis annul\u00e9s"
+      "default": 0
     },
     "expediteur_nom": {
-      "type": "string",
-      "description": "Nom de l'exp\u00e9diteur"
+      "type": "string"
     },
     "expediteur_telephone": {
-      "type": "string",
-      "description": "T\u00e9l\u00e9phone de l'exp\u00e9diteur"
+      "type": "string"
     },
     "expediteur_phone_normalized": {
-      "type": "string",
-      "description": "T\u00e9l\u00e9phone normalis\u00e9 (sans espaces, avec indicatif)"
+      "type": "string"
     },
     "expediteur_client_id": {
-      "type": "string",
-      "description": "ID du client SILGAPP si l'exp\u00e9diteur existe"
+      "type": "string"
     },
     "destinataire_nom": {
-      "type": "string",
-      "description": "Nom du destinataire (colis unique) ou 'Multi-colis' si plusieurs"
+      "type": "string"
     },
     "destinataire_telephone": {
-      "type": "string",
-      "description": "T\u00e9l\u00e9phone du destinataire (colis unique)"
+      "type": "string"
     },
     "destinataire_phone_normalized": {
-      "type": "string",
-      "description": "T\u00e9l\u00e9phone normalis\u00e9 (sans espaces, avec indicatif)"
+      "type": "string"
     },
     "destinataire_client_id": {
-      "type": "string",
-      "description": "ID du client SILGAPP si le destinataire existe"
+      "type": "string"
     },
     "recipient_has_app": {
       "type": "boolean",
-      "default": false,
-      "description": "Le destinataire a l'application SILGAPP"
+      "default": false
     },
     "adresse_depart": {
       "type": "string",
-      "description": "Adresse ou quartier de r\u00e9cup\u00e9ration"
+      "description": "Adresse ou quartier de recuperation / prise en charge"
     },
     "adresse_arrivee": {
       "type": "string",
-      "description": "Adresse ou quartier de livraison (colis unique) ou 'Tourn\u00e9e multi-colis' si plusieurs"
+      "description": "Adresse ou quartier de livraison / depot"
     },
     "ville_depart": {
-      "type": "string",
-      "description": "Ville de d\u00e9part (d\u00e9tect\u00e9e par GPS)"
+      "type": "string"
     },
     "ville_arrivee": {
-      "type": "string",
-      "description": "Ville d'arriv\u00e9e (d\u00e9tect\u00e9e par GPS)"
+      "type": "string"
     },
     "destination_inconnue": {
       "type": "boolean",
-      "default": false,
-      "description": "La destination finale n'est pas connue au moment de la commande"
+      "default": false
     },
     "gps_depart_lat": {
-      "type": "number",
-      "description": "Latitude du point de d\u00e9part"
+      "type": "number"
     },
     "gps_depart_lng": {
-      "type": "number",
-      "description": "Longitude du point de d\u00e9part"
+      "type": "number"
     },
     "gps_arrivee_lat": {
-      "type": "number",
-      "description": "Latitude du point d'arriv\u00e9e (colis unique)"
+      "type": "number"
     },
     "gps_arrivee_lng": {
+      "type": "number"
+    },
+    "passager_nom": {
+      "type": "string",
+      "description": "Nom du passager (deplacement uniquement)"
+    },
+    "passager_telephone": {
+      "type": "string",
+      "description": "Telephone du passager (deplacement uniquement)"
+    },
+    "nb_passagers": {
       "type": "number",
-      "description": "Longitude du point d'arriv\u00e9e (colis unique)"
+      "default": 1,
+      "description": "Nombre de passagers (deplacement uniquement, optionnel)"
     },
     "type_colis": {
       "type": "string",
@@ -137,24 +132,20 @@
         "nourriture",
         "autre"
       ],
-      "description": "Type de colis (colis unique)"
+      "description": "Type de colis"
     },
     "prix_estimate": {
-      "type": "number",
-      "description": "Prix estim\u00e9 (\u00e0 titre indicatif)"
+      "type": "number"
     },
     "prix_final": {
-      "type": "number",
-      "description": "Prix final calcul\u00e9 apr\u00e8s livraison"
+      "type": "number"
     },
     "distance_reelle_km": {
-      "type": "number",
-      "description": "Distance r\u00e9ellement parcourue en km"
+      "type": "number"
     },
     "devise": {
       "type": "string",
-      "default": "FCFA",
-      "description": "Devise utilis\u00e9e pour cette course"
+      "default": "FCFA"
     },
     "statut": {
       "type": "string",
@@ -162,7 +153,9 @@
         "nouvelle",
         "recherche_livreur",
         "livreur_en_route",
+        "arrive_prise_en_charge",
         "colis_recupere",
+        "passager_embarque",
         "en_livraison",
         "livree",
         "annulee"
@@ -177,109 +170,87 @@
         "propose",
         "accepte",
         "expire",
-        "redispatch"
+        "redispatch",
+        "cycle_epuise"
       ],
-      "description": "Statut d\u00e9taill\u00e9 du dispatch automatique"
+      "description": "Statut detaille du dispatch automatique"
     },
     "timeout_expires_at": {
       "type": "string",
-      "format": "date-time",
-      "description": "Heure d'expiration du d\u00e9lai d'acceptation (60s)"
+      "format": "date-time"
     },
     "heure_sollicitation": {
       "type": "string",
-      "format": "date-time",
-      "description": "Heure \u00e0 laquelle le livreur a \u00e9t\u00e9 sollicit\u00e9"
+      "format": "date-time"
     },
     "livreur_id": {
-      "type": "string",
-      "description": "ID du livreur assign\u00e9"
+      "type": "string"
     },
     "livreur_nom": {
-      "type": "string",
-      "description": "Nom du livreur assign\u00e9"
+      "type": "string"
     },
     "livreur_photo_url": {
-      "type": "string",
-      "description": "Photo du livreur"
+      "type": "string"
     },
     "livreur_telephone": {
-      "type": "string",
-      "description": "T\u00e9l\u00e9phone du livreur"
+      "type": "string"
     },
     "livreur_vehicule": {
-      "type": "string",
-      "description": "Type de v\u00e9hicule du livreur"
+      "type": "string"
     },
     "livreur_note_moyenne": {
       "type": "number",
-      "default": 0,
-      "description": "Note moyenne du livreur au moment de l'acceptation"
+      "default": 0
     },
     "livreur_nombre_avis": {
       "type": "number",
-      "default": 0,
-      "description": "Nombre d'avis du livreur au moment de l'acceptation"
+      "default": 0
     },
     "notes": {
-      "type": "string",
-      "description": "Notes suppl\u00e9mentaires"
+      "type": "string"
     },
     "remarque_livreur": {
-      "type": "string",
-      "description": "Remarque du livreur en cas de refus"
+      "type": "string"
     },
     "heure_acceptation": {
       "type": "string",
-      "format": "date-time",
-      "description": "Heure d'acceptation par le livreur"
+      "format": "date-time"
     },
     "heure_recuperation": {
       "type": "string",
-      "format": "date-time",
-      "description": "Heure de r\u00e9cup\u00e9ration du colis"
+      "format": "date-time"
     },
     "heure_livraison": {
       "type": "string",
-      "format": "date-time",
-      "description": "Heure de livraison effective"
+      "format": "date-time"
     },
     "latitude_recuperation": {
-      "type": "number",
-      "description": "Latitude au moment de 'Colis r\u00e9cup\u00e9r\u00e9'"
+      "type": "number"
     },
     "longitude_recuperation": {
-      "type": "number",
-      "description": "Longitude au moment de 'Colis r\u00e9cup\u00e9r\u00e9'"
+      "type": "number"
     },
     "latitude_livraison": {
-      "type": "number",
-      "description": "Latitude au moment de 'Colis livr\u00e9'"
+      "type": "number"
     },
     "longitude_livraison": {
-      "type": "number",
-      "description": "Longitude au moment de 'Colis livr\u00e9'"
+      "type": "number"
     },
     "latitude_arrivee_livraison": {
-      "type": "number",
-      "description": "Latitude finale de livraison (alias standard)"
+      "type": "number"
     },
     "longitude_arrivee_livraison": {
-      "type": "number",
-      "description": "Longitude finale de livraison (alias standard)"
+      "type": "number"
     },
     "colis_livre_at": {
       "type": "string",
-      "format": "date-time",
-      "description": "Timestamp exact de la livraison"
+      "format": "date-time"
     },
     "commission_silga": {
-      "type": "number",
-      "description": "Commission Silga (% configurable par pays)"
+      "type": "number"
     },
     "montant_livreur": {
-      "type": "number",
-      "description": "Montant net pour le livreur"
+      "type": "number"
     },
     "statut_paiement_livreur": {
       "type": "string",
@@ -287,70 +258,56 @@
         "non_paye",
         "paye"
       ],
-      "default": "non_paye",
-      "description": "Statut du paiement du livreur \u00e0 Silga"
+      "default": "non_paye"
     },
     "note_livreur": {
       "type": "number",
       "minimum": 1,
-      "maximum": 5,
-      "description": "Note officielle donn\u00e9e par l'exp\u00e9diteur (1 \u00e0 5 \u00e9toiles)"
+      "maximum": 5
     },
     "commentaire_livreur": {
-      "type": "string",
-      "description": "Commentaire laiss\u00e9 par l'exp\u00e9diteur"
+      "type": "string"
     },
     "note_date": {
       "type": "string",
-      "format": "date-time",
-      "description": "Date et heure de la notation par l'exp\u00e9diteur"
+      "format": "date-time"
     },
     "destinataire_feedback": {
       "type": "string",
       "enum": [
         "bon",
         "mauvais"
-      ],
-      "description": "Feedback simple du destinataire"
+      ]
     },
     "destinataire_feedback_date": {
       "type": "string",
-      "format": "date-time",
-      "description": "Date du feedback destinataire"
+      "format": "date-time"
     },
     "tracking_token": {
-      "type": "string",
-      "description": "Token unique pour le lien de suivi public"
+      "type": "string"
     },
     "tracking_link": {
-      "type": "string",
-      "description": "Lien public de suivi de la course"
+      "type": "string"
     },
     "tracking_shared_at": {
       "type": "string",
-      "format": "date-time",
-      "description": "Date de partage du lien de suivi"
+      "format": "date-time"
     },
     "tracking_opened_count": {
       "type": "number",
-      "default": 0,
-      "description": "Nombre de fois o\u00f9 le lien a \u00e9t\u00e9 ouvert"
+      "default": 0
     },
     "pickup_qr_token": {
-      "type": "string",
-      "description": "Token unique pour QR code de r\u00e9cup\u00e9ration"
+      "type": "string"
     },
     "pickup_code_4_digits": {
-      "type": "string",
-      "description": "Code \u00e0 4 chiffres pour validation manuelle de r\u00e9cup\u00e9ration"
+      "type": "string"
     },
     "delivery_qr_token": {
-      "type": "string",
-      "description": "Token unique pour QR code de livraison"
+      "type": "string"
     },
     "delivery_code_4_digits": {
-      "type": "string",
-      "description": "Code \u00e0 4 chiffres pour validation manuelle de livraison"
+      "type": "string"
     },
     "pickup_confirmed_by": {
       "type": "string",
@@ -358,8 +315,7 @@
         "qr",
         "manual_code",
         "admin"
-      ],
-      "description": "M\u00e9thode de confirmation de r\u00e9cup\u00e9ration"
+      ]
     },
     "delivery_confirmed_by": {
       "type": "string",
@@ -367,18 +323,15 @@
         "qr",
         "manual_code",
         "admin"
-      ],
-      "description": "M\u00e9thode de confirmation de livraison"
+      ]
     },
     "pickup_confirmed_at": {
       "type": "string",
-      "format": "date-time",
-      "description": "Date et heure de confirmation de r\u00e9cup\u00e9ration"
+      "format": "date-time"
     },
     "delivery_confirmed_at": {
       "type": "string",
-      "format": "date-time",
-      "description": "Date et heure de confirmation de livraison"
+      "format": "date-time"
     },
     "pricing_mode": {
       "type": "string",
@@ -386,12 +339,10 @@
         "automatic",
         "manual"
       ],
-      "default": "automatic",
-      "description": "Mode de tarification : automatique ou manuel (propos\u00e9 par le livreur)"
+      "default": "automatic"
     },
     "manual_price": {
-      "type": "number",
-      "description": "Prix manuel propos\u00e9 par le livreur (minimum 1000 FCFA)"
+      "type": "number"
     },
     "manual_price_status": {
       "type": "string",
@@ -399,26 +350,22 @@
         "pending_client_validation",
         "accepted",
         "refused"
-      ],
-      "description": "Statut de validation du prix manuel par le client"
+      ]
     },
     "proposed_by_livreur_id": {
-      "type": "string",
-      "description": "ID du livreur ayant propos\u00e9 le prix manuel"
+      "type": "string"
     },
     "client_price_validated_at": {
       "type": "string",
-      "format": "date-time",
-      "description": "Date d'acceptation du prix manuel par le client"
+      "format": "date-time"
     },
     "client_price_refused_at": {
       "type": "string",
-      "format": "date-time",
-      "description": "Date de refus du prix manuel par le client"
+      "format": "date-time"
     },
     "dispatch_notified_ids": {
       "type": "string",
-      "description": "JSON stringifi\u00e9 des IDs des livreurs notifi\u00e9s pour cette course (dispatch multi-livreurs)"
+      "description": "JSON stringifie des IDs des livreurs notifies"
     }
   },
   "required": [

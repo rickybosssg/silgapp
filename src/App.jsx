@@ -175,6 +175,7 @@ function AppContent() {
           <Route path="/" element={<ClientExterneApp />} />
           <Route path="/client/course/expedier" element={<CourseExterneFormSync />} />
           <Route path="/client/course/recevoir" element={<CourseExterneFormSync />} />
+          <Route path="/client/course/deplacement" element={<CourseExterneFormSync />} />
           <Route path="/client/suivi" element={<ClientSuiviCourse />} />
           <Route path="/livreur/recap-course/:courseId" element={<RecapCourseLivreur />} />
           <Route path="*" element={<ClientExterneApp />} />

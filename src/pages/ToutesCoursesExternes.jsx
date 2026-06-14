@@ -24,6 +24,8 @@ export default function ToutesCoursesExternes() {
   const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
   const [filtreActif, setFiltreActif] = useState("tous");
 
+  const [filtreType, setFiltreType] = useState("tous");
+
   const { data: courses = [] } = useQuery({
     queryKey: ["courses-externes", effectiveCountry],
     queryFn: () => effectiveCountry
@@ -37,19 +39,23 @@ export default function ToutesCoursesExternes() {
   const stats = useMemo(() => ({
     totale:   courses.length,
     nouvelle: courses.filter(c => c.statut === "nouvelle").length,
-    enCours:  courses.filter(c => ["recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut)).length,
+    enCours:  courses.filter(c => ["recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison", "arrive_prise_en_charge", "passager_embarque"].includes(c.statut)).length,
     livree:   courses.filter(c => c.statut === "livree").length,
     annulee:  courses.filter(c => c.statut === "annulee").length,
   }), [courses]);
 
   const coursesFiltrees = useMemo(() => {
-    if (filtreActif === "tous")     return courses;
-    if (filtreActif === "nouvelle") return courses.filter(c => c.statut === "nouvelle");
-    if (filtreActif === "en_cours") return courses.filter(c => ["recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut));
-    if (filtreActif === "livree")   return courses.filter(c => c.statut === "livree");
-    if (filtreActif === "annulee")  return courses.filter(c => c.statut === "annulee");
-    return courses;
-  }, [courses, filtreActif]);
+    let filtered = courses;
+    if (filtreType !== "tous") {
+      filtered = filtered.filter(c => c.type_course === filtreType);
+    }
+    if (filtreActif === "tous")     return filtered;
+    if (filtreActif === "nouvelle") return filtered.filter(c => c.statut === "nouvelle");
+    if (filtreActif === "en_cours") return filtered.filter(c => ["recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison", "arrive_prise_en_charge", "passager_embarque"].includes(c.statut));
+    if (filtreActif === "livree")   return filtered.filter(c => c.statut === "livree");
+    if (filtreActif === "annulee")  return filtered.filter(c => c.statut === "annulee");
+    return filtered;
+  }, [courses, filtreActif, filtreType]);
 
   return (
     <div className="p-4 space-y-5 max-w-5xl mx-auto">
@@ -98,20 +104,46 @@ export default function ToutesCoursesExternes() {
       </div>
 
       {/* ── FILTRES ─────────────────────────────────────────────── */}
-      <div className="flex gap-2 flex-wrap">
-        {STATUT_FILTRES.map(f => (
-          <button
-            key={f.key}
-            onClick={() => setFiltreActif(f.key)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-              filtreActif === f.key
-                ? "bg-primary text-white border-primary"
-                : "bg-white text-slate-600 border-gray-200 hover:border-primary/40 hover:text-primary"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div className="space-y-2">
+        {/* Filtre par type de course */}
+        <div className="flex gap-2 flex-wrap">
+          <span className="text-[10px] font-bold text-gray-400 uppercase self-center mr-1">Type:</span>
+          {[
+            { key: "tous", label: "Tous" },
+            { key: "expedier", label: "📦 Expédition" },
+            { key: "recevoir", label: "📥 Réception" },
+            { key: "deplacement", label: "👤 Déplacement" },
+          ].map(f => (
+            <button
+              key={f.key}
+              onClick={() => setFiltreType(f.key)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                filtreType === f.key
+                  ? "bg-sky-600 text-white border-sky-600"
+                  : "bg-white text-slate-600 border-gray-200 hover:border-sky-400 hover:text-sky-600"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        {/* Filtre par statut */}
+        <div className="flex gap-2 flex-wrap">
+          <span className="text-[10px] font-bold text-gray-400 uppercase self-center mr-1">Statut:</span>
+          {STATUT_FILTRES.map(f => (
+            <button
+              key={f.key}
+              onClick={() => setFiltreActif(f.key)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                filtreActif === f.key
+                  ? "bg-primary text-white border-primary"
+                  : "bg-white text-slate-600 border-gray-200 hover:border-primary/40 hover:text-primary"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── LISTE DES COURSES ───────────────────────────────────── */}
@@ -155,6 +187,11 @@ export default function ToutesCoursesExternes() {
                 {/* Infos */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                    {course.type_course && course.type_course !== "expedier" && (
+                      <span className="text-[10px] font-bold bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded">
+                        {course.type_course === "deplacement" ? "👤" : "📥"}
+                      </span>
+                    )}
                     <span className="font-bold text-sm text-foreground truncate">{course.client_nom || "Client"}</span>
                     <CourseStatusBadge statut={course.statut} />
                     {course.livreur_id && <CanalNotifBadge course={course} />}

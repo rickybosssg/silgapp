@@ -633,7 +633,12 @@ export default function ClientExterneApp() {
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-black text-primary">
-                    {course.statut === "recherche_livreur" ? "🔍 Recherche livreur..." :
+                    {course.type_course === "deplacement" && course.statut === "recherche_livreur" ? "🔍 Recherche chauffeur..." :
+                     course.type_course === "deplacement" && course.statut === "livreur_en_route" ? "🚗 Chauffeur en route" :
+                     course.type_course === "deplacement" && course.statut === "arrive_prise_en_charge" ? "📍 Arrivé au point de prise en charge" :
+                     course.type_course === "deplacement" && course.statut === "passager_embarque" ? "👤 Passager à bord" :
+                     course.type_course === "deplacement" && course.statut === "livree" ? "✅ Déplacement terminé" :
+                     course.statut === "recherche_livreur" ? "🔍 Recherche livreur..." :
                      course.statut === "livreur_en_route"  ? "🚀 Livreur en route" :
                      course.statut === "colis_recupere"    ? "📦 Colis récupéré" : "🚚 En livraison"}
                   </p>
@@ -757,33 +762,38 @@ export default function ClientExterneApp() {
               </div>
 
               {/* ── ACTIONS PRINCIPALES ───────────── */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <button
                   className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-primary/20"
                   onClick={() => navigate("/client/course/expedier", { state: { position, clientProfil } })}
                 >
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-red-600 flex items-center justify-center shadow-lg shadow-red-200 mb-3 group-hover:scale-105 transition-transform">
-                    <Package className="w-6 h-6 text-white" />
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-red-600 flex items-center justify-center shadow-lg shadow-red-200 mb-2 group-hover:scale-105 transition-transform">
+                    <Package className="w-5 h-5 text-white" />
                   </div>
-                  <p className="font-black text-gray-900 text-sm">Expédier</p>
-                  <p className="text-xs text-gray-600 mt-0.5">Envoyer un colis</p>
-                  <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
-                    <ChevronRight className="w-3.5 h-3.5 text-primary" />
-                  </div>
+                  <p className="font-black text-gray-900 text-xs">Expédier</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">Envoyer un colis</p>
                 </button>
 
                 <button
                   className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-green-200"
                   onClick={() => navigate("/client/course/recevoir", { state: { position, clientProfil } })}
                 >
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-lg shadow-green-200 mb-3 group-hover:scale-105 transition-transform">
-                    <span className="text-2xl">📥</span>
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-lg shadow-green-200 mb-2 group-hover:scale-105 transition-transform">
+                    <span className="text-xl">📥</span>
                   </div>
-                  <p className="font-black text-gray-900 text-sm">Recevoir</p>
-                  <p className="text-xs text-gray-600 mt-0.5">Attendre un colis</p>
-                  <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-green-50 flex items-center justify-center">
-                    <ChevronRight className="w-3.5 h-3.5 text-green-600" />
+                  <p className="font-black text-gray-900 text-xs">Recevoir</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">Attendre un colis</p>
+                </button>
+
+                <button
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-sky-200"
+                  onClick={() => navigate("/client/course/deplacement", { state: { position, clientProfil } })}
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center shadow-lg shadow-sky-200 mb-2 group-hover:scale-105 transition-transform">
+                    <span className="text-xl">👤</span>
                   </div>
+                  <p className="font-black text-gray-900 text-xs">Déplacement</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">Transport personne</p>
                 </button>
               </div>
 

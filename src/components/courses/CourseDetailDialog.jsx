@@ -21,9 +21,11 @@ const STATUTS_INTERNE = [
 ];
 
 const STATUTS_EXTERNE = [
-  "nouvelle", "recherche_livreur", "livreur_en_route", "colis_recupere",
-  "en_livraison", "livree", "annulee"
+  "nouvelle", "recherche_livreur", "livreur_en_route", "arrive_prise_en_charge",
+  "colis_recupere", "passager_embarque", "en_livraison", "livree", "annulee"
 ];
+
+const TYPE_LABELS = { expedier: "📦 Expédition", recevoir: "📥 Réception", deplacement: "👤 Déplacement" };
 
 export default function CourseDetailDialog({ course, open, onClose, reseau = "interne" }) {
   const queryClient = useQueryClient();
@@ -111,8 +113,13 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Status */}
+          {/* Status + Type */}
           <div className="flex items-center gap-2 flex-wrap">
+            {course.type_course && (
+              <span className="text-xs font-bold bg-sky-50 text-sky-700 px-2 py-0.5 rounded-full border border-sky-200">
+                {TYPE_LABELS[course.type_course] || course.type_course}
+              </span>
+            )}
             <CourseStatusBadge statut={course.statut} />
             {course.urgence && <UrgenceBadge urgence={course.urgence} />}
             {course.prix && <span className="text-sm font-bold">{course.prix.toLocaleString()} FCFA</span>}

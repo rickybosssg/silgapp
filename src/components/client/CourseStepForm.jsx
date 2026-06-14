@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { 
   ArrowLeft, ArrowRight, MapPin, Navigation, Package, 
   User, FileText, CheckCircle, Truck, AlertCircle,
-  Loader2, Search, Send, Inbox, Sparkles
+  Loader2, Search, Send, Inbox, Sparkles, Car
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
@@ -281,6 +281,7 @@ export default function CourseStepForm({
   const renderStep = () => {
     const isExpedie = formData.type_course === "expedier";
     const isRecevoir = formData.type_course === "recevoir";
+    const isDeplacement = formData.type_course === "deplacement";
 
     switch (step) {
       // ─── ÉTAPE 0 : TYPE DE COURSE ──────────────────────────────────────────
@@ -290,7 +291,7 @@ export default function CourseStepForm({
             <div className="text-center">
               <StepIcon icon={Sparkles} color="text-primary" bgColor="bg-gradient-to-br from-primary/20 to-red-100 shadow-red-200" />
               <h2 className="text-2xl font-black text-gray-900">Que souhaitez-vous faire ?</h2>
-              <p className="text-sm text-gray-500 mt-1.5">Choisissez le type de livraison</p>
+              <p className="text-sm text-gray-500 mt-1.5">Choisissez le type de course</p>
             </div>
             <div className="grid gap-4">
               <button
@@ -350,6 +351,35 @@ export default function CourseStepForm({
                   )}
                 </div>
               </button>
+
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, type_course: "deplacement" })}
+                className={`p-5 rounded-3xl border-2 transition-all duration-200 text-left active:scale-[0.98] shadow-sm ${
+                  formData.type_course === "deplacement"
+                    ? "border-sky-500 bg-gradient-to-br from-sky-50 to-blue-50 shadow-sky-200 shadow-md"
+                    : "border-gray-200 bg-white hover:border-sky-300 hover:shadow-md"
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-md transition-all ${
+                    formData.type_course === "deplacement" ? "bg-gradient-to-br from-sky-500 to-blue-600 shadow-sky-200" : "bg-gray-100"
+                  }`}>
+                    <Car className={`w-7 h-7 ${formData.type_course === "deplacement" ? "text-white" : "text-gray-400"}`} />
+                  </div>
+                  <div className="flex-1">
+                    <p className={`font-black text-lg ${formData.type_course === "deplacement" ? "text-sky-600" : "text-gray-800"}`}>
+                      Déplacement
+                    </p>
+                    <p className="text-sm text-gray-500 mt-0.5">Transport d'une personne</p>
+                  </div>
+                  {formData.type_course === "deplacement" && (
+                    <div className="w-8 h-8 rounded-full bg-sky-500 flex items-center justify-center flex-shrink-0">
+                      <CheckCircle className="w-5 h-5 text-white" />
+                    </div>
+                  )}
+                </div>
+              </button>
             </div>
 
             {/* ── Sélecteur nombre de colis — uniquement pour "expedier" ── */}
@@ -366,6 +396,41 @@ export default function CourseStepForm({
 
       // ─── ÉTAPE 1 ───────────────────────────────────────────────────────────
       case 1: {
+        // Déplacement : adresse de prise en charge (pickup)
+        if (isDeplacement) {
+          return (
+            <div className="space-y-5">
+              <div className="text-center">
+                <StepIcon icon={MapPin} color="text-primary" bgColor="bg-gradient-to-br from-red-100 to-red-50 shadow-red-200" />
+                <h2 className="text-2xl font-black text-gray-900">Point de prise en charge</h2>
+                <p className="text-sm text-gray-500 mt-1.5">Où récupérer le passager ?</p>
+              </div>
+              {formData.recuperationGPS ? (
+                <div className="flex items-center gap-4 p-5 rounded-3xl bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 shadow-sm">
+                  <div className="w-12 h-12 rounded-2xl bg-green-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-green-200">
+                    <CheckCircle className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-green-900">Position GPS récupérée</p>
+                    <p className="text-xs text-green-700 mt-0.5 truncate">{formData.adresse_depart || "Position GPS"}</p>
+                  </div>
+                  <button type="button" onClick={() => setFormData({ ...formData, recuperationGPS: false, gps_depart_lat: null, gps_depart_lng: null, adresse_depart: "" })} className="text-xs text-green-700 font-bold bg-green-100 px-3 py-1.5 rounded-xl flex-shrink-0">Changer</button>
+                </div>
+              ) : (
+                <>
+                  <button type="button" onClick={gpsHandlers?.onGetGPSDepart} className="w-full rounded-3xl bg-gradient-to-r from-primary to-red-600 text-white font-bold text-base shadow-xl shadow-primary/30 active:scale-[0.98] transition-all overflow-hidden">
+                    <div className="flex flex-col items-center justify-center gap-1 py-5 px-4">
+                      <div className="flex items-center gap-2 text-lg font-black"><Navigation className="w-6 h-6" />Utiliser ma position actuelle</div>
+                      <p className="text-xs text-red-100 font-normal">📍 Détection automatique de votre position</p>
+                    </div>
+                  </button>
+                  <div className="flex items-center gap-3"><div className="flex-1 h-px bg-gray-200" /><span className="text-xs text-gray-400 font-medium">ou saisir manuellement</span><div className="flex-1 h-px bg-gray-200" /></div>
+                  <PremiumInput label="Adresse de prise en charge" required={false} value={formData.adresse_depart} onChange={(e) => setFormData({ ...formData, adresse_depart: e.target.value })} placeholder="Quartier, rue, point de repère... (optionnel)" />
+                </>
+              )}
+            </div>
+          );
+        }
         if (isRecevoir) {
           return (
             <div className="space-y-5">
@@ -512,6 +577,33 @@ export default function CourseStepForm({
 
       // ─── ÉTAPE 2 ───────────────────────────────────────────────────────────
       case 2: {
+        // Déplacement : adresse de destination (dropoff)
+        if (isDeplacement) {
+          return (
+            <div className="space-y-5">
+              <div className="text-center">
+                <StepIcon icon={MapPin} color="text-accent" bgColor="bg-gradient-to-br from-green-100 to-green-50 shadow-green-200" />
+                <h2 className="text-2xl font-black text-gray-900">Point de destination</h2>
+                <p className="text-sm text-gray-500 mt-1.5">Où déposer le passager ?</p>
+              </div>
+              <PremiumInput
+                label="Adresse de destination"
+                required={false}
+                hint="Indiquez le quartier, la rue ou un point de repère connu."
+                value={formData.adresse_arrivee}
+                onChange={(e) => setFormData({ ...formData, adresse_arrivee: e.target.value })}
+                placeholder="Quartier, rue, point de repère... (optionnel)"
+                autoFocus
+              />
+              <button type="button" onClick={gpsHandlers?.onGetGPSArrivee} className="w-full rounded-3xl bg-gradient-to-r from-sky-500 to-blue-600 text-white font-bold text-base shadow-xl shadow-sky-200 active:scale-[0.98] transition-all overflow-hidden">
+                <div className="flex flex-col items-center justify-center gap-1 py-4 px-4">
+                  <div className="flex items-center gap-2 text-base font-black"><Navigation className="w-5 h-5" />Utiliser ma position actuelle</div>
+                  <p className="text-xs text-blue-100 font-normal">📍 Définir la destination avec le GPS</p>
+                </div>
+              </button>
+            </div>
+          );
+        }
         // Mode multi-colis : afficher les formulaires des colis
         if (isExpedie && (formData.nb_colis || 1) > 1) {
           return (
@@ -669,6 +761,53 @@ export default function CourseStepForm({
 
       // ─── ÉTAPE 3 ───────────────────────────────────────────────────────────
       case 3: {
+        // Déplacement : infos passager
+        if (isDeplacement) {
+          return (
+            <div className="space-y-5">
+              <div className="text-center">
+                <StepIcon icon={User} color="text-sky-600" bgColor="bg-gradient-to-br from-sky-100 to-blue-50 shadow-sky-200" />
+                <h2 className="text-2xl font-black text-gray-900">Qui se déplace ?</h2>
+                <p className="text-sm text-gray-500 mt-1.5">Informations du passager</p>
+              </div>
+              <PremiumInput
+                label="Nom du passager"
+                required={false}
+                value={formData.passager_nom || ""}
+                onChange={(e) => setFormData({ ...formData, passager_nom: e.target.value })}
+                placeholder="Nom complet du passager"
+                autoFocus
+              />
+              <div className="space-y-3">
+                <Label className="text-sm font-semibold text-gray-700">
+                  Téléphone du passager <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  type="tel"
+                  value={formData.passager_telephone || ""}
+                  onChange={(e) => setFormData({ ...formData, passager_telephone: e.target.value })}
+                  placeholder={phonePlaceholder}
+                  className="h-14 rounded-2xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-sky-400 px-4 text-base"
+                />
+                <p className="text-xs text-gray-400 pl-1">Format : {phonePlaceholder}</p>
+              </div>
+              <PremiumInput
+                label="Nombre de passagers"
+                required={false}
+                hint="Nombre de personnes à transporter"
+              >
+                <Input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={formData.nb_passagers || 1}
+                  onChange={(e) => setFormData({ ...formData, nb_passagers: parseInt(e.target.value) || 1 })}
+                  className="h-14 rounded-2xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-sky-400 px-4 text-base"
+                />
+              </PremiumInput>
+            </div>
+          );
+        }
         if (isExpedie) {
           const gpsDestDispo = !!(formData.gps_arrivee_lat && formData.gps_arrivee_lng && formData.livraisonGPS);
           return (
@@ -714,11 +853,13 @@ export default function CourseStepForm({
       }
 
       case 4: {
+        if (isDeplacement) return renderNotes();
         if (isExpedie) return renderTypeColis();
         return renderNotes();
       }
 
       case 5: {
+        if (isDeplacement) return renderRecap();
         if (isExpedie) return renderNotes();
         return renderRecap();
       }
@@ -842,26 +983,24 @@ export default function CourseStepForm({
     );
   }
 
-  // ─── Logique désactivation bouton Continuer (inchangée) ───────────────────
+  // ─── Logique désactivation bouton Continuer ───────────────────────────────
   const isContinueDisabled = () => {
     const isExpedie = formData.type_course === "expedier";
     const isRecevoir = formData.type_course === "recevoir";
+    const isDeplacement = formData.type_course === "deplacement";
     const isMulti = isExpedie && (formData.nb_colis || 1) > 1;
     if (step === 0) return !formData.type_course;
     if (step === 1) {
       if (isRecevoir) return !formData.expediteur_telephone;
-      // "expedier" : adresse de récupération optionnelle — toujours continuer
+      // expedier/deplacement : adresse optionnelle — toujours continuer
     }
     if (step === 2) {
-      // Multi-colis : tous les colis doivent avoir un téléphone
-      if (isMulti) {
-        return !(colis || []).every(c => !!c.destinataire_telephone);
-      }
+      if (isMulti) return !(colis || []).every(c => !!c.destinataire_telephone);
       if (isExpedie) return !formData.destinataire_telephone;
-      // "recevoir" : adresse de récupération optionnelle — toujours continuer
+      // recevoir/deplacement : adresse optionnelle — toujours continuer
     }
     if (step === 3) {
-      // "expedier" : adresse de livraison optionnelle — toujours continuer
+      if (isDeplacement) return !formData.passager_telephone;
       if (isRecevoir) return !formData.type_colis;
     }
     if (step === 4) {
