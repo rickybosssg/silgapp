@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, X, LogOut, Bell } from "lucide-react";
+import { Menu, X, LogOut, Bell, ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
 import { navItems as allNavItems } from "@/components/layout/Sidebar";
+import { useAdminContext } from "@/hooks/useAdminContext.js";
+import { PAYS_SILGAPP } from "@/components/international/CountrySelector.jsx";
 
 // Bottom tab bar : items communs aux deux réseaux
 const bottomTabPaths = ["/", "/carte", "/courses", "/livreurs"];
@@ -69,6 +71,10 @@ export default function MobileNav({ notificationCount = 0, reseau }) {
     setTimeout(() => window.location.reload(), 300);
   };
   const [showMenu, setShowMenu] = useState(false);
+  const [countryOpen, setCountryOpen] = useState(false);
+  const { isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
+  const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
+  const showCountryPicker = reseau === "externe" && !isPays;
 
   return (
     <>
@@ -121,6 +127,44 @@ export default function MobileNav({ notificationCount = 0, reseau }) {
                 <X className="w-5 h-5" />
               </Button>
             </div>
+
+            {/* Sélecteur de pays — réseau externe uniquement */}
+            {showCountryPicker && (
+              <div className="px-3 py-2 border-b border-border">
+                <button
+                  onClick={() => setCountryOpen(!countryOpen)}
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-muted hover:bg-muted/80 transition-colors"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-base flex-shrink-0">
+                      {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
+                    </span>
+                    <span className="text-sm font-medium text-foreground truncate">
+                      {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
+                    </span>
+                  </div>
+                  <ChevronDown className={cn("w-4 h-4 text-muted-foreground flex-shrink-0 transition-transform", countryOpen && "rotate-180")} />
+                </button>
+                {countryOpen && (
+                  <div className="mt-1 border border-border rounded-xl bg-card shadow-lg max-h-56 overflow-y-auto">
+                    {PAYS_SILGAPP.map((p) => (
+                      <button
+                        key={p.code}
+                        onClick={() => { setSelectedCountry(p.code); setCountryOpen(false); }}
+                        className={cn(
+                          "w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-muted",
+                          effectiveCountry === p.code ? "bg-primary/10 text-primary font-semibold" : "text-foreground"
+                        )}
+                      >
+                        <span className="text-base flex-shrink-0">{p.emoji_flag}</span>
+                        <span className="flex-1 text-left">{p.nom}</span>
+                        {effectiveCountry === p.code && <Check className="w-4 h-4 text-primary flex-shrink-0" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Nav items */}
             <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
