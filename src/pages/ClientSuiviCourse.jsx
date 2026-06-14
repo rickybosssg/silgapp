@@ -495,7 +495,8 @@ export default function ClientSuiviCourse() {
             // Tarif km du pays de la course (fallback 100)
             const countryData = countries.find(c => c.code === maCourse.country_code);
             const tarifKm = countryData?.prix_par_km || 100;
-            const PRIX_MIN = 1000;
+            const PRIX_MIN = countryData?.prix_minimum || 1000;
+            const DEVISE = countryData?.devise || "FCFA";
 
             // === DISTANCE AFFICHÉE (livreur → cible en temps réel) ===
             const livreurLat = maCourse._livreur?.latitude;
@@ -737,6 +738,7 @@ export default function ClientSuiviCourse() {
                   {(() => {
                     const countryDataFinal = countries.find(c => c.code === maCourse.country_code);
                     const tarifKmFinal = countryDataFinal?.prix_par_km || 100;
+                    const prixMinFinal = countryDataFinal?.prix_minimum || 1000;
                     // Guard : éviter NaN si coordonnées GPS nulles (ex: destination_inconnue)
                     const haversineOrNull = (a, b, c, d) =>
                       (a != null && b != null && c != null && d != null && !isNaN(a) && !isNaN(b) && !isNaN(c) && !isNaN(d))
@@ -744,9 +746,8 @@ export default function ClientSuiviCourse() {
                     const distFinal = maCourse.distance_reelle_km > 0
                       ? maCourse.distance_reelle_km
                       : haversineOrNull(maCourse.latitude_recuperation, maCourse.longitude_recuperation, maCourse.latitude_livraison, maCourse.longitude_livraison);
-                    // Règle obligatoire : minimum global SILGAPP = 1 000 FCFA
                     const prixBrutFinal = maCourse.prix_final > 0 ? maCourse.prix_final : (distFinal != null && distFinal > 0 ? Math.round(distFinal * tarifKmFinal) : null);
-                    const prixFinal = prixBrutFinal > 0 ? Math.max(prixBrutFinal, 1000) : null;
+                    const prixFinal = prixBrutFinal > 0 ? Math.max(prixBrutFinal, prixMinFinal) : null;
                     const dureeMs = maCourse.heure_livraison && maCourse.heure_recuperation
                       ? new Date(maCourse.heure_livraison) - new Date(maCourse.heure_recuperation)
                       : maCourse.heure_livraison && maCourse.heure_acceptation

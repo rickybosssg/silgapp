@@ -14,6 +14,7 @@ export const PAYS_LISTE = [
   { code: "ML", nom: "Mali",           emoji: "🇲🇱", indicatif: "+223", digits: 8 },
   { code: "NE", nom: "Niger",          emoji: "🇳🇪", indicatif: "+227", digits: 8 },
   { code: "GN", nom: "Guinée",         emoji: "🇬🇳", indicatif: "+224", digits: 9 },
+  { code: "GH", nom: "Ghana",          emoji: "🇬🇭", indicatif: "+233", digits: 9 },
 ];
 
 // ─── Helpers téléphone ────────────────────────────────────────────────────────
