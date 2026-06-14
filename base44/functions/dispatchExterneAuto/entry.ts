@@ -103,7 +103,10 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
   });
 
   // Classer par priorité : heartbeat récent > GPS récent > distance
-  const niveau1 = [], niveau2 = [], niveau3 = [], niveau4 = [];
+  // 🕐 0-15 min = N1 (priorité max), 15-30 min = N2 (réduite), 30-60 min = N3 (faible)
+  // 🚫 > 60 min = exclusion automatique + mise hors ligne
+  const niveau1 = [], niveau2 = [], niveau3 = [];
+  let nbMarquesHorsLigne = 0;
 
   eligibles.forEach(l => {
     const hbDate = l.last_seen_at || l.derniere_position_date;
@@ -111,6 +114,13 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
     if (hbDate) {
       const hb = new Date(hbDate);
       if (!isNaN(hb.getTime())) heartbeatAgeMin = (now - hb.getTime()) / 60000;
+    }
+
+    // 🚫 Exclusion automatique : heartbeat > 60 min → hors_ligne immédiat
+    if (heartbeatAgeMin !== null && heartbeatAgeMin > 60) {
+      base44.asServiceRole.entities.Livreur.update(l.id, { statut: 'hors_ligne' }).catch(() => {});
+      nbMarquesHorsLigne++;
+      return; // exclu du dispatch
     }
 
     let distance = 0;
@@ -121,12 +131,11 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
     const enriched = { ...l, distance, heartbeatAgeMin };
 
     if (heartbeatAgeMin === null || heartbeatAgeMin >= 30) {
-      niveau4.push(enriched);
-    } else if (heartbeatAgeMin >= 10) {
-      niveau3.push(enriched);
-    } else if (heartbeatAgeMin >= 2) {
-      niveau2.push(enriched);
+      niveau3.push(enriched); // N3 : 30-60 min ou inconnu → priorité faible
+    } else if (heartbeatAgeMin >= 15) {
+      niveau2.push(enriched); // N2 : 15-30 min → priorité réduite
     } else {
+      // N1 : 0-15 min → priorité maximale, trié par GPS puis distance
       const gpsDate = l.derniere_position_date;
       let gpsAgeMin = null;
       if (gpsDate) {
@@ -141,15 +150,19 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
   niveau1.sort((a, b) => {
     const gpsA = a.gpsAgeMin !== null ? a.gpsAgeMin : 999;
     const gpsB = b.gpsAgeMin !== null ? b.gpsAgeMin : 999;
+    // Micro-tranches GPS pour N1 : <2min idéal, <5min bon, <10min ok, >=10min dégradé
     const trancheA = gpsA < 2 ? 0 : gpsA < 5 ? 1 : gpsA < 10 ? 2 : 3;
     const trancheB = gpsB < 2 ? 0 : gpsB < 5 ? 1 : gpsB < 10 ? 2 : 3;
     if (trancheA !== trancheB) return trancheA - trancheB;
     return a.distance - b.distance;
   });
-  [niveau2, niveau3, niveau4].forEach(n => n.sort((a, b) => a.distance - b.distance));
+  [niveau2, niveau3].forEach(n => n.sort((a, b) => a.distance - b.distance));
 
-  const tous = [...niveau1, ...niveau2, ...niveau3, ...niveau4];
-  console.log(`[DISPATCH] 📊 ${tous.length} candidats (exclus: ${exclusions.length}) — N1:${niveau1.length} N2:${niveau2.length} N3:${niveau3.length} N4:${niveau4.length}`);
+  const tous = [...niveau1, ...niveau2, ...niveau3];
+  if (nbMarquesHorsLigne > 0) {
+    console.log(`[DISPATCH] 🚫 ${nbMarquesHorsLigne} livreur(s) marqué(s) hors_ligne (HB > 60 min)`);
+  }
+  console.log(`[DISPATCH] 📊 ${tous.length} candidats (exclus: ${exclusions.length}, hors_ligne: ${nbMarquesHorsLigne}) — N1:${niveau1.length} N2:${niveau2.length} N3:${niveau3.length}`);
   return tous;
 }
 
@@ -173,7 +186,7 @@ async function notifierLivreur(base44, courseId, course, livreur, timeoutSec) {
   const message = `Course à ${distanceSafe}km — ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`;
 
   const heartbeatAgeMin = livreur.heartbeatAgeMin;
-  const appActive = heartbeatAgeMin !== null && heartbeatAgeMin < 2;
+  const appActive = heartbeatAgeMin !== null && heartbeatAgeMin < 5; // N1: app active si HB < 5 min
 
   try {
     await base44.asServiceRole.entities.Notification.create({
