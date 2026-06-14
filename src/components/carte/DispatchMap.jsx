@@ -534,7 +534,18 @@ export default function DispatchMap({
   useEffect(() => {
     if (!mapRef.current || !position || !position.latitude || !position.longitude) return;
 
+    let cancelled = false;
+
     const inject = () => {
+      if (cancelled) {
+        console.log("[DispatchMap] Injection annulée — composant démonté");
+        return;
+      }
+      if (!mapRef.current) {
+        console.warn("[DispatchMap] Container DOM indisponible — annulation injection");
+        return;
+      }
+      
       console.log("[DispatchMap] Injection carte...");
       
       if (!document.getElementById("dmap-styles")) {
@@ -588,6 +599,10 @@ export default function DispatchMap({
       const script = document.createElement("script");
       script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
       script.onload = () => {
+        if (cancelled) {
+          console.log("[DispatchMap] Script Leaflet chargé après démontage — ignoré");
+          return;
+        }
         console.log("[DispatchMap] Script Leaflet chargé");
         inject();
       };
@@ -599,6 +614,7 @@ export default function DispatchMap({
     }
 
     return () => {
+      cancelled = true;
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;

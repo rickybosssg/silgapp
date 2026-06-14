@@ -17,6 +17,8 @@ export default function ModernMap({
   useEffect(() => {
     if (!mapRef.current || !position) return;
 
+    let cancelled = false;
+
     if (!window.L) {
       const link = document.createElement("link");
       link.rel = "stylesheet";
@@ -25,13 +27,20 @@ export default function ModernMap({
 
       const script = document.createElement("script");
       script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-      script.onload = () => initMap();
+      script.onload = () => {
+        if (cancelled) {
+          console.log("[ModernMap] Script Leaflet chargé après démontage — ignoré");
+          return;
+        }
+        initMap();
+      };
       document.head.appendChild(script);
     } else {
       initMap();
     }
 
     return () => {
+      cancelled = true;
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;

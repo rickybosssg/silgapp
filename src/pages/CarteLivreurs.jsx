@@ -65,6 +65,8 @@ function MapView({ livreurs, livreursInactifs = [], showInactifs = false, course
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
 
+    let cancelled = false;
+
     const link = document.createElement("link");
     link.rel = "stylesheet";
     link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
@@ -87,6 +89,10 @@ function MapView({ livreurs, livreursInactifs = [], showInactifs = false, course
     const script = document.createElement("script");
     script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
     script.onload = () => {
+      if (cancelled) {
+        console.log("[CarteLivreurs] Script Leaflet chargé après démontage — ignoré");
+        return;
+      }
       const L = window.L;
       if (!L || !mapRef.current || mapInstanceRef.current) return;
 
@@ -105,6 +111,7 @@ function MapView({ livreurs, livreursInactifs = [], showInactifs = false, course
     document.head.appendChild(script);
 
     return () => {
+      cancelled = true;
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
