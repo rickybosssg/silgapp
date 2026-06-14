@@ -29,7 +29,8 @@
         "SN",
         "ML",
         "GN",
-        "NE"
+        "NE",
+        "GH"
       ],
       "default": "BF",
       "description": "Pays de l'utilisateur"

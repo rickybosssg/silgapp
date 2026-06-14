@@ -208,7 +208,7 @@ async function notifierLivreur(base44, courseId, course, livreur, timeoutSec) {
       const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
       const fromRaw = Deno.env.get('TWILIO_WHATSAPP_FROM') || '';
       if (accountSid && authToken && fromRaw) {
-        const INDICATIFS = { BF: '+226', CI: '+225', TG: '+228', BJ: '+229', SN: '+221', ML: '+223', GN: '+224', NE: '+227' };
+        const INDICATIFS = { BF: '+226', CI: '+225', TG: '+228', BJ: '+229', SN: '+221', ML: '+223', GN: '+224', NE: '+227', GH: '+233' };
         const indicatif = INDICATIFS[livreur.country_code] || '+226';
         let tel = livreur.telephone.replace(/\s+/g, '').replace(/[^\d+]/g, '');
         if (!tel.startsWith('+')) tel = indicatif + tel;
@@ -491,11 +491,20 @@ Deno.serve(async (req) => {
         return Response.json({ success: false, error: 'Course expirée', expired: true });
       }
 
-      const PRIX_MIN = 1000;
+      // Prix minimum dynamique selon le pays
+      let PRIX_MIN = 1000; // default FCFA
+      try {
+        const countryConfig = await base44.asServiceRole.entities.Country.filter({ code: course.country_code, actif: true });
+        if (countryConfig?.[0]?.prix_minimum) {
+          PRIX_MIN = countryConfig[0].prix_minimum;
+        }
+      } catch (_) { /* fallback 1000 FCFA */ }
+      const deviseMin = course.devise || 'FCFA';
+
       if (pricing_mode === 'manual') {
         const montant = Number(manual_price);
         if (!montant || montant < PRIX_MIN) {
-          return Response.json({ success: false, error: `Prix minimum : ${PRIX_MIN} FCFA` }, { status: 400 });
+          return Response.json({ success: false, error: `Prix minimum : ${PRIX_MIN} ${deviseMin}` }, { status: 400 });
         }
       }
 

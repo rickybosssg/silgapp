@@ -14,6 +14,7 @@ export const PAYS_SILGAPP = [
   { code: "ML", nom: "Mali", indicatif: "+223", emoji_flag: "🇲🇱", devise: "FCFA", ville_principale: "Bamako" },
   { code: "GN", nom: "Guinée", indicatif: "+224", emoji_flag: "🇬🇳", devise: "GNF", ville_principale: "Conakry" },
   { code: "NE", nom: "Niger", indicatif: "+227", emoji_flag: "🇳🇪", devise: "FCFA", ville_principale: "Niamey" },
+  { code: "GH", nom: "Ghana", indicatif: "+233", emoji_flag: "🇬🇭", devise: "GHS", ville_principale: "Accra" },
 ];
 
 // Hook pour récupérer les pays actifs

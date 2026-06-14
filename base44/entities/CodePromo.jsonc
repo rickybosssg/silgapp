@@ -28,7 +28,8 @@
         "SN",
         "ML",
         "GN",
-        "NE"
+        "NE",
+        "GH"
       ],
       "default": "BF",
       "description": "Pays du code promo"

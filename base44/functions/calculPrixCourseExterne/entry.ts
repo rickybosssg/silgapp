@@ -10,6 +10,7 @@ const TARIFS_PAYS = {
   ML: { prix_par_km: 100, prix_minimum: 500,  commission_pct: 30, devise: "FCFA" },
   GN: { prix_par_km: 800, prix_minimum: 4000, commission_pct: 30, devise: "GNF"  },
   NE: { prix_par_km: 100, prix_minimum: 500,  commission_pct: 30, devise: "FCFA" },
+  GH: { prix_par_km: 2,   prix_minimum: 10,   commission_pct: 30, devise: "GHS"  },
 };
 
 function calculerDistance(lat1, lon1, lat2, lon2) {
