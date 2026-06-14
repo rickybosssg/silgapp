@@ -330,7 +330,7 @@ export default function DashboardAdminExterne() {
             {apkSaving ? "..." : "Sauver"}
           </Button>
           {apkUrl && (
-            <a href="/telecharger-app" target="_blank" rel="noreferrer">
+            <a href="/telecharger" target="_blank" rel="noreferrer">
               <Button size="sm" variant="outline" className="rounded-xl flex-shrink-0">
                 <ExternalLink className="w-3.5 h-3.5" />
               </Button>
