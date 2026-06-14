@@ -43,6 +43,13 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
   useEffect(() => {
     if (!enabled) return;
 
+    // 🔒 SECOURS WEB : heartbeat de présence toujours actif (30s)
+    // Garantit que last_seen_at est mis à jour même si le GPS natif échoue
+    intervalRef.current = setInterval(() => {
+      syncHeartbeat(position);
+    }, 30000);
+
+    // 🎯 GPS NATIF : précision haute fréquence (5s) si disponible
     if (isNativeMobile()) {
       let cancelled = false;
       startNativeLocationSync({
@@ -55,21 +62,15 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
       }).then((stop) => {
         if (cancelled) stop?.();
         else nativeStopRef.current = stop;
+      }).catch((error) => {
+        console.warn("[useHeartbeat] GPS natif indisponible — heartbeat web actif en secours:", error?.message);
       });
-
-      return () => {
-        cancelled = true;
-        nativeStopRef.current?.();
-        nativeStopRef.current = null;
-      };
     }
-
-    intervalRef.current = setInterval(() => {
-      syncHeartbeat(position);
-    }, 30000);
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      nativeStopRef.current?.();
+      nativeStopRef.current = null;
     };
   }, [enabled, user_type]);
 
