@@ -158,7 +158,7 @@ export default function ModernMap({
   }, [livreursProches]);
 
   const initMap = () => {
-    if (!window.L || !mapRef.current) return;
+    if (!window.L || !mapRef.current || !document.body.contains(mapRef.current)) return;
 
     // Créer la carte avec options premium
     const map = window.L.map(mapRef.current, {

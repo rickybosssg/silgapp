@@ -125,7 +125,13 @@ export default function PublicSuiviCourse({ token }) {
   useEffect(() => {
     if (!mapLoaded || !livreurPos) return;
 
-    const map = window.L.map("public-map").setView([livreurPos.lat, livreurPos.lng], 14);
+    const container = document.getElementById("public-map");
+    if (!container) {
+      console.warn("[PublicSuivi] Container #public-map non trouvé dans le DOM");
+      return;
+    }
+
+    const map = window.L.map(container).setView([livreurPos.lat, livreurPos.lng], 14);
 
     window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: '© OpenStreetMap contributors'

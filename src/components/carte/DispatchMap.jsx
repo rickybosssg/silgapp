@@ -541,8 +541,8 @@ export default function DispatchMap({
         console.log("[DispatchMap] Injection annulée — composant démonté");
         return;
       }
-      if (!mapRef.current) {
-        console.warn("[DispatchMap] Container DOM indisponible — annulation injection");
+      if (!mapRef.current || !document.body.contains(mapRef.current)) {
+        console.warn("[DispatchMap] Container DOM indisponible ou détaché — annulation injection");
         return;
       }
       

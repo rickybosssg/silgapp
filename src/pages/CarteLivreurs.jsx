@@ -94,7 +94,7 @@ function MapView({ livreurs, livreursInactifs = [], showInactifs = false, course
         return;
       }
       const L = window.L;
-      if (!L || !mapRef.current || mapInstanceRef.current) return;
+      if (!L || !mapRef.current || !document.body.contains(mapRef.current) || mapInstanceRef.current) return;
 
       const map = L.map(mapRef.current, { zoomControl: false }).setView([12.3714, -1.5197], 13);
       mapInstanceRef.current = map;
