@@ -346,14 +346,6 @@ export default function AdminCourseForm() {
 
       const course = await base44.entities.CourseExterne.create(courseData);
 
-      // Lancer dispatch auto
-      try {
-        await base44.functions.invoke("dispatchExterneAuto", {
-          action: "lancer_recherche_auto",
-          course_id: course.id,
-        });
-      } catch (e) { console.error("Erreur dispatch:", e); }
-
       toast.success("Course créée avec succès !");
       setCreatedCourse(course);
       setCreatedFormData(formData);
