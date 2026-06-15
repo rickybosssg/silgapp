@@ -684,6 +684,17 @@ Deno.serve(async (req) => {
         return Response.json({ success: true, message: 'Course déjà prise par un autre' });
       }
 
+      // 🚫 Ajouter le livreur aux exclus définitifs (tous les cycles)
+      let dejaNotifies = [];
+      try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
+      if (!dejaNotifies.includes(livreur_id)) {
+        dejaNotifies.push(livreur_id);
+        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+          dispatch_notified_ids: JSON.stringify(dejaNotifies),
+        });
+        console.log(`[DISPATCH] 🚫 Livreur ${livreur_id} ajouté aux exclus définitifs — course ${course_id}`);
+      }
+
       const etaitVerrouillee = course.livreur_id === livreur_id;
       if (etaitVerrouillee) {
         // Libérer le verrou
@@ -694,16 +705,13 @@ Deno.serve(async (req) => {
           livreur_nom: '',
           livreur_telephone: '',
         });
-        // Récupérer tous les déjà notifiés pour les exclure
-        let dejaNotifies = [];
-        try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
         const result = await lancerDispatchMulti(base44, course_id, dejaNotifies);
         if (result.noLivreur) return Response.json({ success: true, noLivreur: true });
         if (result.cycleEpuise) return Response.json({ success: true, cycle_epuise: true });
         return Response.json({ success: true, nb_notifies: result.nb_notifies });
       }
 
-      return Response.json({ success: true });
+      return Response.json({ success: true, exclu_definitif: true });
     }
 
     // ─── 5. Vérifier expiration & redispatch (avec exclusions cumulées) ──
