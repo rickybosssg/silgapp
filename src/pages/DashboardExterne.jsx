@@ -4,7 +4,6 @@ import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { MapPin, Package, Truck, Clock, CheckCircle2, XCircle, TrendingUp, ArrowLeft, Globe, Users, Zap, ChevronRight, Bell } from "lucide-react";
-
 import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
 import { usePaysActifs } from "@/components/international/CountrySelector.jsx";
@@ -21,7 +20,8 @@ import DownloadStatsPanel from "@/components/admin/DownloadStatsPanel";
 import StatDetailModal from "@/components/dashboard/StatDetailModal";
 import AppToggleButton from "@/components/admin/AppToggleButton";
 
-function KpiCard({ label, value, icon: Icon, color, suffix, onClick }) {
+function KpiCard({ label, value, color, suffix, onClick }) {
+  const Icon = arguments[0]?.icon;
   return (
     <button
       onClick={onClick}
@@ -32,7 +32,7 @@ function KpiCard({ label, value, icon: Icon, color, suffix, onClick }) {
       <div className="relative">
         <div className="flex items-center justify-between mb-3">
           <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
-            <Icon className="w-4 h-4 text-white" />
+            {Icon && <Icon className="w-4 h-4 text-white" />}
           </div>
           {onClick && <ChevronRight className="w-3.5 h-3.5 text-white/50 group-hover:text-white/80 transition-colors" />}
         </div>
@@ -100,11 +100,6 @@ export default function DashboardExterne() {
 
   const [filtreTypeDashboard, setFiltreTypeDashboard] = useState("tous");
 
-  const coursesFiltreesDashboard = useMemo(() => {
-    if (filtreTypeDashboard === "tous") return coursesFiltrees;
-    return coursesFiltrees.filter(c => c.type_course === filtreTypeDashboard);
-  }, [coursesFiltrees, filtreTypeDashboard]);
-
   const coursesTerminees = useMemo(
     () => coursesFiltrees.filter(c =>
       ["livree", "annulee"].includes(c.statut) &&
@@ -113,8 +108,6 @@ export default function DashboardExterne() {
     [coursesFiltrees]
   );
 
-  // Même critère que la carte dispatch : statut actif (disponible ou en_course) + validé + actif
-  // PAS de filtre heartbeat (isON) pour garantir la cohérence avec la carte
   const livreursEnLigne = useMemo(
     () => livreurs.filter(l =>
       (l.statut === "disponible" || l.statut === "en_course") &&
@@ -154,14 +147,13 @@ export default function DashboardExterne() {
     <div className="min-h-screen bg-slate-50">
       <div className="px-4 py-4 lg:px-6 lg:py-6 space-y-5 max-w-7xl mx-auto">
 
-        {/* ── HERO HEADER ─────────────────────────────────── */}
+        {/* HERO HEADER */}
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1877F2] via-[#166FE5] to-[#1877F2] p-5 sm:p-6 shadow-2xl shadow-[#1877F2]/30">
-          {/* Décoration */}
           <div className="absolute inset-0 overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-white/15 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
           </div>
-          
+
           <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <Link to="/">
@@ -186,7 +178,6 @@ export default function DashboardExterne() {
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
-              {/* Pill live */}
               <div className="flex items-center gap-2 bg-white/10 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white/70">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
                 {livreursEnLigne.length} livreur{livreursEnLigne.length > 1 ? "s" : ""} en ligne
@@ -219,7 +210,6 @@ export default function DashboardExterne() {
             </div>
           </div>
 
-          {/* Filtres type de course */}
           <div className="relative mt-4 flex gap-2 flex-wrap">
             {[
               { key: "tous", label: "Tous" },
@@ -241,7 +231,6 @@ export default function DashboardExterne() {
             ))}
           </div>
 
-          {/* Mini KPIs dans le hero */}
           <div className="relative mt-4 grid grid-cols-4 gap-3">
             {[
               { label: "Aujourd'hui", value: stats.total, color: "text-white" },
@@ -257,7 +246,7 @@ export default function DashboardExterne() {
           </div>
         </div>
 
-        {/* ── KPI CARDS ───────────────────────────────────── */}
+        {/* KPI CARDS */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
           <KpiCard label="Clients" value={compteursClients.total} icon={Users} color="bg-gradient-to-br from-violet-500 to-purple-600" onClick={() => setStatModal({ type: "clients", data: clients })} />
           <KpiCard label="Courses" value={stats.total} icon={Package} color="bg-gradient-to-br from-blue-500 to-indigo-600" />
@@ -268,17 +257,17 @@ export default function DashboardExterne() {
           <KpiCard label="Disponibles" value={stats.libres} icon={Truck} color="bg-gradient-to-br from-primary to-red-600" onClick={() => setStatModal({ type: "livreurs_dispo", data: livreursEnLigne.filter(l => l.statut === "disponible") })} />
         </div>
 
-        {/* ── TÉLÉCHARGEMENTS ─────────────────────────────── */}
+        {/* TÉLÉCHARGEMENTS */}
         <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
           <DownloadStatsPanel />
         </div>
 
-        {/* ── CODES PROMO ─────────────────────────────────── */}
+        {/* CODES PROMO */}
         <div className="bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm">
           <CodePromoPanel />
         </div>
 
-        {/* ── ACTIVITÉ ─────────────────────────────────────── */}
+        {/* ACTIVITÉ */}
         <div>
           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">Activité en direct</p>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -291,7 +280,7 @@ export default function DashboardExterne() {
           </div>
         </div>
 
-        {/* ── COURSES EN COURS ────────────────────────────── */}
+        {/* COURSES EN COURS */}
         <div>
           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">Courses en cours</p>
           <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
@@ -303,7 +292,7 @@ export default function DashboardExterne() {
           </div>
         </div>
 
-        {/* ── HISTORIQUE DU JOUR ──────────────────────────── */}
+        {/* HISTORIQUE DU JOUR */}
         <div>
           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">Historique du jour</p>
           <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
@@ -316,7 +305,6 @@ export default function DashboardExterne() {
 
       </div>
 
-      {/* Dialogs */}
       <CourseDetailDialog
         course={selectedCourse}
         open={!!selectedCourse}
