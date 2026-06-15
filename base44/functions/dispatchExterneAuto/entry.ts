@@ -435,6 +435,10 @@ Deno.serve(async (req) => {
       }
 
       if (course.dispatch_status === 'accepte') {
+        // 🔧 CORRECTION : distinguer "j'ai accepté" vs "un autre a accepté"
+        if (String(course.livreur_id) === String(livreur_id) || String(course.accepted_by_livreur_id) === String(livreur_id)) {
+          return Response.json({ found: false, you_accepted: true, taken_by: course.livreur_id });
+        }
         return Response.json({ found: false, already_taken: true, taken_by: course.livreur_id });
       }
 
@@ -522,6 +526,20 @@ Deno.serve(async (req) => {
         existing_livreur_id: courseFinal.livreur_id || '',
         accepted_by_livreur_id: courseFinal.accepted_by_livreur_id || '',
       });
+      
+      // 🔧 CORRECTION : si le verrou est déjà posé mais par CE MÊME livreur → succès (requête concurrente du même client)
+      const dejaVerrouilleParMoi = 
+        (courseFinal.livreur_id && String(courseFinal.livreur_id) === String(livreur_id)) ||
+        (courseFinal.accepted_by_livreur_id && String(courseFinal.accepted_by_livreur_id) === String(livreur_id));
+      
+      if (dejaVerrouilleParMoi) {
+        console.log(`[DISPATCH] 🔒 Course ${course_id} déjà verrouillée par le même livreur ${livreur_id} — succès confirmé`);
+        return Response.json({ 
+          success: true, accepted: true, course_id, livreur_id,
+          already_accepted: true,
+        });
+      }
+      
       if (courseFinal.dispatch_status !== 'propose' || courseFinal.livreur_id || courseFinal.accepted_by_livreur_id) {
         return Response.json(reponseDejaPrise('final_check_already_taken', courseFinal));
       }

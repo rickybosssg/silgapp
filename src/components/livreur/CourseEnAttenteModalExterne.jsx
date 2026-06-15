@@ -105,6 +105,10 @@ export default function CourseEnAttenteModalExterne({
           livreur_id: livreurId,
         });
         const d = data?.data;
+        // 🔧 CORRECTION : si c'est NOUS qui avons accepté, ne pas afficher "Course déjà prise"
+        if (d?.you_accepted) {
+          return; // Tout va bien, on attend que onAccepter() soit appelé par handleAccepterAuto
+        }
         if (d?.already_taken || (d?.found === false && !d?.expired)) {
           stopUrgentCourseAlert("course-already-taken");
           setCourseDejaPrise(true);
@@ -143,6 +147,12 @@ export default function CourseEnAttenteModalExterne({
       });
       const data = res?.data;
 
+      // 🔧 CORRECTION : already_accepted = requête concurrente du même livreur déjà traitée
+      if (data?.already_accepted) {
+        stopUrgentCourseAlert("course-accepted");
+        onAccepter();
+        return;
+      }
       if (data?.already_taken || data?.reason === "already_taken") { stopUrgentCourseAlert("course-already-taken"); setCourseDejaPrise(true); return; }
       if (data?.expired) { stopUrgentCourseAlert("course-expired"); setCourseExpiree(true); return; }
       if (data?.success && data?.accepted !== false) {
@@ -173,6 +183,13 @@ export default function CourseEnAttenteModalExterne({
       });
       const data = res?.data;
 
+      // 🔧 CORRECTION : already_accepted = requête concurrente du même livreur déjà traitée
+      if (data?.already_accepted) {
+        stopUrgentCourseAlert("course-accepted-manual");
+        setShowManualPriceModal(false);
+        onAccepter(true); // pending_client_validation = true (mode manuel)
+        return;
+      }
       if (data?.already_taken || data?.reason === "already_taken") { stopUrgentCourseAlert("course-already-taken"); setCourseDejaPrise(true); return; }
       if (data?.expired) { stopUrgentCourseAlert("course-expired"); setCourseExpiree(true); return; }
       if (data?.success && data?.accepted !== false) {
