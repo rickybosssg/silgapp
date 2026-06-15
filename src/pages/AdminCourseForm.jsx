@@ -5,10 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, MapPin, Package, Send, User, Loader2 } from "lucide-react";
+import { ArrowLeft, MapPin, Package, Send, Loader2, Sparkles } from "lucide-react";
 import { useAdminContext } from "@/hooks/useAdminContext";
 
-// Génère QR tokens et PIN codes
 function generarQRData() {
   const pickupQrToken = crypto.randomUUID().replace(/-/g, "");
   const deliveryQrToken = crypto.randomUUID().replace(/-/g, "");
@@ -17,9 +16,27 @@ function generarQRData() {
   return { pickupQrToken, deliveryQrToken, pickupCode4, deliveryCode4 };
 }
 
+const PAYS = [
+  { code: "BF", nom: "Burkina Faso", drapeau: "🇧🇫" },
+  { code: "CI", nom: "Côte d'Ivoire", drapeau: "🇨🇮" },
+  { code: "TG", nom: "Togo", drapeau: "🇹🇬" },
+  { code: "BJ", nom: "Bénin", drapeau: "🇧🇯" },
+  { code: "SN", nom: "Sénégal", drapeau: "🇸🇳" },
+  { code: "ML", nom: "Mali", drapeau: "🇲🇱" },
+  { code: "GN", nom: "Guinée", drapeau: "🇬🇳" },
+  { code: "NE", nom: "Niger", drapeau: "🇳🇪" },
+  { code: "GH", nom: "Ghana", drapeau: "🇬🇭" },
+];
+
+const TYPE_OPTIONS = [
+  { key: "expedier", label: "Expédition", icon: "📦", desc: "Envoyer un colis" },
+  { key: "recevoir", label: "Réception", icon: "📥", desc: "Récupérer un colis" },
+  { key: "deplacement", label: "Déplacement", icon: "👤", desc: "Transport personne" },
+];
+
 export default function AdminCourseForm() {
   const navigate = useNavigate();
-  const { countryCode: adminCountryCode, isPays } = useAdminContext();
+  const { countryCode: adminCountryCode } = useAdminContext();
   const [submitting, setSubmitting] = useState(false);
 
   const [typeCourse, setTypeCourse] = useState("expedier");
@@ -37,12 +54,10 @@ export default function AdminCourseForm() {
   const [destinataireTelephone, setDestinataireTelephone] = useState("");
   const [typeColis, setTypeColis] = useState("petit_colis");
   const [notes, setNotes] = useState("");
-  const [ville, setVille] = useState("");
+
+  const selectedPays = PAYS.find(p => p.code === countryCode);
 
   const handleSubmit = async () => {
-    if (!adresseDepart.trim()) { toast.error("Point de départ requis"); return; }
-    if (!adresseArrivee.trim()) { toast.error("Point d'arrivée requis"); return; }
-
     setSubmitting(true);
     try {
       const { pickupQrToken, deliveryQrToken, pickupCode4, deliveryCode4 } = generarQRData();
@@ -51,10 +66,8 @@ export default function AdminCourseForm() {
         country_code: countryCode,
         source: "admin",
         type_course: typeCourse,
-        adresse_depart: adresseDepart.trim(),
-        adresse_arrivee: adresseArrivee.trim(),
-        ville_depart: ville || null,
-        ville_arrivee: ville || null,
+        adresse_depart: adresseDepart.trim() || "—",
+        adresse_arrivee: adresseArrivee.trim() || "—",
         client_nom: clientNom.trim() || "Client",
         client_telephone: clientTelephone.trim() || "",
         expediteur_nom: expediteurNom.trim() || null,
@@ -71,7 +84,6 @@ export default function AdminCourseForm() {
         pickup_code_4_digits: pickupCode4,
         delivery_qr_token: deliveryQrToken,
         delivery_code_4_digits: deliveryCode4,
-        // Passager (déplacement)
         passager_nom: typeCourse === "deplacement" ? (clientNom.trim() || "Passager") : null,
         passager_telephone: typeCourse === "deplacement" ? (clientTelephone.trim() || null) : null,
         nb_passagers: typeCourse === "deplacement" ? 1 : null,
@@ -80,18 +92,13 @@ export default function AdminCourseForm() {
       const course = await base44.entities.CourseExterne.create(courseData);
       toast.success("Course créée avec succès !");
 
-      // Lancer dispatch auto
       try {
         await base44.functions.invoke("dispatchExterneAuto", {
           action: "lancer_recherche_auto",
           course_id: course.id,
         });
-      } catch (e) {
-        console.error("Erreur dispatch:", e);
-      }
+      } catch (e) { console.error("Erreur dispatch:", e); }
 
-      // Envoyer WhatsApp auto si numéros renseignés
-      const whatsappPayload = { course_id: course.id };
       if (expediteurTelephone.trim() || clientTelephone.trim()) {
         try {
           await base44.functions.invoke("sendCourseWhatsApp", {
@@ -117,234 +124,241 @@ export default function AdminCourseForm() {
     }
   };
 
-  const PAYS = [
-    { code: "BF", nom: "Burkina Faso", drapeau: "🇧🇫" },
-    { code: "CI", nom: "Côte d'Ivoire", drapeau: "🇨🇮" },
-    { code: "TG", nom: "Togo", drapeau: "🇹🇬" },
-    { code: "BJ", nom: "Bénin", drapeau: "🇧🇯" },
-    { code: "SN", nom: "Sénégal", drapeau: "🇸🇳" },
-    { code: "ML", nom: "Mali", drapeau: "🇲🇱" },
-    { code: "GN", nom: "Guinée", drapeau: "🇬🇳" },
-    { code: "NE", nom: "Niger", drapeau: "🇳🇪" },
-    { code: "GH", nom: "Ghana", drapeau: "🇬🇭" },
-  ];
-
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-lg mx-auto space-y-5">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <Link to="/admin/externe">
-            <Button variant="outline" size="sm" className="h-10 w-10 p-0 rounded-xl">
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-xl font-black text-foreground">Nouvelle course</h1>
-            <p className="text-xs text-muted-foreground">Création manuelle par l'administrateur</p>
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100/50">
+      <div className="max-w-xl mx-auto px-4 py-6 space-y-6">
+
+        {/* ── Header Premium ── */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 p-5 shadow-xl shadow-slate-200">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-primary/20 to-transparent rounded-bl-full" />
+          <div className="absolute bottom-0 left-1/2 w-40 h-20 bg-gradient-to-t from-emerald-500/10 to-transparent rounded-t-full" />
+          <div className="relative flex items-center gap-4">
+            <Link to="/admin/externe">
+              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10">
+                <ArrowLeft className="w-4 h-4 text-white" />
+              </Button>
+            </Link>
+            <div>
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-amber-400" />
+                <h1 className="text-xl font-black text-white">Nouvelle course</h1>
+              </div>
+              <p className="text-xs text-white/50">Création manuelle administrateur</p>
+            </div>
           </div>
         </div>
 
-        {/* Formulaire */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
-          {/* Type de course */}
-          <div>
-            <p className="text-xs font-bold text-gray-600 mb-2">Type de course *</p>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { key: "expedier", label: "Expédition", icon: "📦" },
-                { key: "recevoir", label: "Réception", icon: "📥" },
-                { key: "deplacement", label: "Déplacement", icon: "👤" },
-              ].map(t => (
+        {/* ── Type de course ── */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-5 pt-5 pb-1">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Type de course</p>
+          </div>
+          <div className="px-5 pb-5">
+            <div className="grid grid-cols-3 gap-2.5">
+              {TYPE_OPTIONS.map(t => (
                 <button
                   key={t.key}
                   type="button"
                   onClick={() => setTypeCourse(t.key)}
-                  className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all ${
+                  className={`flex flex-col items-center gap-1.5 p-4 rounded-xl border-2 transition-all duration-200 ${
                     typeCourse === t.key
-                      ? "border-primary bg-primary/5 shadow-sm"
-                      : "border-gray-200 hover:border-gray-300"
+                      ? "border-primary bg-primary/5 shadow-md shadow-primary/10 scale-[1.02]"
+                      : "border-gray-100 hover:border-gray-200 hover:bg-gray-50"
                   }`}
                 >
-                  <span className="text-xl">{t.icon}</span>
-                  <span className={`text-xs font-bold ${typeCourse === t.key ? "text-primary" : "text-gray-600"}`}>
+                  <span className="text-2xl">{t.icon}</span>
+                  <span className={`text-xs font-bold ${typeCourse === t.key ? "text-primary" : "text-gray-700"}`}>
                     {t.label}
+                  </span>
+                  <span className={`text-[10px] ${typeCourse === t.key ? "text-primary/60" : "text-gray-400"}`}>
+                    {t.desc}
                   </span>
                 </button>
               ))}
             </div>
           </div>
+        </div>
+
+        {/* ── Informations principales ── */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Détails</p>
 
           {/* Pays */}
           <div>
-            <p className="text-xs font-bold text-gray-600 mb-2">Pays *</p>
+            <p className="text-xs font-semibold text-gray-500 mb-1.5">Pays</p>
             <Select value={countryCode} onValueChange={setCountryCode}>
-              <SelectTrigger className="rounded-xl">
-                <SelectValue />
+              <SelectTrigger className="rounded-xl h-12 bg-gray-50 border-gray-200 text-sm">
+                <SelectValue>
+                  {selectedPays ? `${selectedPays.drapeau}  ${selectedPays.nom}` : "Choisir un pays"}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {PAYS.map(p => (
                   <SelectItem key={p.code} value={p.code}>
-                    {p.drapeau} {p.nom}
+                    {p.drapeau}  {p.nom}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Adresses */}
+          {/* Point de départ */}
           <div>
-            <p className="text-xs font-bold text-gray-600 mb-2">Point de départ *</p>
-            <Input
-              value={adresseDepart}
-              onChange={e => setAdresseDepart(e.target.value)}
-              placeholder="Ex: Ouaga 2000, face à la mairie"
-              className="rounded-xl"
-            />
+            <p className="text-xs font-semibold text-gray-500 mb-1.5">Point de départ</p>
+            <div className="relative">
+              <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+              <Input
+                value={adresseDepart}
+                onChange={e => setAdresseDepart(e.target.value)}
+                placeholder="Ex: Ouaga 2000, face à la mairie"
+                className="rounded-xl h-12 pl-10 bg-gray-50 border-gray-200 text-sm"
+              />
+            </div>
           </div>
 
+          {/* Point d'arrivée */}
           <div>
-            <p className="text-xs font-bold text-gray-600 mb-2">Point d'arrivée *</p>
-            <Input
-              value={adresseArrivee}
-              onChange={e => setAdresseArrivee(e.target.value)}
-              placeholder="Ex: Gounghin, derrière le marché"
-              className="rounded-xl"
-            />
+            <p className="text-xs font-semibold text-gray-500 mb-1.5">Point d'arrivée</p>
+            <div className="relative">
+              <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+              <Input
+                value={adresseArrivee}
+                onChange={e => setAdresseArrivee(e.target.value)}
+                placeholder="Ex: Gounghin, derrière le marché"
+                className="rounded-xl h-12 pl-10 bg-gray-50 border-gray-200 text-sm"
+              />
+            </div>
           </div>
 
-          {/* Ville */}
-          <div>
-            <p className="text-xs font-bold text-gray-600 mb-2">Ville</p>
-            <Input
-              value={ville}
-              onChange={e => setVille(e.target.value)}
-              placeholder="Ex: Ouagadougou"
-              className="rounded-xl"
-            />
-          </div>
+          {/* Type de colis (pas pour déplacement) */}
+          {typeCourse !== "deplacement" && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 mb-1.5">Type de colis</p>
+              <Select value={typeColis} onValueChange={setTypeColis}>
+                <SelectTrigger className="rounded-xl h-12 bg-gray-50 border-gray-200 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="petit_colis">📦  Petit colis</SelectItem>
+                  <SelectItem value="moyen_colis">📦  Moyen colis</SelectItem>
+                  <SelectItem value="gros_colis">📦  Gros colis</SelectItem>
+                  <SelectItem value="document">📄  Document</SelectItem>
+                  <SelectItem value="nourriture">🍽️  Nourriture</SelectItem>
+                  <SelectItem value="autre">📋  Autre</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
 
-          {/* Separator */}
-          <div className="border-t pt-3">
-            <p className="text-xs font-bold text-gray-400 uppercase mb-3">Informations optionnelles</p>
+        {/* ── Contacts (optionnel) ── */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Contacts</p>
+            <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">Optionnel</span>
           </div>
 
           {/* Client */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <p className="text-[10px] text-gray-500 mb-1">Nom</p>
+              <p className="text-[10px] text-gray-400 mb-1">Nom du client</p>
               <Input
                 value={clientNom}
                 onChange={e => setClientNom(e.target.value)}
-                placeholder="Nom client"
-                className="rounded-xl text-sm"
+                placeholder="Nom"
+                className="rounded-xl h-11 bg-gray-50 border-gray-200 text-sm"
               />
             </div>
             <div>
-              <p className="text-[10px] text-gray-500 mb-1">Téléphone</p>
+              <p className="text-[10px] text-gray-400 mb-1">Téléphone client</p>
               <Input
                 value={clientTelephone}
                 onChange={e => setClientTelephone(e.target.value)}
-                placeholder="+226..."
-                className="rounded-xl text-sm"
+                placeholder="+226 XXXXXXXX"
+                className="rounded-xl h-11 bg-gray-50 border-gray-200 text-sm"
               />
             </div>
           </div>
 
           {/* Expéditeur / Destinataire selon type */}
           {typeCourse === "recevoir" ? (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <p className="text-[10px] text-gray-500 mb-1">Expéditeur (nom)</p>
-                  <Input
-                    value={expediteurNom}
-                    onChange={e => setExpediteurNom(e.target.value)}
-                    placeholder="Nom expéditeur"
-                    className="rounded-xl text-sm"
-                  />
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-500 mb-1">Tél. expéditeur</p>
-                  <Input
-                    value={expediteurTelephone}
-                    onChange={e => setExpediteurTelephone(e.target.value)}
-                    placeholder="+226..."
-                    className="rounded-xl text-sm"
-                  />
-                </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-[10px] text-gray-400 mb-1">Expéditeur</p>
+                <Input
+                  value={expediteurNom}
+                  onChange={e => setExpediteurNom(e.target.value)}
+                  placeholder="Nom expéditeur"
+                  className="rounded-xl h-11 bg-gray-50 border-gray-200 text-sm"
+                />
               </div>
-            </>
-          ) : typeCourse === "expedier" ? (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <p className="text-[10px] text-gray-500 mb-1">Destinataire (nom)</p>
-                  <Input
-                    value={destinataireNom}
-                    onChange={e => setDestinataireNom(e.target.value)}
-                    placeholder="Nom destinataire"
-                    className="rounded-xl text-sm"
-                  />
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-500 mb-1">Tél. destinataire</p>
-                  <Input
-                    value={destinataireTelephone}
-                    onChange={e => setDestinataireTelephone(e.target.value)}
-                    placeholder="+226..."
-                    className="rounded-xl text-sm"
-                  />
-                </div>
+              <div>
+                <p className="text-[10px] text-gray-400 mb-1">Tél. expéditeur</p>
+                <Input
+                  value={expediteurTelephone}
+                  onChange={e => setExpediteurTelephone(e.target.value)}
+                  placeholder="+226 XXXXXXXX"
+                  className="rounded-xl h-11 bg-gray-50 border-gray-200 text-sm"
+                />
               </div>
-            </>
-          ) : null}
-
-          {/* Type colis (pas pour déplacement) */}
-          {typeCourse !== "deplacement" && (
-            <div>
-              <p className="text-[10px] text-gray-500 mb-1">Type de colis</p>
-              <Select value={typeColis} onValueChange={setTypeColis}>
-                <SelectTrigger className="rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="petit_colis">Petit colis</SelectItem>
-                  <SelectItem value="moyen_colis">Moyen colis</SelectItem>
-                  <SelectItem value="gros_colis">Gros colis</SelectItem>
-                  <SelectItem value="document">Document</SelectItem>
-                  <SelectItem value="nourriture">Nourriture</SelectItem>
-                  <SelectItem value="autre">Autre</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
-          )}
+          ) : typeCourse === "expedier" ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-[10px] text-gray-400 mb-1">Destinataire</p>
+                <Input
+                  value={destinataireNom}
+                  onChange={e => setDestinataireNom(e.target.value)}
+                  placeholder="Nom destinataire"
+                  className="rounded-xl h-11 bg-gray-50 border-gray-200 text-sm"
+                />
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-400 mb-1">Tél. destinataire</p>
+                <Input
+                  value={destinataireTelephone}
+                  onChange={e => setDestinataireTelephone(e.target.value)}
+                  placeholder="+226 XXXXXXXX"
+                  className="rounded-xl h-11 bg-gray-50 border-gray-200 text-sm"
+                />
+              </div>
+            </div>
+          ) : null}
 
           {/* Notes */}
           <div>
-            <p className="text-[10px] text-gray-500 mb-1">Notes / Observations</p>
+            <p className="text-[10px] text-gray-400 mb-1">Notes</p>
             <Input
               value={notes}
               onChange={e => setNotes(e.target.value)}
               placeholder="Instructions particulières..."
-              className="rounded-xl text-sm"
+              className="rounded-xl h-11 bg-gray-50 border-gray-200 text-sm"
             />
           </div>
-
-          {/* Submit */}
-          <Button
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="w-full h-12 rounded-xl gap-2 font-bold text-base"
-          >
-            {submitting ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <Send className="w-5 h-5" />
-            )}
-            {submitting ? "Création..." : "Créer la course"}
-          </Button>
         </div>
+
+        {/* ── Bouton Créer ── */}
+        <Button
+          onClick={handleSubmit}
+          disabled={submitting}
+          className="w-full h-14 rounded-2xl gap-2.5 font-bold text-base bg-gradient-to-r from-primary via-red-600 to-rose-600 hover:from-primary/90 hover:to-rose-600/90 shadow-lg shadow-red-200 transition-all active:scale-[0.98]"
+        >
+          {submitting ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Création en cours...
+            </>
+          ) : (
+            <>
+              <Send className="w-5 h-5" />
+              Créer la course
+            </>
+          )}
+        </Button>
+
+        <p className="text-center text-[11px] text-gray-400 pb-6">
+          La course sera automatiquement proposée aux livreurs disponibles
+        </p>
       </div>
     </div>
   );
