@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -15,59 +16,128 @@ import {
   Download,
   Star,
   Truck,
-  QrCode
+  QrCode,
+  AlertCircle,
+  Search
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import QRCodeDisplay from "@/components/client/QRCodeDisplay";
 
 const APK_DOWNLOAD_URL = "/telecharger-app";
+const LOADING_TIMEOUT_MS = 8000; // 8 secondes max avant d'afficher une erreur
 
-export default function PublicSuiviCourse({ token }) {
+export default function PublicSuiviCourse() {
+  // 🔧 CORRECTION : lire le token depuis l'URL via useParams (React Router v6)
+  const { token } = useParams();
   const [course, setCourse] = useState(null);
+  const [error, setError] = useState(null);       // "not_found" | "timeout" | "server_error"
+  const [loading, setLoading] = useState(true);
   const [mapLoaded, setMapLoaded] = useState(false);
-  const [livreurPos, setLivreurPos] = useState(null); // Position live du livreur
+  const [livreurPos, setLivreurPos] = useState(null);
 
-  // Récupérer la course par token ou par ID direct
+  // Récupérer la course avec timeout
   useEffect(() => {
+    if (!token) {
+      console.warn("[PublicSuivi] ❌ Aucun token dans l'URL");
+      setError("not_found");
+      setLoading(false);
+      return;
+    }
+
+    console.log("[PublicSuivi] 🔍 Token reçu:", token);
+
+    let cancelled = false;
+    let timeoutId = null;
+
     async function fetchCourse() {
       try {
-        // Chercher par tracking_token d'abord, puis par id
-        let courses = await base44.entities.CourseExterne.filter({
-          tracking_token: token
+        console.log("[PublicSuivi] 📡 Recherche course...");
+
+        // Timeout de sécurité : si la requête prend plus de 8s, afficher erreur
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error("TIMEOUT")), LOADING_TIMEOUT_MS);
         });
-        
-        // Fallback : chercher par ID
+
+        // Chercher d'abord par tracking_token
+        let courses = await Promise.race([
+          base44.entities.CourseExterne.filter({ tracking_token: token }),
+          timeoutPromise.then(() => { throw new Error("TIMEOUT"); }),
+        ]);
+
+        if (cancelled) return;
+        clearTimeout(timeoutId);
+
+        // Fallback : chercher par ID direct
         if (!courses || courses.length === 0) {
+          console.log("[PublicSuivi] 🔄 Pas trouvé par tracking_token, essai par ID:", token);
           try {
             const byId = await base44.entities.CourseExterne.get(token);
-            if (byId) courses = [byId];
-          } catch (_) {}
+            if (byId) {
+              courses = [byId];
+              console.log("[PublicSuivi] ✅ Course trouvée par ID:", byId.id);
+            }
+          } catch (idErr) {
+            console.warn("[PublicSuivi] ⚠️ Erreur recherche par ID:", idErr?.message || idErr);
+          }
+        } else {
+          console.log("[PublicSuivi] ✅ Course trouvée par tracking_token");
         }
+
+        if (cancelled) return;
 
         if (courses && courses.length > 0) {
+          console.log("[PublicSuivi] 🎉 Course chargée:", courses[0].id, "statut:", courses[0].statut);
           setCourse(courses[0]);
+          setError(null);
+        } else {
+          console.warn("[PublicSuivi] ❌ Aucune course trouvée pour le token:", token);
+          setError("not_found");
         }
       } catch (err) {
-        console.error("Erreur fetch course:", err);
+        if (cancelled) return;
+        console.error("[PublicSuivi] 💥 Erreur:", err?.message || err);
+
+        if (err?.message === "TIMEOUT") {
+          setError("timeout");
+        } else {
+          setError("server_error");
+        }
+      } finally {
+        if (!cancelled) {
+          clearTimeout(timeoutId);
+          setLoading(false);
+        }
       }
     }
-    
+
+    setLoading(true);
+    setError(null);
+    setCourse(null);
     fetchCourse();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
   }, [token]);
 
-  // Rafraîchir toutes les 10 secondes
+  // Rafraîchir toutes les 10 secondes (seulement si course trouvée)
   const { data: freshCourse } = useQuery({
     queryKey: ["public-course", token],
     queryFn: async () => {
-      const courses = await base44.entities.CourseExterne.filter({
-        tracking_token: token
-      });
-      return courses?.[0] || null;
+      const courses = await base44.entities.CourseExterne.filter({ tracking_token: token });
+      if (!courses || courses.length === 0) {
+        try {
+          const byId = await base44.entities.CourseExterne.get(token);
+          return byId || null;
+        } catch (_) { return null; }
+      }
+      return courses[0] || null;
     },
     initialData: null,
     refetchInterval: 10000,
-    enabled: !!course,
+    enabled: !!course && !error,
   });
 
   useEffect(() => {
@@ -157,12 +227,102 @@ export default function PublicSuiviCourse({ token }) {
     return () => { map.remove(); };
   }, [mapLoaded, livreurPos]);
 
-  if (!course) {
+  // ── ÉCRAN : Erreur serveur ──
+  if (error === "server_error") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-red-50 px-4">
+        <Card className="max-w-md w-full p-8 text-center border-red-200 shadow-lg">
+          <div className="w-16 h-16 rounded-2xl bg-red-100 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-8 h-8 text-red-600" />
+          </div>
+          <h1 className="text-xl font-black text-red-900 mb-2">Erreur de chargement</h1>
+          <p className="text-sm text-red-700 mb-6">
+            Impossible de charger les informations de suivi pour le moment. 
+            Veuillez réessayer dans quelques instants.
+          </p>
+          <p className="text-xs text-red-500 mb-6 font-mono bg-red-100 rounded-lg px-3 py-2 break-all">
+            ID : {token || "—"}
+          </p>
+          <Button 
+            onClick={() => window.location.reload()}
+            className="w-full bg-red-600 hover:bg-red-700 text-white"
+          >
+            Réessayer
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
+  // ── ÉCRAN : Timeout ──
+  if (error === "timeout") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-amber-50 px-4">
+        <Card className="max-w-md w-full p-8 text-center border-amber-200 shadow-lg">
+          <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center mx-auto mb-4">
+            <Clock className="w-8 h-8 text-amber-600" />
+          </div>
+          <h1 className="text-xl font-black text-amber-900 mb-2">Délai dépassé</h1>
+          <p className="text-sm text-amber-700 mb-6">
+            Le chargement des informations prend trop de temps. 
+            Vérifiez votre connexion internet et réessayez.
+          </p>
+          <p className="text-xs text-amber-500 mb-6 font-mono bg-amber-100 rounded-lg px-3 py-2 break-all">
+            ID : {token || "—"}
+          </p>
+          <Button 
+            onClick={() => window.location.reload()}
+            className="w-full bg-amber-600 hover:bg-amber-700 text-white"
+          >
+            Réessayer
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
+  // ── ÉCRAN : Course introuvable ──
+  if (error === "not_found") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <Card className="max-w-md w-full p-8 text-center border-gray-200 shadow-lg">
+          <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+            <Search className="w-8 h-8 text-gray-400" />
+          </div>
+          <h1 className="text-xl font-black text-gray-900 mb-2">Course introuvable</h1>
+          <p className="text-sm text-gray-500 mb-6">
+            Aucune course ne correspond à cet identifiant. 
+            Vérifiez le lien ou contactez l'expéditeur.
+          </p>
+          <p className="text-xs text-gray-400 mb-6 font-mono bg-gray-100 rounded-lg px-3 py-2 break-all">
+            ID : {token || "—"}
+          </p>
+          <a href={APK_DOWNLOAD_URL}>
+            <Button className="w-full bg-primary hover:bg-primary/90 text-white">
+              <Download className="w-4 h-4 mr-2" />
+              Télécharger SILGAPP
+            </Button>
+          </a>
+        </Card>
+      </div>
+    );
+  }
+
+  // ── ÉCRAN : Chargement (avec spinner temporisé) ──
+  if (loading || !course) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-600">Chargement du suivi...</p>
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <Package className="w-8 h-8 text-primary" />
+          </div>
+          <p className="text-gray-600 font-semibold">Chargement du suivi...</p>
+          <p className="text-xs text-gray-400 mt-2 font-mono">{token || "..."}</p>
+          <div className="mt-4 flex justify-center gap-1">
+            {[0, 1, 2].map(i => (
+              <div key={i} className="w-2 h-2 rounded-full bg-primary/30 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+            ))}
+          </div>
         </div>
       </div>
     );
