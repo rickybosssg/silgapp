@@ -125,6 +125,24 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const [prixManuelReponse, setPrixManuelReponse] = useState(null); // { accepted, prix, devise }
   const prixManuelWatchedRef = useRef({}); // track les course_id déjà notifiés
 
+  // Système anti-réapparition : courses écartées (refusées, expirées, déjà prises)
+  const dismissedCourseIdsRef = useRef({}); // { courseId: timestamp }
+  const DISMISS_TTL_MS = 120000; // 2 min — après ce délai, la course peut réapparaître si reproposée
+
+  const dismissCourse = (courseId) => {
+    if (courseId) dismissedCourseIdsRef.current[courseId] = Date.now();
+  };
+
+  const isCourseDismissed = (courseId) => {
+    const ts = dismissedCourseIdsRef.current[courseId];
+    if (!ts) return false;
+    if (Date.now() - ts > DISMISS_TTL_MS) {
+      delete dismissedCourseIdsRef.current[courseId];
+      return false;
+    }
+    return true;
+  };
+
   // Pull-to-refresh
   const { pulling, refreshing } = usePullToRefresh(async () => {
     await queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
@@ -491,7 +509,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   );
 
   const courseEnAttente = useMemo(() => {
-    const waiting = courseCandidates.find((course) => isCourseWaitingForLivreur(course, livreurId)) || null;
+    const waiting = courseCandidates.find((course) => {
+      if (isCourseDismissed(course.id)) return false; // déjà écartée par le livreur
+      return isCourseWaitingForLivreur(course, livreurId);
+    }) || null;
     if (waiting) {
       logAcceptationLivreur("modal-triggered", {
         course_id: waiting.id,
@@ -715,6 +736,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   };
 
   const handleRefuser = () => {
+    // Écarter définitivement cette course (empêche la modale de réapparaître)
+    if (courseEnAttente?.id) dismissCourse(courseEnAttente.id);
     setNotificationCourseCandidate(null);
     setNotificationCourseId(null);
     setCourseProposeeDirecte(null);
@@ -724,6 +747,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   };
 
   const handleCourseDejaPrise = (source = "accept") => {
+    // Écarter la course pour éviter qu'elle réapparaisse
+    if (courseEnAttente?.id) dismissCourse(courseEnAttente.id);
     setNotificationCourseCandidate(null);
     setNotificationCourseId(null);
     setCourseProposeeDirecte(null);
@@ -787,30 +812,20 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   const handleFallbackRefuser = async (course) => {
     if (!course?.id || !livreurProfil?.id) return;
+    // Toujours écarter la course immédiatement — ne jamais bloquer le livreur
+    dismissCourse(course.id);
+    stopUrgentCourseAlert("fallback-refused");
+    handleRefuser();
+    // Appel backend en arrière-plan (best-effort)
     try {
-      logAcceptationLivreur("fallback-refuse-clicked", {
-        course_id: course.id,
-        livreur_id: livreurProfil.id,
-      });
-      const res = await base44.functions.invoke("dispatchExterneAuto", {
+      await base44.functions.invoke("dispatchExterneAuto", {
         action: "refuser_course",
         course_id: course.id,
         livreur_id: livreurProfil.id,
         raison: "Refuse depuis fallback dashboard",
       });
-      const data = res?.data;
-      if (data?.success) {
-        stopUrgentCourseAlert("fallback-refused");
-        handleRefuser();
-      } else {
-        toast.error(data?.error || "Erreur lors du refus");
-      }
     } catch (error) {
-      logAcceptationLivreur("fallback-refuse-error", {
-        course_id: course?.id,
-        error: error?.message || String(error),
-      });
-      toast.error("Erreur reseau lors du refus");
+      console.error('Erreur refuser fallback (non bloquant):', error?.message);
     }
   };
 
@@ -1068,9 +1083,12 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           onAccepter={handleAccepter}
           onRefuser={handleRefuser}
           onExpire={() => {
+            // Écarter la course expirée pour éviter qu'elle réapparaisse
+            if (courseEnAttente?.id) dismissCourse(courseEnAttente.id);
             setNotificationCourseCandidate(null);
             setNotificationCourseId(null);
             setCourseProposeeDirecte(null);
+            // Remettre le livreur disponible immédiatement
             if (coursesActives.length === 0 && livreurProfil?.statut !== "hors_ligne") {
               saveLivreur(livreurProfil.id, { statut: "disponible" }).catch(() => null);
             }

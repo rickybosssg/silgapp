@@ -73,6 +73,27 @@ export default function CourseEnAttenteModalExterne({
     return () => clearInterval(timer);
   }, [course?.id]);
 
+  // Souscription temps réel — détection immédiate "course déjà prise"
+  useEffect(() => {
+    const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
+      if (event.id !== course.id || event.type !== 'update') return;
+      const updated = event.data;
+      // Course assignée à un autre livreur
+      if (updated.livreur_id && String(updated.livreur_id) !== String(livreurId)) {
+        stopUrgentCourseAlert("course-taken-realtime");
+        setCourseDejaPrise(true);
+        return;
+      }
+      // Course passée en statut final ou annulée
+      if (['livree', 'annulee'].includes(updated.statut)) {
+        courseExpireeSentRef.current = true;
+        stopUrgentCourseAlert("course-finalized-realtime");
+        setCourseExpiree(true);
+      }
+    });
+    return unsubscribe;
+  }, [course.id, livreurId]);
+
   // Vérifier expiration backend
   const courseExpireeSentRef = useRef(false);
   useEffect(() => {
@@ -97,7 +118,7 @@ export default function CourseEnAttenteModalExterne({
       } catch (_) {}
     };
 
-    const interval = setInterval(checkStatus, 3000);
+    const interval = setInterval(checkStatus, 2000);
     return () => clearInterval(interval);
   }, [course.id, livreurId]);
 
@@ -172,19 +193,18 @@ export default function CourseEnAttenteModalExterne({
   const handleRefuser = async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
+    // Fermer la modale IMMÉDIATEMENT — le livreur ne doit jamais rester bloqué
+    stopUrgentCourseAlert("course-refused");
+    onRefuser();
+    // Appel backend en arrière-plan (best-effort)
     try {
-      const res = await base44.functions.invoke('dispatchExterneAuto', {
+      await base44.functions.invoke('dispatchExterneAuto', {
         action: 'refuser_course',
         course_id: course.id,
         livreur_id: livreurId,
       });
-      const data = res?.data;
-      if (data?.success) {
-        stopUrgentCourseAlert("course-refused");
-        onRefuser();
-      }
     } catch (err) {
-      console.error('Erreur refuser:', err);
+      console.error('Erreur refuser (non bloquant):', err?.message);
     } finally {
       setIsSubmitting(false);
     }
