@@ -23,6 +23,7 @@ export const navItems = [
   { path: "/", label: "Tableau de bord", icon: LayoutDashboard, reseauOnly: "interne" },
   { path: "/", label: "Tableau de bord", icon: LayoutDashboard, reseauOnly: "externe" },
   { path: "/nouvelle-course", label: "Nouvelle course", icon: Plus, reseauOnly: "interne" },
+  { path: "/admin/nouvelle-course", label: "Nouvelle course", icon: Plus, reseauOnly: "externe" },
   { path: "/carte", label: "Carte en direct", icon: MapPin, reseauOnly: "interne" },
   { path: "/carte", label: "Carte en direct", icon: MapPin, reseauOnly: "externe" },
   { path: "/courses", label: "Toutes les courses", icon: Package, reseauOnly: "interne" },
