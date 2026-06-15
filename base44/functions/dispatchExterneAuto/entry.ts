@@ -310,7 +310,7 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
 
   // 🧠 Mode vagues : activé si ni GPS ni quartier
   // Le dispatch_wave stocké sur la course indique la vague actuelle (1=N1, 2=N2, 3=N3)
-  const modeVagues = pickupSource === 'gps' ? false : (pickupSource === 'quartier' ? false : true);
+  const modeVagues = pickupSource === 'gps' ? false : true;
   let wave = modeVagues ? (course.dispatch_wave || 1) : 0;
 
   // En mode vagues, sélectionner uniquement le niveau correspondant
