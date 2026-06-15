@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, MapPin, Package, Send, Loader2, Sparkles } from "lucide-react";
+import { ArrowLeft, MapPin, Send, Loader2, Sparkles, MessageCircle, CheckCircle2, Copy, ExternalLink } from "lucide-react";
 import { useAdminContext } from "@/hooks/useAdminContext";
 
 function generarQRData() {
@@ -14,6 +14,18 @@ function generarQRData() {
   const pickupCode4 = String(Math.floor(1000 + Math.random() * 9000));
   const deliveryCode4 = String(Math.floor(1000 + Math.random() * 9000));
   return { pickupQrToken, deliveryQrToken, pickupCode4, deliveryCode4 };
+}
+
+function cleanPhone(phone) {
+  return (phone || "").replace(/[\s\-\+\(\)]/g, "");
+}
+
+function waLink(phone, message) {
+  return `https://wa.me/${cleanPhone(phone)}?text=${encodeURIComponent(message)}`;
+}
+
+function buildTrackingUrl(courseId) {
+  return `https://silga-dispatch-go.base44.app/suivi-public/${courseId}`;
 }
 
 const PAYS = [
@@ -34,17 +46,224 @@ const TYPE_OPTIONS = [
   { key: "deplacement", label: "Déplacement", icon: "👤", desc: "Transport personne" },
 ];
 
+// ── Success view after course creation ──
+function CourseCreated({ course, onNewCourse, formData }) {
+  const navigate = useNavigate();
+  const trackingUrl = buildTrackingUrl(course.id);
+
+  const expediteurPhone = formData.expediteurTelephone || formData.clientTelephone || "";
+  const destinatairePhone = formData.destinataireTelephone || "";
+
+  const expediteurName = formData.expediteurNom || formData.clientNom || "Client";
+  const destinataireName = formData.destinataireNom || "Destinataire";
+
+  const msgExpediteur = [
+    `✅ *Course SILGAPP confirmée !*`,
+    ``,
+    `Votre course a été créée avec succès.`,
+    ``,
+    `📦 *Destinataire :* ${destinataireName || "—"}`,
+    `📍 *Adresse de livraison :* ${course.adresse_arrivee || "—"}`,
+    `📋 *Statut :* Recherche livreur en cours`,
+    ``,
+    `🔗 *Suivez votre course en temps réel :*`,
+    trackingUrl,
+    ``,
+    `Merci de votre confiance ! 🏍️`,
+  ].join("\n");
+
+  const msgDestinataire = [
+    `📦 *Un colis vous est destiné !*`,
+    ``,
+    `${expediteurName ? `👤 *Expéditeur :* ${expediteurName}` : ""}`,
+    `📍 *Adresse de livraison :* ${course.adresse_arrivee || "—"}`,
+    ``,
+    `🔐 *Code PIN de livraison :* *${course.delivery_code_4_digits}*`,
+    ``,
+    `🔗 *Suivez votre colis en temps réel :*`,
+    trackingUrl,
+    ``,
+    `📱 *Téléchargez SILGAPP :*`,
+    `https://silga-dispatch-go.base44.app/telecharger`,
+    ``,
+    `Merci de votre confiance ! 🏍️`,
+  ].filter(Boolean).join("\n");
+
+  const copyTracking = () => {
+    navigator.clipboard.writeText(trackingUrl);
+    toast.success("Lien de suivi copié !");
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100/50">
+      <div className="max-w-xl mx-auto px-4 py-6 space-y-5">
+
+        {/* Header succès */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-700 via-emerald-800 to-emerald-950 p-5 shadow-xl shadow-emerald-200">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-white/10 to-transparent rounded-bl-full" />
+          <div className="relative flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+              <CheckCircle2 className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-lg font-black text-white">Course créée !</h1>
+              <p className="text-xs text-white/60">Envoyez les informations aux contacts</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Récapitulatif course */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Récapitulatif</p>
+
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-[10px] text-gray-400 mb-0.5">Type</p>
+              <p className="font-bold text-gray-800">
+                {TYPE_OPTIONS.find(t => t.key === course.type_course)?.icon} {TYPE_OPTIONS.find(t => t.key === course.type_course)?.label || course.type_course}
+              </p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-[10px] text-gray-400 mb-0.5">Statut</p>
+              <p className="font-bold text-orange-600">Recherche livreur</p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-[10px] text-gray-400 mb-0.5">Départ</p>
+              <p className="font-medium text-gray-700 text-xs">{course.adresse_depart || "—"}</p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-[10px] text-gray-400 mb-0.5">Arrivée</p>
+              <p className="font-medium text-gray-700 text-xs">{course.adresse_arrivee || "—"}</p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-[10px] text-gray-400 mb-0.5">Code PIN livraison</p>
+              <p className="font-black text-lg text-primary tracking-widest">{course.delivery_code_4_digits}</p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-[10px] text-gray-400 mb-0.5">Code PIN récupération</p>
+              <p className="font-black text-lg text-primary tracking-widest">{course.pickup_code_4_digits}</p>
+            </div>
+          </div>
+
+          {/* Lien de suivi */}
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] text-blue-500 mb-0.5">Lien de suivi</p>
+              <p className="text-xs text-blue-700 truncate">{trackingUrl}</p>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={copyTracking}
+              className="h-8 w-8 p-0 rounded-lg text-blue-600 hover:bg-blue-100 flex-shrink-0"
+            >
+              <Copy className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Boutons WhatsApp */}
+        <div className="space-y-3">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">Envoyer par WhatsApp</p>
+
+          {/* Bouton Expéditeur */}
+          {expediteurPhone ? (
+            <a
+              href={waLink(expediteurPhone, msgExpediteur)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block"
+            >
+              <div className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 hover:shadow-md hover:border-emerald-300 transition-all group">
+                <div className="w-12 h-12 rounded-xl bg-green-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-green-200">
+                  <MessageCircle className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-sm text-gray-800">Envoyer à l'expéditeur</p>
+                  <p className="text-[11px] text-gray-500">{expediteurName} — {expediteurPhone}</p>
+                </div>
+                <ExternalLink className="w-4 h-4 text-green-500 group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
+              </div>
+            </a>
+          ) : (
+            <div className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50 border border-gray-200 opacity-50">
+              <div className="w-12 h-12 rounded-xl bg-gray-300 flex items-center justify-center flex-shrink-0">
+                <MessageCircle className="w-6 h-6 text-gray-400" />
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-sm text-gray-400">Envoyer à l'expéditeur</p>
+                <p className="text-[11px] text-gray-400">Aucun numéro renseigné</p>
+              </div>
+            </div>
+          )}
+
+          {/* Bouton Destinataire */}
+          {destinatairePhone ? (
+            <a
+              href={waLink(destinatairePhone, msgDestinataire)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block"
+            >
+              <div className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 hover:shadow-md hover:border-blue-300 transition-all group">
+                <div className="w-12 h-12 rounded-xl bg-blue-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-blue-200">
+                  <MessageCircle className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-sm text-gray-800">Envoyer au destinataire</p>
+                  <p className="text-[11px] text-gray-500">{destinataireName} — {destinatairePhone}</p>
+                </div>
+                <ExternalLink className="w-4 h-4 text-blue-500 group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
+              </div>
+            </a>
+          ) : (
+            <div className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50 border border-gray-200 opacity-50">
+              <div className="w-12 h-12 rounded-xl bg-gray-300 flex items-center justify-center flex-shrink-0">
+                <MessageCircle className="w-6 h-6 text-gray-400" />
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-sm text-gray-400">Envoyer au destinataire</p>
+                <p className="text-[11px] text-gray-400">Aucun numéro renseigné</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="space-y-2">
+          <Button
+            onClick={onNewCourse}
+            className="w-full h-14 rounded-2xl gap-2 font-bold text-base bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 shadow-lg shadow-slate-200"
+          >
+            <Sparkles className="w-5 h-5" />
+            Créer une autre course
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate("/admin/externe")}
+            className="w-full h-12 rounded-2xl font-medium text-sm border-gray-200 text-gray-600"
+          >
+            Retour au tableau de bord
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main form component ──
 export default function AdminCourseForm() {
   const navigate = useNavigate();
   const { countryCode: adminCountryCode } = useAdminContext();
   const [submitting, setSubmitting] = useState(false);
+  const [createdCourse, setCreatedCourse] = useState(null);
+  const [createdFormData, setCreatedFormData] = useState(null);
 
   const [typeCourse, setTypeCourse] = useState("expedier");
   const [adresseDepart, setAdresseDepart] = useState("");
   const [adresseArrivee, setAdresseArrivee] = useState("");
   const [countryCode, setCountryCode] = useState(adminCountryCode || "BF");
 
-  // Champs optionnels
   const [clientNom, setClientNom] = useState("");
   const [clientPrenom, setClientPrenom] = useState("");
   const [clientTelephone, setClientTelephone] = useState("");
@@ -57,10 +276,33 @@ export default function AdminCourseForm() {
 
   const selectedPays = PAYS.find(p => p.code === countryCode);
 
+  // ── Success state ──
+  if (createdCourse) {
+    return (
+      <CourseCreated
+        course={createdCourse}
+        formData={createdFormData}
+        onNewCourse={() => {
+          setCreatedCourse(null);
+          setCreatedFormData(null);
+        }}
+      />
+    );
+  }
+
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
       const { pickupQrToken, deliveryQrToken, pickupCode4, deliveryCode4 } = generarQRData();
+
+      const formData = {
+        expediteurTelephone: expediteurTelephone.trim(),
+        destinataireTelephone: destinataireTelephone.trim(),
+        clientTelephone: clientTelephone.trim(),
+        expediteurNom: expediteurNom.trim(),
+        destinataireNom: destinataireNom.trim(),
+        clientNom: clientNom.trim(),
+      };
 
       const courseData = {
         country_code: countryCode,
@@ -90,8 +332,8 @@ export default function AdminCourseForm() {
       };
 
       const course = await base44.entities.CourseExterne.create(courseData);
-      toast.success("Course créée avec succès !");
 
+      // Lancer dispatch auto
       try {
         await base44.functions.invoke("dispatchExterneAuto", {
           action: "lancer_recherche_auto",
@@ -99,24 +341,9 @@ export default function AdminCourseForm() {
         });
       } catch (e) { console.error("Erreur dispatch:", e); }
 
-      if (expediteurTelephone.trim() || clientTelephone.trim()) {
-        try {
-          await base44.functions.invoke("sendCourseWhatsApp", {
-            course_id: course.id,
-            type_destinataire: "expediteur",
-          });
-        } catch (e) { console.error("WhatsApp expediteur:", e); }
-      }
-      if (destinataireTelephone.trim()) {
-        try {
-          await base44.functions.invoke("sendCourseWhatsApp", {
-            course_id: course.id,
-            type_destinataire: "destinataire",
-          });
-        } catch (e) { console.error("WhatsApp destinataire:", e); }
-      }
-
-      navigate("/admin/externe");
+      toast.success("Course créée avec succès !");
+      setCreatedCourse(course);
+      setCreatedFormData(formData);
     } catch (err) {
       toast.error("Erreur création: " + (err?.message || "inconnue"));
     } finally {
@@ -128,7 +355,7 @@ export default function AdminCourseForm() {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100/50">
       <div className="max-w-xl mx-auto px-4 py-6 space-y-6">
 
-        {/* ── Header Premium ── */}
+        {/* Header Premium */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 p-5 shadow-xl shadow-slate-200">
           <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-primary/20 to-transparent rounded-bl-full" />
           <div className="absolute bottom-0 left-1/2 w-40 h-20 bg-gradient-to-t from-emerald-500/10 to-transparent rounded-t-full" />
@@ -148,7 +375,7 @@ export default function AdminCourseForm() {
           </div>
         </div>
 
-        {/* ── Type de course ── */}
+        {/* Type de course */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-5 pt-5 pb-1">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Type de course</p>
@@ -179,11 +406,10 @@ export default function AdminCourseForm() {
           </div>
         </div>
 
-        {/* ── Informations principales ── */}
+        {/* Détails */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Détails</p>
 
-          {/* Pays */}
           <div>
             <p className="text-xs font-semibold text-gray-500 mb-1.5">Pays</p>
             <Select value={countryCode} onValueChange={setCountryCode}>
@@ -202,7 +428,6 @@ export default function AdminCourseForm() {
             </Select>
           </div>
 
-          {/* Point de départ */}
           <div>
             <p className="text-xs font-semibold text-gray-500 mb-1.5">Point de départ</p>
             <div className="relative">
@@ -216,7 +441,6 @@ export default function AdminCourseForm() {
             </div>
           </div>
 
-          {/* Point d'arrivée */}
           <div>
             <p className="text-xs font-semibold text-gray-500 mb-1.5">Point d'arrivée</p>
             <div className="relative">
@@ -230,7 +454,6 @@ export default function AdminCourseForm() {
             </div>
           </div>
 
-          {/* Type de colis (pas pour déplacement) */}
           {typeCourse !== "deplacement" && (
             <div>
               <p className="text-xs font-semibold text-gray-500 mb-1.5">Type de colis</p>
@@ -251,14 +474,13 @@ export default function AdminCourseForm() {
           )}
         </div>
 
-        {/* ── Contacts (optionnel) ── */}
+        {/* Contacts */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
           <div className="flex items-center gap-2">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Contacts</p>
             <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">Optionnel</span>
           </div>
 
-          {/* Client */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <p className="text-[10px] text-gray-400 mb-1">Nom du client</p>
@@ -280,7 +502,6 @@ export default function AdminCourseForm() {
             </div>
           </div>
 
-          {/* Expéditeur / Destinataire selon type */}
           {typeCourse === "recevoir" ? (
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -325,7 +546,6 @@ export default function AdminCourseForm() {
             </div>
           ) : null}
 
-          {/* Notes */}
           <div>
             <p className="text-[10px] text-gray-400 mb-1">Notes</p>
             <Input
@@ -337,7 +557,7 @@ export default function AdminCourseForm() {
           </div>
         </div>
 
-        {/* ── Bouton Créer ── */}
+        {/* Bouton Créer */}
         <Button
           onClick={handleSubmit}
           disabled={submitting}
