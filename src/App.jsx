@@ -54,6 +54,7 @@ const FraisAnnulationAdmin = lazy(() => import('./pages/FraisAnnulationAdmin.jsx
 const VenusRapportsPage = lazy(() => import('./pages/VenusRapportsPage.jsx'));
 const ZonesChaudesAdmin = lazy(() => import('./pages/ZonesChaudesAdmin.jsx'));
 const AdminCourseForm = lazy(() => import('./pages/AdminCourseForm.jsx'));
+const DemandesLivreursAdmin = lazy(() => import('./components/admin/DemandesLivreursPanel.jsx'));
 const PolitiqueConfidentialite = lazy(() => import('./pages/PolitiqueConfidentialite.jsx'));
 const TestNotifications = lazy(() => import('./pages/TestNotifications.jsx'));
 const DiagnosticPushComplet = lazy(() => import('./pages/DiagnosticPushComplet.jsx'));
@@ -273,6 +274,7 @@ function AppContent() {
           <Route path="/diagnostic-push-complet" element={<AnimatedRoutes><DiagnosticPushComplet /></AnimatedRoutes>} />
           <Route path="/admin/test-dispatch-livreur" element={<AnimatedRoutes><TestDispatchLivreur /></AnimatedRoutes>} />
           <Route path="/admin/centre-notifications" element={<AnimatedRoutes><CentreNotificationsPush /></AnimatedRoutes>} />
+          <Route path="/admin/demandes-livreurs" element={<AnimatedRoutes><DemandesLivreursAdmin /></AnimatedRoutes>} />
         </Route>
         <Route path="*" element={<PageNotFound />} />
       </Routes>

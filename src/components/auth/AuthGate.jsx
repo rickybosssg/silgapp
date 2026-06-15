@@ -4,6 +4,7 @@ import { APP_PUBLIC_URL, BASE44_APP_ID } from "@/lib/app-params";
 import { Loader2, Lock, Mail, Truck } from "lucide-react";
 import AppMaintenanceGate from "@/components/admin/AppMaintenanceGate";
 import { registerPushToken } from "@/lib/notifications";
+import RoleSelection from "@/pages/RoleSelection";
 
 const AUTH_TOKEN_KEYS = ["base44_access_token", "access_token", "base44_token", "token"];
 
@@ -253,43 +254,29 @@ export default function AuthGate({ children, onLivreur, onClient }) {
         return;
       }
 
-      // 3. Inconnu → Client automatique
-      // Vérifier si profil client existe, sinon le créer
+      // 3. Vérifier si un profil client existe déjà
       const clients = await base44.entities.ClientExterne.filter({
         user_email: user.email
       });
       
       if (!mounted) return;
 
-      let clientProfil = clients?.[0] || null;
-      if (!clients || clients.length === 0) {
-        // Créer profil client automatiquement
-        try {
-          clientProfil = await base44.entities.ClientExterne.create({
-            nom: user.full_name || user.email.split('@')[0] || "Client",
-            telephone: "",
-            email: user.email,
-            user_email: user.email,
-            actif: true
-          });
-        } catch (err) {
-          console.error("Erreur création profil client:", err);
-        }
+      // Si un profil client existe → router vers dashboard client
+      if (clients && clients.length > 0) {
+        const clientProfil = clients[0];
+        registerPushToken(null, {
+          email: user.email,
+          user_email: user.email,
+          user_type: "client",
+          client_id: clientProfil?.id || "",
+        }).catch(() => null);
+        setState("client");
+        onClient?.();
+        return;
       }
 
-      // Router vers dashboard client
-      registerPushToken(null, {
-        email: user.email,
-        user_email: user.email,
-        user_type: "client",
-        client_id: clientProfil?.id || "",
-      }).catch(() => null);
-      setState("client");
-      onClient?.();
-
-      // ⚠️ Sécurité finale : si un profil Livreur existe sans user_email,
-      // il aurait dû être capturé plus haut. Log de diagnostic.
-      console.warn(`[AuthGate] Utilisateur ${user.email} routé en CLIENT. Si c'est un livreur, vérifier que son user_email est bien renseigné dans l'entité Livreur.`);
+      // 4. Aucun profil → choix du rôle (Client ou Livreur)
+      setState("choix_role");
     }
 
     check().catch((error) => {
@@ -568,6 +555,11 @@ export default function AuthGate({ children, onLivreur, onClient }) {
         </div>
       </div>
     );
+  }
+
+  // Choix du rôle (nouvel utilisateur sans profil)
+  if (state === "choix_role") {
+    return <RoleSelection />;
   }
 
   // Admin → toujours accessible, pas de gate maintenance
