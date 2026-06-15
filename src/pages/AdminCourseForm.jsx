@@ -28,6 +28,12 @@ function buildTrackingUrl(courseId) {
   return `https://silga-dispatch-go.base44.app/suivi-public/${courseId}`;
 }
 
+function buildQrUrl(token) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(token)}`;
+}
+
+const SILGAPP_DL = "https://silga-dispatch-go.base44.app/telecharger";
+
 const PAYS = [
   { code: "BF", nom: "Burkina Faso", drapeau: "🇧🇫" },
   { code: "CI", nom: "Côte d'Ivoire", drapeau: "🇨🇮" },
@@ -64,10 +70,16 @@ function CourseCreated({ course, onNewCourse, formData }) {
     ``,
     `📦 *Destinataire :* ${destinataireName || "—"}`,
     `📍 *Adresse de livraison :* ${course.adresse_arrivee || "—"}`,
-    `📋 *Statut :* Recherche livreur en cours`,
+    `#️⃣ *N° de course :* ${course.id?.slice(-8) || course.id}`,
+    ``,
+    `🔐 *PIN de récupération :* *${course.pickup_code_4_digits}*`,
+    `📱 *QR Code récupération :* ${buildQrUrl(course.pickup_qr_token)}`,
     ``,
     `🔗 *Suivez votre course en temps réel :*`,
     trackingUrl,
+    ``,
+    `📲 *Téléchargez SILGAPP :*`,
+    SILGAPP_DL,
     ``,
     `Merci de votre confiance ! 🏍️`,
   ].join("\n");
@@ -76,15 +88,16 @@ function CourseCreated({ course, onNewCourse, formData }) {
     `📦 *Un colis vous est destiné !*`,
     ``,
     `${expediteurName ? `👤 *Expéditeur :* ${expediteurName}` : ""}`,
-    `📍 *Adresse de livraison :* ${course.adresse_arrivee || "—"}`,
+    `#️⃣ *N° de course :* ${course.id?.slice(-8) || course.id}`,
     ``,
-    `🔐 *Code PIN de livraison :* *${course.delivery_code_4_digits}*`,
+    `🔐 *PIN de livraison :* *${course.delivery_code_4_digits}*`,
+    `📱 *QR Code livraison :* ${buildQrUrl(course.delivery_qr_token)}`,
     ``,
     `🔗 *Suivez votre colis en temps réel :*`,
     trackingUrl,
     ``,
-    `📱 *Téléchargez SILGAPP :*`,
-    `https://silga-dispatch-go.base44.app/telecharger`,
+    `📲 *Téléchargez SILGAPP :*`,
+    SILGAPP_DL,
     ``,
     `Merci de votre confiance ! 🏍️`,
   ].filter(Boolean).join("\n");
