@@ -44,7 +44,30 @@ function buildWhatsAppMessage(course) {
   const trackingUrl = course.tracking_token
     ? `${window.location.origin}/suivi-public/${course.tracking_token}`
     : `${window.location.origin}/suivi-public/${course.id}`;
-  return `Bonjour 👋\nUn colis SILGAPP est en route pour vous.\n\n📍 Suivre la livraison :\n${trackingUrl}\n\nMerci.`;
+  const SILGAPP_DL = "https://silga-dispatch-go.base44.app/telecharger";
+  const expediteurName = course.expediteur_nom || course.client_nom || "Expéditeur";
+  const numeroCourse = course.id?.slice(-8) || course.id;
+  const pinLivraison = course.delivery_code_4_digits || "";
+  const qrLivraison = course.delivery_qr_token
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(course.delivery_qr_token)}`
+    : "";
+  return [
+    `📦 *Un colis vous est destiné !*`,
+    ``,
+    `👤 *Expéditeur :* ${expediteurName}`,
+    `#️⃣ *N° de course :* ${numeroCourse}`,
+    ``,
+    `🔐 *PIN de livraison :* *${pinLivraison}*`,
+    `📱 *QR Code livraison :* ${qrLivraison}`,
+    ``,
+    `📍 *Suivez votre colis en temps réel :*`,
+    trackingUrl,
+    ``,
+    `📲 *Téléchargez SILGAPP :*`,
+    SILGAPP_DL,
+    ``,
+    `Merci de votre confiance.`,
+  ].join("\n");
 }
 
 export default function ClientSuiviCourse() {
