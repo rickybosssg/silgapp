@@ -23,7 +23,7 @@ export default function DemandesLivreursAdmin() {
       await base44.entities.Livreur.update(livreur.id, {
         validation: "valide",
         actif: true,
-        statut: "disponible",
+        statut: "hors_ligne",
       });
       toast.success(`${livreur.prenom || ""} ${livreur.nom} validé avec succès`);
       queryClient.invalidateQueries({ queryKey: ["demandes_livreurs"] });

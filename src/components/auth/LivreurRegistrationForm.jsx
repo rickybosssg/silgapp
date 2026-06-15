@@ -72,7 +72,7 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
         type_livreur: "externe",
         reseau: "externe",
         validation: "en_attente",
-        actif: true,
+        actif: false,
         statut: "hors_ligne",
       });
 
