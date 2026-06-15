@@ -1,0 +1,88 @@
+{
+  "name": "ZoneChaudeHistorique",
+  "type": "object",
+  "properties": {
+    "country_code": {
+      "type": "string",
+      "description": "Code pays de la zone"
+    },
+    "ville": {
+      "type": "string",
+      "description": "Ville de la zone"
+    },
+    "quartier": {
+      "type": "string",
+      "description": "Nom du quartier/zone"
+    },
+    "score": {
+      "type": "number",
+      "description": "Score de chaleur d\u00e9tect\u00e9"
+    },
+    "niveau": {
+      "type": "string",
+      "enum": [
+        "faible",
+        "moyenne",
+        "forte",
+        "tres_forte"
+      ],
+      "description": "Niveau de chaleur"
+    },
+    "nb_courses": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de courses en attente dans la zone"
+    },
+    "nb_livreurs": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de livreurs disponibles dans la zone"
+    },
+    "temps_attente_min": {
+      "type": "number",
+      "default": 0,
+      "description": "Temps d'attente moyen en minutes"
+    },
+    "rayon_km": {
+      "type": "number",
+      "description": "Rayon de la zone en km"
+    },
+    "latitude": {
+      "type": "number",
+      "description": "Latitude du centre de la zone"
+    },
+    "longitude": {
+      "type": "number",
+      "description": "Longitude du centre de la zone"
+    },
+    "notifications_envoyees": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de notifications push envoy\u00e9es"
+    },
+    "notifications_echouees": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre d'\u00e9checs FCM"
+    },
+    "message_envoye": {
+      "type": "string",
+      "description": "Contenu du message push envoy\u00e9"
+    },
+    "alerte_livreur_id": {
+      "type": "string",
+      "description": "ID de l'AlerteLivreur cr\u00e9\u00e9e pour cette zone"
+    },
+    "date_analyse": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date et heure de l'analyse"
+    }
+  },
+  "required": [
+    "country_code",
+    "quartier",
+    "score",
+    "niveau"
+  ]
+}
