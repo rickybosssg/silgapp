@@ -20,8 +20,7 @@ import DownloadStatsPanel from "@/components/admin/DownloadStatsPanel";
 import StatDetailModal from "@/components/dashboard/StatDetailModal";
 import AppToggleButton from "@/components/admin/AppToggleButton";
 
-function KpiCard({ label, value, color, suffix, onClick }) {
-  const Icon = arguments[0]?.icon;
+function KpiCard({ label, value, icon: Icon, color, suffix, onClick }) {
   return (
     <button
       onClick={onClick}
@@ -32,7 +31,7 @@ function KpiCard({ label, value, color, suffix, onClick }) {
       <div className="relative">
         <div className="flex items-center justify-between mb-3">
           <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
-            {Icon && <Icon className="w-4 h-4 text-white" />}
+            <Icon className="w-4 h-4 text-white" />
           </div>
           {onClick && <ChevronRight className="w-3.5 h-3.5 text-white/50 group-hover:text-white/80 transition-colors" />}
         </div>
