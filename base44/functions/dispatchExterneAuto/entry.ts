@@ -526,10 +526,18 @@ Deno.serve(async (req) => {
         return Response.json(reponseDejaPrise('final_check_already_taken', courseFinal));
       }
 
-      const pickupToken = generateToken();
-      const deliveryToken = generateToken();
-      const pickupPIN = generatePIN();
-      const deliveryPIN = generatePIN();
+      // 🔐 Préserver les tokens/PINs existants — ne JAMAIS les regénérer
+      // (générés une fois à la création de la course pour garantir l'unicité partout)
+      const pickupToken = course.pickup_qr_token || generateToken();
+      const deliveryToken = course.delivery_qr_token || generateToken();
+      const pickupPIN = course.pickup_code_4_digits || generatePIN();
+      const deliveryPIN = course.delivery_code_4_digits || generatePIN();
+      const tokensOntEteGeneres = !!(course.pickup_qr_token && course.pickup_code_4_digits);
+      if (!tokensOntEteGeneres) {
+        console.log(`[DISPATCH] 🔐 Génération nouveaux tokens/PINs pour course ${course_id} (absents à la création)`);
+      } else {
+        console.log(`[DISPATCH] 🔒 Conservation tokens/PINs existants pour course ${course_id}`);
+      }
 
       const updateData = {
         dispatch_status: isManual ? 'propose' : 'accepte',
