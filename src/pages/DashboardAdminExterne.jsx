@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Users, Package, ArrowLeft,
+  Users, Package, ArrowLeft, PlusCircle,
   AlertCircle, AlertTriangle, Eye, MapPin, CreditCard, Download,
   Save, ExternalLink, Bug, Search, CheckCircle2, XCircle,
   Loader2, MessageCircle, Tag, Globe, Zap, ChevronRight, Bell, Flame, Megaphone
@@ -114,6 +114,14 @@ export default function DashboardAdminExterne() {
   }, [courses, livreurs, clients]);
 
   const QUICK_LINKS = [
+    {
+      to: "/admin/nouvelle-course",
+      label: "Nouvelle course",
+      sub: "Création manuelle admin",
+      icon: PlusCircle,
+      grad: "from-green-500 to-emerald-600",
+      shadow: "shadow-green-100",
+    },
     {
       to: "/livreurs",
       label: "Livreurs externes",

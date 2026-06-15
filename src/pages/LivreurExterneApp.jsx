@@ -887,7 +887,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
   };
 
-  const handleColisLivre = (course, gpsArrivee) => {
+  const handleColisLivre = (course, montantSaisi) => {
     // Cas QR externe : la course est déjà "livree" en DB (validée par le backend validateQRCode)
     // On fait juste les invalidations + statut livreur, le récap est géré dans CourseActiveCard
     if (course.statut === "livree") {
@@ -900,7 +900,34 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       return;
     }
 
+    // ── ADMIN_MANUEL : montant saisi par le livreur, split 70/30 ──
+    if (course.pricing_mode === "admin_manuel" && typeof montantSaisi === "number" && montantSaisi > 0) {
+      const commissionSilga = Math.round(montantSaisi * 0.3);
+      const montantLivreur = montantSaisi - commissionSilga;
+
+      updateCourseMutation.mutate({
+        id: course.id,
+        data: {
+          statut: "livree",
+          heure_livraison: new Date().toISOString(),
+          prix_final: montantSaisi,
+          commission_silga: commissionSilga,
+          montant_livreur: montantLivreur,
+        },
+      });
+      saveLivreur(livreurProfil.id, {
+        montant_du_silga: (livreurProfil.montant_du_silga || 0) + commissionSilga,
+      }).catch(() => null);
+
+      if (livreurProfil?.statut !== "hors_ligne") {
+        statutMutation.mutate("disponible");
+      }
+      toast.success(`Livraison terminée ! 💰 ${montantSaisi.toLocaleString()} F`);
+      return;
+    }
+
     // Cas interne (bouton manuel) : calcul prix via GPS
+    const gpsArrivee = montantSaisi; // en interne, le 2e paramètre peut être le GPS
     const baseData = { statut: "livree", heure_livraison: new Date().toISOString() };
 
     if (gpsArrivee && course.latitude_recuperation && course.longitude_recuperation) {

@@ -53,6 +53,7 @@ const GestionPublicites = lazy(() => import('./pages/GestionPublicites.jsx'));
 const FraisAnnulationAdmin = lazy(() => import('./pages/FraisAnnulationAdmin.jsx'));
 const VenusRapportsPage = lazy(() => import('./pages/VenusRapportsPage.jsx'));
 const ZonesChaudesAdmin = lazy(() => import('./pages/ZonesChaudesAdmin.jsx'));
+const AdminCourseForm = lazy(() => import('./pages/AdminCourseForm.jsx'));
 const PolitiqueConfidentialite = lazy(() => import('./pages/PolitiqueConfidentialite.jsx'));
 const TestNotifications = lazy(() => import('./pages/TestNotifications.jsx'));
 const DiagnosticPushComplet = lazy(() => import('./pages/DiagnosticPushComplet.jsx'));
@@ -261,6 +262,7 @@ function AppContent() {
               <Route path="/admin/frais-annulation" element={<AnimatedRoutes><FraisAnnulationAdmin /></AnimatedRoutes>} />
               <Route path="/admin/venus-rapports" element={<AnimatedRoutes><VenusRapportsPage /></AnimatedRoutes>} />
               <Route path="/admin/zones-chaudes" element={<AnimatedRoutes><ZonesChaudesAdmin /></AnimatedRoutes>} />
+              <Route path="/admin/nouvelle-course" element={<AnimatedRoutes><AdminCourseForm /></AnimatedRoutes>} />
               <Route path="/admin/externe" element={<AnimatedRoutes><DashboardAdminExterne /></AnimatedRoutes>} />
               <Route path="/maintenance" element={<AnimatedRoutes><Maintenance /></AnimatedRoutes>} />
               <Route path="/diagnostic-push-complet" element={<AnimatedRoutes><DiagnosticPushComplet /></AnimatedRoutes>} />

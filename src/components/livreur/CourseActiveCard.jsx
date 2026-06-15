@@ -160,7 +160,14 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const colisLivre = course.statut === "livree";
 
   const handleConfirmerLivraison = () => {
-    if (isExterne) {
+    if (course.pricing_mode === "admin_manuel") {
+      const montant = parseFloat(prixReel);
+      if (!prixReel || isNaN(montant) || montant <= 0) {
+        toast.error("Entrez le montant reçu du client");
+        return;
+      }
+      onColisLivre(course, montant);
+    } else if (isExterne) {
       onColisLivre(course);
     } else {
       const montant = parseFloat(prixReel);
@@ -328,8 +335,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
         </div>
       )}
 
-      {/* Modal montant — uniquement pour l'interne */}
-      {showPrixModal && !isExterne && (
+      {/* Modal montant — pour l'interne ET admin_manuel */}
+      {showPrixModal && (!isExterne || course.pricing_mode === "admin_manuel") && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
         >
@@ -666,16 +673,27 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               ) : (
                 isExterne ? (
                   /* ── EXTERNE multi-colis : géré par MultiColisLivreurView ci-dessus ── */
-                  /* ── EXTERNE colis unique : Scanner QR pour livrer ── */
+                  /* ── EXTERNE colis unique : Scanner QR ou saisie montant admin ── */
                   !course.is_multi_colis && (
-                    <button
-                      className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                      onClick={() => setShowQRScanner("delivery")}
-                      disabled={isPending}
-                    >
-                      <QrCode className="w-6 h-6" />
-                      Scanner pour livrer ✅
-                    </button>
+                    course.pricing_mode === "admin_manuel" ? (
+                      <button
+                        className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                        onClick={() => setShowPrixModal(true)}
+                        disabled={isPending}
+                      >
+                        <Check className="w-6 h-6" />
+                        Course terminée — saisir le montant
+                      </button>
+                    ) : (
+                      <button
+                        className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                        onClick={() => setShowQRScanner("delivery")}
+                        disabled={isPending}
+                      >
+                        <QrCode className="w-6 h-6" />
+                        Scanner pour livrer ✅
+                      </button>
+                    )
                   )
                 ) : (
                   /* ── INTERNE : bouton classique avec GPS + récapitulatif ── */
