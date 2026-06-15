@@ -41,12 +41,11 @@
         "recevoir",
         "deplacement"
       ],
-      "description": "Type de course : expedier, recevoir, ou deplacement (transport de personne)"
+      "description": "Type de course"
     },
     "is_multi_colis": {
       "type": "boolean",
-      "default": false,
-      "description": "TRUE si la course contient plusieurs colis"
+      "default": false
     },
     "nb_colis": {
       "type": "number",
@@ -89,12 +88,10 @@
       "default": false
     },
     "adresse_depart": {
-      "type": "string",
-      "description": "Adresse ou quartier de recuperation / prise en charge"
+      "type": "string"
     },
     "adresse_arrivee": {
-      "type": "string",
-      "description": "Adresse ou quartier de livraison / depot"
+      "type": "string"
     },
     "quartier_depart": {
       "type": "string",
@@ -127,17 +124,14 @@
       "type": "number"
     },
     "passager_nom": {
-      "type": "string",
-      "description": "Nom du passager (deplacement uniquement)"
+      "type": "string"
     },
     "passager_telephone": {
-      "type": "string",
-      "description": "Telephone du passager (deplacement uniquement)"
+      "type": "string"
     },
     "nb_passagers": {
       "type": "number",
-      "default": 1,
-      "description": "Nombre de passagers (deplacement uniquement, optionnel)"
+      "default": 1
     },
     "type_colis": {
       "type": "string",
@@ -148,8 +142,7 @@
         "document",
         "nourriture",
         "autre"
-      ],
-      "description": "Type de colis"
+      ]
     },
     "prix_estimate": {
       "type": "number"
@@ -177,8 +170,7 @@
         "livree",
         "annulee"
       ],
-      "default": "nouvelle",
-      "description": "Statut de la course"
+      "default": "nouvelle"
     },
     "dispatch_status": {
       "type": "string",
@@ -191,6 +183,11 @@
         "cycle_epuise"
       ],
       "description": "Statut detaille du dispatch automatique"
+    },
+    "dispatch_wave": {
+      "type": "number",
+      "default": 0,
+      "description": "Vague de dispatch actuelle (1=N1, 2=N2, 3=N3). 0 = mode normal (distance). Utilise uniquement quand GPS ET quartier absents."
     },
     "timeout_expires_at": {
       "type": "string",
@@ -357,8 +354,7 @@
         "manual",
         "admin_manuel"
       ],
-      "default": "automatic",
-      "description": "Mode de tarification"
+      "default": "automatic"
     },
     "manual_price": {
       "type": "number"
@@ -394,8 +390,7 @@
         "echec",
         "lu"
       ],
-      "default": "non_envoye",
-      "description": "Statut d'envoi WhatsApp a l'expediteur"
+      "default": "non_envoye"
     },
     "whatsapp_destinataire_statut": {
       "type": "string",
@@ -405,16 +400,13 @@
         "echec",
         "lu"
       ],
-      "default": "non_envoye",
-      "description": "Statut d'envoi WhatsApp au destinataire"
+      "default": "non_envoye"
     },
     "whatsapp_expediteur_erreur": {
-      "type": "string",
-      "description": "Message d'erreur WhatsApp expediteur le cas echeant"
+      "type": "string"
     },
     "whatsapp_destinataire_erreur": {
-      "type": "string",
-      "description": "Message d'erreur WhatsApp destinataire le cas echeant"
+      "type": "string"
     }
   },
   "required": [

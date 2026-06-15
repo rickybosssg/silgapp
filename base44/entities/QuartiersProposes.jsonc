@@ -1,0 +1,82 @@
+{
+  "name": "QuartiersProposes",
+  "type": "object",
+  "properties": {
+    "country_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE",
+        "GH"
+      ],
+      "description": "Code pays"
+    },
+    "ville": {
+      "type": "string",
+      "description": "Ville du quartier propos\u00e9"
+    },
+    "nom_quartier": {
+      "type": "string",
+      "description": "Nom du quartier saisi par l'utilisateur"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "en_attente_validation",
+        "valide",
+        "fusionne",
+        "supprime"
+      ],
+      "default": "en_attente_validation",
+      "description": "Statut de validation par l'administrateur"
+    },
+    "quartier_fusionne_id": {
+      "type": "string",
+      "description": "ID du Quartier officiel vers lequel fusionner (si fusionne)"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "client",
+        "admin"
+      ],
+      "description": "Qui a propos\u00e9 ce quartier"
+    },
+    "course_id": {
+      "type": "string",
+      "description": "ID de la course qui a g\u00e9n\u00e9r\u00e9 cette proposition"
+    },
+    "nb_occurrences": {
+      "type": "number",
+      "default": 1,
+      "description": "Nombre de fois que ce quartier a \u00e9t\u00e9 propos\u00e9"
+    },
+    "latitude": {
+      "type": "number",
+      "description": "Latitude (renseign\u00e9e par l'admin lors de la validation)"
+    },
+    "longitude": {
+      "type": "number",
+      "description": "Longitude (renseign\u00e9e par l'admin lors de la validation)"
+    },
+    "valide_par": {
+      "type": "string",
+      "description": "Admin ayant valid\u00e9 cette proposition"
+    },
+    "valide_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de validation"
+    }
+  },
+  "required": [
+    "country_code",
+    "nom_quartier"
+  ]
+}

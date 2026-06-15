@@ -142,7 +142,8 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
       return; // exclu du dispatch
     }
 
-    let distance = 0;
+    // distance = null quand ni GPS ni quartier → pas de calcul fictif
+    let distance = null;
     if (pickupLat && pickupLng && l.latitude && l.longitude) {
       distance = calculerDistance(pickupLat, pickupLng, l.latitude, l.longitude);
     }
@@ -169,20 +170,28 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
   niveau1.sort((a, b) => {
     const gpsA = a.gpsAgeMin !== null ? a.gpsAgeMin : 999;
     const gpsB = b.gpsAgeMin !== null ? b.gpsAgeMin : 999;
-    // Micro-tranches GPS pour N1 : <2min idéal, <5min bon, <10min ok, >=10min dégradé
     const trancheA = gpsA < 2 ? 0 : gpsA < 5 ? 1 : gpsA < 10 ? 2 : 3;
     const trancheB = gpsB < 2 ? 0 : gpsB < 5 ? 1 : gpsB < 10 ? 2 : 3;
     if (trancheA !== trancheB) return trancheA - trancheB;
+    // distance peut être null (ni GPS ni quartier)
+    if (a.distance === null && b.distance === null) return 0;
+    if (a.distance === null) return 1;
+    if (b.distance === null) return -1;
     return a.distance - b.distance;
   });
-  [niveau2, niveau3].forEach(n => n.sort((a, b) => a.distance - b.distance));
+  [niveau2, niveau3].forEach(n => n.sort((a, b) => {
+    if (a.distance === null && b.distance === null) return 0;
+    if (a.distance === null) return 1;
+    if (b.distance === null) return -1;
+    return a.distance - b.distance;
+  }));
 
   const tous = [...niveau1, ...niveau2, ...niveau3];
   if (nbMarquesHorsLigne > 0) {
     console.log(`[DISPATCH] 🚫 ${nbMarquesHorsLigne} livreur(s) marqué(s) hors_ligne (HB > 60 min)`);
   }
   console.log(`[DISPATCH] 📊 ${tous.length} candidats (exclus: ${exclusions.length}, hors_ligne: ${nbMarquesHorsLigne}) — N1:${niveau1.length} N2:${niveau2.length} N3:${niveau3.length} — pickup: ${pickupSource}${pickupSource === 'quartier' ? ` (${course.quartier_depart})` : ''}`);
-  return tous;
+  return { tous, niveau1, niveau2, niveau3, pickupSource };
 }
 
 async function notifierLivreur(base44, courseId, course, livreur, timeoutSec) {
@@ -296,13 +305,40 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
   console.log(`[DISPATCH] ⚙️ Config: ${config.nb} livreurs, ${config.timeout}s`);
 
   // Trouver les meilleurs candidats hors exclusions (tous les déjà notifiés)
-  const candidats = await trouverLivreursCandidats(base44, course, exclusions);
+  const resultat = await trouverLivreursCandidats(base44, course, exclusions);
+  const { tous: candidatsTous, niveau1, niveau2, niveau3, pickupSource } = resultat;
+
+  // 🧠 Mode vagues : activé si ni GPS ni quartier
+  // Le dispatch_wave stocké sur la course indique la vague actuelle (1=N1, 2=N2, 3=N3)
+  const modeVagues = pickupSource === 'gps' ? false : (pickupSource === 'quartier' ? false : true);
+  let wave = modeVagues ? (course.dispatch_wave || 1) : 0;
+
+  // En mode vagues, sélectionner uniquement le niveau correspondant
+  let candidats;
+  if (modeVagues) {
+    if (wave === 1) candidats = niveau1;
+    else if (wave === 2) candidats = niveau2;
+    else if (wave === 3) candidats = niveau3;
+    else candidats = []; // ne devrait pas arriver, fallback
+    console.log(`[DISPATCH] 🌊 Mode vagues — vague ${wave} (N${wave}: ${candidats.length} candidats)`);
+  } else {
+    candidats = candidatsTous;
+  }
 
   // Récupérer les IDs déjà notifiés précédemment
   let dejaNotifies = [];
   try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
 
   if (candidats.length === 0) {
+    // En mode vagues vague 3 épuisée → cycle_epuise
+    if (modeVagues && wave >= 3) {
+      console.log(`[DISPATCH] 🌊 Vague 3 épuisée — cycle_epuise pour course ${courseId}`);
+      await base44.asServiceRole.entities.CourseExterne.update(courseId, {
+        dispatch_status: 'cycle_epuise',
+        dispatch_wave: 3,
+      });
+      return { cycleEpuise: true };
+    }
     if (dejaNotifies.length > 0) {
       // Tous les livreurs ont été sollicités → cycle épuisé
       // On vérifie si les 2 minutes d'attente sont écoulées (depuis la dernière sollicitation)
@@ -318,6 +354,7 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
         await base44.asServiceRole.entities.CourseExterne.update(courseId, {
           dispatch_status: 'en_attente',
           dispatch_notified_ids: '[]',
+          dispatch_wave: 0,
           livreur_id: '',
           livreur_nom: '',
         });
@@ -357,6 +394,7 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
   await base44.asServiceRole.entities.CourseExterne.update(courseId, {
     statut: 'recherche_livreur',
     dispatch_status: 'propose',
+    dispatch_wave: wave, // 0 = mode normal, 1/2/3 = vague en cours
     livreur_id: '',
     livreur_nom: '',
     livreur_telephone: '',
@@ -695,8 +733,29 @@ Deno.serve(async (req) => {
 
       // Expiration vague multi (sans verrou)
       if (expired && course.dispatch_status === 'propose' && !course.livreur_id) {
-        console.log(`[DISPATCH] ⏰ Vague expirée course ${course_id} — nouvelle sélection`);
-        await base44.asServiceRole.entities.CourseExterne.update(course_id, { dispatch_status: 'redispatch' });
+        // 🌊 Mode vagues : avancer à la vague suivante
+        const currentWave = course.dispatch_wave || 0;
+        if (currentWave > 0) {
+          const nextWave = currentWave + 1;
+          if (nextWave > 3) {
+            console.log(`[DISPATCH] 🌊 Vague 3 expirée — cycle_epuise pour course ${course_id}`);
+            await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+              dispatch_status: 'cycle_epuise',
+              dispatch_wave: 3,
+            });
+            return Response.json({ expired: true, wave_epuise: true });
+          }
+          // Avancer à la vague suivante
+          console.log(`[DISPATCH] 🌊 Avancement vague ${currentWave} → ${nextWave} pour course ${course_id}`);
+          await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+            dispatch_status: 'redispatch',
+            dispatch_wave: nextWave,
+          });
+        } else {
+          // Mode normal (pas de vagues)
+          console.log(`[DISPATCH] ⏰ Vague expirée course ${course_id} — nouvelle sélection`);
+          await base44.asServiceRole.entities.CourseExterne.update(course_id, { dispatch_status: 'redispatch' });
+        }
 
         let dejaNotifies = [];
         try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
