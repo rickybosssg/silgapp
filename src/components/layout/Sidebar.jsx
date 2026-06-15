@@ -59,23 +59,23 @@ export default function Sidebar({ notificationCount = 0, reseau }) {
 
   return (
     <aside className={cn(
-      "h-screen bg-gradient-to-b from-[#0077B6] to-[#005F8A] flex flex-col transition-all duration-300 sticky top-0 shadow-xl shadow-[#005F8A]/25",
+      "h-screen bg-gradient-to-b from-[#1877F2] to-[#166FE5] flex flex-col transition-all duration-300 sticky top-0 shadow-xl shadow-[#166FE5]/25",
       collapsed ? "w-[68px]" : "w-60"
     )}>
       {/* Logo */}
       <div className={cn(
-        "h-16 flex items-center border-b border-[#48CAE4]/20 flex-shrink-0 overflow-hidden",
+        "h-16 flex items-center border-b border-[#7BB8FA]/25 flex-shrink-0 overflow-hidden",
         collapsed ? "px-4 justify-center" : "px-5 gap-3"
       )}>
         <img 
           src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/2c20ad136_SILGAPPLOGO2.jpg"
           alt="SILGAPP ET"
-          className="w-9 h-9 rounded-xl flex-shrink-0 ring-2 ring-[#90E0EF]/20"
+          className="w-9 h-9 rounded-xl flex-shrink-0 ring-2 ring-[#7BB8FA]/20"
         />
         {!collapsed && (
           <div>
             <h1 className="font-extrabold text-sm text-white tracking-wide">SILGAPP</h1>
-            <p className="text-[10px] text-[#90E0EF]/70">Silga Livraison</p>
+            <p className="text-[10px] text-[#7BB8FA]/70">Silga Livraison</p>
           </div>
         )}
       </div>
@@ -97,7 +97,7 @@ export default function Sidebar({ notificationCount = 0, reseau }) {
                 "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group",
                 isActive
                   ? "bg-primary text-white shadow-lg shadow-primary/30"
-                  : "text-white/70 hover:bg-[#0096C7]/25 hover:text-white"
+                  : "text-white/80 hover:bg-[#3890F5]/25 hover:text-white"
               )}
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
@@ -120,15 +120,15 @@ export default function Sidebar({ notificationCount = 0, reseau }) {
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-[#48CAE4]/20 flex-shrink-0">
+      <div className="border-t border-[#7BB8FA]/25 flex-shrink-0">
 
         {/* Sélecteur de pays — réseau externe uniquement */}
         {showCountryPicker && (
-          <div className={cn("relative border-b border-[#48CAE4]/20", collapsed ? "px-2 py-2" : "px-3 py-2")}>
+          <div className={cn("relative border-b border-[#7BB8FA]/25", collapsed ? "px-2 py-2" : "px-3 py-2")}>
             {collapsed ? (
               <button
                 onClick={() => setCountryOpen(!countryOpen)}
-                className="w-full flex items-center justify-center h-9 rounded-lg bg-[#0096C7]/20 hover:bg-[#00B4D8]/30 transition-colors"
+                className="w-full flex items-center justify-center h-9 rounded-lg bg-[#3890F5]/20 hover:bg-[#3B8CF7]/30 transition-colors"
                 title={effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
               >
                 <span className="text-base">
@@ -138,7 +138,7 @@ export default function Sidebar({ notificationCount = 0, reseau }) {
             ) : (
               <button
                 onClick={() => setCountryOpen(!countryOpen)}
-                className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[#0096C7]/20 hover:bg-[#00B4D8]/30 transition-colors"
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[#3890F5]/20 hover:bg-[#3B8CF7]/30 transition-colors"
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-base flex-shrink-0">
@@ -148,7 +148,7 @@ export default function Sidebar({ notificationCount = 0, reseau }) {
                     {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
                   </span>
                 </div>
-                <ChevronDown className={cn("w-3.5 h-3.5 text-[#90E0EF]/60 flex-shrink-0 transition-transform", countryOpen && "rotate-180")} />
+                <ChevronDown className={cn("w-3.5 h-3.5 text-[#7BB8FA]/60 flex-shrink-0 transition-transform", countryOpen && "rotate-180")} />
               </button>
             )}
 
@@ -157,7 +157,7 @@ export default function Sidebar({ notificationCount = 0, reseau }) {
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setCountryOpen(false)} />
                 <div className={cn(
-                  "absolute z-50 bg-[#00638C] border border-[#00B4D8]/30 rounded-xl shadow-2xl max-h-72 overflow-y-auto",
+                  "absolute z-50 bg-[#166FE5] border border-[#7BB8FA]/30 rounded-xl shadow-2xl max-h-72 overflow-y-auto",
                   collapsed ? "left-14 bottom-0 w-52" : "left-3 right-3 bottom-full mb-2"
                 )}>
                   {PAYS_SILGAPP.map((p) => (
@@ -165,8 +165,8 @@ export default function Sidebar({ notificationCount = 0, reseau }) {
                       key={p.code}
                       onClick={() => { setSelectedCountry(p.code); setCountryOpen(false); }}
                       className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-[#0096C7]/30",
-                        effectiveCountry === p.code ? "bg-[#48CAE4]/25 text-white" : "text-white/80"
+                        "w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-[#3890F5]/30",
+                        effectiveCountry === p.code ? "bg-[#3B8CF7]/25 text-white" : "text-white/80"
                       )}
                     >
                       <span className="text-base flex-shrink-0">{p.emoji_flag}</span>
@@ -184,7 +184,7 @@ export default function Sidebar({ notificationCount = 0, reseau }) {
         <button
           onClick={doLogout}
           className={cn(
-            "w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#90E0EF]/60 hover:text-red-400 hover:bg-red-500/10 transition-colors",
+            "w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-[#7BB8FA]/60 hover:text-red-400 hover:bg-red-500/10 transition-colors",
             collapsed ? "justify-center" : ""
           )}
           title="Déconnexion"
@@ -195,7 +195,7 @@ export default function Sidebar({ notificationCount = 0, reseau }) {
         {/* Collapse toggle */}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="w-full h-9 flex items-center justify-center text-[#90E0EF]/50 hover:text-white/80 hover:bg-[#0096C7]/15 transition-colors"
+          className="w-full h-9 flex items-center justify-center text-[#7BB8FA]/50 hover:text-white/80 hover:bg-[#3890F5]/15 transition-colors"
           title={collapsed ? "Étendre" : "Réduire"}
         >
           {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}

@@ -154,11 +154,11 @@ export default function DashboardExterne() {
       <div className="px-4 py-4 lg:px-6 lg:py-6 space-y-5 max-w-7xl mx-auto">
 
         {/* ── HERO HEADER ─────────────────────────────────── */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-5 sm:p-6 shadow-2xl">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1877F2] via-[#166FE5] to-[#1877F2] p-5 sm:p-6 shadow-2xl shadow-[#1877F2]/30">
           {/* Décoration */}
           <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-500/10 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white/15 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
           </div>
           
           <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -191,7 +191,7 @@ export default function DashboardExterne() {
                 {livreursEnLigne.length} livreur{livreursEnLigne.length > 1 ? "s" : ""} en ligne
               </div>
               <div className="flex items-center gap-2 bg-white/10 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white/70">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#7BB8FA] animate-pulse" />
                 {clientsEnLigne.length} client{clientsEnLigne.length > 1 ? "s" : ""} actif{clientsEnLigne.length > 1 ? "s" : ""}
               </div>
               {isGlobal && (
@@ -244,7 +244,7 @@ export default function DashboardExterne() {
           <div className="relative mt-4 grid grid-cols-4 gap-3">
             {[
               { label: "Aujourd'hui", value: stats.total, color: "text-white" },
-              { label: "En cours", value: stats.enCours, color: "text-blue-300" },
+              { label: "En cours", value: stats.enCours, color: "text-[#7BB8FA]" },
               { label: "Livrées", value: stats.livrees, color: "text-green-300" },
               { label: "Taux", value: `${taux}%`, color: "text-yellow-300" },
             ].map(item => (
