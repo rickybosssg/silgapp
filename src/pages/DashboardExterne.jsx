@@ -85,12 +85,24 @@ export default function DashboardExterne() {
     [courses, effectiveCountry]
   );
 
-  const coursesEnTraitement = useMemo(
-    () => coursesFiltrees.filter(c => !["livree", "annulee"].includes(c.statut)).filter(c => isToday(new Date(c.created_date)) || !["livree", "annulee"].includes(c.statut)),
+  const todayCourses = useMemo(
+    () => coursesFiltrees.filter(c =>
+      isToday(new Date(c.created_date)) || !["livree", "annulee"].includes(c.statut)
+    ),
     [coursesFiltrees]
   );
 
+  const coursesEnTraitement = useMemo(
+    () => todayCourses.filter(c => !["livree", "annulee"].includes(c.statut)),
+    [todayCourses]
+  );
+
   const [filtreTypeDashboard, setFiltreTypeDashboard] = useState("tous");
+
+  const coursesFiltreesDashboard = useMemo(() => {
+    if (filtreTypeDashboard === "tous") return coursesFiltrees;
+    return coursesFiltrees.filter(c => c.type_course === filtreTypeDashboard);
+  }, [coursesFiltrees, filtreTypeDashboard]);
 
   const coursesTerminees = useMemo(
     () => coursesFiltrees.filter(c =>
@@ -100,6 +112,8 @@ export default function DashboardExterne() {
     [coursesFiltrees]
   );
 
+  // Même critère que la carte dispatch : statut actif (disponible ou en_course) + validé + actif
+  // PAS de filtre heartbeat (isON) pour garantir la cohérence avec la carte
   const livreursEnLigne = useMemo(
     () => livreurs.filter(l =>
       (l.statut === "disponible" || l.statut === "en_course") &&
@@ -139,12 +153,14 @@ export default function DashboardExterne() {
     <div className="min-h-screen bg-slate-50">
       <div className="px-4 py-4 lg:px-6 lg:py-6 space-y-5 max-w-7xl mx-auto">
 
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1877F2] via-[#166FE5] to-[#1877F2] p-5 sm:p-6 shadow-2xl shadow-[#1877F2]/30">
+        {/* ── HERO HEADER ─────────────────────────────────── */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-5 sm:p-6 shadow-2xl">
+          {/* Décoration */}
           <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-white/15 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
+            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-500/10 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
           </div>
-
+          
           <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <Link to="/">
@@ -169,12 +185,13 @@ export default function DashboardExterne() {
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
+              {/* Pill live */}
               <div className="flex items-center gap-2 bg-white/10 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white/70">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
                 {livreursEnLigne.length} livreur{livreursEnLigne.length > 1 ? "s" : ""} en ligne
               </div>
               <div className="flex items-center gap-2 bg-white/10 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white/70">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#7BB8FA] animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
                 {clientsEnLigne.length} client{clientsEnLigne.length > 1 ? "s" : ""} actif{clientsEnLigne.length > 1 ? "s" : ""}
               </div>
               {isGlobal && (
@@ -201,6 +218,7 @@ export default function DashboardExterne() {
             </div>
           </div>
 
+          {/* Filtres type de course */}
           <div className="relative mt-4 flex gap-2 flex-wrap">
             {[
               { key: "tous", label: "Tous" },
@@ -222,10 +240,11 @@ export default function DashboardExterne() {
             ))}
           </div>
 
+          {/* Mini KPIs dans le hero */}
           <div className="relative mt-4 grid grid-cols-4 gap-3">
             {[
               { label: "Aujourd'hui", value: stats.total, color: "text-white" },
-              { label: "En cours", value: stats.enCours, color: "text-[#7BB8FA]" },
+              { label: "En cours", value: stats.enCours, color: "text-blue-300" },
               { label: "Livrées", value: stats.livrees, color: "text-green-300" },
               { label: "Taux", value: `${taux}%`, color: "text-yellow-300" },
             ].map(item => (
@@ -237,6 +256,7 @@ export default function DashboardExterne() {
           </div>
         </div>
 
+        {/* ── KPI CARDS ───────────────────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
           <KpiCard label="Clients" value={compteursClients.total} icon={Users} color="bg-gradient-to-br from-violet-500 to-purple-600" onClick={() => setStatModal({ type: "clients", data: clients })} />
           <KpiCard label="Courses" value={stats.total} icon={Package} color="bg-gradient-to-br from-blue-500 to-indigo-600" />
@@ -247,14 +267,17 @@ export default function DashboardExterne() {
           <KpiCard label="Disponibles" value={stats.libres} icon={Truck} color="bg-gradient-to-br from-primary to-red-600" onClick={() => setStatModal({ type: "livreurs_dispo", data: livreursEnLigne.filter(l => l.statut === "disponible") })} />
         </div>
 
+        {/* ── TÉLÉCHARGEMENTS ─────────────────────────────── */}
         <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
           <DownloadStatsPanel />
         </div>
 
+        {/* ── CODES PROMO ─────────────────────────────────── */}
         <div className="bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm">
           <CodePromoPanel />
         </div>
 
+        {/* ── ACTIVITÉ ─────────────────────────────────────── */}
         <div>
           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">Activité en direct</p>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -267,6 +290,7 @@ export default function DashboardExterne() {
           </div>
         </div>
 
+        {/* ── COURSES EN COURS ────────────────────────────── */}
         <div>
           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">Courses en cours</p>
           <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
@@ -278,17 +302,32 @@ export default function DashboardExterne() {
           </div>
         </div>
 
+        {/* ── HISTORIQUE DU JOUR ──────────────────────────── */}
         <div>
           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">Historique du jour</p>
           <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-            <CoursesTerminees courses={coursesTerminees} onView={setSelectedCourse} />
+            <CoursesTerminees
+              courses={coursesTerminees}
+              onView={setSelectedCourse}
+            />
           </div>
         </div>
 
       </div>
 
-      <CourseDetailDialog course={selectedCourse} open={!!selectedCourse} onClose={() => setSelectedCourse(null)} reseau="externe" />
-      <StatDetailModal open={!!statModal} onClose={() => setStatModal(null)} type={statModal?.type} data={statModal?.data} />
+      {/* Dialogs */}
+      <CourseDetailDialog
+        course={selectedCourse}
+        open={!!selectedCourse}
+        onClose={() => setSelectedCourse(null)}
+        reseau="externe"
+      />
+      <StatDetailModal
+        open={!!statModal}
+        onClose={() => setStatModal(null)}
+        type={statModal?.type}
+        data={statModal?.data}
+      />
     </div>
   );
 }

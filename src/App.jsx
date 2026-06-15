@@ -16,7 +16,7 @@ const InscriptionLivreur = () => null;
 
 const AppLayout = lazy(() => import('./components/layout/AppLayout'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
-const DashboardExterne = lazy(() => import('./pages/DashboardExterne'));
+const DashboardExterne = lazy(() => import('./pages/DashboardExterne.jsx'));
 const NouvelleCourse = lazy(() => import('./pages/NouvelleCourse'));
 
 const CarteLivreurs = lazy(() => import('./pages/CarteLivreurs'));
