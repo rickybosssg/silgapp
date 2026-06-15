@@ -108,6 +108,25 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
   const niveau1 = [], niveau2 = [], niveau3 = [];
   let nbMarquesHorsLigne = 0;
 
+  // 🧠 Résoudre les coordonnées de pickup : GPS > quartier > fallback large
+  let pickupLat = course.gps_depart_lat;
+  let pickupLng = course.gps_depart_lng;
+  let pickupSource = 'gps';
+
+  if ((!pickupLat || !pickupLng) && course.quartier_depart) {
+    try {
+      const quartiers = await base44.asServiceRole.entities.Quartier.filter({
+        country_code: course.country_code, nom: course.quartier_depart, actif: true,
+      });
+      if (quartiers?.[0]?.latitude && quartiers[0]?.longitude) {
+        pickupLat = quartiers[0].latitude;
+        pickupLng = quartiers[0].longitude;
+        pickupSource = 'quartier';
+        console.log(`[DISPATCH] 📍 Fallback quartier: ${course.quartier_depart} (${pickupLat}, ${pickupLng})`);
+      }
+    } catch (_) {}
+  }
+
   eligibles.forEach(l => {
     const hbDate = l.last_seen_at || l.derniere_position_date;
     let heartbeatAgeMin = null;
@@ -124,8 +143,8 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
     }
 
     let distance = 0;
-    if (course.gps_depart_lat && course.gps_depart_lng && l.latitude && l.longitude) {
-      distance = calculerDistance(course.gps_depart_lat, course.gps_depart_lng, l.latitude, l.longitude);
+    if (pickupLat && pickupLng && l.latitude && l.longitude) {
+      distance = calculerDistance(pickupLat, pickupLng, l.latitude, l.longitude);
     }
 
     const enriched = { ...l, distance, heartbeatAgeMin };
@@ -162,7 +181,7 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
   if (nbMarquesHorsLigne > 0) {
     console.log(`[DISPATCH] 🚫 ${nbMarquesHorsLigne} livreur(s) marqué(s) hors_ligne (HB > 60 min)`);
   }
-  console.log(`[DISPATCH] 📊 ${tous.length} candidats (exclus: ${exclusions.length}, hors_ligne: ${nbMarquesHorsLigne}) — N1:${niveau1.length} N2:${niveau2.length} N3:${niveau3.length}`);
+  console.log(`[DISPATCH] 📊 ${tous.length} candidats (exclus: ${exclusions.length}, hors_ligne: ${nbMarquesHorsLigne}) — N1:${niveau1.length} N2:${niveau2.length} N3:${niveau3.length} — pickup: ${pickupSource}${pickupSource === 'quartier' ? ` (${course.quartier_depart})` : ''}`);
   return tous;
 }
 

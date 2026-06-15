@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { ArrowLeft, MapPin, Send, Loader2, Sparkles, MessageCircle, CheckCircle2, Copy, ExternalLink } from "lucide-react";
 import { useAdminContext } from "@/hooks/useAdminContext";
+import QuartierSelect from "@/components/client/QuartierSelect";
 
 function generarQRData() {
   const pickupQrToken = crypto.randomUUID().replace(/-/g, "");
@@ -286,6 +287,8 @@ export default function AdminCourseForm() {
   const [destinataireTelephone, setDestinataireTelephone] = useState("");
   const [typeColis, setTypeColis] = useState("petit_colis");
   const [notes, setNotes] = useState("");
+  const [quartierDepart, setQuartierDepart] = useState("");
+  const [quartierArrivee, setQuartierArrivee] = useState("");
 
   const selectedPays = PAYS.find(p => p.code === countryCode);
 
@@ -323,6 +326,8 @@ export default function AdminCourseForm() {
         type_course: typeCourse,
         adresse_depart: adresseDepart.trim() || "—",
         adresse_arrivee: adresseArrivee.trim() || "—",
+        quartier_depart: quartierDepart || null,
+        quartier_arrivee: quartierArrivee || null,
         client_nom: clientNom.trim() || "Client",
         client_telephone: clientTelephone.trim() || "",
         expediteur_nom: expediteurNom.trim() || null,
@@ -446,6 +451,14 @@ export default function AdminCourseForm() {
             </div>
           </div>
 
+          <QuartierSelect
+            countryCode={countryCode}
+            value={quartierDepart}
+            onChange={setQuartierDepart}
+            placeholder="Quartier de récupération..."
+            label="Quartier de récupération"
+          />
+
           <div>
             <p className="text-xs font-semibold text-gray-500 mb-1.5">Point d'arrivée</p>
             <div className="relative">
@@ -458,6 +471,14 @@ export default function AdminCourseForm() {
               />
             </div>
           </div>
+
+          <QuartierSelect
+            countryCode={countryCode}
+            value={quartierArrivee}
+            onChange={setQuartierArrivee}
+            placeholder="Quartier de livraison..."
+            label="Quartier de livraison"
+          />
 
           {typeCourse !== "deplacement" && (
             <div>

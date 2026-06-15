@@ -100,6 +100,8 @@ export default function CourseExterneFormSync() {
     type_colis: "petit_colis",
     adresse_depart: "",
     adresse_arrivee: "",
+    quartier_depart: "",
+    quartier_arrivee: "",
     destination_inconnue: false,
     notes: "",
     // Pour "recevoir" : départ = chez l'expéditeur (à saisir), arrivée = position client (auto)
@@ -581,6 +583,8 @@ export default function CourseExterneFormSync() {
       expediteur_has_app: false,
       adresse_depart: isDeplacement ? (formData.adresse_depart || (formData.recuperationGPS ? "Position GPS" : "À définir")) : (formData.adresse_depart || (formData.recuperationGPS ? "Position GPS" : "À définir")),
       adresse_arrivee: adresseArriveeFinale,
+      quartier_depart: formData.quartier_depart || null,
+      quartier_arrivee: formData.quartier_arrivee || null,
       type_colis: isDeplacement ? "autre" : (isMulti ? (colis[0]?.type_colis || "petit_colis") : formData.type_colis),
       notes: formData.notes,
       gps_depart_lat: formData.gps_depart_lat,

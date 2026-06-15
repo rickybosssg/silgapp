@@ -15,6 +15,7 @@ import ContactPickerButton from "@/components/client/ContactPickerButton";
 import { SILGAPP_COUNTRIES, phoneVariants } from "@/lib/phoneUtils";
 import NombreColisSelector from "@/components/multi-colis/NombreColisSelector";
 import MultiColisFormStep from "@/components/multi-colis/MultiColisFormStep";
+import QuartierSelect from "@/components/client/QuartierSelect";
 
 // Retourne l'indicatif affiché (ex: "+226") selon le pays
 function getDialCode(countryCode) {
@@ -569,6 +570,14 @@ export default function CourseStepForm({
                   onChange={(e) => setFormData({ ...formData, adresse_depart: e.target.value })}
                   placeholder="Quartier, rue, point de repère... (optionnel)"
                 />
+
+                <QuartierSelect
+                  countryCode={activeCountry}
+                  value={formData.quartier_depart || ""}
+                  onChange={(quartier) => setFormData({ ...formData, quartier_depart: quartier })}
+                  placeholder="Sélectionnez votre quartier..."
+                  label="Quartier de récupération"
+                />
               </>
             )}
           </div>
@@ -836,6 +845,7 @@ export default function CourseStepForm({
                   </button>
                 </div>
               ) : (
+                <>
                 <PremiumInput
                   label="Adresse de livraison"
                   required={false}
@@ -845,6 +855,15 @@ export default function CourseStepForm({
                   placeholder="Quartier, rue, point de repère... (optionnel)"
                   autoFocus
                 />
+
+                <QuartierSelect
+                  countryCode={activeCountry}
+                  value={formData.quartier_arrivee || ""}
+                  onChange={(quartier) => setFormData({ ...formData, quartier_arrivee: quartier })}
+                  placeholder="Sélectionnez le quartier de livraison..."
+                  label="Quartier de livraison"
+                />
+                </>
               )}
             </div>
           );

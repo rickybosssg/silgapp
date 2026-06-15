@@ -1,0 +1,53 @@
+{
+  "name": "Quartier",
+  "type": "object",
+  "properties": {
+    "country_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE",
+        "GH"
+      ],
+      "description": "Code pays du quartier"
+    },
+    "ville": {
+      "type": "string",
+      "description": "Ville du quartier (ex: Ouagadougou, Abidjan, Lom\u00e9)"
+    },
+    "nom": {
+      "type": "string",
+      "description": "Nom officiel du quartier"
+    },
+    "latitude": {
+      "type": "number",
+      "description": "Latitude approximative du centre du quartier"
+    },
+    "longitude": {
+      "type": "number",
+      "description": "Longitude approximative du centre du quartier"
+    },
+    "variantes": {
+      "type": "string",
+      "description": "Variantes orthographiques s\u00e9par\u00e9es par des virgules (ex: Ouaga 2000, Ouaga2000)"
+    },
+    "actif": {
+      "type": "boolean",
+      "default": true,
+      "description": "Quartier actif pour le dispatch"
+    }
+  },
+  "required": [
+    "country_code",
+    "ville",
+    "nom",
+    "latitude",
+    "longitude"
+  ]
+}

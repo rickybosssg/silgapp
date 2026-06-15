@@ -96,6 +96,14 @@
       "type": "string",
       "description": "Adresse ou quartier de livraison / depot"
     },
+    "quartier_depart": {
+      "type": "string",
+      "description": "Quartier de recuperation (selectionne ou saisi librement)"
+    },
+    "quartier_arrivee": {
+      "type": "string",
+      "description": "Quartier de livraison (selectionne ou saisi librement)"
+    },
     "ville_depart": {
       "type": "string"
     },
@@ -350,7 +358,7 @@
         "admin_manuel"
       ],
       "default": "automatic",
-      "description": "Mode de tarification : automatic (prix auto), manual (prix manuel livreur->client), admin_manuel (admin course, livreur saisit montant a la fin)"
+      "description": "Mode de tarification"
     },
     "manual_price": {
       "type": "number"
