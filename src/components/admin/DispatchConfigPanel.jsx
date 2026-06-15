@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
-import { Save, Loader2, Users, Clock, Info } from "lucide-react";
+import { Save, Loader2, Users, Clock, Info, Flame, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 
 const NB_OPTIONS = [
   { value: "1", label: "1 livreur", desc: "Attribution séquentielle classique" },
@@ -166,6 +167,19 @@ export default function DispatchConfigPanel() {
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
         {saving ? "Sauvegarde..." : "Sauvegarder la configuration"}
       </Button>
+
+      <Link to="/admin/zones-chaudes" className="block mt-2">
+        <div className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-xl hover:bg-orange-100 transition-colors group">
+          <div className="flex items-center gap-2.5">
+            <Flame className="w-4 h-4 text-orange-500" />
+            <div>
+              <p className="text-sm font-bold text-orange-700">Zones Chaudes</p>
+              <p className="text-[10px] text-orange-500">Configurer la détection et les notifications push</p>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-orange-400 group-hover:text-orange-600" />
+        </div>
+      </Link>
     </div>
   );
 }
