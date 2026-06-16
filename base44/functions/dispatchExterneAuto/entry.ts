@@ -515,7 +515,7 @@ Deno.serve(async (req) => {
 
     // ─── 3. Accepter une course — VERROU ATOMIQUE ─────────────────────────
     if (action === 'accepter_course') {
-      const { pricing_mode, manual_price } = body;
+      const { pricing_mode, manual_price, override_pricing_mode } = body;
 
       const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
@@ -623,6 +623,7 @@ Deno.serve(async (req) => {
         dispatch_status: isManual ? 'propose' : 'accepte',
         statut: isManual ? 'recherche_livreur' : 'livreur_en_route',
         heure_acceptation: isManual ? null : new Date().toISOString(),
+        ...(override_pricing_mode === 'automatic' ? { pricing_mode: 'automatic' } : {}),
         livreur_id: livreur_id,
         livreur_nom: `${livreur.prenom || ''} ${livreur.nom}`.trim(),
         livreur_photo_url: livreur.photo_url || '',

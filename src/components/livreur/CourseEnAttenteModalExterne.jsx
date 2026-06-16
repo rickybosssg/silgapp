@@ -46,6 +46,10 @@ export default function CourseEnAttenteModalExterne({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showManualPriceModal, setShowManualPriceModal] = useState(false);
 
+  // 🏛️ Course admin : le livreur en mode manuel ne peut pas proposer de prix
+  const isAdminCourse = course?.source === "admin" || course?.pricing_mode === "admin_manuel";
+  const showAdminBlock = isAdminCourse && pricingMode === "manual";
+
   // Sonnerie répétée
   useEffect(() => {
     setTempsRestant(alertDurationSeconds);
@@ -133,6 +137,64 @@ export default function CourseEnAttenteModalExterne({
       setShowManualPriceModal(true);
     } else {
       handleAccepterAuto();
+    }
+  };
+
+  // 🏛️ Accepter une course admin en mode automatique (override)
+  const handleAccepterAdminAuto = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const res = await base44.functions.invoke('dispatchExterneAuto', {
+        action: 'accepter_course',
+        course_id: course.id,
+        livreur_id: livreurId,
+        override_pricing_mode: "automatic",
+      });
+      const data = res?.data;
+      if (data?.already_accepted) { stopUrgentCourseAlert("course-accepted"); onAccepter(); return; }
+      if (data?.already_taken || data?.reason === "already_taken") { stopUrgentCourseAlert("course-already-taken"); setCourseDejaPrise(true); return; }
+      if (data?.expired) { stopUrgentCourseAlert("course-expired"); setCourseExpiree(true); return; }
+      if (data?.success && data?.accepted !== false) {
+        stopUrgentCourseAlert("course-accepted");
+        onAccepter();
+      } else {
+        alert(data?.error || "Erreur lors de l'acceptation");
+      }
+    } catch (err) {
+      console.error('Erreur acceptation admin auto:', err);
+      alert('Erreur réseau');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // 🏛️ Accepter une course admin au tarif administratif
+  const handleAccepterAdminManuel = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const res = await base44.functions.invoke('dispatchExterneAuto', {
+        action: 'accepter_course',
+        course_id: course.id,
+        livreur_id: livreurId,
+        override_pricing_mode: "admin_manuel",
+      });
+      const data = res?.data;
+      if (data?.already_accepted) { stopUrgentCourseAlert("course-accepted"); onAccepter(); return; }
+      if (data?.already_taken || data?.reason === "already_taken") { stopUrgentCourseAlert("course-already-taken"); setCourseDejaPrise(true); return; }
+      if (data?.expired) { stopUrgentCourseAlert("course-expired"); setCourseExpiree(true); return; }
+      if (data?.success && data?.accepted !== false) {
+        stopUrgentCourseAlert("course-accepted");
+        onAccepter(); // admin_manuel : pas de validation client, prix saisi à la livraison
+      } else {
+        alert(data?.error || "Erreur lors de l'acceptation");
+      }
+    } catch (err) {
+      console.error('Erreur acceptation admin manuel:', err);
+      alert('Erreur réseau');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -451,31 +513,77 @@ export default function CourseEnAttenteModalExterne({
           </div>
 
           {/* Badge mode tarification */}
-          {pricingMode === "manual" && (
+          {pricingMode === "manual" && !showAdminBlock && (
             <div className="flex items-center justify-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-1.5">
               <span className="text-xs font-bold text-blue-700">💰 Mode prix manuel activé — vous allez saisir votre prix</span>
             </div>
           )}
 
+          {/* 🏛️ Bloc course administrative (bloque le prix manuel) */}
+          {showAdminBlock && (
+            <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-200 flex items-center justify-center flex-shrink-0">
+                  <span className="text-lg">🏛️</span>
+                </div>
+                <div>
+                  <p className="text-sm font-black text-amber-900">Course administrative SILGA</p>
+                  <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+                    Cette course a été créée par l'administration SILGA. Les propositions de prix ne sont pas autorisées sur les courses administratives.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Boutons */}
-          <div className="grid grid-cols-2 gap-3 pt-1">
-            <button
-              className="h-16 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 disabled:opacity-50"
-              onClick={handleAccepterClick}
-              disabled={isSubmitting}
-            >
-              <Check className="w-6 h-6" />
-              <span className="text-xs font-bold">Oui, je prends !</span>
-            </button>
-            <button
-              className="h-16 rounded-2xl bg-gray-100 text-gray-700 font-black text-base border border-gray-200 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 disabled:opacity-50"
-              onClick={handleRefuser}
-              disabled={isSubmitting}
-            >
-              <X className="w-6 h-6 text-gray-500" />
-              <span className="text-xs font-bold text-gray-500">Non, occupé</span>
-            </button>
-          </div>
+          {showAdminBlock ? (
+            <div className="space-y-2 pt-1">
+              <button
+                className="w-full h-12 rounded-2xl bg-green-600 text-white font-bold text-sm active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                onClick={handleAccepterAdminAuto}
+                disabled={isSubmitting}
+              >
+                <Check className="w-5 h-5" />
+                Basculer en mode automatique
+              </button>
+              <button
+                className="w-full h-12 rounded-2xl bg-blue-600 text-white font-bold text-sm active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                onClick={handleAccepterAdminManuel}
+                disabled={isSubmitting}
+              >
+                <Check className="w-5 h-5" />
+                Accepter au tarif administratif
+              </button>
+              <button
+                className="w-full h-12 rounded-2xl bg-gray-100 text-gray-600 font-bold text-sm border border-gray-200 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                onClick={handleRefuser}
+                disabled={isSubmitting}
+              >
+                <X className="w-5 h-5 text-gray-400" />
+                Refuser la course
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <button
+                className="h-16 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 disabled:opacity-50"
+                onClick={handleAccepterClick}
+                disabled={isSubmitting}
+              >
+                <Check className="w-6 h-6" />
+                <span className="text-xs font-bold">Oui, je prends !</span>
+              </button>
+              <button
+                className="h-16 rounded-2xl bg-gray-100 text-gray-700 font-black text-base border border-gray-200 active:scale-95 transition-all flex flex-col items-center justify-center gap-1 disabled:opacity-50"
+                onClick={handleRefuser}
+                disabled={isSubmitting}
+              >
+                <X className="w-6 h-6 text-gray-500" />
+                <span className="text-xs font-bold text-gray-500">Non, occupé</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
