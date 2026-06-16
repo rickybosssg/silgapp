@@ -483,11 +483,15 @@ export default function CourseEnAttenteModalExterne({
 
           {/* 🏛️ Bloc course administrative — acceptation uniquement */}
           {showAdminBlock && (
-            <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">🏛️</span>
-                <p className="text-xs font-bold text-amber-800">Course SILGA administration — tarif saisi à la livraison</p>
+            <div className="bg-blue-600 rounded-2xl px-4 py-3 flex items-center gap-3 shadow-lg shadow-blue-200">
+              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
               </div>
+              <p className="text-white font-black text-sm leading-tight">
+                COURSE CRÉÉE PAR SILGAPP ADMINISTRATION — TARIF SAISI EN FIN DE COURSE
+              </p>
             </div>
           )}
 

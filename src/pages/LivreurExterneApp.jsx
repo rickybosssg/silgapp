@@ -552,7 +552,13 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const coursesActives = useMemo(
     () => mesCourses.filter(c =>
       sameLivreurId(c.livreur_id, livreurProfil?.id) &&
-      ["livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut)
+      (
+        ["livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut) ||
+        // 🏛️ Admin_manuel : garder la carte visible tant que le montant n'est pas saisi,
+        // même si le backend a déjà marqué la course "livree" via validateQRCode.
+        // Sans cela, la modale de saisie du montant disparaît avant validation.
+        (c.pricing_mode === "admin_manuel" && c.statut === "livree" && !c.prix_final)
+      )
     ),
     [mesCourses, livreurProfil?.id]
   );
@@ -903,19 +909,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   };
 
   const handleColisLivre = (course, montantSaisi) => {
-    // Cas QR externe : la course est déjà "livree" en DB (validée par le backend validateQRCode)
-    // On fait juste les invalidations + statut livreur, le récap est géré dans CourseActiveCard
-    if (course.statut === "livree") {
-      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-      queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
-      if (livreurProfil?.statut !== "hors_ligne") {
-        statutMutation.mutate("disponible");
-      }
-      toast.success("Livraison terminée ! 🎉");
-      return;
-    }
-
-    // ── ADMIN_MANUEL : montant saisi par le livreur, split 70/30 ──
+    // 🏛️ ADMIN_MANUEL : montant saisi par le livreur, split 70/30 — PRIORITAIRE avant tout autre check
     if (course.pricing_mode === "admin_manuel" && typeof montantSaisi === "number" && montantSaisi > 0) {
       const commissionSilga = Math.round(montantSaisi * 0.3);
       const montantLivreur = montantSaisi - commissionSilga;
@@ -938,6 +932,18 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         statutMutation.mutate("disponible");
       }
       toast.success(`Livraison terminée ! 💰 ${montantSaisi.toLocaleString()} F`);
+      return;
+    }
+
+    // Cas QR externe (non admin) : la course est déjà "livree" en DB (validée par le backend validateQRCode)
+    // On fait juste les invalidations + statut livreur, le récap est géré dans CourseActiveCard
+    if (course.statut === "livree") {
+      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+      if (livreurProfil?.statut !== "hors_ligne") {
+        statutMutation.mutate("disponible");
+      }
+      toast.success("Livraison terminée ! 🎉");
       return;
     }
 
