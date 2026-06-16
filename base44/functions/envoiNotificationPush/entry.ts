@@ -355,6 +355,7 @@ Deno.serve(async (req) => {
     };
 
     const urgentAndroidPayload = {
+      notification: { title: titre, body: message },
       data: {
         ...dataPayload,
         title: String(titre),
@@ -364,6 +365,17 @@ Deno.serve(async (req) => {
         collapse_key: notificationTag,
         priority: 'HIGH',
         ttl: `${Math.max(60, Number(alert_duration_seconds || 60) + 30)}s`,
+        notification: {
+          tag: notificationTag,
+          channel_id: ANDROID_CHANNEL_ID,
+          sound: 'default',
+          vibrate_timings: ['0s', '0.2s', '0.1s', '0.2s', '0.1s', '0.4s'],
+          default_sound: true,
+          default_vibrate_timings: false,
+          notification_priority: 'PRIORITY_HIGH',
+          visibility: 'PUBLIC',
+          click_action: ANDROID_CLICK_ACTION,
+        },
       },
     };
 
