@@ -313,9 +313,9 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
   const resultat = await trouverLivreursCandidats(base44, course, exclusions);
   const { tous: candidatsTous, niveau1, niveau2, niveau3, pickupSource } = resultat;
 
-  // 🧠 Mode vagues : activé UNIQUEMENT si ni GPS ni quartier
+  // 🧠 Mode vagues : activé pour quartier et "none" (GPS = notif simultanée)
   // Le dispatch_wave stocké sur la course indique la vague actuelle (1=N1, 2=N2, 3=N3)
-  const modeVagues = pickupSource === 'none';
+  const modeVagues = pickupSource !== 'gps';
   let wave = modeVagues ? (course.dispatch_wave || 1) : 0;
 
   // En mode vagues, sélectionner uniquement le niveau correspondant
@@ -779,7 +779,81 @@ Deno.serve(async (req) => {
       return Response.json({ expired, dispatch_status: course.dispatch_status, livreur_id: course.livreur_id });
     }
 
-    // ─── 6. Retry courses en attente / cycle_epuise ───────────────────────
+    // ─── 6. Avancer les vagues expirées (N1→N2→N3→cycle_epuise→N1) ──
+    if (action === 'avancer_vagues_expirees') {
+      const { country_code: filterCountry } = body;
+      const filter = { statut: 'recherche_livreur' };
+      if (filterCountry) filter.country_code = filterCountry;
+
+      const courses = await base44.asServiceRole.entities.CourseExterne.filter(filter);
+      const now = new Date();
+      const resultats = [];
+
+      for (const course of courses) {
+        // 🔄 cycle_epuise : après 2 min d'attente → reset et retour N1
+        if (course.dispatch_status === 'cycle_epuise') {
+          const derniereSollicitation = course.heure_sollicitation ? new Date(course.heure_sollicitation) : null;
+          const deuxMinutesPassees = derniereSollicitation
+            ? (now.getTime() - derniereSollicitation.getTime()) >= 2 * 60 * 1000
+            : true;
+
+          if (deuxMinutesPassees) {
+            console.log(`[DISPATCH] 🔄 Cycle épuisé → reset N1 pour course ${course.id}`);
+            await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+              dispatch_status: 'en_attente',
+              dispatch_notified_ids: '[]',
+              dispatch_wave: 0,
+              livreur_id: '',
+              livreur_nom: '',
+            });
+            const result = await lancerDispatchMulti(base44, course.id, []);
+            resultats.push({ course_id: course.id, wave: 'reset→N1', ...result });
+          }
+          continue;
+        }
+
+        // 📌 Courses en attente / redispatch (hors vagues) → relancer
+        if (['en_attente', 'redispatch'].includes(course.dispatch_status)) {
+          let dejaNotifies = [];
+          try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
+          const result = await lancerDispatchMulti(base44, course.id, dejaNotifies);
+          resultats.push({ course_id: course.id, wave: 'retry', ...result });
+          continue;
+        }
+
+        // 🌊 Vagues expirées (propose sans verrou, mode vagues)
+        const expired = !!(course.timeout_expires_at && new Date(course.timeout_expires_at) < now);
+        if (!expired || course.dispatch_status !== 'propose' || course.livreur_id) continue;
+
+        const currentWave = course.dispatch_wave || 0;
+        if (currentWave > 0) {
+          const nextWave = currentWave + 1;
+          if (nextWave > 3) {
+            console.log(`[DISPATCH] 🌊 Vague 3 expirée — cycle_epuise pour course ${course.id}`);
+            await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+              dispatch_status: 'cycle_epuise',
+              dispatch_wave: 3,
+            });
+            resultats.push({ course_id: course.id, wave: '3→epuise' });
+            continue;
+          }
+          console.log(`[DISPATCH] 🌊 Avancement vague ${currentWave} → ${nextWave} pour course ${course.id}`);
+          await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+            dispatch_status: 'redispatch',
+            dispatch_wave: nextWave,
+          });
+        }
+
+        let dejaNotifies = [];
+        try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
+        const result = await lancerDispatchMulti(base44, course.id, dejaNotifies);
+        resultats.push({ course_id: course.id, wave: `${currentWave}→${currentWave + 1}`, ...result });
+      }
+
+      return Response.json({ success: true, traitees: resultats.length, resultats: resultats.slice(0, 20) });
+    }
+
+    // ─── 7. Retry courses en attente / redispatch (hors vagues) ────────────
     if (action === 'retry_courses_en_attente') {
       const { country_code: filterCountry } = body;
       const filter = { statut: 'recherche_livreur' };
@@ -787,8 +861,7 @@ Deno.serve(async (req) => {
 
       const courses = await base44.asServiceRole.entities.CourseExterne.filter(filter);
       const aRetenter = courses.filter(c =>
-        ['en_attente', 'redispatch', 'cycle_epuise'].includes(c.dispatch_status) ||
-        (c.dispatch_status === 'propose' && c.timeout_expires_at && new Date(c.timeout_expires_at) < new Date(Date.now() - 5000))
+        ['en_attente', 'redispatch', 'cycle_epuise'].includes(c.dispatch_status)
       );
 
       const resultats = [];
