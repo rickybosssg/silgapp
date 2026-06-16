@@ -162,7 +162,9 @@ export default function RecapCourseLivreur() {
   const prixFinal = Math.max(1000, prixBrut);
   const gainLivreur = Number(course.montant_livreur) > 0 ? Number(course.montant_livreur) : Math.round(prixFinal * 0.7);
   const commissionSilga = Number(course.commission_silga) > 0 ? Number(course.commission_silga) : Math.round(prixFinal * 0.3);
-  const duree = dureeMinutes(course.heure_recuperation, course.heure_livraison);
+  const duree = course.type_course === "deplacement"
+    ? dureeMinutes(course.heure_prise_en_charge, course.heure_livraison)
+    : dureeMinutes(course.heure_recuperation, course.heure_livraison);
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
@@ -172,8 +174,12 @@ export default function RecapCourseLivreur() {
         <div className="w-20 h-20 rounded-full bg-green-500 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-green-500/40">
           <CheckCircle2 className="w-10 h-10 text-white" />
         </div>
-        <h1 className="text-3xl font-black text-white tracking-tight">COURSE TERMINÉE</h1>
-        <p className="text-green-400 font-semibold mt-1 text-sm">Livraison confirmée avec succès</p>
+        <h1 className="text-3xl font-black text-white tracking-tight">
+          {course.type_course === "deplacement" ? "DÉPLACEMENT TERMINÉ" : "COURSE TERMINÉE"}
+        </h1>
+        <p className="text-green-400 font-semibold mt-1 text-sm">
+          {course.type_course === "deplacement" ? "Course terminée avec succès" : "Livraison confirmée avec succès"}
+        </p>
       </div>
 
       {/* ── CONTENU ── */}
@@ -266,29 +272,67 @@ export default function RecapCourseLivreur() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-gray-800 rounded-2xl p-3 text-center">
-              <p className="text-gray-500 text-[10px] uppercase mb-1">Récupération</p>
-              <p className="text-white font-bold">{formatHeure(course.heure_recuperation)}</p>
-            </div>
-            <div className="bg-gray-800 rounded-2xl p-3 text-center">
-              <p className="text-gray-500 text-[10px] uppercase mb-1">Livraison</p>
-              <p className="text-white font-bold">{formatHeure(course.heure_livraison)}</p>
-            </div>
-          </div>
+          {/* 🚗 Déplacement : grille spécifique avec heures détaillées */}
+          {course.type_course === "deplacement" ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-800 rounded-2xl p-3 text-center">
+                  <p className="text-gray-500 text-[10px] uppercase mb-1">Acceptation</p>
+                  <p className="text-white font-bold">{formatHeure(course.heure_acceptation)}</p>
+                </div>
+                <div className="bg-gray-800 rounded-2xl p-3 text-center">
+                  <p className="text-gray-500 text-[10px] uppercase mb-1">Prise en charge</p>
+                  <p className="text-white font-bold">{formatHeure(course.heure_prise_en_charge)}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-800 rounded-2xl p-3 text-center">
+                  <p className="text-gray-500 text-[10px] uppercase mb-1">Arrivée</p>
+                  <p className="text-white font-bold">{formatHeure(course.heure_arrivee)}</p>
+                </div>
+                <div className="bg-gray-800 rounded-2xl p-3 text-center">
+                  <p className="text-gray-500 text-[10px] uppercase mb-1">Fin de course</p>
+                  <p className="text-white font-bold">{formatHeure(course.heure_livraison)}</p>
+                </div>
+              </div>
+              {course.passager_nom && (
+                <div className="flex items-center justify-between px-1">
+                  <p className="text-gray-500 text-sm">Passager</p>
+                  <p className="text-white font-semibold text-sm">{course.passager_nom}</p>
+                </div>
+              )}
+              <div className="flex items-center justify-between px-1">
+                <p className="text-gray-500 text-sm">Type de course</p>
+                <p className="text-white font-semibold text-sm">🚗 Déplacement</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-800 rounded-2xl p-3 text-center">
+                  <p className="text-gray-500 text-[10px] uppercase mb-1">Récupération</p>
+                  <p className="text-white font-bold">{formatHeure(course.heure_recuperation)}</p>
+                </div>
+                <div className="bg-gray-800 rounded-2xl p-3 text-center">
+                  <p className="text-gray-500 text-[10px] uppercase mb-1">Livraison</p>
+                  <p className="text-white font-bold">{formatHeure(course.heure_livraison)}</p>
+                </div>
+              </div>
 
-          {duree && (
-            <div className="bg-gray-800 rounded-2xl p-3 text-center">
-              <p className="text-gray-500 text-[10px] uppercase mb-1">Durée totale</p>
-              <p className="text-white font-bold">{duree}</p>
-            </div>
-          )}
+              {duree && (
+                <div className="bg-gray-800 rounded-2xl p-3 text-center">
+                  <p className="text-gray-500 text-[10px] uppercase mb-1">Durée totale</p>
+                  <p className="text-white font-bold">{duree}</p>
+                </div>
+              )}
 
-          {course.type_colis && (
-            <div className="flex items-center justify-between px-1">
-              <p className="text-gray-500 text-sm">Type de colis</p>
-              <p className="text-white font-semibold text-sm">{TYPE_COLIS_LABELS[course.type_colis] || course.type_colis}</p>
-            </div>
+              {course.type_colis && (
+                <div className="flex items-center justify-between px-1">
+                  <p className="text-gray-500 text-sm">Type de colis</p>
+                  <p className="text-white font-semibold text-sm">{TYPE_COLIS_LABELS[course.type_colis] || course.type_colis}</p>
+                </div>
+              )}
+            </>
           )}
 
           {course.adresse_depart && (

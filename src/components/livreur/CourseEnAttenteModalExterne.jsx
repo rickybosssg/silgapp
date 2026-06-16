@@ -445,11 +445,17 @@ export default function CourseEnAttenteModalExterne({
                         <span className="text-xs text-green-600 font-bold">Prix convenu avec le client</span>
                       </div>
                     )}
-                    {course.type_colis && !isPrixManuel && (
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <Package className="w-3.5 h-3.5 text-gray-600" />
-                        <span className="text-xs text-gray-500">{typeColisLabel[course.type_colis] || course.type_colis}</span>
-                      </div>
+                    {!isPrixManuel && (
+                      isDeplacement ? (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="text-[10px] text-gray-500 uppercase">🚗 Déplacement</span>
+                        </div>
+                      ) : course.type_colis && (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <Package className="w-3.5 h-3.5 text-gray-600" />
+                          <span className="text-xs text-gray-500">{typeColisLabel[course.type_colis] || course.type_colis}</span>
+                        </div>
+                      )
                     )}
                   </>
                 );
@@ -474,6 +480,31 @@ export default function CourseEnAttenteModalExterne({
               );
             })()}
           </div>
+
+          {/* 🚗 DÉPLACEMENT : distances détaillées avant acceptation */}
+          {isDeplacement && (() => {
+            const distPickup = haversine(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng);
+            if (!distPickup || distPickup <= 0) return null;
+            const distLabelPickup = distPickup < 1 ? `${Math.round(distPickup * 1000)} m` : `${distPickup.toFixed(1)} km`;
+            return (
+              <div className="bg-cyan-50 border border-cyan-200 rounded-2xl px-4 py-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">📍</span>
+                    <span className="text-xs font-semibold text-cyan-800">Distance prise en charge</span>
+                  </div>
+                  <span className="text-sm font-black text-cyan-700">{distLabelPickup}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">🏁</span>
+                    <span className="text-xs font-semibold text-cyan-800">Distance totale déplacement</span>
+                  </div>
+                  <span className="text-sm font-black text-cyan-700">{distLabelPickup}</span>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Badge mode tarification — affiché uniquement pour courses NON admin */}
           {!isAdminCourse && pricingMode === "manual" && (

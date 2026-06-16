@@ -174,6 +174,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
   const handleConfirmerLivraison = () => {
     // 🚗 DÉPLACEMENT : prix saisi → recap local → attendre TERMINER
+    // IMPORTANT : garder statut "arrivee" (pas "livree") pour que syncStatutLivreurOnCourse
+    // ne libère PAS le livreur automatiquement. Le livreur doit rester "en_course" jusqu'à TERMINER.
     if (isDeplacement) {
       const montant = parseFloat(prixReel);
       if (!prixReel || isNaN(montant) || montant <= 0) {
@@ -189,16 +191,14 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
         montant_livreur: montantLivreur,
         heure_livraison: new Date().toISOString(),
       };
-      updateOptimisticStatut("livree", mergedData);
+      // On sauvegarde le prix mais on garde statut="arrivee" — le livreur reste en_course
       base44.entities.CourseExterne.update(course.id, {
-        statut: "livree",
         prix_final: montant,
         commission_silga: commissionSilga,
         montant_livreur: montantLivreur,
         heure_livraison: mergedData.heure_livraison,
       }).catch(() => null);
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-      // Afficher le récapitulatif local — NE PAS appeler onColisLivre (disponibilité retenue)
       setDeplacementRecap(mergedData);
       setShowPrixModal(false);
       setPrixReel("");
@@ -1044,12 +1044,22 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               </div>
               <button
                 className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
-                onClick={() => {
+                onClick={async () => {
                   const finalData = {
                     ...course,
                     ...deplacementRecap,
                     statut: "livree",
                   };
+                  updateOptimisticStatut("livree", finalData);
+                  await base44.entities.CourseExterne.update(course.id, {
+                    statut: "livree",
+                    prix_final: deplacementRecap.prix_final,
+                    commission_silga: deplacementRecap.commission_silga,
+                    montant_livreur: deplacementRecap.montant_livreur,
+                    heure_livraison: deplacementRecap.heure_livraison,
+                  }).catch(() => null);
+                  queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+                  // Appeler onColisLivre pour libérer le livreur UNIQUEMENT maintenant
                   onColisLivre(finalData, deplacementRecap.prix_final);
                   navigateToRecap(finalData);
                   setDeplacementRecap(null);
