@@ -11,7 +11,7 @@ const buildWelcomeMessage = (countryContext) => {
   if (!countryContext || !countryContext.code) {
     return {
       role: "assistant",
-      content: "Bonjour 👋 Je suis **VENUS**, votre assistante intelligente **SILGAPP**.\n\n❤️ *Plus qu'un service, une promesse* ❤️\n\nSILGAPP est disponible dans **8 pays d'Afrique de l'Ouest** :\n🇧🇫 Burkina Faso · 🇨🇮 Côte d'Ivoire · 🇹🇬 Togo · 🇧🇯 Bénin · 🇸🇳 Sénégal · 🇲🇱 Mali · 🇬🇳 Guinée · 🇳🇪 Niger\n\nJe suis là pour vous aider à :\n\n✨ **Créer une course** — Expédier ou recevoir un colis\n🚚 **Suivre en temps réel** — Localisez votre livreur sur la carte\n📱 **QR codes & PIN** — Validation de récupération et livraison\n💰 **Prix adapté à votre pays** — Calculé automatiquement selon votre localisation\n📞 **Support** — +226 66 92 51 90\n\n**Dans quel pays êtes-vous ? Comment puis-je vous aider ?**",
+      content: "Bonjour 👋 Je suis **VENUS**, votre assistante intelligente **SILGAPP**.\n\n❤️ *Plus qu'un service, une promesse* ❤️\n\nSILGAPP est disponible dans **9 pays d'Afrique de l'Ouest** :\n🇧🇫 Burkina Faso · 🇨🇮 Côte d'Ivoire · 🇹🇬 Togo · 🇧🇯 Bénin · 🇸🇳 Sénégal · 🇲🇱 Mali · 🇬🇳 Guinée · 🇳🇪 Niger · 🇬🇭 Ghana\n\nJe suis là pour vous aider à :\n\n✨ **Créer une course** — Expédier ou recevoir un colis\n🚚 **Suivre en temps réel** — Localisez votre livreur sur la carte\n📱 **QR codes & PIN** — Validation de récupération et livraison\n💰 **Prix adapté à votre pays** — Calculé automatiquement selon votre localisation\n📞 **Support** — +226 66 92 51 90\n\n**Dans quel pays êtes-vous ? Comment puis-je vous aider ?**",
     };
   }
 
