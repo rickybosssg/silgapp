@@ -127,6 +127,11 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
     } catch (_) {}
   }
 
+  // Ni GPS ni quartier → marquer explicitement pour le mode vagues
+  if ((!pickupLat || !pickupLng) && pickupSource === 'gps') {
+    pickupSource = 'none';
+  }
+
   eligibles.forEach(l => {
     const hbDate = l.last_seen_at || l.derniere_position_date;
     let heartbeatAgeMin = null;
@@ -308,9 +313,9 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
   const resultat = await trouverLivreursCandidats(base44, course, exclusions);
   const { tous: candidatsTous, niveau1, niveau2, niveau3, pickupSource } = resultat;
 
-  // 🧠 Mode vagues : activé si ni GPS ni quartier
+  // 🧠 Mode vagues : activé UNIQUEMENT si ni GPS ni quartier
   // Le dispatch_wave stocké sur la course indique la vague actuelle (1=N1, 2=N2, 3=N3)
-  const modeVagues = pickupSource === 'gps' ? false : true;
+  const modeVagues = pickupSource === 'none';
   let wave = modeVagues ? (course.dispatch_wave || 1) : 0;
 
   // En mode vagues, sélectionner uniquement le niveau correspondant
