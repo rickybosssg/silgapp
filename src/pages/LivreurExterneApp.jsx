@@ -911,6 +911,17 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   };
 
   const handleColisLivre = (course, montantSaisi) => {
+    // 🚗 Annulation déplacement : libérer le livreur sans calcul de prix
+    if (course.statut === "annulee") {
+      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+      if (livreurProfil?.statut !== "hors_ligne") {
+        statutMutation.mutate("disponible");
+      }
+      toast.success("Déplacement annulé");
+      return;
+    }
+
     // 🏛️ ADMIN : montant saisi par le livreur, split 70/30 — PRIORITAIRE avant tout autre check
     if ((course.pricing_mode === "admin_manuel" || course.source === "admin") && typeof montantSaisi === "number" && montantSaisi > 0) {
       const commissionSilga = Math.round(montantSaisi * 0.3);
