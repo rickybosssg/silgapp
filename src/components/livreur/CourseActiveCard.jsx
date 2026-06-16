@@ -126,6 +126,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const [multiPickupPending, setMultiPickupPending] = useState(false);
   // Optimistic status — overrides course.statut immediately on tap
   const [optimisticStatut, setOptimisticStatut] = useState(null);
+  // Données de livraison en attente (admin_manuel : saisie montant après validation QR/PIN)
+  const [pendingDeliveryData, setPendingDeliveryData] = useState(null);
 
   const effectiveStatut = optimisticStatut || course.statut;
 
@@ -166,7 +168,19 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
         toast.error("Entrez le montant reçu du client");
         return;
       }
-      onColisLivre(course, montant);
+      const commissionSilga = Math.round(montant * 0.3);
+      const montantLivreur = montant - commissionSilga;
+      const mergedData = {
+        ...(pendingDeliveryData || {}),
+        prix_final: montant,
+        commission_silga: commissionSilga,
+        montant_livreur: montantLivreur,
+        heure_livraison: pendingDeliveryData?.heure_livraison || new Date().toISOString(),
+      };
+      updateOptimisticStatut("livree", mergedData);
+      onColisLivre({ ...course, ...mergedData }, montant);
+      navigateToRecap(mergedData);
+      setPendingDeliveryData(null);
     } else if (isExterne) {
       onColisLivre(course);
     } else {
@@ -204,9 +218,14 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   };
 
   // Handler succès scan QR delivery (externe) — livraison confirmée par le backend
-  // → Redirection immédiate vers la page récapitulatif dédiée
   const handleQRDeliverySuccess = (courseData) => {
     setShowQRScanner(null);
+    // Admin_manuel : intercepter pour saisie du montant AVANT le récapitulatif
+    if (course.pricing_mode === "admin_manuel") {
+      setPendingDeliveryData(courseData);
+      setShowPrixModal(true);
+      return;
+    }
     // OPTIMISTIC UI: Update cache immediately
     updateOptimisticStatut("livree", {
       heure_livraison: new Date().toISOString(),
@@ -345,8 +364,14 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               <div className="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center mx-auto mb-3 text-3xl">
                 🎉
               </div>
-              <p className="text-xl font-black text-gray-900">Course terminée !</p>
-              <p className="text-sm text-gray-500 mt-1">Quel montant avez-vous reçu du client ?</p>
+              <p className="text-xl font-black text-gray-900">
+                {course.pricing_mode === "admin_manuel" ? "Livraison confirmée !" : "Course terminée !"}
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                {course.pricing_mode === "admin_manuel"
+                  ? "Saisissez le montant payé par le client"
+                  : "Quel montant avez-vous reçu du client ?"}
+              </p>
             </div>
             <div className="relative">
               <Input
@@ -673,27 +698,16 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               ) : (
                 isExterne ? (
                   /* ── EXTERNE multi-colis : géré par MultiColisLivreurView ci-dessus ── */
-                  /* ── EXTERNE colis unique : Scanner QR ou saisie montant admin ── */
+                  /* ── EXTERNE colis unique : Scanner QR ou PIN pour livrer ── */
                   !course.is_multi_colis && (
-                    course.pricing_mode === "admin_manuel" ? (
-                      <button
-                        className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                        onClick={() => setShowPrixModal(true)}
-                        disabled={isPending}
-                      >
-                        <Check className="w-6 h-6" />
-                        Course terminée — saisir le montant
-                      </button>
-                    ) : (
-                      <button
-                        className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                        onClick={() => setShowQRScanner("delivery")}
-                        disabled={isPending}
-                      >
-                        <QrCode className="w-6 h-6" />
-                        Scanner pour livrer ✅
-                      </button>
-                    )
+                    <button
+                      className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                      onClick={() => setShowQRScanner("delivery")}
+                      disabled={isPending}
+                    >
+                      <QrCode className="w-6 h-6" />
+                      Scanner pour livrer ✅
+                    </button>
                   )
                 ) : (
                   /* ── INTERNE : bouton classique avec GPS + récapitulatif ── */
