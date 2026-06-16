@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -54,7 +54,7 @@ const TYPE_OPTIONS = [
 ];
 
 // ── Success view after course creation ──
-function CourseCreated({ course, onNewCourse, formData }) {
+function CourseCreated({ course, onNewCourse, formData, onClearStorage }) {
   const navigate = useNavigate();
   const trackingUrl = buildTrackingUrl(course.id);
 
@@ -254,7 +254,7 @@ function CourseCreated({ course, onNewCourse, formData }) {
           </Button>
           <Button
             variant="outline"
-            onClick={() => navigate("/admin/externe")}
+            onClick={() => { onClearStorage(); navigate("/admin/externe"); }}
             className="w-full h-12 rounded-2xl font-medium text-sm border-gray-200 text-gray-600"
           >
             Retour au tableau de bord
@@ -269,9 +269,41 @@ function CourseCreated({ course, onNewCourse, formData }) {
 export default function AdminCourseForm() {
   const navigate = useNavigate();
   const { countryCode: adminCountryCode } = useAdminContext();
+  const STORAGE_KEY = "silga_last_admin_course";
+
   const [submitting, setSubmitting] = useState(false);
   const [createdCourse, setCreatedCourse] = useState(null);
   const [createdFormData, setCreatedFormData] = useState(null);
+  const [restoringCourse, setRestoringCourse] = useState(false);
+
+  // Restaurer la dernière course créée si l'admin revient sur la page
+  useEffect(() => {
+    const restore = async () => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (!stored) return;
+        const { courseId, formData } = JSON.parse(stored);
+        if (!courseId) return;
+
+        setRestoringCourse(true);
+        try {
+          const course = await base44.entities.CourseExterne.get(courseId);
+          if (course && course.id && course.statut !== "annulee" && course.statut !== "livree") {
+            setCreatedCourse(course);
+            setCreatedFormData(formData);
+          } else {
+            // Course introuvable ou terminée → nettoyer
+            localStorage.removeItem(STORAGE_KEY);
+          }
+        } catch {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      } finally {
+        setRestoringCourse(false);
+      }
+    };
+    restore();
+  }, []);
 
   const [typeCourse, setTypeCourse] = useState("expedier");
   const [adresseDepart, setAdresseDepart] = useState("");
@@ -292,6 +324,18 @@ export default function AdminCourseForm() {
 
   const selectedPays = PAYS.find(p => p.code === countryCode);
 
+  // ── Restoring state ──
+  if (restoringCourse) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100/50 flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
+          <p className="text-sm text-gray-500">Restauration de la dernière course...</p>
+        </div>
+      </div>
+    );
+  }
+
   // ── Success state ──
   if (createdCourse) {
     return (
@@ -301,7 +345,9 @@ export default function AdminCourseForm() {
         onNewCourse={() => {
           setCreatedCourse(null);
           setCreatedFormData(null);
+          localStorage.removeItem(STORAGE_KEY);
         }}
+        onClearStorage={() => localStorage.removeItem(STORAGE_KEY)}
       />
     );
   }
@@ -354,6 +400,8 @@ export default function AdminCourseForm() {
       toast.success("Course créée avec succès !");
       setCreatedCourse(course);
       setCreatedFormData(formData);
+      // Persister pour que l'admin retrouve cette page après navigation
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ courseId: course.id, formData }));
     } catch (err) {
       toast.error("Erreur création: " + (err?.message || "inconnue"));
     } finally {
