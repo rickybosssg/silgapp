@@ -80,13 +80,21 @@ const STEPS = [
   { key: "livree", label: "Livré", icon: "🎉" },
 ];
 
-function ProgressBar({ statut }) {
-  const idx = STEPS.findIndex(s => s.key === statut);
-  const current = idx === -1 ? 0 : idx;
+const DEPLACEMENT_STEPS = [
+  { key: "acceptee", label: "Accepté", icon: "✅" },
+  { key: "pris_en_charge", label: "Pris en charge", icon: "🧑" },
+  { key: "arrivee", label: "Arrivée", icon: "📍" },
+  { key: "termine", label: "Terminé", icon: "🎉" },
+];
+
+function ProgressBar({ statut, isDeplacement }) {
+  const steps = isDeplacement ? DEPLACEMENT_STEPS : STEPS;
+  const idx = steps.findIndex(s => s.key === statut);
+  const current = idx === -1 ? 0 : (statut === "livree" && isDeplacement ? steps.length - 1 : idx);
 
   return (
     <div className="flex items-center gap-1 py-1">
-      {STEPS.map((step, i) => (
+      {steps.map((step, i) => (
         <React.Fragment key={step.key}>
           <div className={cn(
             "flex flex-col items-center gap-1 flex-shrink-0",
@@ -101,7 +109,7 @@ function ProgressBar({ statut }) {
               {step.label}
             </p>
           </div>
-          {i < STEPS.length - 1 && (
+          {i < steps.length - 1 && (
             <div className={cn(
               "flex-1 h-0.5 rounded mb-4 transition-all",
               i < current ? "bg-primary" : "bg-gray-100"
@@ -128,8 +136,11 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const [optimisticStatut, setOptimisticStatut] = useState(null);
   // Données de livraison en attente (admin_manuel : saisie montant après validation QR/PIN)
   const [pendingDeliveryData, setPendingDeliveryData] = useState(null);
+  // 🚗 Recap déplacement : affiché après saisie du prix, avant clic TERMINER
+  const [deplacementRecap, setDeplacementRecap] = useState(null);
 
   const effectiveStatut = optimisticStatut || course.statut;
+  const isDeplacement = course.type_course === "deplacement";
 
   const navigateToRecap = (courseData = {}) => {
     const courseId = courseData?.id || course.id;
@@ -158,10 +169,43 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       (old || []).map(c => c.id === course.id ? { ...c, statut: newStatut, ...courseData } : c)
     );
   };
-  const colisRecupere = effectiveStatut === "colis_recupere" || effectiveStatut === "en_livraison";
+  const colisRecupere = effectiveStatut === "colis_recupere" || effectiveStatut === "en_livraison" || (isDeplacement && effectiveStatut === "pris_en_charge");
   const colisLivre = course.statut === "livree";
 
   const handleConfirmerLivraison = () => {
+    // 🚗 DÉPLACEMENT : prix saisi → recap local → attendre TERMINER
+    if (isDeplacement) {
+      const montant = parseFloat(prixReel);
+      if (!prixReel || isNaN(montant) || montant <= 0) {
+        toast.error("Entrez le montant reçu du client");
+        return;
+      }
+      const commissionSilga = Math.round(montant * 0.3);
+      const montantLivreur = montant - commissionSilga;
+      const mergedData = {
+        ...(pendingDeliveryData || {}),
+        prix_final: montant,
+        commission_silga: commissionSilga,
+        montant_livreur: montantLivreur,
+        heure_livraison: new Date().toISOString(),
+      };
+      updateOptimisticStatut("livree", mergedData);
+      base44.entities.CourseExterne.update(course.id, {
+        statut: "livree",
+        prix_final: montant,
+        commission_silga: commissionSilga,
+        montant_livreur: montantLivreur,
+        heure_livraison: mergedData.heure_livraison,
+      }).catch(() => null);
+      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+      // Afficher le récapitulatif local — NE PAS appeler onColisLivre (disponibilité retenue)
+      setDeplacementRecap(mergedData);
+      setShowPrixModal(false);
+      setPrixReel("");
+      setPendingDeliveryData(null);
+      return;
+    }
+
     if (course.pricing_mode === "admin_manuel" || course.source === "admin") {
       const montant = parseFloat(prixReel);
       if (!prixReel || isNaN(montant) || montant <= 0) {
@@ -354,8 +398,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
         </div>
       )}
 
-      {/* Modal montant — pour l'interne ET admin */}
-      {showPrixModal && (!isExterne || course.pricing_mode === "admin_manuel" || course.source === "admin") && (
+      {/* Modal montant — pour l'interne, admin ET déplacement */}
+      {showPrixModal && (!isExterne || course.pricing_mode === "admin_manuel" || course.source === "admin" || isDeplacement) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
         >
@@ -431,7 +475,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
         <div className="p-5 space-y-4">
           {/* Barre de progression */}
-          <ProgressBar statut={effectiveStatut} />
+          <ProgressBar statut={effectiveStatut} isDeplacement={isDeplacement} />
 
           {/* Badge ETA temps réel */}
           {!colisLivre && (
@@ -440,6 +484,49 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
           {/* Contact dynamique : expéditeur avant récupération, destinataire après */}
           {(() => {
+            // 🚗 DÉPLACEMENT : afficher le passager comme contact unique
+            if (isDeplacement) {
+              const contactNom = course.passager_nom || course.client_nom || "Passager";
+              const contactTel = course.passager_telephone || course.client_telephone;
+              const contactRole = "Passager";
+
+              const handleWhatsApp = () => {
+                let num = (contactTel || "").replace(/\D/g, "");
+                const msg = encodeURIComponent(
+                  "Bonjour, je suis votre chauffeur SILGAPP. Je suis en route pour vous prendre en charge."
+                );
+                const lien = `https://wa.me/${num}?text=${msg}`;
+                const popup = window.open(lien, "_blank", "noopener,noreferrer");
+                if (!popup || popup.closed || typeof popup.closed === "undefined") {
+                  window.location.href = lien;
+                }
+              };
+
+              return (
+                <div className="flex items-center justify-between rounded-2xl p-3 bg-gray-50">
+                  <div>
+                    <p className="text-[10px] text-gray-600 font-semibold uppercase">{contactRole}</p>
+                    <p className="font-black text-gray-900 text-base">{contactNom}</p>
+                    <p className="text-xs text-gray-500">{contactTel}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <a href={`tel:${contactTel}`}>
+                      <div className="w-11 h-11 rounded-2xl border flex items-center justify-center bg-blue-50 border-blue-100">
+                        <Phone className="w-5 h-5 text-blue-600" />
+                      </div>
+                    </a>
+                    <button onClick={handleWhatsApp}>
+                      <div className="w-11 h-11 rounded-2xl border flex items-center justify-center bg-green-50 border-green-100">
+                        <svg viewBox="0 0 24 24" className="w-5 h-5 fill-green-600" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                        </svg>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              );
+            }
+
             const contactNom = colisRecupere
               ? (course.destinataire_nom || "Destinataire")
               : (course.expediteur_nom || course.client_nom || "Expéditeur");
@@ -653,8 +740,125 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             )
           )}
 
-          {/* Boutons d'action */}
-          {!colisLivre && (
+          {/* ── HANDLERS DÉPLACEMENT ── */}
+          {(() => {
+            if (!isDeplacement) return null;
+
+            const deplacementStatut = effectiveStatut;
+            const isPrisEnCharge = deplacementStatut === "pris_en_charge";
+            const isArrivee = deplacementStatut === "arrivee";
+            const isTermine = deplacementStatut === "livree";
+
+            const handlePriseEnCharge = () => {
+              navigator.geolocation.getCurrentPosition(
+                async (pos) => {
+                  const now = new Date().toISOString();
+                  const data = {
+                    statut: "pris_en_charge",
+                    heure_prise_en_charge: now,
+                    latitude_prise_en_charge: pos.coords.latitude,
+                    longitude_prise_en_charge: pos.coords.longitude,
+                  };
+                  updateOptimisticStatut("pris_en_charge", data);
+                  await base44.entities.CourseExterne.update(course.id, data).catch(() => null);
+                  queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+                  toast.success("Passager pris en charge ! 🧑");
+                },
+                (err) => {
+                  console.warn("GPS indisponible pour prise en charge:", err?.message);
+                  const now = new Date().toISOString();
+                  const data = { statut: "pris_en_charge", heure_prise_en_charge: now };
+                  updateOptimisticStatut("pris_en_charge", data);
+                  base44.entities.CourseExterne.update(course.id, data).catch(() => null);
+                  queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+                  toast.success("Passager pris en charge ! 🧑");
+                },
+                { enableHighAccuracy: true, timeout: 5000 }
+              );
+            };
+
+            const handleArrivee = () => {
+              navigator.geolocation.getCurrentPosition(
+                async (pos) => {
+                  const now = new Date().toISOString();
+                  const data = {
+                    statut: "arrivee",
+                    heure_arrivee: now,
+                    latitude_arrivee_dest: pos.coords.latitude,
+                    longitude_arrivee_dest: pos.coords.longitude,
+                  };
+                  updateOptimisticStatut("arrivee", data);
+                  await base44.entities.CourseExterne.update(course.id, data).catch(() => null);
+                  queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+                  // Ouvrir automatiquement la modale de prix
+                  setShowPrixModal(true);
+                },
+                (err) => {
+                  console.warn("GPS indisponible pour arrivee:", err?.message);
+                  const now = new Date().toISOString();
+                  const data = { statut: "arrivee", heure_arrivee: now };
+                  updateOptimisticStatut("arrivee", data);
+                  base44.entities.CourseExterne.update(course.id, data).catch(() => null);
+                  queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+                  setShowPrixModal(true);
+                },
+                { enableHighAccuracy: true, timeout: 5000 }
+              );
+            };
+
+            const handleTerminerDeplacement = () => {
+              updateOptimisticStatut("livree", {
+                heure_livraison: new Date().toISOString(),
+              });
+              navigateToRecap({
+                statut: "livree",
+                heure_livraison: new Date().toISOString(),
+              });
+              onColisLivre({ ...course, statut: "livree" }, null);
+            };
+
+            if (isTermine) return null;
+
+            return (
+              <div className="space-y-3 pt-1">
+                {!isPrisEnCharge && !isArrivee && (
+                  <button
+                    className="w-full h-14 rounded-2xl bg-gradient-to-b from-cyan-500 to-cyan-700 text-white font-black text-base shadow-lg shadow-cyan-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                    onClick={handlePriseEnCharge}
+                    disabled={isPending}
+                  >
+                    <span className="text-xl">🧑</span>
+                    PRIS EN CHARGE
+                  </button>
+                )}
+
+                {isPrisEnCharge && (
+                  <button
+                    className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-700 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                    onClick={handleArrivee}
+                    disabled={isPending}
+                  >
+                    <MapPin className="w-6 h-6" />
+                    ARRIVÉE
+                  </button>
+                )}
+
+                {isArrivee && (
+                  <button
+                    className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                    onClick={() => setShowPrixModal(true)}
+                    disabled={isPending}
+                  >
+                    <span className="text-xl">💰</span>
+                    SAISIR LE PRIX DE LA COURSE
+                  </button>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Boutons d'action — COLIS */}
+          {!isDeplacement && !colisLivre && (
             <div className="space-y-3 pt-1">
               {!colisRecupere ? (
                 isExterne ? (
@@ -790,7 +994,74 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             </div>
           )}
 
-          {colisLivre && (() => {
+          {/* 🚗 RÉCAPITULATIF DÉPLACEMENT — avant clic TERMINER */}
+          {deplacementRecap && (
+            <div className="py-4 bg-blue-50 rounded-2xl border-2 border-blue-300 space-y-3 px-4">
+              <div className="text-center">
+                <p className="text-2xl mb-1">🧑</p>
+                <p className="font-black text-blue-800 text-base">Récapitulatif — Se déplacer</p>
+                <p className="text-xs text-blue-600 mt-0.5">Vérifiez avant de terminer</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-white rounded-xl p-2.5 border border-blue-100">
+                  <p className="text-[10px] text-gray-600 font-semibold uppercase">Départ</p>
+                  <p className="text-xs font-bold text-gray-800 truncate">{course.adresse_depart || "—"}</p>
+                </div>
+                <div className="bg-white rounded-xl p-2.5 border border-blue-100">
+                  <p className="text-[10px] text-gray-600 font-semibold uppercase">Arrivée</p>
+                  <p className="text-xs font-bold text-gray-800 truncate">{course.adresse_arrivee || "—"}</p>
+                </div>
+                <div className="bg-white rounded-xl p-2.5 border border-blue-100">
+                  <p className="text-[10px] text-gray-600 font-semibold uppercase">Passager</p>
+                  <p className="text-xs font-bold text-gray-800">{course.passager_nom || course.client_nom || "—"}</p>
+                </div>
+                <div className="bg-white rounded-xl p-2.5 border border-blue-100">
+                  <p className="text-[10px] text-gray-600 font-semibold uppercase">Distance</p>
+                  <p className="text-xs font-bold text-gray-800">
+                    {course.distance_reelle_km ? `${Number(course.distance_reelle_km).toFixed(1)} km` : "—"}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-white rounded-xl p-2.5 text-center border border-blue-100">
+                  <p className="text-[10px] text-gray-600 font-semibold uppercase">Montant</p>
+                  <p className="text-sm font-black text-blue-700">
+                    {Number(deplacementRecap.prix_final || 0).toLocaleString()} {course.devise || "F"}
+                  </p>
+                </div>
+                <div className="bg-white rounded-xl p-2.5 text-center border border-blue-100">
+                  <p className="text-[10px] text-gray-600 font-semibold uppercase">Ton gain</p>
+                  <p className="text-sm font-black text-green-700">
+                    +{Number(deplacementRecap.montant_livreur || 0).toLocaleString()} {course.devise || "F"}
+                  </p>
+                </div>
+                <div className="bg-white rounded-xl p-2.5 text-center border border-gray-100">
+                  <p className="text-[10px] text-gray-600 font-semibold uppercase">Commission</p>
+                  <p className="text-sm font-black text-gray-500">
+                    {Number(deplacementRecap.commission_silga || 0).toLocaleString()} {course.devise || "F"}
+                  </p>
+                </div>
+              </div>
+              <button
+                className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+                onClick={() => {
+                  const finalData = {
+                    ...course,
+                    ...deplacementRecap,
+                    statut: "livree",
+                  };
+                  onColisLivre(finalData, deplacementRecap.prix_final);
+                  navigateToRecap(finalData);
+                  setDeplacementRecap(null);
+                }}
+              >
+                <Check className="w-6 h-6" />
+                TERMINER
+              </button>
+            </div>
+          )}
+
+          {!isDeplacement && colisLivre && (() => {
             const isMulti = isExterne && course.is_multi_colis && (course.nb_colis || 1) > 1;
 
             // Multi-colis : totaux issus des montants par colis (pas de tarification auto)

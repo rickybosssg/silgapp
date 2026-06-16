@@ -42,22 +42,42 @@ Deno.serve(async (req) => {
       const lieuDepart = course.adresse_depart || 'Non precise';
       const lieuArrivee = course.adresse_arrivee || 'Non precise';
 
-      message = [
-        `*SILGAPP - Votre course #${ref}*\n`,
-        `Bonjour ${nom},`,
-        `Votre course a ete creee avec succes.\n`,
-        `*Details :*`,
-        `📦 Type : ${course.type_course === 'expedier' ? 'Expedition' : course.type_course === 'recevoir' ? 'Reception' : 'Deplacement'}`,
-        `📍 Depart : ${lieuDepart}`,
-        `📍 Arrivee : ${lieuArrivee}`,
-        ``,
-        `*Code de recuperation :*`,
-        `🔢 PIN : *${pickupCode}*`,
-        ``,
-        `Montrez ce code au livreur lors de la recuperation.`,
-        ``,
-        `📲 *Telechargez SILGAPP* pour suivre votre course : https://silgapp.com/telecharger`,
-      ].join('\n');
+      const isDeplacement = course.type_course === 'deplacement';
+      const trackingLink = course.tracking_link || 'https://silgapp.com/suivi';
+
+      if (isDeplacement) {
+        message = [
+          `*SILGAPP - Votre deplacement #${ref}*\n`,
+          `Bonjour ${nom},`,
+          `Votre deplacement SILGAPP a ete cree.\n`,
+          `*Details :*`,
+          `🚗 Type : Deplacement`,
+          `📍 Depart : ${lieuDepart}`,
+          `📍 Destination : ${lieuArrivee}`,
+          ``,
+          `📲 *Suivez votre livreur en temps reel :*`,
+          `${trackingLink}`,
+          ``,
+          `📲 *Telechargez SILGAPP* : https://silgapp.com/telecharger`,
+        ].join('\n');
+      } else {
+        message = [
+          `*SILGAPP - Votre course #${ref}*\n`,
+          `Bonjour ${nom},`,
+          `Votre course a ete creee avec succes.\n`,
+          `*Details :*`,
+          `📦 Type : ${course.type_course === 'expedier' ? 'Expedition' : 'Reception'}`,
+          `📍 Depart : ${lieuDepart}`,
+          `📍 Arrivee : ${lieuArrivee}`,
+          ``,
+          `*Code de recuperation :*`,
+          `🔢 PIN : *${pickupCode}*`,
+          ``,
+          `Montrez ce code au livreur lors de la recuperation.`,
+          ``,
+          `📲 *Telechargez SILGAPP* pour suivre votre course : https://silgapp.com/telecharger`,
+        ].join('\n');
+      }
     } else {
       telephone = course.destinataire_telephone;
       nom = course.destinataire_nom || 'Destinataire';

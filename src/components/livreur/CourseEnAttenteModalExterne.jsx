@@ -49,6 +49,7 @@ export default function CourseEnAttenteModalExterne({
   // 🏛️ Course admin : Accepter / Refuser uniquement, quel que soit le mode du livreur
   const isAdminCourse = course?.source === "admin" || course?.pricing_mode === "admin_manuel";
   const showAdminBlock = isAdminCourse;
+  const isDeplacement = course?.type_course === "deplacement";
 
   // Sonnerie répétée
   useEffect(() => {
@@ -490,7 +491,9 @@ export default function CourseEnAttenteModalExterne({
                 </svg>
               </div>
               <p className="text-white font-black text-sm leading-tight">
-                COURSE CRÉÉE PAR SILGAPP ADMINISTRATION — TARIF SAISI EN FIN DE COURSE
+                {isDeplacement
+                  ? "COURSE CRÉÉE PAR SILGAPP ADMINISTRATION — DÉPLACEMENT — TARIF SAISI EN FIN DE COURSE"
+                  : "COURSE CRÉÉE PAR SILGAPP ADMINISTRATION — TARIF SAISI EN FIN DE COURSE"}
               </p>
             </div>
           )}

@@ -554,6 +554,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       sameLivreurId(c.livreur_id, livreurProfil?.id) &&
       (
         ["livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut) ||
+        // 🚗 Déplacement : statuts intermédiaires pris_en_charge et arrivee
+        (c.type_course === "deplacement" && ["pris_en_charge", "arrivee"].includes(c.statut)) ||
         // 🏛️ Admin_manuel : garder la carte visible tant que le montant n'est pas saisi,
         // même si le backend a déjà marqué la course "livree" via validateQRCode.
         // Sans cela, la modale de saisie du montant disparaît avant validation.

@@ -166,7 +166,9 @@
         "arrive_prise_en_charge",
         "colis_recupere",
         "passager_embarque",
+        "pris_en_charge",
         "en_livraison",
+        "arrivee",
         "livree",
         "annulee"
       ],
@@ -229,6 +231,32 @@
     "heure_acceptation": {
       "type": "string",
       "format": "date-time"
+    },
+    "heure_prise_en_charge": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure de prise en charge du passager (deplacement)"
+    },
+    "heure_arrivee": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure d'arrivee a destination (deplacement)"
+    },
+    "latitude_prise_en_charge": {
+      "type": "number",
+      "description": "Latitude au moment de la prise en charge (deplacement)"
+    },
+    "longitude_prise_en_charge": {
+      "type": "number",
+      "description": "Longitude au moment de la prise en charge (deplacement)"
+    },
+    "latitude_arrivee_dest": {
+      "type": "number",
+      "description": "Latitude au moment de l'arrivee a destination (deplacement)"
+    },
+    "longitude_arrivee_dest": {
+      "type": "number",
+      "description": "Longitude au moment de l'arrivee a destination (deplacement)"
     },
     "heure_recuperation": {
       "type": "string",

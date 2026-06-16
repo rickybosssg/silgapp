@@ -12,7 +12,9 @@ const statusConfig = {
   arrive_prise_en_charge: { label: "Arrivé prise en charge", className: "bg-cyan-100 text-cyan-700 border-cyan-200" },
   colis_recupere: { label: "Colis récupéré", className: "bg-indigo-100 text-indigo-700 border-indigo-200" },
   passager_embarque: { label: "Passager embarqué", className: "bg-teal-100 text-teal-700 border-teal-200" },
+  pris_en_charge: { label: "Pris en charge", className: "bg-cyan-100 text-cyan-700 border-cyan-200" },
   en_livraison: { label: "En livraison", className: "bg-purple-100 text-purple-700 border-purple-200" },
+  arrivee: { label: "Arrivée", className: "bg-amber-100 text-amber-700 border-amber-200" },
   livree: { label: "Livrée / Terminée", className: "bg-green-100 text-green-700 border-green-200" },
   annulee: { label: "Annulée", className: "bg-red-100 text-red-700 border-red-200" },
 };
