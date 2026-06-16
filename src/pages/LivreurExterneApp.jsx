@@ -557,7 +557,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         // 🏛️ Admin_manuel : garder la carte visible tant que le montant n'est pas saisi,
         // même si le backend a déjà marqué la course "livree" via validateQRCode.
         // Sans cela, la modale de saisie du montant disparaît avant validation.
-        (c.pricing_mode === "admin_manuel" && c.statut === "livree" && !c.prix_final)
+        ((c.pricing_mode === "admin_manuel" || c.source === "admin") && c.statut === "livree" && !c.prix_final)
       )
     ),
     [mesCourses, livreurProfil?.id]
@@ -909,8 +909,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   };
 
   const handleColisLivre = (course, montantSaisi) => {
-    // 🏛️ ADMIN_MANUEL : montant saisi par le livreur, split 70/30 — PRIORITAIRE avant tout autre check
-    if (course.pricing_mode === "admin_manuel" && typeof montantSaisi === "number" && montantSaisi > 0) {
+    // 🏛️ ADMIN : montant saisi par le livreur, split 70/30 — PRIORITAIRE avant tout autre check
+    if ((course.pricing_mode === "admin_manuel" || course.source === "admin") && typeof montantSaisi === "number" && montantSaisi > 0) {
       const commissionSilga = Math.round(montantSaisi * 0.3);
       const montantLivreur = montantSaisi - commissionSilga;
 

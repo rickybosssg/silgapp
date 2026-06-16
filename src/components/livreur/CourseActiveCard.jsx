@@ -162,7 +162,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const colisLivre = course.statut === "livree";
 
   const handleConfirmerLivraison = () => {
-    if (course.pricing_mode === "admin_manuel") {
+    if (course.pricing_mode === "admin_manuel" || course.source === "admin") {
       const montant = parseFloat(prixReel);
       if (!prixReel || isNaN(montant) || montant <= 0) {
         toast.error("Entrez le montant reçu du client");
@@ -220,8 +220,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   // Handler succès scan QR delivery (externe) — livraison confirmée par le backend
   const handleQRDeliverySuccess = (courseData) => {
     setShowQRScanner(null);
-    // Admin_manuel : intercepter pour saisie du montant AVANT le récapitulatif
-    if (course.pricing_mode === "admin_manuel") {
+    // Admin : intercepter pour saisie du montant AVANT le récapitulatif
+    if (course.pricing_mode === "admin_manuel" || course.source === "admin") {
       setPendingDeliveryData(courseData);
       setShowPrixModal(true);
       return;
@@ -354,8 +354,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
         </div>
       )}
 
-      {/* Modal montant — pour l'interne ET admin_manuel */}
-      {showPrixModal && (!isExterne || course.pricing_mode === "admin_manuel") && (
+      {/* Modal montant — pour l'interne ET admin */}
+      {showPrixModal && (!isExterne || course.pricing_mode === "admin_manuel" || course.source === "admin") && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
         >
@@ -365,10 +365,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 🎉
               </div>
               <p className="text-xl font-black text-gray-900">
-                {course.pricing_mode === "admin_manuel" ? "Livraison confirmée !" : "Course terminée !"}
+                {(course.pricing_mode === "admin_manuel" || course.source === "admin") ? "Livraison confirmée !" : "Course terminée !"}
               </p>
               <p className="text-sm text-gray-500 mt-1">
-                {course.pricing_mode === "admin_manuel"
+                {(course.pricing_mode === "admin_manuel" || course.source === "admin")
                   ? "Saisissez le montant payé par le client"
                   : "Quel montant avez-vous reçu du client ?"}
               </p>
