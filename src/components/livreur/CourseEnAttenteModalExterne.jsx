@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { MapPin, Phone, Navigation, Check, X, Package, Clock, MessageCircle, Ruler, AlertCircle } from "lucide-react";
+import { MapPin, Navigation, Check, X, Package, Clock, Ruler, AlertCircle } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
 import ManualPriceModal from "./ManualPriceModal";
@@ -406,23 +406,14 @@ export default function CourseEnAttenteModalExterne({
         </div>
 
         <div className="p-5 space-y-4">
-          {/* Client */}
+          {/* Client — coordonnées masquées avant acceptation (protection client) */}
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-gray-600 font-medium uppercase tracking-wide">Client</p>
               <p className="text-lg font-black text-gray-900">{course.expediteur_nom || "Client"}</p>
             </div>
-            <div className="flex gap-2">
-              <a href={`https://wa.me/${course.expediteur_telephone?.replace(/[^0-9]/g, "")}`} target="_blank" rel="noreferrer">
-                <button className="w-11 h-11 rounded-2xl bg-green-50 border border-green-200 flex items-center justify-center">
-                  <MessageCircle className="w-5 h-5 text-green-600" />
-                </button>
-              </a>
-              <a href={`tel:${course.expediteur_telephone}`}>
-                <button className="w-11 h-11 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center">
-                  <Phone className="w-5 h-5 text-blue-600" />
-                </button>
-              </a>
+            <div className="flex items-center gap-1.5 bg-gray-100 border border-gray-200 rounded-xl px-3 py-1.5">
+              <span className="text-[10px] text-gray-500 font-semibold uppercase">Coordonnées après acceptation</span>
             </div>
           </div>
 
