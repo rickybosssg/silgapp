@@ -46,9 +46,9 @@ export default function CourseEnAttenteModalExterne({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showManualPriceModal, setShowManualPriceModal] = useState(false);
 
-  // 🏛️ Course admin : le livreur en mode manuel ne peut pas proposer de prix
+  // 🏛️ Course admin : Accepter / Refuser uniquement, quel que soit le mode du livreur
   const isAdminCourse = course?.source === "admin" || course?.pricing_mode === "admin_manuel";
-  const showAdminBlock = isAdminCourse && pricingMode === "manual";
+  const showAdminBlock = isAdminCourse;
 
   // Sonnerie répétée
   useEffect(() => {
@@ -474,19 +474,19 @@ export default function CourseEnAttenteModalExterne({
             })()}
           </div>
 
-          {/* Badge mode tarification */}
-          {pricingMode === "manual" && !showAdminBlock && (
+          {/* Badge mode tarification — affiché uniquement pour courses NON admin */}
+          {!isAdminCourse && pricingMode === "manual" && (
             <div className="flex items-center justify-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-1.5">
               <span className="text-xs font-bold text-blue-700">💰 Mode prix manuel activé — vous allez saisir votre prix</span>
             </div>
           )}
 
-          {/* 🏛️ Bloc course administrative — acceptation simplifiée */}
+          {/* 🏛️ Bloc course administrative — acceptation uniquement */}
           {showAdminBlock && (
             <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <span className="text-lg">🏛️</span>
-                <p className="text-xs font-bold text-amber-800">Course administrative SILGA — tarif saisi à la livraison</p>
+                <p className="text-xs font-bold text-amber-800">Course SILGA administration — tarif saisi à la livraison</p>
               </div>
             </div>
           )}
