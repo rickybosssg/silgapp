@@ -306,6 +306,16 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
     }
   }
 
+  // 🛡️ Garde anti-double-traitement : course en vague active non expirée → ne pas retraiter
+  if (course.dispatch_status === 'propose' && !course.livreur_id && course.timeout_expires_at) {
+    const expires = new Date(course.timeout_expires_at);
+    if (expires > new Date()) {
+      const remaining = Math.round((expires - Date.now()) / 1000);
+      console.log(`[DISPATCH] 🛡️ Vague active sur course ${courseId} (${remaining}s restantes) — pas de retraitement`);
+      return { en_attente: true, remaining, wave_active: true };
+    }
+  }
+
   const config = await chargerConfigDispatch(base44);
   console.log(`[DISPATCH] ⚙️ Config: ${config.nb} livreurs, ${config.timeout}s`);
 
@@ -392,8 +402,8 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
   const timeoutAt = new Date(Date.now() + config.timeout * 1000).toISOString();
   const nouveauxNotifiedIds = selection.map(l => l.id);
 
-  // ACCUMULER les IDs notifiés (concaténer, pas remplacer)
-  const tousNotifies = [...dejaNotifies, ...nouveauxNotifiedIds];
+  // ACCUMULER les IDs notifiés (concaténer + dédoublonner)
+  const tousNotifies = [...new Set([...dejaNotifies, ...nouveauxNotifiedIds])];
   const totalNotifies = tousNotifies.length;
 
   await base44.asServiceRole.entities.CourseExterne.update(courseId, {
