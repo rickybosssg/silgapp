@@ -438,12 +438,13 @@ export default function CarteLivreursExterne() {
           </div>
 
           {/* KPI tiles */}
-          <div className="grid grid-cols-4 gap-2 mt-5">
+          <div className="grid grid-cols-5 gap-2 mt-5">
             {[
               { val: compteursLivreurs.verts,   label: "Libres",      sub: "livreurs",  dot: "bg-green-400",  glow: "shadow-green-500/20" },
               { val: compteursLivreurs.oranges, label: "En mission",  sub: "livreurs",  dot: "bg-orange-400", glow: "shadow-orange-500/20" },
               { val: compteursClients.bleus,    label: "Clients GPS", sub: "< 30 min",  dot: "bg-blue-400",   glow: "shadow-blue-500/20" },
               { val: coursesEnAttente.length,   label: "En attente",  sub: `${coursesEnAttenteAvecGPS.length} avec GPS`, dot: "bg-red-400", glow: "shadow-red-500/20" },
+            { val: coursesVraimentActives.length, label: "En cours",   sub: `livreur assigné`,        dot: "bg-orange-400", glow: "shadow-orange-500/20" },
             ].map((item, i) => (
               <div key={i} className={`bg-white/8 backdrop-blur-sm border border-white/10 rounded-2xl p-3 text-center shadow-lg ${item.glow}`}>
                 <div className={`w-2 h-2 rounded-full ${item.dot} mx-auto mb-2`} />
@@ -483,6 +484,7 @@ export default function CarteLivreursExterne() {
             <div className="bg-orange-400 transition-all" style={{ flex: compteursLivreurs.oranges + 0.01 }} />
             <div className="bg-blue-400 transition-all" style={{ flex: compteursClients.bleus + 0.01 }} />
             <div className="bg-red-400 transition-all" style={{ flex: coursesEnAttente.length + 0.01 }} />
+            <div className="bg-yellow-400 transition-all" style={{ flex: coursesVraimentActives.length + 0.01 }} />
           </div>
         </button>
 
@@ -496,6 +498,7 @@ export default function CarteLivreursExterne() {
               { dot: "bg-orange-500", label: "En course" },
               { dot: "bg-blue-500",   label: "Client actif" },
               { dot: "bg-red-600",    label: "Course attente" },
+              { dot: "bg-yellow-500", label: "Course en cours" },
             ].map((l, i) => (
               <div key={i} className="flex items-center gap-2">
                 <span className={`w-3 h-3 rounded-full flex-shrink-0 ${l.dot}`} />
