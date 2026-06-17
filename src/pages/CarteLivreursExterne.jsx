@@ -206,14 +206,15 @@ export default function CarteLivreursExterne() {
     [coursesEnAttente]
   );
 
-  // Courses récentes (< 2h) pour la heatmap — utilise le MÊME filtre que coursesEnAttenteAvecGPS
+  // Courses récentes (< 2h) pour la heatmap — attente ET actives (livreur assigné)
   const coursesRecents = useMemo(() => {
     const now = Date.now();
-    return coursesEnAttenteAvecGPS.filter(c => {
+    const coursesAffichees = [...coursesEnAttenteAvecGPS, ...coursesVraimentActives.filter(c => c.gps_depart_lat && c.gps_depart_lng)];
+    return coursesAffichees.filter(c => {
       if (!c.created_date) return false;
       return (now - new Date(c.created_date).getTime()) < 2 * 60 * 60 * 1000;
     });
-  }, [coursesEnAttenteAvecGPS]);
+  }, [coursesEnAttenteAvecGPS, coursesVraimentActives]);
 
   // ─── CONTRÔLE DE COHÉRENCE : compteurs = marqueurs sur la carte ─────────
   useEffect(() => {
@@ -236,7 +237,7 @@ export default function CarteLivreursExterne() {
   // EXCLU : annulee, livree (qui peuvent conserver livreur_id pour l'historique)
   const coursesVraimentActives = useMemo(() => {
     // Seuls ces statuts signifient qu'un livreur est réellement occupé
-    const STATUTS_LIVREUR_OCCUPE = ["livreur_en_route", "colis_recupere", "en_livraison"];
+    const STATUTS_LIVREUR_OCCUPE = ["livreur_en_route", "colis_recupere", "en_livraison", "acceptee", "pris_en_charge", "arrivee"];
     const STATUTS_TERMINAUX = ["annulee", "livree", "terminee", "completed"];
 
     const actives = toutesCoursesExternes.filter(c =>
