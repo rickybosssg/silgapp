@@ -107,7 +107,39 @@ Deno.serve(async (req) => {
             }
         }
 
-        // 4. Log d'audit dans RapportMaintenance
+        // 4. Courses orphelines (livreur_id pointe vers un livreur supprimé)
+        const allCourses = await asService.entities.CourseExterne.list('-updated_date', 500);
+        const allLivreurIds = new Set((await asService.entities.Livreur.list('nom', 500)).map(l => l.id));
+        const orphanActive = allCourses.filter(c => 
+            c.livreur_id && !allLivreurIds.has(c.livreur_id) && !['livree', 'annulee'].includes(c.statut)
+        );
+        
+        for (const course of orphanActive) {
+            await asService.entities.CourseExterne.update(course.id, {
+                statut: "annulee",
+                notes: (course.notes || '') + ' | [AUTO] Livreur supprimé — course fermée',
+            });
+            corrections.push({
+                type: "course_orpheline_fermee",
+                course_id: course.id,
+                ancien_livreur_id: course.livreur_id,
+                statut_precedent: course.statut,
+            });
+            logs.push(`[CORRECTION] Course orpheline ${course.id?.slice(-8)} (livreur supprimé) fermée`);
+        }
+
+        // Marquer toutes les courses orphelines livrees/annulees comme audit
+        const orphanTerminal = allCourses.filter(c =>
+            c.livreur_id && !allLivreurIds.has(c.livreur_id) && ['livree', 'annulee'].includes(c.statut) &&
+            !(c.notes || '').includes('[AUDIT] Livreur supprimé')
+        );
+        for (const course of orphanTerminal.slice(0, 20)) {
+            await asService.entities.CourseExterne.update(course.id, {
+                notes: (course.notes || '') + ' | [AUDIT] Livreur supprimé — course historique',
+            });
+        }
+
+        // 5. Log d'audit dans RapportMaintenance
         if (corrections.length > 0) {
             await asService.entities.RapportMaintenance.create({
                 type: "correction_courses_bloquees",
