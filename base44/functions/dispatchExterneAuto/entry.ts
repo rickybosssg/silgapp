@@ -323,9 +323,10 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
   const resultat = await trouverLivreursCandidats(base44, course, exclusions);
   const { tous: candidatsTous, niveau1, niveau2, niveau3, pickupSource } = resultat;
 
-  // 🧠 Mode vagues : activé pour quartier et "none" (GPS = notif simultanée)
+  // 🧠 Mode vagues : activé pour quartier et "none" SAUF courses admin
+  // Courses admin → notification simultanée à tous les livreurs (pas de vagues)
   // Le dispatch_wave stocké sur la course indique la vague actuelle (1=N1, 2=N2, 3=N3)
-  const modeVagues = pickupSource !== 'gps';
+  const modeVagues = pickupSource !== 'gps' && course.source !== 'admin';
   let wave = modeVagues ? (course.dispatch_wave || 1) : 0;
 
   // En mode vagues, sélectionner uniquement le niveau correspondant
