@@ -8,8 +8,7 @@
         "interne",
         "externe"
       ],
-      "default": "interne",
-      "description": "R\u00e9seau SILGAPP (interne ou externe)"
+      "default": "interne"
     },
     "type_livreur": {
       "type": "string",
@@ -17,8 +16,7 @@
         "interne",
         "externe"
       ],
-      "default": "interne",
-      "description": "Type de livreur (interne ou externe)"
+      "default": "interne"
     },
     "country_code": {
       "type": "string",
@@ -32,8 +30,7 @@
         "GN",
         "NE",
         "GH"
-      ],
-      "description": "Code pays ISO du livreur"
+      ]
     },
     "prenom": {
       "type": "string"
@@ -65,6 +62,26 @@
       ],
       "default": "en_attente"
     },
+    "valide_par": {
+      "type": "string",
+      "description": "Email admin ayant valid\u00e9"
+    },
+    "valide_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "refuse_par": {
+      "type": "string",
+      "description": "Email admin ayant refus\u00e9"
+    },
+    "refuse_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "motif_refus": {
+      "type": "string",
+      "description": "Motif du refus (optionnel)"
+    },
     "actif": {
       "type": "boolean",
       "default": true
@@ -80,12 +97,10 @@
     },
     "admin_hors_ligne": {
       "type": "boolean",
-      "default": false,
-      "description": "Mis hors ligne par l'administration (non dispatchable)"
+      "default": false
     },
     "admin_statut_log": {
-      "type": "string",
-      "description": "JSON stringifi\u00e9 de l'historique des actions administratives sur le statut"
+      "type": "string"
     },
     "latitude": {
       "type": "number"
@@ -183,32 +198,26 @@
         "automatic",
         "manual"
       ],
-      "default": "automatic",
-      "description": "Mode de tarification pr\u00e9f\u00e9r\u00e9 par le livreur : automatique ou manuel"
+      "default": "automatic"
     },
     "whatsapp_opt_in": {
       "type": "boolean",
-      "default": false,
-      "description": "Livreur inscrit au Sandbox WhatsApp Twilio (opt-in actif)"
+      "default": false
     },
     "whatsapp_opt_in_date": {
       "type": "string",
-      "format": "date-time",
-      "description": "Date du dernier opt-in WhatsApp Sandbox confirm\u00e9"
+      "format": "date-time"
     },
     "whatsapp_opt_in_expire_at": {
       "type": "string",
-      "format": "date-time",
-      "description": "Date d'expiration estim\u00e9e de l'opt-in (72h apr\u00e8s derni\u00e8re interaction)"
+      "format": "date-time"
     },
     "whatsapp_derniere_erreur": {
-      "type": "string",
-      "description": "Derni\u00e8re erreur Twilio re\u00e7ue pour ce livreur (ex: 63015)"
+      "type": "string"
     },
     "whatsapp_derniere_erreur_date": {
       "type": "string",
-      "format": "date-time",
-      "description": "Date de la derni\u00e8re erreur WhatsApp"
+      "format": "date-time"
     }
   },
   "required": [

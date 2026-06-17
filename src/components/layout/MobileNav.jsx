@@ -27,7 +27,7 @@ function restoreScrollPosition(pathname) {
   } catch (_) { return 0; }
 }
 
-export default function MobileNav({ notificationCount = 0, reseau }) {
+export default function MobileNav({ notificationCount = 0, demandesCount = 0, reseau }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -91,6 +91,13 @@ export default function MobileNav({ notificationCount = 0, reseau }) {
         </div>
 
         <div className="flex items-center gap-2">
+          {demandesCount > 0 && (
+            <Link to="/admin/demandes-livreurs" className="relative">
+              <span className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center text-white text-[10px] font-black">
+                {demandesCount > 9 ? '9+' : demandesCount}
+              </span>
+            </Link>
+          )}
           {notificationCount > 0 && (
             <Link to="/notifications" className="relative">
               <Bell className="w-5 h-5 text-muted-foreground" />
@@ -190,6 +197,11 @@ export default function MobileNav({ notificationCount = 0, reseau }) {
                         {notificationCount}
                       </Badge>
                     )}
+                    {item.path === "/admin/demandes-livreurs" && demandesCount > 0 && (
+                      <Badge className="bg-destructive text-destructive-foreground text-xs">
+                        {demandesCount}
+                      </Badge>
+                    )}
                   </Link>
                 );
               })}
@@ -259,9 +271,9 @@ export default function MobileNav({ notificationCount = 0, reseau }) {
           >
             <div className="w-10 h-6 flex items-center justify-center rounded-full relative">
               <Menu className="w-5 h-5" />
-              {notificationCount > 0 && (
+              {(notificationCount > 0 || demandesCount > 0) && (
                 <span className="absolute -top-1 right-0 w-3.5 h-3.5 rounded-full bg-destructive text-destructive-foreground text-[8px] font-bold flex items-center justify-center">
-                  {notificationCount > 9 ? '9+' : notificationCount}
+                  {((notificationCount || 0) + (demandesCount || 0)) > 9 ? '9+' : (notificationCount || 0) + (demandesCount || 0)}
                 </span>
               )}
             </div>

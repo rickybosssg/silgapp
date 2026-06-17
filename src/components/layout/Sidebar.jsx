@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
-  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check
+  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
@@ -42,13 +42,15 @@ export const navItems = [
   { path: "/admin/venus-rapports", label: "Rapports VENUS", icon: MessageCircle, reseauOnly: "externe" },
   { path: "/admin/centre-notifications", label: "Notifications Push", icon: Megaphone, reseauOnly: "externe" },
   { path: "/admin/externe", label: "Config Dispatch", icon: Settings, reseauOnly: "externe" },
+  { path: "/admin/demandes-livreurs", label: "Livreurs à valider", icon: UserCheck, reseauOnly: "interne" },
+  { path: "/admin/demandes-livreurs", label: "Livreurs à valider", icon: UserCheck, reseauOnly: "externe" },
   { path: "/notifications", label: "Notifications", icon: Bell, reseauOnly: "interne" },
   { path: "/notifications", label: "Notifications", icon: Bell, reseauOnly: "externe" },
   { path: "/maintenance", label: "Maintenance", icon: Shield, reseauOnly: "interne" },
   { path: "/maintenance", label: "Maintenance", icon: Shield, reseauOnly: "externe" },
 ];
 
-export default function Sidebar({ notificationCount = 0, reseau }) {
+export default function Sidebar({ notificationCount = 0, demandesCount = 0, reseau }) {
   const [collapsed, setCollapsed] = useState(false);
   const [countryOpen, setCountryOpen] = useState(false);
   const location = useLocation();
@@ -109,11 +111,18 @@ export default function Sidebar({ notificationCount = 0, reseau }) {
                       {notificationCount}
                     </Badge>
                   )}
+                  {item.path === "/admin/demandes-livreurs" && demandesCount > 0 && (
+                    <Badge className="bg-destructive text-white text-[10px] h-5 min-w-5 flex items-center justify-center px-1">
+                      {demandesCount}
+                    </Badge>
+                  )}
                 </>
               )}
-              {collapsed && item.path === "/notifications" && notificationCount > 0 && (
-                <span className="absolute right-1 top-1 w-2 h-2 rounded-full bg-destructive" />
-              )}
+              {(item.path === "/notifications" && notificationCount > 0) || (item.path === "/admin/demandes-livreurs" && demandesCount > 0) ? (
+                collapsed && (
+                  <span className="absolute right-1 top-1 w-2 h-2 rounded-full bg-destructive" />
+                )
+              ) : null}
             </Link>
           );
         })}

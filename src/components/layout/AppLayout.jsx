@@ -3,9 +3,11 @@ import { Outlet } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import Sidebar from "./Sidebar";
 import MobileNav from "./MobileNav";
+import DemandesLivreursPopup from "@/components/admin/DemandesLivreursPopup";
 
 export default function AppLayout({ reseau }) {
   const [notifCount, setNotifCount] = useState(0);
+  const [demandesCount, setDemandesCount] = useState(0);
 
   useEffect(() => {
     const fetchNotifs = async () => {
@@ -14,16 +16,26 @@ export default function AppLayout({ reseau }) {
         setNotifCount((data || []).length);
       } catch (_) {}
     };
+    const fetchDemandes = async () => {
+      try {
+        const data = await base44.entities.Livreur.filter({ validation: "en_attente", type_livreur: "externe" });
+        setDemandesCount((data || []).length);
+      } catch (_) {}
+    };
     fetchNotifs();
-    const iv = setInterval(fetchNotifs, 30000);
+    fetchDemandes();
+    const iv = setInterval(() => { fetchNotifs(); fetchDemandes(); }, 30000);
     return () => clearInterval(iv);
   }, []);
 
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Desktop layout */}
+      {/* Popup automatique demandes livreurs */}
+      <DemandesLivreursPopup />
+
       <div className="hidden lg:flex min-h-screen">
-        <Sidebar notificationCount={notifCount} reseau={reseau} />
+        <Sidebar notificationCount={notifCount} demandesCount={demandesCount} reseau={reseau} />
         <main className="flex-1 min-h-screen overflow-x-hidden bg-slate-50">
           <Outlet />
         </main>
@@ -31,7 +43,7 @@ export default function AppLayout({ reseau }) {
 
       {/* Mobile layout */}
       <div className="lg:hidden">
-        <MobileNav notificationCount={notifCount} reseau={reseau} />
+        <MobileNav notificationCount={notifCount} demandesCount={demandesCount} reseau={reseau} />
         <main className="pt-14 pb-16 min-h-screen bg-slate-50 safe-area-top safe-area-bottom">
           <Outlet />
         </main>
