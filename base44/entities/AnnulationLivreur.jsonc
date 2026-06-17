@@ -1,0 +1,81 @@
+{
+  "name": "AnnulationLivreur",
+  "type": "object",
+  "properties": {
+    "livreur_id": {
+      "type": "string",
+      "description": "ID du livreur ayant annul\u00e9"
+    },
+    "livreur_nom": {
+      "type": "string",
+      "description": "Nom du livreur"
+    },
+    "livreur_email": {
+      "type": "string",
+      "description": "Email du livreur"
+    },
+    "course_id": {
+      "type": "string",
+      "description": "ID de la course annul\u00e9e"
+    },
+    "type_course": {
+      "type": "string",
+      "enum": [
+        "colis",
+        "deplacement"
+      ],
+      "description": "Type de course annul\u00e9e"
+    },
+    "statut_course_avant": {
+      "type": "string",
+      "description": "Statut de la course avant annulation (acceptee, livreur_en_route, etc.)"
+    },
+    "motif": {
+      "type": "string",
+      "enum": [
+        "client_injoignable",
+        "mauvaise_adresse",
+        "colis_inexistant",
+        "client_change_avis",
+        "colis_interdit",
+        "panne_vehicule",
+        "accident",
+        "autre"
+      ],
+      "description": "Motif de l'annulation"
+    },
+    "motif_detail": {
+      "type": "string",
+      "description": "D\u00e9tail suppl\u00e9mentaire si motif=autre"
+    },
+    "country_code": {
+      "type": "string",
+      "description": "Code pays de la course"
+    },
+    "ville": {
+      "type": "string",
+      "description": "Ville de d\u00e9part"
+    },
+    "date_annulation": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date et heure de l'annulation"
+    },
+    "course_redispatch": {
+      "type": "boolean",
+      "default": true,
+      "description": "La course a-t-elle \u00e9t\u00e9 remise en dispatch ?"
+    },
+    "admin_notifie": {
+      "type": "boolean",
+      "default": false,
+      "description": "Notification admin envoy\u00e9e ?"
+    }
+  },
+  "required": [
+    "livreur_id",
+    "course_id",
+    "motif",
+    "date_annulation"
+  ]
+}

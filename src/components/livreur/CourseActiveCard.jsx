@@ -139,8 +139,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   // 🚗 Recap déplacement : affiché après saisie du prix, avant clic TERMINER
   const [deplacementRecap, setDeplacementRecap] = useState(null);
   // 🚗 Annulation déplacement
-  const [showAnnulerDeplacement, setShowAnnulerDeplacement] = useState(false);
-  const [motifAnnulation, setMotifAnnulation] = useState("");
+  const [showAnnulerCourse, setShowAnnulerCourse] = useState(false);
+  const [motifAnnulationLivreur, setMotifAnnulationLivreur] = useState("");
+  const [motifAnnulationDetail, setMotifAnnulationDetail] = useState("");
 
   const effectiveStatut = optimisticStatut || course.statut;
   const isDeplacement = course.type_course === "deplacement";
@@ -295,29 +296,46 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     setPauseMotif("");
   };
 
-  // 🚗 Annulation déplacement
-  const handleAnnulerDeplacement = async () => {
-    if (!motifAnnulation) {
+  // 🔄 Annulation livreur (unifiée colis + déplacement)
+  const handleAnnulerCourseLivreur = async () => {
+    if (!motifAnnulationLivreur) {
       toast.error("Veuillez sélectionner un motif");
       return;
     }
-    setShowAnnulerDeplacement(false);
-    const remarque = `Annulation déplacement : ${motifAnnulation}`;
-    const now = new Date().toISOString();
+    setShowAnnulerCourse(false);
+
+    // Optimistic UI : retirer immédiatement la course de l'affichage
     updateOptimisticStatut("annulee", {
       statut: "annulee",
-      remarque_livreur: remarque,
-      heure_livraison: now,
     });
-    await base44.entities.CourseExterne.update(course.id, {
-      statut: "annulee",
-      remarque_livreur: remarque,
-    }).catch(() => null);
+
+    try {
+      const res = await base44.functions.invoke("annulerCourseExterne", {
+        course_id: course.id,
+        motif: motifAnnulationLivreur,
+        motif_detail: motifAnnulationLivreur === "autre" ? motifAnnulationDetail : "",
+        source: "livreur",
+      });
+
+      if (res?.data?.success) {
+        toast.success(res.data.course_redispatch
+          ? "Course remise en dispatch — nouveau livreur recherché"
+          : "Course annulée");
+        // Libérer le livreur localement
+        onColisLivre({ ...course, statut: "annulee" }, null);
+      } else {
+        toast.error(res?.data?.error || "Erreur lors de l'annulation");
+        setOptimisticStatut(null);
+      }
+    } catch (error) {
+      toast.error("Erreur réseau lors de l'annulation");
+      setOptimisticStatut(null);
+    }
+
+    setMotifAnnulationLivreur("");
+    setMotifAnnulationDetail("");
     queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-    // Libérer le livreur
-    onColisLivre({ ...course, statut: "annulee" }, null);
-    setMotifAnnulation("");
-    toast.success("Déplacement annulé");
+    queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
   };
 
   const handleMultiColisRecuperes = async () => {
@@ -373,8 +391,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
         />
       )}
 
-      {/* 🚗 Modal annulation déplacement */}
-      {showAnnulerDeplacement && (
+      {/* Modal annulation livreur (unifié colis + déplacement) */}
+      {showAnnulerCourse && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
         >
@@ -383,44 +401,63 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-3 text-3xl">
                 🛑
               </div>
-              <p className="text-xl font-black text-gray-900">Annuler le déplacement</p>
-              <p className="text-sm text-gray-500 mt-1">Pourquoi souhaitez-vous annuler ce déplacement ?</p>
+              <p className="text-xl font-black text-gray-900">Annuler la course</p>
+              <p className="text-sm text-gray-500 mt-1">
+                {isDeplacement
+                  ? "Pourquoi souhaitez-vous annuler ce déplacement ?"
+                  : "Pourquoi souhaitez-vous annuler cette course ?"}
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { id: "client_absent", label: "Client absent", icon: "🚫" },
+                { id: "client_injoignable", label: "Client injoignable", icon: "📞" },
                 { id: "mauvaise_adresse", label: "Mauvaise adresse", icon: "📍" },
-                { id: "annulation_client", label: "Annulation client", icon: "📞" },
-                { id: "vehicule_panne", label: "Véhicule en panne", icon: "🔧" },
+                { id: "colis_inexistant", label: "Colis inexistant", icon: "📦" },
+                { id: "client_change_avis", label: "Client a changé d'avis", icon: "🔄" },
+                { id: "colis_interdit", label: "Colis interdit", icon: "🚫" },
+                { id: "panne_vehicule", label: "Panne du véhicule", icon: "🔧" },
+                { id: "accident", label: "Accident", icon: "⚠️" },
                 { id: "autre", label: "Autre", icon: "💬" },
               ].map((m) => (
                 <button
                   key={m.id}
                   className={`h-20 rounded-2xl border-2 font-semibold text-sm transition-all flex flex-col items-center justify-center gap-1 ${
-                    motifAnnulation === m.id
+                    motifAnnulationLivreur === m.id
                       ? "border-red-500 bg-red-50 text-red-700"
                       : "border-gray-200 text-gray-600 hover:bg-gray-50"
                   }`}
-                  onClick={() => setMotifAnnulation(m.id)}
+                  onClick={() => setMotifAnnulationLivreur(m.id)}
                 >
                   <span className="text-xl">{m.icon}</span>
-                  <span className="text-xs">{m.label}</span>
+                  <span className="text-[10px] leading-tight text-center">{m.label}</span>
                 </button>
               ))}
             </div>
+            {motifAnnulationLivreur === "autre" && (
+              <textarea
+                placeholder="Précisez le motif..."
+                value={motifAnnulationDetail}
+                onChange={(e) => setMotifAnnulationDetail(e.target.value)}
+                className="w-full h-16 rounded-xl border-2 border-gray-200 p-3 text-sm resize-none focus:border-red-400 focus:outline-none"
+              />
+            )}
             <div className="grid grid-cols-2 gap-3 pt-2">
               <button
                 className="h-12 rounded-2xl border border-gray-200 text-gray-600 font-bold text-sm"
-                onClick={() => { setShowAnnulerDeplacement(false); setMotifAnnulation(""); }}
+                onClick={() => {
+                  setShowAnnulerCourse(false);
+                  setMotifAnnulationLivreur("");
+                  setMotifAnnulationDetail("");
+                }}
               >
                 Retour
               </button>
               <button
                 className="h-12 rounded-2xl bg-red-500 hover:bg-red-600 text-white font-bold text-sm disabled:opacity-50"
-                onClick={handleAnnulerDeplacement}
-                disabled={!motifAnnulation || isPending}
+                onClick={handleAnnulerCourseLivreur}
+                disabled={!motifAnnulationLivreur || isPending}
               >
-                Annuler le déplacement
+                Annuler la course
               </button>
             </div>
           </div>
@@ -936,14 +973,14 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   </button>
                 )}
 
-                {/* 🚗 Bouton annulation — toujours visible tant que déplacement non terminé */}
-                {!isTermine && (
+                {/* 🚗 Bouton annulation — visible UNIQUEMENT avant prise en charge */}
+                {!isPrisEnCharge && !isArrivee && !isTermine && (
                   <button
                     className="w-full h-11 rounded-2xl border border-red-200 text-red-500 font-semibold text-sm flex items-center justify-center gap-2 active:bg-red-50 transition-colors disabled:opacity-50"
-                    onClick={() => setShowAnnulerDeplacement(true)}
+                    onClick={() => setShowAnnulerCourse(true)}
                     disabled={isPending}
                   >
-                    <X className="w-4 h-4" /> Annuler le déplacement
+                    <X className="w-4 h-4" /> ANNULER LA COURSE
                   </button>
                 )}
               </div>
@@ -953,6 +990,18 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           {/* Boutons d'action — COLIS */}
           {!isDeplacement && !colisLivre && (
             <div className="space-y-3 pt-1">
+
+              {/* 🔄 Bouton annulation livreur — visible UNIQUEMENT avant récupération */}
+              {!colisRecupere && (
+                <button
+                  className="w-full h-11 rounded-2xl border border-red-200 text-red-500 font-semibold text-sm flex items-center justify-center gap-2 active:bg-red-50 transition-colors disabled:opacity-50"
+                  onClick={() => setShowAnnulerCourse(true)}
+                  disabled={isPending}
+                >
+                  <X className="w-4 h-4" /> ANNULER LA COURSE
+                </button>
+              )}
+
               {!colisRecupere ? (
                 isExterne ? (
                   /* ── EXTERNE multi-colis : bouton simple sans QR ── */

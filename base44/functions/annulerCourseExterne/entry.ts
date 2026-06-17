@@ -1,221 +1,196 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
-/**
- * ANNULATION DE COURSE - SILGAPP EXTERNE
- * 
- * Gère l'annulation d'une course par le client ou l'admin.
- * 
- * WORKFLOW COMPLET :
- * 1. Vérifie que la course existe et peut être annulée
- * 2. Si un livreur est assigné :
- *    - Libère immédiatement le livreur (statut → 'disponible')
- *    - Supprime toutes les références de mission
- * 3. Met à jour la course (statut → 'annulee')
- * 4. Archive les notifications liées
- * 5. Met à jour la carte dispatch en temps réel
- * 
- * CAS GÉRÉS :
- * - Annulation par le client (avant acceptation livreur)
- * - Annulation par le client (après acceptation livreur)
- * - Annulation par l'admin
- * - Annulation automatique (timeout, bug détecté)
- */
+const MOTIFS_VALIDES = [
+  "client_injoignable",
+  "mauvaise_adresse",
+  "colis_inexistant",
+  "client_change_avis",
+  "colis_interdit",
+  "panne_vehicule",
+  "accident",
+  "autre"
+];
 
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
+    const asService = base44.asServiceRole;
     const body = await req.json();
-    const { course_id, admin_email, motif } = body;
-
-    console.log(`[ANNULATION] 📋 Annulation demandée pour course ${course_id}`);
+    const { course_id, motif, motif_detail, source } = body; // source = "livreur" | "admin"
 
     if (!course_id) {
-      return Response.json({ error: 'course_id requis' }, { status: 400 });
+      return Response.json({ error: "course_id requis" }, { status: 400 });
     }
 
-    // ─── 1. Récupérer la course ─────────────────────────────────────────────
-    const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+    // ── Récupérer la course ───────────────────────────────────────────
+    const course = await asService.entities.CourseExterne.get(course_id);
     if (!course) {
-      return Response.json({ error: 'Course introuvable' }, { status: 404 });
+      return Response.json({ error: "Course introuvable" }, { status: 404 });
     }
+
+    if (["annulee"].includes(course.statut)) {
+      return Response.json({ success: false, error: "Course déjà annulée" });
+    }
+    if (course.statut === "livree") {
+      return Response.json({ success: false, error: "Course déjà livrée" });
+    }
+
+    // ── Vérification pays admin ──────────────────────────────────────
     const user = await base44.auth.me().catch(() => null);
-    if (user?.admin_type === 'pays' && user.country_code && course.country_code !== user.country_code) {
-      console.error('[ANNULATION][CRITICAL_COUNTRY_BLOCK]', {
-        course_id,
-        course_country_code: course.country_code || 'ABSENT',
-        admin_email: user.email,
-        admin_country_code: user.country_code,
-      });
+    if (user?.admin_type === "pays" && user.country_code && course.country_code !== user.country_code) {
       return Response.json({
         success: false,
-        error: 'Action interdite : course hors pays admin',
-        blocked_reason: 'country_mismatch',
-        course_country_code: course.country_code || '',
-        admin_country_code: user.country_code,
+        error: "Action interdite : course hors pays admin",
+        blocked_reason: "country_mismatch",
       }, { status: 403 });
     }
 
-    console.log(`[ANNULATION] Course trouvée:`, {
-      id: course.id,
-      statut: course.statut,
-      livreur_id: course.livreur_id || 'AUCUN',
-      livreur_nom: course.livreur_nom || 'AUCUN',
-      dispatch_status: course.dispatch_status
-    });
-
-    // Vérifier si la course est déjà annulée ou livrée
-    if (course.statut === 'annulee') {
-      return Response.json({ 
-        success: false, 
-        error: 'Course déjà annulée',
-        already_cancelled: true 
-      });
-    }
-
-    if (course.statut === 'livree') {
-      return Response.json({ 
-        success: false, 
-        error: 'Course déjà livrée - impossible d\'annuler' 
-      });
-    }
-
-    // ─── 2. Si livreur assigné → LIBÉRATION IMMÉDIATE ─────────────────────
+    const livreurId = course.livreur_id;
     let livreurLibere = false;
-    let livreurDetails = null;
+    let courseRedispatch = false;
 
-    if (course.livreur_id) {
-      console.log(`[ANNULATION] 🚚 Livreur assigné détecté: ${course.livreur_id} (${course.livreur_nom})`);
+    // ── Libérer le livreur ────────────────────────────────────────────
+    if (livreurId) {
+      const livreur = await asService.entities.Livreur.get(livreurId).catch(() => null);
+      if (livreur) {
+        const heartbeatAge = livreur.last_seen_at
+          ? (Date.now() - new Date(livreur.last_seen_at).getTime()) / 60000
+          : 999;
+        const nouveauStatut = heartbeatAge < 10 ? "disponible" : "hors_ligne";
 
-      try {
-        // Récupérer le livreur pour vérifier son statut actuel
-        const livreur = await base44.asServiceRole.entities.Livreur.get(course.livreur_id);
-        
-        if (livreur) {
-          livreurDetails = {
-            id: livreur.id,
-            nom: `${livreur.prenom || ''} ${livreur.nom}`.trim(),
-            statut_avant: livreur.statut,
-            user_email: livreur.user_email
-          };
+        await asService.entities.Livreur.update(livreurId, {
+          statut: nouveauStatut,
+        });
+        livreurLibere = true;
 
-          console.log(`[ANNULATION] Statut actuel du livreur: ${livreur.statut}`);
-
-          // ⚠️ CRITIQUE: Remettre le livreur en statut approprié
-          // Si heartbeat récent (< 10 min) → disponible, sinon → hors_ligne
-          const heartbeatAge = livreur.last_seen_at
-            ? (Date.now() - new Date(livreur.last_seen_at).getTime()) / 60000
-            : 999;
-          const nouveauStatut = heartbeatAge < 10 ? 'disponible' : 'hors_ligne';
-
-          await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
-            statut: nouveauStatut
-          });
-
-          livreurLibere = true;
-          console.log(`[ANNULATION] ✅ Livreur ${livreurDetails.nom} libéré (statut → ${nouveauStatut}, heartbeat_age: ${Math.round(heartbeatAge)}min)`);
-
-          // Nettoyer toutes les références de mission sur le livreur
-          // (au cas où il y aurait d'autres champs custom)
-          const cleanUpdates = {};
-          
-          // Si le livreur a un champ currentCourseId ou assignedCourse, le nettoyer
-          // Note: Ces champs n'existent pas dans le schema Livreur actuel, mais on anticipe
-          if (livreur.currentCourseId || livreur.assignedCourse) {
-            cleanUpdates.currentCourseId = null;
-            cleanUpdates.assignedCourse = null;
-            await base44.asServiceRole.entities.Livreur.update(course.livreur_id, cleanUpdates);
-            console.log(`[ANNULATION] 🧹 Références de mission nettoyées sur le livreur`);
-          }
-
-          // Notification au livreur (optionnel - pour information)
-          if (livreur.user_email) {
-            try {
-              await base44.asServiceRole.entities.Notification.create({
-                titre: 'ℹ️ Course annulée',
-                message: `La course ${course.id.substr(-8)} a été annulée. Vous êtes maintenant disponible.`,
-                type: 'course_annulee',
-                course_id: course_id,
-                destinataire_email: livreur.user_email,
-                lue: false,
-              });
-              console.log(`[ANNULATION] 📧 Notification envoyée au livreur ${livreur.user_email}`);
-            } catch (err) {
-              console.warn('[ANNULATION] Erreur notification livreur:', err.message);
-            }
-          }
-        } else {
-          console.warn(`[ANNULATION] ⚠️ Livreur ${course.livreur_id} introuvable en BDD`);
+        // Notification au livreur
+        if (livreur.user_email) {
+          await asService.entities.Notification.create({
+            titre: "ℹ️ Course annulée",
+            message: `La course #${course_id.slice(-8)} a été annulée. ${source === "livreur" ? "Vous êtes maintenant disponible." : ""}`,
+            type: "course_annulee",
+            course_id,
+            destinataire_email: livreur.user_email,
+            lue: false,
+          }).catch(() => null);
         }
-      } catch (err) {
-        console.error(`[ANNULATION] ❌ Erreur libération livreur:`, err.message);
-        // On continue l'annulation même si la libération échoue
       }
-    } else {
-      console.log(`[ANNULATION] ℹ️ Aucun livreur assigné à cette course`);
     }
 
-    // ─── 3. Mettre à jour la course (statut → 'annulee') ───────────────────
-    const updateData = {
-      statut: 'annulee',
-      // ⚠️ CRITIQUE : Forcer dispatch_status='expire' pour TOUTE course annulée en dispatch
-      // Cela empêche le modal de s'afficher chez les livreurs
-      ...(course.dispatch_status === 'propose' || course.dispatch_status === 'en_attente' || course.dispatch_status === 'redispatch'
-        ? { dispatch_status: 'expire' }
-        : {}),
-      // Garder les infos du livreur pour l'historique (mais course annulée)
-      // Ne pas effacer livreur_id/livreur_nom pour tracer qui était assigné
-    };
+    // ═══════════════════════════════════════════════════════════════════
+    // COMPORTEMENT DIFFÉRENT SELON LA SOURCE
+    // ═══════════════════════════════════════════════════════════════════
 
-    // ─── Nettoyer prix manuel si applicable ────────────────────────────────
-    if (course.pricing_mode === 'manual' && course.manual_price_status === 'pending_client_validation') {
-      updateData.manual_price_status = null;
-      updateData.manual_price = null;
-      updateData.pricing_mode = 'automatic'; // reset pour éviter affichage bloqué
-      console.log(`[ANNULATION] 🧹 Prix manuel nettoyé (était en attente de validation)`);
-    }
+    const now = new Date().toISOString();
 
-    // Ajouter le motif si fourni
-    if (motif) {
-      updateData.notes = motif;
-    }
+    if (source === "livreur") {
+      // ── ANNULATION LIVREUR : course retourne au dispatch ──────────
+      const resetData = {
+        statut: "nouvelle",
+        dispatch_status: "en_attente",
+        dispatch_wave: 0,
+        livreur_id: null,
+        livreur_nom: null,
+        livreur_photo_url: null,
+        livreur_telephone: null,
+        livreur_vehicule: null,
+        livreur_note_moyenne: 0,
+        livreur_nombre_avis: 0,
+        dispatch_notified_ids: null, // reset — tous les livreurs éligibles à nouveau
+        heure_acceptation: null,
+        heure_recuperation: null,
+        heure_livraison: null,
+        timeout_expires_at: null,
+        heure_sollicitation: null,
+        pickup_confirmed_by: null,
+        pickup_confirmed_at: null,
+        delivery_confirmed_by: null,
+        delivery_confirmed_at: null,
+        notes: (course.notes || "") + ` | [ANNULÉ LIVREUR] ${motif || "non spécifié"}`,
+      };
 
-    // Timestamp d'annulation (champ dédié via notes, pas colis_livre_at)
-    updateData.date_annulation = new Date().toISOString();
+      // Nettoyer prix manuel si applicable
+      if (course.pricing_mode === "manual" && course.manual_price_status === "pending_client_validation") {
+        resetData.manual_price_status = null;
+        resetData.manual_price = null;
+        resetData.pricing_mode = "automatic";
+      }
 
-    await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
+      await asService.entities.CourseExterne.update(course_id, resetData);
+      courseRedispatch = true;
 
-    console.log(`[ANNULATION] ✅ Course ${course_id} marquée comme annulée`);
+      // ── Historique d'annulation ──────────────────────────────────
+      if (motif && livreurId) {
+        const livreurPourLog = await asService.entities.Livreur.get(livreurId).catch(() => null);
+        await asService.entities.AnnulationLivreur.create({
+          livreur_id: livreurId,
+          livreur_nom: livreurPourLog ? `${livreurPourLog.prenom || ""} ${livreurPourLog.nom || ""}`.trim() : (course.livreur_nom || ""),
+          livreur_email: livreurPourLog?.user_email || "",
+          course_id,
+          type_course: course.type_course === "deplacement" ? "deplacement" : "colis",
+          statut_course_avant: course.statut,
+          motif,
+          motif_detail: motif === "autre" ? (motif_detail || "") : "",
+          country_code: course.country_code || "",
+          ville: course.ville_depart || "",
+          date_annulation: now,
+          course_redispatch: true,
+          admin_notifie: false,
+        }).catch(() => null);
+      }
 
-    // ─── 4. Archiver les notifications liées à cette course ────────────────
-    try {
-      const notifs = await base44.asServiceRole.entities.Notification.filter({
-        course_id: course_id,
+      // ── Notification admin ───────────────────────────────────────
+      await asService.entities.Notification.create({
+        titre: "🔄 Course remise en dispatch",
+        message: `Le livreur a annulé la course #${course_id.slice(-8)}. Motif: ${motif || "non spécifié"}. La course est retournée dans le circuit de dispatch.`,
+        type: "course_redispatch",
+        course_id,
+        destinataire_email: "admin", // tous les admins
         lue: false,
-      });
+      }).catch(() => null);
 
-      for (const notif of notifs) {
-        await base44.asServiceRole.entities.Notification.update(notif.id, { lue: true });
+    } else {
+      // ── ANNULATION ADMIN : course définitivement annulée ──────────
+      const annulData = {
+        statut: "annulee",
+        date_annulation: now,
+        notes: (course.notes || "") + ` | [ANNULÉ ADMIN] ${motif || ""}`,
+      };
+
+      if (course.dispatch_status === "propose" || course.dispatch_status === "en_attente") {
+        annulData.dispatch_status = "expire";
       }
 
-      if (notifs.length > 0) {
-        console.log(`[ANNULATION] 🧹 ${notifs.length} notification(s) archivée(s)`);
+      if (course.pricing_mode === "manual" && course.manual_price_status === "pending_client_validation") {
+        annulData.manual_price_status = null;
+        annulData.manual_price = null;
+        annulData.pricing_mode = "automatic";
       }
-    } catch (err) {
-      console.warn('[ANNULATION] Erreur archivage notifications:', err.message);
+
+      await asService.entities.CourseExterne.update(course_id, annulData);
+
+      // Archiver notifications
+      const notifs = await asService.entities.Notification.filter({
+        course_id,
+        lue: false,
+      }).catch(() => []);
+      for (const n of notifs) {
+        await asService.entities.Notification.update(n.id, { lue: true }).catch(() => null);
+      }
     }
 
-    // ─── 5. Résultat ───────────────────────────────────────────────────────
     return Response.json({
       success: true,
-      message: 'Course annulée avec succès',
-      course_id: course_id,
+      course_id,
       livreur_libere: livreurLibere,
-      livreur_details: livreurDetails,
-      statut_final: 'annulee',
+      course_redispatch: courseRedispatch,
+      message: source === "livreur"
+        ? "Course remise en dispatch — nouveau livreur recherché"
+        : "Course annulée définitivement",
     });
 
   } catch (error) {
-    console.error('[ANNULATION] Erreur fatale:', error);
+    console.error("[ANNULATION] Erreur:", error);
     return Response.json({ error: error.message }, { status: 500 });
   }
 });
