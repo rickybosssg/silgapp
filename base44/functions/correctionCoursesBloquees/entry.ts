@@ -6,118 +6,173 @@ Deno.serve(async (req) => {
         const asService = base44.asServiceRole;
 
         const corrections = [];
-        const logs = [];
+        const anomalies = [];
+        const now = Date.now();
+        const AUDIT_TAG = '[AUDIT] Livreur supprimé — course historique';
 
-        // 1. Livreurs "en_course" sans course active assignée
-        const livreursEnCourse = await asService.entities.Livreur.filter({
-            statut: "en_course",
-            type_livreur: "externe"
-        });
-        
-        for (const livreur of livreursEnCourse) {
-            const coursesActives = await asService.entities.CourseExterne.filter({
+        // ── Pré-chargement ──────────────────────────────────────────────
+        const allLivreurs = await asService.entities.Livreur.list("id", 500);
+        const allLivreurIds = new Set(allLivreurs.map(l => l.id));
+        const livreurMap = {};
+        for (const l of allLivreurs) livreurMap[l.id] = l;
+
+        const coursesActives = await asService.entities.CourseExterne.filter({
+            statut: { $nin: ["livree", "annulee"] }
+        }, "livreur_id", 300);
+
+        const coursesLivrees = await asService.entities.CourseExterne.filter({
+            statut: "livree"
+        }, "-updated_date", 200);
+
+        const livreurParId = (id) => livreurMap[id] || null;
+
+        // ── 1. Livreurs avec statut anormal et 0 course active ──────────
+        for (const livreur of allLivreurs) {
+            if (livreur.type_livreur !== "externe") continue;
+            if (livreur.statut === "disponible" || livreur.statut === "hors_ligne") continue;
+
+            const aDesCourses = coursesActives.some(c => c.livreur_id === livreur.id);
+            if (aDesCourses) continue;
+
+            await asService.entities.Livreur.update(livreur.id, { statut: "disponible" });
+            corrections.push({
+                type: "livreur_bloque_sans_course",
                 livreur_id: livreur.id,
-                statut: { $nin: ["livree", "annulee"] }
+                livreur_nom: `${livreur.prenom || ""} ${livreur.nom || ""}`.trim(),
+                statut_avant: livreur.statut,
+                country: livreur.country_code,
             });
-            
-            if (coursesActives.length === 0) {
-                await asService.entities.Livreur.update(livreur.id, {
-                    statut: "disponible"
-                });
-                corrections.push({
-                    type: "livreur_bloque_sans_course",
-                    livreur_id: livreur.id,
-                    livreur_nom: `${livreur.prenom || ""} ${livreur.nom || ""}`.trim(),
-                    country: livreur.country_code,
-                });
-                logs.push(`[CORRECTION] Livreur ${livreur.nom} (${livreur.id?.slice(-8)}) : en_course → disponible (aucune course active)`);
-            }
         }
 
-        // 2. Courses "livree" avec prix_final > 0 mais livreur toujours "en_course"
-        const coursesLivrees = await asService.entities.CourseExterne.filter({
-            statut: "livree",
-            prix_final: { $gt: 0 }
-        }, "-updated_date", 200);
-        
+        // ── 2. Courses "livree" → livreur toujours "en_course" ──────────
         for (const course of coursesLivrees) {
             if (!course.livreur_id) continue;
-            const livreur = await asService.entities.Livreur.get(course.livreur_id).catch(() => null);
-            if (!livreur) continue;
-            
-            if (livreur.statut === "en_course") {
-                await asService.entities.Livreur.update(livreur.id, {
-                    statut: "disponible"
-                });
-                corrections.push({
-                    type: "course_livree_livreur_bloque",
-                    course_id: course.id,
-                    livreur_id: livreur.id,
-                    livreur_nom: `${livreur.prenom || ""} ${livreur.nom || ""}`.trim(),
-                    prix_final: course.prix_final,
-                    country: course.country_code,
-                });
-                logs.push(`[CORRECTION] Course ${course.id?.slice(-8)} livrée (${course.prix_final}F) — Livreur ${livreur.nom} libéré`);
-            }
+            const livreur = livreurParId(course.livreur_id);
+            if (!livreur || livreur.statut !== "en_course") continue;
+
+            await asService.entities.Livreur.update(livreur.id, { statut: "disponible" });
+            corrections.push({
+                type: "course_livree_livreur_bloque",
+                course_id: course.id,
+                livreur_id: livreur.id,
+                livreur_nom: `${livreur.prenom || ""} ${livreur.nom || ""}`.trim(),
+                prix_final: course.prix_final,
+                country: course.country_code,
+            });
         }
 
-        // 3. Courses "arrivee" (déplacement) avec prix_final > 0 non fermées
+        // ── 3. Courses admin_manuel "livree" sans prix_final ────────────
+        for (const course of coursesLivrees) {
+            if (course.prix_final > 0) continue;
+            if (course.pricing_mode !== "admin_manuel" && course.source !== "admin") continue;
+
+            const prixDefault = 1000;
+            const commission = Math.round(prixDefault * 0.3);
+            const gainLivreur = prixDefault - commission;
+
+            await asService.entities.CourseExterne.update(course.id, {
+                prix_final: prixDefault,
+                commission_silga: commission,
+                montant_livreur: gainLivreur,
+                notes: (course.notes || "") + " | [AUTO] Prix admin manquant complété",
+            });
+
+            if (course.livreur_id) {
+                const livreur = livreurParId(course.livreur_id);
+                if (livreur) {
+                    await asService.entities.Livreur.update(livreur.id, {
+                        montant_du_silga: (livreur.montant_du_silga || 0) + commission,
+                    });
+                    if (livreur.statut === "en_course") {
+                        await asService.entities.Livreur.update(livreur.id, { statut: "disponible" });
+                    }
+                }
+            }
+
+            corrections.push({
+                type: "admin_manuel_prix_manquant",
+                course_id: course.id,
+                livreur_id: course.livreur_id,
+                prix_complete: prixDefault,
+                source: course.source,
+            });
+        }
+
+        // ── 4. Déplacement "arrivee" avec prix → fermer (30 min+) ──────
         const coursesArrivee = await asService.entities.CourseExterne.filter({
             statut: "arrivee",
             type_course: "deplacement",
             prix_final: { $gt: 0 }
         }, "-updated_date", 100);
-        
+
         for (const course of coursesArrivee) {
-            if (!course.livreur_id) continue;
-            const livreur = await asService.entities.Livreur.get(course.livreur_id).catch(() => null);
-            if (!livreur) continue;
-            
-            // Si la course a un prix_final ET est arrivée depuis +30min → fermer
             const heureArrivee = course.heure_arrivee || course.updated_date;
-            const diffMin = (Date.now() - new Date(heureArrivee).getTime()) / (1000 * 60);
-            
-            if (diffMin > 30) {
-                const commissionSilga = Math.round(course.prix_final * 0.3);
-                const montantLivreur = course.prix_final - commissionSilga;
-                
-                await asService.entities.CourseExterne.update(course.id, {
-                    statut: "livree",
-                    heure_livraison: new Date().toISOString(),
-                    commission_silga: commissionSilga,
-                    montant_livreur: montantLivreur,
-                });
-                
-                if (livreur.statut === "en_course") {
-                    await asService.entities.Livreur.update(livreur.id, {
-                        statut: "disponible"
-                    });
+            const diffMin = (now - new Date(heureArrivee).getTime()) / 60000;
+            if (diffMin <= 30) continue;
+
+            const commission = Math.round(course.prix_final * 0.3);
+            const gain = course.prix_final - commission;
+
+            await asService.entities.CourseExterne.update(course.id, {
+                statut: "livree",
+                heure_livraison: new Date().toISOString(),
+                commission_silga: commission,
+                montant_livreur: gain,
+            });
+
+            if (course.livreur_id) {
+                const livreur = livreurParId(course.livreur_id);
+                if (livreur?.statut === "en_course") {
+                    await asService.entities.Livreur.update(livreur.id, { statut: "disponible" });
                 }
-                
-                corrections.push({
-                    type: "deplacement_arrivee_non_ferme",
-                    course_id: course.id,
-                    livreur_id: livreur.id,
-                    livreur_nom: `${livreur.prenom || ""} ${livreur.nom || ""}`.trim(),
-                    prix_final: course.prix_final,
-                    minutes_depuis_arrivee: Math.round(diffMin),
-                    country: course.country_code,
-                });
-                logs.push(`[CORRECTION] Déplacement ${course.id?.slice(-8)} arrivée depuis ${Math.round(diffMin)}min — fermée automatiquement`);
             }
+
+            corrections.push({
+                type: "deplacement_arrivee_non_ferme",
+                course_id: course.id,
+                livreur_id: course.livreur_id,
+                prix_final: course.prix_final,
+                minutes_depuis_arrivee: Math.round(diffMin),
+            });
         }
 
-        // 4. Courses orphelines (livreur_id pointe vers un livreur supprimé)
-        const allCourses = await asService.entities.CourseExterne.list('-updated_date', 500);
-        const allLivreurIds = new Set((await asService.entities.Livreur.list('nom', 500)).map(l => l.id));
-        const orphanActive = allCourses.filter(c => 
-            c.livreur_id && !allLivreurIds.has(c.livreur_id) && !['livree', 'annulee'].includes(c.statut)
-        );
-        
-        for (const course of orphanActive) {
+        // ── 5. Courses coincées (statuts intermédiaires bloqués) ────────
+        const seuils = { acceptee: 30, livreur_en_route: 60, colis_recupere: 120, en_livraison: 120, pris_en_charge: 120 };
+        for (const course of coursesActives) {
+            const seuil = seuils[course.statut];
+            if (!seuil) continue;
+            const diffMin = (now - new Date(course.updated_date).getTime()) / 60000;
+            if (diffMin <= seuil) continue;
+
             await asService.entities.CourseExterne.update(course.id, {
                 statut: "annulee",
-                notes: (course.notes || '') + ' | [AUTO] Livreur supprimé — course fermée',
+                notes: (course.notes || "") + ` | [AUTO] Course bloquée ${diffMin.toFixed(0)}min — annulée`,
+            });
+
+            if (course.livreur_id) {
+                const livreur = livreurParId(course.livreur_id);
+                if (livreur && livreur.statut !== "hors_ligne") {
+                    await asService.entities.Livreur.update(livreur.id, { statut: "disponible" });
+                }
+            }
+
+            corrections.push({
+                type: "course_coincee_annulee",
+                course_id: course.id,
+                statut: course.statut,
+                minutes_bloque: Math.round(diffMin),
+                livreur_id: course.livreur_id,
+            });
+        }
+
+        // ── 6. Courses orphelines actives → annuler ─────────────────────
+        const coursesOrphanActive = coursesActives.filter(c =>
+            c.livreur_id && !allLivreurIds.has(c.livreur_id)
+        );
+        for (const course of coursesOrphanActive) {
+            await asService.entities.CourseExterne.update(course.id, {
+                statut: "annulee",
+                notes: (course.notes || "") + " | [AUTO] Livreur supprimé — course fermée",
             });
             corrections.push({
                 type: "course_orpheline_fermee",
@@ -125,26 +180,36 @@ Deno.serve(async (req) => {
                 ancien_livreur_id: course.livreur_id,
                 statut_precedent: course.statut,
             });
-            logs.push(`[CORRECTION] Course orpheline ${course.id?.slice(-8)} (livreur supprimé) fermée`);
         }
 
-        // Marquer toutes les courses orphelines livrees/annulees comme audit
-        const orphanTerminal = allCourses.filter(c =>
-            c.livreur_id && !allLivreurIds.has(c.livreur_id) && ['livree', 'annulee'].includes(c.statut) &&
-            !(c.notes || '').includes('[AUDIT] Livreur supprimé')
-        );
-        for (const course of orphanTerminal.slice(0, 20)) {
+        // ── 7. Tag courses orphelines historiques (batch 20) ────────────
+        let taggedCount = 0;
+        for (const course of coursesLivrees) {
+            if (taggedCount >= 20) break;
+            if (!course.livreur_id || allLivreurIds.has(course.livreur_id)) continue;
+            if ((course.notes || "").includes(AUDIT_TAG)) continue;
             await asService.entities.CourseExterne.update(course.id, {
-                notes: (course.notes || '') + ' | [AUDIT] Livreur supprimé — course historique',
+                notes: (course.notes || "") + " | " + AUDIT_TAG,
             });
+            taggedCount++;
         }
 
-        // 5. Log d'audit dans RapportMaintenance
+        // ── 8. Rapport Maintenance ──────────────────────────────────────
         if (corrections.length > 0) {
             await asService.entities.RapportMaintenance.create({
-                type: "correction_courses_bloquees",
-                titre: `Correction automatique — ${corrections.length} anomalie(s)`,
-                details: JSON.stringify({ corrections, logs }),
+                type: "audit_quotidien",
+                titre: `Audit quotidien SILGAPP — ${corrections.length} correction(s)`,
+                details: JSON.stringify({
+                    corrections,
+                    resume: {
+                        livreurs_bloques: corrections.filter(c => c.type === "livreur_bloque_sans_course").length,
+                        admin_manuel_prix: corrections.filter(c => c.type === "admin_manuel_prix_manquant").length,
+                        deplacement_ferme: corrections.filter(c => c.type === "deplacement_arrivee_non_ferme").length,
+                        courses_coincees: corrections.filter(c => c.type === "course_coincee_annulee").length,
+                        orphelines_fermees: corrections.filter(c => c.type === "course_orpheline_fermee").length,
+                        orphelines_tagguees: taggedCount,
+                    },
+                }),
                 date_rapport: new Date().toISOString(),
             }).catch(() => null);
         }
@@ -153,8 +218,8 @@ Deno.serve(async (req) => {
             success: true,
             date: new Date().toISOString(),
             corrections_count: corrections.length,
+            orphelines_tagguees: taggedCount,
             corrections,
-            logs,
         });
 
     } catch (error) {
