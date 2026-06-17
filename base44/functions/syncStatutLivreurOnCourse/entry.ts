@@ -35,6 +35,16 @@ Deno.serve(async (req) => {
 
     // Cas 1 : Course passée à un statut terminal (annulée ou livrée)
     if (STATUTS_TERMINAUX.includes(statut) && livreurId) {
+      // 🏛️ ADMIN_MANUEL sans prix_final : ne PAS libérer le livreur
+      // Le livreur doit d'abord saisir le montant payé par le client dans l'app.
+      const isAdminSansPrix = (course.pricing_mode === "admin_manuel" || course.source === "admin")
+        && statut === "livree"
+        && (!course.prix_final || Number(course.prix_final) <= 0);
+      if (isAdminSansPrix) {
+        console.log(`[syncStatutLivreur] ⏸️ Course admin_manuel livrée sans prix_final — livreur reste en_course (attente saisie montant)`);
+        return Response.json({ success: true, skipped: "admin_manuel_waiting_price", livreur_id: livreurId });
+      }
+
       // Vérifier si le livreur a une AUTRE course encore active
       const coursesActives = await base44.asServiceRole.entities.CourseExterne.filter(
         { livreur_id: livreurId },

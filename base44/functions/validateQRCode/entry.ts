@@ -95,6 +95,36 @@ Deno.serve(async (req) => {
 
       // ── DELIVERY validé ──
       const now = new Date().toISOString();
+
+      // 🏛️ COURSE ADMIN : pas de calcul de prix automatique
+      // Le prix est saisi par le livreur dans l'app après scan/PIN livraison.
+      // Ne PAS mettre le livreur disponible — il doit d'abord saisir le montant.
+      if (course.pricing_mode === "admin_manuel" || course.source === "admin") {
+        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+          statut: 'livree',
+          heure_livraison: now,
+          latitude_livraison: latitude || null,
+          longitude_livraison: longitude || null,
+          delivery_confirmed_by: isBackupPin ? 'pin_secours' : method,
+          delivery_confirmed_at: now,
+          latitude_arrivee_livraison: latitude || null,
+          longitude_arrivee_livraison: longitude || null,
+          colis_livre_at: now,
+          // PRIX NON CALCULÉ — saisi par le livreur côté app
+        });
+
+        return Response.json({
+          success: true,
+          message: 'Livraison confirmée — saisir le montant payé par le client',
+          course: {
+            statut: 'livree',
+            heure_livraison: now,
+            latitude_livraison: latitude || null,
+            longitude_livraison: longitude || null,
+          },
+        });
+      }
+
       const updateData = {
         statut: 'livree',
         heure_livraison: now,
@@ -102,7 +132,6 @@ Deno.serve(async (req) => {
         longitude_livraison: longitude || null,
         delivery_confirmed_by: isBackupPin ? 'pin_secours' : method,
         delivery_confirmed_at: now,
-        // Sauvegarder aussi dans les champs standards de suivi
         latitude_arrivee_livraison: latitude || null,
         longitude_arrivee_livraison: longitude || null,
         colis_livre_at: now,
