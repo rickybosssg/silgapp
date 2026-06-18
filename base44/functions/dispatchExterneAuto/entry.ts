@@ -63,6 +63,42 @@ async function chargerConfigDispatch(base44) {
   }
 }
 
+async function chargerConfigVaguesGPS(base44) {
+  try {
+    const configs = await base44.asServiceRole.entities.DispatchWaveConfig.filter({});
+    const cfg = configs[0];
+    if (!cfg) {
+      return {
+        gps_waves_enabled: true,
+        waves: [
+          { size: 3, timeout_sec: 60 },
+          { size: 5, timeout_sec: 60 },
+          { size: 999, timeout_sec: 60 },
+        ],
+      };
+    }
+    const waves = JSON.parse(cfg.waves_json || '[]');
+    return {
+      gps_waves_enabled: cfg.gps_waves_enabled !== false,
+      waves: waves.length > 0 ? waves : [
+        { size: 3, timeout_sec: 60 },
+        { size: 5, timeout_sec: 60 },
+        { size: 999, timeout_sec: 60 },
+      ],
+    };
+  } catch (err) {
+    console.warn('[DISPATCH] ⚠️ Impossible de charger config vagues GPS, défaut utilisé:', err.message);
+    return {
+      gps_waves_enabled: true,
+      waves: [
+        { size: 3, timeout_sec: 60 },
+        { size: 5, timeout_sec: 60 },
+        { size: 999, timeout_sec: 60 },
+      ],
+    };
+  }
+}
+
 /**
  * Trouve les livreurs candidats classés par priorité.
  * @param {Array} exclusions - IDs des livreurs déjà notifiés (à exclure totalement de ce cycle)
@@ -323,20 +359,30 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
   const resultat = await trouverLivreursCandidats(base44, course, exclusions);
   const { tous: candidatsTous, niveau1, niveau2, niveau3, pickupSource } = resultat;
 
-  // 🧠 Mode vagues : activé pour quartier et "none" SAUF courses admin
-  // Courses admin → notification simultanée à tous les livreurs (pas de vagues)
-  // Le dispatch_wave stocké sur la course indique la vague actuelle (1=N1, 2=N2, 3=N3)
-  const modeVagues = pickupSource !== 'gps' && course.source !== 'admin';
-  let wave = modeVagues ? (course.dispatch_wave || 1) : 0;
+  // 🧠 Charger la config vagues GPS
+  const gpsConfig = await chargerConfigVaguesGPS(base44);
+  const useGPSWaves = pickupSource === 'gps' && gpsConfig.gps_waves_enabled;
 
-  // En mode vagues, sélectionner uniquement le niveau correspondant
+  // 📍 Mode vagues GPS (distance-based, configurable) — pour courses AVEC GPS
+  // 🌊 Mode vagues heartbeat (N1/N2/N3) — pour courses SANS GPS (quartier/none, non-admin)
+  // ⚡ Mode direct (tous simultanés) — admin courses sans GPS waves actif
+  const modeVaguesHeartbeat = !useGPSWaves && pickupSource !== 'gps' && course.source !== 'admin';
+  let wave = modeVaguesHeartbeat
+    ? (course.dispatch_wave || 1)      // heartbeat: 1=N1, 2=N2, 3=N3
+    : useGPSWaves
+      ? (course.dispatch_wave || 1)    // GPS: 1, 2, 3, ... = indices vagues config
+      : 0;                              // direct: pas de vagues
+
   let candidats;
-  if (modeVagues) {
+  if (modeVaguesHeartbeat) {
     if (wave === 1) candidats = niveau1;
     else if (wave === 2) candidats = niveau2;
     else if (wave === 3) candidats = niveau3;
-    else candidats = []; // ne devrait pas arriver, fallback
-    console.log(`[DISPATCH] 🌊 Mode vagues — vague ${wave} (N${wave}: ${candidats.length} candidats)`);
+    else candidats = [];
+    console.log(`[DISPATCH] 🌊 Mode vagues heartbeat — vague ${wave} (N${wave}: ${candidats.length} candidats)`);
+  } else if (useGPSWaves) {
+    candidats = candidatsTous; // Déjà triés par distance (GPS)
+    console.log(`[DISPATCH] 📍 Mode vagues GPS — vague ${wave}/${gpsConfig.waves.length} (${candidatsTous.length} candidats triés par distance)`);
   } else {
     candidats = candidatsTous;
   }
@@ -346,12 +392,21 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
   try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
 
   if (candidats.length === 0) {
-    // En mode vagues vague 3 épuisée → cycle_epuise
-    if (modeVagues && wave >= 3) {
-      console.log(`[DISPATCH] 🌊 Vague 3 épuisée — cycle_epuise pour course ${courseId}`);
+    // 🌊 Heartbeat: vague 3 épuisée → cycle_epuise
+    if (modeVaguesHeartbeat && wave >= 3) {
+      console.log(`[DISPATCH] 🌊 Vague 3 heartbeat épuisée — cycle_epuise pour course ${courseId}`);
       await base44.asServiceRole.entities.CourseExterne.update(courseId, {
         dispatch_status: 'cycle_epuise',
         dispatch_wave: 3,
+      });
+      return { cycleEpuise: true };
+    }
+    // 📍 GPS waves: dernière vague épuisée → cycle_epuise
+    if (useGPSWaves && wave > gpsConfig.waves.length) {
+      console.log(`[DISPATCH] 📍 Vague GPS ${wave} épuisée (dernière: ${gpsConfig.waves.length}) — cycle_epuise pour course ${courseId}`);
+      await base44.asServiceRole.entities.CourseExterne.update(courseId, {
+        dispatch_status: 'cycle_epuise',
+        dispatch_wave: gpsConfig.waves.length,
       });
       return { cycleEpuise: true };
     }
@@ -396,11 +451,23 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
     }
   }
 
-  // Sélectionner les X meilleurs
-  const selection = config.nb >= 999 ? candidats : candidats.slice(0, config.nb);
-  console.log(`[DISPATCH] 🎯 Sélection de ${selection.length}/${candidats.length} livreurs pour course ${courseId}`);
+  // Sélectionner les X meilleurs selon le mode
+  let selection, timeoutSec, waveLabel;
+  if (useGPSWaves) {
+    const waveIndex = wave - 1; // 0-based
+    const waveCfg = gpsConfig.waves[waveIndex];
+    const maxSize = waveCfg.size >= 999 ? candidats.length : waveCfg.size;
+    selection = candidats.slice(0, maxSize);
+    timeoutSec = waveCfg.timeout_sec;
+    waveLabel = `GPS vague ${wave}/${gpsConfig.waves.length}`;
+  } else {
+    selection = config.nb >= 999 ? candidats : candidats.slice(0, config.nb);
+    timeoutSec = config.timeout;
+    waveLabel = modeVaguesHeartbeat ? `heartbeat N${wave}` : 'direct';
+  }
+  console.log(`[DISPATCH] 🎯 ${waveLabel} — ${selection.length}/${candidats.length} livreurs pour course ${courseId}`);
 
-  const timeoutAt = new Date(Date.now() + config.timeout * 1000).toISOString();
+  const timeoutAt = new Date(Date.now() + timeoutSec * 1000).toISOString();
   const nouveauxNotifiedIds = selection.map(l => l.id);
 
   // ACCUMULER les IDs notifiés (concaténer + dédoublonner)
@@ -420,16 +487,16 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
   });
 
   // Notifier tous les livreurs sélectionnés en parallèle
-  const notifPromises = selection.map(l => notifierLivreur(base44, courseId, course, l, config.timeout));
+  const notifPromises = selection.map(l => notifierLivreur(base44, courseId, course, l, timeoutSec));
   await Promise.allSettled(notifPromises);
 
-  console.log(`[DISPATCH] ✅ ${selection.length} livreur(s) notifiés (total cumulé: ${totalNotifies}) pour course ${courseId}, timeout: ${config.timeout}s`);
+  console.log(`[DISPATCH] ✅ ${selection.length} livreur(s) notifiés (total cumulé: ${totalNotifies}) pour course ${courseId}, timeout: ${timeoutSec}s`);
   return {
     propose: true,
     nb_notifies: selection.length,
     total_notifies: totalNotifies,
     livreurs: selection.map(l => ({ id: l.id, nom: `${l.prenom || ''} ${l.nom}`.trim(), distance_km: l.distance?.toFixed(1) })),
-    timeout_sec: config.timeout,
+    timeout_sec: timeoutSec,
   };
 }
 
@@ -758,20 +825,27 @@ Deno.serve(async (req) => {
 
       // Expiration vague multi (sans verrou)
       if (expired && course.dispatch_status === 'propose' && !course.livreur_id) {
-        // 🌊 Mode vagues : avancer à la vague suivante
         const currentWave = course.dispatch_wave || 0;
         if (currentWave > 0) {
+          // Déterminer si GPS waves ou heartbeat (via pickupSource)
+          const pickupLat = course.gps_depart_lat;
+          const pickupLng = course.gps_depart_lng;
+          const hasGPS = !!(pickupLat && pickupLng);
+          const gpsCfg = hasGPS ? await chargerConfigVaguesGPS(base44) : null;
+          const isGPSWave = hasGPS && gpsCfg?.gps_waves_enabled;
+
           const nextWave = currentWave + 1;
-          if (nextWave > 3) {
-            console.log(`[DISPATCH] 🌊 Vague 3 expirée — cycle_epuise pour course ${course_id}`);
+          const maxWave = isGPSWave ? gpsCfg.waves.length : 3;
+
+          if (nextWave > maxWave) {
+            console.log(`[DISPATCH] ${isGPSWave ? '📍 GPS' : '🌊 Heartbeat'} vague ${currentWave} expirée (max: ${maxWave}) — cycle_epuise pour course ${course_id}`);
             await base44.asServiceRole.entities.CourseExterne.update(course_id, {
               dispatch_status: 'cycle_epuise',
-              dispatch_wave: 3,
+              dispatch_wave: maxWave,
             });
             return Response.json({ expired: true, wave_epuise: true });
           }
-          // Avancer à la vague suivante
-          console.log(`[DISPATCH] 🌊 Avancement vague ${currentWave} → ${nextWave} pour course ${course_id}`);
+          console.log(`[DISPATCH] ${isGPSWave ? '📍 GPS' : '🌊 Heartbeat'} avancement vague ${currentWave} → ${nextWave} pour course ${course_id}`);
           await base44.asServiceRole.entities.CourseExterne.update(course_id, {
             dispatch_status: 'redispatch',
             dispatch_wave: nextWave,
@@ -833,23 +907,29 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // 🌊 Vagues expirées (propose sans verrou, mode vagues)
+        // 🌊/📍 Vagues expirées (propose sans verrou, mode vagues heartbeat ou GPS)
         const expired = !!(course.timeout_expires_at && new Date(course.timeout_expires_at) < now);
         if (!expired || course.dispatch_status !== 'propose' || course.livreur_id) continue;
 
         const currentWave = course.dispatch_wave || 0;
         if (currentWave > 0) {
+          // Détecter le type de vagues
+          const hasGPS = !!(course.gps_depart_lat && course.gps_depart_lng);
+          const gpsCfg = hasGPS ? await chargerConfigVaguesGPS(base44) : null;
+          const isGPSWave = hasGPS && gpsCfg?.gps_waves_enabled;
+          const maxWave = isGPSWave ? gpsCfg.waves.length : 3;
+
           const nextWave = currentWave + 1;
-          if (nextWave > 3) {
-            console.log(`[DISPATCH] 🌊 Vague 3 expirée — cycle_epuise pour course ${course.id}`);
+          if (nextWave > maxWave) {
+            console.log(`[DISPATCH] ${isGPSWave ? '📍 GPS' : '🌊 Heartbeat'} vague ${currentWave} expirée (max: ${maxWave}) — cycle_epuise pour course ${course.id}`);
             await base44.asServiceRole.entities.CourseExterne.update(course.id, {
               dispatch_status: 'cycle_epuise',
-              dispatch_wave: 3,
+              dispatch_wave: maxWave,
             });
-            resultats.push({ course_id: course.id, wave: '3→epuise' });
+            resultats.push({ course_id: course.id, wave: `${currentWave}→epuise` });
             continue;
           }
-          console.log(`[DISPATCH] 🌊 Avancement vague ${currentWave} → ${nextWave} pour course ${course.id}`);
+          console.log(`[DISPATCH] ${isGPSWave ? '📍 GPS' : '🌊 Heartbeat'} avancement vague ${currentWave} → ${nextWave} pour course ${course.id}`);
           await base44.asServiceRole.entities.CourseExterne.update(course.id, {
             dispatch_status: 'redispatch',
             dispatch_wave: nextWave,
@@ -981,6 +1061,33 @@ Deno.serve(async (req) => {
       }
 
       return Response.json({ success: true, message: 'Configuration dispatch sauvegardée' });
+    }
+
+    // ─── 10. Lire la config vagues GPS ───────────────────────────────────
+    if (action === 'get_wave_config') {
+      const cfg = await chargerConfigVaguesGPS(base44);
+      return Response.json({ success: true, config: cfg });
+    }
+
+    // ─── 11. Sauvegarder la config vagues GPS ───────────────────────────
+    if (action === 'set_wave_config') {
+      const { gps_waves_enabled, waves } = body;
+      const configs = await base44.asServiceRole.entities.DispatchWaveConfig.filter({});
+      const wavesJson = JSON.stringify(waves || []);
+
+      if (configs[0]) {
+        await base44.asServiceRole.entities.DispatchWaveConfig.update(configs[0].id, {
+          gps_waves_enabled: gps_waves_enabled !== false,
+          waves_json: wavesJson,
+        });
+      } else {
+        await base44.asServiceRole.entities.DispatchWaveConfig.create({
+          gps_waves_enabled: gps_waves_enabled !== false,
+          waves_json: wavesJson,
+        });
+      }
+
+      return Response.json({ success: true, message: 'Configuration vagues GPS sauvegardée' });
     }
 
     return Response.json({ error: 'Action inconnue' }, { status: 400 });

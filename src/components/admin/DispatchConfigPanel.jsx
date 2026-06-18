@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
-import { Save, Loader2, Users, Clock, Info, Flame, ChevronRight } from "lucide-react";
+import { Save, Loader2, Users, Clock, Info, Flame, ChevronRight, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import DispatchWaveConfigPanel from "@/components/admin/DispatchWaveConfigPanel";
 
 const NB_OPTIONS = [
   { value: "1", label: "1 livreur", desc: "Attribution séquentielle classique" },
@@ -168,7 +169,16 @@ export default function DispatchConfigPanel() {
         {saving ? "Sauvegarde..." : "Sauvegarder la configuration"}
       </Button>
 
-      <Link to="/admin/zones-chaudes" className="block mt-2">
+      {/* Séparateur vagues GPS */}
+      <div className="border-t border-gray-200 pt-5 mt-5">
+        <div className="flex items-center gap-2 mb-4">
+          <MapPin className="w-4 h-4 text-indigo-600" />
+          <p className="font-black text-sm text-indigo-700">DISPATCH GPS — VAGUES PAR PROXIMITÉ</p>
+        </div>
+        <DispatchWaveConfigPanel />
+      </div>
+
+      <Link to="/admin/zones-chaudes" className="block mt-5">
         <div className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-xl hover:bg-orange-100 transition-colors group">
           <div className="flex items-center gap-2.5">
             <Flame className="w-4 h-4 text-orange-500" />
