@@ -32,7 +32,7 @@
     "commission_pct": {
       "type": "number",
       "default": 30,
-      "description": "Pourcentage de commission Silga (par d\u00e9faut 30%)"
+      "description": "Pourcentage de commission Silga configure pour ce pays"
     },
     "ville_principale": {
       "type": "string",
