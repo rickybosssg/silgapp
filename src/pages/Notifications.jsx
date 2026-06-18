@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -21,11 +21,30 @@ const typeConfig = {
 export default function Notifications() {
   const queryClient = useQueryClient();
 
-  const { data: notifications = [], isLoading } = useQuery({
+  const { data: notificationsRaw = [], isLoading } = useQuery({
     queryKey: ["notifications"],
     queryFn: () => base44.entities.Notification.list("-created_date", 100),
     initialData: [],
   });
+
+  // 🛡️ ANTI-DOUBLON COURSE : une seule notification par course_id
+  // Priorité : non-lue > plus récente
+  const notifications = React.useMemo(() => {
+    const seen = new Map();
+    const sorted = [...notificationsRaw].sort((a, b) => {
+      // Non-lue d'abord
+      if (!a.lue && b.lue) return -1;
+      if (a.lue && !b.lue) return 1;
+      // Puis plus récente
+      return new Date(b.created_date) - new Date(a.created_date);
+    });
+    return sorted.filter(n => {
+      if (!n.course_id) return true; // garder les notifs sans course_id
+      if (seen.has(n.course_id)) return false; // déjà vu → doublon
+      seen.set(n.course_id, true);
+      return true;
+    });
+  }, [notificationsRaw]);
 
   const markReadMutation = useMutation({
     mutationFn: (id) => base44.entities.Notification.update(id, { lue: true }),
@@ -47,6 +66,9 @@ export default function Notifications() {
   });
 
   const unreadCount = notifications.filter(n => !n.lue).length;
+
+  // 🛡️ Stats dédoublonnage (diagnostic)
+  const dedupCount = notificationsRaw.length - notifications.length;
 
   return (
     <div className="p-4 lg:p-6 space-y-5 max-w-3xl mx-auto">
@@ -70,8 +92,13 @@ export default function Notifications() {
             <div>
               <h1 className="text-xl font-black text-white tracking-tight">Notifications</h1>
               <p className="text-white/60 text-xs mt-0.5">
-                {unreadCount > 0 ? `${unreadCount} non lue${unreadCount > 1 ? "s" : ""}` : "Tout est à jour"} · {notifications.length} au total
+                {unreadCount > 0 ? `${unreadCount} non lue${unreadCount > 1 ? "s" : ""}` : "Tout est à jour"} · {notifications.length} affichées
               </p>
+              {dedupCount > 0 && (
+                <p className="text-white/40 text-[10px] mt-0.5">
+                  🛡️ {dedupCount} doublon{dedupCount > 1 ? "s" : ""} filtré{dedupCount > 1 ? "s" : ""} (unicité par course)
+                </p>
+              )}
             </div>
           </div>
           {unreadCount > 0 && (

@@ -238,16 +238,22 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
 async function notifierLivreur(base44, courseId, course, livreur, timeoutSec) {
   if (!livreur.user_email) return;
 
-  const depuis = new Date(Date.now() - timeoutSec * 1000).toISOString();
+  // 🛡️ ANTI-DOUBLON PERMANENT — une seule notification par course par livreur
   const existantes = await base44.asServiceRole.entities.Notification.filter({
     course_id: courseId,
     destinataire_email: livreur.user_email,
     type: 'nouvelle_course',
   });
-  const recentes = existantes.filter(n => n.created_date > depuis);
-  if (recentes.length > 0) {
-    console.log(`[DISPATCH] 🛡️ Doublon notification (< ${timeoutSec}s) pour ${livreur.user_email}`);
-    return;
+  if (existantes.length > 0) {
+    console.log(`[DISPATCH] 🛡️ Anti-doublon permanent — ${existantes.length} notif(s) existante(s) pour course ${courseId} / livreur ${livreur.user_email}`);
+    // Si une notif non-lue existe, pas besoin d'en créer une nouvelle
+    const nonLue = existantes.find(n => !n.lue);
+    if (nonLue) {
+      console.log(`[DISPATCH] 🛡️ Notif non-lue déjà existante (id=${nonLue.id}) — skip`);
+      return;
+    }
+    // Si toutes sont lues, on peut en créer une nouvelle (re-dispatch après reset)
+    console.log(`[DISPATCH] 📤 Toutes les notifs sont lues — nouvelle notif autorisée`);
   }
 
   const distanceSafe = livreur.distance ? Number(livreur.distance).toFixed(1) : '?';
@@ -485,6 +491,13 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
     timeout_expires_at: timeoutAt,
     dispatch_notified_ids: JSON.stringify(tousNotifies),
   });
+
+  // 🧹 Nettoyer les notifications de la vague précédente avant la nouvelle vague
+  // Seulement si on avance dans les vagues (wave > 1) — évite de supprimer en N1
+  if (wave > 1) {
+    await supprimerNotificationsCourse(base44, courseId);
+    console.log(`[DISPATCH] 🧹 Notifications vague précédente archivées pour course ${courseId} (vague ${wave})`);
+  }
 
   // Notifier tous les livreurs sélectionnés en parallèle
   const notifPromises = selection.map(l => notifierLivreur(base44, courseId, course, l, timeoutSec));
@@ -1088,6 +1101,42 @@ Deno.serve(async (req) => {
       }
 
       return Response.json({ success: true, message: 'Configuration vagues GPS sauvegardée' });
+    }
+
+    // ─── 12. Diagnostic anti-doublon notifications ────────────────────────
+    if (action === 'diagnostic_notifications') {
+      const toutes = await base44.asServiceRole.entities.Notification.filter({ type: 'nouvelle_course' }, '-created_date', 500);
+      
+      // Grouper par course_id + destinataire_email
+      const grouped = {};
+      for (const n of toutes) {
+        const key = `${n.course_id || '?'}::${n.destinataire_email || '?'}`;
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(n);
+      }
+
+      const doublons = Object.entries(grouped)
+        .filter(([, notifs]) => notifs.length > 1)
+        .map(([key, notifs]) => ({
+          key,
+          count: notifs.length,
+          non_lues: notifs.filter(n => !n.lue).length,
+          lues: notifs.filter(n => n.lue).length,
+          derniere: notifs[0]?.created_date,
+          premiere: notifs[notifs.length - 1]?.created_date,
+        }));
+
+      const stats = {
+        total_notifications: toutes.length,
+        total_combinaisons: Object.keys(grouped).length,
+        combinaisons_avec_doublons: doublons.length,
+        total_doublons_en_surplus: doublons.reduce((s, d) => s + d.count - 1, 0),
+        doublons_non_lus: doublons.filter(d => d.non_lues > 0).length,
+        doublons_detail: doublons.slice(0, 30),
+      };
+
+      console.log(`[DIAGNOSTIC NOTIFS] ${stats.total_notifications} notifs, ${stats.combinaisons_avec_doublons} combinaisons avec doublons, ${stats.total_doublons_en_surplus} notifs en surplus`);
+      return Response.json({ success: true, stats });
     }
 
     return Response.json({ error: 'Action inconnue' }, { status: 400 });

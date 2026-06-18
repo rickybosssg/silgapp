@@ -119,6 +119,20 @@ Deno.serve(async (req) => {
       await asService.entities.CourseExterne.update(course_id, resetData);
       courseRedispatch = true;
 
+      // 🧹 Archiver toutes les notifications 'nouvelle_course' pour cette course
+      // pour que les livreurs ne voient plus une course qui est retournée en dispatch
+      const notifsNouvelleCourse = await asService.entities.Notification.filter({
+        course_id,
+        type: 'nouvelle_course',
+        lue: false,
+      }).catch(() => []);
+      for (const n of notifsNouvelleCourse) {
+        await asService.entities.Notification.update(n.id, { lue: true }).catch(() => null);
+      }
+      if (notifsNouvelleCourse.length > 0) {
+        console.log(`[ANNULATION] 🧹 ${notifsNouvelleCourse.length} notifications 'nouvelle_course' archivées pour course ${course_id}`);
+      }
+
       // ── Historique d'annulation ──────────────────────────────────
       if (motif && livreurId) {
         const livreurPourLog = await asService.entities.Livreur.get(livreurId).catch(() => null);
