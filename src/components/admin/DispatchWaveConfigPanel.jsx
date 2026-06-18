@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
-import { Save, Loader2, Plus, Trash2, GripVertical, ChevronUp, ChevronDown, ToggleLeft, ToggleRight, Info } from "lucide-react";
+import { Save, Loader2, Plus, Trash2, ChevronUp, ChevronDown, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 

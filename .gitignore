@@ -17,6 +17,12 @@ node_modules
 dist
 dist-ssr
 *.local
+outputs/
+work-certs/
+*.apk
+*.aab
+*.jks
+*.keystore
 
 # Editor directories and files
 .vscode/*

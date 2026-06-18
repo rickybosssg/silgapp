@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Check } from "lucide-react";
 import { SILGAPP_COUNTRIES, normalizePhone } from "@/lib/phoneUtils";
 import { requestNativeAppPermissions } from "@/lib/nativePermissions";
+import CountryCodeSelect from "@/components/ui/CountryCodeSelect";
 
 // ─── Helpers téléphone (délègue à phoneUtils) ─────────────────────────────────
 export function normaliserTelephone(tel, countryCode = "BF") {
@@ -124,18 +125,6 @@ function EcranGPS({ livreurId, onGpsOk }) {
   );
 }
 
-// Pays SILGAPP pour la sélection livreur
-const PAYS_LIVREUR = [
-  { code: "BF", nom: "Burkina Faso",  emoji: "🇧🇫" },
-  { code: "CI", nom: "Côte d'Ivoire", emoji: "🇨🇮" },
-  { code: "TG", nom: "Togo",          emoji: "🇹🇬" },
-  { code: "BJ", nom: "Bénin",         emoji: "🇧🇯" },
-  { code: "SN", nom: "Sénégal",       emoji: "🇸🇳" },
-  { code: "ML", nom: "Mali",          emoji: "🇲🇱" },
-  { code: "GN", nom: "Guinée",        emoji: "🇬🇳" },
-  { code: "NE", nom: "Niger",         emoji: "🇳🇪" },
-];
-
 // ─── Formulaire profil livreur ────────────────────────────────────────────────
 function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
   const [countryCode, setCountryCode] = useState(livreurProfil?.country_code || "");
@@ -251,23 +240,11 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
         {/* Pays */}
         <div>
           <label className="block text-xs font-bold text-gray-300 mb-2 uppercase tracking-wide">🌍 Pays * (obligatoire)</label>
-          <div className="grid grid-cols-2 gap-2">
-            {PAYS_LIVREUR.map(pays => (
-              <button
-                key={pays.code}
-                type="button"
-                onClick={() => { setCountryCode(pays.code); setF("telephone", ""); }}
-                className={`h-11 rounded-xl border-2 text-sm font-semibold flex items-center gap-2 px-3 transition-all ${
-                  countryCode === pays.code
-                    ? "border-red-500 bg-red-600/20 text-red-300"
-                    : "border-zinc-600 bg-zinc-800 text-gray-200 hover:border-zinc-400"
-                }`}
-              >
-                <span className="text-lg">{pays.emoji}</span>
-                <span className="text-xs truncate">{pays.nom}</span>
-              </button>
-            ))}
-          </div>
+          <CountryCodeSelect
+            value={countryCode}
+            onChange={(code) => { setCountryCode(code); setF("telephone", ""); }}
+            dark
+          />
         </div>
 
         {/* Téléphone */}

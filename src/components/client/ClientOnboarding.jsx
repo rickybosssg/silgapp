@@ -3,19 +3,17 @@ import { base44 } from "@/api/base44Client";
 import { requestNativeAppPermissions } from "@/lib/nativePermissions";
 import { toast } from "sonner";
 import { MapPin, User, Check, Loader2 } from "lucide-react";
+import CountryCodeSelect from "@/components/ui/CountryCodeSelect";
+import { SILGAPP_COUNTRIES } from "@/lib/phoneUtils";
 
 // ─── Pays disponibles ─────────────────────────────────────────────────────────
-export const PAYS_LISTE = [
-  { code: "BF", nom: "Burkina Faso",   emoji: "🇧🇫", indicatif: "+226", digits: 8 },
-  { code: "CI", nom: "Côte d'Ivoire",  emoji: "🇨🇮", indicatif: "+225", digits: 10 },
-  { code: "TG", nom: "Togo",           emoji: "🇹🇬", indicatif: "+228", digits: 8 },
-  { code: "BJ", nom: "Bénin",          emoji: "🇧🇯", indicatif: "+229", digits: 8 },
-  { code: "SN", nom: "Sénégal",        emoji: "🇸🇳", indicatif: "+221", digits: 9 },
-  { code: "ML", nom: "Mali",           emoji: "🇲🇱", indicatif: "+223", digits: 8 },
-  { code: "NE", nom: "Niger",          emoji: "🇳🇪", indicatif: "+227", digits: 8 },
-  { code: "GN", nom: "Guinée",         emoji: "🇬🇳", indicatif: "+224", digits: 9 },
-  { code: "GH", nom: "Ghana",          emoji: "🇬🇭", indicatif: "+233", digits: 9 },
-];
+export const PAYS_LISTE = SILGAPP_COUNTRIES.map((country) => ({
+  code: country.code,
+  nom: country.name,
+  emoji: country.flag,
+  indicatif: `+${country.dial}`,
+  digits: country.len,
+}));
 
 // ─── Helpers téléphone ────────────────────────────────────────────────────────
 export function normaliserTelephone(raw, countryCode = "BF") {
@@ -36,7 +34,14 @@ function formaterAffichage(raw, maxDigits = 8) {
 export function profilClientComplet(p) {
   if (!p) return false;
   const tel = (p.telephone || "").replace(/\D/g, "");
-  return !!(p.nom && p.nom.trim() && p.prenom && p.prenom.trim() && tel.length >= 8 && p.country_code);
+  return !!(
+    p.nom && p.nom.trim() &&
+    p.prenom && p.prenom.trim() &&
+    tel.length >= 8 &&
+    p.country_code &&
+    p.ville && p.ville.trim() &&
+    p.quartier && p.quartier.trim()
+  );
 }
 
 // ─── Reverse geocoding ────────────────────────────────────────────────────────
@@ -147,6 +152,8 @@ function EtapeProfil({ clientProfil, onSuccess }) {
   const [nom, setNom] = useState(clientProfil?.nom || "");
   const [prenom, setPrenom] = useState(clientProfil?.prenom || "");
   const [countryCode, setCountryCode] = useState(clientProfil?.country_code || "");
+  const [ville, setVille] = useState(clientProfil?.ville || "");
+  const [quartier, setQuartier] = useState(clientProfil?.quartier || "");
   const [telAffiche, setTelAffiche] = useState(
     clientProfil?.telephone ? formaterAffichage(clientProfil.telephone) : ""
   );
@@ -183,7 +190,7 @@ function EtapeProfil({ clientProfil, onSuccess }) {
 
   const telDigits = telAffiche.replace(/\D/g, "");
   const telValide = paysSelectionne ? telDigits.length === paysSelectionne.digits : false;
-  const peutSauvegarder = nom.trim() && prenom.trim() && telValide && countryCode;
+  const peutSauvegarder = nom.trim() && prenom.trim() && telValide && countryCode && ville.trim() && quartier.trim();
 
   const handleSave = async () => {
     if (!peutSauvegarder) return;
@@ -209,6 +216,8 @@ function EtapeProfil({ clientProfil, onSuccess }) {
         prenom: prenom.trim(),
         telephone: telNormalise,
         country_code: countryCode,
+        ville: ville.trim(),
+        quartier: quartier.trim(),
         actif: true,
         ...(gpsData ? { latitude: gpsData.latitude, longitude: gpsData.longitude } : {}),
         ...(codePromoStatut === "valide" && codePromoData ? {
@@ -281,23 +290,10 @@ function EtapeProfil({ clientProfil, onSuccess }) {
           {/* Pays */}
           <div>
             <label className="text-xs font-bold text-gray-800 mb-1 block">🌍 Pays *</label>
-            <div className="grid grid-cols-2 gap-2">
-              {PAYS_LISTE.map(pays => (
-                <button
-                  key={pays.code}
-                  type="button"
-                  onClick={() => { setCountryCode(pays.code); setTelAffiche(""); }}
-                  className={`h-11 rounded-xl border-2 text-sm font-semibold flex items-center gap-2 px-3 transition-all ${
-                    countryCode === pays.code
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-gray-300 bg-white text-gray-800 hover:border-primary/50"
-                  }`}
-                >
-                  <span className="text-lg">{pays.emoji}</span>
-                  <span className="text-xs truncate">{pays.nom}</span>
-                </button>
-              ))}
-            </div>
+            <CountryCodeSelect
+              value={countryCode}
+              onChange={(code) => { setCountryCode(code); setTelAffiche(""); }}
+            />
           </div>
 
           <div>
@@ -315,6 +311,24 @@ function EtapeProfil({ clientProfil, onSuccess }) {
               value={prenom}
               onChange={e => setPrenom(e.target.value)}
               placeholder="Votre prénom"
+              className="w-full h-12 rounded-xl border-2 border-gray-300 px-4 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-800 mb-1 block">Ville *</label>
+            <input
+              value={ville}
+              onChange={e => setVille(e.target.value)}
+              placeholder="Votre ville"
+              className="w-full h-12 rounded-xl border-2 border-gray-300 px-4 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-800 mb-1 block">Quartier / Adresse *</label>
+            <input
+              value={quartier}
+              onChange={e => setQuartier(e.target.value)}
+              placeholder="Votre quartier ou adresse"
               className="w-full h-12 rounded-xl border-2 border-gray-300 px-4 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
             />
           </div>
@@ -399,7 +413,10 @@ export default function ClientOnboarding({ clientProfil, onComplete }) {
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
 
   useEffect(() => {
-    if (!clientProfil) return; // Attendre que le profil soit chargé
+    if (!clientProfil) {
+      setStep("profil");
+      return;
+    }
     let gpsOk = false;
     try { gpsOk = localStorage.getItem("client_gps_active") === "true"; } catch (_) {}
     const complet = profilClientComplet(clientProfil);

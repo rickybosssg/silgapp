@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Flame, Settings, BarChart3, Clock, MapPin, Zap, RefreshCw,
+  Flame, Settings, BarChart3, Clock, Zap,
   Save, Loader2, Bell, BellOff, Sliders, TrendingUp, History,
-  Phone, Users, Package, ChevronDown, ChevronUp
+  Users, Package, ChevronDown, ChevronUp
 } from "lucide-react";
 import { usePaysActifs } from "@/components/international/CountrySelector.jsx";
 import { useAdminContext } from "@/hooks/useAdminContext.js";

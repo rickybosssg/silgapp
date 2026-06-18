@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Truck, Package, ArrowRight, Loader2, CheckCircle } from "lucide-react";
-import ClientOnboardingForm from "@/components/auth/ClientOnboardingForm";
+import ClientOnboarding from "@/components/client/ClientOnboarding";
 import LivreurRegistrationForm from "@/components/auth/LivreurRegistrationForm";
 
 export default function RoleSelection() {
@@ -82,7 +82,7 @@ export default function RoleSelection() {
           <button onClick={() => setStep("choix")} className="text-sm text-muted-foreground hover:text-foreground mb-6">
             ← Retour
           </button>
-          <ClientOnboardingForm user={user} onComplete={handleClientComplete} />
+          <ClientOnboarding clientProfil={null} onComplete={handleClientComplete} />
         </div>
       </div>
     );

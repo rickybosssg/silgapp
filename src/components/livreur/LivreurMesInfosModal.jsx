@@ -5,7 +5,7 @@ import { formaterTelephone } from "./LivreurExterneOnboarding";
 import PhotoPicker from "./PhotoPicker";
 import LivreurPhotoUploader from "./LivreurPhotoUploader";
 import { base44 } from "@/api/base44Client";
-import { SILGAPP_COUNTRIES } from "@/lib/phoneUtils";
+import { SILGAPP_COUNTRIES, getCountryLabel } from "@/lib/phoneUtils";
 
 export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
   const countryCode = livreurProfil?.country_code || "BF";
@@ -95,6 +95,13 @@ export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
       </div>
 
       {/* Champs */}
+      <div>
+        <label className="block text-xs font-semibold text-gray-500 mb-1">Pays</label>
+        <div className="w-full min-h-12 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-800">
+          {getCountryLabel(countryCode)}
+        </div>
+      </div>
+
       {[
         { key: "nom", label: "Nom *", placeholder: "Ex: Ouédraogo" },
         { key: "prenom", label: "Prénom *", placeholder: "Ex: Ibrahim" },

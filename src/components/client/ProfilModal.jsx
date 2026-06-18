@@ -2,44 +2,55 @@ import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import { User, Save, X, Check, Trash2 } from "lucide-react";
+import CountryCodeSelect from "@/components/ui/CountryCodeSelect";
+import { SILGAPP_COUNTRIES, normalizePhone } from "@/lib/phoneUtils";
 
-// Normalise +226XXXXXXXX
-function normaliserTel(raw) {
-  if (!raw) return "";
-  const digits = raw.replace(/\D/g, "");
-  if (digits.startsWith("226") && digits.length === 11) return "+" + digits;
-  if (digits.length === 8) return "+226" + digits;
-  if (digits.length > 8) return "+" + digits.slice(-11);
-  return "";
+function getCountryInfo(countryCode) {
+  return SILGAPP_COUNTRIES.find((country) => country.code === countryCode) || SILGAPP_COUNTRIES[0];
 }
 
-// Formater XX XX XX XX pour affichage
-function formaterAffichage(raw) {
-  const digits = (raw || "").replace(/\D/g, "").slice(-8);
+function normaliserTel(raw, countryCode) {
+  if (!raw) return "";
+  const normalized = normalizePhone(raw, countryCode);
+  return normalized ? `+${normalized}` : "";
+}
+
+function extraireLocal(raw, countryCode) {
+  const country = getCountryInfo(countryCode);
+  const digits = (raw || "").replace(/\D/g, "");
+  if (digits.startsWith(country.dial)) return digits.slice(country.dial.length).slice(0, country.len);
+  return digits.slice(-country.len);
+}
+
+function formaterAffichage(raw, maxDigits = 8) {
+  const digits = (raw || "").replace(/\D/g, "").slice(0, maxDigits);
   return digits.replace(/(\d{2})(?=\d)/g, "$1 ").trim();
 }
 
 export default function ProfilModal({ clientProfil, onClose, onSave }) {
   const [nom, setNom] = useState(clientProfil?.nom || "");
   const [prenom, setPrenom] = useState(clientProfil?.prenom || "");
-  const initTel = clientProfil?.telephone ? formaterAffichage(clientProfil.telephone) : "";
+  const [countryCode, setCountryCode] = useState(clientProfil?.country_code || "BF");
+  const countryInfo = getCountryInfo(countryCode);
+  const initTel = clientProfil?.telephone ? formaterAffichage(extraireLocal(clientProfil.telephone, countryCode), countryInfo.len) : "";
   const [telAffiche, setTelAffiche] = useState(initTel);
   const [loading, setLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const handleTelChange = (e) => {
-    const raw = e.target.value.replace(/\D/g, "").slice(0, 8);
-    setTelAffiche(formaterAffichage(raw));
+    const raw = e.target.value.replace(/\D/g, "").slice(0, countryInfo.len);
+    setTelAffiche(formaterAffichage(raw, countryInfo.len));
   };
 
   const handleSave = async () => {
     const telDigits = telAffiche.replace(/\D/g, "");
     if (!nom.trim()) { toast.error("Veuillez entrer votre nom"); return; }
     if (!prenom.trim()) { toast.error("Veuillez entrer votre prénom"); return; }
-    if (telDigits.length !== 8) { toast.error("Téléphone invalide (8 chiffres requis)"); return; }
+    if (!countryCode) { toast.error("Veuillez choisir votre pays"); return; }
+    if (telDigits.length !== countryInfo.len) { toast.error(`T�l�phone invalide (${countryInfo.len} chiffres requis)`); return; }
 
-    const telNormalise = normaliserTel(telDigits);
+    const telNormalise = normaliserTel(telDigits, countryCode);
     if (!telNormalise) { toast.error("Numéro de téléphone invalide"); return; }
 
     setLoading(true);
@@ -48,10 +59,11 @@ export default function ProfilModal({ clientProfil, onClose, onSave }) {
         nom: nom.trim(),
         prenom: prenom.trim(),
         telephone: telNormalise,
+        country_code: countryCode,
       });
       toast.success("Profil mis à jour ✓");
       // Passer l'objet mis à jour au parent
-      onSave?.(updated || { ...clientProfil, nom: nom.trim(), prenom: prenom.trim(), telephone: telNormalise });
+      onSave?.(updated || { ...clientProfil, nom: nom.trim(), prenom: prenom.trim(), telephone: telNormalise, country_code: countryCode });
     } catch {
       toast.error("Erreur lors de la sauvegarde");
     } finally {
@@ -59,7 +71,7 @@ export default function ProfilModal({ clientProfil, onClose, onSave }) {
     }
   };
 
-  const telValide = telAffiche.replace(/\D/g, "").length === 8;
+  const telValide = telAffiche.replace(/\D/g, "").length === countryInfo.len;
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -101,22 +113,32 @@ export default function ProfilModal({ clientProfil, onClose, onSave }) {
             />
           </div>
           <div>
-            <label className="text-xs font-bold text-gray-800 mb-1 block">Téléphone * (8 chiffres)</label>
+            <label className="text-xs font-bold text-gray-800 mb-1 block">Pays *</label>
+            <CountryCodeSelect
+              value={countryCode}
+              onChange={(code) => {
+                setCountryCode(code);
+                setTelAffiche("");
+              }}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-800 mb-1 block">T�l�phone * ({countryInfo.len} chiffres)</label>
             <div className="flex gap-2">
               <div className="h-12 rounded-xl border border-gray-200 bg-gray-100 px-3 flex items-center text-sm font-bold text-gray-700 flex-shrink-0">
-                +226
+                {countryInfo.flag} +{countryInfo.dial}
               </div>
               <input
                 value={telAffiche}
                 onChange={handleTelChange}
-                placeholder="70 71 45 00"
+                placeholder={"0".repeat(countryInfo.len).replace(/(.{2})/g, "$1 ").trim()}
                 inputMode="numeric"
                 className="flex-1 h-12 rounded-xl border border-gray-200 px-4 text-sm font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
             </div>
             {telAffiche.length > 0 && (
               <p className={`text-xs mt-1 flex items-center gap-1 ${telValide ? "text-green-600" : "text-red-400"}`}>
-                {telValide ? <><Check className="w-3 h-3" /> {normaliserTel(telAffiche.replace(/\D/g, ""))}</> : `${telAffiche.replace(/\D/g, "").length}/8 chiffres`}
+                {telValide ? <><Check className="w-3 h-3" /> {normaliserTel(telAffiche.replace(/\D/g, ""), countryCode)}</> : `${telAffiche.replace(/\D/g, "").length}/${countryInfo.len} chiffres`}
               </p>
             )}
           </div>

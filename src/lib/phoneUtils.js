@@ -10,15 +10,35 @@
 
 /** Tous les pays SILGAPP avec indicatif et longueur du numéro local */
 export const SILGAPP_COUNTRIES = [
-  { code: "BF", dial: "226", len: 8  },
-  { code: "CI", dial: "225", len: 10 },
-  { code: "TG", dial: "228", len: 8  },
-  { code: "BJ", dial: "229", len: 8  },
-  { code: "SN", dial: "221", len: 9  },
-  { code: "ML", dial: "223", len: 8  },
-  { code: "GN", dial: "224", len: 9  },
-  { code: "NE", dial: "227", len: 8  },
+  { code: "BF", dial: "226", len: 8, name: "Burkina Faso", flag: "🇧🇫" },
+  { code: "TG", dial: "228", len: 8, name: "Togo", flag: "🇹🇬" },
+  { code: "CI", dial: "225", len: 10, name: "Côte d'Ivoire", flag: "🇨🇮" },
+  { code: "BJ", dial: "229", len: 8, name: "Bénin", flag: "🇧🇯" },
+  { code: "SN", dial: "221", len: 9, name: "Sénégal", flag: "🇸🇳" },
+  { code: "ML", dial: "223", len: 8, name: "Mali", flag: "🇲🇱" },
+  { code: "GN", dial: "224", len: 9, name: "Guinée", flag: "🇬🇳" },
+  { code: "NE", dial: "227", len: 8, name: "Niger", flag: "🇳🇪" },
+  { code: "GH", dial: "233", len: 9, name: "Ghana", flag: "🇬🇭" },
 ];
+
+const normalizeSearch = (value) =>
+  String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+export function getCountryLabel(countryCode) {
+  const country = SILGAPP_COUNTRIES.find((item) => item.code === countryCode);
+  return country ? `${country.flag} ${country.name} (+${country.dial})` : "Sélectionner un pays";
+}
+
+export function searchCountries(query) {
+  const normalizedQuery = normalizeSearch(query);
+  if (!normalizedQuery) return SILGAPP_COUNTRIES;
+  return SILGAPP_COUNTRIES.filter((country) =>
+    normalizeSearch(`${country.name} ${country.code} ${country.dial}`).includes(normalizedQuery)
+  );
+}
 
 /**
  * Normalise un numéro de téléphone au format international sans "+"

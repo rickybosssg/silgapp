@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
   Loader2, CheckCircle, XCircle, Phone, User, MapPin, FileText, IdCard,
-  Camera, Car, Eye, ZoomIn, Download, AlertTriangle, Clock, ChevronLeft, ChevronRight, X
+  Camera, Car, Eye, Download, AlertTriangle, Clock, X
 } from "lucide-react";
 
 /* ─── Mini zoom modal pour les images ─── */

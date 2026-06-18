@@ -3,8 +3,9 @@ import { base44 } from "@/api/base44Client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Loader2, User, Phone, Camera, Upload, MapPin } from "lucide-react";
+import { Loader2, Phone, Camera, Upload, MapPin } from "lucide-react";
 import { SILGAPP_COUNTRIES } from "@/lib/phoneUtils";
+import CountryCodeSelect from "@/components/ui/CountryCodeSelect";
 
 export default function LivreurRegistrationForm({ user, onComplete }) {
   const [form, setForm] = useState({
@@ -148,14 +149,10 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
 
       <div className="space-y-1.5">
         <Label className="text-sm font-semibold">Pays</Label>
-        <select
-          value={form.country_code} onChange={e => setForm({ ...form, country_code: e.target.value })}
-          className="w-full h-12 rounded-xl border-2 border-input bg-background px-3 text-sm"
-        >
-          {SILGAPP_COUNTRIES.map(c => (
-            <option key={c.code} value={c.code}>{c.flag} {c.name} (+{c.dial})</option>
-          ))}
-        </select>
+        <CountryCodeSelect
+          value={form.country_code}
+          onChange={(country_code) => setForm({ ...form, country_code })}
+        />
       </div>
 
       <div className="space-y-1.5">

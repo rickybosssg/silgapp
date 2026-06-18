@@ -4,10 +4,10 @@ android {
     namespace "com.silgapp2.app"
     compileSdkVersion rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.silgapp2.app"
+        applicationId "com.base6a0ec08f3af5e1d1284254c1.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
+        versionCode 6
         versionName "1.0.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
@@ -16,8 +16,23 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            def releaseStoreFile = project.findProperty("MYAPP_RELEASE_STORE_FILE")
+            def releaseStorePassword = project.findProperty("MYAPP_RELEASE_STORE_PASSWORD")
+            def releaseKeyAlias = project.findProperty("MYAPP_RELEASE_KEY_ALIAS")
+            def releaseKeyPassword = project.findProperty("MYAPP_RELEASE_KEY_PASSWORD")
+            if (releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword) {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

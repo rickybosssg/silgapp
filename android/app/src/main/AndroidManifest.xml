@@ -15,13 +15,13 @@
             android:value="silgapp_default" />
 
         <service
-            android:name=".SilgappLocationService"
+            android:name="com.silgapp2.app.SilgappLocationService"
             android:exported="false"
             android:foregroundServiceType="location"
             android:stopWithTask="false" />
 
         <service
-            android:name=".SilgappFirebaseMessagingService"
+            android:name="com.silgapp2.app.SilgappFirebaseMessagingService"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />

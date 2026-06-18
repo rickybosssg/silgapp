@@ -27,6 +27,46 @@ const saveAuthToken = (token) => {
   return true;
 };
 
+const normalizeOtpCode = (value) =>
+  String(value || "")
+    .normalize("NFKC")
+    .replace(/[^\d]/g, "")
+    .slice(0, 6);
+
+const getPasswordResetTokenFromUrl = () => {
+  if (typeof window === "undefined") return "";
+  const candidates = [];
+  try {
+    const search = new URLSearchParams(window.location.search);
+    candidates.push(
+      search.get("reset_token"),
+      search.get("resetToken"),
+      search.get("token")
+    );
+  } catch (_) {}
+  try {
+    const hash = window.location.hash || "";
+    const hashQuery = hash.includes("?") ? hash.slice(hash.indexOf("?") + 1) : hash.replace(/^#\/?/, "");
+    const params = new URLSearchParams(hashQuery);
+    candidates.push(
+      params.get("reset_token"),
+      params.get("resetToken"),
+      params.get("token")
+    );
+  } catch (_) {}
+  return candidates.find((value) => value && value.length > 10) || "";
+};
+
+const clearPasswordResetTokenFromUrl = () => {
+  if (typeof window === "undefined") return;
+  try {
+    const url = new URL(window.location.href);
+    ["reset_token", "resetToken", "token"].forEach((key) => url.searchParams.delete(key));
+    const cleanUrl = `${url.pathname}${url.search}${url.hash && !url.hash.includes("reset_token") && !url.hash.includes("resetToken") && !url.hash.includes("token") ? url.hash : ""}`;
+    window.history.replaceState({}, document.title, cleanUrl || "/");
+  } catch (_) {}
+};
+
 async function loginWithEmailPassword(email, password) {
   const appId = getBase44AppId();
   const response = await fetch(`${APP_PUBLIC_URL}/api/apps/${appId}/auth/login`, {
@@ -88,13 +128,25 @@ async function registerWithEmailPassword(email, password) {
 
 async function verifyEmailOtp(email, otpCode) {
   const appId = getBase44AppId();
+  const normalizedOtpCode = normalizeOtpCode(otpCode);
+
+  if (normalizedOtpCode.length !== 6) {
+    throw new Error("Le code de verification doit contenir 6 chiffres.");
+  }
+
+  console.info("[AuthGate] Verification email OTP", {
+    endpoint: "/auth/verify-otp",
+    raw_length: String(otpCode || "").length,
+    normalized_length: normalizedOtpCode.length,
+  });
+
   const response = await fetch(`${APP_PUBLIC_URL}/api/apps/${appId}/auth/verify-otp`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-App-Id": appId,
     },
-    body: JSON.stringify({ email, otp_code: otpCode }),
+    body: JSON.stringify({ email, otp_code: normalizedOtpCode }),
   });
 
   let payload = null;
@@ -134,6 +186,14 @@ async function resendEmailOtp(email) {
   }
 }
 
+async function requestPasswordReset(email) {
+  await base44.auth.resetPasswordRequest(email);
+}
+
+async function resetPasswordWithToken(resetToken, newPassword) {
+  await base44.auth.resetPassword({ resetToken, newPassword });
+}
+
 /**
  * AuthGate — routage post-connexion Base44
  * - admin → children (dashboard admin avec choix Interne/Externe)
@@ -149,12 +209,14 @@ async function resendEmailOtp(email) {
 export default function AuthGate({ children, onLivreur, onClient }) {
   const [state, setState] = useState("loading");
   const [authRetry, setAuthRetry] = useState(0);
-  const [authMode, setAuthMode] = useState("login");
+  const initialResetToken = getPasswordResetTokenFromUrl();
+  const [authMode, setAuthMode] = useState(initialResetToken ? "reset_confirm" : "login");
   const [loginForm, setLoginForm] = useState({
     email: "",
     password: "",
     confirmPassword: "",
     otpCode: "",
+    resetToken: initialResetToken,
   });
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
@@ -304,16 +366,37 @@ export default function AuthGate({ children, onLivreur, onClient }) {
         }
 
         await registerWithEmailPassword(email, loginForm.password);
-        try {
-          await loginWithEmailPassword(email, loginForm.password);
-        } catch (_) {
-          setAuthMode("verify");
-          setLoginInfo("Compte cree. Entrez le code recu par email pour confirmer votre compte.");
-          return;
-        }
+        setAuthMode("verify");
+        setLoginForm((form) => ({ ...form, otpCode: "" }));
+        setLoginInfo("Compte cree. Entrez le code recu par email pour confirmer votre compte.");
+        return;
       } else if (authMode === "verify") {
-        await verifyEmailOtp(email, loginForm.otpCode.trim());
+        await verifyEmailOtp(email, loginForm.otpCode);
         await loginWithEmailPassword(email, loginForm.password);
+      } else if (authMode === "reset_request") {
+        if (!email) {
+          throw new Error("Entrez votre adresse email.");
+        }
+        await requestPasswordReset(email);
+        setLoginInfo("Si cette adresse email est associee a un compte, un lien de reinitialisation a ete envoye.");
+        return;
+      } else if (authMode === "reset_confirm") {
+        const resetToken = loginForm.resetToken.trim();
+        if (!resetToken) {
+          throw new Error("Lien de reinitialisation invalide ou incomplet.");
+        }
+        if (loginForm.password.length < 6) {
+          throw new Error("Le nouveau mot de passe doit contenir au moins 6 caracteres.");
+        }
+        if (loginForm.password !== loginForm.confirmPassword) {
+          throw new Error("Les mots de passe ne correspondent pas.");
+        }
+        await resetPasswordWithToken(resetToken, loginForm.password);
+        clearPasswordResetTokenFromUrl();
+        setLoginForm((form) => ({ ...form, password: "", confirmPassword: "", resetToken: "" }));
+        setAuthMode("login");
+        setLoginInfo("Mot de passe reinitialise. Vous pouvez maintenant vous connecter.");
+        return;
       } else {
         await loginWithEmailPassword(email, loginForm.password);
       }
@@ -332,6 +415,14 @@ export default function AuthGate({ children, onLivreur, onClient }) {
     setAuthMode(mode);
     setLoginError("");
     setLoginInfo("");
+    if (mode === "login" || mode === "register") {
+      setLoginForm((form) => ({
+        ...form,
+        password: "",
+        confirmPassword: "",
+        otpCode: "",
+      }));
+    }
   };
 
   if (state === "loading") {
@@ -357,14 +448,26 @@ export default function AuthGate({ children, onLivreur, onClient }) {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground">
-                {authMode === "register" ? "Creer un compte" : authMode === "verify" ? "Verifier le compte" : "Connexion SILGAPP"}
+                {authMode === "register"
+                  ? "Creer un compte"
+                  : authMode === "verify"
+                    ? "Verifier le compte"
+                    : authMode === "reset_request"
+                      ? "Mot de passe oublie"
+                      : authMode === "reset_confirm"
+                        ? "Nouveau mot de passe"
+                        : "Connexion SILGAPP"}
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
                 {authMode === "register"
                   ? "Inscrivez-vous pour acceder a SILGAPP."
                   : authMode === "verify"
                     ? "Confirmez le code envoye par email."
-                    : "Connectez-vous pour acceder a votre espace."}
+                    : authMode === "reset_request"
+                      ? "Entrez votre email pour recevoir un lien securise."
+                      : authMode === "reset_confirm"
+                        ? "Choisissez un nouveau mot de passe."
+                        : "Connectez-vous pour acceder a votre espace."}
               </p>
             </div>
           </div>
@@ -386,25 +489,27 @@ export default function AuthGate({ children, onLivreur, onClient }) {
               </div>
             </label>
 
-            <label className="block">
-              <span className="sr-only">Mot de passe</span>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-                <input
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={loginForm.password}
-                  onChange={(event) => setLoginForm((form) => ({ ...form, password: event.target.value }))}
-                  className="w-full h-12 rounded-lg border border-zinc-700 bg-[#0f0f0f] pl-10 pr-3 text-sm text-white caret-white placeholder:text-zinc-400 outline-none focus:border-primary focus:ring-2 focus:ring-primary/40"
-                  placeholder="Mot de passe"
-                />
-              </div>
-            </label>
-
-            {authMode === "register" ? (
+            {authMode !== "reset_request" ? (
               <label className="block">
-                <span className="sr-only">Confirmer le mot de passe</span>
+                <span className="sr-only">{authMode === "reset_confirm" ? "Nouveau mot de passe" : "Mot de passe"}</span>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                  <input
+                    type="password"
+                    autoComplete={authMode === "reset_confirm" || authMode === "register" ? "new-password" : "current-password"}
+                    required
+                    value={loginForm.password}
+                    onChange={(event) => setLoginForm((form) => ({ ...form, password: event.target.value }))}
+                    className="w-full h-12 rounded-lg border border-zinc-700 bg-[#0f0f0f] pl-10 pr-3 text-sm text-white caret-white placeholder:text-zinc-400 outline-none focus:border-primary focus:ring-2 focus:ring-primary/40"
+                    placeholder={authMode === "reset_confirm" ? "Nouveau mot de passe" : "Mot de passe"}
+                  />
+                </div>
+              </label>
+            ) : null}
+
+            {authMode === "register" || authMode === "reset_confirm" ? (
+              <label className="block">
+                <span className="sr-only">Confirmer le nouveau mot de passe</span>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                   <input
@@ -414,9 +519,23 @@ export default function AuthGate({ children, onLivreur, onClient }) {
                     value={loginForm.confirmPassword}
                     onChange={(event) => setLoginForm((form) => ({ ...form, confirmPassword: event.target.value }))}
                     className="w-full h-12 rounded-lg border border-zinc-700 bg-[#0f0f0f] pl-10 pr-3 text-sm text-white caret-white placeholder:text-zinc-400 outline-none focus:border-primary focus:ring-2 focus:ring-primary/40"
-                    placeholder="Confirmer le mot de passe"
+                    placeholder={authMode === "reset_confirm" ? "Confirmer le nouveau mot de passe" : "Confirmer le mot de passe"}
                   />
                 </div>
+              </label>
+            ) : null}
+
+            {authMode === "reset_confirm" && !initialResetToken ? (
+              <label className="block">
+                <span className="sr-only">Code de reinitialisation</span>
+                <input
+                  type="text"
+                  required
+                  value={loginForm.resetToken}
+                  onChange={(event) => setLoginForm((form) => ({ ...form, resetToken: event.target.value.trim() }))}
+                  className="w-full h-12 rounded-lg border border-zinc-700 bg-[#0f0f0f] px-3 text-sm text-white caret-white placeholder:text-zinc-400 outline-none focus:border-primary focus:ring-2 focus:ring-primary/40"
+                  placeholder="Token du lien de reinitialisation"
+                />
               </label>
             ) : null}
 
@@ -426,10 +545,12 @@ export default function AuthGate({ children, onLivreur, onClient }) {
                 <input
                   type="text"
                   inputMode="numeric"
+                  pattern="[0-9]*"
                   autoComplete="one-time-code"
+                  maxLength={6}
                   required
                   value={loginForm.otpCode}
-                  onChange={(event) => setLoginForm((form) => ({ ...form, otpCode: event.target.value }))}
+                  onChange={(event) => setLoginForm((form) => ({ ...form, otpCode: normalizeOtpCode(event.target.value) }))}
                   className="w-full h-12 rounded-lg border border-zinc-700 bg-[#0f0f0f] px-3 text-sm text-center text-white caret-white placeholder:text-zinc-400 tracking-widest outline-none focus:border-primary focus:ring-2 focus:ring-primary/40"
                   placeholder="Code email"
                 />
@@ -454,8 +575,26 @@ export default function AuthGate({ children, onLivreur, onClient }) {
               className="w-full h-12 rounded-lg bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 disabled:opacity-70"
             >
               {loginLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
-              {authMode === "register" ? "Creer mon compte" : authMode === "verify" ? "Verifier et continuer" : "Se connecter"}
+              {authMode === "register"
+                ? "Creer mon compte"
+                : authMode === "verify"
+                  ? "Verifier et continuer"
+                  : authMode === "reset_request"
+                    ? "Reinitialiser mon mot de passe"
+                    : authMode === "reset_confirm"
+                      ? "Changer le mot de passe"
+                      : "Se connecter"}
             </button>
+
+            {authMode === "login" ? (
+              <button
+                type="button"
+                onClick={() => switchAuthMode("reset_request")}
+                className="w-full text-sm font-semibold text-primary underline"
+              >
+                Mot de passe oublié ?
+              </button>
+            ) : null}
 
             {authMode === "verify" ? (
               <button
@@ -474,13 +613,23 @@ export default function AuthGate({ children, onLivreur, onClient }) {
             ) : null}
           </form>
 
-          <button
-            type="button"
-            onClick={() => switchAuthMode(authMode === "login" ? "register" : "login")}
-            className="w-full text-sm text-primary underline"
-          >
-            {authMode === "login" ? "Creer un nouveau compte" : "J'ai deja un compte"}
-          </button>
+          {authMode === "reset_request" || authMode === "reset_confirm" ? (
+            <button
+              type="button"
+              onClick={() => switchAuthMode("login")}
+              className="w-full text-sm text-primary underline"
+            >
+              Retour à la connexion
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => switchAuthMode(authMode === "login" ? "register" : "login")}
+              className="w-full text-sm text-primary underline"
+            >
+              {authMode === "login" ? "Creer un nouveau compte" : "J'ai deja un compte"}
+            </button>
+          )}
 
         </div>
       </div>

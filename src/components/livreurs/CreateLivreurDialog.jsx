@@ -9,6 +9,8 @@ import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import { toast } from "sonner";
+import CountryCodeSelect from "@/components/ui/CountryCodeSelect";
+import { getCountryLabel } from "@/lib/phoneUtils";
 
 export default function CreateLivreurDialog({ reseau = "interne", countryCode = null }) {
   const [open, setOpen] = useState(false);
@@ -178,20 +180,14 @@ export default function CreateLivreurDialog({ reseau = "interne", countryCode = 
               <Label className="text-xs flex items-center gap-1"><Globe className="w-3 h-3" />Pays</Label>
               {effectiveCountryCode ? (
                 <div className="flex items-center gap-2 px-3 py-2 border rounded-lg bg-muted text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">{effectiveCountryCode}</span>
+                  <span className="font-medium text-foreground">{getCountryLabel(effectiveCountryCode)}</span>
                   <span className="text-xs">(défini par votre compte admin)</span>
                 </div>
               ) : (
-                <select
-                  className="w-full border rounded-lg px-3 py-2 text-sm bg-background"
+                <CountryCodeSelect
                   value={form.country_code}
-                  onChange={(e) => setForm(p => ({ ...p, country_code: e.target.value }))}
-                >
-                  <option value="" disabled>SÃ©lectionner un pays</option>
-                  {["BF","CI","TG","BJ","SN","ML","GN","NE"].map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
+                  onChange={(country_code) => setForm(p => ({ ...p, country_code }))}
+                />
               )}
             </div>
           )}

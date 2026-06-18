@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">SILGAPP</string>
     <string name="title_activity_main">SILGAPP</string>
-    <string name="package_name">com.silgapp2.app</string>
-    <string name="custom_url_scheme">com.silgapp2.app</string>
+    <string name="package_name">com.base6a0ec08f3af5e1d1284254c1.app</string>
+    <string name="custom_url_scheme">com.base6a0ec08f3af5e1d1284254c1.app</string>
 </resources>
