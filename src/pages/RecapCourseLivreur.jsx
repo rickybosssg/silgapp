@@ -52,6 +52,16 @@ export default function RecapCourseLivreur() {
   const [loading, setLoading] = useState(!initialCourse);
   const [error, setError] = useState(null);
   const inFlightRef = useRef(false);
+  // 🎯 Commission dynamique du pays
+  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+  useEffect(() => {
+    if (!course?.country_code) return;
+    base44.entities.Country.filter({ code: course.country_code, actif: true })
+      .then(countries => {
+        if (countries?.[0]?.commission_pct) setCountryCommissionPct(countries[0].commission_pct);
+      })
+      .catch(() => {});
+  }, [course?.country_code]);
 
   const chargerCourse = async ({ silent = false, retries = 2 } = {}) => {
     if (!courseId || inFlightRef.current) return;
@@ -160,8 +170,8 @@ export default function RecapCourseLivreur() {
     ? Number(course.manual_price)
     : (Number(course.prix_final) > 0 ? Number(course.prix_final) : (dist > 0 ? Math.round(dist * 100) : 0));
   const prixFinal = Math.max(1000, prixBrut);
-  const gainLivreur = Number(course.montant_livreur) > 0 ? Number(course.montant_livreur) : Math.round(prixFinal * 0.7);
-  const commissionSilga = Number(course.commission_silga) > 0 ? Number(course.commission_silga) : Math.round(prixFinal * 0.3);
+  const gainLivreur = Number(course.montant_livreur) > 0 ? Number(course.montant_livreur) : Math.round(prixFinal * ((100 - countryCommissionPct) / 100));
+  const commissionSilga = Number(course.commission_silga) > 0 ? Number(course.commission_silga) : Math.round(prixFinal * (countryCommissionPct / 100));
   const duree = course.type_course === "deplacement"
     ? dureeMinutes(course.heure_prise_en_charge, course.heure_livraison)
     : dureeMinutes(course.heure_recuperation, course.heure_livraison);
@@ -244,14 +254,14 @@ export default function RecapCourseLivreur() {
           <p className="text-gray-600 text-xs font-semibold uppercase tracking-widest mb-2">Répartition</p>
           <div className="flex items-center justify-between py-2 border-b border-gray-800">
             <div>
-              <p className="text-green-400 font-bold text-sm">Ton gain (70%)</p>
+              <p className="text-green-400 font-bold text-sm">Ton gain ({100 - countryCommissionPct}%)</p>
               <p className="text-gray-500 text-xs">À encaisser auprès du client</p>
             </div>
             <p className="text-green-400 text-2xl font-black">+{gainLivreur.toLocaleString()} F</p>
           </div>
           <div className="flex items-center justify-between py-2">
             <div>
-              <p className="text-red-400 font-bold text-sm">Commission Silga (30%)</p>
+              <p className="text-red-400 font-bold text-sm">Commission Silga ({countryCommissionPct}%)</p>
               <p className="text-gray-500 text-xs">À reverser à Silga</p>
             </div>
             <p className="text-red-400 text-xl font-black">{commissionSilga.toLocaleString()} F</p>

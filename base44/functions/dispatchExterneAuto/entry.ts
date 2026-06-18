@@ -991,7 +991,15 @@ Deno.serve(async (req) => {
 
       if (accepted) {
         const prixManuel = Number(course.manual_price);
-        const commission = Math.round(prixManuel * 0.3);
+        // 🎯 Commission dynamique du pays de la course
+        let commissionPct = 30; // fallback
+        try {
+          if (course.country_code) {
+            const countries = await base44.asServiceRole.entities.Country.filter({ code: course.country_code, actif: true });
+            if (countries?.[0]?.commission_pct) commissionPct = countries[0].commission_pct;
+          }
+        } catch (_) {}
+        const commission = Math.round(prixManuel * (commissionPct / 100));
         const montantLivreur = prixManuel - commission;
 
         await base44.asServiceRole.entities.CourseExterne.update(course_id, {

@@ -67,7 +67,15 @@ Deno.serve(async (req) => {
             if (course.pricing_mode !== "admin_manuel" && course.source !== "admin") continue;
 
             const prixDefault = 1000;
-            const commission = Math.round(prixDefault * 0.3);
+            // 🎯 Commission dynamique du pays de la course
+            let commissionPct = 30; // fallback
+            try {
+              if (course.country_code) {
+                const countries = await asService.entities.Country.filter({ code: course.country_code, actif: true });
+                if (countries?.[0]?.commission_pct) commissionPct = countries[0].commission_pct;
+              }
+            } catch (_) {}
+            const commission = Math.round(prixDefault * (commissionPct / 100));
             const gainLivreur = prixDefault - commission;
 
             await asService.entities.CourseExterne.update(course.id, {
@@ -110,7 +118,15 @@ Deno.serve(async (req) => {
             const diffMin = (now - new Date(heureArrivee).getTime()) / 60000;
             if (diffMin <= 30) continue;
 
-            const commission = Math.round(course.prix_final * 0.3);
+            // 🎯 Commission dynamique du pays de la course
+            let commissionPct = 30; // fallback
+            try {
+              if (course.country_code) {
+                const countries = await asService.entities.Country.filter({ code: course.country_code, actif: true });
+                if (countries?.[0]?.commission_pct) commissionPct = countries[0].commission_pct;
+              }
+            } catch (_) {}
+            const commission = Math.round(course.prix_final * (commissionPct / 100));
             const gain = course.prix_final - commission;
 
             await asService.entities.CourseExterne.update(course.id, {

@@ -142,6 +142,16 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const [showAnnulerCourse, setShowAnnulerCourse] = useState(false);
   const [motifAnnulationLivreur, setMotifAnnulationLivreur] = useState("");
   const [motifAnnulationDetail, setMotifAnnulationDetail] = useState("");
+  // 🎯 Commission dynamique du pays (fetch auto)
+  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+  useEffect(() => {
+    if (!course.country_code) return;
+    base44.entities.Country.filter({ code: course.country_code, actif: true })
+      .then(countries => {
+        if (countries?.[0]?.commission_pct) setCountryCommissionPct(countries[0].commission_pct);
+      })
+      .catch(() => {});
+  }, [course.country_code]);
 
   const effectiveStatut = optimisticStatut || course.statut;
   const isDeplacement = course.type_course === "deplacement";
@@ -186,7 +196,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
         toast.error("Entrez le montant reçu du client");
         return;
       }
-      const commissionSilga = Math.round(montant * 0.3);
+      const commissionSilga = Math.round(montant * (countryCommissionPct / 100));
       const montantLivreur = montant - commissionSilga;
       const mergedData = {
         ...(pendingDeliveryData || {}),
@@ -216,7 +226,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
         toast.error("Entrez le montant reçu du client");
         return;
       }
-      const commissionSilga = Math.round(montant * 0.3);
+      const commissionSilga = Math.round(montant * (countryCommissionPct / 100));
       const montantLivreur = montant - commissionSilga;
       const mergedData = {
         ...(pendingDeliveryData || {}),
@@ -754,7 +764,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             (() => {
               const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
               const prixBase = isPrixManuel ? Number(course.manual_price) : (course.prix_estimate || 0);
-              const gain = Math.round(prixBase * 0.7);
+              const gain = Math.round(prixBase * ((100 - countryCommissionPct) / 100));
               
               if (prixBase <= 0) return null;
               
@@ -788,7 +798,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   <div className="mt-2 pt-2 border-t flex items-center justify-between text-xs"
                     style={{ borderColor: isPrixManuel ? "rgb(200, 235, 215)" : "rgb(191, 226, 255)" }}
                   >
-                    <span className={cn("font-semibold", isPrixManuel ? "text-green-700" : "text-blue-700")}>Votre gain (70%)</span>
+                    <span className={cn("font-semibold", isPrixManuel ? "text-green-700" : "text-blue-700")}>Votre gain ({100 - countryCommissionPct}%)</span>
                     <span className={cn("font-bold", isPrixManuel ? "text-green-800" : "text-green-700")}>
                       +{gain.toLocaleString()} {course.devise || "F"}
                     </span>
@@ -1219,8 +1229,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             // Multi-colis : totaux issus des montants par colis (pas de tarification auto)
             if (isMulti) {
               const total = Number(course.prix_final) || 0;
-              const gain = Number(course.montant_livreur) || Math.round(total * 0.7);
-              const commission = Number(course.commission_silga) || Math.round(total * 0.3);
+              const gain = Number(course.montant_livreur) || Math.round(total * ((100 - countryCommissionPct) / 100));
+              const commission = Number(course.commission_silga) || Math.round(total * (countryCommissionPct / 100));
               return (
                 <div className="py-4 bg-green-50 rounded-2xl border border-green-200 space-y-3 px-4">
                   <div className="text-center">
@@ -1252,8 +1262,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             const prix = isPrixManuel
               ? Number(course.manual_price)
               : (Math.max(1000, Number(course.prix_final) || (dist ? Math.round(dist * 100) : 0)) || null);
-            const gain = Number(course.montant_livreur) > 0 ? Number(course.montant_livreur) : (prix ? Math.round(prix * 0.7) : null);
-            const commission = Number(course.commission_silga) > 0 ? Number(course.commission_silga) : (prix ? Math.round(prix * 0.3) : null);
+            const gain = Number(course.montant_livreur) > 0 ? Number(course.montant_livreur) : (prix ? Math.round(prix * ((100 - countryCommissionPct) / 100)) : null);
+            const commission = Number(course.commission_silga) > 0 ? Number(course.commission_silga) : (prix ? Math.round(prix * (countryCommissionPct / 100)) : null);
             return (
               <div className="py-4 bg-green-50 rounded-2xl border border-green-200 space-y-3 px-4">
                 <div className="text-center">
