@@ -163,8 +163,8 @@ function CoursesList({ courses }) {
 function CADetail({ courses }) {
   const total = courses.length;
   const montantTotal = courses.reduce((s, c) => s + (c.prix_final || 0), 0);
-  const commission = courses.reduce((s, c) => s + (c.commission_silga || Math.round((c.prix_final || 0) * 0.3)), 0);
-  const gainLivreurs = courses.reduce((s, c) => s + (c.montant_livreur || Math.round((c.prix_final || 0) * 0.7)), 0);
+  const commission = courses.reduce((s, c) => s + (Number(c.commission_silga) || 0), 0);
+  const gainLivreurs = courses.reduce((s, c) => s + (Number(c.montant_livreur) || 0), 0);
 
   return (
     <div className="space-y-4">
@@ -173,8 +173,8 @@ function CADetail({ courses }) {
         {[
           { label: "Courses livrées", val: total, color: "text-foreground" },
           { label: "Montant total", val: `${montantTotal.toLocaleString()} F`, color: "text-emerald-600" },
-          { label: "Commission SILGAPP (30%)", val: `${commission.toLocaleString()} F`, color: "text-indigo-600" },
-          { label: "Gain livreurs (70%)", val: `${gainLivreurs.toLocaleString()} F`, color: "text-blue-600" },
+          { label: "Commission SILGAPP", val: `${commission.toLocaleString()} F`, color: "text-indigo-600" },
+          { label: "Gain livreurs", val: `${gainLivreurs.toLocaleString()} F`, color: "text-blue-600" },
         ].map(item => (
           <div key={item.label} className="border rounded-xl p-3 bg-card text-center">
             <p className="text-xs text-muted-foreground mb-1">{item.label}</p>

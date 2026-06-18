@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Check, X, AlertCircle } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
@@ -9,10 +9,18 @@ import { toast } from "sonner";
  */
 export default function PrixManuelConfirmModal({ course, onAccepted, onRefused }) {
   const [loading, setLoading] = useState(false);
+  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+
+  useEffect(() => {
+    if (!course?.country_code) return;
+    base44.entities.Country.filter({ code: course.country_code, actif: true })
+      .then(countries => { if (countries?.[0]?.commission_pct) setCountryCommissionPct(countries[0].commission_pct); })
+      .catch(() => {});
+  }, [course?.country_code]);
 
   const devise = course.devise || "FCFA";
   const prix = course.manual_price;
-  const gainLivreur = Math.round(prix * 0.7);
+  const gainLivreur = Math.round(prix * ((100 - countryCommissionPct) / 100));
 
   const handleAccepter = async () => {
     setLoading(true);

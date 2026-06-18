@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { TrendingUp, Package, CheckCircle, AlertCircle, Banknote } from "lucide-react";
+import { base44 } from "@/api/base44Client";
 
 export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantDüSilga, isExterne = false }) {
   const today = new Date().toDateString();
@@ -10,6 +11,16 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
     new Date(c.created_date).toDateString() === today
   ).length;
 
+  // 🎯 Commission dynamique du pays
+  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+  useEffect(() => {
+    const countryCode = mesCourses?.[0]?.country_code;
+    if (!countryCode) return;
+    base44.entities.Country.filter({ code: countryCode, actif: true })
+      .then(countries => { if (countries?.[0]?.commission_pct) setCountryCommissionPct(countries[0].commission_pct); })
+      .catch(() => {});
+  }, [mesCourses]);
+
   // Calculs financiers du jour — priorité aux champs sauvegardés, fallback calcul local
   const prixTotalToday = livreesToday.reduce((s, c) => {
     const prix = c.prix_final || 0;
@@ -17,11 +28,11 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
   }, 0);
   const commissionToday = livreesToday.reduce((s, c) => {
     if (c.commission_silga > 0) return s + c.commission_silga;
-    return s + Math.round((c.prix_final || 0) * 0.3);
+    return s + Math.round((c.prix_final || 0) * (countryCommissionPct / 100));
   }, 0);
   const gainToday = livreesToday.reduce((s, c) => {
     if (c.montant_livreur > 0) return s + c.montant_livreur;
-    return s + Math.round((c.prix_final || 0) * 0.7);
+    return s + Math.round((c.prix_final || 0) * ((100 - countryCommissionPct) / 100));
   }, 0);
 
   if (isExterne) {
@@ -60,8 +71,8 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
             <div className="bg-white border border-gray-100 grid grid-cols-3 divide-x divide-gray-100">
               {[
                 { label: "Total client", val: prixTotalToday, color: "text-gray-800" },
-                { label: "Votre gain 70%", val: gainToday,    color: "text-green-700" },
-                { label: "Commission 30%", val: commissionToday, color: "text-orange-600" },
+                { label: `Votre gain ${100 - countryCommissionPct}%`, val: gainToday,    color: "text-green-700" },
+                { label: `Commission ${countryCommissionPct}%`, val: commissionToday, color: "text-orange-600" },
               ].map((s, i) => (
                 <div key={i} className="p-3 text-center">
                   <p className={`text-sm font-black ${s.color}`}>{s.val.toLocaleString()}<span className="text-[9px] ml-0.5 font-normal">F</span></p>

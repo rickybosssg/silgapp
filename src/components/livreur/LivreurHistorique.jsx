@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -6,6 +6,7 @@ import { CheckCircle2, XCircle, Clock, MapPin, Banknote, Calendar } from "lucide
 import { format, subDays, startOfWeek, startOfMonth } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { base44 } from "@/api/base44Client";
 
 const periodFilters = [
   { value: "today", label: "Aujourd'hui" },
@@ -16,6 +17,15 @@ const periodFilters = [
 
 export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne = false }) {
   const [period, setPeriod] = useState("today");
+  // 🎯 Commission dynamique du pays (récupérée depuis les courses du livreur)
+  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+  useEffect(() => {
+    const countryCode = mesCourses?.[0]?.country_code || livreurProfil?.country_code;
+    if (!countryCode) return;
+    base44.entities.Country.filter({ code: countryCode, actif: true })
+      .then(countries => { if (countries?.[0]?.commission_pct) setCountryCommissionPct(countries[0].commission_pct); })
+      .catch(() => {});
+  }, [mesCourses, livreurProfil?.country_code]);
 
   // Déterminer la période
   const dateRange = useMemo(() => {
@@ -67,14 +77,14 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
     if (c.montant_livreur > 0) return sum + c.montant_livreur;
     const isPrixManuel = c.pricing_mode === "manual" && c.manual_price_status === "accepted" && Number(c.manual_price) > 0;
     const prixBase = isPrixManuel ? Number(c.manual_price) : (c.prix_final || 0);
-    return sum + Math.round(prixBase * 0.7);
+    return sum + Math.round(prixBase * ((100 - countryCommissionPct) / 100));
   }, 0);
   const commissionToday = livreesToday.reduce((sum, c) => {
     // ⚠️ CORRECTION PRIX MANUEL : Utiliser commission_silga si déjà calculée
     if (c.commission_silga > 0) return sum + c.commission_silga;
     const isPrixManuel = c.pricing_mode === "manual" && c.manual_price_status === "accepted" && Number(c.manual_price) > 0;
     const prixBase = isPrixManuel ? Number(c.manual_price) : (c.prix_final || 0);
-    return sum + Math.round(prixBase * 0.3);
+    return sum + Math.round(prixBase * (countryCommissionPct / 100));
   }, 0);
   const montantDuSilga = livreurProfil?.montant_du_silga || 0;
   const isPaye = livreurProfil?.statut_paiement === "paye";
@@ -108,11 +118,11 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
             <div className="grid grid-cols-3 gap-2">
               <div className="bg-green-50 rounded-lg p-2 border border-green-200 text-center">
                 <p className="text-xs font-bold text-green-700">{gainLivreurToday.toLocaleString()} FCFA</p>
-                <p className="text-[10px] text-green-600 mt-0.5">Votre gain (70%)</p>
+                <p className="text-[10px] text-green-600 mt-0.5">Votre gain ({100 - countryCommissionPct}%)</p>
               </div>
               <div className="bg-orange-50 rounded-lg p-2 border border-orange-200 text-center">
                 <p className="text-xs font-bold text-orange-700">{commissionToday.toLocaleString()} FCFA</p>
-                <p className="text-[10px] text-orange-600 mt-0.5">Commission (30%)</p>
+                <p className="text-[10px] text-orange-600 mt-0.5">Commission ({countryCommissionPct}%)</p>
               </div>
               <div className="bg-red-50 rounded-lg p-2 border border-red-200 text-center">
                 <p className="text-xs font-bold text-red-700">{commissionToday.toLocaleString()} FCFA</p>

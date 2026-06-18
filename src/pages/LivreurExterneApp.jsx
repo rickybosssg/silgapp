@@ -633,6 +633,16 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   // Auto-resync statut supprimé — le statut ne se change QUE manuellement via le bouton
 
+  // 🎯 Commission dynamique du pays du livreur
+  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+  useEffect(() => {
+    const countryCode = livreurProfil?.country_code || mesCourses?.[0]?.country_code;
+    if (!countryCode) return;
+    base44.entities.Country.filter({ code: countryCode, actif: true })
+      .then(countries => { if (countries?.[0]?.commission_pct) setCountryCommissionPct(countries[0].commission_pct); })
+      .catch(() => {});
+  }, [livreurProfil?.country_code, mesCourses]);
+
   // ─── Gains du jour ────────────────────────────────────────────────────────
   const livreesToday = useMemo(() => {
     const todayStr = new Date().toDateString();
@@ -649,9 +659,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       if (c.montant_livreur > 0) return sum + c.montant_livreur;
       const isPrixManuel = c.pricing_mode === "manual" && c.manual_price_status === "accepted" && Number(c.manual_price) > 0;
       const prixBase = isPrixManuel ? Number(c.manual_price) : (c.prix_final || 0);
-      return sum + Math.round(prixBase * 0.7);
+      return sum + Math.round(prixBase * ((100 - countryCommissionPct) / 100));
     }, 0),
-    [livreesToday]
+    [livreesToday, countryCommissionPct]
   );
 
   const montantDüSilga = useMemo(() =>
@@ -661,9 +671,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       if (c.commission_silga > 0) return sum + c.commission_silga;
       const isPrixManuel = c.pricing_mode === "manual" && c.manual_price_status === "accepted" && Number(c.manual_price) > 0;
       const prixBase = isPrixManuel ? Number(c.manual_price) : (c.prix_final || 0);
-      return sum + Math.round(prixBase * 0.3);
+      return sum + Math.round(prixBase * (countryCommissionPct / 100));
     }, 0),
-    [livreesToday]
+    [livreesToday, countryCommissionPct]
   );
 
   // ─── isEnLigne ────────────────────────────────────────────────────────────
@@ -932,9 +942,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       return;
     }
 
-    // 🏛️ ADMIN : montant saisi par le livreur, split 70/30 — PRIORITAIRE avant tout autre check
+    // 🏛️ ADMIN : montant saisi par le livreur — PRIORITAIRE avant tout autre check
     if ((course.pricing_mode === "admin_manuel" || course.source === "admin") && typeof montantSaisi === "number" && montantSaisi > 0) {
-      const commissionSilga = Math.round(montantSaisi * 0.3);
+      const commissionSilga = Math.round(montantSaisi * (countryCommissionPct / 100));
       const montantLivreur = montantSaisi - commissionSilga;
 
       updateCourseMutation.mutate({
@@ -981,7 +991,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       );
       const distanceVal = Number(distance || 0);
       const prixFinal = Math.max(Math.round(distanceVal * 100), 1000);
-      const commissionSilga = Math.round(prixFinal * 0.3);
+      const commissionSilga = Math.round(prixFinal * (countryCommissionPct / 100));
       const montantLivreur = prixFinal - commissionSilga;
 
       updateCourseMutation.mutate({

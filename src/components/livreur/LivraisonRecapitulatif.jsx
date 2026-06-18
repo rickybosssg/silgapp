@@ -1,11 +1,20 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { CheckCircle2, MapPin, Banknote, Clock, TrendingUp, Star } from "lucide-react";
+import { base44 } from "@/api/base44Client";
 
 /**
  * Écran récapitulatif après livraison confirmée (côté livreur externe).
  * Affiche distance réelle, temps, prix final, et part livreur.
  */
 export default function LivraisonRecapitulatif({ course, onClose }) {
+  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+  useEffect(() => {
+    if (!course?.country_code) return;
+    base44.entities.Country.filter({ code: course.country_code, actif: true })
+      .then(countries => { if (countries?.[0]?.commission_pct) setCountryCommissionPct(countries[0].commission_pct); })
+      .catch(() => {});
+  }, [course?.country_code]);
+
   // Calcul distance avec fallback (comme ClientSuiviCourse)
   function haversine(lat1, lon1, lat2, lon2) {
     if (!lat1 || !lon1 || !lat2 || !lon2) return null;
@@ -32,11 +41,11 @@ export default function LivraisonRecapitulatif({ course, onClose }) {
 
   const montantLivreur = Number(course.montant_livreur) > 0 
     ? Number(course.montant_livreur)
-    : Math.round(prixFinal * 0.7);
+    : Math.round(prixFinal * ((100 - countryCommissionPct) / 100));
 
   const commission = Number(course.commission_silga) > 0 
     ? Number(course.commission_silga)
-    : Math.round(prixFinal * 0.3);
+    : Math.round(prixFinal * (countryCommissionPct / 100));
 
   // Calcul temps réel si heures disponibles
   let tempsMinutes = null;
@@ -115,9 +124,9 @@ export default function LivraisonRecapitulatif({ course, onClose }) {
               <TrendingUp className="w-5 h-5 text-amber-600" />
             </div>
             <div className="flex-1">
-              <p className="text-xs text-amber-600 font-semibold uppercase tracking-wide">Votre gain (70%)</p>
+              <p className="text-xs text-amber-600 font-semibold uppercase tracking-wide">Votre gain ({100 - countryCommissionPct}%)</p>
               <p className="text-xl font-black text-amber-900">{Math.max(montantLivreur, 70).toLocaleString()} FCFA</p>
-              <p className="text-[10px] text-amber-500 mt-0.5">Commission SILGA : {Math.max(commission, 30).toLocaleString()} F (30%)</p>
+              <p className="text-[10px] text-amber-500 mt-0.5">Commission SILGA : {Math.max(commission, 30).toLocaleString()} F ({countryCommissionPct}%)</p>
             </div>
           </div>
 

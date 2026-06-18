@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Phone, Copy, MapPin, CheckCircle, Lock, Package, ChevronDown, ChevronUp, XCircle } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -104,6 +104,14 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(true);
   const [confirmColis, setConfirmColis] = useState(null); // colis en attente de confirmation
+  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+
+  useEffect(() => {
+    if (!course?.country_code) return;
+    base44.entities.Country.filter({ code: course.country_code, actif: true })
+      .then(countries => { if (countries?.[0]?.commission_pct) setCountryCommissionPct(countries[0].commission_pct); })
+      .catch(() => {});
+  }, [course?.country_code]);
 
   // Charger les sous-colis
   const { data: colis = [], isLoading } = useQuery({
@@ -141,8 +149,8 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
       const nbTotal = course.nb_colis || 1;
       const tousTermines = nbLivres + nbAnnules >= nbTotal;
 
-      const gainLivreur = Math.round(montantTotal * 0.7);
-      const commissionSilga = Math.round(montantTotal * 0.3);
+      const gainLivreur = Math.round(montantTotal * ((100 - countryCommissionPct) / 100));
+      const commissionSilga = Math.round(montantTotal * (countryCommissionPct / 100));
 
       const updateData = {
         nb_colis_livres: nbLivres,
@@ -184,7 +192,7 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
       } else {
         queryClient.invalidateQueries({ queryKey: ["colis-externes", course.id] });
         queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-        toast.success(`Colis livré ✅ — +${gainLivreur.toLocaleString()} ${course.devise || "F"} (70%)`);
+        toast.success(`Colis livré ✅ — +${gainLivreur.toLocaleString()} ${course.devise || "F"} (${100 - countryCommissionPct}%)`);
       }
     },
     onError: () => toast.error("Erreur lors de la mise à jour"),
@@ -207,8 +215,8 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
       const nbAnnules = colis.filter(c => c.id === colisItem.id || c.statut === "annule").length;
       const nbTotal = course.nb_colis || 1;
       const tousTermines = nbLivres + nbAnnules >= nbTotal;
-      const gainLivreur = Math.round(montantTotal * 0.7);
-      const commissionSilga = Math.round(montantTotal * 0.3);
+      const gainLivreur = Math.round(montantTotal * ((100 - countryCommissionPct) / 100));
+      const commissionSilga = Math.round(montantTotal * (countryCommissionPct / 100));
 
       const updateData = {
         nb_colis_livres: nbLivres,
@@ -273,8 +281,8 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
   const nbLivres = colis.filter(c => c.statut === "livre").length;
   const nbAnnules = colis.filter(c => c.statut === "annule").length;
   const totalEncaisse = colis.filter(c => c.statut === "livre").reduce((s, c) => s + (c.montant_a_encaisser || 0), 0);
-  const gainLivreur = Math.round(totalEncaisse * 0.7);
-  const commission = Math.round(totalEncaisse * 0.3);
+  const gainLivreur = Math.round(totalEncaisse * ((100 - countryCommissionPct) / 100));
+  const commission = Math.round(totalEncaisse * (countryCommissionPct / 100));
 
   if (isLoading) {
     return (
@@ -476,11 +484,11 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
                 <p className="text-xs font-black text-gray-800">{totalEncaisse.toLocaleString()} {course.devise || "F"}</p>
               </div>
               <div className="bg-white rounded-xl p-2 text-center border border-green-100">
-                <p className="text-[9px] text-gray-600 font-bold uppercase">Ton gain (70%)</p>
+                <p className="text-[9px] text-gray-600 font-bold uppercase">Ton gain ({100 - countryCommissionPct}%)</p>
                 <p className="text-xs font-black text-green-700">+{gainLivreur.toLocaleString()} {course.devise || "F"}</p>
               </div>
               <div className="bg-white rounded-xl p-2 text-center border border-gray-100">
-                <p className="text-[9px] text-gray-600 font-bold uppercase">Commission</p>
+                <p className="text-[9px] text-gray-600 font-bold uppercase">Commission ({countryCommissionPct}%)</p>
                 <p className="text-xs font-black text-gray-500">{commission.toLocaleString()} {course.devise || "F"}</p>
               </div>
             </div>

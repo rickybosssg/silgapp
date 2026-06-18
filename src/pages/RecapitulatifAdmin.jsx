@@ -31,7 +31,7 @@ function ReseauCard({ title, icon: Icon, color, livreurs, coursesLivrees, isExte
     : coursesLivrees.reduce((sum, c) => sum + (c.prix_reel || c.prix || 0), 0);
 
   const totalDuSilga = isExterne
-    ? coursesLivrees.reduce((sum, c) => sum + (c.commission_silga || Math.round((c.prix_final || 0) * 0.3)), 0)
+    ? coursesLivrees.reduce((sum, c) => sum + (Number(c.commission_silga) || 0), 0)
     : totalEncaisse;
 
   const kpis = [

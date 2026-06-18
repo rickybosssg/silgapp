@@ -1,12 +1,22 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { CheckCircle2, Banknote, MapPin, Clock, Ruler } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { base44 } from "@/api/base44Client";
 
 export default function LivreurRecapitulatifPaiement({ course }) {
+  // 🎯 Commission dynamique du pays
+  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+  useEffect(() => {
+    if (!course?.country_code) return;
+    base44.entities.Country.filter({ code: course.country_code, actif: true })
+      .then(countries => { if (countries?.[0]?.commission_pct) setCountryCommissionPct(countries[0].commission_pct); })
+      .catch(() => {});
+  }, [course?.country_code]);
+
   // Calcul du montant : distance réelle × 100 FCFA
   const distance = course.distance_reelle_km || 0;
   const montantTotal = Math.round(distance * 100);
-  const commissionSilga = Math.round(montantTotal * 0.3);
+  const commissionSilga = Math.round(montantTotal * (countryCommissionPct / 100));
   const montantLivreur = montantTotal - commissionSilga;
 
   return (

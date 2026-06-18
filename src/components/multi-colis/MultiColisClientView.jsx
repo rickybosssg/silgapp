@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { MapPin, Clock, Package, Banknote } from "lucide-react";
@@ -36,14 +36,22 @@ export default function MultiColisClientView({ course }) {
     initialData: [],
   });
 
+  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+  useEffect(() => {
+    if (!course?.country_code) return;
+    base44.entities.Country.filter({ code: course.country_code, actif: true })
+      .then(countries => { if (countries?.[0]?.commission_pct) setCountryCommissionPct(countries[0].commission_pct); })
+      .catch(() => {});
+  }, [course?.country_code]);
+
   if (!course.is_multi_colis || !course.nb_colis || course.nb_colis <= 1) return null;
 
   const nbLivres = colis.filter(c => c.statut === "livre").length;
   const nbAnnules = colis.filter(c => c.statut === "annule").length;
   const nbTotal = colis.length || course.nb_colis;
   const totalEncaisse = colis.filter(c => c.statut === "livre").reduce((s, c) => s + (c.montant_a_encaisser || 0), 0);
-  const gainLivreur = Math.round(totalEncaisse * 0.7);
-  const commission = Math.round(totalEncaisse * 0.3);
+  const gainLivreur = Math.round(totalEncaisse * ((100 - countryCommissionPct) / 100));
+  const commission = Math.round(totalEncaisse * (countryCommissionPct / 100));
 
   if (isLoading) {
     return (

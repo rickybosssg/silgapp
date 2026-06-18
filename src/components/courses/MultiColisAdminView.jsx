@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Package, CheckCircle, XCircle, Clock, Banknote, MapPin } from "lucide-react";
@@ -16,7 +16,7 @@ const STATUT_CONFIG = {
 /**
  * Section affichée dans CourseDetailDialog pour les courses externes multi-colis.
  * Affiche chaque sous-colis avec : destinataire, statut, montant encaissé.
- * + Totaux : total encaissé, gain livreur (70%), commission Silga (30%).
+ * + Totaux : total encaissé, gain livreur, commission Silga (dynamique par pays).
  */
 export default function MultiColisAdminView({ course }) {
   const { data: colis = [], isLoading } = useQuery({
@@ -26,12 +26,20 @@ export default function MultiColisAdminView({ course }) {
     initialData: [],
   });
 
+  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+  useEffect(() => {
+    if (!course?.country_code) return;
+    base44.entities.Country.filter({ code: course.country_code, actif: true })
+      .then(countries => { if (countries?.[0]?.commission_pct) setCountryCommissionPct(countries[0].commission_pct); })
+      .catch(() => {});
+  }, [course?.country_code]);
+
   if (!course.is_multi_colis || course.nb_colis <= 1) return null;
 
   const devise = course.devise || "F";
   const totalEncaisse = colis.filter(c => c.statut === "livre").reduce((s, c) => s + (c.montant_a_encaisser || 0), 0);
-  const gainLivreur = Math.round(totalEncaisse * 0.7);
-  const commissionSilga = Math.round(totalEncaisse * 0.3);
+  const gainLivreur = Math.round(totalEncaisse * ((100 - countryCommissionPct) / 100));
+  const commissionSilga = Math.round(totalEncaisse * (countryCommissionPct / 100));
   const nbLivres = colis.filter(c => c.statut === "livre").length;
   const nbAnnules = colis.filter(c => c.statut === "annule").length;
 
@@ -141,12 +149,12 @@ export default function MultiColisAdminView({ course }) {
                 <div className="bg-white rounded-xl p-2 text-center border border-green-100">
                   <p className="text-[9px] text-gray-600 font-bold uppercase">Gain livreur</p>
                   <p className="text-sm font-black text-green-700">{gainLivreur.toLocaleString()} {devise}</p>
-                  <p className="text-[8px] text-green-500">70%</p>
+                  <p className="text-[8px] text-green-500">{100 - countryCommissionPct}%</p>
                 </div>
                 <div className="bg-white rounded-xl p-2 text-center border border-orange-100">
                   <p className="text-[9px] text-gray-600 font-bold uppercase">Commission</p>
                   <p className="text-sm font-black text-orange-600">{commissionSilga.toLocaleString()} {devise}</p>
-                  <p className="text-[8px] text-orange-400">30%</p>
+                  <p className="text-[8px] text-orange-400">{countryCommissionPct}%</p>
                 </div>
               </div>
             </div>

@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { DollarSign, AlertCircle, Check, X } from "lucide-react";
+import { base44 } from "@/api/base44Client";
 
 const PRIX_MIN = 1000;
 
@@ -10,6 +11,14 @@ const PRIX_MIN = 1000;
 export default function ManualPriceModal({ course, onConfirm, onCancel, isSubmitting }) {
   const [montant, setMontant] = useState("");
   const [erreur, setErreur] = useState("");
+  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+
+  useEffect(() => {
+    if (!course?.country_code) return;
+    base44.entities.Country.filter({ code: course.country_code, actif: true })
+      .then(countries => { if (countries?.[0]?.commission_pct) setCountryCommissionPct(countries[0].commission_pct); })
+      .catch(() => {});
+  }, [course?.country_code]);
 
   const valeur = parseInt(montant.replace(/\D/g, ""), 10);
   const valide = !isNaN(valeur) && valeur >= PRIX_MIN;
@@ -105,12 +114,12 @@ export default function ManualPriceModal({ course, onConfirm, onCancel, isSubmit
                   <span className="font-black text-blue-900">{valeur.toLocaleString()} {course.devise || "FCFA"}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-green-700">Votre gain (70%)</span>
-                  <span className="font-bold text-green-700">+{Math.round(valeur * 0.7).toLocaleString()} {course.devise || "FCFA"}</span>
+                  <span className="text-green-700">Votre gain ({100 - countryCommissionPct}%)</span>
+                  <span className="font-bold text-green-700">+{Math.round(valeur * ((100 - countryCommissionPct) / 100)).toLocaleString()} {course.devise || "FCFA"}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-500">Commission Silga (30%)</span>
-                  <span className="text-gray-500">{Math.round(valeur * 0.3).toLocaleString()} {course.devise || "FCFA"}</span>
+                  <span className="text-gray-500">Commission Silga ({countryCommissionPct}%)</span>
+                  <span className="text-gray-500">{Math.round(valeur * (countryCommissionPct / 100)).toLocaleString()} {course.devise || "FCFA"}</span>
                 </div>
               </div>
             )}
