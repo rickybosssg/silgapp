@@ -1,5 +1,20 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
+function normalizeCommissionPct(value) {
+  const pct = Number(value);
+  if (!Number.isFinite(pct) || pct < 0 || pct > 100) return null;
+  return pct;
+}
+
+async function chargerCommissionPays(base44, countryCode) {
+  const code = String(countryCode || '').trim().toUpperCase();
+  if (!code) throw new Error('country_code manquant pour calculer la commission');
+  const countries = await base44.asServiceRole.entities.Country.filter({ code, actif: true });
+  const pct = normalizeCommissionPct(countries?.[0]?.commission_pct);
+  if (pct === null) throw new Error(`Commission non configuree pour le pays ${code}`);
+  return pct;
+}
+
 /**
  * Valide et applique la prime code promo lors de la livraison d'une première course.
  * Appelé après qu'une course est marquée "livree".
@@ -91,7 +106,9 @@ Deno.serve(async (req) => {
     // Prix final > 1000 → réduction fixe 100 FCFA (pas 10% du total)
     const PRIME_FIXE = 100;
     const prixClientPaye = prixFinal - PRIME_FIXE;       // Client paie prix - 100
-    const montantLivreur = Math.round(prixFinal * 0.70); // Livreur 70% du prix total
+    const commissionPct = await chargerCommissionPays(base44, course.country_code);
+    const commissionBrute = Math.round(prixFinal * (commissionPct / 100));
+    const montantLivreur = prixFinal - commissionBrute;
     const commissionSilga = prixFinal - montantLivreur - PRIME_FIXE; // SILGAPP = reste
 
     // Créer la PrimePromo

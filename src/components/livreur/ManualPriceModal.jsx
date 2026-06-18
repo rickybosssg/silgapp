@@ -1,5 +1,8 @@
 import React, { useState } from "react";
 import { DollarSign, AlertCircle, Check, X } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
+import { normalizeCommissionPct, splitAmountByCommission } from "@/lib/commissionUtils";
 
 const PRIX_MIN = 1000;
 
@@ -10,6 +13,13 @@ const PRIX_MIN = 1000;
 export default function ManualPriceModal({ course, onConfirm, onCancel, isSubmitting }) {
   const [montant, setMontant] = useState("");
   const [erreur, setErreur] = useState("");
+  const { data: countryCommissionRows = [] } = useQuery({
+    queryKey: ["country-commission", course.country_code],
+    queryFn: () => base44.entities.Country.filter({ code: course.country_code, actif: true }),
+    enabled: !!course.country_code,
+    staleTime: 30000,
+  });
+  const commissionPct = normalizeCommissionPct(countryCommissionRows?.[0]?.commission_pct);
 
   const valeur = parseInt(montant.replace(/\D/g, ""), 10);
   const valide = !isNaN(valeur) && valeur >= PRIX_MIN;
@@ -27,6 +37,10 @@ export default function ManualPriceModal({ course, onConfirm, onCancel, isSubmit
   const handleConfirm = () => {
     if (!valide) {
       setErreur(`Minimum autorisé : ${PRIX_MIN.toLocaleString()} ${course.devise || "FCFA"}`);
+      return;
+    }
+    if (commissionPct === null) {
+      setErreur(`Commission non configurée pour le pays ${course.country_code || ""}`);
       return;
     }
     onConfirm(valeur);
@@ -105,12 +119,22 @@ export default function ManualPriceModal({ course, onConfirm, onCancel, isSubmit
                   <span className="font-black text-blue-900">{valeur.toLocaleString()} {course.devise || "FCFA"}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-green-700">Votre gain (70%)</span>
-                  <span className="font-bold text-green-700">+{Math.round(valeur * 0.7).toLocaleString()} {course.devise || "FCFA"}</span>
+                  <span className="text-green-700">Votre gain</span>
+                  <span className="font-bold text-green-700">
+                    {(() => {
+                      const split = splitAmountByCommission(valeur, commissionPct);
+                      return split.montant_livreur !== null ? `+${split.montant_livreur.toLocaleString()} ${course.devise || "FCFA"}` : "—";
+                    })()}
+                  </span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-500">Commission Silga (30%)</span>
-                  <span className="text-gray-500">{Math.round(valeur * 0.3).toLocaleString()} {course.devise || "FCFA"}</span>
+                  <span className="text-gray-500">Commission SILGAPP</span>
+                  <span className="text-gray-500">
+                    {(() => {
+                      const split = splitAmountByCommission(valeur, commissionPct);
+                      return split.commission_silga !== null ? `${split.commission_silga.toLocaleString()} ${course.devise || "FCFA"}` : "—";
+                    })()}
+                  </span>
                 </div>
               </div>
             )}

@@ -15,12 +15,11 @@ const buildWelcomeMessage = (countryContext) => {
     };
   }
 
-  const { code, nom, ville, devise, prix_par_km, prix_minimum, commission_pct, indicatif, livreursDispos, pubsActives } = countryContext;
-  const gainLivreur = 100 - (commission_pct || 30);
+  const { code, nom, ville, devise, prix_par_km, prix_minimum, indicatif, livreursDispos, pubsActives } = countryContext;
 
   return {
     role: "assistant",
-    content: `Bonjour 👋 Je suis **VENUS**, votre assistante SILGAPP pour **${nom || code}** ${countryContext.emoji || "🌍"}\n\n❤️ *Plus qu'un service, une promesse* ❤️\n\n🌍 **Pays actif : ${nom || code} (${code})**\n📍 **Ville principale : ${ville || "N/D"}**\n📞 **Indicatif : ${indicatif || "N/D"}**\n\n💰 **Tarifs ${code} :**\n- Prix/km : **${prix_par_km || "N/D"} ${devise || "FCFA"}**\n- Minimum course : **${prix_minimum || 1000} ${devise || "FCFA"}**\n- Commission SILGAPP : **${commission_pct || 30}%** | Gain livreur : **${gainLivreur}%**\n\n🚚 **Réseau actuel à ${ville || code} :**\n- Livreurs disponibles : **${livreursDispos ?? "N/D"}**${pubsActives > 0 ? `\n- Offres actives dans votre pays : **${pubsActives}**` : ""}\n\nJe réponds **uniquement** aux questions concernant **${nom || code}**. Pour un autre pays, demandez-moi de changer de contexte.\n\n**Comment puis-je vous aider aujourd'hui ?**`,
+    content: `Bonjour 👋 Je suis **VENUS**, votre assistante SILGAPP pour **${nom || code}** ${countryContext.emoji || "🌍"}\n\n❤️ *Plus qu'un service, une promesse* ❤️\n\n🌍 **Pays actif : ${nom || code} (${code})**\n📍 **Ville principale : ${ville || "N/D"}**\n📞 **Indicatif : ${indicatif || "N/D"}**\n\n💰 **Tarifs ${code} :**\n- Prix/km : **${prix_par_km || "N/D"} ${devise || "FCFA"}**\n- Minimum course : **${prix_minimum || 1000} ${devise || "FCFA"}**\n\n🚚 **Réseau actuel à ${ville || code} :**\n- Livreurs disponibles : **${livreursDispos ?? "N/D"}**${pubsActives > 0 ? `\n- Offres actives dans votre pays : **${pubsActives}**` : ""}\n\nJe réponds **uniquement** aux questions concernant **${nom || code}**. Pour un autre pays, demandez-moi de changer de contexte.\n\n**Comment puis-je vous aider aujourd'hui ?**`,
   };
 };
 

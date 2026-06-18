@@ -8,9 +8,10 @@ import { toast } from "sonner";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import QRScannerModal from "./QRScannerModal";
 import NavigationGPS from "./NavigationGPS";
+import { normalizeCommissionPct, resolveStoredOrDynamicSplit, splitAmountByCommission } from "@/lib/commissionUtils";
 
 // Haversine
 function haversine(lat1, lon1, lat2, lon2) {
@@ -145,6 +146,22 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
   const effectiveStatut = optimisticStatut || course.statut;
   const isDeplacement = course.type_course === "deplacement";
+  const { data: countryCommissionRows = [] } = useQuery({
+    queryKey: ["country-commission", course.country_code],
+    queryFn: () => base44.entities.Country.filter({ code: course.country_code, actif: true }),
+    enabled: !!course.country_code,
+    staleTime: 30000,
+  });
+  const commissionPct = normalizeCommissionPct(countryCommissionRows?.[0]?.commission_pct);
+
+  const getRequiredSplit = (montant) => {
+    const split = splitAmountByCommission(montant, commissionPct);
+    if (split.commission_silga === null || split.montant_livreur === null) {
+      toast.error(`Commission non configurée pour le pays ${course.country_code || ""}`);
+      return null;
+    }
+    return split;
+  };
 
   const navigateToRecap = (courseData = {}) => {
     const courseId = courseData?.id || course.id;
@@ -186,20 +203,21 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
         toast.error("Entrez le montant reçu du client");
         return;
       }
-      const commissionSilga = Math.round(montant * 0.3);
-      const montantLivreur = montant - commissionSilga;
+      const split = getRequiredSplit(montant);
+      if (!split) return;
       const mergedData = {
         ...(pendingDeliveryData || {}),
         prix_final: montant,
-        commission_silga: commissionSilga,
-        montant_livreur: montantLivreur,
+        commission_silga: split.commission_silga,
+        montant_livreur: split.montant_livreur,
+        commission_pct: split.commission_pct,
         heure_livraison: new Date().toISOString(),
       };
       // On sauvegarde le prix mais on garde statut="arrivee" — le livreur reste en_course
       base44.entities.CourseExterne.update(course.id, {
         prix_final: montant,
-        commission_silga: commissionSilga,
-        montant_livreur: montantLivreur,
+        commission_silga: split.commission_silga,
+        montant_livreur: split.montant_livreur,
         heure_livraison: mergedData.heure_livraison,
       }).catch(() => null);
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
@@ -216,13 +234,14 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
         toast.error("Entrez le montant reçu du client");
         return;
       }
-      const commissionSilga = Math.round(montant * 0.3);
-      const montantLivreur = montant - commissionSilga;
+      const split = getRequiredSplit(montant);
+      if (!split) return;
       const mergedData = {
         ...(pendingDeliveryData || {}),
         prix_final: montant,
-        commission_silga: commissionSilga,
-        montant_livreur: montantLivreur,
+        commission_silga: split.commission_silga,
+        montant_livreur: split.montant_livreur,
+        commission_pct: split.commission_pct,
         heure_livraison: pendingDeliveryData?.heure_livraison || new Date().toISOString(),
       };
       updateOptimisticStatut("livree", mergedData);
@@ -754,7 +773,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             (() => {
               const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
               const prixBase = isPrixManuel ? Number(course.manual_price) : (course.prix_estimate || 0);
-              const gain = Math.round(prixBase * 0.7);
+              const split = splitAmountByCommission(prixBase, commissionPct);
+              const gain = split.montant_livreur;
               
               if (prixBase <= 0) return null;
               
@@ -788,9 +808,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   <div className="mt-2 pt-2 border-t flex items-center justify-between text-xs"
                     style={{ borderColor: isPrixManuel ? "rgb(200, 235, 215)" : "rgb(191, 226, 255)" }}
                   >
-                    <span className={cn("font-semibold", isPrixManuel ? "text-green-700" : "text-blue-700")}>Votre gain (70%)</span>
+                    <span className={cn("font-semibold", isPrixManuel ? "text-green-700" : "text-blue-700")}>Votre gain estimé</span>
                     <span className={cn("font-bold", isPrixManuel ? "text-green-800" : "text-green-700")}>
-                      +{gain.toLocaleString()} {course.devise || "F"}
+                      {gain !== null ? `+${gain.toLocaleString()} ${course.devise || "F"}` : "—"}
                     </span>
                   </div>
                 </div>
@@ -1219,8 +1239,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             // Multi-colis : totaux issus des montants par colis (pas de tarification auto)
             if (isMulti) {
               const total = Number(course.prix_final) || 0;
-              const gain = Number(course.montant_livreur) || Math.round(total * 0.7);
-              const commission = Number(course.commission_silga) || Math.round(total * 0.3);
+              const split = resolveStoredOrDynamicSplit(course, total, commissionPct);
+              const gain = split.montant_livreur;
+              const commission = split.commission_silga;
               return (
                 <div className="py-4 bg-green-50 rounded-2xl border border-green-200 space-y-3 px-4">
                   <div className="text-center">
@@ -1235,11 +1256,11 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     </div>
                     <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
                       <p className="text-[10px] text-gray-600 font-semibold uppercase">Ton gain</p>
-                      <p className="text-sm font-black text-green-700">+{gain.toLocaleString()} {course.devise || "F"}</p>
+                      <p className="text-sm font-black text-green-700">{gain !== null ? `+${gain.toLocaleString()} ${course.devise || "F"}` : "—"}</p>
                     </div>
                     <div className="bg-white rounded-xl p-2.5 text-center border border-gray-100">
                       <p className="text-[10px] text-gray-600 font-semibold uppercase">Commission</p>
-                      <p className="text-sm font-black text-gray-500">{commission.toLocaleString()} {course.devise || "F"}</p>
+                      <p className="text-sm font-black text-gray-500">{commission !== null ? `${commission.toLocaleString()} ${course.devise || "F"}` : "—"}</p>
                     </div>
                   </div>
                 </div>
@@ -1252,8 +1273,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             const prix = isPrixManuel
               ? Number(course.manual_price)
               : (Math.max(1000, Number(course.prix_final) || (dist ? Math.round(dist * 100) : 0)) || null);
-            const gain = Number(course.montant_livreur) > 0 ? Number(course.montant_livreur) : (prix ? Math.round(prix * 0.7) : null);
-            const commission = Number(course.commission_silga) > 0 ? Number(course.commission_silga) : (prix ? Math.round(prix * 0.3) : null);
+            const split = prix ? resolveStoredOrDynamicSplit(course, prix, commissionPct) : { montant_livreur: null, commission_silga: null };
+            const gain = split.montant_livreur;
+            const commission = split.commission_silga;
             return (
               <div className="py-4 bg-green-50 rounded-2xl border border-green-200 space-y-3 px-4">
                 <div className="text-center">

@@ -5,6 +5,7 @@ import { MapPin, Clock, Package, Banknote } from "lucide-react";
 import MultiColisProgressBadge from "./MultiColisProgressBadge";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { normalizeCommissionPct, splitAmountByCommission } from "@/lib/commissionUtils";
 
 const STATUT_LABELS = {
   en_attente: "En attente",
@@ -35,6 +36,12 @@ export default function MultiColisClientView({ course }) {
     refetchInterval: 5000,
     initialData: [],
   });
+  const { data: countryCommissionRows = [] } = useQuery({
+    queryKey: ["country-commission", course.country_code],
+    queryFn: () => base44.entities.Country.filter({ code: course.country_code, actif: true }),
+    enabled: !!course.country_code,
+    staleTime: 30000,
+  });
 
   if (!course.is_multi_colis || !course.nb_colis || course.nb_colis <= 1) return null;
 
@@ -42,8 +49,10 @@ export default function MultiColisClientView({ course }) {
   const nbAnnules = colis.filter(c => c.statut === "annule").length;
   const nbTotal = colis.length || course.nb_colis;
   const totalEncaisse = colis.filter(c => c.statut === "livre").reduce((s, c) => s + (c.montant_a_encaisser || 0), 0);
-  const gainLivreur = Math.round(totalEncaisse * 0.7);
-  const commission = Math.round(totalEncaisse * 0.3);
+  const commissionPct = normalizeCommissionPct(countryCommissionRows?.[0]?.commission_pct);
+  const split = splitAmountByCommission(totalEncaisse, commissionPct);
+  const gainLivreur = split.montant_livreur || 0;
+  const commission = split.commission_silga || 0;
 
   if (isLoading) {
     return (

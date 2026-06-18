@@ -24,6 +24,29 @@ function normalizeCountryCode(value) {
   return String(value || '').trim().toUpperCase();
 }
 
+function normalizeCommissionPct(value) {
+  const pct = Number(value);
+  if (!Number.isFinite(pct) || pct < 0 || pct > 100) return null;
+  return pct;
+}
+
+async function chargerCommissionPays(base44, countryCode) {
+  const code = normalizeCountryCode(countryCode);
+  if (!code) throw new Error('country_code manquant pour calculer la commission');
+  const countries = await base44.asServiceRole.entities.Country.filter({ code, actif: true });
+  const pct = normalizeCommissionPct(countries?.[0]?.commission_pct);
+  if (pct === null) throw new Error(`Commission non configuree pour le pays ${code}`);
+  return pct;
+}
+
+async function calculerRepartitionPays(base44, countryCode, montant) {
+  const prix = Number(montant);
+  if (!Number.isFinite(prix) || prix < 0) throw new Error('Montant invalide pour calculer la commission');
+  const pct = await chargerCommissionPays(base44, countryCode);
+  const commission = Math.round(prix * (pct / 100));
+  return { commission_silga: commission, montant_livreur: prix - commission, commission_pct: pct };
+}
+
 async function verifierPaysCourseLivreur(base44, course, livreurId, contexte) {
   const livreur = await base44.asServiceRole.entities.Livreur.get(livreurId);
   if (!livreur) {
@@ -991,8 +1014,8 @@ Deno.serve(async (req) => {
 
       if (accepted) {
         const prixManuel = Number(course.manual_price);
-        const commission = Math.round(prixManuel * 0.3);
-        const montantLivreur = prixManuel - commission;
+        const { commission_silga: commission, montant_livreur: montantLivreur } =
+          await calculerRepartitionPays(base44, course.country_code, prixManuel);
 
         await base44.asServiceRole.entities.CourseExterne.update(course_id, {
           manual_price_status: 'accepted', client_price_validated_at: now,

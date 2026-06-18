@@ -182,7 +182,7 @@ export default function ReseauInternePremiumCard({ livreurs, coursesLivrees }) {
 
   const totalEncaisse = coursesLivrees.reduce((sum, c) => sum + (c.prix_reel || c.prix || 0), 0);
   const totalDuSilga = totalEncaisse;
-  const netLivreurs = Math.round(totalEncaisse * 0.7);
+  const netLivreurs = coursesLivrees.reduce((sum, c) => sum + (Number(c.montant_livreur) || 0), 0);
 
   const stats = {
     coursesLivrees: coursesLivrees.length,

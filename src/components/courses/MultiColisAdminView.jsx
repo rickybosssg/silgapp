@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Package, CheckCircle, XCircle, Clock, Banknote, MapPin } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { normalizeCommissionPct, splitAmountByCommission } from "@/lib/commissionUtils";
 
 const STATUT_CONFIG = {
   en_attente:  { label: "En attente",   cls: "bg-gray-100 text-gray-600" },
@@ -16,7 +17,7 @@ const STATUT_CONFIG = {
 /**
  * Section affichée dans CourseDetailDialog pour les courses externes multi-colis.
  * Affiche chaque sous-colis avec : destinataire, statut, montant encaissé.
- * + Totaux : total encaissé, gain livreur (70%), commission Silga (30%).
+ * + Totaux : total encaissé, gain livreur, commission Silga.
  */
 export default function MultiColisAdminView({ course }) {
   const { data: colis = [], isLoading } = useQuery({
@@ -25,13 +26,21 @@ export default function MultiColisAdminView({ course }) {
     enabled: !!course.id && course.is_multi_colis,
     initialData: [],
   });
+  const { data: countryCommissionRows = [] } = useQuery({
+    queryKey: ["country-commission", course.country_code],
+    queryFn: () => base44.entities.Country.filter({ code: course.country_code, actif: true }),
+    enabled: !!course.country_code && course.is_multi_colis,
+    staleTime: 30000,
+  });
 
   if (!course.is_multi_colis || course.nb_colis <= 1) return null;
 
   const devise = course.devise || "F";
   const totalEncaisse = colis.filter(c => c.statut === "livre").reduce((s, c) => s + (c.montant_a_encaisser || 0), 0);
-  const gainLivreur = Math.round(totalEncaisse * 0.7);
-  const commissionSilga = Math.round(totalEncaisse * 0.3);
+  const commissionPct = normalizeCommissionPct(countryCommissionRows?.[0]?.commission_pct);
+  const split = splitAmountByCommission(totalEncaisse, commissionPct);
+  const gainLivreur = split.montant_livreur || 0;
+  const commissionSilga = split.commission_silga || 0;
   const nbLivres = colis.filter(c => c.statut === "livre").length;
   const nbAnnules = colis.filter(c => c.statut === "annule").length;
 
@@ -141,12 +150,11 @@ export default function MultiColisAdminView({ course }) {
                 <div className="bg-white rounded-xl p-2 text-center border border-green-100">
                   <p className="text-[9px] text-gray-600 font-bold uppercase">Gain livreur</p>
                   <p className="text-sm font-black text-green-700">{gainLivreur.toLocaleString()} {devise}</p>
-                  <p className="text-[8px] text-green-500">70%</p>
                 </div>
                 <div className="bg-white rounded-xl p-2 text-center border border-orange-100">
                   <p className="text-[9px] text-gray-600 font-bold uppercase">Commission</p>
                   <p className="text-sm font-black text-orange-600">{commissionSilga.toLocaleString()} {devise}</p>
-                  <p className="text-[8px] text-orange-400">30%</p>
+                  {commissionPct !== null && <p className="text-[8px] text-orange-400">{commissionPct}%</p>}
                 </div>
               </div>
             </div>

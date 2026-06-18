@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import MultiColisProgressBadge from "./MultiColisProgressBadge";
+import { normalizeCommissionPct, splitAmountByCommission } from "@/lib/commissionUtils";
 
 // Bouton WhatsApp SVG inline
 function WhatsAppIcon({ className }) {
@@ -97,7 +98,7 @@ function ConfirmMontantDialog({ colis, devise, onConfirm, onCancel, isPending })
  * Vue multi-colis pour le livreur externe.
  * - Pas de QR Code ni de PIN Code
  * - Bouton "✅ Livrer ce colis" → dialogue confirmation + saisie montant
- * - Calcul automatique : total, gain livreur (70%), commission Silga (30%)
+ * - Calcul automatique : total, gain livreur, commission Silga
  * - Fin de course automatique quand tous les colis sont livrés/annulés
  */
 export default function MultiColisLivreurView({ course, colisRecupere, onAllLivres }) {
@@ -113,6 +114,13 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
     refetchInterval: 5000,
     initialData: [],
   });
+  const { data: countryCommissionRows = [] } = useQuery({
+    queryKey: ["country-commission", course.country_code],
+    queryFn: () => base44.entities.Country.filter({ code: course.country_code, actif: true }),
+    enabled: !!course.country_code,
+    staleTime: 30000,
+  });
+  const commissionPct = normalizeCommissionPct(countryCommissionRows?.[0]?.commission_pct);
 
   // Mutation : livrer un colis individuel + mettre à jour les totaux de la course
   const livrerColisMutation = useMutation({
@@ -141,8 +149,12 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
       const nbTotal = course.nb_colis || 1;
       const tousTermines = nbLivres + nbAnnules >= nbTotal;
 
-      const gainLivreur = Math.round(montantTotal * 0.7);
-      const commissionSilga = Math.round(montantTotal * 0.3);
+      const split = splitAmountByCommission(montantTotal, commissionPct);
+      if (split.commission_silga === null || split.montant_livreur === null) {
+        throw new Error(`Commission non configuree pour ${course.country_code || "ce pays"}`);
+      }
+      const gainLivreur = split.montant_livreur;
+      const commissionSilga = split.commission_silga;
 
       const updateData = {
         nb_colis_livres: nbLivres,
@@ -184,7 +196,7 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
       } else {
         queryClient.invalidateQueries({ queryKey: ["colis-externes", course.id] });
         queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-        toast.success(`Colis livré ✅ — +${gainLivreur.toLocaleString()} ${course.devise || "F"} (70%)`);
+        toast.success(`Colis livré ✅ — +${gainLivreur.toLocaleString()} ${course.devise || "F"}`);
       }
     },
     onError: () => toast.error("Erreur lors de la mise à jour"),
@@ -207,8 +219,12 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
       const nbAnnules = colis.filter(c => c.id === colisItem.id || c.statut === "annule").length;
       const nbTotal = course.nb_colis || 1;
       const tousTermines = nbLivres + nbAnnules >= nbTotal;
-      const gainLivreur = Math.round(montantTotal * 0.7);
-      const commissionSilga = Math.round(montantTotal * 0.3);
+      const split = splitAmountByCommission(montantTotal, commissionPct);
+      if (split.commission_silga === null || split.montant_livreur === null) {
+        throw new Error(`Commission non configuree pour ${course.country_code || "ce pays"}`);
+      }
+      const gainLivreur = split.montant_livreur;
+      const commissionSilga = split.commission_silga;
 
       const updateData = {
         nb_colis_livres: nbLivres,
@@ -273,8 +289,9 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
   const nbLivres = colis.filter(c => c.statut === "livre").length;
   const nbAnnules = colis.filter(c => c.statut === "annule").length;
   const totalEncaisse = colis.filter(c => c.statut === "livre").reduce((s, c) => s + (c.montant_a_encaisser || 0), 0);
-  const gainLivreur = Math.round(totalEncaisse * 0.7);
-  const commission = Math.round(totalEncaisse * 0.3);
+  const split = splitAmountByCommission(totalEncaisse, commissionPct);
+  const gainLivreur = split.montant_livreur || 0;
+  const commission = split.commission_silga || 0;
 
   if (isLoading) {
     return (
@@ -476,7 +493,7 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
                 <p className="text-xs font-black text-gray-800">{totalEncaisse.toLocaleString()} {course.devise || "F"}</p>
               </div>
               <div className="bg-white rounded-xl p-2 text-center border border-green-100">
-                <p className="text-[9px] text-gray-600 font-bold uppercase">Ton gain (70%)</p>
+                <p className="text-[9px] text-gray-600 font-bold uppercase">Ton gain</p>
                 <p className="text-xs font-black text-green-700">+{gainLivreur.toLocaleString()} {course.devise || "F"}</p>
               </div>
               <div className="bg-white rounded-xl p-2 text-center border border-gray-100">

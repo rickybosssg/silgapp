@@ -5,6 +5,21 @@
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
+function normalizeCommissionPct(value) {
+  const pct = Number(value);
+  if (!Number.isFinite(pct) || pct < 0 || pct > 100) return null;
+  return pct;
+}
+
+async function chargerCommissionPays(base44, countryCode) {
+  const code = String(countryCode || '').trim().toUpperCase();
+  if (!code) throw new Error('country_code manquant pour calculer la commission');
+  const countries = await base44.asServiceRole.entities.Country.filter({ code, actif: true });
+  const pct = normalizeCommissionPct(countries?.[0]?.commission_pct);
+  if (pct === null) throw new Error(`Commission non configuree pour le pays ${code}`);
+  return pct;
+}
+
 function haversine(lat1, lon1, lat2, lon2) {
   if (!lat1 || !lon1 || !lat2 || !lon2) return null;
   const R = 6371;
@@ -55,7 +70,8 @@ Deno.serve(async (req) => {
 
       const distSafe = distanceKm;
       const prixFinal = Math.round(distSafe * 100);
-      const commission = Math.round(prixFinal * 0.3);
+      const commissionPct = await chargerCommissionPays(base44, course.country_code);
+      const commission = Math.round(prixFinal * (commissionPct / 100));
       const montantLivreur = prixFinal - commission;
 
       await base44.asServiceRole.entities.CourseExterne.update(course.id, {

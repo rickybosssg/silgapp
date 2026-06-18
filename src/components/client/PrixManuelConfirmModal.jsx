@@ -12,7 +12,6 @@ export default function PrixManuelConfirmModal({ course, onAccepted, onRefused }
 
   const devise = course.devise || "FCFA";
   const prix = course.manual_price;
-  const gainLivreur = Math.round(prix * 0.7);
 
   const handleAccepter = async () => {
     setLoading(true);

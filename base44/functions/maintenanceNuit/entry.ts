@@ -20,6 +20,21 @@ function isOlderThanDays(dateStr, days) {
   return isOlderThanHours(dateStr, days * 24);
 }
 
+function normalizeCommissionPct(value) {
+  const pct = Number(value);
+  if (!Number.isFinite(pct) || pct < 0 || pct > 100) return null;
+  return pct;
+}
+
+async function chargerCommissionPays(base44, countryCode) {
+  const code = String(countryCode || '').trim().toUpperCase();
+  if (!code) throw new Error('country_code manquant pour calculer la commission');
+  const countries = await base44.asServiceRole.entities.Country.filter({ code, actif: true });
+  const pct = normalizeCommissionPct(countries?.[0]?.commission_pct);
+  if (pct === null) throw new Error(`Commission non configuree pour le pays ${code}`);
+  return pct;
+}
+
 // ─── Scan functions ─────────────────────────────────────────────────────────
 
 async function scanCoursesBloquees(base44, bugs, corrections, recommandations) {
@@ -251,7 +266,8 @@ async function scanPaiementsNonSync(base44, bugs, corrections, recommandations) 
 
       if (dist && dist > 0) {
         const prixFinal = Math.round(dist * 100);
-        const commission = Math.round(prixFinal * 0.3);
+        const commissionPct = await chargerCommissionPays(base44, c.country_code);
+        const commission = Math.round(prixFinal * (commissionPct / 100));
         const montantLivreur = prixFinal - commission;
 
         await base44.asServiceRole.entities.CourseExterne.update(c.id, {
@@ -291,7 +307,8 @@ async function scanPaiementsNonSync(base44, bugs, corrections, recommandations) 
 
     // Courses livrées sans commission calculée
     if (c.prix_final && (!c.commission_silga || !c.montant_livreur)) {
-      const commission = Math.round(c.prix_final * 0.3);
+      const commissionPct = await chargerCommissionPays(base44, c.country_code);
+      const commission = Math.round(c.prix_final * (commissionPct / 100));
       const montantLivreur = c.prix_final - commission;
       await base44.asServiceRole.entities.CourseExterne.update(c.id, {
         commission_silga: commission,

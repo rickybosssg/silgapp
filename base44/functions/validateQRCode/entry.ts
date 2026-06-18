@@ -9,6 +9,12 @@ function haversine(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function normalizeCommissionPct(value) {
+  const pct = Number(value);
+  if (!Number.isFinite(pct) || pct < 0 || pct > 100) return null;
+  return pct;
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -170,15 +176,24 @@ Deno.serve(async (req) => {
       const countryCode = course.country_code || "BF";
       let prixParKm = 100;
       let prixMinimumPays = 500;
-      let commissionPct = 30;
+      let commissionPct = null;
       try {
         const countriesDB = await base44.asServiceRole.entities.Country.filter({ code: countryCode, actif: true });
         if (countriesDB?.[0]) {
           prixParKm    = countriesDB[0].prix_par_km    || 100;
           prixMinimumPays = countriesDB[0].prix_minimum || 500;
-          commissionPct   = countriesDB[0].commission_pct || 30;
+          commissionPct = normalizeCommissionPct(countriesDB[0].commission_pct);
         }
       } catch (_) {}
+
+      if (commissionPct === null) {
+        console.error('[validateQRCode][COMMISSION_CONFIG_MISSING]', { course_id, countryCode });
+        return Response.json({
+          success: false,
+          error: `Commission pays non configurée pour ${countryCode}`,
+          blocked_reason: 'missing_country_commission_pct',
+        }, { status: 400 });
+      }
 
       const PRIX_MINIMUM_GLOBAL = 1000;
 
@@ -227,8 +242,8 @@ Deno.serve(async (req) => {
       } else {
         // GPS course (départ/arrivée) manquants → appliquer le minimum SILGAPP
         updateData.prix_final = PRIX_MINIMUM_GLOBAL;
-        updateData.commission_silga = Math.round(PRIX_MINIMUM_GLOBAL * 0.3);
-        updateData.montant_livreur = PRIX_MINIMUM_GLOBAL - Math.round(PRIX_MINIMUM_GLOBAL * 0.3);
+        updateData.commission_silga = Math.round(PRIX_MINIMUM_GLOBAL * (commissionPct / 100));
+        updateData.montant_livreur = PRIX_MINIMUM_GLOBAL - updateData.commission_silga;
         if (distReelle != null) updateData.distance_reelle_km = Math.max(Number(distReelle) || 0, 0.01);
       }
 

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Loader2, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
+import { normalizeCommissionPct, resolveStoredOrDynamicSplit } from "@/lib/commissionUtils";
 
 function haversine(lat1, lon1, lat2, lon2) {
   if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
@@ -51,6 +52,7 @@ export default function RecapCourseLivreur() {
   const [course, setCourse] = useState(initialCourse);
   const [loading, setLoading] = useState(!initialCourse);
   const [error, setError] = useState(null);
+  const [commissionPct, setCommissionPct] = useState(null);
   const inFlightRef = useRef(false);
 
   const chargerCourse = async ({ silent = false, retries = 2 } = {}) => {
@@ -108,6 +110,25 @@ export default function RecapCourseLivreur() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadCommission = async () => {
+      const code = course?.country_code;
+      if (!code) {
+        setCommissionPct(null);
+        return;
+      }
+      try {
+        const rows = await base44.entities.Country.filter({ code, actif: true });
+        if (!cancelled) setCommissionPct(normalizeCommissionPct(rows?.[0]?.commission_pct));
+      } catch (_) {
+        if (!cancelled) setCommissionPct(null);
+      }
+    };
+    loadCommission();
+    return () => { cancelled = true; };
+  }, [course?.country_code]);
+
   const handleTerminer = async () => {
     // Retourner au dashboard livreur (reload propre)
     navigate("/", { replace: true });
@@ -160,8 +181,9 @@ export default function RecapCourseLivreur() {
     ? Number(course.manual_price)
     : (Number(course.prix_final) > 0 ? Number(course.prix_final) : (dist > 0 ? Math.round(dist * 100) : 0));
   const prixFinal = Math.max(1000, prixBrut);
-  const gainLivreur = Number(course.montant_livreur) > 0 ? Number(course.montant_livreur) : Math.round(prixFinal * 0.7);
-  const commissionSilga = Number(course.commission_silga) > 0 ? Number(course.commission_silga) : Math.round(prixFinal * 0.3);
+  const split = resolveStoredOrDynamicSplit(course, prixFinal, commissionPct);
+  const gainLivreur = split.montant_livreur || 0;
+  const commissionSilga = split.commission_silga || 0;
   const duree = course.type_course === "deplacement"
     ? dureeMinutes(course.heure_prise_en_charge, course.heure_livraison)
     : dureeMinutes(course.heure_recuperation, course.heure_livraison);
@@ -244,14 +266,14 @@ export default function RecapCourseLivreur() {
           <p className="text-gray-600 text-xs font-semibold uppercase tracking-widest mb-2">Répartition</p>
           <div className="flex items-center justify-between py-2 border-b border-gray-800">
             <div>
-              <p className="text-green-400 font-bold text-sm">Ton gain (70%)</p>
+              <p className="text-green-400 font-bold text-sm">Ton gain</p>
               <p className="text-gray-500 text-xs">À encaisser auprès du client</p>
             </div>
             <p className="text-green-400 text-2xl font-black">+{gainLivreur.toLocaleString()} F</p>
           </div>
           <div className="flex items-center justify-between py-2">
             <div>
-              <p className="text-red-400 font-bold text-sm">Commission Silga (30%)</p>
+              <p className="text-red-400 font-bold text-sm">Commission SILGAPP</p>
               <p className="text-gray-500 text-xs">À reverser à Silga</p>
             </div>
             <p className="text-red-400 text-xl font-black">{commissionSilga.toLocaleString()} F</p>

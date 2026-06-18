@@ -1,5 +1,20 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
+function normalizeCommissionPct(value) {
+  const pct = Number(value);
+  if (!Number.isFinite(pct) || pct < 0 || pct > 100) return null;
+  return pct;
+}
+
+async function chargerCommissionPays(base44, countryCode) {
+  const code = String(countryCode || '').trim().toUpperCase();
+  if (!code) throw new Error('country_code manquant pour calculer la commission');
+  const countries = await base44.asServiceRole.entities.Country.filter({ code, actif: true });
+  const pct = normalizeCommissionPct(countries?.[0]?.commission_pct);
+  if (pct === null) throw new Error(`Commission non configuree pour le pays ${code}`);
+  return pct;
+}
+
 /**
  * CORRECTION CRITIQUE AGRESSIVE
  * Supprime TOUS les 0, NaN, null parasites
@@ -55,9 +70,12 @@ Deno.serve(async (req) => {
         // CORRECTION 4 : Prix final manquant sur livrées
         if (course.statut === "livree" && (!course.prix_final || course.prix_final === 0)) {
           if (course.distance_reelle_km && course.distance_reelle_km > 0) {
-            updates.prix_final = Math.round(course.distance_reelle_km * 100);
-            updates.commission_silga = Math.round(course.distance_reelle_km * 100 * 0.3);
-            updates.montant_livreur = Math.round(course.distance_reelle_km * 100 * 0.7);
+            const prixFinal = Math.round(course.distance_reelle_km * 100);
+            const commissionPct = await chargerCommissionPays(base44, course.country_code);
+            const commission = Math.round(prixFinal * (commissionPct / 100));
+            updates.prix_final = prixFinal;
+            updates.commission_silga = commission;
+            updates.montant_livreur = prixFinal - commission;
           }
         }
 

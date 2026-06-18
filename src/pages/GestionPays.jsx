@@ -69,7 +69,7 @@ export default function GestionPays() {
       devise: p.devise || "FCFA",
       prix_par_km: p.prix_par_km || 100,
       prix_minimum: p.prix_minimum || 500,
-      commission_pct: p.commission_pct || 30,
+      commission_pct: p.commission_pct ?? "",
       ville_principale: p.ville_principale || "",
       rayon_km: p.rayon_km || 30,
     });
@@ -198,7 +198,7 @@ export default function GestionPays() {
                       Min : {(p.prix_minimum || 500).toLocaleString()} {p.devise || "FCFA"}
                     </span>
                     <span className="flex items-center gap-1 text-[10px] bg-violet-50 text-violet-700 rounded-full px-2 py-0.5 font-medium">
-                      <Percent className="w-2.5 h-2.5" />{p.commission_pct || 30}% commission
+                      <Percent className="w-2.5 h-2.5" />{p.commission_pct != null ? `${p.commission_pct}% commission` : "Commission non configurée"}
                     </span>
                     {p.ville_principale && (
                       <span className="flex items-center gap-1 text-[10px] bg-gray-100 text-gray-600 rounded-full px-2 py-0.5 font-medium">

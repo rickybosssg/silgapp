@@ -1,7 +1,30 @@
 import React from "react";
+import { useQuery } from "@tanstack/react-query";
 import { TrendingUp, Package, CheckCircle, AlertCircle, Banknote } from "lucide-react";
+import { base44 } from "@/api/base44Client";
+import { normalizeCommissionPct, splitAmountByCommission } from "@/lib/commissionUtils";
 
 export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantDüSilga, isExterne = false }) {
+  const { data: countries = [] } = useQuery({
+    queryKey: ["countries-commission-livreur-stats"],
+    queryFn: () => base44.entities.Country.filter({ actif: true }, "ordre"),
+    staleTime: 5 * 60 * 1000,
+    enabled: isExterne,
+  });
+
+  const commissionByCountry = new Map(
+    countries.map((country) => [
+      String(country.code || "").toUpperCase(),
+      normalizeCommissionPct(country.commission_pct),
+    ])
+  );
+
+  const splitForCourse = (course) => {
+    const prix = Number(course.prix_final || 0);
+    const countryCode = String(course.country_code || "").toUpperCase();
+    return splitAmountByCommission(prix, commissionByCountry.get(countryCode));
+  };
+
   const today = new Date().toDateString();
   const livreesToday = mesCourses.filter(c =>
     c.statut === "livree" && new Date(c.heure_livraison || c.updated_date).toDateString() === today
@@ -10,28 +33,23 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
     new Date(c.created_date).toDateString() === today
   ).length;
 
-  // Calculs financiers du jour — priorité aux champs sauvegardés, fallback calcul local
-  const prixTotalToday = livreesToday.reduce((s, c) => {
-    const prix = c.prix_final || 0;
-    return s + prix;
-  }, 0);
+  const prixTotalToday = livreesToday.reduce((s, c) => s + (Number(c.prix_final) || 0), 0);
   const commissionToday = livreesToday.reduce((s, c) => {
-    if (c.commission_silga > 0) return s + c.commission_silga;
-    return s + Math.round((c.prix_final || 0) * 0.3);
+    if (Number(c.commission_silga) > 0) return s + Number(c.commission_silga);
+    return s + (splitForCourse(c).commission_silga || 0);
   }, 0);
   const gainToday = livreesToday.reduce((s, c) => {
-    if (c.montant_livreur > 0) return s + c.montant_livreur;
-    return s + Math.round((c.prix_final || 0) * 0.7);
+    if (Number(c.montant_livreur) > 0) return s + Number(c.montant_livreur);
+    return s + (splitForCourse(c).montant_livreur || 0);
   }, 0);
 
   if (isExterne) {
     return (
       <div className="space-y-2">
-        {/* KPI row */}
         <div className="grid grid-cols-3 gap-2">
           {[
-            { icon: <Package className="w-4 h-4 text-blue-500" />,   bg: "bg-blue-50",   val: coursesAujourdHui,       label: "Courses",   valClass: "text-blue-800" },
-            { icon: <CheckCircle className="w-4 h-4 text-green-500" />, bg: "bg-green-50", val: livreesToday.length,    label: "Livrées",   valClass: "text-green-800" },
+            { icon: <Package className="w-4 h-4 text-blue-500" />, bg: "bg-blue-50", val: coursesAujourdHui, label: "Courses", valClass: "text-blue-800" },
+            { icon: <CheckCircle className="w-4 h-4 text-green-500" />, bg: "bg-green-50", val: livreesToday.length, label: "Livrées", valClass: "text-green-800" },
             { icon: <AlertCircle className="w-4 h-4 text-orange-500" />, bg: "bg-orange-50", val: null, label: "Dû Silga", valClass: "text-orange-700" },
           ].map((item, i) => (
             <div key={i} className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 text-center">
@@ -50,7 +68,6 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
           ))}
         </div>
 
-        {/* Bilan financier du jour */}
         {livreesToday.length > 0 && (
           <div className="rounded-2xl overflow-hidden shadow-sm">
             <div className="bg-slate-800 px-4 py-2 flex items-center gap-2">
@@ -60,8 +77,8 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
             <div className="bg-white border border-gray-100 grid grid-cols-3 divide-x divide-gray-100">
               {[
                 { label: "Total client", val: prixTotalToday, color: "text-gray-800" },
-                { label: "Votre gain 70%", val: gainToday,    color: "text-green-700" },
-                { label: "Commission 30%", val: commissionToday, color: "text-orange-600" },
+                { label: "Votre gain", val: gainToday, color: "text-green-700" },
+                { label: "Commission SILGAPP", val: commissionToday, color: "text-orange-600" },
               ].map((s, i) => (
                 <div key={i} className="p-3 text-center">
                   <p className={`text-sm font-black ${s.color}`}>{s.val.toLocaleString()}<span className="text-[9px] ml-0.5 font-normal">F</span></p>

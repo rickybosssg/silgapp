@@ -2,16 +2,22 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 // Tarifs par pays (fallback si pas de config en DB)
 const TARIFS_PAYS = {
-  BF: { prix_par_km: 100, prix_minimum: 500,  commission_pct: 30, devise: "FCFA" },
-  CI: { prix_par_km: 120, prix_minimum: 600,  commission_pct: 30, devise: "FCFA" },
-  TG: { prix_par_km: 100, prix_minimum: 500,  commission_pct: 30, devise: "FCFA" },
-  BJ: { prix_par_km: 100, prix_minimum: 500,  commission_pct: 30, devise: "FCFA" },
-  SN: { prix_par_km: 150, prix_minimum: 750,  commission_pct: 30, devise: "FCFA" },
-  ML: { prix_par_km: 100, prix_minimum: 500,  commission_pct: 30, devise: "FCFA" },
-  GN: { prix_par_km: 800, prix_minimum: 4000, commission_pct: 30, devise: "GNF"  },
-  NE: { prix_par_km: 100, prix_minimum: 500,  commission_pct: 30, devise: "FCFA" },
-  GH: { prix_par_km: 2,   prix_minimum: 10,   commission_pct: 30, devise: "GHS"  },
+  BF: { prix_par_km: 100, prix_minimum: 500, devise: "FCFA" },
+  CI: { prix_par_km: 120, prix_minimum: 600, devise: "FCFA" },
+  TG: { prix_par_km: 100, prix_minimum: 500, devise: "FCFA" },
+  BJ: { prix_par_km: 100, prix_minimum: 500, devise: "FCFA" },
+  SN: { prix_par_km: 150, prix_minimum: 750, devise: "FCFA" },
+  ML: { prix_par_km: 100, prix_minimum: 500, devise: "FCFA" },
+  GN: { prix_par_km: 800, prix_minimum: 4000, devise: "GNF" },
+  NE: { prix_par_km: 100, prix_minimum: 500, devise: "FCFA" },
+  GH: { prix_par_km: 2, prix_minimum: 10, devise: "GHS" },
 };
+
+function normalizeCommissionPct(value) {
+  const pct = Number(value);
+  if (!Number.isFinite(pct) || pct < 0 || pct > 100) return null;
+  return pct;
+}
 
 function calculerDistance(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -58,6 +64,7 @@ Deno.serve(async (req) => {
 
     // Essayer de récupérer la config depuis la DB
     let tarif = TARIFS_PAYS[countryCode] || TARIFS_PAYS["BF"];
+    let commissionPct = null;
     try {
       const countriesDB = await base44.asServiceRole.entities.Country.filter({ code: countryCode, actif: true });
       if (countriesDB?.[0]) {
@@ -65,12 +72,19 @@ Deno.serve(async (req) => {
         tarif = {
           prix_par_km:    c.prix_par_km    || tarif.prix_par_km,
           prix_minimum:   c.prix_minimum   || tarif.prix_minimum,
-          commission_pct: c.commission_pct || tarif.commission_pct,
           devise:         c.devise         || tarif.devise,
         };
+        commissionPct = normalizeCommissionPct(c.commission_pct);
       }
     } catch (_) {
       // Fallback silencieux sur le tarif statique
+    }
+
+    if (commissionPct === null) {
+      return Response.json({
+        error: `Commission non configuree pour le pays ${countryCode}`,
+        blocked_reason: 'missing_country_commission_pct',
+      }, { status: 400 });
     }
 
     // Calculer la distance tarifaire avec les positions GPS réelles si disponibles
@@ -96,8 +110,7 @@ Deno.serve(async (req) => {
     const prixFinal = Math.max(Math.round(prixBrut), tarif.prix_minimum, PRIX_MINIMUM_GLOBAL);
 
     // Commission Silga et montant livreur
-    const commissionRate = (tarif.commission_pct || 30) / 100;
-    const commissionSilga = Math.round(prixFinal * commissionRate);
+    const commissionSilga = Math.round(prixFinal * (commissionPct / 100));
     const montantLivreur = prixFinal - commissionSilga;
 
     // Mettre à jour la course

@@ -13,7 +13,6 @@ Deno.serve(async (req) => {
     const configReference = {
       prix_par_km: 100,
       prix_minimum: 500,
-      commission_pct: 30,
       devise: 'FCFA',
       rayon_km: 30,
     };
@@ -27,7 +26,6 @@ Deno.serve(async (req) => {
       await base44.entities.Country.update(pays.id, {
         prix_par_km: configReference.prix_par_km,
         prix_minimum: configReference.prix_minimum,
-        commission_pct: configReference.commission_pct,
         devise: configReference.devise,
         rayon_km: configReference.rayon_km,
       });

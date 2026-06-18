@@ -1,5 +1,20 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
+function normalizeCommissionPct(value) {
+    const pct = Number(value);
+    if (!Number.isFinite(pct) || pct < 0 || pct > 100) return null;
+    return pct;
+}
+
+async function chargerCommissionPays(asService, countryCode) {
+    const code = String(countryCode || '').trim().toUpperCase();
+    if (!code) throw new Error('country_code manquant pour calculer la commission');
+    const countries = await asService.entities.Country.filter({ code, actif: true });
+    const pct = normalizeCommissionPct(countries?.[0]?.commission_pct);
+    if (pct === null) throw new Error(`Commission non configuree pour le pays ${code}`);
+    return pct;
+}
+
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
@@ -67,7 +82,8 @@ Deno.serve(async (req) => {
             if (course.pricing_mode !== "admin_manuel" && course.source !== "admin") continue;
 
             const prixDefault = 1000;
-            const commission = Math.round(prixDefault * 0.3);
+            const commissionPct = await chargerCommissionPays(asService, course.country_code);
+            const commission = Math.round(prixDefault * (commissionPct / 100));
             const gainLivreur = prixDefault - commission;
 
             await asService.entities.CourseExterne.update(course.id, {
@@ -110,7 +126,8 @@ Deno.serve(async (req) => {
             const diffMin = (now - new Date(heureArrivee).getTime()) / 60000;
             if (diffMin <= 30) continue;
 
-            const commission = Math.round(course.prix_final * 0.3);
+            const commissionPct = await chargerCommissionPays(asService, course.country_code);
+            const commission = Math.round(course.prix_final * (commissionPct / 100));
             const gain = course.prix_final - commission;
 
             await asService.entities.CourseExterne.update(course.id, {

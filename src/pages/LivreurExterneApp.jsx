@@ -30,6 +30,7 @@ import PubliciteCarousel from "@/components/publicite/PubliciteCarousel";
 import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
 import PricingModeSelector from "@/components/livreur/PricingModeSelector";
 import PrixManuelReponseAlert from "@/components/livreur/PrixManuelReponseAlert";
+import { normalizeCommissionPct, splitAmountByCommission } from "@/lib/commissionUtils";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -160,6 +161,14 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     refetchInterval: 8000, // ⚡ 2s → 8s : profil change rarement
     staleTime: 4000,
   });
+
+  const { data: countryCommissionRows = [] } = useQuery({
+    queryKey: ["country-commission", livreurProfil?.country_code],
+    queryFn: () => base44.entities.Country.filter({ code: livreurProfil.country_code, actif: true }),
+    enabled: !!livreurProfil?.country_code,
+    staleTime: 30000,
+  });
+  const commissionPct = normalizeCommissionPct(countryCommissionRows?.[0]?.commission_pct);
 
   // Synchroniser le pricingMode depuis le profil BDD au chargement
   useEffect(() => {
@@ -649,7 +658,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       if (c.montant_livreur > 0) return sum + c.montant_livreur;
       const isPrixManuel = c.pricing_mode === "manual" && c.manual_price_status === "accepted" && Number(c.manual_price) > 0;
       const prixBase = isPrixManuel ? Number(c.manual_price) : (c.prix_final || 0);
-      return sum + Math.round(prixBase * 0.7);
+      const split = splitAmountByCommission(prixBase, commissionPct);
+      return sum + (split.montant_livreur || 0);
     }, 0),
     [livreesToday]
   );
@@ -661,7 +671,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       if (c.commission_silga > 0) return sum + c.commission_silga;
       const isPrixManuel = c.pricing_mode === "manual" && c.manual_price_status === "accepted" && Number(c.manual_price) > 0;
       const prixBase = isPrixManuel ? Number(c.manual_price) : (c.prix_final || 0);
-      return sum + Math.round(prixBase * 0.3);
+      const split = splitAmountByCommission(prixBase, commissionPct);
+      return sum + (split.commission_silga || 0);
     }, 0),
     [livreesToday]
   );
@@ -790,7 +801,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         livreur_id: livreurProfil.id,
       };
 
-      if (pricingMode === "manual") {
+      const isAdminCourse = course?.source === "admin" || course?.pricing_mode === "admin_manuel";
+      if (!isAdminCourse && pricingMode === "manual") {
         const montant = window.prompt("Montant propose au client (FCFA)");
         if (!montant) return;
         payload = {
@@ -934,8 +946,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
     // 🏛️ ADMIN : montant saisi par le livreur, split 70/30 — PRIORITAIRE avant tout autre check
     if ((course.pricing_mode === "admin_manuel" || course.source === "admin") && typeof montantSaisi === "number" && montantSaisi > 0) {
-      const commissionSilga = Math.round(montantSaisi * 0.3);
-      const montantLivreur = montantSaisi - commissionSilga;
+      const split = splitAmountByCommission(montantSaisi, commissionPct);
+      if (split.commission_silga === null || split.montant_livreur === null) {
+        toast.error(`Commission non configurée pour le pays ${livreurProfil?.country_code || course.country_code || ""}`);
+        return;
+      }
 
       updateCourseMutation.mutate({
         id: course.id,
@@ -943,12 +958,12 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           statut: "livree",
           heure_livraison: new Date().toISOString(),
           prix_final: montantSaisi,
-          commission_silga: commissionSilga,
-          montant_livreur: montantLivreur,
+          commission_silga: split.commission_silga,
+          montant_livreur: split.montant_livreur,
         },
       });
       saveLivreur(livreurProfil.id, {
-        montant_du_silga: (livreurProfil.montant_du_silga || 0) + commissionSilga,
+        montant_du_silga: (livreurProfil.montant_du_silga || 0) + split.commission_silga,
       }).catch(() => null);
 
       if (livreurProfil?.statut !== "hors_ligne") {
@@ -981,8 +996,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       );
       const distanceVal = Number(distance || 0);
       const prixFinal = Math.max(Math.round(distanceVal * 100), 1000);
-      const commissionSilga = Math.round(prixFinal * 0.3);
-      const montantLivreur = prixFinal - commissionSilga;
+      const split = splitAmountByCommission(prixFinal, commissionPct);
+      if (split.commission_silga === null || split.montant_livreur === null) {
+        toast.error(`Commission non configurée pour le pays ${livreurProfil?.country_code || course.country_code || ""}`);
+        return;
+      }
 
       updateCourseMutation.mutate({
         id: course.id,
@@ -992,12 +1010,12 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           longitude_livraison: gpsArrivee.lng,
           distance_reelle_km: distanceVal,
           prix_final: prixFinal,
-          commission_silga: commissionSilga,
-          montant_livreur: montantLivreur,
+          commission_silga: split.commission_silga,
+          montant_livreur: split.montant_livreur,
         },
       });
       saveLivreur(livreurProfil.id, {
-        montant_du_silga: (livreurProfil.montant_du_silga || 0) + commissionSilga
+        montant_du_silga: (livreurProfil.montant_du_silga || 0) + split.commission_silga
       });
     } else {
       updateCourseMutation.mutate({ id: course.id, data: baseData });

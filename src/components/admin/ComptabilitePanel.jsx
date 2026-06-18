@@ -78,7 +78,7 @@ function DetailPaiementModal({ entry, onClose, onPaiement, onBloquer, onDebloque
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${sf.color}`}>{sf.label}</span>
             </div>
             <div className="flex justify-between text-sm"><span className="text-muted-foreground">Courses ({entry.courses.length})</span><span className="font-semibold">{entry.montantTotal.toLocaleString()} F</span></div>
-            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Commission Silga 30%</span><span className="font-semibold text-orange-600">{entry.commissionTotal.toLocaleString()} F</span></div>
+            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Commission SILGAPP</span><span className="font-semibold text-orange-600">{entry.commissionTotal.toLocaleString()} F</span></div>
             <div className="flex justify-between text-sm"><span className="text-muted-foreground">Déjà payé</span><span className="font-semibold text-green-600">{entry.montantPaye.toLocaleString()} F</span></div>
             <div className="border-t pt-2 flex justify-between text-sm font-bold">
               <span>Reste dû à Silga</span>

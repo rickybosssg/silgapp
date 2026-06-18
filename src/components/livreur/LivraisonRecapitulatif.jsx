@@ -1,11 +1,21 @@
 import React from "react";
 import { CheckCircle2, MapPin, Banknote, Clock, TrendingUp, Star } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
+import { normalizeCommissionPct, resolveStoredOrDynamicSplit } from "@/lib/commissionUtils";
 
 /**
  * Écran récapitulatif après livraison confirmée (côté livreur externe).
  * Affiche distance réelle, temps, prix final, et part livreur.
  */
 export default function LivraisonRecapitulatif({ course, onClose }) {
+  const { data: countryCommissionRows = [] } = useQuery({
+    queryKey: ["country-commission", course.country_code],
+    queryFn: () => base44.entities.Country.filter({ code: course.country_code, actif: true }),
+    enabled: !!course.country_code,
+    staleTime: 30000,
+  });
+  const commissionPct = normalizeCommissionPct(countryCommissionRows?.[0]?.commission_pct);
   // Calcul distance avec fallback (comme ClientSuiviCourse)
   function haversine(lat1, lon1, lat2, lon2) {
     if (!lat1 || !lon1 || !lat2 || !lon2) return null;
@@ -30,13 +40,9 @@ export default function LivraisonRecapitulatif({ course, onClose }) {
     ? Number(course.manual_price)
     : (Number(course.prix_final) > 0 ? Number(course.prix_final) : (distance > 0 ? Math.round(distance * 100) : 0));
 
-  const montantLivreur = Number(course.montant_livreur) > 0 
-    ? Number(course.montant_livreur)
-    : Math.round(prixFinal * 0.7);
-
-  const commission = Number(course.commission_silga) > 0 
-    ? Number(course.commission_silga)
-    : Math.round(prixFinal * 0.3);
+  const split = resolveStoredOrDynamicSplit(course, prixFinal, commissionPct);
+  const montantLivreur = split.montant_livreur || 0;
+  const commission = split.commission_silga || 0;
 
   // Calcul temps réel si heures disponibles
   let tempsMinutes = null;
@@ -115,9 +121,9 @@ export default function LivraisonRecapitulatif({ course, onClose }) {
               <TrendingUp className="w-5 h-5 text-amber-600" />
             </div>
             <div className="flex-1">
-              <p className="text-xs text-amber-600 font-semibold uppercase tracking-wide">Votre gain (70%)</p>
-              <p className="text-xl font-black text-amber-900">{Math.max(montantLivreur, 70).toLocaleString()} FCFA</p>
-              <p className="text-[10px] text-amber-500 mt-0.5">Commission SILGA : {Math.max(commission, 30).toLocaleString()} F (30%)</p>
+              <p className="text-xs text-amber-600 font-semibold uppercase tracking-wide">Votre gain</p>
+              <p className="text-xl font-black text-amber-900">{montantLivreur.toLocaleString()} FCFA</p>
+              <p className="text-[10px] text-amber-500 mt-0.5">Commission SILGAPP : {commission.toLocaleString()} F</p>
             </div>
           </div>
 

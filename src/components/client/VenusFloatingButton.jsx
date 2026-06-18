@@ -61,7 +61,6 @@ export default function VenusFloatingButton() {
     devise: country.devise || "FCFA",
     prix_par_km: country.prix_par_km,
     prix_minimum: country.prix_minimum,
-    commission_pct: country.commission_pct || 30,
     indicatif: country.indicatif,
     rayon_km: country.rayon_km,
     emoji: country.emoji_flag,
