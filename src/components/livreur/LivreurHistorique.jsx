@@ -118,11 +118,11 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
             <div className="grid grid-cols-3 gap-2">
               <div className="bg-green-50 rounded-lg p-2 border border-green-200 text-center">
                 <p className="text-xs font-bold text-green-700">{gainLivreurToday.toLocaleString()} FCFA</p>
-                <p className="text-[10px] text-green-600 mt-0.5">Votre gain ({100 - countryCommissionPct}%)</p>
+                <p className="text-[10px] text-green-600 mt-0.5">Votre gain</p>
               </div>
               <div className="bg-orange-50 rounded-lg p-2 border border-orange-200 text-center">
                 <p className="text-xs font-bold text-orange-700">{commissionToday.toLocaleString()} FCFA</p>
-                <p className="text-[10px] text-orange-600 mt-0.5">Commission ({countryCommissionPct}%)</p>
+                <p className="text-[10px] text-orange-600 mt-0.5">Commission SILGAPP</p>
               </div>
               <div className="bg-red-50 rounded-lg p-2 border border-red-200 text-center">
                 <p className="text-xs font-bold text-red-700">{commissionToday.toLocaleString()} FCFA</p>

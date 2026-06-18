@@ -114,11 +114,11 @@ export default function ManualPriceModal({ course, onConfirm, onCancel, isSubmit
                   <span className="font-black text-blue-900">{valeur.toLocaleString()} {course.devise || "FCFA"}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-green-700">Votre gain ({100 - countryCommissionPct}%)</span>
+                  <span className="text-green-700">Votre gain</span>
                   <span className="font-bold text-green-700">+{Math.round(valeur * ((100 - countryCommissionPct) / 100)).toLocaleString()} {course.devise || "FCFA"}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-500">Commission Silga ({countryCommissionPct}%)</span>
+                  <span className="text-gray-500">Commission SILGAPP</span>
                   <span className="text-gray-500">{Math.round(valeur * (countryCommissionPct / 100)).toLocaleString()} {course.devise || "FCFA"}</span>
                 </div>
               </div>

@@ -71,8 +71,8 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
             <div className="bg-white border border-gray-100 grid grid-cols-3 divide-x divide-gray-100">
               {[
                 { label: "Total client", val: prixTotalToday, color: "text-gray-800" },
-                { label: `Votre gain ${100 - countryCommissionPct}%`, val: gainToday,    color: "text-green-700" },
-                { label: `Commission ${countryCommissionPct}%`, val: commissionToday, color: "text-orange-600" },
+                { label: "Votre gain", val: gainToday,    color: "text-green-700" },
+                { label: "Commission SILGAPP", val: commissionToday, color: "text-orange-600" },
               ].map((s, i) => (
                 <div key={i} className="p-3 text-center">
                   <p className={`text-sm font-black ${s.color}`}>{s.val.toLocaleString()}<span className="text-[9px] ml-0.5 font-normal">F</span></p>

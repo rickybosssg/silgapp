@@ -124,9 +124,9 @@ export default function LivraisonRecapitulatif({ course, onClose }) {
               <TrendingUp className="w-5 h-5 text-amber-600" />
             </div>
             <div className="flex-1">
-              <p className="text-xs text-amber-600 font-semibold uppercase tracking-wide">Votre gain ({100 - countryCommissionPct}%)</p>
+              <p className="text-xs text-amber-600 font-semibold uppercase tracking-wide">Votre gain</p>
               <p className="text-xl font-black text-amber-900">{Math.max(montantLivreur, 70).toLocaleString()} FCFA</p>
-              <p className="text-[10px] text-amber-500 mt-0.5">Commission SILGA : {Math.max(commission, 30).toLocaleString()} F ({countryCommissionPct}%)</p>
+              <p className="text-[10px] text-amber-500 mt-0.5">Commission SILGAPP : {Math.max(commission, 30).toLocaleString()} F</p>
             </div>
           </div>
 

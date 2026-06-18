@@ -798,7 +798,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   <div className="mt-2 pt-2 border-t flex items-center justify-between text-xs"
                     style={{ borderColor: isPrixManuel ? "rgb(200, 235, 215)" : "rgb(191, 226, 255)" }}
                   >
-                    <span className={cn("font-semibold", isPrixManuel ? "text-green-700" : "text-blue-700")}>Votre gain ({100 - countryCommissionPct}%)</span>
+                    <span className={cn("font-semibold", isPrixManuel ? "text-green-700" : "text-blue-700")}>Votre gain</span>
                     <span className={cn("font-bold", isPrixManuel ? "text-green-800" : "text-green-700")}>
                       +{gain.toLocaleString()} {course.devise || "F"}
                     </span>

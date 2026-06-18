@@ -254,14 +254,14 @@ export default function RecapCourseLivreur() {
           <p className="text-gray-600 text-xs font-semibold uppercase tracking-widest mb-2">Répartition</p>
           <div className="flex items-center justify-between py-2 border-b border-gray-800">
             <div>
-              <p className="text-green-400 font-bold text-sm">Ton gain ({100 - countryCommissionPct}%)</p>
+              <p className="text-green-400 font-bold text-sm">Ton gain</p>
               <p className="text-gray-500 text-xs">À encaisser auprès du client</p>
             </div>
             <p className="text-green-400 text-2xl font-black">+{gainLivreur.toLocaleString()} F</p>
           </div>
           <div className="flex items-center justify-between py-2">
             <div>
-              <p className="text-red-400 font-bold text-sm">Commission Silga ({countryCommissionPct}%)</p>
+              <p className="text-red-400 font-bold text-sm">Commission SILGAPP</p>
               <p className="text-gray-500 text-xs">À reverser à Silga</p>
             </div>
             <p className="text-red-400 text-xl font-black">{commissionSilga.toLocaleString()} F</p>

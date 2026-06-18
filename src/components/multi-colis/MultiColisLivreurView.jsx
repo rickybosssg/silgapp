@@ -97,7 +97,7 @@ function ConfirmMontantDialog({ colis, devise, onConfirm, onCancel, isPending })
  * Vue multi-colis pour le livreur externe.
  * - Pas de QR Code ni de PIN Code
  * - Bouton "✅ Livrer ce colis" → dialogue confirmation + saisie montant
- * - Calcul automatique : total, gain livreur (70%), commission Silga (30%)
+ * - Calcul automatique : total, gain livreur, commission Silga
  * - Fin de course automatique quand tous les colis sont livrés/annulés
  */
 export default function MultiColisLivreurView({ course, colisRecupere, onAllLivres }) {
@@ -192,7 +192,7 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
       } else {
         queryClient.invalidateQueries({ queryKey: ["colis-externes", course.id] });
         queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-        toast.success(`Colis livré ✅ — +${gainLivreur.toLocaleString()} ${course.devise || "F"} (${100 - countryCommissionPct}%)`);
+        toast.success(`Colis livré ✅ — +${gainLivreur.toLocaleString()} ${course.devise || "F"}`);
       }
     },
     onError: () => toast.error("Erreur lors de la mise à jour"),
@@ -484,11 +484,11 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
                 <p className="text-xs font-black text-gray-800">{totalEncaisse.toLocaleString()} {course.devise || "F"}</p>
               </div>
               <div className="bg-white rounded-xl p-2 text-center border border-green-100">
-                <p className="text-[9px] text-gray-600 font-bold uppercase">Ton gain ({100 - countryCommissionPct}%)</p>
+                <p className="text-[9px] text-gray-600 font-bold uppercase">Ton gain</p>
                 <p className="text-xs font-black text-green-700">+{gainLivreur.toLocaleString()} {course.devise || "F"}</p>
               </div>
               <div className="bg-white rounded-xl p-2 text-center border border-gray-100">
-                <p className="text-[9px] text-gray-600 font-bold uppercase">Commission ({countryCommissionPct}%)</p>
+                <p className="text-[9px] text-gray-600 font-bold uppercase">Commission SILGAPP</p>
                 <p className="text-xs font-black text-gray-500">{commission.toLocaleString()} {course.devise || "F"}</p>
               </div>
             </div>
