@@ -692,6 +692,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   const handleToggleLigne = () => {
     const estHorsLigne = livreurProfil.statut === "hors_ligne";
+    // 🚫 Bloquer le passage en ligne si l'encours est dépassé
+    if (estHorsLigne && livreurProfil?.bloque_encours) {
+      toast.error("Votre plafond d'encours SILGAPP a été atteint. Veuillez effectuer votre dépôt auprès de SILGAPP afin de réactiver votre compte.");
+      return;
+    }
     statutMutation.mutate(estHorsLigne ? "disponible" : "hors_ligne");
   };
 
@@ -1283,7 +1288,20 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
             {coursesActives.length === 0 && isEnLigne && <EmptyStateAttente />}
 
-            {!isEnLigne && (
+            {!isEnLigne && livreurProfil?.bloque_encours ? (
+              <div className="rounded-2xl bg-red-600 text-white p-5 text-center space-y-2 shadow-lg">
+                <p className="text-2xl">🚫</p>
+                <p className="font-black text-base">Compte bloqué</p>
+                <p className="text-white/80 text-xs leading-relaxed">
+                  Votre plafond d'encours SILGAPP a été atteint. Veuillez effectuer votre dépôt auprès de SILGAPP afin de réactiver votre compte.
+                </p>
+                {livreurProfil?.encours > 0 && (
+                  <p className="text-white/60 text-[10px]">
+                    Encours actuel : {livreurProfil.encours.toLocaleString()} {livreurProfil.country_code ? "FCFA" : "FCFA"}
+                  </p>
+                )}
+              </div>
+            ) : !isEnLigne && (
               <div className="rounded-2xl bg-slate-800 text-white p-5 text-center space-y-2 shadow-lg">
                 <p className="text-2xl">😴</p>
                 <p className="font-black text-base">Vous êtes hors ligne</p>
