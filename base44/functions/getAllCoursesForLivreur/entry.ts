@@ -44,6 +44,17 @@ Deno.serve(async (req) => {
       }, { status: 403 });
     }
 
+    if (livreur.bloque_encours) {
+      return Response.json({
+        success: true,
+        courses: [],
+        total: 0,
+        country_code: effectiveCountry,
+        bloque_encours: true,
+        blocked_reason: 'bloque_encours',
+      });
+    }
+
     const allCourses = await base44.asServiceRole.entities.CourseExterne.filter(
       { country_code: effectiveCountry },
       '-created_date',

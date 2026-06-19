@@ -70,6 +70,13 @@ Deno.serve(async (req) => {
           return Response.json({ success: true, skipped: "already_correct", statut: livreur.statut });
         }
 
+        // 🚫 Livreur bloqué pour encours → toujours hors_ligne
+        if (livreur.bloque_encours) {
+          await base44.asServiceRole.entities.Livreur.update(livreurId, { statut: "hors_ligne" });
+          console.log(`[syncStatutLivreur] 🚫 Livreur ${livreur.prenom} ${livreur.nom} bloqué encours → forcé hors_ligne`);
+          return Response.json({ success: true, action: "bloque_hors_ligne", livreur_id: livreurId });
+        }
+
         const heartbeatAge = livreur.last_seen_at
           ? (Date.now() - new Date(livreur.last_seen_at).getTime()) / 60000
           : 999;

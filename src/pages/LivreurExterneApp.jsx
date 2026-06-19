@@ -693,6 +693,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   const handleToggleLigne = () => {
     const estHorsLigne = livreurProfil.statut === "hors_ligne";
+    // 🚫 Bloquer le passage en ligne si l'encours est dépassé
+    if (estHorsLigne && livreurProfil?.bloque_encours) {
+      toast.error("Votre plafond d'encours SILGAPP a été atteint. Veuillez effectuer votre dépôt auprès de SILGAPP afin de réactiver votre compte.");
+      return;
+    }
     statutMutation.mutate(estHorsLigne ? "disponible" : "hors_ligne");
   };
 
@@ -932,14 +937,33 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
   };
 
-  const handleColisLivre = (course, montantSaisi) => {
+  const verifierEncoursApresCourse = async (courseId) => {
+    if (!courseId) return;
+    try {
+      await base44.functions.invoke("verifierEncoursLivreur", { course_id: courseId });
+    } catch (error) {
+      console.warn("[LivreurExterneApp] verifierEncoursLivreur skipped:", error?.message || error);
+    }
+    queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+  };
+
+  const remettreDisponibleSiAutorise = async () => {
+    if (!livreurProfil?.id || livreurProfil?.statut === "hors_ligne") return;
+    const fresh = await base44.entities.Livreur.get(livreurProfil.id).catch(() => null);
+    if (fresh?.bloque_encours) {
+      queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+      toast.error("Votre plafond d'encours SILGAPP a ete atteint. Veuillez effectuer votre depot.");
+      return;
+    }
+    statutMutation.mutate("disponible");
+  };
+
+  const handleColisLivre = async (course, montantSaisi) => {
     // 🚗 Annulation déplacement : libérer le livreur sans calcul de prix
     if (course.statut === "annulee") {
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
-      if (livreurProfil?.statut !== "hors_ligne") {
-        statutMutation.mutate("disponible");
-      }
+      await remettreDisponibleSiAutorise();
       toast.success("Déplacement annulé");
       return;
     }
@@ -952,7 +976,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         return;
       }
 
-      updateCourseMutation.mutate({
+      await updateCourseMutation.mutateAsync({
         id: course.id,
         data: {
           statut: "livree",
@@ -966,9 +990,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         montant_du_silga: (livreurProfil.montant_du_silga || 0) + split.commission_silga,
       }).catch(() => null);
 
-      if (livreurProfil?.statut !== "hors_ligne") {
-        statutMutation.mutate("disponible");
-      }
+      await verifierEncoursApresCourse(course.id);
+      await remettreDisponibleSiAutorise();
       toast.success(`Livraison terminée ! 💰 ${montantSaisi.toLocaleString()} F`);
       return;
     }
@@ -978,9 +1001,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     if (course.statut === "livree") {
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
-      if (livreurProfil?.statut !== "hors_ligne") {
-        statutMutation.mutate("disponible");
-      }
+      await verifierEncoursApresCourse(course.id);
+      await remettreDisponibleSiAutorise();
       toast.success("Livraison terminée ! 🎉");
       return;
     }
@@ -1002,7 +1024,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         return;
       }
 
-      updateCourseMutation.mutate({
+      await updateCourseMutation.mutateAsync({
         id: course.id,
         data: {
           ...baseData,
@@ -1018,12 +1040,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         montant_du_silga: (livreurProfil.montant_du_silga || 0) + split.commission_silga
       });
     } else {
-      updateCourseMutation.mutate({ id: course.id, data: baseData });
+      await updateCourseMutation.mutateAsync({ id: course.id, data: baseData });
     }
 
-    if (livreurProfil?.statut !== "hors_ligne") {
-      statutMutation.mutate("disponible");
-    }
+    await verifierEncoursApresCourse(course.id);
+    await remettreDisponibleSiAutorise();
     toast.success("Livraison terminée ! 🎉");
   };
 
@@ -1291,7 +1312,20 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
             {coursesActives.length === 0 && isEnLigne && <EmptyStateAttente />}
 
-            {!isEnLigne && (
+            {!isEnLigne && livreurProfil?.bloque_encours ? (
+              <div className="rounded-2xl bg-red-600 text-white p-5 text-center space-y-2 shadow-lg">
+                <p className="text-2xl">🚫</p>
+                <p className="font-black text-base">Compte bloqué</p>
+                <p className="text-white/80 text-xs leading-relaxed">
+                  Votre plafond d'encours SILGAPP a été atteint. Veuillez effectuer votre dépôt auprès de SILGAPP afin de réactiver votre compte.
+                </p>
+                {livreurProfil?.encours > 0 && (
+                  <p className="text-white/60 text-[10px]">
+                    Encours actuel : {livreurProfil.encours.toLocaleString()} {livreurProfil.country_code ? "FCFA" : "FCFA"}
+                  </p>
+                )}
+              </div>
+            ) : !isEnLigne && (
               <div className="rounded-2xl bg-slate-800 text-white p-5 text-center space-y-2 shadow-lg">
                 <p className="text-2xl">😴</p>
                 <p className="font-black text-base">Vous êtes hors ligne</p>

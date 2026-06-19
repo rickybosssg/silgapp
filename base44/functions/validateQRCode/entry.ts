@@ -254,7 +254,8 @@ Deno.serve(async (req) => {
         const livreur = await base44.asServiceRole.entities.Livreur.get(course.livreur_id);
         if (livreur) {
           const livreurUpdate = {
-            statut: 'disponible',
+            statut: livreur.bloque_encours ? 'hors_ligne' : 'disponible',
+            ...(livreur.bloque_encours ? { admin_hors_ligne: true } : {}),
           };
           if (updateData.commission_silga) {
             livreurUpdate.montant_du_silga = (Number(livreur.montant_du_silga) || 0) + updateData.commission_silga;
@@ -263,6 +264,12 @@ Deno.serve(async (req) => {
           livreurUpdate.courses_du_jour = (Number(livreur.courses_du_jour) || 0) + 1;
           await base44.asServiceRole.entities.Livreur.update(course.livreur_id, livreurUpdate);
         }
+      }
+
+      try {
+        await base44.functions.invoke('verifierEncoursLivreur', { course_id });
+      } catch (encoursError) {
+        console.error('[validateQRCode][verifierEncoursLivreur]', encoursError?.message || encoursError);
       }
 
       // Construire la réponse sans relecture DB supplémentaire

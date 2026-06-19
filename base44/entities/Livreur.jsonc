@@ -184,6 +184,26 @@
       "type": "number",
       "default": 0
     },
+    "encours": {
+      "type": "number",
+      "default": 0,
+      "description": "Encours cumul\u00e9 d\u00fb \u00e0 SILGAPP (montant total non encore revers\u00e9)"
+    },
+    "bloque_encours": {
+      "type": "boolean",
+      "default": false,
+      "description": "Livreur bloqu\u00e9 automatiquement pour d\u00e9passement du seuil d'encours"
+    },
+    "encours_bloque_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date du blocage automatique pour d\u00e9passement d'encours"
+    },
+    "encours_alerte_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de la derni\u00e8re alerte 80% envoy\u00e9e"
+    },
     "note_moyenne": {
       "type": "number",
       "default": 0

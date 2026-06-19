@@ -55,12 +55,13 @@ Deno.serve(async (req) => {
         timeout_expires_at: null,
       });
 
-      // 2. Réinitialiser le statut du livreur à "disponible"
+      const livreur = await base44.entities.Livreur.get(course.livreur_id).catch(() => null);
       await base44.entities.Livreur.update(course.livreur_id, {
-        statut: 'disponible',
+        statut: livreur?.bloque_encours ? 'hors_ligne' : 'disponible',
+        ...(livreur?.bloque_encours ? { admin_hors_ligne: true } : {}),
       });
 
-      console.log(`[nettoyerCourseAnnulee] Livreur ${course.livreur_nom} réinitialisé à "disponible"`);
+      console.log(`[nettoyerCourseAnnulee] Livreur ${course.livreur_nom} réinitialisé selon encours`);
       
       return Response.json({ 
         success: true, 

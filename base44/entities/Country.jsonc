@@ -31,8 +31,12 @@
     },
     "commission_pct": {
       "type": "number",
-      "default": 30,
       "description": "Pourcentage de commission Silga configure pour ce pays"
+    },
+    "seuil_encours_max": {
+      "type": "number",
+      "default": 5000,
+      "description": "Seuil d'encours maximum avant blocage automatique du livreur (en devise locale)"
     },
     "ville_principale": {
       "type": "string",

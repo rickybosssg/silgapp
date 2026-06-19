@@ -20,7 +20,29 @@ export default function GestionPays() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Country.update(id, data),
+    mutationFn: async ({ id, data, oldCountry }) => {
+      await base44.entities.Country.update(id, data);
+
+      const oldSeuil = Number(oldCountry?.seuil_encours_max || 0);
+      const newSeuil = Number(data?.seuil_encours_max || 0);
+      if (oldCountry?.code && newSeuil > 0 && oldSeuil !== newSeuil) {
+        const user = await base44.auth.me().catch(() => null);
+        await base44.entities.HistoriqueEncours.create({
+          type_action: "modification_seuil",
+          livreur_id: `country:${oldCountry.code}`,
+          livreur_nom: `Seuil pays ${oldCountry.nom || oldCountry.code}`,
+          livreur_telephone: "",
+          pays_code: oldCountry.code,
+          encours_avant: oldSeuil,
+          encours_apres: newSeuil,
+          seuil_applicable: newSeuil,
+          pourcentage_atteint: 0,
+          action_par: user?.email || "admin",
+          commentaire: `Modification du seuil encours ${oldSeuil || "non configure"} -> ${newSeuil}`,
+          date_action: new Date().toISOString(),
+        });
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["countries-all"] });
       queryClient.invalidateQueries({ queryKey: ["countries-actifs"] });
@@ -70,12 +92,13 @@ export default function GestionPays() {
       prix_par_km: p.prix_par_km || 100,
       prix_minimum: p.prix_minimum || 500,
       commission_pct: p.commission_pct ?? "",
+      seuil_encours_max: p.seuil_encours_max ?? 5000,
       ville_principale: p.ville_principale || "",
       rayon_km: p.rayon_km || 30,
     });
   };
 
-  const handleSave = (id) => updateMutation.mutate({ id, data: { ...editForm } });
+  const handleSave = (p) => updateMutation.mutate({ id: p.id, data: { ...editForm }, oldCountry: p });
 
   const actifCount = pays.filter(p => p.actif).length;
 
@@ -150,8 +173,9 @@ export default function GestionPays() {
                     { label: "Devise",          key: "devise" },
                     { label: "Prix / km",       key: "prix_par_km",    type: "number" },
                     { label: "Prix minimum",    key: "prix_minimum",   type: "number" },
-                    { label: "Commission %",    key: "commission_pct", type: "number" },
-                    { label: "Ville principale",key: "ville_principale" },
+                    { label: "Commission %",       key: "commission_pct",    type: "number" },
+                    { label: "Seuil encours (F)", key: "seuil_encours_max", type: "number" },
+                    { label: "Ville principale",  key: "ville_principale" },
                     { label: "Rayon km",        key: "rayon_km",       type: "number" },
                   ].map(f => (
                     <div key={f.key}>
@@ -161,7 +185,7 @@ export default function GestionPays() {
                         value={editForm[f.key] || ""}
                         onChange={e => setEditForm(prev => ({
                           ...prev,
-                          [f.key]: f.type === "number" ? Number(e.target.value) : e.target.value
+                          [f.key]: f.type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value
                         }))}
                         className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
                       />
@@ -170,7 +194,7 @@ export default function GestionPays() {
                 </div>
                 <div className="flex gap-2 justify-end pt-1">
                   <Button size="sm" variant="outline" className="rounded-xl" onClick={() => setEditingId(null)}>Annuler</Button>
-                  <Button size="sm" onClick={() => handleSave(p.id)} disabled={updateMutation.isPending} className="gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600">
+                  <Button size="sm" onClick={() => handleSave(p)} disabled={updateMutation.isPending} className="gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600">
                     <Save className="w-3.5 h-3.5" />
                     Sauvegarder
                   </Button>
@@ -199,6 +223,9 @@ export default function GestionPays() {
                     </span>
                     <span className="flex items-center gap-1 text-[10px] bg-violet-50 text-violet-700 rounded-full px-2 py-0.5 font-medium">
                       <Percent className="w-2.5 h-2.5" />{p.commission_pct != null ? `${p.commission_pct}% commission` : "Commission non configurée"}
+                    </span>
+                    <span className="flex items-center gap-1 text-[10px] bg-red-50 text-red-600 rounded-full px-2 py-0.5 font-medium">
+                      🔒 Seuil encours : {(p.seuil_encours_max || 5000).toLocaleString()} {p.devise || "FCFA"}
                     </span>
                     {p.ville_principale && (
                       <span className="flex items-center gap-1 text-[10px] bg-gray-100 text-gray-600 rounded-full px-2 py-0.5 font-medium">
@@ -243,6 +270,7 @@ export default function GestionPays() {
             <li>• <strong>Activer un pays</strong> → il apparaît dans les sélecteurs livreurs/clients</li>
             <li>• <strong>Prix/km</strong> → utilisé automatiquement au calcul de la course</li>
             <li>• <strong>Commission %</strong> → part de Silga sur chaque course</li>
+            <li>• <strong>Seuil encours</strong> → plafond avant blocage automatique du livreur</li>
             <li>• Les livreurs/clients s'enregistrent avec leur pays → les stats se filtrent automatiquement</li>
           </ul>
         </div>

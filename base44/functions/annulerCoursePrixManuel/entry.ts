@@ -44,7 +44,8 @@ Deno.serve(async (req) => {
       
       if (livreur && livreur.statut === 'en_course') {
         await base44.entities.Livreur.update(course.livreur_id, {
-          statut: 'disponible',
+          statut: livreur.bloque_encours ? 'hors_ligne' : 'disponible',
+          ...(livreur.bloque_encours ? { admin_hors_ligne: true } : {}),
         });
       }
     }

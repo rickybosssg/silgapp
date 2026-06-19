@@ -26,32 +26,40 @@ export default function AssignLivreurDialog({ course, open, onClose, reseau = "i
   const queryClient = useQueryClient();
 
   const { data: livreurs = [] } = useQuery({
-    queryKey: ["livreurs", reseau],
+    queryKey: ["livreurs", reseau, course?.country_code || ""],
     queryFn: () => base44.entities.Livreur.filter({ 
       reseau,
       validation: "valide",
-      actif: true
+      actif: true,
+      ...(course?.country_code ? { country_code: course.country_code } : {}),
     }, "-created_date"),
     initialData: [],
   });
 
   const assignMutation = useMutation({
     mutationFn: async ({ courseId, livreur }) => {
+      const freshLivreur = await base44.entities.Livreur.get(livreur.id);
+      if (freshLivreur?.bloque_encours) {
+        throw new Error("Ce livreur est bloque par son encours SILGAPP.");
+      }
+      if (course?.country_code && freshLivreur?.country_code && course.country_code !== freshLivreur.country_code) {
+        throw new Error("Ce livreur appartient a un autre pays.");
+      }
       await base44.entities.Course.update(courseId, {
-        livreur_id: livreur.id,
-        livreur_nom: livreur.nom,
+        livreur_id: freshLivreur.id,
+        livreur_nom: freshLivreur.nom,
         statut: "en_attente_livreur",
         dispatch_mode: "manuel",
         dispatch_status: "assigne_manuel",
         heure_acceptation: new Date().toISOString(), // Initialiser le timer de 60s
       });
 
-      const notificationEmail = livreur.user_email;
+      const notificationEmail = freshLivreur.user_email;
       if (notificationEmail) {
         await notifyNouvelleCourse(notificationEmail, {
           ...course,
           id: courseId,
-          livreur_id: livreur.id,
+          livreur_id: freshLivreur.id,
         });
       }
     },
@@ -60,9 +68,17 @@ export default function AssignLivreurDialog({ course, open, onClose, reseau = "i
       toast.success("Livreur assigne avec succes");
       onClose();
     },
+    onError: (error) => {
+      toast.error(error?.message || "Impossible d'assigner ce livreur");
+    },
   });
 
-  const disponibles = livreurs.filter(l => l.statut === "disponible" && (l.reseau || "interne") === reseau);
+  const disponibles = livreurs.filter(l =>
+    l.statut === "disponible" &&
+    (l.reseau || "interne") === reseau &&
+    !l.bloque_encours &&
+    (!course?.country_code || l.country_code === course.country_code)
+  );
   const sorted = [...disponibles].sort((a, b) => {
     if (!course?.gps_depart_lat) return 0;
     const distA = getDistance(course.gps_depart_lat, course.gps_depart_lng, a.latitude, a.longitude);

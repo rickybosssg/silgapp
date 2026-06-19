@@ -138,6 +138,7 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
     actif: true,
     statut: 'disponible',
     country_code: course.country_code,
+    bloque_encours: false,
   });
 
   if (!tousLivreurs || tousLivreurs.length === 0) return [];
@@ -597,7 +598,15 @@ Deno.serve(async (req) => {
       const countryGuard = await verifierPaysCourseLivreur(base44, course, livreur_id, 'check_course_pour_livreur');
       if (!countryGuard.ok) return Response.json(countryGuard.response, { status: countryGuard.status });
 
-      if (course.statut === 'annulee' || course.statut === 'livree') {
+      // 🚫 Vérifier blocage encours du livreur
+    if (countryGuard.ok && countryGuard.livreur?.bloque_encours) {
+      return Response.json({ 
+        found: false, bloque_encours: true,
+        error: 'Votre plafond d\'encours SILGAPP a été atteint.',
+      });
+    }
+
+    if (course.statut === 'annulee' || course.statut === 'livree') {
         try {
           const livreurData = countryGuard.livreur;
           if (livreurData?.user_email) {
@@ -608,6 +617,15 @@ Deno.serve(async (req) => {
           }
         } catch (_) {}
         return Response.json({ found: false, cancelled: true });
+      }
+
+      // 🚫 Vérifier blocage encours du livreur
+      const livreurCheck = countryGuard.livreur;
+      if (livreurCheck?.bloque_encours) {
+        return Response.json({ 
+          found: false, bloque_encours: true,
+          error: 'Votre plafond d\'encours SILGAPP a été atteint. Veuillez effectuer votre dépôt auprès de SILGAPP afin de réactiver votre compte.',
+        });
       }
 
       if (course.dispatch_status === 'accepte') {
@@ -637,6 +655,14 @@ Deno.serve(async (req) => {
       const countryGuard = await verifierPaysCourseLivreur(base44, course, livreur_id, 'accepter_course');
       if (!countryGuard.ok) return Response.json(countryGuard.response, { status: countryGuard.status });
       const livreur = countryGuard.livreur;
+
+      // 🚫 Vérifier blocage encours
+      if (livreur.bloque_encours) {
+        return Response.json({ 
+          success: false, accepted: false, reason: 'bloque_encours',
+          error: 'Votre plafond d\'encours SILGAPP a été atteint. Veuillez effectuer votre dépôt auprès de SILGAPP afin de réactiver votre compte.',
+        });
+      }
 
       console.log('[DISPATCH][ACCEPT_ATTEMPT]', {
         course_id, livreur_id, course_status: course.statut || '',
@@ -1017,6 +1043,19 @@ Deno.serve(async (req) => {
         const { commission_silga: commission, montant_livreur: montantLivreur } =
           await calculerRepartitionPays(base44, course.country_code, prixManuel);
 
+        let livreurPrixManuel = null;
+        if (course.proposed_by_livreur_id) {
+          livreurPrixManuel = await base44.asServiceRole.entities.Livreur.get(course.proposed_by_livreur_id);
+          if (livreurPrixManuel?.bloque_encours) {
+            return Response.json({
+              success: false,
+              accepted: false,
+              reason: 'bloque_encours',
+              error: 'Livreur bloque par encours SILGAPP',
+            }, { status: 409 });
+          }
+        }
+
         await base44.asServiceRole.entities.CourseExterne.update(course_id, {
           manual_price_status: 'accepted', client_price_validated_at: now,
           statut: 'livreur_en_route', dispatch_status: 'accepte', heure_acceptation: now,
@@ -1025,9 +1064,9 @@ Deno.serve(async (req) => {
 
         if (course.proposed_by_livreur_id) {
           const livreurId = course.proposed_by_livreur_id;
+          const livreurData = livreurPrixManuel || await base44.asServiceRole.entities.Livreur.get(livreurId);
           await base44.asServiceRole.entities.Livreur.update(livreurId, { statut: 'en_course' });
           try {
-            const livreurData = await base44.asServiceRole.entities.Livreur.get(livreurId);
             if (livreurData?.user_email) {
               await base44.asServiceRole.entities.Notification.create({
                 titre: '✅ Prix accepté — La course peut commencer !',
@@ -1058,7 +1097,11 @@ Deno.serve(async (req) => {
         });
 
         if (livreurRefuseId) {
-          await base44.asServiceRole.entities.Livreur.update(livreurRefuseId, { statut: 'disponible' });
+          const livreurRefuse = await base44.asServiceRole.entities.Livreur.get(livreurRefuseId).catch(() => null);
+          await base44.asServiceRole.entities.Livreur.update(livreurRefuseId, {
+            statut: livreurRefuse?.bloque_encours ? 'hors_ligne' : 'disponible',
+            ...(livreurRefuse?.bloque_encours ? { admin_hors_ligne: true } : {}),
+          });
         }
 
         // Redispatch sans exclure (le refus était côté client, pas livreur)

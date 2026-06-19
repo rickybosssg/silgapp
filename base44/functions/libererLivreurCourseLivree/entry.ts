@@ -53,6 +53,20 @@ Deno.serve(async (req) => {
 
       // Récupérer le livreur pour vérifier le heartbeat
       const livreur = await base44.entities.Livreur.get(course.livreur_id).catch(() => null);
+      if (livreur?.bloque_encours) {
+        await base44.entities.Livreur.update(course.livreur_id, {
+          statut: 'hors_ligne',
+          admin_hors_ligne: true,
+        });
+        return Response.json({
+          success: true,
+          message: 'Livreur conserve hors ligne: encours bloque',
+          course_id: course_id,
+          livreur_id: course.livreur_id,
+          livreur_nom: course.livreur_nom,
+          bloque_encours: true,
+        });
+      }
       const heartbeatAge = livreur?.last_seen_at
         ? (Date.now() - new Date(livreur.last_seen_at).getTime()) / 60000
         : 999;

@@ -1,0 +1,70 @@
+{
+  "name": "HistoriqueEncours",
+  "type": "object",
+  "properties": {
+    "type_action": {
+      "type": "string",
+      "enum": [
+        "blocage_auto",
+        "deblocage_admin",
+        "reduction_encours",
+        "modification_seuil"
+      ],
+      "description": "Type d'action enregistr\u00e9e"
+    },
+    "livreur_id": {
+      "type": "string",
+      "description": "ID du livreur concern\u00e9"
+    },
+    "livreur_nom": {
+      "type": "string",
+      "description": "Nom complet du livreur"
+    },
+    "livreur_telephone": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone du livreur"
+    },
+    "pays_code": {
+      "type": "string",
+      "description": "Code pays du livreur"
+    },
+    "course_id": {
+      "type": "string",
+      "description": "ID de la course concern\u00e9e, si applicable"
+    },
+    "encours_avant": {
+      "type": "number",
+      "description": "Montant de l'encours avant l'action"
+    },
+    "encours_apres": {
+      "type": "number",
+      "description": "Montant de l'encours apr\u00e8s l'action"
+    },
+    "seuil_applicable": {
+      "type": "number",
+      "description": "Seuil d'encours en vigueur au moment de l'action"
+    },
+    "pourcentage_atteint": {
+      "type": "number",
+      "description": "Pourcentage du seuil atteint au moment du blocage"
+    },
+    "action_par": {
+      "type": "string",
+      "description": "Email de l'admin ou 'systeme' pour actions automatiques"
+    },
+    "commentaire": {
+      "type": "string",
+      "description": "Commentaire optionnel (ex: motif de r\u00e9duction partielle)"
+    },
+    "date_action": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date et heure de l'action"
+    }
+  },
+  "required": [
+    "type_action",
+    "livreur_id",
+    "pays_code"
+  ]
+}

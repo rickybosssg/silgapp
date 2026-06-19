@@ -25,6 +25,7 @@ import AlertesLivreursPanel from "@/components/admin/AlertesLivreursPanel";
 import ZonesChaudesWidget from "@/components/carte/ZonesChaudes";
 import ComptabilitePanel from "@/components/admin/ComptabilitePanel";
 import DispatchConfigPanel from "@/components/admin/DispatchConfigPanel";
+import LivreursBloquesEncours from "@/components/admin/LivreursBloquesEncours";
 
 export default function DashboardAdminExterne() {
   const { isPays, countryCode: adminCountryCode } = useAdminContext();
@@ -383,6 +384,11 @@ export default function DashboardAdminExterne() {
       {/* ── ALERTES LIVREURS ─────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm" id="alertes-livreurs">
         <AlertesLivreursPanel />
+      </div>
+
+      {/* ── LIVREURS BLOQUÉS ENCOURS ─────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-red-100 p-5 shadow-sm">
+        <LivreursBloquesEncours countryCode={effectiveCountry} />
       </div>
 
       {/* ── COMPTABILITÉ LIVREURS & CLIENTS ──────────────────────── */}
