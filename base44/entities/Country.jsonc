@@ -34,6 +34,11 @@
       "default": 30,
       "description": "Pourcentage de commission Silga (par d\u00e9faut 30%)"
     },
+    "seuil_encours_max": {
+      "type": "number",
+      "default": 5000,
+      "description": "Seuil d'encours maximum avant blocage automatique du livreur (en devise locale)"
+    },
     "ville_principale": {
       "type": "string",
       "description": "Ville principale d'op\u00e9ration (ex: Ouagadougou, Abidjan)"

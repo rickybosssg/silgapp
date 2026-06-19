@@ -70,6 +70,7 @@ export default function GestionPays() {
       prix_par_km: p.prix_par_km || 100,
       prix_minimum: p.prix_minimum || 500,
       commission_pct: p.commission_pct || 30,
+      seuil_encours_max: p.seuil_encours_max || 5000,
       ville_principale: p.ville_principale || "",
       rayon_km: p.rayon_km || 30,
     });
@@ -150,8 +151,9 @@ export default function GestionPays() {
                     { label: "Devise",          key: "devise" },
                     { label: "Prix / km",       key: "prix_par_km",    type: "number" },
                     { label: "Prix minimum",    key: "prix_minimum",   type: "number" },
-                    { label: "Commission %",    key: "commission_pct", type: "number" },
-                    { label: "Ville principale",key: "ville_principale" },
+                    { label: "Commission %",       key: "commission_pct",    type: "number" },
+                    { label: "Seuil encours (F)", key: "seuil_encours_max", type: "number" },
+                    { label: "Ville principale",  key: "ville_principale" },
                     { label: "Rayon km",        key: "rayon_km",       type: "number" },
                   ].map(f => (
                     <div key={f.key}>
@@ -200,6 +202,9 @@ export default function GestionPays() {
                     <span className="flex items-center gap-1 text-[10px] bg-violet-50 text-violet-700 rounded-full px-2 py-0.5 font-medium">
                       <Percent className="w-2.5 h-2.5" />{p.commission_pct || 30}% commission
                     </span>
+                    <span className="flex items-center gap-1 text-[10px] bg-red-50 text-red-600 rounded-full px-2 py-0.5 font-medium">
+                      🔒 Seuil encours : {(p.seuil_encours_max || 5000).toLocaleString()} {p.devise || "FCFA"}
+                    </span>
                     {p.ville_principale && (
                       <span className="flex items-center gap-1 text-[10px] bg-gray-100 text-gray-600 rounded-full px-2 py-0.5 font-medium">
                         <MapPin className="w-2.5 h-2.5" />{p.ville_principale}
@@ -243,6 +248,7 @@ export default function GestionPays() {
             <li>• <strong>Activer un pays</strong> → il apparaît dans les sélecteurs livreurs/clients</li>
             <li>• <strong>Prix/km</strong> → utilisé automatiquement au calcul de la course</li>
             <li>• <strong>Commission %</strong> → part de Silga sur chaque course</li>
+            <li>• <strong>Seuil encours</strong> → plafond avant blocage automatique du livreur</li>
             <li>• Les livreurs/clients s'enregistrent avec leur pays → les stats se filtrent automatiquement</li>
           </ul>
         </div>

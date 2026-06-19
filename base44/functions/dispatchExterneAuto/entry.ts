@@ -115,6 +115,7 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
     actif: true,
     statut: 'disponible',
     country_code: course.country_code,
+    bloque_encours: false,
   });
 
   if (!tousLivreurs || tousLivreurs.length === 0) return [];
@@ -574,7 +575,15 @@ Deno.serve(async (req) => {
       const countryGuard = await verifierPaysCourseLivreur(base44, course, livreur_id, 'check_course_pour_livreur');
       if (!countryGuard.ok) return Response.json(countryGuard.response, { status: countryGuard.status });
 
-      if (course.statut === 'annulee' || course.statut === 'livree') {
+      // 🚫 Vérifier blocage encours du livreur
+    if (countryGuard.ok && countryGuard.livreur?.bloque_encours) {
+      return Response.json({ 
+        found: false, bloque_encours: true,
+        error: 'Votre plafond d\'encours SILGAPP a été atteint.',
+      });
+    }
+
+    if (course.statut === 'annulee' || course.statut === 'livree') {
         try {
           const livreurData = countryGuard.livreur;
           if (livreurData?.user_email) {
@@ -585,6 +594,15 @@ Deno.serve(async (req) => {
           }
         } catch (_) {}
         return Response.json({ found: false, cancelled: true });
+      }
+
+      // 🚫 Vérifier blocage encours du livreur
+      const livreurCheck = countryGuard.livreur;
+      if (livreurCheck?.bloque_encours) {
+        return Response.json({ 
+          found: false, bloque_encours: true,
+          error: 'Votre plafond d\'encours SILGAPP a été atteint. Veuillez effectuer votre dépôt auprès de SILGAPP afin de réactiver votre compte.',
+        });
       }
 
       if (course.dispatch_status === 'accepte') {
@@ -614,6 +632,14 @@ Deno.serve(async (req) => {
       const countryGuard = await verifierPaysCourseLivreur(base44, course, livreur_id, 'accepter_course');
       if (!countryGuard.ok) return Response.json(countryGuard.response, { status: countryGuard.status });
       const livreur = countryGuard.livreur;
+
+      // 🚫 Vérifier blocage encours
+      if (livreur.bloque_encours) {
+        return Response.json({ 
+          success: false, accepted: false, reason: 'bloque_encours',
+          error: 'Votre plafond d\'encours SILGAPP a été atteint. Veuillez effectuer votre dépôt auprès de SILGAPP afin de réactiver votre compte.',
+        });
+      }
 
       console.log('[DISPATCH][ACCEPT_ATTEMPT]', {
         course_id, livreur_id, course_status: course.statut || '',
