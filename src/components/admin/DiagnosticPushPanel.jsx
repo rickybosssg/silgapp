@@ -334,7 +334,7 @@ export default function DiagnosticPushPanel({ defaultSearchEmail = "" }) {
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-black text-blue-900">Diagnostic Firebase</p>
-            <p className="text-[10px] text-blue-700">VÃ©rifie les secrets Base44 et l'accÃ¨s FCM</p>
+            <p className="text-[10px] text-blue-700">Vérifie les secrets Base44 et l'accès FCM</p>
           </div>
           <button
             onClick={handleFirebaseDiagnostic}

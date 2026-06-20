@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from "react";
-import { LogOut, Wifi, WifiOff, MapPin, MapPinOff, Power, Navigation } from "lucide-react";
+import { LogOut, Wifi, WifiOff, MapPin, MapPinOff, Power, Navigation, Star, Smartphone, Users, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { base44 } from "@/api/base44Client";
 
@@ -90,11 +90,11 @@ export default function LivreurHeader({
         ? "bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900"
         : "bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800"
     )}>
-      {/* Halos dÃ©coratifs */}
+      {/* Halos decoratifs */}
       {isON && <div className="absolute top-0 right-0 w-48 h-48 bg-green-500/8 rounded-full blur-3xl pointer-events-none" />}
       {isEnCourse && <div className="absolute top-0 left-0 w-48 h-48 bg-blue-500/8 rounded-full blur-3xl pointer-events-none" />}
 
-      {/* Barre de statut colorÃ©e */}
+      {/* Barre de statut coloree */}
       <div className={cn(
         "h-0.5 w-full",
         isON && isLibre ? "bg-gradient-to-r from-green-400 via-emerald-300 to-green-400" :
@@ -104,7 +104,7 @@ export default function LivreurHeader({
 
       <div className="p-4">
 
-        {/* â”€â”€ Ligne 1 : Heure + RÃ©seau + DÃ©connexion â”€â”€ */}
+        {/* Ligne 1 : Heure + reseau + deconnexion */}
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-2xl font-black tracking-tight tabular-nums leading-none">{heureStr}</p>
@@ -116,8 +116,8 @@ export default function LivreurHeader({
               online ? "bg-green-500/15 text-green-400" : "bg-red-500/15 text-red-400"
             )}>
               {online
-                ? <><Wifi className="w-2.5 h-2.5" /><span>RÃ©seau</span></>
-                : <><WifiOff className="w-2.5 h-2.5" /><span>Hors rÃ©seau</span></>
+                ? <><Wifi className="w-2.5 h-2.5" /><span>Réseau</span></>
+                : <><WifiOff className="w-2.5 h-2.5" /><span>Hors réseau</span></>
               }
             </div>
             <button
@@ -130,7 +130,7 @@ export default function LivreurHeader({
           </div>
         </div>
 
-        {/* â”€â”€ Ligne 2 : Avatar + Infos + Boutons â”€â”€ */}
+        {/* Ligne 2 : Avatar + infos + boutons */}
         <div className="flex items-center gap-3 mb-4">
 
           {/* Avatar */}
@@ -155,7 +155,7 @@ export default function LivreurHeader({
             <p className="text-sm font-bold leading-tight truncate">{nomComplet}</p>
             {livreur.note_moyenne > 0 && (
               <p className="text-[11px] text-yellow-300/80 mt-0.5">
-                â­ {livreur.note_moyenne.toFixed(1)}
+                <Star className="inline w-3 h-3 mr-1 fill-yellow-300 text-yellow-300" />{livreur.note_moyenne.toFixed(1)}
                 <span className="text-white/75 ml-1">({livreur.nombre_avis || 0})</span>
               </p>
             )}
@@ -167,7 +167,7 @@ export default function LivreurHeader({
             )}
           </div>
 
-          {/* Boutons action â€” uniformisÃ©s */}
+          {/* Boutons action uniformises */}
           <div className="flex flex-col gap-1.5 flex-shrink-0">
             <button
               type="button"
@@ -206,7 +206,7 @@ export default function LivreurHeader({
           </div>
         </div>
 
-        {/* â”€â”€ Ligne 3 : Badges statut horizontaux â”€â”€ */}
+        {/* Ligne 3 : Badges statut horizontaux */}
         <div className="flex items-center gap-1.5 mb-3">
           {/* Badge ON/OFF */}
           <span className={cn(
@@ -216,7 +216,7 @@ export default function LivreurHeader({
               : "bg-red-500/15 text-red-300 border border-red-400/20"
           )}>
             <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", isON ? "bg-green-400 animate-pulse" : "bg-red-400")} />
-            {isON ? "ðŸŸ¢ ON" : "ðŸ”´ OFF"}
+            {isON ? "ON" : "OFF"}
           </span>
 
           {/* Badge Libre / En course / Hors ligne */}
@@ -228,26 +228,26 @@ export default function LivreurHeader({
                 ? "bg-blue-500/18 text-blue-300 border border-blue-400/25"
                 : "bg-white/8 text-white/75 border border-white/20"
           )}>
-            {isLibre ? "ðŸšš Libre" : isEnCourse ? "ðŸ”µ En course" : "âšª En pause"}
+            {isLibre ? "Libre" : isEnCourse ? "En course" : "En pause"}
           </span>
 
           {/* Badge App ouverte */}
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wide flex-1 justify-center bg-sky-500/15 text-sky-300 border border-sky-400/20">
-            ðŸ“± App ouverte
+            <Smartphone className="w-3 h-3 flex-shrink-0" /> App ouverte
           </span>
         </div>
 
-        {/* â”€â”€ Ligne 4 : Compteurs clients + courses â”€â”€ */}
+        {/* Ligne 4 : Compteurs clients + courses */}
         <div className="grid grid-cols-2 gap-2">
           {/* Clients en ligne */}
           <div className="bg-white/6 border border-white/10 rounded-2xl px-3 py-2.5 flex items-center gap-2">
             <div className="relative flex-shrink-0">
-              <span className="text-lg">ðŸ‘¥</span>
+              <Users className="w-5 h-5 text-white/80" />
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-400 rounded-full border border-slate-900" style={{ animation: "pulse-live 2s ease-in-out infinite" }} />
             </div>
             <div className="min-w-0">
               <p className="text-base font-black tabular-nums leading-none text-white">
-                {clientsEnLigne ?? "â€”"}
+                {clientsEnLigne ?? "-"}
               </p>
               <p className="text-[10px] text-white/75 leading-tight mt-0.5">
                 {clientsEnLigne === 1 ? "client en ligne" : "clients en ligne"}
@@ -258,7 +258,7 @@ export default function LivreurHeader({
           {/* Courses en attente */}
           <div className="bg-white/6 border border-white/10 rounded-2xl px-3 py-2.5 flex items-center gap-2">
             <div className="relative flex-shrink-0">
-              <span className="text-lg">ðŸ“¦</span>
+              <Package className="w-5 h-5 text-white/80" />
               {coursesEnAttente > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-400 rounded-full border border-slate-900" style={{ animation: "pulse-live 2s ease-in-out infinite" }} />
               )}
@@ -268,7 +268,7 @@ export default function LivreurHeader({
                 "text-base font-black tabular-nums leading-none",
                 coursesEnAttente > 0 ? "text-amber-300" : "text-white"
               )}>
-                {coursesEnAttente ?? "â€”"}
+                {coursesEnAttente ?? "-"}
               </p>
               <p className="text-[10px] text-white/75 leading-tight mt-0.5">
                 {coursesEnAttente === 1 ? "course en attente" : "courses en attente"}
@@ -287,4 +287,3 @@ export default function LivreurHeader({
     </div>
   );
 }
-
