@@ -101,10 +101,13 @@ export default function Comptabilite() {
   };
 
   const handleExportPDF = async () => {
-    if (!window.jspdf) {
-      try { await import('jspdf'); } catch { alert("Module PDF non disponible"); return; }
+    let jsPDF;
+    try {
+      jsPDF = (await import('jspdf')).jsPDF;
+    } catch {
+      alert("Module PDF non disponible");
+      return;
     }
-    const { jsPDF } = window.jspdf || await import('jspdf');
     const doc = new jsPDF();
     doc.setFontSize(16);
     doc.text(`Comptabilite SILGAPP - ${selectedCountry === 'all' ? 'Tous pays' : selectedCountry}`, 14, 20);
