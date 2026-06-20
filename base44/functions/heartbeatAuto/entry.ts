@@ -31,21 +31,37 @@ Deno.serve(async (req) => {
       const livreurs = await base44.asServiceRole.entities.Livreur.filter({ user_email: user.email });
       if (livreurs && livreurs.length > 0) {
         const livreur = livreurs[0];
-        
-        // Si le livreur a une session active différente → cette session est périmée
         if (livreur.session_active_id && livreur.session_active_id !== session_id) {
-          console.log('[heartbeatAuto] Session expirée détectée', {
+          console.log('[heartbeatAuto] Session livreur expirée', {
             livreur_id: livreur.id,
             session_attendue: livreur.session_active_id,
             session_recue: session_id,
           });
-          
-          // Forcer hors_ligne pour cette session périmée
           return Response.json({
             success: false,
             error: 'session_expired',
             message: 'Vous avez été déconnecté car une autre session a été ouverte sur un autre appareil.',
             force_hors_ligne: true,
+          }, { status: 409 });
+        }
+      }
+    }
+
+    // --- VÉRIFICATION SESSION UNIQUE POUR LES CLIENTS ---
+    if (user_type === "client" && session_id) {
+      const clients = await base44.asServiceRole.entities.ClientExterne.filter({ user_email: user.email });
+      if (clients && clients.length > 0) {
+        const client = clients[0];
+        if (client.session_active_id && client.session_active_id !== session_id) {
+          console.log('[heartbeatAuto] Session client expirée', {
+            client_id: client.id,
+            session_attendue: client.session_active_id,
+            session_recue: session_id,
+          });
+          return Response.json({
+            success: false,
+            error: 'session_expired',
+            message: 'Vous avez été déconnecté car une autre session a été ouverte sur un autre appareil.',
           }, { status: 409 });
         }
       }

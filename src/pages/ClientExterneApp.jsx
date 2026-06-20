@@ -80,6 +80,10 @@ export default function ClientExterneApp() {
   const [notationShownFor, setNotationShownFor] = useState(null);
   const [courseAnnuleeRelance, setCourseAnnuleeRelance] = useState(null); // course annulée auto → proposer relance
   const [showMessages, setShowMessages] = useState(false);
+  const [sessionId, setSessionId] = useState(() => {
+    try { return localStorage.getItem("silgapp_client_session_id") || null; } catch { return null; }
+  });
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   const [userId, setUserId] = useState(null);
   const queryClient = useQueryClient();
@@ -117,10 +121,49 @@ export default function ClientExterneApp() {
 
   // Heartbeat automatique — sync toutes les 30s + événements lifecycle
   // Activé dès que le profil est chargé (même sans GPS pour anciens utilisateurs)
+  // --- GESTION SESSION UNIQUE CLIENT ---
+  useEffect(() => {
+    if (!onboardingDone || !clientProfil?.id || sessionExpired) return;
+    
+    const initSession = async () => {
+      try {
+        const deviceId = navigator.userAgent.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 50);
+        const res = await base44.functions.invoke("gestionSessionClient", {
+          device_id: deviceId,
+          plateforme: "android",
+        });
+        
+        if (res?.data?.session_id) {
+          const newSessionId = res.data.session_id;
+          setSessionId(newSessionId);
+          try { localStorage.setItem("silgapp_client_session_id", newSessionId); } catch {}
+          console.log("[Session Client] Nouvelle session:", newSessionId);
+        }
+      } catch (err) {
+        console.error("[Session Client] Erreur init:", err);
+      }
+    };
+    
+    initSession();
+  }, [onboardingDone, clientProfil?.id, sessionExpired]);
+
+  const handleClientSessionExpired = () => {
+    console.log("[Session Client] Session expirée");
+    setSessionExpired(true);
+    try { localStorage.removeItem("silgapp_client_session_id"); } catch {}
+    toast.error("Session expirée", {
+      description: "Vous avez été déconnecté car une autre session a été ouverte sur un autre appareil.",
+      duration: 8000,
+    });
+  };
+
+  // Heartbeat automatique
   useHeartbeat({
     user_type: "client",
     position: position,
-    enabled: !!clientProfil, // heartbeat dès que profil chargé
+    enabled: !!clientProfil && !sessionExpired,
+    session_id: sessionId,
+    onSessionExpired: handleClientSessionExpired,
   });
 
   // Enregistrement token push pour les clients (notifications même app fermée)
@@ -561,6 +604,35 @@ export default function ClientExterneApp() {
 
 
 
+
+  // ── Session expirée ───────────────────────────────────────────────────────
+  if (sessionExpired) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-50 p-6">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center space-y-5">
+          <div className="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center mx-auto">
+            <span className="text-4xl">📱</span>
+          </div>
+          <div>
+            <h2 className="text-xl font-black text-gray-900">Session expirée</h2>
+            <p className="text-sm text-gray-600 mt-3 leading-relaxed">
+              Vous avez été déconnecté car une autre session a été ouverte sur un autre appareil.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              try { localStorage.removeItem("silgapp_client_session_id"); } catch {}
+              base44.auth.logout();
+              setTimeout(() => window.location.reload(), 300);
+            }}
+            className="inline-flex items-center justify-center w-full h-12 rounded-2xl bg-primary hover:bg-primary/90 text-white font-bold text-sm transition-colors"
+          >
+            Se reconnecter
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // ── Client bloqué pour frais d'annulation impayés ─────────────────────────
   if (!loading && clientProfil?.bloque_frais_annulation) {

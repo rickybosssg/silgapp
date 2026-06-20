@@ -73,6 +73,19 @@
       "format": "date-time",
       "description": "Derni\u00e8re activit\u00e9 dans l'application (heartbeat)"
     },
+    "session_active_id": {
+      "type": "string",
+      "description": "ID de la session active unique. Une seule session autoris\u00e9e par client."
+    },
+    "session_active_device": {
+      "type": "string",
+      "description": "Device ID de la session active"
+    },
+    "session_active_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de cr\u00e9ation de la session active"
+    },
     "code_promo_utilise": {
       "type": "string",
       "description": "Code promo saisi \u00e0 l'inscription (usage unique)"
