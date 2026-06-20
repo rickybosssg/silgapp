@@ -1281,6 +1281,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                     isExterne={true}
                     livreurLat={livreurProfil?.latitude}
                     livreurLng={livreurProfil?.longitude}
+                    livreurId={livreurProfil?.id}
+                    livreurNom={`${livreurProfil?.prenom || ""} ${livreurProfil?.nom || ""}`.trim()}
                   />
                 ))}
               </div>

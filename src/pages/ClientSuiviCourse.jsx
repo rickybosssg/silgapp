@@ -32,6 +32,7 @@ import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import DestinataireReactionButton from "@/components/client/DestinataireReactionButton";
 import QRCodeDisplay from "@/components/client/QRCodeDisplay";
 import AnnulerCourseDialog from "@/components/client/AnnulerCourseDialog";
+import ChatWindow from "@/components/chat/ChatWindow";
 import ETADisplay from "@/components/client/ETADisplay";
 import HistoriqueCoursesClient from "@/components/client/HistoriqueCoursesClient";
 import FraisAnnulationBannerClient from "@/components/client/FraisAnnulationBannerClient";
@@ -459,6 +460,18 @@ export default function ClientSuiviCourse() {
         {/* Infos livreur — Card style Uber uniquement si livreur a accepté */}
         {maCourse.livreur_id && maCourse.heure_acceptation && (
           <LivreurAssigneCard course={maCourse} />
+        )}
+
+        {/* 💬 Messagerie client-livreur-admin */}
+        {maCourse.livreur_id && !["livree", "annulee"].includes(maCourse.statut) && clientProfilId && (
+          <ChatWindow
+            courseId={maCourse.id}
+            senderType="client"
+            senderId={clientProfilId}
+            senderName={maCourse.expediteur_nom || maCourse.client_nom || "Client"}
+            clientName={maCourse.expediteur_nom || maCourse.client_nom}
+            livreurName={maCourse.livreur_nom}
+          />
         )}
 
         {/* ETA temps réel — expéditeur : vers récupération puis vers livraison */}

@@ -10,6 +10,7 @@ import { fr } from "date-fns/locale";
 import CourseStatusBadge from "./CourseStatusBadge";
 import UrgenceBadge from "./UrgenceBadge";
 import MultiColisAdminView from "./MultiColisAdminView";
+import ChatWindow from "@/components/chat/ChatWindow";
 import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -283,6 +284,19 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
               Mettre à jour
             </Button>
           </div>
+
+          {/* 💬 Messagerie admin */}
+          {reseau === "externe" && course.livreur_id && !["livree", "annulee"].includes(course.statut) && (
+            <div className="pt-2 border-t">
+              <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">💬 Messagerie</p>
+              <ChatWindow
+                courseId={course.id}
+                senderType="admin"
+                senderId="admin"
+                senderName="Admin SILGAPP"
+              />
+            </div>
+          )}
 
           {/* Annulation rapide */}
           {course.statut !== "annulee" && course.statut !== "livree" && (

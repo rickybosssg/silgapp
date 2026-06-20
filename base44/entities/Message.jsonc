@@ -1,0 +1,38 @@
+{
+  "name": "Message",
+  "type": "object",
+  "properties": {
+    "course_id": {
+      "type": "string",
+      "description": "ID de la course concern\u00e9e"
+    },
+    "sender_type": {
+      "type": "string",
+      "enum": [
+        "client",
+        "livreur",
+        "admin"
+      ],
+      "description": "Qui envoie le message"
+    },
+    "sender_id": {
+      "type": "string",
+      "description": "ID du sender (client_id, livreur_id, ou email admin)"
+    },
+    "sender_name": {
+      "type": "string",
+      "description": "Nom affich\u00e9 du sender"
+    },
+    "content": {
+      "type": "string",
+      "description": "Contenu du message"
+    }
+  },
+  "required": [
+    "course_id",
+    "sender_type",
+    "sender_id",
+    "sender_name",
+    "content"
+  ]
+}

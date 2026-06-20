@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import QRScannerModal from "./QRScannerModal";
 import NavigationGPS from "./NavigationGPS";
+import ChatWindow from "@/components/chat/ChatWindow";
 
 // Haversine
 function haversine(lat1, lon1, lat2, lon2) {
@@ -121,7 +122,7 @@ function ProgressBar({ statut, isDeplacement }) {
   );
 }
 
-export default function CourseActiveCard({ course, onColisRecupere, onColisLivre, onClientAnnule, onMettrePause, isPending, isExterne = false, livreurLat, livreurLng }) {
+export default function CourseActiveCard({ course, onColisRecupere, onColisLivre, onClientAnnule, onMettrePause, isPending, isExterne = false, livreurLat, livreurLng, livreurId, livreurNom }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [prixReel, setPrixReel] = useState("");
@@ -1220,6 +1221,18 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 <Check className="w-6 h-6" />
                 TERMINER
               </button>
+            </div>
+          )}
+
+          {/* 💬 Messagerie livreur-client-admin */}
+          {!colisLivre && livreurId && (
+            <div className="pt-2">
+              <ChatWindow
+                courseId={course.id}
+                senderType="livreur"
+                senderId={livreurId}
+                senderName={livreurNom || course.livreur_nom || "Livreur"}
+              />
             </div>
           )}
 
