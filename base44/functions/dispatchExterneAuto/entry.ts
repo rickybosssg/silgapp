@@ -106,7 +106,7 @@ async function chargerConfigVaguesGPS(base44) {
 async function trouverLivreursCandidats(base44, course, exclusions = []) {
   if (!course.country_code) {
     console.error(`[DISPATCH] ❌ BLOQUÉ — course ${course.id} sans country_code`);
-    return [];
+    return { tous: [], niveau1: [], niveau2: [], niveau3: [], pickupSource: 'none' };
   }
 
   const tousLivreurs = await base44.asServiceRole.entities.Livreur.filter({
@@ -915,70 +915,75 @@ Deno.serve(async (req) => {
       const resultats = [];
 
       for (const course of courses) {
-        // 🔄 cycle_epuise : après 2 min d'attente → reset et retour N1
-        if (course.dispatch_status === 'cycle_epuise') {
-          const derniereSollicitation = course.heure_sollicitation ? new Date(course.heure_sollicitation) : null;
-          const deuxMinutesPassees = derniereSollicitation
-            ? (now.getTime() - derniereSollicitation.getTime()) >= 2 * 60 * 1000
-            : true;
+        try {
+          // 🔄 cycle_epuise : après 2 min d'attente → reset et retour N1
+          if (course.dispatch_status === 'cycle_epuise') {
+            const derniereSollicitation = course.heure_sollicitation ? new Date(course.heure_sollicitation) : null;
+            const deuxMinutesPassees = derniereSollicitation
+              ? (now.getTime() - derniereSollicitation.getTime()) >= 2 * 60 * 1000
+              : true;
 
-          if (deuxMinutesPassees) {
-            console.log(`[DISPATCH] 🔄 Cycle épuisé → reset N1 pour course ${course.id}`);
-            await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-              dispatch_status: 'en_attente',
-              dispatch_notified_ids: '[]',
-              dispatch_wave: 0,
-              livreur_id: '',
-              livreur_nom: '',
-            });
-            const result = await lancerDispatchMulti(base44, course.id, []);
-            resultats.push({ course_id: course.id, wave: 'reset→N1', ...result });
+            if (deuxMinutesPassees) {
+              console.log(`[DISPATCH] 🔄 Cycle épuisé → reset N1 pour course ${course.id}`);
+              await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+                dispatch_status: 'en_attente',
+                dispatch_notified_ids: '[]',
+                dispatch_wave: 0,
+                livreur_id: '',
+                livreur_nom: '',
+              });
+              const result = await lancerDispatchMulti(base44, course.id, []);
+              resultats.push({ course_id: course.id, wave: 'reset→N1', ...result });
+            }
+            continue;
           }
-          continue;
-        }
 
-        // 📌 Courses en attente / redispatch (hors vagues) → relancer
-        if (['en_attente', 'redispatch'].includes(course.dispatch_status)) {
+          // 📌 Courses en attente / redispatch (hors vagues) → relancer
+          if (['en_attente', 'redispatch'].includes(course.dispatch_status)) {
+            let dejaNotifies = [];
+            try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
+            const result = await lancerDispatchMulti(base44, course.id, dejaNotifies);
+            resultats.push({ course_id: course.id, wave: 'retry', ...result });
+            continue;
+          }
+
+          // 🌊/📍 Vagues expirées (propose sans verrou, mode vagues heartbeat ou GPS)
+          const expired = !!(course.timeout_expires_at && new Date(course.timeout_expires_at) < now);
+          if (!expired || course.dispatch_status !== 'propose' || course.livreur_id) continue;
+
+          const currentWave = course.dispatch_wave || 0;
+          if (currentWave > 0) {
+            // Détecter le type de vagues
+            const hasGPS = !!(course.gps_depart_lat && course.gps_depart_lng);
+            const gpsCfg = hasGPS ? await chargerConfigVaguesGPS(base44) : null;
+            const isGPSWave = hasGPS && gpsCfg?.gps_waves_enabled;
+            const maxWave = isGPSWave ? gpsCfg.waves.length : 3;
+
+            const nextWave = currentWave + 1;
+            if (nextWave > maxWave) {
+              console.log(`[DISPATCH] ${isGPSWave ? '📍 GPS' : '🌊 Heartbeat'} vague ${currentWave} expirée (max: ${maxWave}) — cycle_epuise pour course ${course.id}`);
+              await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+                dispatch_status: 'cycle_epuise',
+                dispatch_wave: maxWave,
+              });
+              resultats.push({ course_id: course.id, wave: `${currentWave}→epuise` });
+              continue;
+            }
+            console.log(`[DISPATCH] ${isGPSWave ? '📍 GPS' : '🌊 Heartbeat'} avancement vague ${currentWave} → ${nextWave} pour course ${course.id}`);
+            await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+              dispatch_status: 'redispatch',
+              dispatch_wave: nextWave,
+            });
+          }
+
           let dejaNotifies = [];
           try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
           const result = await lancerDispatchMulti(base44, course.id, dejaNotifies);
-          resultats.push({ course_id: course.id, wave: 'retry', ...result });
-          continue;
+          resultats.push({ course_id: course.id, wave: `${currentWave}→${currentWave + 1}`, ...result });
+        } catch (err) {
+          console.error(`[DISPATCH] ❌ Erreur sur course ${course.id}:`, err.message);
+          resultats.push({ course_id: course.id, error: err.message });
         }
-
-        // 🌊/📍 Vagues expirées (propose sans verrou, mode vagues heartbeat ou GPS)
-        const expired = !!(course.timeout_expires_at && new Date(course.timeout_expires_at) < now);
-        if (!expired || course.dispatch_status !== 'propose' || course.livreur_id) continue;
-
-        const currentWave = course.dispatch_wave || 0;
-        if (currentWave > 0) {
-          // Détecter le type de vagues
-          const hasGPS = !!(course.gps_depart_lat && course.gps_depart_lng);
-          const gpsCfg = hasGPS ? await chargerConfigVaguesGPS(base44) : null;
-          const isGPSWave = hasGPS && gpsCfg?.gps_waves_enabled;
-          const maxWave = isGPSWave ? gpsCfg.waves.length : 3;
-
-          const nextWave = currentWave + 1;
-          if (nextWave > maxWave) {
-            console.log(`[DISPATCH] ${isGPSWave ? '📍 GPS' : '🌊 Heartbeat'} vague ${currentWave} expirée (max: ${maxWave}) — cycle_epuise pour course ${course.id}`);
-            await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-              dispatch_status: 'cycle_epuise',
-              dispatch_wave: maxWave,
-            });
-            resultats.push({ course_id: course.id, wave: `${currentWave}→epuise` });
-            continue;
-          }
-          console.log(`[DISPATCH] ${isGPSWave ? '📍 GPS' : '🌊 Heartbeat'} avancement vague ${currentWave} → ${nextWave} pour course ${course.id}`);
-          await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-            dispatch_status: 'redispatch',
-            dispatch_wave: nextWave,
-          });
-        }
-
-        let dejaNotifies = [];
-        try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-        const result = await lancerDispatchMulti(base44, course.id, dejaNotifies);
-        resultats.push({ course_id: course.id, wave: `${currentWave}→${currentWave + 1}`, ...result });
       }
 
       return Response.json({ success: true, traitees: resultats.length, resultats: resultats.slice(0, 20) });
@@ -997,12 +1002,17 @@ Deno.serve(async (req) => {
 
       const resultats = [];
       for (const course of aRetenter) {
-        let dejaNotifies = [];
-        try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
+        try {
+          let dejaNotifies = [];
+          try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
 
-        // Si cycle_epuise, on laisse lancerDispatchMulti gérer le reset après 2 min
-        const result = await lancerDispatchMulti(base44, course.id, dejaNotifies);
-        resultats.push({ course_id: course.id, ...result });
+          // Si cycle_epuise, on laisse lancerDispatchMulti gérer le reset après 2 min
+          const result = await lancerDispatchMulti(base44, course.id, dejaNotifies);
+          resultats.push({ course_id: course.id, ...result });
+        } catch (err) {
+          console.error(`[DISPATCH] ❌ Erreur retry course ${course.id}:`, err.message);
+          resultats.push({ course_id: course.id, error: err.message });
+        }
       }
       return Response.json({ success: true, retried: aRetenter.length, resultats });
     }
