@@ -34,7 +34,7 @@ export const navItems = [
   { path: "/rapport", label: "Rapport du jour", icon: BarChart3, reseauOnly: "externe" },
   { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp, reseauOnly: "interne" },
   { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp, reseauOnly: "externe" },
-  { path: "/admin/externe/dus-livreurs", label: "Comptabilité", icon: Wallet, reseauOnly: "externe" },
+  { path: "/admin/comptabilite", label: "Comptabilité", icon: Wallet, reseauOnly: "externe" },
   { path: "/admin/global", label: "Admin Global", icon: Globe, reseauOnly: "externe" },
   { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Settings, reseauOnly: "externe" },
   { path: "/admin/externe/clients", label: "Clients externes", icon: Users, reseauOnly: "externe" },
