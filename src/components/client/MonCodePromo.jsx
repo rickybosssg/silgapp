@@ -48,7 +48,7 @@ export default function MonCodePromo({ clientProfil }) {
       </div>
 
       <p className="text-xs text-purple-700 mb-3">
-        🎁 Partagez votre code ! Chaque ami qui s'inscrit et fait sa première course vous rapporte <strong>100 FCFA</strong>.
+         Partagez votre code ! Chaque ami qui s'inscrit et fait sa première course vous rapporte <strong>100 FCFA</strong>.
       </p>
 
       {/* Stats */}
@@ -79,7 +79,7 @@ export default function MonCodePromo({ clientProfil }) {
           <p className="text-xs font-bold text-purple-800">Historique des primes :</p>
           {primes.slice(0, 5).map(p => (
             <div key={p.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-purple-100 text-xs">
-              <span className="text-gray-700">👤 {p.client_nouveau_nom}</span>
+              <span className="text-gray-700"> {p.client_nouveau_nom}</span>
               <Badge className={
                 p.statut === "validee" ? "bg-green-100 text-green-700 border-green-200" :
                 p.statut === "annulee" ? "bg-red-100 text-red-700" :

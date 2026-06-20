@@ -17,14 +17,14 @@ import { useAdminContext } from "@/hooks/useAdminContext.js";
 import CountrySelector, { usePaysActifs } from "@/components/international/CountrySelector";
 
 const CIBLES = [
-  { value: "tous",              label: "Tous les utilisateurs", color: "bg-purple-100 text-purple-700" },
-  { value: "clients",           label: "Clients uniquement",   color: "bg-blue-100 text-blue-700" },
-  { value: "livreurs_externes", label: "Livreurs externes",    color: "bg-green-100 text-green-700" },
+  { value: "tous", label: "Tous les utilisateurs", color: "bg-purple-100 text-purple-700" },
+  { value: "clients", label: "Clients uniquement", color: "bg-blue-100 text-blue-700" },
+  { value: "livreurs_externes", label: "Livreurs externes", color: "bg-green-100 text-green-700" },
 ];
 
 const FORMATS = [
-  { value: "carrousel",   label: "Carrousel",    icon: "🎠", desc: "Défilement dans le dashboard" },
-  { value: "plein_ecran", label: "Plein écran",  icon: "📢", desc: "Annonce importante à l'ouverture" },
+  { value: "carrousel", label: "Carrousel", icon: "", desc: "Défilement dans le dashboard" },
+  { value: "plein_ecran", label: "Plein écran", icon: "", desc: "Annonce importante à l'ouverture" },
 ];
 
 const defaultForm = {
@@ -73,7 +73,7 @@ export default function GestionPublicites() {
       ? base44.entities.Publicite.update(editingId, data)
       : base44.entities.Publicite.create(data),
     onSuccess: () => {
-      toast.success(editingId ? "Publicité mise à jour ✓" : "Publicité créée ✓");
+      toast.success(editingId ? "Publicité mise à jour " : "Publicité créée ");
       queryClient.invalidateQueries({ queryKey: ["publicites"] });
       resetForm();
     },
@@ -140,7 +140,7 @@ export default function GestionPublicites() {
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       setForm(prev => ({ ...prev, media_url: file_url }));
-      toast.success("Média uploadé ✓");
+      toast.success("Média uploadé ");
     } catch (err) {
       toast.error("Erreur upload : " + err.message);
     } finally {
@@ -209,10 +209,10 @@ export default function GestionPublicites() {
       {/* ── STATS GLOBALES ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Pubs actives",  value: pubsActives.length,   grad: "from-violet-500 to-purple-600", icon: Megaphone },
-          { label: "Affichages",    value: totalAffichages.toLocaleString(), grad: "from-blue-500 to-indigo-600", icon: Eye },
-          { label: "Clics",         value: totalClics.toLocaleString(),      grad: "from-green-500 to-emerald-600", icon: MousePointerClick },
-          { label: "Taux de clic",  value: `${tauxClic}%`,                   grad: "from-orange-500 to-amber-600", icon: TrendingUp },
+          { label: "Pubs actives", value: pubsActives.length, grad: "from-violet-500 to-purple-600", icon: Megaphone },
+          { label: "Affichages", value: totalAffichages.toLocaleString(), grad: "from-blue-500 to-indigo-600", icon: Eye },
+          { label: "Clics", value: totalClics.toLocaleString(), grad: "from-green-500 to-emerald-600", icon: MousePointerClick },
+          { label: "Taux de clic", value: `${tauxClic}%`, grad: "from-orange-500 to-amber-600", icon: TrendingUp },
         ].map(s => {
           const Icon = s.icon;
           return (
@@ -230,7 +230,7 @@ export default function GestionPublicites() {
         <Card className="p-5 border-violet-200 shadow-lg">
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-lg font-black text-gray-900">
-              {editingId ? "✏️ Modifier la publicité" : "➕ Nouvelle publicité"}
+              {editingId ? " Modifier la publicité" : " Nouvelle publicité"}
             </h2>
             <button onClick={resetForm} className="text-gray-400 hover:text-gray-600">
               <X className="w-5 h-5" />
@@ -279,7 +279,7 @@ export default function GestionPublicites() {
 
             {/* Pays cible */}
             <div className="space-y-2">
-              <Label className="font-bold text-sm">🌍 Pays cible</Label>
+              <Label className="font-bold text-sm"> Pays cible</Label>
               <div className="flex items-center gap-3">
                 <div className="flex-1">
                   <CountrySelector
@@ -290,7 +290,7 @@ export default function GestionPublicites() {
                 </div>
                 {!form.pays_cible && (
                   <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 font-semibold flex-shrink-0">
-                    ⚠️ Visible dans tous les pays
+                     Visible dans tous les pays
                   </span>
                 )}
               </div>
@@ -440,7 +440,7 @@ export default function GestionPublicites() {
       <div className="space-y-3">
         {isGlobal && (
           <div className="flex items-center gap-3">
-            <span className="text-xs font-bold text-gray-500">🌍 Pays :</span>
+            <span className="text-xs font-bold text-gray-500"> Pays :</span>
             <div className="w-48">
               <CountrySelector value={effectiveCountry} onChange={setSelectedCountry} className="text-xs" />
             </div>
@@ -511,21 +511,21 @@ export default function GestionPublicites() {
                             {cibleInfo?.label || pub.cible}
                           </span>
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${pub.format === "plein_ecran" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600"}`}>
-                            {pub.format === "plein_ecran" ? "📢 Plein écran" : "🎠 Carrousel"}
+                            {pub.format === "plein_ecran" ? " Plein écran" : " Carrousel"}
                           </span>
                           {pub.pays_cibles && pub.pays_cibles !== "tous" && (() => {
                             try {
                               const arr = JSON.parse(pub.pays_cibles);
                               return Array.isArray(arr) && arr.length > 0 ? (
                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 bg-indigo-100 text-indigo-700">
-                                  🌍 {arr.join(", ")}
+                                   {arr.join(", ")}
                                 </span>
                               ) : null;
                             } catch { return null; }
                           })()}
                         </div>
                         {pub.description && <p className="text-xs text-gray-500 mt-0.5 truncate">{pub.description}</p>}
-                        {pub.annonceur_nom && <p className="text-[10px] text-gray-400 mt-0.5">📍 {pub.annonceur_nom}</p>}
+                        {pub.annonceur_nom && <p className="text-[10px] text-gray-400 mt-0.5"> {pub.annonceur_nom}</p>}
                       </div>
 
                       {/* Statut toggle */}
@@ -565,7 +565,7 @@ export default function GestionPublicites() {
                     {/* Dates + statut */}
                     <div className="flex items-center gap-2 mt-2 flex-wrap">
                       {isExpired && <span className="text-[10px] font-bold bg-red-100 text-red-600 px-2 py-0.5 rounded-full">⏰ Expirée</span>}
-                      {isNotStarted && <span className="text-[10px] font-bold bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">🕐 Pas encore démarrée</span>}
+                      {isNotStarted && <span className="text-[10px] font-bold bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full"> Pas encore démarrée</span>}
                       {!pub.actif && !isExpired && <span className="text-[10px] font-bold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">⏸ Désactivée</span>}
                       {pub.date_fin && !isExpired && (
                         <span className="text-[10px] text-gray-400 flex items-center gap-1">
@@ -598,13 +598,13 @@ export default function GestionPublicites() {
 
       {/* Architecture ciblage futur */}
       <div className="bg-gradient-to-br from-indigo-50 to-violet-50 rounded-2xl border border-indigo-100 p-4">
-        <p className="text-xs font-black text-indigo-700 uppercase tracking-widest mb-2">🔮 Intelligence Publicitaire (Architecture préparée)</p>
+        <p className="text-xs font-black text-indigo-700 uppercase tracking-widest mb-2"> Intelligence Publicitaire (Architecture préparée)</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
-            "📍 Ciblage par quartier",
-            "🕐 Ciblage horaire",
-            "👤 Ciblage comportemental",
-            "🤖 Recommandations IA SILGAPP",
+            " Ciblage par quartier",
+            " Ciblage horaire",
+            " Ciblage comportemental",
+            " Recommandations IA SILGAPP",
           ].map(f => (
             <div key={f} className="bg-white/60 rounded-xl p-2.5 text-xs text-indigo-700 font-semibold text-center border border-indigo-100/50">{f}</div>
           ))}

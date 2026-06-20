@@ -23,7 +23,7 @@ const NIVEAU_COLORS = {
   tres_forte: { bg: "bg-red-50", text: "text-red-700", dot: "bg-red-500", border: "border-red-200" },
 };
 
-const NIVEAU_EMOJI = { faible: "🟢", moyenne: "🟡", forte: "🟠", tres_forte: "🔴" };
+const NIVEAU_EMOJI = { faible: "", moyenne: "", forte: "", tres_forte: "" };
 
 const CONFIG_FIELDS = [
   { key: "ZC_ACTIF", label: "Zones chaudes actives", type: "switch", desc: "Activer/Désactiver la détection" },

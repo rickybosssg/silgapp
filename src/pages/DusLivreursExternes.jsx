@@ -118,8 +118,8 @@ function DetailPaiementModal({ entry, livreurInfo, onClose, onPaiement, onBloque
                   </div>
                   <p className="text-sm font-medium text-foreground truncate">{c.adresse_depart} → {c.adresse_arrivee || "?"}</p>
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-xs text-muted-foreground">
-                    {c.distance_reelle_km != null && <span>📏 {Number(c.distance_reelle_km).toFixed(1)} km</span>}
-                    {c.prix_final != null && <span>💰 {c.prix_final.toLocaleString()} F</span>}
+                    {c.distance_reelle_km != null && <span> {Number(c.distance_reelle_km).toFixed(1)} km</span>}
+                    {c.prix_final != null && <span> {c.prix_final.toLocaleString()} F</span>}
                     {c.commission_silga != null && <span className="text-orange-600 font-semibold">Silga: {c.commission_silga.toLocaleString()} F</span>}
                   </div>
                 </div>
@@ -307,7 +307,7 @@ export default function DusLivreursExternes() {
 
   const blockMutation = useMutation({
     mutationFn: ({ id, actif }) => base44.functions.invoke("updateLivreur", { id, data: { actif } }),
-    onSuccess: (_, { actif }) => { queryClient.invalidateQueries({ queryKey: ["livreurs-externes-all"] }); toast.success(actif ? "Livreur débloqué ✓" : "Livreur bloqué ✓"); setDetailEntry(null); },
+    onSuccess: (_, { actif }) => { queryClient.invalidateQueries({ queryKey: ["livreurs-externes-all"] }); toast.success(actif ? "Livreur débloqué " : "Livreur bloqué "); setDetailEntry(null); },
     onError: () => toast.error("Erreur"),
   });
 
@@ -338,7 +338,7 @@ export default function DusLivreursExternes() {
             </Button>
           </Link>
           <div className="flex items-center gap-3 flex-1">
-            <div className="w-10 h-10 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center text-xl flex-shrink-0">💼</div>
+            <div className="w-10 h-10 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center text-xl flex-shrink-0"></div>
             <div>
               <h1 className="text-xl font-black text-white tracking-tight">Comptabilité Livreurs & Clients</h1>
               <p className="text-white/65 text-xs mt-0.5">Commissions · Frais d'annulation · Clôture à 20h00</p>
@@ -351,11 +351,11 @@ export default function DusLivreursExternes() {
       <div className="flex gap-2">
         <button onClick={() => setActiveTab("livreurs")}
           className={`flex-1 py-3 px-4 rounded-2xl text-sm font-bold transition-all ${activeTab === "livreurs" ? "bg-primary text-white shadow-md shadow-red-100" : "bg-white text-gray-600 border border-gray-200 hover:border-primary/40"}`}>
-          💼 Dus Livreurs
+           Dus Livreurs
         </button>
         <button onClick={() => setActiveTab("frais")}
           className={`flex-1 py-3 px-4 rounded-2xl text-sm font-bold transition-all relative ${activeTab === "frais" ? "bg-primary text-white shadow-md shadow-red-100" : "bg-white text-gray-600 border border-gray-200 hover:border-primary/40"}`}>
-          🚫 Frais Annulation Clients
+           Frais Annulation Clients
           {nbImpayeFrais > 0 && <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-orange-500 text-white text-[10px] font-black rounded-full flex items-center justify-center">{nbImpayeFrais}</span>}
         </button>
       </div>
@@ -366,10 +366,10 @@ export default function DusLivreursExternes() {
           {/* KPI STATS */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             {[
-              { label: "Total dû", value: totalDu.toLocaleString(), suffix: "F", grad: "from-orange-500 to-amber-500", shadow: "shadow-orange-100", icon: "⚠️" },
-              { label: "Livreurs", value: recapLivreurs.length, suffix: null, grad: "from-primary to-red-600", shadow: "shadow-red-100", icon: "👥" },
-              { label: "Commission totale", value: totalCommission.toLocaleString(), suffix: "F", grad: "from-blue-500 to-indigo-600", shadow: "shadow-blue-100", icon: "📊" },
-              { label: "Encaissé", value: totalPaye.toLocaleString(), suffix: "F", grad: "from-green-500 to-emerald-500", shadow: "shadow-green-100", icon: "✅" },
+              { label: "Total dû", value: totalDu.toLocaleString(), suffix: "F", grad: "from-orange-500 to-amber-500", shadow: "shadow-orange-100", icon: "" },
+              { label: "Livreurs", value: recapLivreurs.length, suffix: null, grad: "from-primary to-red-600", shadow: "shadow-red-100", icon: "" },
+              { label: "Commission totale", value: totalCommission.toLocaleString(), suffix: "F", grad: "from-blue-500 to-indigo-600", shadow: "shadow-blue-100", icon: "" },
+              { label: "Encaissé", value: totalPaye.toLocaleString(), suffix: "F", grad: "from-green-500 to-emerald-500", shadow: "shadow-green-100", icon: "" },
             ].map(s => (
               <div key={s.label} className={`bg-gradient-to-br ${s.grad} rounded-2xl p-3.5 text-white shadow-md ${s.shadow}`}>
                 <div className="flex items-center justify-between mb-2">
@@ -394,7 +394,7 @@ export default function DusLivreursExternes() {
           {/* LISTE LIVREURS */}
           {recapLivreurs.length === 0 ? (
             <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center text-muted-foreground">
-              <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3 text-2xl">💼</div>
+              <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3 text-2xl"></div>
               <p className="font-semibold text-sm">Aucun résultat</p>
               <p className="text-xs mt-1 opacity-70">Modifiez le filtre ou revenez plus tard.</p>
             </div>
@@ -410,7 +410,7 @@ export default function DusLivreursExternes() {
                         <div className="flex items-center gap-2 flex-wrap mb-0.5">
                           <span className="font-black text-foreground">{entry.prenom} {entry.nom}</span>
                           <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${sf.color}`}>{sf.label}</span>
-                          {isBloque && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">🔒 Bloqué</span>}
+                          {isBloque && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold"> Bloqué</span>}
                         </div>
                         {entry.telephone && <p className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="w-3 h-3" />{entry.telephone}</p>}
                       </div>

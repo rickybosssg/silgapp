@@ -52,7 +52,7 @@ export default function DispatchConfigPanel() {
         nb_livreurs: nbLivreurs,
         timeout_sec: parseInt(timeoutSec, 10),
       });
-      toast.success("Configuration dispatch sauvegardée ✓");
+      toast.success("Configuration dispatch sauvegardée ");
     } catch (err) {
       toast.error("Erreur sauvegarde: " + err.message);
     } finally {

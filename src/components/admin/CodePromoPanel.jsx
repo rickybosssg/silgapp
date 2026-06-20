@@ -9,14 +9,14 @@ import { Plus, Tag, ToggleLeft, ToggleRight, Users, TrendingUp, Gift, Trash2, X 
 import { toast } from "sonner";
 
 const PAYS_LISTE = [
-  { code: "BF", nom: "Burkina Faso", emoji: "🇧🇫" },
-  { code: "CI", nom: "Côte d'Ivoire", emoji: "🇨🇮" },
-  { code: "TG", nom: "Togo", emoji: "🇹🇬" },
-  { code: "BJ", nom: "Bénin", emoji: "🇧🇯" },
-  { code: "SN", nom: "Sénégal", emoji: "🇸🇳" },
-  { code: "ML", nom: "Mali", emoji: "🇲🇱" },
-  { code: "GN", nom: "Guinée", emoji: "🇬🇳" },
-  { code: "NE", nom: "Niger", emoji: "🇳🇪" },
+  { code: "BF", nom: "Burkina Faso", emoji: "" },
+  { code: "CI", nom: "Côte d'Ivoire", emoji: "" },
+  { code: "TG", nom: "Togo", emoji: "" },
+  { code: "BJ", nom: "Bénin", emoji: "" },
+  { code: "SN", nom: "Sénégal", emoji: "" },
+  { code: "ML", nom: "Mali", emoji: "" },
+  { code: "GN", nom: "Guinée", emoji: "" },
+  { code: "NE", nom: "Niger", emoji: "" },
 ];
 
 function CreateCodeModal({ onClose, onCreated }) {
@@ -115,7 +115,7 @@ function CreateCodeModal({ onClose, onCreated }) {
         </div>
 
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
-          💡 Le propriétaire gagnera <strong>100 FCFA fixe</strong> à chaque première course d'un client inscrit avec son code.
+           Le propriétaire gagnera <strong>100 FCFA fixe</strong> à chaque première course d'un client inscrit avec son code.
         </div>
 
         <Button onClick={handleCreate} disabled={loading} className="w-full">
@@ -210,11 +210,11 @@ export default function CodePromoPanel() {
                     <div className="flex items-center gap-2 flex-wrap mb-2">
                       <span className="font-black text-lg text-purple-700 font-mono tracking-widest">{c.code}</span>
                       <Badge className={c.actif ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-600 border-gray-200"}>
-                        {c.actif ? "✅ Actif" : "❌ Inactif"}
+                        {c.actif ? " Actif" : " Inactif"}
                       </Badge>
                       {pays && <span className="text-sm">{pays.emoji} {pays.nom}</span>}
                     </div>
-                    <p className="text-sm font-semibold text-foreground">👤 {c.proprietaire_nom}</p>
+                    <p className="text-sm font-semibold text-foreground"> {c.proprietaire_nom}</p>
                     {c.proprietaire_email && <p className="text-xs text-muted-foreground">{c.proprietaire_email}</p>}
                     <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1"><Users className="w-3 h-3" />{c.nb_inscrits || 0} inscrits</span>
@@ -238,7 +238,7 @@ export default function CodePromoPanel() {
                     <p className="text-xs font-bold text-gray-600">Primes récentes :</p>
                     {primesCode.slice(0, 3).map(p => (
                       <div key={p.id} className="flex items-center justify-between text-xs">
-                        <span className="text-gray-700">👤 {p.client_nouveau_nom}</span>
+                        <span className="text-gray-700"> {p.client_nouveau_nom}</span>
                         <div className="flex items-center gap-2">
                           <span className="text-gray-500">{p.prix_course?.toLocaleString()} F</span>
                           <Badge className={

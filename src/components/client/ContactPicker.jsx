@@ -25,7 +25,7 @@ function detectPlatform() {
   const isNative = capacitorNative || hasCapacitorGlobal || isWebView;
   const hasContactPickerAPI = !!(navigator.contacts && navigator.contacts.select);
   const hasCapacitorContacts = !!(window.Capacitor?.Plugins?.Contacts || window.CapacitorContacts);
-  
+
   return {
     isNative,
     isAndroid,
@@ -264,7 +264,7 @@ export default function ContactPicker({ type = "destinataire", onSelect }) {
     await saveFrequentContact({ nom: contact.nom, telephone: contact.telephone });
     onSelect({ nom: contact.nom, telephone: contact.telephone });
     setShowContacts(false);
-    toast.success(`✅ ${contact.nom} sélectionné`);
+    toast.success(` ${contact.nom} sélectionné`);
     if (fromPhone) toast.info("Contact ajouté à vos favoris SILGAPP");
   };
 
@@ -340,13 +340,13 @@ export default function ContactPicker({ type = "destinataire", onSelect }) {
             {/* Panel diagnostic */}
             {showDiag && (
               <div className="bg-gray-900 text-green-400 p-3 text-xs font-mono flex-shrink-0 overflow-auto max-h-48">
-                <p className="text-yellow-400 font-bold mb-1">🔍 DIAGNOSTIC CONTACTS</p>
-                <p>APK détecté : <span className={platform.isNative ? "text-green-400" : "text-red-400"}>{platform.isNative ? "OUI ✓" : "NON ✗"}</span></p>
-                <p>Capacitor.isNativePlatform() : <span className={platform.capacitorNative ? "text-green-400" : "text-red-400"}>{platform.capacitorNative ? "true ✓" : "false ✗"}</span></p>
-                <p>Capacitor global : <span className={platform.hasCapacitorGlobal ? "text-green-400" : "text-red-400"}>{platform.hasCapacitorGlobal ? "OUI ✓" : "NON ✗"}</span></p>
-                <p>Android : <span className={platform.isAndroid ? "text-green-400" : "text-gray-400"}>{platform.isAndroid ? "OUI ✓" : "NON"}</span></p>
-                <p>Contact Picker API : <span className={platform.hasContactPickerAPI ? "text-green-400" : "text-red-400"}>{platform.hasContactPickerAPI ? "DISPONIBLE ✓" : "NON DISPONIBLE ✗"}</span></p>
-                <p>Plugin Capacitor Contacts : <span className={platform.hasCapacitorContacts ? "text-green-400" : "text-red-400"}>{platform.hasCapacitorContacts ? "INSTALLÉ ✓" : "NON INSTALLÉ ✗"}</span></p>
+                <p className="text-yellow-400 font-bold mb-1"> DIAGNOSTIC CONTACTS</p>
+                <p>APK détecté : <span className={platform.isNative ? "text-green-400" : "text-red-400"}>{platform.isNative ? "OUI " : "NON "}</span></p>
+                <p>Capacitor.isNativePlatform() : <span className={platform.capacitorNative ? "text-green-400" : "text-red-400"}>{platform.capacitorNative ? "true " : "false "}</span></p>
+                <p>Capacitor global : <span className={platform.hasCapacitorGlobal ? "text-green-400" : "text-red-400"}>{platform.hasCapacitorGlobal ? "OUI " : "NON "}</span></p>
+                <p>Android : <span className={platform.isAndroid ? "text-green-400" : "text-gray-400"}>{platform.isAndroid ? "OUI " : "NON"}</span></p>
+                <p>Contact Picker API : <span className={platform.hasContactPickerAPI ? "text-green-400" : "text-red-400"}>{platform.hasContactPickerAPI ? "DISPONIBLE " : "NON DISPONIBLE "}</span></p>
+                <p>Plugin Capacitor Contacts : <span className={platform.hasCapacitorContacts ? "text-green-400" : "text-red-400"}>{platform.hasCapacitorContacts ? "INSTALLÉ " : "NON INSTALLÉ "}</span></p>
                 {diagInfo?.method && <p>Méthode utilisée : <span className="text-cyan-400">{diagInfo.method}</span></p>}
                 {diagInfo?.count !== undefined && <p>Contacts trouvés : <span className="text-cyan-400">{diagInfo.count}</span></p>}
                 {diagInfo?.error && <p>Erreur : <span className="text-red-400">{diagInfo.error}</span></p>}
@@ -471,10 +471,10 @@ export default function ContactPicker({ type = "destinataire", onSelect }) {
                         {/* Info méthode disponible */}
                         <div className="text-xs text-gray-400 text-center px-4">
                           {platform.hasContactPickerAPI
-                            ? "📱 API contacts disponible"
+                            ? " API contacts disponible"
                             : platform.hasCapacitorContacts
-                            ? "📱 Plugin Capacitor détecté"
-                            : "ℹ️ Cliquez pour tester l'accès aux contacts"}
+                            ? " Plugin Capacitor détecté"
+                            : "ℹ Cliquez pour tester l'accès aux contacts"}
                         </div>
                       </div>
                     )}

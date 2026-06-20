@@ -6,7 +6,7 @@ Deno.serve(async (req) => {
     // Use service role for public endpoints (no auth required)
     const body = await req.json().catch(() => ({}));
     const { event_type, country_code, platform, referrer } = body;
-    
+
     // Validation
     if (!event_type) {
       return Response.json({ success: false, error: "event_type requis" }, { status: 400 });
@@ -15,9 +15,9 @@ Deno.serve(async (req) => {
     // Créer ou mettre à jour les stats de téléchargement
     const today = new Date();
     const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-    
+
     // Récupérer les stats existantes (service role for public access)
-    const existingStats = await base44.asServiceRole.entities.DownloadStats.filter({ 
+    const existingStats = await base44.asServiceRole.entities.DownloadStats.filter({
       month: monthKey,
       country_code: country_code || 'BF'
     });
@@ -26,14 +26,14 @@ Deno.serve(async (req) => {
       // Mettre à jour les stats existantes
       const stats = existingStats[0];
       const updates = {};
-      
+
       if (event_type === 'page_visit') updates.page_visits = (stats.page_visits || 0) + 1;
       if (event_type === 'download_click') updates.clicks = (stats.clicks || 0) + 1;
       if (event_type === 'apk_download') {
         updates.downloads = (stats.downloads || 0) + 1;
         updates.last_download_date = new Date().toISOString();
       }
-      
+
       if (Object.keys(updates).length > 0) {
         await base44.asServiceRole.entities.DownloadStats.update(stats.id, updates);
       }
@@ -52,15 +52,15 @@ Deno.serve(async (req) => {
       await base44.asServiceRole.entities.DownloadStats.create(newStats);
     }
 
-    return Response.json({ 
-      success: true, 
+    return Response.json({
+      success: true,
       message: 'Download tracked',
-      event_type 
+      event_type
     });
   } catch (error) {
-    return Response.json({ 
-      success: false, 
-      error: error.message 
+    return Response.json({
+      success: false,
+      error: error.message
     }, { status: 500 });
   }
 });

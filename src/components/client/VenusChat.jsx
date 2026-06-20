@@ -11,7 +11,7 @@ const buildWelcomeMessage = (countryContext) => {
   if (!countryContext || !countryContext.code) {
     return {
       role: "assistant",
-      content: "Bonjour 👋 Je suis **VENUS**, votre assistante intelligente **SILGAPP**.\n\n❤️ *Plus qu'un service, une promesse* ❤️\n\nJe suis là pour vous aider à :\n\n✨ **Créer une course** — Expédier ou recevoir un colis\n🚚 **Suivre en temps réel** — Localisez votre livreur sur la carte\n📱 **QR codes & PIN** — Validation de récupération et livraison\n💰 **Prix adapté à votre pays** — Calculé automatiquement selon votre localisation\n📞 **Support** — +226 66 92 51 90\n\n**Dans quel pays êtes-vous ? Comment puis-je vous aider ?**",
+      content: "Bonjour Je suis **VENUS**, votre assistante intelligente **SILGAPP**.\n\n *Plus qu'un service, une promesse* \n\nJe suis là pour vous aider à :\n\n **Créer une course** — Expédier ou recevoir un colis\n **Suivre en temps réel** — Localisez votre livreur sur la carte\n **QR codes & PIN** — Validation de récupération et livraison\n **Prix adapté à votre pays** — Calculé automatiquement selon votre localisation\n **Support** — +226 66 92 51 90\n\n**Dans quel pays êtes-vous ? Comment puis-je vous aider ?**",
     };
   }
 
@@ -19,7 +19,7 @@ const buildWelcomeMessage = (countryContext) => {
 
   return {
     role: "assistant",
-    content: `Bonjour 👋 Je suis **VENUS**, votre assistante SILGAPP pour **${nom || code}** ${countryContext.emoji || "🌍"}\n\n❤️ *Plus qu'un service, une promesse* ❤️\n\n🌍 **Pays actif : ${nom || code} (${code})**\n📍 **Ville principale : ${ville || "N/D"}**\n📞 **Indicatif : ${indicatif || "N/D"}**\n\n💰 **Tarifs ${code} :**\n- Prix/km : **${prix_par_km || "N/D"} ${devise || "FCFA"}**\n- Minimum course : **${prix_minimum || 1000} ${devise || "FCFA"}**\n\n🚚 **Réseau actuel à ${ville || code} :**\n- Livreurs disponibles : **${livreursDispos ?? "N/D"}**${pubsActives > 0 ? `\n- Offres actives dans votre pays : **${pubsActives}**` : ""}\n\nJe réponds **uniquement** aux questions concernant **${nom || code}**. Pour un autre pays, demandez-moi de changer de contexte.\n\n**Comment puis-je vous aider aujourd'hui ?**`,
+    content: `Bonjour Je suis **VENUS**, votre assistante SILGAPP pour **${nom || code}** ${countryContext.emoji || ""}\n\n *Plus qu'un service, une promesse* \n\n **Pays actif : ${nom || code} (${code})**\n **Ville principale : ${ville || "N/D"}**\n **Indicatif : ${indicatif || "N/D"}**\n\n **Tarifs ${code} :**\n- Prix/km : **${prix_par_km || "N/D"} ${devise || "FCFA"}**\n- Minimum course : **${prix_minimum || 1000} ${devise || "FCFA"}**\n\n **Réseau actuel à ${ville || code} :**\n- Livreurs disponibles : **${livreursDispos ?? "N/D"}**${pubsActives > 0 ? `\n- Offres actives dans votre pays : **${pubsActives}**` : ""}\n\nJe réponds **uniquement** aux questions concernant **${nom || code}**. Pour un autre pays, demandez-moi de changer de contexte.\n\n**Comment puis-je vous aider aujourd'hui ?**`,
   };
 };
 
@@ -245,7 +245,7 @@ export default function VenusChat({ onClose, countryContext }) {
                 <h2 className="font-black text-white text-lg leading-tight">VENUS</h2>
                 {countryContext?.code && (
                   <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full border border-white/30">
-                    🌍 {countryContext.code}
+                     {countryContext.code}
                   </span>
                 )}
               </div>
@@ -274,7 +274,7 @@ export default function VenusChat({ onClose, countryContext }) {
         {/* Confirmation suppression historique */}
         {showClearConfirm && (
           <div className="p-3 bg-red-50 border-b border-red-200 flex items-center gap-2">
-            <p className="text-xs text-red-700 flex-1">🗑️ Supprimer tout l'historique VENUS ?</p>
+            <p className="text-xs text-red-700 flex-1"> Supprimer tout l'historique VENUS ?</p>
             <Button size="sm" variant="destructive" className="h-7 text-xs px-2" onClick={handleClearHistory}>
               Confirmer
             </Button>

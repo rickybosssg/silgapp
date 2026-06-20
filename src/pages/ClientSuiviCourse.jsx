@@ -32,6 +32,8 @@ import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import DestinataireReactionButton from "@/components/client/DestinataireReactionButton";
 import QRCodeDisplay from "@/components/client/QRCodeDisplay";
 import AnnulerCourseDialog from "@/components/client/AnnulerCourseDialog";
+import ChatWindow from "@/components/chat/ChatWindow";
+import CarteLivreurClient from "@/components/chat/CarteLivreurClient";
 import ETADisplay from "@/components/client/ETADisplay";
 import HistoriqueCoursesClient from "@/components/client/HistoriqueCoursesClient";
 import FraisAnnulationBannerClient from "@/components/client/FraisAnnulationBannerClient";
@@ -52,18 +54,18 @@ function buildWhatsAppMessage(course) {
     ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(course.delivery_qr_token)}`
     : "";
   return [
-    `📦 *Un colis vous est destiné !*`,
+    ` *Un colis vous est destiné !*`,
     ``,
-    `👤 *Expéditeur :* ${expediteurName}`,
-    `#️⃣ *N° de course :* ${numeroCourse}`,
+    ` *Expéditeur :* ${expediteurName}`,
+    `#⃣ *N° de course :* ${numeroCourse}`,
     ``,
-    `🔐 *PIN de livraison :* *${pinLivraison}*`,
-    `📱 *QR Code livraison :* ${qrLivraison}`,
+    ` *PIN de livraison :* *${pinLivraison}*`,
+    ` *QR Code livraison :* ${qrLivraison}`,
     ``,
-    `📍 *Suivez votre colis en temps réel :*`,
+    ` *Suivez votre colis en temps réel :*`,
     trackingUrl,
     ``,
-    `📲 *Téléchargez SILGAPP :*`,
+    ` *Téléchargez SILGAPP :*`,
     SILGAPP_DL,
     ``,
     `Merci de votre confiance.`,
@@ -190,7 +192,7 @@ export default function ClientSuiviCourse() {
     },
     enabled: !!userId,
     initialData: [],
-    refetchInterval: 5000, // ⚡ 2s → 5s : 4 requêtes imbriquées par poll = ~48/min max
+    refetchInterval: 5000, // 2s → 5s : 4 requêtes imbriquées par poll = ~48/min max
     staleTime: 2000,
   });
 
@@ -205,13 +207,13 @@ export default function ClientSuiviCourse() {
   const [prevStatut, setPrevStatut] = useState(null);
   useEffect(() => {
     if (!maCourse?.statut || prevStatut === maCourse.statut) return;
-    
+
     const statutsCritiques = ["livreur_en_route", "colis_recupere", "en_livraison", "livree"];
     if (statutsCritiques.includes(maCourse.statut) && !statutsCritiques.includes(prevStatut)) {
       playNotificationSound();
       navigator.vibrate?.([500, 150, 500, 150, 500]);
     }
-    
+
     setPrevStatut(maCourse.statut);
   }, [maCourse?.statut, prevStatut]);
 
@@ -279,7 +281,7 @@ export default function ClientSuiviCourse() {
     nouvelle: "Nouvelle course",
     recherche_livreur: (course) =>
       course?.pricing_mode === "manual" && course?.manual_price_status === "pending_client_validation"
-        ? (course.created_by_id === userId ? "💰 Prix proposé — votre accord requis" : "🔍 Recherche de livreur...")
+        ? (course.created_by_id === userId ? " Prix proposé — votre accord requis" : " Recherche de livreur...")
         : "Recherche de livreur...",
     livreur_en_route: "Livreur en route vers récupération",
     colis_recupere: "Colis récupéré",
@@ -325,7 +327,7 @@ export default function ClientSuiviCourse() {
                 onglet === "actives" ? "bg-primary text-white shadow" : "text-gray-500"
               }`}
             >
-              🚚 Actives
+               Actives
               {coursesActives.length > 0 && (
                 <span className={`text-xs px-1.5 py-0.5 rounded-full font-black ${onglet === "actives" ? "bg-white/30" : "bg-primary/10 text-primary"}`}>
                   {coursesActives.length}
@@ -338,7 +340,7 @@ export default function ClientSuiviCourse() {
                 onglet === "historique" ? "bg-gray-800 text-white shadow" : "text-gray-500"
               }`}
             >
-              📋 Historique
+               Historique
               {coursesHistorique.length > 0 && (
                 <span className={`text-xs px-1.5 py-0.5 rounded-full font-black ${onglet === "historique" ? "bg-white/30" : "bg-gray-100 text-gray-600"}`}>
                   {coursesHistorique.length}
@@ -368,7 +370,7 @@ export default function ClientSuiviCourse() {
         {/* ── PAS DE COURSE ACTIVE ── */}
         {onglet === "actives" && !maCourse && (
           <div className="py-12 text-center space-y-3">
-            <div className="text-6xl">😊</div>
+            <div className="text-6xl"></div>
             <p className="text-sm font-medium text-gray-500">Aucune course active en ce moment</p>
             <button
               onClick={() => navigate("/")}
@@ -407,7 +409,7 @@ export default function ClientSuiviCourse() {
                       c.statut === "livreur_en_route" ? "bg-blue-100 text-blue-700" :
                       "bg-purple-100 text-purple-700"
                     }`}>
-                      {c.statut === "recherche_livreur" ? "🔍" : c.statut === "livreur_en_route" ? "🚀" : "📦"}
+                      {c.statut === "recherche_livreur" ? "" : c.statut === "livreur_en_route" ? "" : ""}
                     </Badge>
                   </div>
                 </button>
@@ -460,6 +462,36 @@ export default function ClientSuiviCourse() {
         {maCourse.livreur_id && maCourse.heure_acceptation && (
           <LivreurAssigneCard course={maCourse} />
         )}
+
+        {/* Messagerie client-livreur-admin */}
+        {maCourse.livreur_id && !["livree", "annulee"].includes(maCourse.statut) && clientProfilId && (
+          <ChatWindow
+            courseId={maCourse.id}
+            senderType="client"
+            senderId={clientProfilId}
+            senderName={maCourse.expediteur_nom || maCourse.client_nom || "Client"}
+            clientName={maCourse.expediteur_nom || maCourse.client_nom}
+            livreurName={maCourse.livreur_nom}
+          />
+        )}
+
+        {/* Carte live du livreur */}
+        {["livreur_en_route", "colis_recupere", "en_livraison"].includes(maCourse.statut) && (() => {
+          const l = maCourse._livreur;
+          const isVersRecup = maCourse.statut === "livreur_en_route";
+          return (
+            <CarteLivreurClient
+              livreurLat={l?.latitude}
+              livreurLng={l?.longitude}
+              livreurNom={maCourse.livreur_nom}
+              departLat={maCourse.gps_depart_lat}
+              departLng={maCourse.gps_depart_lng}
+              arriveeLat={maCourse.gps_arrivee_lat}
+              arriveeLng={maCourse.gps_arrivee_lng}
+              statut={maCourse.statut}
+            />
+          );
+        })()}
 
         {/* ETA temps réel — expéditeur : vers récupération puis vers livraison */}
         {/* CORRECTION CRITIQUE : ETA TOUJOURS affiché, même <100m */}
@@ -561,12 +593,12 @@ export default function ClientSuiviCourse() {
               ? haversineKm(maCourse.gps_depart_lat, maCourse.gps_depart_lng, maCourse.gps_arrivee_lat, maCourse.gps_arrivee_lng)
               : null;
             const isFinal = isLivree && maCourse.prix_final > 0;
-            
-            // ✅ PRIX MANUEL ACCEPTÉ = prix officiel de la course
-            const isPrixManuelAccepte = maCourse.pricing_mode === "manual" 
-              && maCourse.manual_price_status === "accepted" 
+
+            // PRIX MANUEL ACCEPTÉ = prix officiel de la course
+            const isPrixManuelAccepte = maCourse.pricing_mode === "manual"
+              && maCourse.manual_price_status === "accepted"
               && maCourse.manual_price > 0;
-            
+
             let prix = 0;
             if (isPrixManuelAccepte) {
               // Prix manuel accepté = source de vérité unique
@@ -602,7 +634,7 @@ export default function ClientSuiviCourse() {
                 <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-3 text-center shadow-lg">
                   <span className="text-2xl font-black text-white block">{prix > 0 ? prix.toLocaleString() : "—"}</span>
                   <span className="text-[10px] font-bold text-blue-100 uppercase tracking-wide">
-                    {isPrixManuelAccepte ? "Prix validé ✓" : isFinal ? "Prix final" : "Prix approx."}
+                    {isPrixManuelAccepte ? "Prix validé " : isFinal ? "Prix final" : "Prix approx."}
                   </span>
                 </div>
               </div>
@@ -629,9 +661,9 @@ export default function ClientSuiviCourse() {
                   ? maCourse.adresse_arrivee && maCourse.adresse_arrivee !== "Destination à définir"
                     ? maCourse.adresse_arrivee
                     : maCourse.latitude_livraison
-                      ? `📍 GPS : ${Number(maCourse.latitude_livraison).toFixed(4)}, ${Number(maCourse.longitude_livraison).toFixed(4)}`
+                      ? ` GPS : ${Number(maCourse.latitude_livraison).toFixed(4)}, ${Number(maCourse.longitude_livraison).toFixed(4)}`
                       : maCourse.latitude_arrivee_livraison
-                        ? `📍 GPS : ${Number(maCourse.latitude_arrivee_livraison).toFixed(4)}, ${Number(maCourse.longitude_arrivee_livraison).toFixed(4)}`
+                        ? ` GPS : ${Number(maCourse.latitude_arrivee_livraison).toFixed(4)}, ${Number(maCourse.longitude_arrivee_livraison).toFixed(4)}`
                         : "Position du destinataire confirmée"
                   : maCourse.adresse_arrivee || "—"}
               </p>
@@ -692,19 +724,19 @@ export default function ClientSuiviCourse() {
             )}
             {maCourse.heure_acceptation && (
               <div className="flex justify-between items-center">
-                <span className="flex items-center gap-1.5 text-muted-foreground"><span className="text-green-500">✅</span> Acceptée à</span>
+                <span className="flex items-center gap-1.5 text-muted-foreground"><span className="text-green-500"></span> Acceptée à</span>
                 <span className="font-semibold">{format(new Date(maCourse.heure_acceptation), "HH:mm", { locale: fr })}</span>
               </div>
             )}
             {maCourse.heure_recuperation && (
               <div className="flex justify-between items-center">
-                <span className="flex items-center gap-1.5 text-muted-foreground"><span className="text-blue-500">📦</span> Récupérée à</span>
+                <span className="flex items-center gap-1.5 text-muted-foreground"><span className="text-blue-500"></span> Récupérée à</span>
                 <span className="font-semibold">{format(new Date(maCourse.heure_recuperation), "HH:mm", { locale: fr })}</span>
               </div>
             )}
             {maCourse.heure_livraison && (
               <div className="flex justify-between items-center">
-                <span className="flex items-center gap-1.5 text-muted-foreground"><span className="text-green-600">🏁</span> Livrée à</span>
+                <span className="flex items-center gap-1.5 text-muted-foreground"><span className="text-green-600"></span> Livrée à</span>
                 <span className="font-semibold text-green-600">{format(new Date(maCourse.heure_livraison), "HH:mm", { locale: fr })}</span>
               </div>
             )}
@@ -716,7 +748,7 @@ export default function ClientSuiviCourse() {
             )}
             {maCourse.distance_reelle_km > 0 && (
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">📏 Distance réelle</span>
+                <span className="text-muted-foreground"> Distance réelle</span>
                 <span className="font-semibold">{Number(maCourse.distance_reelle_km).toFixed(1)} km</span>
               </div>
             )}
@@ -804,7 +836,7 @@ export default function ClientSuiviCourse() {
                     );
                   })()}
                   <p className="text-center text-xs text-green-700 font-medium">
-                    Merci d'avoir utilisé SILGAPP 🙏
+                    Merci d'avoir utilisé SILGAPP
                   </p>
                 </div>
               </Card>
@@ -846,10 +878,10 @@ export default function ClientSuiviCourse() {
                 </Card>
               )}
 
-              {/* 👍/👎 Feedback destinataire */}
+              {/* / Feedback destinataire */}
               {isDestinataire && (
                 <div className="space-y-3">
-                  <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-1">👍/👎 Votre avis sur la livraison</p>
+                  <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-1">/ Votre avis sur la livraison</p>
                   <DestinataireReactionButton
                     course={maCourse}
                     onDone={() => navigate("/", { replace: true })}

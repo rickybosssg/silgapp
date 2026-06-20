@@ -97,7 +97,7 @@ function EcranGPS({ livreurId, onGpsOk }) {
     <div className="fixed inset-0 bg-black flex items-center justify-center p-6 z-50">
       <div className="w-full max-w-sm bg-zinc-900 rounded-3xl p-8 space-y-6 text-center border border-zinc-800">
         <div className="w-24 h-24 rounded-full bg-red-600/20 border-2 border-red-600 flex items-center justify-center mx-auto animate-pulse">
-          <span className="text-5xl">📍</span>
+          <span className="text-5xl"></span>
         </div>
         <div>
           <p className="text-2xl font-black text-white mb-2">GPS Obligatoire</p>
@@ -107,7 +107,7 @@ function EcranGPS({ livreurId, onGpsOk }) {
         </div>
         <div className="bg-amber-950/50 border border-amber-700 rounded-2xl p-4">
           <p className="text-xs text-amber-400 leading-relaxed">
-            ⚠️ Sans GPS, vous ne pourrez pas recevoir de courses.
+             Sans GPS, vous ne pourrez pas recevoir de courses.
           </p>
         </div>
         <button
@@ -117,7 +117,7 @@ function EcranGPS({ livreurId, onGpsOk }) {
         >
           {loading ? (
             <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Activation...</>
-          ) : "📍 Activer le GPS"}
+          ) : " Activer le GPS"}
         </button>
         <p className="text-xs text-gray-400">Appuyez sur "Autoriser" lorsque l'appareil vous le demande</p>
       </div>
@@ -188,7 +188,7 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
       // Marquer en localStorage que le profil est complet
       try { localStorage.setItem(`livreur_profil_complet_${livreurProfil.id}`, "true"); } catch (_) {}
       toast.success("Profil enregistré !");
-      
+
       // Initialisation automatique système
       base44.functions.invoke('initLivreurAuto', {
         device_id: navigator.userAgent.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 50),
@@ -200,7 +200,7 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
         latitude: gpsData?.lat,
         longitude: gpsData?.lng,
       }).catch(() => null);
-      
+
       onTermine({ ...livreurProfil, ...data });
     } catch {
       toast.error("Erreur lors de la sauvegarde – réessayez");
@@ -214,7 +214,7 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
       <div className="max-w-sm mx-auto px-5 py-8 space-y-5">
         <div className="text-center mb-2">
           <div className="w-16 h-16 rounded-2xl bg-red-600 flex items-center justify-center mx-auto mb-3">
-            <span className="text-3xl">⚡</span>
+            <span className="text-3xl"></span>
           </div>
           <h1 className="text-2xl font-black text-white">Complétez votre profil</h1>
           <p className="text-sm text-gray-400 mt-1">Indispensable pour recevoir des courses</p>
@@ -239,7 +239,7 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
 
         {/* Pays */}
         <div>
-          <label className="block text-xs font-bold text-gray-300 mb-2 uppercase tracking-wide">🌍 Pays * (obligatoire)</label>
+          <label className="block text-xs font-bold text-gray-300 mb-2 uppercase tracking-wide"> Pays * (obligatoire)</label>
           <CountryCodeSelect
             value={countryCode}
             onChange={(code) => { setCountryCode(code); setF("telephone", ""); }}
@@ -275,10 +275,10 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
           <label className="block text-xs font-bold text-gray-300 mb-2 uppercase tracking-wide">Type de véhicule *</label>
           <div className="grid grid-cols-2 gap-2">
             {[
-              { val: "moto", label: "🏍️ Moto" },
-              { val: "velo", label: "🚲 Vélo" },
-              { val: "voiture", label: "🚗 Voiture" },
-              { val: "a_pied", label: "🚶 À pied" },
+              { val: "moto", label: " Moto" },
+              { val: "velo", label: " Vélo" },
+              { val: "voiture", label: " Voiture" },
+              { val: "a_pied", label: " À pied" },
             ].map(({ val, label }) => (
               <button
                 key={val}

@@ -8,11 +8,11 @@ function getNetworkHealth({ libres, enCourse, clientsGPS, clientsTotal, enAttent
   const totalActifs = libres + enCourse + (clientsGPS || 0);
   const hasActivity = totalActifs > 0 || enAttente > 0;
 
-  // 🔴 Réseau inactif = ZERO livreur libre + ZERO client GPS récent + ZERO course en attente
+  // Réseau inactif = ZERO livreur libre + ZERO client GPS récent + ZERO course en attente
   // Les livreurs "en course" ne comptent PAS pour activer le réseau
   if (libres === 0 && (clientsGPS || 0) === 0 && enAttente === 0) {
     return {
-      heart: "🔴",
+      heart: "",
       label: "Réseau inactif",
       description: "Aucun utilisateur actif visible.",
       bg: "bg-gray-100 border-gray-300",
@@ -20,10 +20,10 @@ function getNetworkHealth({ libres, enCourse, clientsGPS, clientsTotal, enAttent
     };
   }
 
-  // 🟡 Activité faible = très peu d'utilisateurs (1-2)
+  // Activité faible = très peu d'utilisateurs (1-2)
   if (totalActifs <= 2 && enAttente === 0) {
     return {
-      heart: "🟡",
+      heart: "",
       label: "Activité faible",
       description: "Très peu d'utilisateurs actifs sur le réseau.",
       bg: "bg-yellow-50 border-yellow-300",
@@ -31,10 +31,10 @@ function getNetworkHealth({ libres, enCourse, clientsGPS, clientsTotal, enAttent
     };
   }
 
-  // 🟢 Réseau opérationnel = au moins un livreur libre ou client GPS
+  // Réseau opérationnel = au moins un livreur libre ou client GPS
   if (libres > 0 || (clientsGPS || 0) > 0) {
     return {
-      heart: "🟢",
+      heart: "",
       label: "Réseau opérationnel",
       description: "Utilisateurs actifs et opérationnels.",
       bg: "bg-green-50 border-green-300",
@@ -42,9 +42,9 @@ function getNetworkHealth({ libres, enCourse, clientsGPS, clientsTotal, enAttent
     };
   }
 
-  // 🟠 Situation intermédiaire
+  // Situation intermédiaire
   return {
-    heart: "🟠",
+    heart: "",
     label: "Activité en cours",
     description: "Livreurs en mission, réseau actif.",
     bg: "bg-orange-50 border-orange-300",
@@ -73,10 +73,10 @@ export default function NetworkHealthBanner({ libres, enCourse, clientsGPS, clie
 
       {/* Stats */}
       <div className="flex flex-wrap gap-x-4 gap-y-1">
-        <StatItem emoji="🟢" label="Livreurs libres" value={libres} />
-        <StatItem emoji="🟠" label="En course" value={enCourse} />
-        <StatItem emoji="🔵" label={`Clients${clientsTotal !== undefined && clientsTotal !== clientsGPS ? ` (${clientsTotal} totaux)` : ''}`} value={clientsGPS} />
-        <StatItem emoji="🔴" label="Courses en attente" value={enAttente} />
+        <StatItem emoji="" label="Livreurs libres" value={libres} />
+        <StatItem emoji="" label="En course" value={enCourse} />
+        <StatItem emoji="" label={`Clients${clientsTotal !== undefined && clientsTotal !== clientsGPS ? ` (${clientsTotal} totaux)` : ''}`} value={clientsGPS} />
+        <StatItem emoji="" label="Courses en attente" value={enAttente} />
       </div>
     </div>
   );

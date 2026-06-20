@@ -21,7 +21,7 @@ export default function DiagnosticLivreurCard() {
     onSuccess: (data) => {
       setResult(data);
       if (data.success) {
-        toast.success("Diagnostic terminé ✅");
+        toast.success("Diagnostic terminé ");
       } else {
         toast.error("Erreur: " + data.error);
       }
@@ -62,9 +62,9 @@ export default function DiagnosticLivreurCard() {
               placeholder="collez l'ID ici"
               className="flex-1 bg-white text-sm"
             />
-            <Button 
-              size="sm" 
-              onClick={handleDiagnostic} 
+            <Button
+              size="sm"
+              onClick={handleDiagnostic}
               disabled={loading || !courseId.trim()}
               className="flex-shrink-0"
             >
@@ -81,7 +81,7 @@ export default function DiagnosticLivreurCard() {
                   <CheckCircle2 className="w-4 h-4" />
                   <span className="font-semibold">Course trouvée</span>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-2 mt-2">
                   <div className="bg-white p-2 rounded border">
                     <p className="text-gray-500">Statut</p>

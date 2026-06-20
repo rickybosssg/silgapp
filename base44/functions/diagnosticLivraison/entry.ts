@@ -53,13 +53,13 @@ Deno.serve(async (req) => {
 
     // Calculer la distance réelle si coordonnées disponibles
     let distance_calculated = null;
-    if (course.latitude_recuperation && course.longitude_recuperation && 
+    if (course.latitude_recuperation && course.longitude_recuperation &&
         course.latitude_livraison && course.longitude_livraison) {
       const lat1 = course.latitude_recuperation;
       const lon1 = course.longitude_recuperation;
       const lat2 = course.latitude_livraison;
       const lon2 = course.longitude_livraison;
-      
+
       const R = 6371;
       const dLat = (lat2 - lat1) * Math.PI / 180;
       const dLon = (lon2 - lon1) * Math.PI / 180;
@@ -90,19 +90,19 @@ Deno.serve(async (req) => {
         actif: livreur_info.actif,
       } : null,
       recommendations: [
-        !checks.delivery_token_exists && "❌ Token QR de livraison manquant - régénérer via admin",
-        !checks.delivery_code_exists && "❌ Code 4 chiffres manquant - régénérer via admin",
-        !checks.has_livraison_coords && "❌ Coordonnées de livraison manquantes - le livreur n'a pas scanné",
-        !checks.has_prix_final && "⚠️ Prix final non calculé",
-        !checks.has_distance_reelle && "⚠️ Distance réelle non enregistrée",
-        checks.statut_is_livree && !checks.delivery_confirmed && "⚠️ Statut 'livree' mais non confirmé par QR/code",
+        !checks.delivery_token_exists && " Token QR de livraison manquant - régénérer via admin",
+        !checks.delivery_code_exists && " Code 4 chiffres manquant - régénérer via admin",
+        !checks.has_livraison_coords && " Coordonnées de livraison manquantes - le livreur n'a pas scanné",
+        !checks.has_prix_final && " Prix final non calculé",
+        !checks.has_distance_reelle && " Distance réelle non enregistrée",
+        checks.statut_is_livree && !checks.delivery_confirmed && " Statut 'livree' mais non confirmé par QR/code",
       ].filter(Boolean),
     });
   } catch (error) {
-    return Response.json({ 
-      success: false, 
+    return Response.json({
+      success: false,
       error: error.message,
-      stack: error.stack 
+      stack: error.stack
     }, { status: 500 });
   }
 });

@@ -2,26 +2,26 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 // ─── Quartiers de référence (Ouagadougou) ────────────────────────────────────
 const QUARTIERS_REF = [
-  { nom: "Ouaga 2000",       lat: 12.3230, lng: -1.5325, rayon_km: 2.0 },
-  { nom: "Pissy",            lat: 12.3580, lng: -1.5780, rayon_km: 1.8 },
-  { nom: "Gounghin",         lat: 12.3590, lng: -1.5250, rayon_km: 1.5 },
-  { nom: "Patte d'Oie",      lat: 12.3720, lng: -1.5560, rayon_km: 1.5 },
-  { nom: "Hamdalaye",        lat: 12.3800, lng: -1.5200, rayon_km: 1.5 },
-  { nom: "Zone du Bois",     lat: 12.3660, lng: -1.5050, rayon_km: 1.5 },
-  { nom: "Zogona",           lat: 12.3900, lng: -1.5320, rayon_km: 1.5 },
-  { nom: "Dapoya",           lat: 12.3660, lng: -1.5280, rayon_km: 1.5 },
-  { nom: "Ouaga centre",     lat: 12.3648, lng: -1.5355, rayon_km: 2.5 },
-  { nom: "Cissin",           lat: 12.3480, lng: -1.5100, rayon_km: 1.5 },
-  { nom: "Karpala",          lat: 12.3350, lng: -1.5280, rayon_km: 1.5 },
-  { nom: "Tampouy",          lat: 12.3950, lng: -1.5500, rayon_km: 1.5 },
-  { nom: "Wemtenga",         lat: 12.3800, lng: -1.5070, rayon_km: 1.5 },
-  { nom: "Nagrin",           lat: 12.3700, lng: -1.4900, rayon_km: 1.5 },
-  { nom: "Secteur 27",       lat: 12.3400, lng: -1.5580, rayon_km: 2.0 },
-  { nom: "Nioko",            lat: 12.4100, lng: -1.5600, rayon_km: 1.8 },
-  { nom: "Samandin",         lat: 12.3560, lng: -1.5460, rayon_km: 1.5 },
-  { nom: "Koulouba",         lat: 12.3740, lng: -1.5430, rayon_km: 1.5 },
-  { nom: "Saint-Léon",       lat: 12.3770, lng: -1.5310, rayon_km: 1.5 },
-  { nom: "Larlé",            lat: 12.3630, lng: -1.4980, rayon_km: 1.5 },
+  { nom: "Ouaga 2000", lat: 12.3230, lng: -1.5325, rayon_km: 2.0 },
+  { nom: "Pissy", lat: 12.3580, lng: -1.5780, rayon_km: 1.8 },
+  { nom: "Gounghin", lat: 12.3590, lng: -1.5250, rayon_km: 1.5 },
+  { nom: "Patte d'Oie", lat: 12.3720, lng: -1.5560, rayon_km: 1.5 },
+  { nom: "Hamdalaye", lat: 12.3800, lng: -1.5200, rayon_km: 1.5 },
+  { nom: "Zone du Bois", lat: 12.3660, lng: -1.5050, rayon_km: 1.5 },
+  { nom: "Zogona", lat: 12.3900, lng: -1.5320, rayon_km: 1.5 },
+  { nom: "Dapoya", lat: 12.3660, lng: -1.5280, rayon_km: 1.5 },
+  { nom: "Ouaga centre", lat: 12.3648, lng: -1.5355, rayon_km: 2.5 },
+  { nom: "Cissin", lat: 12.3480, lng: -1.5100, rayon_km: 1.5 },
+  { nom: "Karpala", lat: 12.3350, lng: -1.5280, rayon_km: 1.5 },
+  { nom: "Tampouy", lat: 12.3950, lng: -1.5500, rayon_km: 1.5 },
+  { nom: "Wemtenga", lat: 12.3800, lng: -1.5070, rayon_km: 1.5 },
+  { nom: "Nagrin", lat: 12.3700, lng: -1.4900, rayon_km: 1.5 },
+  { nom: "Secteur 27", lat: 12.3400, lng: -1.5580, rayon_km: 2.0 },
+  { nom: "Nioko", lat: 12.4100, lng: -1.5600, rayon_km: 1.8 },
+  { nom: "Samandin", lat: 12.3560, lng: -1.5460, rayon_km: 1.5 },
+  { nom: "Koulouba", lat: 12.3740, lng: -1.5430, rayon_km: 1.5 },
+  { nom: "Saint-Léon", lat: 12.3770, lng: -1.5310, rayon_km: 1.5 },
+  { nom: "Larlé", lat: 12.3630, lng: -1.4980, rayon_km: 1.5 },
 ];
 
 // ─── Firebase FCM ─────────────────────────────────────────────────────────────
@@ -136,10 +136,10 @@ function niveauFromScore(score, config) {
     moyenne: parseFloat(config.ZC_SCORE_MOYEN) || 3,
     faible: parseFloat(config.ZC_SCORE_FAIBLE) || 1.5,
   };
-  if (score >= seuils.tres_forte) return { niveau: "tres_forte", emoji: "🔴", label: "Très forte demande" };
-  if (score >= seuils.forte) return { niveau: "forte", emoji: "🟠", label: "Forte demande" };
-  if (score >= seuils.moyenne) return { niveau: "moyenne", emoji: "🟡", label: "Demande moyenne" };
-  return { niveau: "faible", emoji: "🟢", label: "Faible demande" };
+  if (score >= seuils.tres_forte) return { niveau: "tres_forte", emoji: "", label: "Très forte demande" };
+  if (score >= seuils.forte) return { niveau: "forte", emoji: "", label: "Forte demande" };
+  if (score >= seuils.moyenne) return { niveau: "moyenne", emoji: "", label: "Demande moyenne" };
+  return { niveau: "faible", emoji: "", label: "Faible demande" };
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────
@@ -209,15 +209,15 @@ Deno.serve(async (req) => {
       const lng = pays.longitude_centre;
       const ville = pays.ville_principale || pays.nom || countryCode;
       zonesRef = [
-        { nom: `${ville} Centre`,   lat,        lng,        rayon_km: rayonKm * 1.0 },
-        { nom: `${ville} Nord`,     lat: lat + 0.05, lng,        rayon_km: rayonKm * 0.67 },
-        { nom: `${ville} Sud`,      lat: lat - 0.05, lng,        rayon_km: rayonKm * 0.67 },
-        { nom: `${ville} Est`,      lat,        lng: lng + 0.05, rayon_km: rayonKm * 0.67 },
-        { nom: `${ville} Ouest`,    lat,        lng: lng - 0.05, rayon_km: rayonKm * 0.67 },
+        { nom: `${ville} Centre`, lat, lng, rayon_km: rayonKm * 1.0 },
+        { nom: `${ville} Nord`, lat: lat + 0.05, lng, rayon_km: rayonKm * 0.67 },
+        { nom: `${ville} Sud`, lat: lat - 0.05, lng, rayon_km: rayonKm * 0.67 },
+        { nom: `${ville} Est`, lat, lng: lng + 0.05, rayon_km: rayonKm * 0.67 },
+        { nom: `${ville} Ouest`, lat, lng: lng - 0.05, rayon_km: rayonKm * 0.67 },
         { nom: `${ville} Nord-Est`, lat: lat + 0.04, lng: lng + 0.04, rayon_km: rayonKm * 0.6 },
         { nom: `${ville} Sud-Ouest`,lat: lat - 0.04, lng: lng - 0.04, rayon_km: rayonKm * 0.6 },
         { nom: `${ville} Périphérie Nord`, lat: lat + 0.09, lng, rayon_km: rayonKm * 0.83 },
-        { nom: `${ville} Périphérie Sud`,  lat: lat - 0.09, lng, rayon_km: rayonKm * 0.83 },
+        { nom: `${ville} Périphérie Sud`, lat: lat - 0.09, lng, rayon_km: rayonKm * 0.83 },
       ];
     } else {
       // Appliquer le rayon configurable aux zones Ouaga
@@ -317,7 +317,7 @@ Deno.serve(async (req) => {
         const attenteStr = zone.temps_attente_min > 0 ? `\nTemps d'attente moyen : ${zone.temps_attente_min} min.` : "";
 
         const alerte = await base44.asServiceRole.entities.AlerteLivreur.create({
-          titre: `🔥 Forte demande détectée à ${zone.nom}`,
+          titre: ` Forte demande détectée à ${zone.nom}`,
           message: `${nbCourses} demande${nbCourses > 1 ? "s" : ""} de livraison en attente.\nSeulement ${nbLivreurs} livreur${nbLivreurs !== 1 ? "s" : ""} disponible${nbLivreurs !== 1 ? "s" : ""}.${attenteStr}\n\nRapprochez-vous de cette zone pour recevoir davantage de courses.`,
           niveau: zone.niveau === "tres_forte" ? "urgent" : "important",
           reseau: "externe",
@@ -382,8 +382,8 @@ Deno.serve(async (req) => {
         }
 
         // Envoyer les push
-        const message = `🔥 ${zone.nb_courses} course${zone.nb_courses > 1 ? "s" : ""} disponible${zone.nb_courses > 1 ? "s" : ""} à ${zone.nom}. Déplacez-vous vers cette zone pour augmenter vos chances.`;
-        const pushTitre = `🔥 Zone très demandée`;
+        const message = ` ${zone.nb_courses} course${zone.nb_courses > 1 ? "s" : ""} disponible${zone.nb_courses > 1 ? "s" : ""} à ${zone.nom}. Déplacez-vous vers cette zone pour augmenter vos chances.`;
+        const pushTitre = ` Zone très demandée`;
 
         for (const eligible of livreursEligibles) {
           for (const tokenItem of eligible.tokens) {
@@ -448,14 +448,14 @@ Deno.serve(async (req) => {
           longitude: zone.lng,
           notifications_envoyees: notifsEnvoyees,
           notifications_echouees: notifsEchouees,
-          message_envoye: pushActif ? `🔥 Zone chaude ${zone.nom} — ${zone.nb_courses} courses, ${zone.nb_livreurs} livreurs` : "Push désactivé",
+          message_envoye: pushActif ? ` Zone chaude ${zone.nom} — ${zone.nb_courses} courses, ${zone.nb_livreurs} livreurs` : "Push désactivé",
           alerte_livreur_id: alerteId,
           date_analyse: nowIso,
         });
       } catch (_) {}
     }
 
-    console.log(`[ZonesChaudes] ✅ Analyse terminée — ${zonesChaudes.length} zones chaudes, ${alertesCreees.length} alertes créées, ${pushesEnvoyes.reduce((s, p) => s + p.envoyees, 0)} push envoyées`);
+    console.log(`[ZonesChaudes] Analyse terminée — ${zonesChaudes.length} zones chaudes, ${alertesCreees.length} alertes créées, ${pushesEnvoyes.reduce((s, p) => s + p.envoyees, 0)} push envoyées`);
 
     return Response.json({
       success: true,
@@ -480,7 +480,7 @@ Deno.serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('[ZonesChaudes] ❌ Erreur:', error.message);
+    console.error('[ZonesChaudes] Erreur:', error.message);
     return Response.json({ success: false, error: error.message }, { status: 500 });
   }
 });

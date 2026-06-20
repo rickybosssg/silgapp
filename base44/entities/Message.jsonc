@@ -1,0 +1,58 @@
+{
+  "name": "Message",
+  "type": "object",
+  "properties": {
+    "course_id": {
+      "type": "string",
+      "description": "ID de la course concern\u00e9e (optionnel pour conversations g\u00e9n\u00e9rales)"
+    },
+    "conversation_id": {
+      "type": "string",
+      "description": "ID de la conversation g\u00e9n\u00e9rale (optionnel pour chat de course)"
+    },
+    "sender_type": {
+      "type": "string",
+      "enum": [
+        "client",
+        "livreur",
+        "admin"
+      ],
+      "description": "Qui envoie le message"
+    },
+    "sender_id": {
+      "type": "string",
+      "description": "ID du sender (client_id, livreur_id, ou email admin)"
+    },
+    "sender_name": {
+      "type": "string",
+      "description": "Nom affich\u00e9 du sender"
+    },
+    "message_type": {
+      "type": "string",
+      "enum": [
+        "text",
+        "audio",
+        "photo"
+      ],
+      "default": "text",
+      "description": "Type de message"
+    },
+    "content": {
+      "type": "string",
+      "description": "Contenu du message texte"
+    },
+    "audio_url": {
+      "type": "string",
+      "description": "URL du fichier audio"
+    },
+    "photo_url": {
+      "type": "string",
+      "description": "URL de la photo"
+    }
+  },
+  "required": [
+    "sender_type",
+    "sender_id",
+    "sender_name"
+  ]
+}

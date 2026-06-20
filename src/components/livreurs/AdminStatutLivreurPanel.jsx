@@ -47,8 +47,8 @@ export default function AdminStatutLivreurPanel({ livreur, coursesActives = [] }
       if (livreur.user_email) {
         base44.integrations.Core.SendEmail({
           to: livreur.user_email,
-          subject: "⚠️ Compte mis hors ligne",
-          body: `Bonjour ${livreur.prenom || livreur.nom},\n\n⚠️ Votre compte a été mis hors ligne par l'administration SILGAPP.\n\nVous ne recevrez plus de nouvelles courses jusqu'à réactivation.\n\nContactez l'administration pour plus d'informations.`,
+          subject: " Compte mis hors ligne",
+          body: `Bonjour ${livreur.prenom || livreur.nom},\n\n Votre compte a été mis hors ligne par l'administration SILGAPP.\n\nVous ne recevrez plus de nouvelles courses jusqu'à réactivation.\n\nContactez l'administration pour plus d'informations.`,
         }).catch(() => null);
       }
       queryClient.invalidateQueries({ queryKey: ["livreurs-externes"] });
@@ -73,8 +73,8 @@ export default function AdminStatutLivreurPanel({ livreur, coursesActives = [] }
       if (livreur.user_email) {
         base44.integrations.Core.SendEmail({
           to: livreur.user_email,
-          subject: "✅ Compte remis en ligne",
-          body: `Bonjour ${livreur.prenom || livreur.nom},\n\n✅ Votre compte a été remis en ligne par l'administration SILGAPP.\n\nVous pouvez à nouveau recevoir des courses. Bonne journée !`,
+          subject: " Compte remis en ligne",
+          body: `Bonjour ${livreur.prenom || livreur.nom},\n\n Votre compte a été remis en ligne par l'administration SILGAPP.\n\nVous pouvez à nouveau recevoir des courses. Bonne journée !`,
         }).catch(() => null);
       }
       queryClient.invalidateQueries({ queryKey: ["livreurs-externes"] });
@@ -112,7 +112,7 @@ export default function AdminStatutLivreurPanel({ livreur, coursesActives = [] }
         </div>
         <div className="flex-1">
           <p className={`text-sm font-bold ${isAdminOff ? "text-red-700" : "text-green-700"}`}>
-            {isAdminOff ? "🔴 OFF par l'administration" : livreur.statut === "en_course" ? "🟠 En course (livreur)" : livreur.statut === "disponible" ? "🟢 ON par le livreur" : "⚫ OFF par le livreur"}
+            {isAdminOff ? " OFF par l'administration" : livreur.statut === "en_course" ? " En course (livreur)" : livreur.statut === "disponible" ? " ON par le livreur" : " OFF par le livreur"}
           </p>
           <p className={`text-xs ${isAdminOff ? "text-red-500" : "text-green-600"}`}>
             {isAdminOff ? "Non dispatchable — hors service admin" : "Éligible au dispatch"}
@@ -125,7 +125,7 @@ export default function AdminStatutLivreurPanel({ livreur, coursesActives = [] }
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
           <p className="text-xs text-amber-700 font-medium">
-            ⚠️ Ce livreur est actuellement en mission active.
+             Ce livreur est actuellement en mission active.
           </p>
         </div>
       )}
@@ -133,7 +133,7 @@ export default function AdminStatutLivreurPanel({ livreur, coursesActives = [] }
       {/* Confirmation force (en course) */}
       {showConfirmForce && (
         <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 space-y-3">
-          <p className="text-sm font-bold text-red-700">⚠️ Livreur en mission</p>
+          <p className="text-sm font-bold text-red-700"> Livreur en mission</p>
           <p className="text-xs text-red-600">
             Ce livreur a une course en cours. Forcer la mise hors ligne l'exclura du dispatch immédiatement.
           </p>
@@ -168,7 +168,7 @@ export default function AdminStatutLivreurPanel({ livreur, coursesActives = [] }
             disabled={loading}
           >
             <Power className="w-4 h-4" />
-            {loading ? "Réactivation..." : "🟢 Remettre en ligne"}
+            {loading ? "Réactivation..." : " Remettre en ligne"}
           </Button>
         ) : (
           <Button
@@ -178,7 +178,7 @@ export default function AdminStatutLivreurPanel({ livreur, coursesActives = [] }
             disabled={loading}
           >
             <PowerOff className="w-4 h-4" />
-            {loading ? "Mise hors ligne..." : "🔴 Mettre hors ligne"}
+            {loading ? "Mise hors ligne..." : " Mettre hors ligne"}
           </Button>
         )
       )}

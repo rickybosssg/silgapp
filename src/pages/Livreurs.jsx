@@ -161,7 +161,7 @@ function LivreurCard({ livreur, courses, onValider, onRefuser, onToggleStatut, o
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
             <span className="text-muted-foreground">{nbCourses} course{nbCourses > 1 ? "s" : ""} livrée{nbCourses > 1 ? "s" : ""} aujourd'hui</span>
             {isPaye ? (
-              <Badge className="bg-green-500 text-white text-[10px] self-start">✅ Payé</Badge>
+              <Badge className="bg-green-500 text-white text-[10px] self-start"> Payé</Badge>
             ) : totalDu > 0 ? (
               <Badge className="bg-amber-500 text-white text-[10px] self-start">Non payé</Badge>
             ) : null}
@@ -242,7 +242,7 @@ export default function Livreurs() {
 
   const handleValider = (livreur) => {
     updateMutation.mutate({ id: livreur.id, data: { validation: "valide", statut: "hors_ligne" } });
-    toast.success(`${livreur.prenom || livreur.nom} validé ✅`);
+    toast.success(`${livreur.prenom || livreur.nom} validé `);
   };
 
   const handleRefuser = (livreur) => {
@@ -277,7 +277,7 @@ export default function Livreurs() {
         admin_paiement: currentUser?.full_name || currentUser?.email || "admin",
       },
     });
-    toast.success(`Paiement de ${montant.toLocaleString()} FCFA validé ✅`);
+    toast.success(`Paiement de ${montant.toLocaleString()} FCFA validé `);
   };
 
   const genererCodesMutation = useMutation({
@@ -292,7 +292,7 @@ export default function Livreurs() {
   // Séparer par type_livreur
   const internes = livreurs.filter(l => l.type_livreur === "interne");
   const externes = livreurs.filter(l => l.type_livreur === "externe");
-  
+
   const enAttente = internes.filter(l => l.validation === "en_attente");
   const valides = internes.filter(l => l.validation === "valide");
   const refuses = internes.filter(l => l.validation === "refuse");
@@ -321,7 +321,7 @@ export default function Livreurs() {
           )}
           {livreursError && (
             <span className="text-xs text-destructive bg-destructive/10 px-2 py-0.5 rounded-full" title={livreursError?.message}>
-              ⚠️ {livreursError?.message || 'Erreur chargement'}
+               {livreursError?.message || 'Erreur chargement'}
             </span>
           )}
         </div>

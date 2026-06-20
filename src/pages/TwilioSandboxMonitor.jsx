@@ -224,7 +224,7 @@ export default function TwilioSandboxMonitor() {
                 <p className="text-xs text-gray-500 font-mono mt-0.5 truncate">{stats.derniere_erreur_63015.livreur_telephone}</p>
               </div>
             ) : (
-              <p className="text-sm text-green-600 font-medium">✅ Aucune erreur récente</p>
+              <p className="text-sm text-green-600 font-medium"> Aucune erreur récente</p>
             )}
           </Card>
 

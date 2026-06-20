@@ -4,18 +4,18 @@ import { base44 } from "@/api/base44Client";
 /**
  * Hook qui détermine le contexte admin de l'utilisateur connecté.
  *et gère le pays sélectionné*.
- * 
+ *
  * - Admin Global : role="admin" ET (pas de country_code OU admin_type="global")
- * - Admin Pays   : role="admin" ET admin_type="pays" ET country_code renseigné
- * 
+ * - Admin Pays : role="admin" ET admin_type="pays" ET country_code renseigné
+ *
  * Retourne :
- *   - isGlobal          : boolean
- *   - isPays            : boolean
- *   - countryCode       : string | null (ex: "BF", "CI") — null si global
- *   - selectedCountry   : string | null (pays sélectionné par l'admin global)
- *   - setSelectedCountry: fonction pour changer le pays sélectionné
- *   - user              : object | null
- *   - loading           : boolean
+ * - isGlobal : boolean
+ * - isPays : boolean
+ * - countryCode : string | null (ex: "BF", "CI") — null si global
+ * - selectedCountry : string | null (pays sélectionné par l'admin global)
+ * - setSelectedCountry: fonction pour changer le pays sélectionné
+ * - user : object | null
+ * - loading : boolean
  */
 export function useAdminContext() {
   const [state, setState] = useState({ user: null, loading: true });

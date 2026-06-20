@@ -15,11 +15,11 @@ export default function SyncLivreurGPSPanel() {
     try {
       const response = await base44.functions.invoke("syncLivreurGPS", {});
       setStats(response.data);
-      
+
       if (response.data.success) {
-        toast.success(`✅ ${response.data.message}`);
+        toast.success(` ${response.data.message}`);
       } else {
-        toast.error(`❌ ${response.data.error}`);
+        toast.error(` ${response.data.error}`);
       }
     } catch (error) {
       toast.error(`Erreur: ${error.message}`);
@@ -43,8 +43,8 @@ export default function SyncLivreurGPSPanel() {
           <strong>Note:</strong> Le GPS est maintenant automatiquement sauvegardé lors de l'onboarding.
         </div>
 
-        <Button 
-          onClick={handleSync} 
+        <Button
+          onClick={handleSync}
           disabled={syncing}
           className="w-full"
         >
@@ -81,7 +81,7 @@ export default function SyncLivreurGPSPanel() {
             {stats.details && stats.details.length > 0 && (
               <div className="max-h-60 overflow-y-auto space-y-2">
                 {stats.details.map((livreur) => (
-                  <div 
+                  <div
                     key={livreur.id}
                     className="flex items-center justify-between p-2 rounded-lg border"
                   >
@@ -89,7 +89,7 @@ export default function SyncLivreurGPSPanel() {
                       <p className="text-sm font-semibold">{livreur.nom}</p>
                       <p className="text-xs text-muted-foreground">{livreur.telephone}</p>
                       <p className="text-[10px] text-muted-foreground mt-1">
-                        {livreur.statut} • {livreur.app_active ? '🟢 En ligne' : '⚫ Hors ligne'}
+                        {livreur.statut} • {livreur.app_active ? ' En ligne' : ' Hors ligne'}
                       </p>
                     </div>
                     {livreur.status === 'déjà synchronisé' ? (

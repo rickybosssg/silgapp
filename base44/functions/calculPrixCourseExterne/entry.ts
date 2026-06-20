@@ -70,9 +70,9 @@ Deno.serve(async (req) => {
       if (countriesDB?.[0]) {
         const c = countriesDB[0];
         tarif = {
-          prix_par_km:    c.prix_par_km    || tarif.prix_par_km,
-          prix_minimum:   c.prix_minimum   || tarif.prix_minimum,
-          devise:         c.devise         || tarif.devise,
+          prix_par_km: c.prix_par_km || tarif.prix_par_km,
+          prix_minimum: c.prix_minimum || tarif.prix_minimum,
+          devise: c.devise || tarif.devise,
         };
         commissionPct = normalizeCommissionPct(c.commission_pct);
       }

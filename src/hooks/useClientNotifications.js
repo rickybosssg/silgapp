@@ -17,15 +17,15 @@ const CLIENT_IMPORTANT_TYPES = [
 ];
 
 const TYPE_LABELS = {
-  nouvelle_course:  "🆕 Nouvelle course",
-  course_assignee:  "🚴 Livreur assigné",
-  course_acceptee:  "✅ Course acceptée",
-  colis_recupere:   "📦 Colis récupéré",
-  en_livraison:     "🚚 En route pour livraison",
-  course_livree:    "🎉 Colis livré !",
-  course_bloquee:   "⚠️ Course bloquée",
-  course_annulee:   "❌ Course annulée",
-  rappel_reponse:   "⏰ Rappel",
+  nouvelle_course: "🆕 Nouvelle course",
+  course_assignee: " Livreur assigné",
+  course_acceptee: " Course acceptée",
+  colis_recupere: " Colis récupéré",
+  en_livraison: " En route pour livraison",
+  course_livree: " Colis livré !",
+  course_bloquee: " Course bloquée",
+  course_annulee: " Course annulée",
+  rappel_reponse: "⏰ Rappel",
 };
 
 /**
@@ -57,7 +57,7 @@ export function useClientNotifications(userEmail, onNotification) {
       const isImportant = CLIENT_IMPORTANT_TYPES.includes(notif.type);
       const label = TYPE_LABELS[notif.type] || notif.titre;
 
-      // ✅ Son + vibration immédiat — au moment exact de la réception de la notification
+      // Son + vibration immédiat — au moment exact de la réception de la notification
       if (isImportant) {
         playNotificationSound();
         navigator.vibrate?.([500, 150, 500, 150, 500]);

@@ -47,7 +47,7 @@ export default function GestionPays() {
       queryClient.invalidateQueries({ queryKey: ["countries-all"] });
       queryClient.invalidateQueries({ queryKey: ["countries-actifs"] });
       setEditingId(null);
-      toast.success("Pays mis à jour ✓");
+      toast.success("Pays mis à jour ");
     },
     onError: () => toast.error("Erreur de mise à jour"),
   });
@@ -57,7 +57,7 @@ export default function GestionPays() {
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["countries-all"] });
       queryClient.invalidateQueries({ queryKey: ["countries-actifs"] });
-      toast.success(vars.actif ? "Pays activé ✓" : "Pays désactivé");
+      toast.success(vars.actif ? "Pays activé " : "Pays désactivé");
     },
   });
 
@@ -75,7 +75,7 @@ export default function GestionPays() {
         }
       }
       queryClient.invalidateQueries({ queryKey: ["countries-all"] });
-      toast.success("Pays initialisés ✓");
+      toast.success("Pays initialisés ");
     } catch (e) {
       toast.error("Erreur : " + e.message);
     } finally {
@@ -118,7 +118,7 @@ export default function GestionPays() {
                 <ArrowLeft className="w-4 h-4" />
               </Button>
             </Link>
-            <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-2xl">🌍</div>
+            <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-2xl"></div>
             <div>
               <h1 className="text-xl font-black text-white tracking-tight">Gestion des pays SILGAPP</h1>
               <p className="text-white/60 text-xs mt-0.5">
@@ -170,13 +170,13 @@ export default function GestionPays() {
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {[
-                    { label: "Devise",          key: "devise" },
-                    { label: "Prix / km",       key: "prix_par_km",    type: "number" },
-                    { label: "Prix minimum",    key: "prix_minimum",   type: "number" },
-                    { label: "Commission %",       key: "commission_pct",    type: "number" },
+                    { label: "Devise", key: "devise" },
+                    { label: "Prix / km", key: "prix_par_km", type: "number" },
+                    { label: "Prix minimum", key: "prix_minimum", type: "number" },
+                    { label: "Commission %", key: "commission_pct", type: "number" },
                     { label: "Seuil encours (F)", key: "seuil_encours_max", type: "number" },
-                    { label: "Ville principale",  key: "ville_principale" },
-                    { label: "Rayon km",        key: "rayon_km",       type: "number" },
+                    { label: "Ville principale", key: "ville_principale" },
+                    { label: "Rayon km", key: "rayon_km", type: "number" },
                   ].map(f => (
                     <div key={f.key}>
                       <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide block mb-1">{f.label}</label>
@@ -204,7 +204,7 @@ export default function GestionPays() {
               /* ── VUE NORMALE ── */
               <div className="flex items-center gap-3">
                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 ${p.actif ? "bg-green-100" : "bg-gray-100"}`}>
-                  {p.emoji_flag || "🌍"}
+                  {p.emoji_flag || ""}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -225,7 +225,7 @@ export default function GestionPays() {
                       <Percent className="w-2.5 h-2.5" />{p.commission_pct != null ? `${p.commission_pct}% commission` : "Commission non configurée"}
                     </span>
                     <span className="flex items-center gap-1 text-[10px] bg-red-50 text-red-600 rounded-full px-2 py-0.5 font-medium">
-                      🔒 Seuil encours : {(p.seuil_encours_max || 5000).toLocaleString()} {p.devise || "FCFA"}
+                       Seuil encours : {(p.seuil_encours_max || 5000).toLocaleString()} {p.devise || "FCFA"}
                     </span>
                     {p.ville_principale && (
                       <span className="flex items-center gap-1 text-[10px] bg-gray-100 text-gray-600 rounded-full px-2 py-0.5 font-medium">
@@ -265,7 +265,7 @@ export default function GestionPays() {
       {/* ── LÉGENDE ──────────────────────────────────── */}
       {pays.length > 0 && (
         <div className="rounded-2xl bg-blue-50 border border-blue-100 p-4">
-          <p className="text-xs font-bold text-blue-800 mb-2 flex items-center gap-1.5">💡 Comment ça marche</p>
+          <p className="text-xs font-bold text-blue-800 mb-2 flex items-center gap-1.5"> Comment ça marche</p>
           <ul className="text-xs text-blue-700 space-y-1.5">
             <li>• <strong>Activer un pays</strong> → il apparaît dans les sélecteurs livreurs/clients</li>
             <li>• <strong>Prix/km</strong> → utilisé automatiquement au calcul de la course</li>

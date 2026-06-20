@@ -6,15 +6,15 @@ import { cn } from "@/lib/utils";
 
 // Données statiques de référence pour les pays supportés
 export const PAYS_SILGAPP = [
-  { code: "BF", nom: "Burkina Faso", indicatif: "+226", emoji_flag: "🇧🇫", devise: "FCFA", ville_principale: "Ouagadougou" },
-  { code: "CI", nom: "Côte d'Ivoire", indicatif: "+225", emoji_flag: "🇨🇮", devise: "FCFA", ville_principale: "Abidjan" },
-  { code: "TG", nom: "Togo", indicatif: "+228", emoji_flag: "🇹🇬", devise: "FCFA", ville_principale: "Lomé" },
-  { code: "BJ", nom: "Bénin", indicatif: "+229", emoji_flag: "🇧🇯", devise: "FCFA", ville_principale: "Cotonou" },
-  { code: "SN", nom: "Sénégal", indicatif: "+221", emoji_flag: "🇸🇳", devise: "FCFA", ville_principale: "Dakar" },
-  { code: "ML", nom: "Mali", indicatif: "+223", emoji_flag: "🇲🇱", devise: "FCFA", ville_principale: "Bamako" },
-  { code: "GN", nom: "Guinée", indicatif: "+224", emoji_flag: "🇬🇳", devise: "GNF", ville_principale: "Conakry" },
-  { code: "NE", nom: "Niger", indicatif: "+227", emoji_flag: "🇳🇪", devise: "FCFA", ville_principale: "Niamey" },
-  { code: "GH", nom: "Ghana", indicatif: "+233", emoji_flag: "🇬🇭", devise: "GHS", ville_principale: "Accra" },
+  { code: "BF", nom: "Burkina Faso", indicatif: "+226", emoji_flag: "", devise: "FCFA", ville_principale: "Ouagadougou" },
+  { code: "CI", nom: "Côte d'Ivoire", indicatif: "+225", emoji_flag: "", devise: "FCFA", ville_principale: "Abidjan" },
+  { code: "TG", nom: "Togo", indicatif: "+228", emoji_flag: "", devise: "FCFA", ville_principale: "Lomé" },
+  { code: "BJ", nom: "Bénin", indicatif: "+229", emoji_flag: "", devise: "FCFA", ville_principale: "Cotonou" },
+  { code: "SN", nom: "Sénégal", indicatif: "+221", emoji_flag: "", devise: "FCFA", ville_principale: "Dakar" },
+  { code: "ML", nom: "Mali", indicatif: "+223", emoji_flag: "", devise: "FCFA", ville_principale: "Bamako" },
+  { code: "GN", nom: "Guinée", indicatif: "+224", emoji_flag: "", devise: "GNF", ville_principale: "Conakry" },
+  { code: "NE", nom: "Niger", indicatif: "+227", emoji_flag: "", devise: "FCFA", ville_principale: "Niamey" },
+  { code: "GH", nom: "Ghana", indicatif: "+233", emoji_flag: "", devise: "GHS", ville_principale: "Accra" },
 ];
 
 // Hook pour récupérer les pays actifs
@@ -45,7 +45,7 @@ export default function CountrySelector({ value, onChange, className = "" }) {
         className="flex items-center justify-between gap-2 w-full px-3 py-2 rounded-lg border border-white/20 bg-white text-gray-900 text-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-white/30 transition-all"
       >
         <span className="flex items-center gap-2">
-          <span className="text-lg">{selectedCountry?.emoji_flag || "🌍"}</span>
+          <span className="text-lg">{selectedCountry?.emoji_flag || ""}</span>
           <span>{selectedCountry?.nom || "Tous les pays"}</span>
         </span>
         <ChevronDown className={cn("w-4 h-4 transition-transform", isOpen && "rotate-180")} />
@@ -65,7 +65,7 @@ export default function CountrySelector({ value, onChange, className = "" }) {
                 !value && "bg-gray-100"
               )}
               >
-              <span className="text-lg">🌍</span>
+              <span className="text-lg"></span>
               <span className="flex-1 text-left">Tous les pays</span>
               {!value && <Check className="w-4 h-4 text-primary" />}
               </button>

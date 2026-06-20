@@ -5,7 +5,7 @@ import { Bike, Users, Wifi } from "lucide-react";
 /**
  * Badge premium affichant les livreurs disponibles en temps réel.
  * - type="livreurs" : compte les livreurs disponibles (pour clients)
- * - type="clients"  : compte les clients actifs (pour livreurs)
+ * - type="clients" : compte les clients actifs (pour livreurs)
  * Filtre par pays de l'utilisateur connecté.
  */
 export default function LiveCounterBadge({ type = "livreurs", count: externalCount, className = "" }) {

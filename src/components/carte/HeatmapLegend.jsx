@@ -7,16 +7,16 @@ import { AlertCircle } from "lucide-react";
  */
 export default function HeatmapLegend({ mode, clients, livreurs, courses }) {
   if (mode === "off") return null;
-  
+
   // Calcul des points
   const clientPoints = clients.filter(c => c.latitude && c.longitude).length;
   const coursePoints = courses.filter(c => c.gps_depart_lat && c.gps_depart_lng).length;
   const livreurDispo = livreurs.filter(l => l.latitude && l.longitude && l.statut === "disponible").length;
   const livreurCourse = livreurs.filter(l => l.latitude && l.longitude && l.statut === "en_course").length;
-  
+
   if (mode === "demande") {
     const totalPoints = clientPoints + coursePoints;
-    
+
     if (totalPoints < 3) {
       return (
         <div className="bg-yellow-50/95 backdrop-blur-sm border border-yellow-200 rounded-lg shadow-lg p-3">
@@ -30,11 +30,11 @@ export default function HeatmapLegend({ mode, clients, livreurs, courses }) {
         </div>
       );
     }
-    
+
     return (
       <div className="bg-white/95 backdrop-blur-sm border border-red-200 rounded-lg shadow-lg p-3 space-y-2">
-        <p className="text-xs font-semibold text-red-800">🔥 Demande clients</p>
-        
+        <p className="text-xs font-semibold text-red-800"> Demande clients</p>
+
         {/* Gradient */}
         <div className="space-y-1">
           <div className="flex items-center gap-1 h-3 rounded overflow-hidden">
@@ -46,7 +46,7 @@ export default function HeatmapLegend({ mode, clients, livreurs, courses }) {
             <span className="text-red-700 font-medium">Forte</span>
           </div>
         </div>
-        
+
         {/* Données */}
         <div className="pt-2 border-t border-red-100 space-y-1 text-xs text-gray-600">
           <div className="flex justify-between">
@@ -62,10 +62,10 @@ export default function HeatmapLegend({ mode, clients, livreurs, courses }) {
             <span>{totalPoints}</span>
           </div>
         </div>
-        
+
         {/* Conseils */}
         <div className="pt-2 border-t border-red-100">
-          <p className="text-xs font-semibold text-red-800 mb-1">📊 Analyse stratégique</p>
+          <p className="text-xs font-semibold text-red-800 mb-1"> Analyse stratégique</p>
           <ul className="text-xs text-red-700 space-y-0.5 list-disc list-inside">
             <li>Zones rouges : forte concentration de clients</li>
             <li>Zones jaunes : demande modérée</li>
@@ -75,10 +75,10 @@ export default function HeatmapLegend({ mode, clients, livreurs, courses }) {
       </div>
     );
   }
-  
+
   if (mode === "couverture") {
     const totalLivreurs = livreurDispo + livreurCourse;
-    
+
     if (totalLivreurs < 3) {
       return (
         <div className="bg-yellow-50/95 backdrop-blur-sm border border-yellow-200 rounded-lg shadow-lg p-3">
@@ -92,11 +92,11 @@ export default function HeatmapLegend({ mode, clients, livreurs, courses }) {
         </div>
       );
     }
-    
+
     return (
       <div className="bg-white/95 backdrop-blur-sm border border-emerald-200 rounded-lg shadow-lg p-3 space-y-2">
-        <p className="text-xs font-semibold text-emerald-800">🟢 Couverture livreurs</p>
-        
+        <p className="text-xs font-semibold text-emerald-800"> Couverture livreurs</p>
+
         {/* Gradient */}
         <div className="space-y-1">
           <div className="flex items-center gap-1 h-3 rounded overflow-hidden">
@@ -108,7 +108,7 @@ export default function HeatmapLegend({ mode, clients, livreurs, courses }) {
             <span className="text-emerald-700 font-medium">Bonne</span>
           </div>
         </div>
-        
+
         {/* Données */}
         <div className="pt-2 border-t border-emerald-100 space-y-1 text-xs text-gray-600">
           <div className="flex justify-between">
@@ -124,10 +124,10 @@ export default function HeatmapLegend({ mode, clients, livreurs, courses }) {
             <span>{totalLivreurs}</span>
           </div>
         </div>
-        
+
         {/* Conseils */}
         <div className="pt-2 border-t border-emerald-100">
-          <p className="text-xs font-semibold text-emerald-800 mb-1">📊 Analyse stratégique</p>
+          <p className="text-xs font-semibold text-emerald-800 mb-1"> Analyse stratégique</p>
           <ul className="text-xs text-emerald-700 space-y-0.5 list-disc list-inside">
             <li>Zones rouges : sous-couvertes (manque de livreurs)</li>
             <li>Zones jaunes : couverture modérée</li>
@@ -137,6 +137,6 @@ export default function HeatmapLegend({ mode, clients, livreurs, courses }) {
       </div>
     );
   }
-  
+
   return null;
 }

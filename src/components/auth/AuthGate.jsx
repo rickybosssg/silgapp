@@ -320,7 +320,7 @@ export default function AuthGate({ children, onLivreur, onClient }) {
       const clients = await base44.entities.ClientExterne.filter({
         user_email: user.email
       });
-      
+
       if (!mounted) return;
 
       // Si un profil client existe → router vers dashboard client
@@ -648,7 +648,7 @@ export default function AuthGate({ children, onLivreur, onClient }) {
             Votre compte livreur est en cours de vérification par l'équipe SILGAPP.
             Vous serez notifié dès que votre compte sera validé.
           </p>
-          <p className="text-xs text-muted-foreground">📞 Support : +226 66 92 51 90</p>
+          <p className="text-xs text-muted-foreground"> Support : +226 66 92 51 90</p>
           <button
             onClick={() => base44.auth.logout()}
             className="text-xs text-primary underline"
@@ -671,7 +671,7 @@ export default function AuthGate({ children, onLivreur, onClient }) {
           <p className="text-sm text-muted-foreground">
             Votre demande d'inscription a été refusée. Contactez le support SILGAPP pour plus d'informations.
           </p>
-          <p className="text-xs text-muted-foreground">📞 Support : +226 66 92 51 90</p>
+          <p className="text-xs text-muted-foreground"> Support : +226 66 92 51 90</p>
           <button
             onClick={() => base44.auth.logout()}
             className="text-xs text-primary underline"
@@ -694,7 +694,7 @@ export default function AuthGate({ children, onLivreur, onClient }) {
           <p className="text-sm text-muted-foreground">
             Votre compte livreur a été désactivé. Contactez le support SILGAPP.
           </p>
-          <p className="text-xs text-muted-foreground">📞 Support : +226 66 92 51 90</p>
+          <p className="text-xs text-muted-foreground"> Support : +226 66 92 51 90</p>
           <button
             onClick={() => base44.auth.logout()}
             className="text-xs text-primary underline"

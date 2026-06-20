@@ -160,7 +160,7 @@ export default function DashboardExterne() {
             <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-500/10 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
           </div>
-          
+
           <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <Link to="/">
@@ -222,9 +222,9 @@ export default function DashboardExterne() {
           <div className="relative mt-4 flex gap-2 flex-wrap">
             {[
               { key: "tous", label: "Tous" },
-              { key: "expedier", label: "📦 Expédition" },
-              { key: "recevoir", label: "📥 Réception" },
-              { key: "deplacement", label: "👤 Déplacement" },
+              { key: "expedier", label: " Expédition" },
+              { key: "recevoir", label: " Réception" },
+              { key: "deplacement", label: " Déplacement" },
             ].map(f => (
               <button
                 key={f.key}

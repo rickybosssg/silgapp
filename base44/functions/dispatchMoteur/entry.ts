@@ -2,7 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 /**
  * MOTEUR DE DISPATCH AUTOMATIQUE — SILGA INTERNE UNIQUEMENT
- * 
+ *
  * Règles :
  * - Uniquement livreurs internes (type_livreur === "interne")
  * - Jamais de livreurs OFF (statut !== "hors_ligne")
@@ -37,7 +37,7 @@ function calculerDistance(lat1, lon1, lat2, lon2) {
  */
 async function trouverLivreursCandidats(base44, course, cycle = 1, exclusions = []) {
   const filtreStatut = cycle === 1 ? 'disponible' : 'en_course';
-  
+
   const livreurs = await base44.asServiceRole.entities.Livreur.filter({
     type_livreur: 'interne',
     validation: 'valide',
@@ -48,9 +48,9 @@ async function trouverLivreursCandidats(base44, course, cycle = 1, exclusions = 
   if (!livreurs || livreurs.length === 0) return [];
 
   // Filtrer GPS obligatoire
-  const avecGPS = livreurs.filter(l => 
-    l.latitude && 
-    l.longitude && 
+  const avecGPS = livreurs.filter(l =>
+    l.latitude &&
+    l.longitude &&
     l.app_active === true &&
     !exclusions.includes(l.id)
   );
@@ -91,33 +91,33 @@ async function proposerAuLivreur(base44, courseId, course, livreur, cycle) {
   if (livreur.user_email) {
     try {
       await base44.asServiceRole.entities.Notification.create({
-        titre: '🚨 Nouvelle course disponible !',
+        titre: ' Nouvelle course disponible !',
         message: `Course : ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`,
         type: 'nouvelle_course',
         course_id: courseId,
         destinataire_email: livreur.user_email,
         lue: false,
       });
-      console.log(`[DISPATCH INTERNE] 🔔 Notification créée pour ${livreur.user_email}`);
+      console.log(`[DISPATCH INTERNE] Notification créée pour ${livreur.user_email}`);
     } catch (err) {
-      console.error('[DISPATCH INTERNE] ❌ Erreur création notification:', err.message);
+      console.error('[DISPATCH INTERNE] Erreur création notification:', err.message);
     }
 
     try {
       await base44.functions.invoke('envoiNotificationPush', {
         destinataire_email: livreur.user_email,
         livreur_id: livreur.id,
-        titre: '🚨 Nouvelle course disponible !',
+        titre: ' Nouvelle course disponible !',
         message: `Course : ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`,
         type: 'nouvelle_course',
         course_id: courseId,
       });
     } catch (err) {
-      console.error('[DISPATCH INTERNE] ❌ Erreur notif push:', err.message);
+      console.error('[DISPATCH INTERNE] Erreur notif push:', err.message);
     }
   }
 
-  console.log(`[DISPATCH INTERNE] 📤 Course ${courseId} proposée à ${livreur.nom} (cycle ${cycle})`);
+  console.log(`[DISPATCH INTERNE] Course ${courseId} proposée à ${livreur.nom} (cycle ${cycle})`);
   return 0;
 }
 
@@ -131,19 +131,19 @@ async function lancerDispatch(base44, courseId, exclusions = [], cycle = 1) {
 
   // Ne pas dispatcher si déjà acceptée/livrée/annulée
   if (['acceptee', 'colis_recupere', 'en_livraison', 'livree', 'annulee'].includes(course.statut)) {
-    console.log(`[DISPATCH INTERNE] ⛔ Course ${courseId} statut=${course.statut} → dispatch ignoré`);
+    console.log(`[DISPATCH INTERNE] Course ${courseId} statut=${course.statut} → dispatch ignoré`);
     return { ignore: true, statut: course.statut };
   }
 
   // GPS optionnel — si absent, on cherche tous les livreurs avec GPS
   const hasGPS = course.gps_depart_lat && course.gps_depart_lng;
   if (!hasGPS) {
-    console.log(`[DISPATCH INTERNE] ℹ️ Course ${courseId} sans GPS — recherche tous les livreurs`);
+    console.log(`[DISPATCH INTERNE] ℹ Course ${courseId} sans GPS — recherche tous les livreurs`);
   }
 
   // Cycle 1 : disponible + GPS + app_active
   let candidats = await trouverLivreursCandidats(base44, course, 1, exclusions);
-  
+
   // Cycle 2 : en_course + GPS + app_active (si Cycle 1 vide)
   if (candidats.length === 0 && cycle >= 2) {
     candidats = await trouverLivreursCandidats(base44, course, 2, exclusions);
@@ -166,16 +166,16 @@ async function lancerDispatch(base44, courseId, exclusions = [], cycle = 1) {
       heure_sollicitation: '',
       dispatch_cycle: 0,
     });
-    console.log(`[DISPATCH INTERNE] ⚠️ Aucun livreur interne disponible — course ${courseId} en attente admin`);
+    console.log(`[DISPATCH INTERNE] Aucun livreur interne disponible — course ${courseId} en attente admin`);
     return { noLivreur: true };
   }
 
   const livreur = candidats[0];
   await proposerAuLivreur(base44, courseId, course, livreur, cycle);
-  return { 
-    propose: true, 
-    livreur: { 
-      id: livreur.id, 
+  return {
+    propose: true,
+    livreur: {
+      id: livreur.id,
       nom: `${livreur.prenom || ''} ${livreur.nom}`.trim()
     }
   };
@@ -202,7 +202,7 @@ async function verifierExpiration(base44, courseId) {
 
   // Exclure le livreur actuel
   const exclusions = course.livreur_id ? [course.livreur_id] : [];
-  
+
   // Déterminer le cycle actuel
   const cycle = course.dispatch_cycle || 1;
   const nextCycle = exclusions.length > 0 ? Math.ceil(exclusions.length / 10) + 1 : 1;
@@ -225,10 +225,10 @@ async function verifierExpiration(base44, courseId) {
       heure_sollicitation: '',
       dispatch_cycle: 0,
     });
-    console.log(`[DISPATCH INTERNE] 🚨 MAX CYCLES (${MAX_CYCLES}) atteint pour course ${courseId}`);
-    return { 
-      expired: true, 
-      maxCyclesAtteint: true, 
+    console.log(`[DISPATCH INTERNE] MAX CYCLES (${MAX_CYCLES}) atteint pour course ${courseId}`);
+    return {
+      expired: true,
+      maxCyclesAtteint: true,
       message: `Aucun livreur n'a accepté après ${MAX_CYCLES} cycles — intervention admin requise`
     };
   }
@@ -244,9 +244,9 @@ async function verifierExpiration(base44, courseId) {
     dispatch_cycle: nextCycle,
   });
 
-  return { 
-    expired: true, 
-    redispatched: true, 
+  return {
+    expired: true,
+    redispatched: true,
     livreur: result.livreur,
     cycle: nextCycle
   };
@@ -266,13 +266,13 @@ Deno.serve(async (req) => {
 
     // ─── 1. Lancer dispatch automatique ───────────────────────────────────────
     if (action === 'lancer_auto') {
-      console.log(`[DISPATCH INTERNE] 🚀 Démarrage dispatch pour course ${course_id}`);
+      console.log(`[DISPATCH INTERNE] Démarrage dispatch pour course ${course_id}`);
 
       if (!course_id) return Response.json({ error: 'course_id requis' }, { status: 400 });
 
       const course = await base44.asServiceRole.entities.Course.get(course_id);
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
-      
+
   // Le mode dispatch peut être mis à jour si l'utilisateur clique sur "Auto"
   // Pas de blocage pour dispatch_mode='manuel' — on permet le dispatch auto
 
@@ -281,10 +281,10 @@ Deno.serve(async (req) => {
       if (result.erreur) return Response.json({ error: result.erreur }, { status: 404 });
       if (result.ignore) return Response.json({ success: true, message: `Dispatch ignoré : ${result.statut}` });
       if (result.noLivreur) {
-        return Response.json({ 
-          success: false, 
-          noLivreur: true, 
-          message: result.missing_gps 
+        return Response.json({
+          success: false,
+          noLivreur: true,
+          message: result.missing_gps
             ? 'Course sans GPS — veuillez ajouter la position de départ'
             : 'Aucun livreur interne disponible',
           missing_gps: result.missing_gps
@@ -308,7 +308,7 @@ Deno.serve(async (req) => {
 
     // ─── 3. Refuser course (depuis LivreurApp) ────────────────────────────────
     if (action === 'refuser_course') {
-      console.log(`[DISPATCH INTERNE] 🚫 Livreur ${livreur_id} refuse course ${course_id}`);
+      console.log(`[DISPATCH INTERNE] Livreur ${livreur_id} refuse course ${course_id}`);
 
       const course = await base44.asServiceRole.entities.Course.get(course_id);
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
@@ -320,26 +320,26 @@ Deno.serve(async (req) => {
       // Exclure ce livreur
       const exclusions = livreur_id ? [livreur_id] : [];
       const cycle = course.dispatch_cycle || 1;
-      
+
       const result = await lancerDispatch(base44, course_id, exclusions, cycle);
 
       if (result.noLivreur) {
-        return Response.json({ 
-          success: true, 
-          noLivreur: true, 
-          message: 'Aucun autre livreur interne disponible' 
+        return Response.json({
+          success: true,
+          noLivreur: true,
+          message: 'Aucun autre livreur interne disponible'
         });
       }
 
-      return Response.json({ 
-        success: true, 
-        message: `Course redispatchée vers ${result.livreur?.nom || 'un autre livreur'}` 
+      return Response.json({
+        success: true,
+        message: `Course redispatchée vers ${result.livreur?.nom || 'un autre livreur'}`
       });
     }
 
     // ─── 4. Accepter course (depuis LivreurApp) ───────────────────────────────
     if (action === 'accepter_course') {
-      console.log(`[DISPATCH INTERNE] ✅ Livreur ${livreur_id} accepte course ${course_id}`);
+      console.log(`[DISPATCH INTERNE] Livreur ${livreur_id} accepte course ${course_id}`);
 
       const course = await base44.asServiceRole.entities.Course.get(course_id);
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
@@ -380,7 +380,7 @@ Deno.serve(async (req) => {
         dispatch_cycle: 0,
       });
 
-      console.log(`[DISPATCH INTERNE] 🎉 Course ${course_id} acceptée par ${livreur_id}`);
+      console.log(`[DISPATCH INTERNE] Course ${course_id} acceptée par ${livreur_id}`);
       return Response.json({ success: true, message: 'Course acceptée avec succès' });
     }
 

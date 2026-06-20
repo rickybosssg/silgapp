@@ -4,10 +4,10 @@ import { base44 } from "@/api/base44Client";
 import { Flame, RefreshCw } from "lucide-react";
 
 const NIVEAU_STYLE = {
-  faible:     { emoji: "🟢", color: "#22c55e", label: "Faible",       ring: "rgba(34,197,94,0.25)",  glow: "rgba(34,197,94,0.15)" },
-  moyenne:    { emoji: "🟡", color: "#eab308", label: "Moyenne",      ring: "rgba(234,179,8,0.30)",  glow: "rgba(234,179,8,0.15)" },
-  forte:      { emoji: "🟠", color: "#f97316", label: "Forte",        ring: "rgba(249,115,22,0.35)", glow: "rgba(249,115,22,0.18)" },
-  tres_forte: { emoji: "🔴", color: "#ef4444", label: "Très forte",   ring: "rgba(239,68,68,0.40)",  glow: "rgba(239,68,68,0.20)" },
+  faible: { emoji: "", color: "#22c55e", label: "Faible", ring: "rgba(34,197,94,0.25)", glow: "rgba(34,197,94,0.15)" },
+  moyenne: { emoji: "", color: "#eab308", label: "Moyenne", ring: "rgba(234,179,8,0.30)", glow: "rgba(234,179,8,0.15)" },
+  forte: { emoji: "", color: "#f97316", label: "Forte", ring: "rgba(249,115,22,0.35)", glow: "rgba(249,115,22,0.18)" },
+  tres_forte: { emoji: "", color: "#ef4444", label: "Très forte", ring: "rgba(239,68,68,0.40)", glow: "rgba(239,68,68,0.20)" },
 };
 
 // ─── Halos sur carte Leaflet ─────────────────────────────────────────────────
@@ -230,8 +230,8 @@ export default function ZonesChaudesWidget({ compact = false, onDataLoaded, coun
                     </span>
                   </div>
                   <div className="flex items-center gap-3 mt-0.5 text-[11px] text-gray-400">
-                    <span>📦 {zone.nb_courses} course{zone.nb_courses !== 1 ? "s" : ""}</span>
-                    <span>🛵 {zone.nb_livreurs} livreur{zone.nb_livreurs !== 1 ? "s" : ""}</span>
+                    <span> {zone.nb_courses} course{zone.nb_courses !== 1 ? "s" : ""}</span>
+                    <span> {zone.nb_livreurs} livreur{zone.nb_livreurs !== 1 ? "s" : ""}</span>
                     {zone.temps_attente_min > 0 && (
                       <span>⏱ {zone.temps_attente_min} min attente moy.</span>
                     )}

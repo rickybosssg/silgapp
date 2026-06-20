@@ -12,11 +12,11 @@ import { useAdminContext } from "@/hooks/useAdminContext.js";
 import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
 
 const STATUT_FILTRES = [
-  { key: "tous",        label: "Toutes" },
-  { key: "nouvelle",    label: "Nouvelles" },
-  { key: "en_cours",    label: "En cours" },
-  { key: "livree",      label: "Livrées" },
-  { key: "annulee",     label: "Annulées" },
+  { key: "tous", label: "Toutes" },
+  { key: "nouvelle", label: "Nouvelles" },
+  { key: "en_cours", label: "En cours" },
+  { key: "livree", label: "Livrées" },
+  { key: "annulee", label: "Annulées" },
 ];
 
 export default function ToutesCoursesExternes() {
@@ -37,11 +37,11 @@ export default function ToutesCoursesExternes() {
   });
 
   const stats = useMemo(() => ({
-    totale:   courses.length,
+    totale: courses.length,
     nouvelle: courses.filter(c => c.statut === "nouvelle").length,
-    enCours:  courses.filter(c => ["recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison", "arrive_prise_en_charge", "passager_embarque"].includes(c.statut)).length,
-    livree:   courses.filter(c => c.statut === "livree").length,
-    annulee:  courses.filter(c => c.statut === "annulee").length,
+    enCours: courses.filter(c => ["recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison", "arrive_prise_en_charge", "passager_embarque"].includes(c.statut)).length,
+    livree: courses.filter(c => c.statut === "livree").length,
+    annulee: courses.filter(c => c.statut === "annulee").length,
   }), [courses]);
 
   const coursesFiltrees = useMemo(() => {
@@ -49,11 +49,11 @@ export default function ToutesCoursesExternes() {
     if (filtreType !== "tous") {
       filtered = filtered.filter(c => c.type_course === filtreType);
     }
-    if (filtreActif === "tous")     return filtered;
+    if (filtreActif === "tous") return filtered;
     if (filtreActif === "nouvelle") return filtered.filter(c => c.statut === "nouvelle");
     if (filtreActif === "en_cours") return filtered.filter(c => ["recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison", "arrive_prise_en_charge", "passager_embarque"].includes(c.statut));
-    if (filtreActif === "livree")   return filtered.filter(c => c.statut === "livree");
-    if (filtreActif === "annulee")  return filtered.filter(c => c.statut === "annulee");
+    if (filtreActif === "livree") return filtered.filter(c => c.statut === "livree");
+    if (filtreActif === "annulee") return filtered.filter(c => c.statut === "annulee");
     return filtered;
   }, [courses, filtreActif, filtreType]);
 
@@ -75,7 +75,7 @@ export default function ToutesCoursesExternes() {
           </Link>
           <div className="flex items-center gap-3 flex-1">
             <div className="w-10 h-10 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center text-xl flex-shrink-0">
-              📦
+
             </div>
             <div>
               <h1 className="text-xl font-black text-white tracking-tight">Courses Externes</h1>
@@ -90,11 +90,11 @@ export default function ToutesCoursesExternes() {
       {/* ── STATS KPI ───────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5">
         {[
-          { label: "Total",     value: stats.totale,   grad: "from-primary to-red-600",         shadow: "shadow-red-100" },
-          { label: "Nouvelles", value: stats.nouvelle, grad: "from-orange-500 to-amber-500",    shadow: "shadow-orange-100" },
-          { label: "En cours",  value: stats.enCours,  grad: "from-blue-500 to-indigo-500",     shadow: "shadow-blue-100" },
-          { label: "Livrées",   value: stats.livree,   grad: "from-green-500 to-emerald-500",   shadow: "shadow-green-100" },
-          { label: "Annulées",  value: stats.annulee,  grad: "from-red-400 to-rose-500",        shadow: "shadow-red-100" },
+          { label: "Total", value: stats.totale, grad: "from-primary to-red-600", shadow: "shadow-red-100" },
+          { label: "Nouvelles", value: stats.nouvelle, grad: "from-orange-500 to-amber-500", shadow: "shadow-orange-100" },
+          { label: "En cours", value: stats.enCours, grad: "from-blue-500 to-indigo-500", shadow: "shadow-blue-100" },
+          { label: "Livrées", value: stats.livree, grad: "from-green-500 to-emerald-500", shadow: "shadow-green-100" },
+          { label: "Annulées", value: stats.annulee, grad: "from-red-400 to-rose-500", shadow: "shadow-red-100" },
         ].map(s => (
           <div key={s.label} className={`bg-gradient-to-br ${s.grad} rounded-2xl p-3.5 text-white shadow-md ${s.shadow}`}>
             <p className="text-[10px] font-semibold opacity-80 uppercase tracking-wide mb-1">{s.label}</p>
@@ -110,9 +110,9 @@ export default function ToutesCoursesExternes() {
           <span className="text-[10px] font-bold text-gray-400 uppercase self-center mr-1">Type:</span>
           {[
             { key: "tous", label: "Tous" },
-            { key: "expedier", label: "📦 Expédition" },
-            { key: "recevoir", label: "📥 Réception" },
-            { key: "deplacement", label: "👤 Déplacement" },
+            { key: "expedier", label: " Expédition" },
+            { key: "recevoir", label: " Réception" },
+            { key: "deplacement", label: " Déplacement" },
           ].map(f => (
             <button
               key={f.key}
@@ -162,7 +162,7 @@ export default function ToutesCoursesExternes() {
 
         {coursesFiltrees.length === 0 ? (
           <div className="text-center py-14 text-muted-foreground">
-            <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3 text-2xl">📦</div>
+            <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3 text-2xl"></div>
             <p className="font-semibold text-sm">Aucune course dans cette catégorie</p>
           </div>
         ) : (
@@ -174,14 +174,14 @@ export default function ToutesCoursesExternes() {
               >
                 {/* Icône statut */}
                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-base ${
-                  course.statut === "livree"   ? "bg-green-100" :
-                  course.statut === "annulee"  ? "bg-red-100" :
+                  course.statut === "livree" ? "bg-green-100" :
+                  course.statut === "annulee" ? "bg-red-100" :
                   course.statut === "nouvelle" ? "bg-orange-100" :
                   "bg-blue-100"
                 }`}>
-                  {course.statut === "livree"   ? "✅" :
-                   course.statut === "annulee"  ? "❌" :
-                   course.statut === "nouvelle" ? "🆕" : "🚀"}
+                  {course.statut === "livree" ? "" :
+                   course.statut === "annulee" ? "" :
+                   course.statut === "nouvelle" ? "🆕" : ""}
                 </div>
 
                 {/* Infos */}
@@ -189,7 +189,7 @@ export default function ToutesCoursesExternes() {
                   <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                     {course.type_course && course.type_course !== "expedier" && (
                       <span className="text-[10px] font-bold bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded">
-                        {course.type_course === "deplacement" ? "👤" : "📥"}
+                        {course.type_course === "deplacement" ? "" : ""}
                       </span>
                     )}
                     <span className="font-bold text-sm text-foreground truncate">{course.client_nom || "Client"}</span>
@@ -209,7 +209,7 @@ export default function ToutesCoursesExternes() {
                   <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-0.5">
                     <Clock className="w-2.5 h-2.5 flex-shrink-0" />
                     <span>{format(new Date(course.created_date), "dd/MM/yyyy · HH:mm", { locale: fr })}</span>
-                    {course.livreur_nom && <><span>·</span><span>👤 {course.livreur_nom}</span></>}
+                    {course.livreur_nom && <><span>·</span><span> {course.livreur_nom}</span></>}
                     {course.country_code && <span className="ml-1 text-[9px] font-bold bg-gray-200 text-gray-500 rounded px-1">{course.country_code}</span>}
                   </div>
                 </div>

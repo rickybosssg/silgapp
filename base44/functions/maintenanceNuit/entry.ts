@@ -499,11 +499,11 @@ Deno.serve(async (req) => {
     const dureeSecondes = Math.round((Date.now() - startTime) / 1000);
 
     const resume = [
-      `🔍 Scan SILGAPP du ${new Date().toLocaleDateString("fr-FR")} à ${new Date().toLocaleTimeString("fr-FR")}`,
-      `📊 ${bugs.length} problème(s) détecté(s) — ${corrections.length} correction(s) appliquée(s)`,
-      `🔴 ${erreursCritiques} erreur(s) critique(s)`,
-      `⚠️ ${recommandations.length} action(s) admin recommandée(s)`,
-      `⏱️ Durée: ${dureeSecondes}s`,
+      ` Scan SILGAPP du ${new Date().toLocaleDateString("fr-FR")} à ${new Date().toLocaleTimeString("fr-FR")}`,
+      ` ${bugs.length} problème(s) détecté(s) — ${corrections.length} correction(s) appliquée(s)`,
+      ` ${erreursCritiques} erreur(s) critique(s)`,
+      ` ${recommandations.length} action(s) admin recommandée(s)`,
+      `⏱ Durée: ${dureeSecondes}s`,
     ].join("\n");
 
     // ── Mise à jour rapport ────────────────────────────────────────────────
@@ -523,7 +523,7 @@ Deno.serve(async (req) => {
     // ── Notification admin si erreurs critiques ────────────────────────────
     if (erreursCritiques > 0) {
       await base44.asServiceRole.entities.Notification.create({
-        titre: `⚠️ Maintenance SILGAPP — ${erreursCritiques} erreur(s) critique(s)`,
+        titre: ` Maintenance SILGAPP — ${erreursCritiques} erreur(s) critique(s)`,
         message: `Scan du ${new Date().toLocaleDateString("fr-FR")}: ${erreursCritiques} erreur(s) critique(s) détectée(s). ${corrections.length} correction(s) auto appliquée(s). Consultez le rapport de maintenance.`,
         type: "course_bloquee",
         lue: false

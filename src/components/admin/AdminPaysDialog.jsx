@@ -28,7 +28,7 @@ export default function AdminPaysDialog({ pays, admins, onClose, onSuccess }) {
         }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["all-admins"] });
-      toast.success(`Admin assigné au ${pays.nom} ✓`);
+      toast.success(`Admin assigné au ${pays.nom} `);
       onSuccess?.();
     },
     onError: (e) => toast.error("Erreur : " + e.message),
@@ -41,7 +41,7 @@ export default function AdminPaysDialog({ pays, admins, onClose, onSuccess }) {
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["all-admins"] });
-      toast.success("Admin redevenu global ✓");
+      toast.success("Admin redevenu global ");
     },
     onError: (e) => toast.error("Erreur : " + e.message),
   });
@@ -131,7 +131,7 @@ export default function AdminPaysDialog({ pays, admins, onClose, onSuccess }) {
         </div>
 
         <p className="text-xs text-muted-foreground bg-blue-50 border border-blue-200 rounded-lg p-3">
-          💡 Un admin pays ne voit que les données de son pays ({pays.code}). Il peut gérer livreurs, clients, courses et comptabilité pour {pays.nom} uniquement.
+           Un admin pays ne voit que les données de son pays ({pays.code}). Il peut gérer livreurs, clients, courses et comptabilité pour {pays.nom} uniquement.
         </p>
 
         <div className="flex justify-end">

@@ -55,7 +55,7 @@ export default function PrixManuelReponseAlert({ accepted, prix, devise, onDismi
 
   useEffect(() => {
     // Son + vibration au montage
-    console.log('[PrixManuelReponseAlert] ✅ Affichage notification prix manuel', { accepted, prix, devise });
+    console.log('[PrixManuelReponseAlert] Affichage notification prix manuel', { accepted, prix, devise });
     playSound(accepted);
     if (accepted) {
       navigator.vibrate?.([200, 100, 200, 100, 400]);
@@ -63,7 +63,7 @@ export default function PrixManuelReponseAlert({ accepted, prix, devise, onDismi
       navigator.vibrate?.([500, 150, 500]);
     }
 
-    // ⚠️ CORRECTION : SUPPRESSION de l'auto-dismiss
+    // CORRECTION : SUPPRESSION de l'auto-dismiss
     // La modale reste affichée jusqu'à ce que le livreur la ferme manuellement
     // Plus de timer automatique — garantie que le livreur voit la notification
   }, [accepted, devise, prix]);
@@ -97,7 +97,7 @@ export default function PrixManuelReponseAlert({ accepted, prix, devise, onDismi
           </div>
           <div className="text-center">
             <p className="text-white font-black text-xl leading-tight">
-              {accepted ? "Prix accepté ! 🎉" : "Prix refusé"}
+              {accepted ? "Prix accepté ! " : "Prix refusé"}
             </p>
             <p className="text-white/80 text-sm mt-1">
               {accepted
@@ -119,8 +119,8 @@ export default function PrixManuelReponseAlert({ accepted, prix, devise, onDismi
 
           <p className={`text-sm font-bold ${accepted ? "text-green-700" : "text-red-700"}`}>
             {accepted
-              ? "✅ La course peut commencer. Rendez-vous au point de récupération !"
-              : "❌ Vous êtes de nouveau disponible."}
+              ? " La course peut commencer. Rendez-vous au point de récupération !"
+              : " Vous êtes de nouveau disponible."}
           </p>
 
           {/* Bouton d'action explicite pour le livreur */}

@@ -57,7 +57,7 @@ export default function DownloadStatsPanel() {
       countryStats[country].downloads += downloads;
     });
 
-    const conversionRate = totalVisits > 0 
+    const conversionRate = totalVisits > 0
       ? ((totalDownloads / totalVisits) * 100).toFixed(1)
       : 0;
 
@@ -76,14 +76,14 @@ export default function DownloadStatsPanel() {
   }, [allStats]);
 
   const countryEmoji = {
-    BF: "🇧🇫",
-    CI: "🇨🇮",
-    TG: "🇹🇬",
-    BJ: "🇧🇯",
-    SN: "🇸🇳",
-    ML: "🇲🇱",
-    GN: "🇬🇳",
-    NE: "🇳🇪",
+    BF: "",
+    CI: "",
+    TG: "",
+    BJ: "",
+    SN: "",
+    ML: "",
+    GN: "",
+    NE: "",
   };
 
   return (
@@ -96,7 +96,7 @@ export default function DownloadStatsPanel() {
               <Download className="w-4 h-4 text-white" />
             </div>
             <div>
-              <p className="font-bold text-sm text-foreground">📥 Téléchargements SILGAPP</p>
+              <p className="font-bold text-sm text-foreground"> Téléchargements SILGAPP</p>
               <p className="text-xs text-muted-foreground">Statistiques en temps réel</p>
             </div>
           </div>
@@ -161,7 +161,7 @@ export default function DownloadStatsPanel() {
             <div className="flex items-center gap-2">
               {stats.topCountries.map(([code, data]) => (
                 <div key={code} className="flex items-center gap-1.5 bg-gray-50 border border-gray-100 rounded-lg px-2 py-1.5">
-                  <span className="text-lg">{countryEmoji[code] || "🌍"}</span>
+                  <span className="text-lg">{countryEmoji[code] || ""}</span>
                   <div>
                     <p className="text-[10px] font-bold text-gray-700">{data.downloads}</p>
                   </div>

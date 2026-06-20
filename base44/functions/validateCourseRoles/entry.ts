@@ -4,7 +4,7 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    
+
     if (!user) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -38,21 +38,21 @@ Deno.serve(async (req) => {
     // La course doit pouvoir être créée avec uniquement nom + téléphone, sans compte lié.
 
     if (errors.length > 0) {
-      return Response.json({ 
-        valid: false, 
-        errors 
+      return Response.json({
+        valid: false,
+        errors
       }, { status: 400 });
     }
 
-    return Response.json({ 
+    return Response.json({
       valid: true,
       message: "Course valide - rôles cohérents"
     });
 
   } catch (error) {
-    return Response.json({ 
+    return Response.json({
       error: error.message,
-      valid: false 
+      valid: false
     }, { status: 500 });
   }
 });

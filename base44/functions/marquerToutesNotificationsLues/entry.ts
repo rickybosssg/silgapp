@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
 
     for (let i = 0; i < allUnread.length; i += batchSize) {
       const batch = allUnread.slice(i, i + batchSize);
-      await Promise.all(batch.map(n => 
+      await Promise.all(batch.map(n =>
         base44.asServiceRole.entities.Notification.update(n.id, { lue: true })
       ));
       marquees += batch.length;

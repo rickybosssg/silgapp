@@ -8,27 +8,27 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    
+
     if (!user) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { client_id } = await req.json();
-    
+
     if (!client_id) {
       return Response.json({ error: 'client_id requis' }, { status: 400 });
     }
 
     // Récupérer le client
     const client = await base44.entities.ClientExterne.get(client_id);
-    
+
     if (!client) {
       return Response.json({ error: 'Client non trouvé' }, { status: 404 });
     }
 
     // Vérifier si le client a déjà des coordonnées GPS
     if (!client.latitude || !client.longitude) {
-      return Response.json({ 
+      return Response.json({
         success: false,
         message: 'Client sans coordonnées GPS. Veuillez activer la localisation dans votre profil.',
         needs_gps_activation: true
@@ -70,9 +70,9 @@ Deno.serve(async (req) => {
       request_sync: true
     });
   } catch (error) {
-    return Response.json({ 
+    return Response.json({
       success: false,
-      error: error.message 
+      error: error.message
     }, { status: 500 });
   }
 });

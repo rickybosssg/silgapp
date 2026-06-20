@@ -4,21 +4,21 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Download, Users, TrendingUp, Globe, Calendar, Clock, 
+import {
+  Download, Users, TrendingUp, Globe, Calendar, Clock,
   BarChart3, Smartphone, Monitor, ArrowLeft, Phone as PhoneIcon
 } from "lucide-react";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 
 const PAYS = {
-  BF: { nom: "Burkina Faso", emoji: "🇧🇫" },
-  CI: { nom: "Côte d'Ivoire", emoji: "🇨🇮" },
-  TG: { nom: "Togo", emoji: "🇹🇬" },
-  BJ: { nom: "Bénin", emoji: "🇧🇯" },
-  SN: { nom: "Sénégal", emoji: "🇸🇳" },
-  ML: { nom: "Mali", emoji: "🇲🇱" },
-  GN: { nom: "Guinée", emoji: "🇬🇳" },
-  NE: { nom: "Niger", emoji: "🇳🇪" },
+  BF: { nom: "Burkina Faso", emoji: "" },
+  CI: { nom: "Côte d'Ivoire", emoji: "" },
+  TG: { nom: "Togo", emoji: "" },
+  BJ: { nom: "Bénin", emoji: "" },
+  SN: { nom: "Sénégal", emoji: "" },
+  ML: { nom: "Mali", emoji: "" },
+  GN: { nom: "Guinée", emoji: "" },
+  NE: { nom: "Niger", emoji: "" },
 };
 
 const SOURCES = {
@@ -312,7 +312,7 @@ export default function StatsTelechargements() {
               sortedCountries.map(([code, data]) => (
                 <div key={code} className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">{PAYS[code]?.emoji || "🌍"}</span>
+                    <span className="text-2xl">{PAYS[code]?.emoji || ""}</span>
                     <div>
                       <p className="font-semibold text-gray-900">{PAYS[code]?.nom || code}</p>
                       <p className="text-xs text-gray-500">{data.visits} visites</p>
@@ -347,10 +347,10 @@ export default function StatsTelechargements() {
               sortedSources.map(([source, count]) => {
                 const SourceIcon = SOURCES[source]?.icon || Users;
                 const color = SOURCES[source]?.color || "text-gray-500";
-                const percentage = stats?.total.downloads > 0 
+                const percentage = stats?.total.downloads > 0
                   ? ((count / stats.total.downloads) * 100).toFixed(1)
                   : 0;
-                
+
                 return (
                   <div key={source} className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
                     <div className="flex items-center gap-3">

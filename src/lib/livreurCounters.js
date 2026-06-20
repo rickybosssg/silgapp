@@ -7,23 +7,23 @@ import { isGPSRecent, hasValidGPS, isAppActive, isON, isLibre, isEnCourse, isCli
 /**
  * Livreur noir = non dispatchable
  * SOURCE UNIQUE : même règle que DispatchMap et CarteLivreursExterne
- * 
+ *
  * NOUVELLE RÈGLE : Disponibilité métier uniquement
  * Noir = hors_ligne OU inactif OU non validé OU pas de GPS
- * 
- * ⚠️ heartbeat et GPS ancien NE sont PLUS des critères d'exclusion
+ *
+ * heartbeat et GPS ancien NE sont PLUS des critères d'exclusion
  * Un livreur peut être :
- *   - 🟢 Libre (disponible + ON + validé + GPS)
- *   - 📍 GPS ancien (20+ min)
- *   - 📡 Heartbeat ancien (app fermée)
- *   - → Reste dispatchable (recevra WhatsApp)
+ * - Libre (disponible + ON + validé + GPS)
+ * - GPS ancien (20+ min)
+ * - Heartbeat ancien (app fermée)
+ * - → Reste dispatchable (recevra WhatsApp)
  */
 export function isLivreurNoir(livreur, livreurIdsEnCourseReelle) {
   if (!livreur.latitude || !livreur.longitude) return true;
   if (livreur.statut === "hors_ligne") return true;
   if (livreur.actif === false) return true;
   if (livreur.validation !== "valide") return true;
-  // 🎯 CORRECTION : En course = avec course ACTIVE (peu importe le statut DB)
+  // CORRECTION : En course = avec course ACTIVE (peu importe le statut DB)
   if (livreurIdsEnCourseReelle?.has(livreur.id)) return false;
   // Disponible avec GPS = vert (même si GPS/heartbeat ancien)
   if (livreur.statut === "disponible") return false;
@@ -38,9 +38,9 @@ export function isLivreurNoir(livreur, livreurIdsEnCourseReelle) {
 export function calculateLivreurCounters(livreurs) {
   const libres = livreurs.filter(l => isLibre(l));
   const enCourse = livreurs.filter(l => isEnCourse(l));
-  
-  // 🔍 Diagnostic pour débogage
-  console.log("🎯 calculateLivreurCounters:", {
+
+  // Diagnostic pour débogage
+  console.log(" calculateLivreurCounters:", {
     total: livreurs.length,
     libres_count: libres.length,
     libres_ids: libres.map(l => l.id.slice(-8)),
@@ -54,7 +54,7 @@ export function calculateLivreurCounters(livreurs) {
       hasValidGPS: hasValidGPS(l),
     })),
   });
-  
+
   return {
     total: livreurs.length,
     on: livreurs.filter(l => isON(l)).length,
@@ -63,8 +63,8 @@ export function calculateLivreurCounters(livreurs) {
     enCourse: enCourse.length,
     appActive: livreurs.filter(l => isAppActive(l)).length,
     noirs: livreurs.filter(l => isLivreurNoir(l)).length,
-    verts: libres.length,      // alias pour libres
-    oranges: enCourse.length,  // alias pour enCourse
+    verts: libres.length, // alias pour libres
+    oranges: enCourse.length, // alias pour enCourse
     surCarte: livreurs.length, // TOUS les livreurs enregistrés
   };
 }

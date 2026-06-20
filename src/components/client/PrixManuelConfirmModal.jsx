@@ -21,7 +21,7 @@ export default function PrixManuelConfirmModal({ course, onAccepted, onRefused }
         course_id: course.id,
         accepted: true,
       });
-      toast.success("Prix accepté ! Le livreur est en route. 🚀");
+      toast.success("Prix accepté ! Le livreur est en route. ");
       onAccepted();
     } catch (err) {
       toast.error("Erreur lors de l'acceptation");
@@ -57,7 +57,7 @@ export default function PrixManuelConfirmModal({ course, onAccepted, onRefused }
         <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-5 pt-5 pb-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center animate-bounce">
-              💰
+
             </div>
             <div>
               <p className="text-white font-black text-lg leading-tight">Prix proposé par le livreur</p>
@@ -92,7 +92,7 @@ export default function PrixManuelConfirmModal({ course, onAccepted, onRefused }
           {course.livreur_nom && (
             <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5">
               <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center text-lg flex-shrink-0">
-                🚴
+
               </div>
               <div>
                 <p className="text-xs text-blue-600 font-semibold">Livreur</p>

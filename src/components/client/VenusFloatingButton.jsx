@@ -140,22 +140,22 @@ export default function VenusFloatingButton() {
         className="fixed z-50 flex items-center justify-center w-16 h-16 rounded-full shadow-2xl overflow-hidden border-4 border-white cursor-grab active:cursor-grabbing"
         style={{
           background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-          boxShadow: isDragging 
-            ? "0 12px 40px rgba(102, 126, 234, 0.5)" 
+          boxShadow: isDragging
+            ? "0 12px 40px rgba(102, 126, 234, 0.5)"
             : "0 8px 32px rgba(102, 126, 234, 0.4), 0 0 20px rgba(118, 75, 162, 0.3)",
           right: "24px",
           bottom: "24px",
         }}
       >
         {/* Animation glow/pulse */}
-        <div 
+        <div
           className="absolute inset-0 rounded-full"
           style={{
             animation: isDragging ? "none" : "pulse-glow 2s ease-in-out infinite",
             background: "radial-gradient(circle, rgba(102, 126, 234, 0.6) 0%, transparent 70%)"
           }}
         />
-        
+
         {/* Avatar VENUS */}
         <div className="relative z-10 w-full h-full flex items-center justify-center">
           {!imageError && imageLoaded ? (

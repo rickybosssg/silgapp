@@ -5,13 +5,13 @@ import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  MapPin, 
-  Package, 
-  CheckCircle2, 
-  Clock, 
-  User, 
-  Phone, 
+import {
+  MapPin,
+  Package,
+  CheckCircle2,
+  Clock,
+  User,
+  Phone,
   Navigation,
   Download,
   Star,
@@ -28,10 +28,10 @@ const APK_DOWNLOAD_URL = "/telecharger-app";
 const LOADING_TIMEOUT_MS = 8000; // 8 secondes max avant d'afficher une erreur
 
 export default function PublicSuiviCourse() {
-  // 🔧 CORRECTION : lire le token depuis l'URL via useParams (React Router v6)
+  // CORRECTION : lire le token depuis l'URL via useParams (React Router v6)
   const { token } = useParams();
   const [course, setCourse] = useState(null);
-  const [error, setError] = useState(null);       // "not_found" | "timeout" | "server_error"
+  const [error, setError] = useState(null); // "not_found" | "timeout" | "server_error"
   const [loading, setLoading] = useState(true);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [livreurPos, setLivreurPos] = useState(null);
@@ -39,20 +39,20 @@ export default function PublicSuiviCourse() {
   // Récupérer la course avec timeout
   useEffect(() => {
     if (!token) {
-      console.warn("[PublicSuivi] ❌ Aucun token dans l'URL");
+      console.warn("[PublicSuivi] Aucun token dans l'URL");
       setError("not_found");
       setLoading(false);
       return;
     }
 
-    console.log("[PublicSuivi] 🔍 Token reçu:", token);
+    console.log("[PublicSuivi] Token reçu:", token);
 
     let cancelled = false;
     let timeoutId = null;
 
     async function fetchCourse() {
       try {
-        console.log("[PublicSuivi] 📡 Recherche course...");
+        console.log("[PublicSuivi] Recherche course...");
 
         // Timeout de sécurité : si la requête prend plus de 8s, afficher erreur
         const timeoutPromise = new Promise((_, reject) => {
@@ -70,33 +70,33 @@ export default function PublicSuiviCourse() {
 
         // Fallback : chercher par ID direct
         if (!courses || courses.length === 0) {
-          console.log("[PublicSuivi] 🔄 Pas trouvé par tracking_token, essai par ID:", token);
+          console.log("[PublicSuivi] Pas trouvé par tracking_token, essai par ID:", token);
           try {
             const byId = await base44.entities.CourseExterne.get(token);
             if (byId) {
               courses = [byId];
-              console.log("[PublicSuivi] ✅ Course trouvée par ID:", byId.id);
+              console.log("[PublicSuivi] Course trouvée par ID:", byId.id);
             }
           } catch (idErr) {
-            console.warn("[PublicSuivi] ⚠️ Erreur recherche par ID:", idErr?.message || idErr);
+            console.warn("[PublicSuivi] Erreur recherche par ID:", idErr?.message || idErr);
           }
         } else {
-          console.log("[PublicSuivi] ✅ Course trouvée par tracking_token");
+          console.log("[PublicSuivi] Course trouvée par tracking_token");
         }
 
         if (cancelled) return;
 
         if (courses && courses.length > 0) {
-          console.log("[PublicSuivi] 🎉 Course chargée:", courses[0].id, "statut:", courses[0].statut);
+          console.log("[PublicSuivi] Course chargée:", courses[0].id, "statut:", courses[0].statut);
           setCourse(courses[0]);
           setError(null);
         } else {
-          console.warn("[PublicSuivi] ❌ Aucune course trouvée pour le token:", token);
+          console.warn("[PublicSuivi] Aucune course trouvée pour le token:", token);
           setError("not_found");
         }
       } catch (err) {
         if (cancelled) return;
-        console.error("[PublicSuivi] 💥 Erreur:", err?.message || err);
+        console.error("[PublicSuivi] Erreur:", err?.message || err);
 
         if (err?.message === "TIMEOUT") {
           setError("timeout");
@@ -209,18 +209,18 @@ export default function PublicSuiviCourse() {
 
     const marker = window.L.marker([livreurPos.lat, livreurPos.lng])
       .addTo(map)
-      .bindPopup(`<b>🚴 ${course?.livreur_nom || livreurPos.nom || 'Livreur'}</b><br>Position en temps réel`)
+      .bindPopup(`<b> ${course?.livreur_nom || livreurPos.nom || 'Livreur'}</b><br>Position en temps réel`)
       .openPopup();
 
     // Ajouter marqueurs départ et arrivée si GPS disponible
     if (course?.gps_depart_lat && course?.gps_depart_lng) {
       window.L.marker([course.gps_depart_lat, course.gps_depart_lng], {
-        icon: window.L.divIcon({ html: '📍', iconSize: [24, 24], className: '' })
+        icon: window.L.divIcon({ html: '', iconSize: [24, 24], className: '' })
       }).addTo(map).bindPopup('Point de récupération');
     }
     if (course?.gps_arrivee_lat && course?.gps_arrivee_lng) {
       window.L.marker([course.gps_arrivee_lat, course.gps_arrivee_lng], {
-        icon: window.L.divIcon({ html: '🏁', iconSize: [24, 24], className: '' })
+        icon: window.L.divIcon({ html: '', iconSize: [24, 24], className: '' })
       }).addTo(map).bindPopup('Point de livraison');
     }
 
@@ -237,13 +237,13 @@ export default function PublicSuiviCourse() {
           </div>
           <h1 className="text-xl font-black text-red-900 mb-2">Erreur de chargement</h1>
           <p className="text-sm text-red-700 mb-6">
-            Impossible de charger les informations de suivi pour le moment. 
+            Impossible de charger les informations de suivi pour le moment.
             Veuillez réessayer dans quelques instants.
           </p>
           <p className="text-xs text-red-500 mb-6 font-mono bg-red-100 rounded-lg px-3 py-2 break-all">
             ID : {token || "—"}
           </p>
-          <Button 
+          <Button
             onClick={() => window.location.reload()}
             className="w-full bg-red-600 hover:bg-red-700 text-white"
           >
@@ -264,13 +264,13 @@ export default function PublicSuiviCourse() {
           </div>
           <h1 className="text-xl font-black text-amber-900 mb-2">Délai dépassé</h1>
           <p className="text-sm text-amber-700 mb-6">
-            Le chargement des informations prend trop de temps. 
+            Le chargement des informations prend trop de temps.
             Vérifiez votre connexion internet et réessayez.
           </p>
           <p className="text-xs text-amber-500 mb-6 font-mono bg-amber-100 rounded-lg px-3 py-2 break-all">
             ID : {token || "—"}
           </p>
-          <Button 
+          <Button
             onClick={() => window.location.reload()}
             className="w-full bg-amber-600 hover:bg-amber-700 text-white"
           >
@@ -291,7 +291,7 @@ export default function PublicSuiviCourse() {
           </div>
           <h1 className="text-xl font-black text-gray-900 mb-2">Course introuvable</h1>
           <p className="text-sm text-gray-500 mb-6">
-            Aucune course ne correspond à cet identifiant. 
+            Aucune course ne correspond à cet identifiant.
             Vérifiez le lien ou contactez l'expéditeur.
           </p>
           <p className="text-xs text-gray-400 mb-6 font-mono bg-gray-100 rounded-lg px-3 py-2 break-all">
@@ -398,7 +398,7 @@ export default function PublicSuiviCourse() {
               </p>
             </div>
           </div>
-          
+
           <Badge className={`${statusColors[course.statut]} border-0`}>
             {statusLabels[course.statut]}
           </Badge>
@@ -410,7 +410,7 @@ export default function PublicSuiviCourse() {
             <Navigation className="w-5 h-5 text-primary" />
             Progression
           </h2>
-          
+
           <div className="space-y-4">
             {[
               { key: "recherche_livreur", label: "Livreur recherché", icon: Package },
@@ -424,7 +424,7 @@ export default function PublicSuiviCourse() {
               const stepIndex = steps.indexOf(step.key);
               const isCompleted = stepIndex <= currentIndex && course.statut !== "annulee";
               const StepIcon = step.icon;
-              
+
               return (
                 <div key={step.key} className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
@@ -476,7 +476,7 @@ export default function PublicSuiviCourse() {
               <User className="w-5 h-5 text-primary" />
               Votre livreur
             </h2>
-            
+
             <div className="flex items-center gap-4 mb-4">
               {course.livreur_photo_url ? (
                 <img
@@ -489,7 +489,7 @@ export default function PublicSuiviCourse() {
                   <User className="w-8 h-8 text-primary" />
                 </div>
               )}
-              
+
               <div className="flex-1">
                 <p className="font-bold text-lg">{course.livreur_nom}</p>
                 {course.livreur_vehicule && (
@@ -498,10 +498,10 @@ export default function PublicSuiviCourse() {
                   </p>
                 )}
                 <p className="text-sm text-muted-foreground">
-                  📞 {course.livreur_telephone}
+                   {course.livreur_telephone}
                 </p>
               </div>
-              
+
               <a href={`tel:${course.livreur_telephone}`}>
                 <Button size="icon" className="rounded-full bg-green-500 hover:bg-green-600">
                   <Phone className="w-5 h-5" />
@@ -556,7 +556,7 @@ export default function PublicSuiviCourse() {
             <Package className="w-5 h-5 text-primary" />
             Détails de la course
           </h2>
-          
+
           <div className="space-y-3 text-sm">
             <div className="flex items-start gap-3">
               <MapPin className="w-5 h-5 text-red-500 mt-0.5" />
@@ -565,7 +565,7 @@ export default function PublicSuiviCourse() {
                 <p className="text-muted-foreground">{course.adresse_depart}</p>
               </div>
             </div>
-            
+
             <div className="flex items-start gap-3">
               <MapPin className="w-5 h-5 text-green-500 mt-0.5" />
               <div>
@@ -573,7 +573,7 @@ export default function PublicSuiviCourse() {
                 <p className="text-muted-foreground">{course.adresse_arrivee}</p>
               </div>
             </div>
-            
+
             {course.type_colis && (
               <div>
                 <p className="font-semibold">Type de colis</p>
@@ -582,7 +582,7 @@ export default function PublicSuiviCourse() {
                 </p>
               </div>
             )}
-            
+
             {course.prix_final && (
               <div>
                 <p className="font-semibold">Prix</p>
@@ -599,7 +599,7 @@ export default function PublicSuiviCourse() {
               <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-3">
                 <CheckCircle2 className="w-9 h-9 text-white" />
               </div>
-              <h2 className="font-black text-white text-xl">Livraison terminée ! 🎉</h2>
+              <h2 className="font-black text-white text-xl">Livraison terminée ! </h2>
               <p className="text-white/80 text-sm mt-1">Votre colis a bien été livré</p>
             </div>
             <div className="p-5 bg-green-50 space-y-3">
@@ -641,7 +641,7 @@ export default function PublicSuiviCourse() {
                 </div>
               )}
               <p className="text-center text-xs text-green-700 font-medium pt-1">
-                Merci d'avoir utilisé SILGAPP 🙏
+                Merci d'avoir utilisé SILGAPP
               </p>
               <a href={APK_DOWNLOAD_URL}>
                 <Button className="w-full bg-primary hover:bg-primary/90 font-semibold gap-2">

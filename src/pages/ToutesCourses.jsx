@@ -34,7 +34,7 @@ export default function ToutesCourses() {
 
   const filtered = useMemo(() => {
     return courses.filter(c => {
-      const matchSearch = !search || 
+      const matchSearch = !search ||
         c.client_nom?.toLowerCase().includes(search.toLowerCase()) ||
         c.client_telephone?.includes(search) ||
         c.adresse_depart?.toLowerCase().includes(search.toLowerCase()) ||

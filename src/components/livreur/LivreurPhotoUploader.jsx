@@ -9,7 +9,7 @@ import { toast } from "sonner";
  * - Compression automatique
  * - Preview instantanée
  * - Suppression
- * 
+ *
  * @param {string} photoUrl - URL actuelle de la photo
  * @param {string} nomComplet - Nom du livreur (pour fallback initiales)
  * @param {string} livreurId - ID du livreur (optionnel, pour update direct)
@@ -123,7 +123,7 @@ export default function LivreurPhotoUploader({
       });
 
       setPreviewUrl(file_url);
-      
+
       // Si livreurId fourni, update direct via la fonction dédiée
       if (livreurId) {
         await base44.functions.invoke('updateLivreurPhoto', {
@@ -131,9 +131,9 @@ export default function LivreurPhotoUploader({
           photo_url: file_url
         });
       }
-      
+
       onPhotoChange?.(file_url);
-      toast.success("Photo mise à jour ✓");
+      toast.success("Photo mise à jour ");
 
       // Cleanup preview URL
       URL.revokeObjectURL(previewUrlTemp);
@@ -150,7 +150,7 @@ export default function LivreurPhotoUploader({
   // Gestion suppression
   const handleRemovePhoto = async () => {
     setPreviewUrl(null);
-    
+
     // Si livreurId fourni, update direct
     if (livreurId) {
       try {
@@ -162,7 +162,7 @@ export default function LivreurPhotoUploader({
         console.error("Erreur suppression photo:", err);
       }
     }
-    
+
     onPhotoChange?.(null);
     toast.success("Photo supprimée");
     if (fileInputRef.current) fileInputRef.current.value = "";

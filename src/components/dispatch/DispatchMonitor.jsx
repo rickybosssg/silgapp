@@ -38,9 +38,9 @@ export default function DispatchMonitor() {
   }, [config?.heure_sollicitation, config?.course_en_dispatch_id, config?.timeout_secondes]);
 
   const tickMutation = useMutation({
-    mutationFn: (courseId) => base44.functions.invoke("dispatchMoteur", { 
+    mutationFn: (courseId) => base44.functions.invoke("dispatchMoteur", {
       action: "verifier_expiration",
-      course_id: courseId 
+      course_id: courseId
     }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dispatch-config"] }),
     onError: (e) => toast.error("Erreur moteur: " + e.message),

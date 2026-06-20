@@ -171,7 +171,7 @@ export default function PubliciteFullscreen({ cible = "clients", userId = null, 
       {/* Texte seul */}
       {(!pub.media_url || pub.type_media === "texte") && (
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-          <div className="text-6xl mb-6">📢</div>
+          <div className="text-6xl mb-6"></div>
           <h2 className="text-3xl font-black mb-4" style={{ color: pub.couleur_texte || "#fff" }}>
             {pub.titre}
           </h2>
@@ -226,7 +226,7 @@ export default function PubliciteFullscreen({ cible = "clients", userId = null, 
         >
           <CheckCircle className="w-5 h-5" />
           {canClose
-            ? "✅ Compris, continuer"
+            ? " Compris, continuer"
             : pub.type_media === "video"
             ? "⏳ Regardez la vidéo..."
             : `⏳ ${countdown}s...`}

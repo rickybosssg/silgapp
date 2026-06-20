@@ -16,8 +16,8 @@ import { useAdminContext } from "@/hooks/useAdminContext.js";
 
 // ── Onglets ────────────────────────────────────────────────────────────────────
 const TABS = [
-  { id: "livreurs", label: "💼 Dus Livreurs" },
-  { id: "frais", label: "🚫 Frais Annulation Clients" },
+  { id: "livreurs", label: " Dus Livreurs" },
+  { id: "frais", label: " Frais Annulation Clients" },
 ];
 
 // ── Statut financier livreur ───────────────────────────────────────────────────
@@ -110,7 +110,7 @@ function DetailPaiementModal({ entry, onClose, onPaiement, onBloquer, onDebloque
                   </div>
                   <p className="text-sm font-medium truncate">{c.adresse_depart} → {c.adresse_arrivee || "?"}</p>
                   <div className="flex flex-wrap gap-x-3 mt-1 text-xs text-muted-foreground">
-                    {c.prix_final != null && <span>💰 {c.prix_final.toLocaleString()} F</span>}
+                    {c.prix_final != null && <span> {c.prix_final.toLocaleString()} F</span>}
                     {c.commission_silga != null && <span className="text-orange-600 font-semibold">Silga: {c.commission_silga.toLocaleString()} F</span>}
                   </div>
                 </div>
@@ -214,7 +214,7 @@ function DusLivreursTab() {
 
   const blockMutation = useMutation({
     mutationFn: ({ id, actif }) => base44.functions.invoke("updateLivreur", { id, data: { actif } }),
-    onSuccess: (_, { actif }) => { queryClient.invalidateQueries({ queryKey: ["livreurs-externes-all"] }); toast.success(actif ? "Livreur débloqué ✓" : "Livreur bloqué ✓"); setDetailEntry(null); },
+    onSuccess: (_, { actif }) => { queryClient.invalidateQueries({ queryKey: ["livreurs-externes-all"] }); toast.success(actif ? "Livreur débloqué " : "Livreur bloqué "); setDetailEntry(null); },
     onError: () => toast.error("Erreur"),
   });
 
@@ -248,7 +248,7 @@ function DusLivreursTab() {
       {/* Liste */}
       {recapLivreurs.length === 0 ? (
         <div className="text-center py-10 text-muted-foreground text-sm">
-          <div className="text-3xl mb-2">💼</div>
+          <div className="text-3xl mb-2"></div>
           <p className="font-semibold">Aucun résultat</p>
         </div>
       ) : (
@@ -263,7 +263,7 @@ function DusLivreursTab() {
                     <div className="flex items-center gap-2 flex-wrap mb-0.5">
                       <span className="font-black">{entry.prenom} {entry.nom}</span>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${sf.color}`}>{sf.label}</span>
-                      {isBloque && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">🔒 Bloqué</span>}
+                      {isBloque && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold"> Bloqué</span>}
                     </div>
                     {entry.telephone && <p className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="w-3 h-3" />{entry.telephone}</p>}
                   </div>

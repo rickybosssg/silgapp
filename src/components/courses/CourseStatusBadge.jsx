@@ -24,11 +24,11 @@ export default function CourseStatusBadge({ statut, dispatchStatus }) {
   if (dispatchStatus === 'propose') {
     return (
       <Badge variant="outline" className={cn("text-[11px] font-medium border", "bg-orange-100 text-orange-700 border-orange-200")}>
-        🔍 Recherche livreur
+         Recherche livreur
       </Badge>
     );
   }
-  
+
   const config = statusConfig[statut] || { label: statut, className: "bg-muted text-muted-foreground" };
   return (
     <Badge variant="outline" className={cn("text-[11px] font-medium border", config.className)}>

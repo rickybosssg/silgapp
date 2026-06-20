@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, error: 'Code incorrect' }, { status: 404 });
     }
 
-    console.log('[findLivreurByCode] ✅ Found:', livreur.nom, livreur.prenom);
+    console.log('[findLivreurByCode] Found:', livreur.nom, livreur.prenom);
 
     return Response.json({
       success: true,

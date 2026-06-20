@@ -9,8 +9,8 @@ const LETTER_IDS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
  * Remplace l'étape "destinataire" du formulaire simple quand nb_colis > 1.
  */
 export default function MultiColisFormStep({
-  colis,       // array of colis objects
-  onChange,    // (index, field, value) => void
+  colis, // array of colis objects
+  onChange, // (index, field, value) => void
   clientId,
   countryCode,
   savedLat,
@@ -40,7 +40,7 @@ export default function MultiColisFormStep({
           : <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />}
         <p className={`text-xs font-semibold ${tousValides ? "text-green-800" : "text-amber-700"}`}>
           {tousValides
-            ? `✅ Tous les ${totalColis} colis sont renseignés`
+            ? ` Tous les ${totalColis} colis sont renseignés`
             : `${colisValides} / ${totalColis} colis renseignés — téléphone requis pour chaque`}
         </p>
       </div>

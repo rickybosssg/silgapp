@@ -30,12 +30,12 @@ function getLastGPS(entity) {
 }
 
 function getGPSHealthEmoji(gpsMin) {
-  if (gpsMin === null) return { emoji: "❓", label: "Inconnu", color: "text-gray-500" };
-  if (gpsMin < 2) return { emoji: "❤️", label: "Excellent", color: "text-green-600" };
-  if (gpsMin < 5) return { emoji: "💚", label: "Bon", color: "text-green-600" };
-  if (gpsMin < 15) return { emoji: "🧡", label: "Moyen", color: "text-orange-600" };
-  if (gpsMin < 30) return { emoji: "💗", label: "Faible", color: "text-red-600" };
-  return { emoji: "❤️‍🔥", label: "Expiré", color: "text-red-700" };
+  if (gpsMin === null) return { emoji: "", label: "Inconnu", color: "text-gray-500" };
+  if (gpsMin < 2) return { emoji: "", label: "Excellent", color: "text-green-600" };
+  if (gpsMin < 5) return { emoji: "", label: "Bon", color: "text-green-600" };
+  if (gpsMin < 15) return { emoji: "", label: "Moyen", color: "text-orange-600" };
+  if (gpsMin < 30) return { emoji: "", label: "Faible", color: "text-red-600" };
+  return { emoji: "", label: "Expiré", color: "text-red-700" };
 }
 
 function isLivreur(entity) {
@@ -53,7 +53,7 @@ function formatTel(tel, countryCode) {
   return cleaned.replace(/(\+\d{3})(\d{2})(\d{2})(\d{2})(\d{2})/, "$1 $2 $3 $4 $5");
 }
 
-const PAYS_EMOJIS = { BF: "🇧🇫", CI: "🇨🇮", TG: "🇹🇬", BJ: "🇧🇯", SN: "🇸🇳", ML: "🇲🇱", GN: "🇬🇳", NE: "🇳🇪" };
+const PAYS_EMOJIS = { BF: "", CI: "", TG: "", BJ: "", SN: "", ML: "", GN: "", NE: "" };
 
 export default function MarkerInfoPanel({ entity, onClose }) {
   if (!entity) return null;
@@ -65,7 +65,7 @@ export default function MarkerInfoPanel({ entity, onClose }) {
   const zone = entity.quartier || entity.ville || "Zone inconnue";
   const isLiv = isLivreur(entity);
   const countryCode = entity.country_code || "BF";
-  const paysEmoji = PAYS_EMOJIS[countryCode] || "🌍";
+  const paysEmoji = PAYS_EMOJIS[countryCode] || "";
 
   const statutLabel = isLiv
     ? entity.statut === "disponible" ? "Libre" : entity.statut === "en_course" ? "En course" : "Hors ligne"

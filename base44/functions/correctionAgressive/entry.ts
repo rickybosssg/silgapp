@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    
+
     if (!user || user.role !== 'admin') {
       return Response.json({ error: 'Admin only' }, { status: 401 });
     }
@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
     for (const course of courses) {
       try {
         const updates = {};
-        
+
         // CORRECTION 1 : GPS départ manquant
         if (!course.gps_depart_lat || !course.gps_depart_lng) {
           if (course.adresse_depart) {

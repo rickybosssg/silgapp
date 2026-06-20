@@ -31,11 +31,11 @@ export default function RapportJourExterne() {
     }), [courses]);
 
   const stats = useMemo(() => {
-    const livrees   = coursesToday.filter(c => c.statut === "livree");
-    const annulees  = coursesToday.filter(c => c.statut === "annulee");
-    const enCours   = coursesToday.filter(c => ["recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut));
-    const ca        = livrees.reduce((sum, c) => sum + (c.prix_final || 0), 0);
-    const distance  = livrees.reduce((sum, c) => sum + (c.distance_reelle_km || 0), 0);
+    const livrees = coursesToday.filter(c => c.statut === "livree");
+    const annulees = coursesToday.filter(c => c.statut === "annulee");
+    const enCours = coursesToday.filter(c => ["recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut));
+    const ca = livrees.reduce((sum, c) => sum + (c.prix_final || 0), 0);
+    const distance = livrees.reduce((sum, c) => sum + (c.distance_reelle_km || 0), 0);
     const commission = livrees.reduce((sum, c) => sum + (c.commission_silga || 0), 0);
 
     // Par livreur
@@ -72,7 +72,7 @@ export default function RapportJourExterne() {
           </Link>
           <div className="flex items-center gap-3 flex-1">
             <div className="w-10 h-10 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center text-xl flex-shrink-0">
-              📊
+
             </div>
             <div>
               <h1 className="text-xl font-black text-white tracking-tight">Rapport du Jour — Externe</h1>
@@ -97,10 +97,10 @@ export default function RapportJourExterne() {
       {/* ── KPI STATS ────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
         {[
-          { label: "Courses totales",  value: stats.totale,                          suffix: null,    grad: "from-primary to-red-600",       shadow: "shadow-red-100",     icon: "📦" },
-          { label: "Livrées",          value: stats.livrees,                          suffix: null,    grad: "from-green-500 to-emerald-500",  shadow: "shadow-green-100",   icon: "✅" },
-          { label: "CA encaissé",      value: stats.ca.toLocaleString(),              suffix: "FCFA",  grad: "from-indigo-500 to-blue-600",    shadow: "shadow-indigo-100",  icon: "💰" },
-          { label: "Distance totale",  value: stats.distance.toFixed(1),              suffix: "km",    grad: "from-cyan-500 to-sky-500",       shadow: "shadow-cyan-100",    icon: "📍" },
+          { label: "Courses totales", value: stats.totale, suffix: null, grad: "from-primary to-red-600", shadow: "shadow-red-100", icon: "" },
+          { label: "Livrées", value: stats.livrees, suffix: null, grad: "from-green-500 to-emerald-500", shadow: "shadow-green-100", icon: "" },
+          { label: "CA encaissé", value: stats.ca.toLocaleString(), suffix: "FCFA", grad: "from-indigo-500 to-blue-600", shadow: "shadow-indigo-100", icon: "" },
+          { label: "Distance totale", value: stats.distance.toFixed(1), suffix: "km", grad: "from-cyan-500 to-sky-500", shadow: "shadow-cyan-100", icon: "" },
         ].map(s => (
           <div key={s.label} className={`bg-gradient-to-br ${s.grad} rounded-2xl p-3.5 text-white shadow-md ${s.shadow}`}>
             <div className="flex items-center justify-between mb-2">
@@ -147,7 +147,7 @@ export default function RapportJourExterne() {
             {stats.livreurStats.map((l, i) => (
               <div key={l.nom} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0 ${i === 0 ? "bg-amber-400 text-white" : "bg-gray-200 text-gray-600"}`}>
-                  {i === 0 ? "🥇" : i + 1}
+                  {i === 0 ? "" : i + 1}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-sm text-foreground truncate">{l.nom}</p>
@@ -174,14 +174,14 @@ export default function RapportJourExterne() {
 
         {livreesDetail.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
-            <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3 text-2xl">📦</div>
+            <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3 text-2xl"></div>
             <p className="font-semibold text-sm">Aucune course livrée aujourd'hui</p>
           </div>
         ) : (
           <div className="space-y-2">
             {livreesDetail.map(course => (
               <div key={course.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 hover:border-gray-200 transition-all">
-                <div className="w-9 h-9 rounded-xl bg-green-100 flex items-center justify-center text-base flex-shrink-0">✅</div>
+                <div className="w-9 h-9 rounded-xl bg-green-100 flex items-center justify-center text-base flex-shrink-0"></div>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-sm text-foreground truncate">{course.client_nom || "Client"}</p>
                   <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-0.5">
@@ -189,7 +189,7 @@ export default function RapportJourExterne() {
                     <span className="truncate">{course.adresse_depart} → {course.adresse_arrivee || "?"}</span>
                   </div>
                   {course.livreur_nom && (
-                    <p className="text-[10px] text-muted-foreground mt-0.5">👤 {course.livreur_nom}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5"> {course.livreur_nom}</p>
                   )}
                 </div>
                 <div className="text-right flex-shrink-0">

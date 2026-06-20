@@ -2,11 +2,11 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 /**
  * LIBÉRER LIVREUR - COURSE LIVRÉE
- * 
+ *
  * Quand une course est livrée (statut: 'livree'), cette fonction :
  * 1. Remet automatiquement le livreur en statut "disponible"
  * 2. Rend le livreur dispatchable immédiatement
- * 
+ *
  * Peut être appelée par :
  * - Un admin (via dashboard)
  * - Une automation entity (sans user context)
@@ -15,7 +15,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    
+
     // Vérifier que c'est un admin qui appelle (sauf si appelé par automation)
     // Les automations n'ont pas de user context, donc on skip la vérification
     const user = await base44.auth.me().catch(() => null);
@@ -24,14 +24,14 @@ Deno.serve(async (req) => {
     }
 
     const { course_id } = await req.json();
-    
+
     if (!course_id) {
       return Response.json({ error: 'course_id requis' }, { status: 400 });
     }
 
     // Récupérer la course
     const course = await base44.entities.CourseExterne.get(course_id);
-    
+
     if (!course) {
       return Response.json({ error: 'Course non trouvée' }, { status: 404 });
     }
@@ -39,8 +39,8 @@ Deno.serve(async (req) => {
     // Vérifier que la course est livrée
     const statutsFin = ["livree", "terminee", "completed"];
     if (!statutsFin.includes(course.statut)) {
-      return Response.json({ 
-        success: true, 
+      return Response.json({
+        success: true,
         message: `Course pas encore terminée (statut: ${course.statut})`,
         course_id: course_id,
         statut: course.statut
@@ -72,13 +72,13 @@ Deno.serve(async (req) => {
         : 999;
       // Heartbeat récent (< 10 min) → disponible, sinon → hors_ligne
       const nouveauStatut = heartbeatAge < 10 ? 'disponible' : 'hors_ligne';
-      
+
       await base44.entities.Livreur.update(course.livreur_id, { statut: nouveauStatut });
 
       console.log(`[libererLivreurCourseLivree] Livreur ${course.livreur_nom} remis à "${nouveauStatut}" (heartbeat: ${Math.round(heartbeatAge)}min)`);
-      
-      return Response.json({ 
-        success: true, 
+
+      return Response.json({
+        success: true,
         message: 'Livreur libéré avec succès',
         course_id: course_id,
         livreur_id: course.livreur_id,
@@ -86,8 +86,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    return Response.json({ 
-      success: true, 
+    return Response.json({
+      success: true,
       message: 'Aucun livreur assigné à cette course',
       course_id: course_id,
       statut: course.statut,

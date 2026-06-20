@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { 
-  Lock, 
-  Shield, 
+import {
+  Lock,
+  Shield,
   AlertCircle,
   ArrowLeft
 } from "lucide-react";
@@ -30,7 +30,7 @@ export default function PinVerification({ onVerify, onCancel, networkName }) {
     } else {
       const newAttempts = attempts + 1;
       setAttempts(newAttempts);
-      
+
       if (newAttempts >= 5) {
         setError("Trop de tentatives. Veuillez réessayer plus tard.");
         toast.error("Trop de tentatives échouées");
@@ -38,7 +38,7 @@ export default function PinVerification({ onVerify, onCancel, networkName }) {
         setError(`Code incorrect. ${5 - newAttempts} tentatives restantes.`);
         toast.error("Code incorrect");
       }
-      
+
       setPin("");
       return false;
     }
@@ -49,7 +49,7 @@ export default function PinVerification({ onVerify, onCancel, networkName }) {
       const newPin = pin + num;
       setPin(newPin);
       setError("");
-      
+
       // Validation automatique après 6 chiffres
       if (newPin.length === 6) {
         setTimeout(() => {
@@ -69,9 +69,9 @@ export default function PinVerification({ onVerify, onCancel, networkName }) {
       <div className="max-w-md w-full space-y-6">
         {/* Header */}
         <div className="text-center space-y-4">
-          <img 
-            src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/ecff74f77_IMG-20260523-WA0003.jpg" 
-            alt="Logo SILGAPP" 
+          <img
+            src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/ecff74f77_IMG-20260523-WA0003.jpg"
+            alt="Logo SILGAPP"
             className="w-32 h-32 object-contain mx-auto"
           />
           <div>

@@ -92,8 +92,8 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
                     )}
                     {/* Badge statut carte (vert/orange/gris) */}
                     <span className={`text-xs px-2 py-0.5 rounded-full border font-medium inline-flex items-center gap-1 ${
-                      libre       ? "bg-green-100 text-green-700 border-green-200" :
-                      enMission   ? "bg-orange-100 text-orange-700 border-orange-200" :
+                      libre ? "bg-green-100 text-green-700 border-green-200" :
+                      enMission ? "bg-orange-100 text-orange-700 border-orange-200" :
                                     "bg-gray-100 text-gray-500 border-gray-200"
                     }`}>
                       <span className={`w-1.5 h-1.5 rounded-full inline-block ${libre ? "bg-green-500" : enMission ? "bg-orange-500" : "bg-gray-400"}`} />
@@ -240,8 +240,8 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
                     <p className="text-foreground truncate">{c.adresse_depart} → {c.adresse_arrivee || "?"}</p>
                     {c.statut === "livree" && (
                       <div className="flex gap-2 mt-1 text-muted-foreground">
-                        {c.distance_reelle_km && <span>📏 {Number(c.distance_reelle_km).toFixed(1)} km</span>}
-                        {c.prix_final && <span>💰 {c.prix_final.toLocaleString()} F</span>}
+                        {c.distance_reelle_km && <span> {Number(c.distance_reelle_km).toFixed(1)} km</span>}
+                        {c.prix_final && <span> {c.prix_final.toLocaleString()} F</span>}
                         {c.commission_silga && <span className="text-orange-600">Dû: {c.commission_silga.toLocaleString()} F</span>}
                       </div>
                     )}
@@ -351,25 +351,25 @@ export default function LivreursExternes() {
   const stats = useMemo(() => {
     const actifs = livreurs.filter(l => l.actif !== false);
     return {
-      total:      livreurs.length,
-      libres:     actifs.filter(l => isLibre(l)).length,
-      enMission:  actifs.filter(l => isEnCourse(l)).length,
-      horsLigne:  actifs.filter(l => isLivreurNoir(l)).length,
+      total: livreurs.length,
+      libres: actifs.filter(l => isLibre(l)).length,
+      enMission: actifs.filter(l => isEnCourse(l)).length,
+      horsLigne: actifs.filter(l => isLivreurNoir(l)).length,
       appOuverte: actifs.filter(l => isAppActive(l)).length,
-      valide:     livreurs.filter(l => l.validation === "valide").length,
-      bloque:     livreurs.filter(l => l.actif === false).length,
-      enAttente:  livreurs.filter(l => l.validation === "en_attente").length,
+      valide: livreurs.filter(l => l.validation === "valide").length,
+      bloque: livreurs.filter(l => l.actif === false).length,
+      enAttente: livreurs.filter(l => l.validation === "en_attente").length,
     };
   }, [livreurs]);
 
   const livreursFiltres = useMemo(() => {
-    if (filterStatut === "tous")        return livreurs;
-    if (filterStatut === "libres")      return livreurs.filter(l => isLibre(l) && l.actif !== false);
-    if (filterStatut === "en_mission")  return livreurs.filter(l => isEnCourse(l) && l.actif !== false);
-    if (filterStatut === "hors_ligne")  return livreurs.filter(l => isLivreurNoir(l) && l.actif !== false);
+    if (filterStatut === "tous") return livreurs;
+    if (filterStatut === "libres") return livreurs.filter(l => isLibre(l) && l.actif !== false);
+    if (filterStatut === "en_mission") return livreurs.filter(l => isEnCourse(l) && l.actif !== false);
+    if (filterStatut === "hors_ligne") return livreurs.filter(l => isLivreurNoir(l) && l.actif !== false);
     if (filterStatut === "app_ouverte") return livreurs.filter(l => isAppActive(l) && l.actif !== false);
-    if (filterStatut === "bloque")      return livreurs.filter(l => l.actif === false);
-    if (filterStatut === "en_attente")  return livreurs.filter(l => l.validation === "en_attente");
+    if (filterStatut === "bloque") return livreurs.filter(l => l.actif === false);
+    if (filterStatut === "en_attente") return livreurs.filter(l => l.validation === "en_attente");
     return livreurs;
   }, [livreurs, filterStatut]);
 
@@ -377,7 +377,7 @@ export default function LivreursExternes() {
     mutationFn: ({ id, data }) => base44.functions.invoke("updateLivreur", { id, data }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["livreurs-externes"] });
-      toast.success("Mis à jour ✓");
+      toast.success("Mis à jour ");
     },
     onError: () => toast.error("Erreur de mise à jour"),
   });
@@ -386,7 +386,7 @@ export default function LivreursExternes() {
     mutationFn: ({ id, validation }) => base44.entities.Livreur.update(id, { validation }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["livreurs-externes"] });
-      toast.success("Validation mise à jour ✓");
+      toast.success("Validation mise à jour ");
     },
     onError: () => toast.error("Erreur"),
   });
@@ -395,7 +395,7 @@ export default function LivreursExternes() {
     mutationFn: (id) => base44.entities.Livreur.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["livreurs-externes"] });
-      toast.success("Livreur supprimé ✓");
+      toast.success("Livreur supprimé ");
     },
     onError: () => toast.error("Erreur lors de la suppression"),
   });
@@ -433,13 +433,13 @@ export default function LivreursExternes() {
     coursesAll.filter(c => c.livreur_id === livreurId);
 
   const FILTRES = [
-    { id: "tous",        label: `Tous (${stats.total})`,                 activeClass: "bg-slate-800 text-white border-slate-800",                    inactiveClass: "bg-gray-100 text-gray-500 hover:bg-gray-200 border-transparent" },
-    { id: "libres",      label: `Libres (${stats.libres})`,              activeClass: "bg-green-500 text-white border-green-500",                    inactiveClass: "bg-green-50 text-green-700 border-green-200 hover:bg-green-100" },
-    { id: "en_mission",  label: `En mission (${stats.enMission})`,       activeClass: "bg-orange-500 text-white border-orange-500",                  inactiveClass: "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100" },
-    { id: "hors_ligne",  label: `Hors ligne (${stats.horsLigne})`,       activeClass: "bg-gray-600 text-white border-gray-600",                      inactiveClass: "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200" },
-    { id: "app_ouverte", label: `App ouverte (${stats.appOuverte})`,     activeClass: "bg-cyan-600 text-white border-cyan-600",                      inactiveClass: "bg-cyan-50 text-cyan-700 border-cyan-200 hover:bg-cyan-100" },
-    { id: "bloque",      label: `Bloqués (${stats.bloque})`,             activeClass: "bg-destructive text-white border-destructive",                inactiveClass: "bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20" },
-    { id: "en_attente",  label: `En attente (${stats.enAttente})`,       activeClass: "bg-amber-500 text-white border-amber-500",                    inactiveClass: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100" },
+    { id: "tous", label: `Tous (${stats.total})`, activeClass: "bg-slate-800 text-white border-slate-800", inactiveClass: "bg-gray-100 text-gray-500 hover:bg-gray-200 border-transparent" },
+    { id: "libres", label: `Libres (${stats.libres})`, activeClass: "bg-green-500 text-white border-green-500", inactiveClass: "bg-green-50 text-green-700 border-green-200 hover:bg-green-100" },
+    { id: "en_mission", label: `En mission (${stats.enMission})`, activeClass: "bg-orange-500 text-white border-orange-500", inactiveClass: "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100" },
+    { id: "hors_ligne", label: `Hors ligne (${stats.horsLigne})`, activeClass: "bg-gray-600 text-white border-gray-600", inactiveClass: "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200" },
+    { id: "app_ouverte", label: `App ouverte (${stats.appOuverte})`, activeClass: "bg-cyan-600 text-white border-cyan-600", inactiveClass: "bg-cyan-50 text-cyan-700 border-cyan-200 hover:bg-cyan-100" },
+    { id: "bloque", label: `Bloqués (${stats.bloque})`, activeClass: "bg-destructive text-white border-destructive", inactiveClass: "bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20" },
+    { id: "en_attente", label: `En attente (${stats.enAttente})`, activeClass: "bg-amber-500 text-white border-amber-500", inactiveClass: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100" },
   ];
 
   return (
@@ -469,7 +469,7 @@ export default function LivreursExternes() {
               try {
                 const res = await base44.functions.invoke("resyncLivreurStatut", {});
                 if (res.data?.resynchronises > 0) {
-                  toast.success(`${res.data.resynchronises} livreur(s) resynchronisé(s) ✓`);
+                  toast.success(`${res.data.resynchronises} livreur(s) resynchronisé(s) `);
                   queryClient.invalidateQueries({ queryKey: ["livreurs-externes"] });
                 } else {
                   toast.info("Tous les statuts sont déjà corrects.");
@@ -489,10 +489,10 @@ export default function LivreursExternes() {
       {/* Statistiques — harmonisées avec la carte dispatch */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {[
-          { label: "Libres",      value: stats.libres,    grad: "from-green-500 to-emerald-500",  shadow: "shadow-green-100",  dot: "bg-green-400" },
-          { label: "En mission",  value: stats.enMission, grad: "from-orange-500 to-amber-500",   shadow: "shadow-orange-100", dot: "bg-orange-400" },
-          { label: "Hors ligne",  value: stats.horsLigne, grad: "from-gray-600 to-slate-700",     shadow: "shadow-gray-100",   dot: "bg-gray-400" },
-          { label: "App ouverte", value: stats.appOuverte,grad: "from-cyan-500 to-sky-500",       shadow: "shadow-cyan-100",   dot: "bg-cyan-400" },
+          { label: "Libres", value: stats.libres, grad: "from-green-500 to-emerald-500", shadow: "shadow-green-100", dot: "bg-green-400" },
+          { label: "En mission", value: stats.enMission, grad: "from-orange-500 to-amber-500", shadow: "shadow-orange-100", dot: "bg-orange-400" },
+          { label: "Hors ligne", value: stats.horsLigne, grad: "from-gray-600 to-slate-700", shadow: "shadow-gray-100", dot: "bg-gray-400" },
+          { label: "App ouverte", value: stats.appOuverte,grad: "from-cyan-500 to-sky-500", shadow: "shadow-cyan-100", dot: "bg-cyan-400" },
         ].map(s => (
           <div key={s.label} className={`bg-gradient-to-br ${s.grad} rounded-2xl p-3.5 text-white shadow-md ${s.shadow}`}>
             <div className={`w-2 h-2 rounded-full ${s.dot} mb-2`} />
@@ -561,7 +561,7 @@ export default function LivreursExternes() {
                   <div className="flex items-center gap-1.5 flex-wrap mb-1">
                     <span className="font-bold text-sm text-foreground truncate">{nomComplet}</span>
                     {isBloque ? (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-red-100 text-red-700">🔒 Bloqué</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-red-100 text-red-700"> Bloqué</span>
                     ) : (
                       <>
                         {isAdminOff && (
@@ -571,8 +571,8 @@ export default function LivreursExternes() {
                         )}
                         {/* Badge statut harmonisé avec la carte dispatch */}
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold inline-flex items-center gap-1 ${
-                          libre      ? "bg-green-100 text-green-700" :
-                          enMission  ? "bg-orange-100 text-orange-700" :
+                          libre ? "bg-green-100 text-green-700" :
+                          enMission ? "bg-orange-100 text-orange-700" :
                                        "bg-gray-100 text-gray-500"
                         }`}>
                           <span className={`w-1.5 h-1.5 rounded-full inline-block ${libre ? "bg-green-500" : enMission ? "bg-orange-500" : "bg-gray-400"}`} />

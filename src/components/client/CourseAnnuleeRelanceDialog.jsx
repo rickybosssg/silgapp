@@ -17,7 +17,7 @@ export default function CourseAnnuleeRelanceDialog({ course, onRelancer, onTermi
         {/* Header coloré */}
         <div className="bg-gradient-to-r from-orange-400 to-red-500 px-6 pt-8 pb-6 text-center">
           <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center mx-auto mb-3">
-            <span className="text-4xl">😔</span>
+            <span className="text-4xl"></span>
           </div>
           <h2 className="text-xl font-black text-white">Aucun livreur disponible</h2>
           <p className="text-white/80 text-sm mt-1">
@@ -28,7 +28,7 @@ export default function CourseAnnuleeRelanceDialog({ course, onRelancer, onTermi
         {/* Détails course */}
         <div className="px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2 text-sm text-gray-600">
-            <span className="text-base">📦</span>
+            <span className="text-base"></span>
             <span className="font-medium truncate">
               {course.adresse_depart || "Point de départ"} → {course.adresse_arrivee || "Destination"}
             </span>
@@ -57,7 +57,7 @@ export default function CourseAnnuleeRelanceDialog({ course, onRelancer, onTermi
         </div>
 
         <p className="text-center text-xs text-gray-400 pb-5">
-          💡 Réessayez dans quelques minutes, des livreurs se connectent régulièrement.
+           Réessayez dans quelques minutes, des livreurs se connectent régulièrement.
         </p>
       </div>
     </div>

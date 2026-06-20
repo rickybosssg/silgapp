@@ -242,7 +242,7 @@ Deno.serve(async (req) => {
 Pays: ${country_code || 'ALL'}
 Nombre de questions: ${interactions.length}
 Top catégories: ${topCats.map(([c, n]) => `${CATEGORIE_LABELS[c] || c}: ${n}`).join(', ')}
-Exemples de questions: 
+Exemples de questions:
 - ${topQs}
 
 Génère un rapport ${type_rapport} structuré avec:

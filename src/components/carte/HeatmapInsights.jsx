@@ -9,21 +9,21 @@ import { Card } from "@/components/ui/card";
 export default function HeatmapInsights({ clients, livreurs, courses, mode }) {
   const insights = useMemo(() => {
     if (mode === "off") return null;
-    
+
     // Calculer les points
     const clientPoints = clients.filter(c => c.latitude && c.longitude).length;
     const coursePoints = courses.filter(c => c.gps_depart_lat && c.gps_depart_lng).length;
     const livreurDispo = livreurs.filter(l => l.latitude && l.longitude && l.statut === "disponible").length;
     const livreurCourse = livreurs.filter(l => l.latitude && l.longitude && l.statut === "en_course").length;
-    
+
     const totalDemande = clientPoints + coursePoints;
     const totalCouverture = livreurDispo + livreurCourse;
-    
+
     // Ratio offre/demande
     const ratio = totalDemande > 0 ? totalCouverture / totalDemande : 0;
-    
+
     const recommendations = [];
-    
+
     if (mode === "demande") {
       if (totalDemande < 3) {
         recommendations.push({
@@ -50,7 +50,7 @@ export default function HeatmapInsights({ clients, livreurs, courses, mode }) {
           color: "text-green-700 bg-green-50 border-green-200"
         });
       }
-      
+
       // Recommandations spécifiques
       if (coursePoints > clientPoints) {
         recommendations.push({
@@ -62,7 +62,7 @@ export default function HeatmapInsights({ clients, livreurs, courses, mode }) {
         });
       }
     }
-    
+
     if (mode === "couverture") {
       if (totalCouverture < 3) {
         recommendations.push({
@@ -105,7 +105,7 @@ export default function HeatmapInsights({ clients, livreurs, courses, mode }) {
           color: "text-green-700 bg-green-50 border-green-200"
         });
       }
-      
+
       // Statut des livreurs
       if (livreurDispo === 0 && livreurCourse > 0) {
         recommendations.push({
@@ -117,15 +117,15 @@ export default function HeatmapInsights({ clients, livreurs, courses, mode }) {
         });
       }
     }
-    
+
     return recommendations;
   }, [clients, livreurs, courses, mode]);
-  
+
   if (!insights || insights.length === 0) return null;
-  
+
   return (
     <div className="space-y-2">
-      <p className="text-xs font-semibold text-gray-700 px-1">💡 Insights stratégiques</p>
+      <p className="text-xs font-semibold text-gray-700 px-1"> Insights stratégiques</p>
       {insights.map((insight, idx) => {
         const Icon = insight.icon;
         return (

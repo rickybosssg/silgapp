@@ -18,7 +18,7 @@ export default function TestSystemeAuto() {
     try {
       const res = await base44.functions.invoke('testAuto', { user_type: "client" });
       setTests(res.data);
-      toast.success("Tests automatiques complétés ✓");
+      toast.success("Tests automatiques complétés ");
     } catch (err) {
       toast.error("Erreur tests: " + err.message);
     } finally {

@@ -9,17 +9,17 @@ function openWhatsApp(phone) {
 }
 
 function vehiculeLabel(v) {
-  if (v === "voiture") return "🚗 Voiture";
-  if (v === "velo") return "🚲 Vélo";
-  if (v === "a_pied") return "🚶 À pied";
-  return "🏍️ Moto";
+  if (v === "voiture") return " Voiture";
+  if (v === "velo") return " Vélo";
+  if (v === "a_pied") return " À pied";
+  return " Moto";
 }
 
 const STATUT_MESSAGE = {
-  livreur_en_route: (prenom) => `🚀 ${prenom} est en route vers le point de récupération`,
-  colis_recupere: (prenom) => `📦 ${prenom} a récupéré le colis`,
-  en_livraison: (prenom) => `🏃 ${prenom} est en route vers vous`,
-  livree: (_prenom) => `✅ Livraison terminée avec succès !`,
+  livreur_en_route: (prenom) => ` ${prenom} est en route vers le point de récupération`,
+  colis_recupere: (prenom) => ` ${prenom} a récupéré le colis`,
+  en_livraison: (prenom) => ` ${prenom} est en route vers vous`,
+  livree: (_prenom) => ` Livraison terminée avec succès !`,
 };
 
 export default function LivreurAssigneCard({ course }) {
@@ -34,7 +34,7 @@ export default function LivreurAssigneCard({ course }) {
   const nombreAvis = course.livreur_nombre_avis || 0;
 
   const headerMsg = STATUT_MESSAGE[course.statut]?.(prenom)
-    ?? `🎉 ${prenom} a accepté votre course !`;
+    ?? ` ${prenom} a accepté votre course !`;
 
   const headerColor = course.statut === "livree"
     ? "bg-gradient-to-r from-green-600 to-emerald-700"

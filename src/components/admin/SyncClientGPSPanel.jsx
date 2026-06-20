@@ -15,11 +15,11 @@ export default function SyncClientGPSPanel() {
     try {
       const response = await base44.functions.invoke("syncClientGPS", {});
       setStats(response.data);
-      
+
       if (response.data.success) {
-        toast.success(`✅ ${response.data.message}`);
+        toast.success(` ${response.data.message}`);
       } else {
-        toast.error(`❌ ${response.data.error}`);
+        toast.error(` ${response.data.error}`);
       }
     } catch (error) {
       toast.error(`Erreur: ${error.message}`);
@@ -43,8 +43,8 @@ export default function SyncClientGPSPanel() {
           <strong>Note:</strong> Le GPS est maintenant automatiquement sauvegardé lors de l'onboarding.
         </div>
 
-        <Button 
-          onClick={handleSync} 
+        <Button
+          onClick={handleSync}
           disabled={syncing}
           className="w-full"
         >
@@ -81,7 +81,7 @@ export default function SyncClientGPSPanel() {
             {stats.details && stats.details.length > 0 && (
               <div className="max-h-60 overflow-y-auto space-y-2">
                 {stats.details.map((client) => (
-                  <div 
+                  <div
                     key={client.id}
                     className="flex items-center justify-between p-2 rounded-lg border"
                   >

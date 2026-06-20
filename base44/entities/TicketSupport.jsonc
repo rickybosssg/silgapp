@@ -1,0 +1,85 @@
+{
+  "name": "TicketSupport",
+  "type": "object",
+  "properties": {
+    "sujet": {
+      "type": "string",
+      "description": "Sujet du ticket"
+    },
+    "message": {
+      "type": "string",
+      "description": "Description du probl\u00e8me"
+    },
+    "type_ticket": {
+      "type": "string",
+      "enum": [
+        "probleme_course",
+        "reclamation",
+        "question",
+        "suggestion",
+        "bug",
+        "autre"
+      ],
+      "default": "question",
+      "description": "Type de ticket"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "ouvert",
+        "en_cours",
+        "resolu",
+        "ferme"
+      ],
+      "default": "ouvert"
+    },
+    "priorite": {
+      "type": "string",
+      "enum": [
+        "basse",
+        "normale",
+        "haute",
+        "urgente"
+      ],
+      "default": "normale"
+    },
+    "country_code": {
+      "type": "string",
+      "description": "Pays du client"
+    },
+    "client_id": {
+      "type": "string",
+      "description": "ID du client"
+    },
+    "client_nom": {
+      "type": "string"
+    },
+    "client_telephone": {
+      "type": "string"
+    },
+    "client_email": {
+      "type": "string"
+    },
+    "course_id": {
+      "type": "string",
+      "description": "Course li\u00e9e (optionnel)"
+    },
+    "reponse_admin": {
+      "type": "string",
+      "description": "R\u00e9ponse de l'admin"
+    },
+    "traite_par": {
+      "type": "string",
+      "description": "Admin ayant trait\u00e9 le ticket"
+    },
+    "traite_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "sujet",
+    "message",
+    "type_ticket"
+  ]
+}

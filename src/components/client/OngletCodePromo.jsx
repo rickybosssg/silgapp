@@ -50,7 +50,7 @@ export default function OngletCodePromo({ clientProfil }) {
 
   const partagerWhatsApp = () => {
     const msg = encodeURIComponent(
-      `🎁 Utilise mon code promo *${monCode.code}* sur SILGAPP et bénéficie de *100 FCFA de réduction* sur ta première course !\n\n📦 Télécharge SILGAPP et inscris-toi maintenant.`
+      ` Utilise mon code promo *${monCode.code}* sur SILGAPP et bénéficie de *100 FCFA de réduction* sur ta première course !\n\n Télécharge SILGAPP et inscris-toi maintenant.`
     );
     const a = document.createElement("a");
     a.href = `whatsapp://send?text=${msg}`;
@@ -70,7 +70,7 @@ export default function OngletCodePromo({ clientProfil }) {
           <Gift className="w-5 h-5 text-white" />
           <h2 className="font-bold text-white text-base">Mon Code Ambassadeur</h2>
           <Badge className="bg-white/20 text-white border-0 text-xs ml-auto">
-            {monCode.actif ? "✅ Actif" : "❌ Inactif"}
+            {monCode.actif ? " Actif" : " Inactif"}
           </Badge>
         </div>
 
@@ -109,16 +109,16 @@ export default function OngletCodePromo({ clientProfil }) {
         </div>
 
         <p className="text-white/80 text-xs text-center mt-3">
-          🎁 Chaque ami qui fait sa 1ère course = <strong className="text-white">100 FCFA</strong> pour vous
+           Chaque ami qui fait sa 1ère course = <strong className="text-white">100 FCFA</strong> pour vous
         </p>
       </Card>
 
       {/* Onglets navigation */}
       <div className="flex bg-muted rounded-xl p-1 gap-1">
         {[
-          { key: "stats", label: "📊 Stats" },
-          { key: "historique", label: "📋 Historique" },
-          { key: "classement", label: "🏆 Classement" },
+          { key: "stats", label: " Stats" },
+          { key: "historique", label: " Historique" },
+          { key: "classement", label: " Classement" },
         ].map(tab => (
           <button
             key={tab.key}
@@ -198,7 +198,7 @@ export default function OngletCodePromo({ clientProfil }) {
           {/* Message si pas encore d'inscrits */}
           {monCode.nb_inscrits === 0 && (
             <Card className="p-5 text-center bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
-              <div className="text-4xl mb-2">🚀</div>
+              <div className="text-4xl mb-2"></div>
               <p className="font-bold text-purple-900 mb-1">Partagez votre code !</p>
               <p className="text-sm text-purple-700">
                 Invitez vos amis à s'inscrire sur SILGAPP avec votre code <strong>{monCode.code}</strong> et gagnez 100 FCFA à chaque première course !
@@ -212,7 +212,7 @@ export default function OngletCodePromo({ clientProfil }) {
         <div className="space-y-2">
           {primes.length === 0 ? (
             <Card className="p-8 text-center">
-              <div className="text-4xl mb-3">📋</div>
+              <div className="text-4xl mb-3"></div>
               <p className="font-semibold text-muted-foreground">Aucune prime enregistrée</p>
               <p className="text-xs text-muted-foreground mt-1">Les primes apparaîtront ici après les premières courses de vos filleuls.</p>
             </Card>
@@ -240,16 +240,16 @@ export default function OngletCodePromo({ clientProfil }) {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <div className="w-7 h-7 rounded-full bg-purple-100 flex items-center justify-center text-sm flex-shrink-0">
-                            👤
+
                           </div>
                           <p className="font-semibold text-sm truncate">{p.client_nouveau_nom || "Client"}</p>
                         </div>
                         <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                           {p.prix_course && (
-                            <span>💰 Course : {p.prix_course.toLocaleString()} FCFA</span>
+                            <span> Course : {p.prix_course.toLocaleString()} FCFA</span>
                           )}
                           {p.validee_at && (
-                            <span>📅 {format(new Date(p.validee_at), "dd MMM yyyy", { locale: fr })}</span>
+                            <span> {format(new Date(p.validee_at), "dd MMM yyyy", { locale: fr })}</span>
                           )}
                         </div>
                       </div>
@@ -287,7 +287,7 @@ export default function OngletCodePromo({ clientProfil }) {
       {onglet === "classement" && (
         <div className="space-y-3">
           <div className="text-center mb-2">
-            <p className="font-bold text-foreground">🏆 Top Ambassadeurs SILGAPP</p>
+            <p className="font-bold text-foreground"> Top Ambassadeurs SILGAPP</p>
             <p className="text-xs text-muted-foreground">Classés par nombre de premières courses validées</p>
           </div>
 
@@ -317,7 +317,7 @@ export default function OngletCodePromo({ clientProfil }) {
                         rang === 3 ? "bg-amber-600 text-white" :
                         "bg-muted text-muted-foreground"
                       }`}>
-                        {rang === 1 ? "🥇" : rang === 2 ? "🥈" : rang === 3 ? "🥉" : rang}
+                        {rang === 1 ? "" : rang === 2 ? "" : rang === 3 ? "" : rang}
                       </div>
 
                       {/* Infos */}

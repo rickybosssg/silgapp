@@ -14,7 +14,7 @@ const STATUT_LABELS = {
   livreur_en_route: "Livreur en route",
   colis_recupere: "Colis récupéré",
   en_livraison: "En livraison",
-  livree: "Livrée ✓",
+  livree: "Livrée ",
   annulee: "Annulée",
 };
 
@@ -29,12 +29,12 @@ const STATUT_COLORS = {
 };
 
 const TYPE_COLIS_ICONS = {
-  petit_colis: "📦",
-  moyen_colis: "📫",
-  gros_colis: "🗃️",
-  document: "📄",
-  nourriture: "🍔",
-  autre: "🎁",
+  petit_colis: "",
+  moyen_colis: "",
+  gros_colis: "",
+  document: "",
+  nourriture: "",
+  autre: "",
 };
 
 function CourseHistoriqueCard({ course, fraisAnnulation, onSelect }) {
@@ -54,7 +54,7 @@ function CourseHistoriqueCard({ course, fraisAnnulation, onSelect }) {
       }`}>
         <div className="flex items-start justify-between gap-2 mb-3">
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className="text-xl flex-shrink-0">{TYPE_COLIS_ICONS[course.type_colis] || "📦"}</span>
+            <span className="text-xl flex-shrink-0">{TYPE_COLIS_ICONS[course.type_colis] || ""}</span>
             <div className="min-w-0">
               <p className="text-xs font-bold text-gray-500 uppercase">
                 {course.type_course === "expedier" ? "Expédition" : "Réception"}
@@ -87,12 +87,12 @@ function CourseHistoriqueCard({ course, fraisAnnulation, onSelect }) {
           <div className="flex items-center gap-2">
             {isTerminee && (
               (() => {
-                // ✅ Prix manuel accepté = priorité absolue
-                const isPrixManuel = course.pricing_mode === "manual" 
-                  && course.manual_price_status === "accepted" 
+                // Prix manuel accepté = priorité absolue
+                const isPrixManuel = course.pricing_mode === "manual"
+                  && course.manual_price_status === "accepted"
                   && course.manual_price > 0;
-                const prix = isPrixManuel 
-                  ? Number(course.manual_price) 
+                const prix = isPrixManuel
+                  ? Number(course.manual_price)
                   : (course.prix_final || 0);
                 return prix > 0 ? (
                   <span className="font-bold text-green-700">
@@ -135,9 +135,9 @@ export default function HistoriqueCoursesClient({ courses = [], fraisAnnulation 
   const totalDepense = courses
     .filter(c => c.statut === "livree")
     .reduce((s, c) => {
-      // ✅ Prix manuel accepté = priorité absolue
-      const isPrixManuel = c.pricing_mode === "manual" 
-        && c.manual_price_status === "accepted" 
+      // Prix manuel accepté = priorité absolue
+      const isPrixManuel = c.pricing_mode === "manual"
+        && c.manual_price_status === "accepted"
         && c.manual_price > 0;
       const prix = isPrixManuel ? Number(c.manual_price) : (c.prix_final || 0);
       return s + (prix > 0 ? prix : 0);

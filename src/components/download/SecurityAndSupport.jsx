@@ -91,7 +91,7 @@ export default function SecurityAndSupport({ pageUrl }) {
       </Card>
 
       {/* Footer */}
-      <motion.footer 
+      <motion.footer
         className="text-center space-y-6 pt-8 border-t border-white/5"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

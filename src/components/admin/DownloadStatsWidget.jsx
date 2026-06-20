@@ -4,13 +4,13 @@ import { base44 } from "@/api/base44Client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Download, 
-  TrendingUp, 
-  Users, 
-  Globe, 
-  Smartphone, 
-  Monitor, 
+import {
+  Download,
+  TrendingUp,
+  Users,
+  Globe,
+  Smartphone,
+  Monitor,
   Phone,
   Facebook,
   MessageCircle,
@@ -21,14 +21,14 @@ import {
 import { Link } from "react-router-dom";
 
 const PAYS = {
-  BF: { nom: "Burkina Faso", emoji: "🇧🇫" },
-  CI: { nom: "Côte d'Ivoire", emoji: "🇨🇮" },
-  TG: { nom: "Togo", emoji: "🇹🇬" },
-  BJ: { nom: "Bénin", emoji: "🇧🇯" },
-  SN: { nom: "Sénégal", emoji: "🇸🇳" },
-  ML: { nom: "Mali", emoji: "🇲🇱" },
-  GN: { nom: "Guinée", emoji: "🇬🇳" },
-  NE: { nom: "Niger", emoji: "🇳🇪" },
+  BF: { nom: "Burkina Faso", emoji: "" },
+  CI: { nom: "Côte d'Ivoire", emoji: "" },
+  TG: { nom: "Togo", emoji: "" },
+  BJ: { nom: "Bénin", emoji: "" },
+  SN: { nom: "Sénégal", emoji: "" },
+  ML: { nom: "Mali", emoji: "" },
+  GN: { nom: "Guinée", emoji: "" },
+  NE: { nom: "Niger", emoji: "" },
 };
 
 const SOURCES = {
@@ -103,7 +103,7 @@ export default function DownloadStatsWidget() {
     return result;
   }, [allStats]);
 
-  const conversionRate = stats.total.visits > 0 
+  const conversionRate = stats.total.visits > 0
     ? ((stats.total.downloads / stats.total.visits) * 100).toFixed(2)
     : 0;
 
@@ -145,7 +145,7 @@ export default function DownloadStatsWidget() {
               onClick={() => setShowDetails(false)}
               className="text-white hover:bg-white/20"
             >
-              ✕
+
             </Button>
           </div>
         </div>
@@ -200,7 +200,7 @@ export default function DownloadStatsWidget() {
                 sortedCountries.map(([code, data]) => (
                   <div key={code} className="flex items-center justify-between text-xs p-2 bg-gray-50 rounded-lg">
                     <div className="flex items-center gap-2">
-                      <span className="text-lg">{PAYS[code]?.emoji || "🌍"}</span>
+                      <span className="text-lg">{PAYS[code]?.emoji || ""}</span>
                       <span className="font-medium text-gray-700">{PAYS[code]?.nom || code}</span>
                     </div>
                     <div className="text-right">
@@ -247,10 +247,10 @@ export default function DownloadStatsWidget() {
                 sortedSources.map(([source, count]) => {
                   const SourceIcon = SOURCES[source]?.icon || Users;
                   const color = SOURCES[source]?.color || "text-gray-600";
-                  const percentage = stats.total.downloads > 0 
+                  const percentage = stats.total.downloads > 0
                     ? ((count / stats.total.downloads) * 100).toFixed(1)
                     : 0;
-                  
+
                   return (
                     <div key={source} className="flex items-center justify-between text-xs p-2 bg-gray-50 rounded-lg">
                       <div className="flex items-center gap-2">
@@ -331,7 +331,7 @@ export default function DownloadStatsWidget() {
             <div className="flex items-center gap-2">
               {sortedCountries.slice(0, 3).map(([code, data]) => (
                 <div key={code} className="flex items-center gap-1">
-                  <span className="text-lg">{PAYS[code]?.emoji || "🌍"}</span>
+                  <span className="text-lg">{PAYS[code]?.emoji || ""}</span>
                   <span className="text-xs font-bold">{data.downloads}</span>
                 </div>
               ))}

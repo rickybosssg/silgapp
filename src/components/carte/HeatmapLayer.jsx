@@ -3,18 +3,18 @@ import { AlertCircle } from "lucide-react";
 
 /**
  * HeatmapLayer — Couche thermique intelligente pour Leaflet
- * 
+ *
  * Modes disponibles :
  * - "demande" : Clients + courses récentes (rouge = forte demande)
  * - "couverture" : Livreurs disponibles + en course (bleu/vert = forte couverture)
  * - "opportunite" : Déséquilibre offre/demande (rouge = opportunité, vert = équilibré)
  */
-export default function HeatmapLayer({ 
-  map, 
-  clients = [], 
-  livreurs = [], 
+export default function HeatmapLayer({
+  map,
+  clients = [],
+  livreurs = [],
   courses = [],
-  mode = "demande" 
+  mode = "demande"
 }) {
   const heatmapRef = useRef(null);
   const [insufficientData, setInsufficientData] = useState(false);
@@ -34,15 +34,15 @@ export default function HeatmapLayer({
     }
 
     // ─── COLLECTE DES DONNÉES PAR MODE ──────────────────────────────────────
-    
+
     let points = [];
-    
+
     if (mode === "demande") {
       // Clients GPS actifs
       const clientPoints = clients
         .filter(c => c.latitude && c.longitude)
         .map(c => ({ lat: c.latitude, lng: c.longitude, type: "client", weight: 1 }));
-      
+
       // Courses créées récemment (< 2h)
       const now = Date.now();
       const recentCourses = courses.filter(c => {
@@ -52,15 +52,15 @@ export default function HeatmapLayer({
       const coursePoints = recentCourses
         .filter(c => c.gps_depart_lat && c.gps_depart_lng)
         .map(c => ({ lat: c.gps_depart_lat, lng: c.gps_depart_lng, type: "course", weight: 2 }));
-      
+
       points = [...clientPoints, ...coursePoints];
-      
+
     } else if (mode === "couverture") {
       // Livreurs connectés (disponibles + en course)
       const livreursPoints = livreurs
-        .filter(l => 
-          l.latitude && 
-          l.longitude && 
+        .filter(l =>
+          l.latitude &&
+          l.longitude &&
           (l.statut === "disponible" || l.statut === "en_course")
         )
         .map(l => ({
@@ -69,15 +69,15 @@ export default function HeatmapLayer({
           type: "livreur",
           weight: l.statut === "disponible" ? 1.5 : 1
         }));
-      
+
       points = livreursPoints;
-      
+
     } else if (mode === "opportunite") {
       // Mode opportunité : comparer offre et demande par cellule
       const cellSize = 0.003; // ~300m pour opportunité
       const demandMap = {};
       const supplyMap = {};
-      
+
       // Demande (clients + courses)
       [...clients, ...courses].forEach(p => {
         const lat = p.latitude || p.gps_depart_lat;
@@ -86,7 +86,7 @@ export default function HeatmapLayer({
         const cellKey = `${Math.floor(lat / cellSize)},${Math.floor(lng / cellSize)}`;
         demandMap[cellKey] = (demandMap[cellKey] || 0) + 1;
       });
-      
+
       // Offre (livreurs disponibles)
       livreurs
         .filter(l => l.latitude && l.longitude && l.statut === "disponible")
@@ -94,24 +94,24 @@ export default function HeatmapLayer({
           const cellKey = `${Math.floor(l.latitude / cellSize)},${Math.floor(l.longitude / cellSize)}`;
           supplyMap[cellKey] = (supplyMap[cellKey] || 0) + 1;
         });
-      
+
       // Calculer le ratio offre/demande par cellule
       const allCells = new Set([...Object.keys(demandMap), ...Object.keys(supplyMap)]);
-      
+
       points = Array.from(allCells)
         .map(cellKey => {
           const [latCell, lngCell] = cellKey.split(',').map(Number);
           const lat = latCell * cellSize + cellSize / 2;
           const lng = lngCell * cellSize + cellSize / 2;
-          
+
           const demand = demandMap[cellKey] || 0;
           const supply = supplyMap[cellKey] || 0;
-          
+
           // Ratio : 0 = forte opportunité (beaucoup de demande, pas d'offre)
-          //        1 = équilibré
-          //       >1 = surcouverture
+          // 1 = équilibré
+          // >1 = surcouverture
           const ratio = demand > 0 ? supply / demand : 0;
-          
+
           return {
             lat,
             lng,
@@ -133,10 +133,10 @@ export default function HeatmapLayer({
     setInsufficientData(false);
 
     // ─── CALCUL DE LA DENSITÉ ──────────────────────────────────────────────
-    
+
     const heatGroup = window.L.layerGroup().addTo(map);
     const cellSize = mode === "opportunite" ? 0.003 : 0.002;
-    
+
     // Regrouper par cellule
     const densityMap = {};
     points.forEach(p => {
@@ -153,17 +153,17 @@ export default function HeatmapLayer({
 
     // Normaliser
     const maxDensity = Math.max(...Object.values(densityMap).map(d => d.count));
-    
+
     // ─── GÉNÉRATION DES CERCLES DE CHALEUR ─────────────────────────────────
-    
+
     Object.values(densityMap).forEach(cell => {
       const intensity = cell.count / maxDensity;
       let fillColor;
-      
+
       if (mode === "opportunite") {
         // Mode opportunité : rouge = opportunité (ratio bas), vert = équilibré
         const ratio = cell.ratio || 0;
-        
+
         if (ratio < 0.5) {
           // Forte opportunité : peu de livreurs, beaucoup de demande → ROUGE
           fillColor = `rgba(220, 38, 38, ${0.5 + intensity * 0.2})`;
@@ -175,7 +175,7 @@ export default function HeatmapLayer({
           // Équilibré ou surcouverture → VERT
           fillColor = `rgba(34, 197, 94, ${0.4 + intensity * 0.2})`;
         }
-        
+
       } else if (mode === "demande") {
         // Mode demande : gradient vert → jaune → rouge
         if (intensity < 0.33) {
@@ -188,7 +188,7 @@ export default function HeatmapLayer({
           const t = (intensity - 0.66) / 0.34;
           fillColor = `rgba(255, ${Math.round(68 + 127 * (1 - t))}, ${Math.round(68 * (1 - t))}, ${0.7 + intensity * 0.1})`;
         }
-        
+
       } else if (mode === "couverture") {
         // Mode couverture : gradient ROUGE → JAUNE → VERT
         // Rouge = manque de livreurs, Vert = bonne couverture
@@ -206,9 +206,9 @@ export default function HeatmapLayer({
           fillColor = `rgba(${Math.round(239 - 205 * t)}, ${Math.round(144 + 53 * t)}, ${Math.round(94 - 26 * t)}, ${0.7 + intensity * 0.1})`;
         }
       }
-      
+
       const radius = mode === "opportunite" ? 45 : (mode === "demande" ? 40 : 35);
-      
+
       window.L.circle([cell.lat, cell.lng], {
         radius,
         fillColor,

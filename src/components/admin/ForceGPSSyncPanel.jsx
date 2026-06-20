@@ -62,7 +62,7 @@ export default function ForceGPSSyncPanel() {
               </div>
               <div className="p-3 rounded-xl bg-green-50 border border-green-200 text-center">
                 <p className="text-2xl font-black text-green-900">{results.stats?.synced ?? 0}</p>
-                <p className="text-xs text-green-700 font-semibold">GPS ✓</p>
+                <p className="text-xs text-green-700 font-semibold">GPS </p>
               </div>
               <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-center">
                 <p className="text-2xl font-black text-red-900">{results.stats?.sans_gps ?? 0}</p>

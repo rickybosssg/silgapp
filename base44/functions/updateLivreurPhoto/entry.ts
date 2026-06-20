@@ -33,10 +33,10 @@ Deno.serve(async (req) => {
     // Mise à jour de la photo
     await base44.entities.Livreur.update(livreur_id, { photo_url });
 
-    return Response.json({ 
-      success: true, 
+    return Response.json({
+      success: true,
       message: 'Photo mise à jour',
-      photo_url 
+      photo_url
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

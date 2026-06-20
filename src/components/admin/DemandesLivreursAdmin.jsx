@@ -49,7 +49,7 @@ function DocBadge({ url, label, icon: Icon, color }) {
       {present ? <CheckCircle className="w-4 h-4 text-green-500" /> : <AlertTriangle className="w-4 h-4 text-gray-400" />}
       <Icon className="w-4 h-4" />
       <span>{label}</span>
-      <span className="ml-auto text-xs">{present ? "✅ Reçu" : "❌ Manquant"}</span>
+      <span className="ml-auto text-xs">{present ? " Reçu" : " Manquant"}</span>
     </button>
   );
 }
@@ -111,7 +111,7 @@ function LivreurDetailModal({ livreur, onClose, onValider, onRefuser, processing
             <div>
               <p className="text-sm font-bold text-gray-700 mb-2">Vérification des documents</p>
               <div className={`rounded-xl p-3 mb-2 text-sm font-semibold ${docsOk ? "bg-green-50 text-green-700 border border-green-200" : "bg-amber-50 text-amber-700 border border-amber-200"}`}>
-                {docsOk ? "✅ Tous les documents requis sont présents" : `⚠️ ${docsManquants.length} document(s) manquant(s) : ${docsManquants.join(", ")}`}
+                {docsOk ? " Tous les documents requis sont présents" : ` ${docsManquants.length} document(s) manquant(s) : ${docsManquants.join(", ")}`}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <DocBadge url={livreur.photo_url} label="Photo livreur" icon={Camera}
@@ -409,7 +409,7 @@ export default function DemandesLivreursAdmin() {
 function DocMiniStatus({ url, label }) {
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${url ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-400"}`}>
-      {url ? "✅" : "❌"} {label}
+      {url ? "" : ""} {label}
     </span>
   );
 }

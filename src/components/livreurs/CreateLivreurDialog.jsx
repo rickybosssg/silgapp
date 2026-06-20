@@ -72,7 +72,7 @@ export default function CreateLivreurDialog({ reseau = "interne", countryCode = 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["livreurs"] });
       queryClient.invalidateQueries({ queryKey: ["livreurs-externes"] });
-      toast.success("Livreur créé avec succès ✅");
+      toast.success("Livreur créé avec succès ");
       setOpen(false);
       setForm({
         prenom: "",
@@ -95,24 +95,24 @@ export default function CreateLivreurDialog({ reseau = "interne", countryCode = 
   const handlePhoto = async (e, fieldName) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     // Vérifier la taille du fichier (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error("La photo ne doit pas dépasser 5MB");
       e.target.value = "";
       return;
     }
-    
+
     setUploading(true);
     try {
       // Utiliser le fichier directement (l'SDK gère la conversion)
-      const result = await base44.integrations.Core.UploadFile({ 
+      const result = await base44.integrations.Core.UploadFile({
         file
       });
-      
+
       if (result && result.file_url) {
         setForm(p => ({ ...p, [fieldName]: result.file_url }));
-        toast.success("Photo ajoutée ✅");
+        toast.success("Photo ajoutée ");
       } else {
         throw new Error("Résultat d'upload invalide");
       }
@@ -126,37 +126,37 @@ export default function CreateLivreurDialog({ reseau = "interne", countryCode = 
   };
 
   const handleSubmit = (e) => {
-    console.log("🔴 handleSubmit appelé, target:", e.target.tagName);
+    console.log(" handleSubmit appelé, target:", e.target.tagName);
     e.preventDefault();
-    console.log("🔍 Début validation - form:", form);
-    
+    console.log(" Début validation - form:", form);
+
     // Validation stricte
     const errors = [];
     if (!form.prenom?.trim()) {
       errors.push("Le prénom est obligatoire");
-      console.log("❌ Prénom manquant");
+      console.log(" Prénom manquant");
     }
     if (!form.nom?.trim()) {
       errors.push("Le nom est obligatoire");
-      console.log("❌ Nom manquant");
+      console.log(" Nom manquant");
     }
     if (!form.telephone?.trim()) {
       errors.push("Le téléphone est obligatoire");
-      console.log("❌ Téléphone manquant");
+      console.log(" Téléphone manquant");
     }
     if (!form.user_email?.trim()) {
       errors.push("L'email du compte livreur est obligatoire");
-      console.log("❌ Email manquant");
+      console.log(" Email manquant");
     }
-    
-    console.log("📋 Erreurs trouvées:", errors);
-    
+
+    console.log(" Erreurs trouvées:", errors);
+
     if (errors.length > 0) {
       errors.forEach(err => toast.error(err));
       return;
     }
 
-    console.log("✅ Validation OK, création du livreur...");
+    console.log(" Validation OK, création du livreur...");
     createMutation.mutate();
   };
 
@@ -207,7 +207,7 @@ export default function CreateLivreurDialog({ reseau = "interne", countryCode = 
                     }`}
                     onClick={() => setForm(p => ({ ...p, type_livreur: "interne", reseau: "interne" }))}
                   >
-                    🏢 Interne
+                     Interne
                   </button>
                   <button
                     type="button"
@@ -218,7 +218,7 @@ export default function CreateLivreurDialog({ reseau = "interne", countryCode = 
                     }`}
                     onClick={() => setForm(p => ({ ...p, type_livreur: "externe", reseau: "externe" }))}
                   >
-                    🤝 Externe
+                     Externe
                   </button>
                 </div>
               </div>

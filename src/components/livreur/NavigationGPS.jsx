@@ -79,7 +79,7 @@ function useContactLive(telephone, enabled = true, clientId = null) {
           const gpsActif = !!(client.latitude && client.longitude);
           const lastSeen = client.last_seen_at || client.updated_date || client.created_date;
           const ageSec = lastSeen ? (Date.now() - new Date(lastSeen).getTime()) / 1000 : Infinity;
-          console.log(`[NavigationGPS] ✅ Contact trouvé par ID="${cid}":`, { nom: client.nom, gpsActif, lat: client.latitude, lng: client.longitude });
+          console.log(`[NavigationGPS] Contact trouvé par ID="${cid}":`, { nom: client.nom, gpsActif, lat: client.latitude, lng: client.longitude });
           setState({
             client,
             gps: gpsActif ? { lat: client.latitude, lng: client.longitude } : null,
@@ -115,7 +115,7 @@ function useContactLive(telephone, enabled = true, clientId = null) {
           const lastSeen = client.last_seen_at || client.updated_date || client.created_date;
           const ageSec = lastSeen ? (Date.now() - new Date(lastSeen).getTime()) / 1000 : Infinity;
           const connecte = client.actif !== false && ageSec < 300;
-          console.log(`[NavigationGPS] ✅ Contact trouvé via variante="${variants[i]}":`, { nom: client.nom, gpsActif, lat: client.latitude, lng: client.longitude, lastSeen, ageSec: Math.round(ageSec) });
+          console.log(`[NavigationGPS] Contact trouvé via variante="${variants[i]}":`, { nom: client.nom, gpsActif, lat: client.latitude, lng: client.longitude, lastSeen, ageSec: Math.round(ageSec) });
           setState({
             client,
             gps: gpsActif ? { lat: client.latitude, lng: client.longitude } : null,
@@ -127,7 +127,7 @@ function useContactLive(telephone, enabled = true, clientId = null) {
           return;
         }
       }
-      console.warn(`[NavigationGPS] ❌ Aucun ClientExterne trouvé pour tél="${tel}" — variantes testées:`, variants);
+      console.warn(`[NavigationGPS] Aucun ClientExterne trouvé pour tél="${tel}" — variantes testées:`, variants);
     } catch (e) {
       console.error(`[NavigationGPS] Erreur fetchGps:`, e);
     }
@@ -140,7 +140,7 @@ function useContactLive(telephone, enabled = true, clientId = null) {
       return;
     }
     fetchGps();
-    const interval = setInterval(fetchGps, 8000); // ⚡ 5s → 8s pour limiter les requêtes
+    const interval = setInterval(fetchGps, 8000); // 5s → 8s pour limiter les requêtes
     return () => clearInterval(interval);
   }, [telephone, enabled]); // stable car fetchGps est une ref
 
@@ -154,11 +154,11 @@ const useDestinataireLive = useContactLive;
  * NavigationGPS — navigation + suivi temps réel expéditeur/destinataire
  *
  * Props:
- *   phase: "recuperation" | "livraison"
- *   destLat, destLng: coordonnées destination fixe (fallback si pas de GPS live)
- *   destLabel: texte adresse
- *   destinataireTelephone: numéro du contact cible (expéditeur ou destinataire)
- *   destinationInconnue: boolean
+ * phase: "recuperation" | "livraison"
+ * destLat, destLng: coordonnées destination fixe (fallback si pas de GPS live)
+ * destLabel: texte adresse
+ * destinataireTelephone: numéro du contact cible (expéditeur ou destinataire)
+ * destinationInconnue: boolean
  */
 export default function NavigationGPS({
   phase,
@@ -229,7 +229,7 @@ export default function NavigationGPS({
     if (!canNavigate) return null;
     return (
       <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
-        {/* ✅ Indicateur GPS live expéditeur */}
+        {/* Indicateur GPS live expéditeur */}
         {usesLiveGps && destClient && (
           <div className="flex items-center gap-2 bg-amber-100 border border-amber-200 rounded-xl px-3 py-2">
             <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse flex-shrink-0" />
@@ -297,7 +297,7 @@ export default function NavigationGPS({
             {lastUpdate ? (
               <p className={cn("text-[10px]", isOld ? "text-orange-600 font-semibold" : "text-green-600")}>
                 {isOld
-                  ? `⚠️ Position ancienne — il y a ${dureeDepuis(lastUpdate)}`
+                  ? ` Position ancienne — il y a ${dureeDepuis(lastUpdate)}`
                   : `GPS synchronisé il y a ${dureeDepuis(lastUpdate)}`
                 }
               </p>
@@ -363,7 +363,7 @@ export default function NavigationGPS({
       <div className="flex items-center gap-2">
         <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
         <p className="text-sm font-bold text-green-800">
-          {usesLiveGps ? "📍 Position GPS du destinataire" : "📍 Destination"}
+          {usesLiveGps ? " Position GPS du destinataire" : " Destination"}
         </p>
         {usesLiveGps && (
           <span className="text-[10px] bg-green-200 text-green-700 font-bold px-2 py-0.5 rounded-full ml-auto">
@@ -438,10 +438,10 @@ export default function NavigationGPS({
 function ETABar({ dist, eta, color }) {
   const textColor = color === "amber" ? "text-amber-800" : "text-green-800";
   const iconColor = color === "amber" ? "text-amber-600" : "text-green-600";
-  
+
   // Calcul ETA : si distance < 0.1 km (100m), afficher "~1 min"
   const etaMinutes = eta !== null ? eta : (dist !== null && dist < 0.1 ? 1 : null);
-  
+
   return (
     <div className="flex items-center gap-4">
       {dist !== null && (
@@ -512,7 +512,7 @@ function MiniMap({ destLat, destLng, livreurLat, livreurLng }) {
         sandbox="allow-scripts allow-same-origin"
       />
       <div className="absolute top-2 left-2 bg-white/90 rounded-lg px-2 py-1 text-[10px] font-bold text-green-700 border border-green-200">
-        📍 Destinataire
+         Destinataire
       </div>
     </div>
   );

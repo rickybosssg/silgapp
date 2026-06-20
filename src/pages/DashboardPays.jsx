@@ -33,7 +33,7 @@ export default function DashboardPays() {
   // L'admin global utilise selectedCountry (depuis localStorage ou URL)
   const effectiveCode = isPays ? adminCountryCode : (codeParam || selectedCountry || "BF");
 
-  const paysInfo = PAYS_SILGAPP.find(p => p.code === effectiveCode) || { code: effectiveCode, nom: effectiveCode, emoji_flag: "🌍", devise: "FCFA" };
+  const paysInfo = PAYS_SILGAPP.find(p => p.code === effectiveCode) || { code: effectiveCode, nom: effectiveCode, emoji_flag: "", devise: "FCFA" };
 
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [statModal, setStatModal] = useState(null);

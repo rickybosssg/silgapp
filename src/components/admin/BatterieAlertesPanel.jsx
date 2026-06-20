@@ -31,7 +31,7 @@ export default function BatterieAlertesPanel({ currentUser }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["batterie-alertes"] });
-      toast.success("Alerte marquée comme traitée ✅");
+      toast.success("Alerte marquée comme traitée ");
     },
   });
 

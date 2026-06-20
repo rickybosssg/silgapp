@@ -8,7 +8,7 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    
+
     if (!user || user.role !== 'admin') {
       return Response.json({ error: 'Admin only' }, { status: 401 });
     }
@@ -20,14 +20,14 @@ Deno.serve(async (req) => {
       try {
         // Si pas de prix_estimate ou = 0, recalculer depuis GPS
         if (!course.prix_estimate || course.prix_estimate === 0) {
-          if (course.gps_depart_lat && course.gps_depart_lng && 
+          if (course.gps_depart_lat && course.gps_depart_lng &&
               course.gps_arrivee_lat && course.gps_arrivee_lng) {
-            
+
             const dist = haversine(
               course.gps_depart_lat, course.gps_depart_lng,
               course.gps_arrivee_lat, course.gps_arrivee_lng
             );
-            
+
             if (dist > 0) {
               const prix = Math.round(dist * 100);
               await base44.entities.CourseExterne.update(course.id, {

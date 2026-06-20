@@ -11,7 +11,7 @@ export default function HeatmapControls({ mode, onModeChange, clients = [], livr
   return (
     <div className="flex flex-col gap-2 bg-white rounded-lg shadow-lg border border-gray-200 p-2 min-w-[200px]">
       <p className="text-xs font-semibold text-gray-700 px-1">Cartes thermiques</p>
-      
+
       {/* Mode standard */}
       <Button
         size="sm"
@@ -21,33 +21,33 @@ export default function HeatmapControls({ mode, onModeChange, clients = [], livr
       >
         <MapPin className="w-3 h-3 mr-1" /> Carte standard
       </Button>
-      
-      {/* 🔥 Carte thermique Demande clients */}
+
+      {/* Carte thermique Demande clients */}
       <Button
         size="sm"
         variant={mode === "demande" ? "default" : "outline"}
         onClick={() => onModeChange("demande")}
         className="text-xs justify-start bg-red-50 hover:bg-red-100 border-red-200 relative"
       >
-        <TrendingUp className="w-3 h-3 mr-1" /> 🔥 Demande clients
+        <TrendingUp className="w-3 h-3 mr-1" /> Demande clients
         <span className="ml-1 px-1.5 py-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full">NOUVEAU</span>
       </Button>
-      
-      {/* 🟢 Carte thermique Couverture livreurs */}
+
+      {/* Carte thermique Couverture livreurs */}
       <Button
         size="sm"
         variant={mode === "couverture" ? "default" : "outline"}
         onClick={() => onModeChange("couverture")}
         className="text-xs justify-start bg-emerald-50 hover:bg-emerald-100 border-emerald-200 relative"
       >
-        <Users className="w-3 h-3 mr-1" /> 🟢 Couverture livreurs
+        <Users className="w-3 h-3 mr-1" /> Couverture livreurs
         <span className="ml-1 px-1.5 py-0.5 bg-emerald-500 text-white text-[9px] font-bold rounded-full">NOUVEAU</span>
       </Button>
-      
+
       {/* Légende Demande clients */}
       {mode === "demande" && (
         <div className="mt-2 pt-2 border-t border-gray-200 space-y-2">
-          <p className="text-xs font-semibold text-red-700">🔥 Demande clients</p>
+          <p className="text-xs font-semibold text-red-700"> Demande clients</p>
           <p className="text-xs text-gray-600 leading-tight">
             Basée sur les clients GPS actifs et les courses récentes
           </p>
@@ -60,7 +60,7 @@ export default function HeatmapControls({ mode, onModeChange, clients = [], livr
             <span className="text-red-700 font-medium">Forte</span>
           </div>
           <div className="pt-2 border-t border-gray-100 space-y-1">
-            <p className="text-xs text-gray-600">📊 Analyse :</p>
+            <p className="text-xs text-gray-600"> Analyse :</p>
             <ul className="text-xs text-gray-500 space-y-0.5 list-disc list-inside">
               <li>Zones rouges : forte concentration de clients</li>
               <li>Zones jaunes : demande modérée</li>
@@ -69,11 +69,11 @@ export default function HeatmapControls({ mode, onModeChange, clients = [], livr
           </div>
         </div>
       )}
-      
+
       {/* Légende Couverture livreurs */}
       {mode === "couverture" && (
         <div className="mt-2 pt-2 border-t border-gray-200 space-y-2">
-          <p className="text-xs font-semibold text-emerald-700">🟢 Couverture livreurs</p>
+          <p className="text-xs font-semibold text-emerald-700"> Couverture livreurs</p>
           <p className="text-xs text-gray-600 leading-tight">
             Basée sur les livreurs disponibles et en course
           </p>
@@ -86,7 +86,7 @@ export default function HeatmapControls({ mode, onModeChange, clients = [], livr
             <span className="text-emerald-700 font-medium">Bonne</span>
           </div>
           <div className="pt-2 border-t border-gray-100 space-y-1">
-            <p className="text-xs text-gray-600">📊 Analyse :</p>
+            <p className="text-xs text-gray-600"> Analyse :</p>
             <ul className="text-xs text-gray-500 space-y-0.5 list-disc list-inside">
               <li>Zones rouges : sous-couvertes (manque de livreurs)</li>
               <li>Zones jaunes : couverture modérée</li>
@@ -95,7 +95,7 @@ export default function HeatmapControls({ mode, onModeChange, clients = [], livr
           </div>
         </div>
       )}
-      
+
       {/* Insights stratégiques */}
       {mode !== "off" && (
         <div className="mt-2 pt-2 border-t border-gray-200">

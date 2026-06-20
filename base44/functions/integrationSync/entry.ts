@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    
+
     if (!user) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
     if (action === "check_sync") {
       const courses = await base44.entities.CourseExterne.filter({}, "-updated_date", 10);
       const livreurs = await base44.entities.Livreur.filter({ type_livreur: "externe" });
-      
+
       const syncStats = {
         courses_total: courses.length,
         livreurs_en_ligne: livreurs.filter(l => l.app_active && l.statut !== "hors_ligne").length,
@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
         derniere_maj: courses[0]?.updated_date,
       };
 
-      return Response.json({ 
+      return Response.json({
         success: true,
         stats: syncStats,
         timestamp: new Date().toISOString()
@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
         } catch (_) {}
       }
 
-      return Response.json({ 
+      return Response.json({
         success: true,
         refreshed,
         timestamp: new Date().toISOString()
@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
         total_courses: courses.length,
         issues,
         total_issues: totalIssues,
-        health: totalIssues === 0 ? "✅ OK" : `⚠️ ${totalIssues} problèmes`
+        health: totalIssues === 0 ? " OK" : ` ${totalIssues} problèmes`
       });
     }
 

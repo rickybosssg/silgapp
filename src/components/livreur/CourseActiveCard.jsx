@@ -12,6 +12,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import QRScannerModal from "./QRScannerModal";
 import NavigationGPS from "./NavigationGPS";
 import { normalizeCommissionPct, resolveStoredOrDynamicSplit, splitAmountByCommission } from "@/lib/commissionUtils";
+import ChatWindow from "@/components/chat/ChatWindow";
 
 // Haversine
 function haversine(lat1, lon1, lat2, lon2) {
@@ -27,7 +28,7 @@ function haversine(lat1, lon1, lat2, lon2) {
 function ETABadge({ course, colisRecupere }) {
   const [livreurPos, setLivreurPos] = useState(null);
 
-  // ✅ CORRECTION : watchPosition créé UNE SEULE FOIS au mount
+  // CORRECTION : watchPosition créé UNE SEULE FOIS au mount
   useEffect(() => {
     if (!navigator.geolocation) return;
     const id = navigator.geolocation.watchPosition(
@@ -40,7 +41,7 @@ function ETABadge({ course, colisRecupere }) {
       navigator.geolocation.clearWatch(id);
       console.log(`[ETABadge] Watch GPS nettoyé pour course ${course.id}`);
     };
-  }, [course.id]); // ✅ Dépend de course.id uniquement
+  }, [course.id]); // Dépend de course.id uniquement
 
   // Cible : vers la récupération si colis pas encore pris, sinon vers la livraison
   // Si destination inconnue → pas de cible GPS pour la livraison
@@ -76,16 +77,16 @@ function ETABadge({ course, colisRecupere }) {
 }
 
 const STEPS = [
-  { key: "acceptee", label: "Accepté", icon: "✅" },
-  { key: "colis_recupere", label: "Récupérer", icon: "📦" },
-  { key: "livree", label: "Livré", icon: "🎉" },
+  { key: "acceptee", label: "Accepté", icon: "" },
+  { key: "colis_recupere", label: "Récupérer", icon: "" },
+  { key: "livree", label: "Livré", icon: "" },
 ];
 
 const DEPLACEMENT_STEPS = [
-  { key: "acceptee", label: "Accepté", icon: "✅" },
-  { key: "pris_en_charge", label: "Pris en charge", icon: "🧑" },
-  { key: "arrivee", label: "Arrivée", icon: "📍" },
-  { key: "termine", label: "Terminé", icon: "🎉" },
+  { key: "acceptee", label: "Accepté", icon: "" },
+  { key: "pris_en_charge", label: "Pris en charge", icon: "" },
+  { key: "arrivee", label: "Arrivée", icon: "" },
+  { key: "termine", label: "Terminé", icon: "" },
 ];
 
 function ProgressBar({ statut, isDeplacement }) {
@@ -122,7 +123,7 @@ function ProgressBar({ statut, isDeplacement }) {
   );
 }
 
-export default function CourseActiveCard({ course, onColisRecupere, onColisLivre, onClientAnnule, onMettrePause, isPending, isExterne = false, livreurLat, livreurLng }) {
+export default function CourseActiveCard({ course, onColisRecupere, onColisLivre, onClientAnnule, onMettrePause, isPending, isExterne = false, livreurLat, livreurLng, livreurId, livreurNom }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [prixReel, setPrixReel] = useState("");
@@ -137,9 +138,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const [optimisticStatut, setOptimisticStatut] = useState(null);
   // Données de livraison en attente (admin_manuel : saisie montant après validation QR/PIN)
   const [pendingDeliveryData, setPendingDeliveryData] = useState(null);
-  // 🚗 Recap déplacement : affiché après saisie du prix, avant clic TERMINER
+  // Recap déplacement : affiché après saisie du prix, avant clic TERMINER
   const [deplacementRecap, setDeplacementRecap] = useState(null);
-  // 🚗 Annulation déplacement
+  // Annulation déplacement
   const [showAnnulerCourse, setShowAnnulerCourse] = useState(false);
   const [motifAnnulationLivreur, setMotifAnnulationLivreur] = useState("");
   const [motifAnnulationDetail, setMotifAnnulationDetail] = useState("");
@@ -186,7 +187,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   // OPTIMISTIC UI helper for status updates
   const updateOptimisticStatut = (newStatut, courseData = {}) => {
     setOptimisticStatut(newStatut);
-    queryClient.setQueryData(['mes-courses-externes'], (old) => 
+    queryClient.setQueryData(['mes-courses-externes'], (old) =>
       (old || []).map(c => c.id === course.id ? { ...c, statut: newStatut, ...courseData } : c)
     );
   };
@@ -194,7 +195,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const colisLivre = course.statut === "livree";
 
   const handleConfirmerLivraison = () => {
-    // 🚗 DÉPLACEMENT : prix saisi → recap local → attendre TERMINER
+    // DÉPLACEMENT : prix saisi → recap local → attendre TERMINER
     // IMPORTANT : garder statut "arrivee" (pas "livree") pour que syncStatutLivreurOnCourse
     // ne libère PAS le livreur automatiquement. Le livreur doit rester "en_course" jusqu'à TERMINER.
     if (isDeplacement) {
@@ -276,12 +277,12 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const handleQRPickupSuccess = (courseData) => {
     setShowQRScanner(null);
     // OPTIMISTIC UI: Update cache immediately
-    updateOptimisticStatut("colis_recupere", { 
+    updateOptimisticStatut("colis_recupere", {
       heure_recuperation: new Date().toISOString(),
-      ...courseData 
+      ...courseData
     });
     onColisRecupere({ ...course, ...courseData });
-    toast.success("Colis récupéré avec succès ! 📦");
+    toast.success("Colis récupéré avec succès ! ");
   };
 
   // Handler succès scan QR delivery (externe) — livraison confirmée par le backend
@@ -315,7 +316,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     setPauseMotif("");
   };
 
-  // 🔄 Annulation livreur (unifiée colis + déplacement)
+  // Annulation livreur (unifiée colis + déplacement)
   const handleAnnulerCourseLivreur = async () => {
     if (!motifAnnulationLivreur) {
       toast.error("Veuillez sélectionner un motif");
@@ -418,7 +419,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl space-y-5">
             <div className="text-center">
               <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-3 text-3xl">
-                🛑
+
               </div>
               <p className="text-xl font-black text-gray-900">Annuler la course</p>
               <p className="text-sm text-gray-500 mt-1">
@@ -429,14 +430,14 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             </div>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { id: "client_injoignable", label: "Client injoignable", icon: "📞" },
-                { id: "mauvaise_adresse", label: "Mauvaise adresse", icon: "📍" },
-                { id: "colis_inexistant", label: "Colis inexistant", icon: "📦" },
-                { id: "client_change_avis", label: "Client a changé d'avis", icon: "🔄" },
-                { id: "colis_interdit", label: "Colis interdit", icon: "🚫" },
-                { id: "panne_vehicule", label: "Panne du véhicule", icon: "🔧" },
-                { id: "accident", label: "Accident", icon: "⚠️" },
-                { id: "autre", label: "Autre", icon: "💬" },
+                { id: "client_injoignable", label: "Client injoignable", icon: "" },
+                { id: "mauvaise_adresse", label: "Mauvaise adresse", icon: "" },
+                { id: "colis_inexistant", label: "Colis inexistant", icon: "" },
+                { id: "client_change_avis", label: "Client a changé d'avis", icon: "" },
+                { id: "colis_interdit", label: "Colis interdit", icon: "" },
+                { id: "panne_vehicule", label: "Panne du véhicule", icon: "" },
+                { id: "accident", label: "Accident", icon: "" },
+                { id: "autre", label: "Autre", icon: "" },
               ].map((m) => (
                 <button
                   key={m.id}
@@ -491,17 +492,17 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl space-y-5">
             <div className="text-center">
               <div className="w-14 h-14 rounded-2xl bg-amber-50 flex items-center justify-center mx-auto mb-3 text-3xl">
-                ⏸️
+                ⏸
               </div>
               <p className="text-xl font-black text-gray-900">Mettre en pause</p>
               <p className="text-sm text-gray-500 mt-1">Pourquoi souhaitez-vous mettre cette course en pause ?</p>
             </div>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { id: "client_injoignable", label: "Client injoignable", icon: "📞" },
-                { id: "client_absent", label: "Client absent", icon: "🏠" },
-                { id: "adresse_a_confirmer", label: "Adresse à confirmer", icon: "📍" },
-                { id: "autre", label: "Autre", icon: "💬" },
+                { id: "client_injoignable", label: "Client injoignable", icon: "" },
+                { id: "client_absent", label: "Client absent", icon: "" },
+                { id: "adresse_a_confirmer", label: "Adresse à confirmer", icon: "" },
+                { id: "autre", label: "Autre", icon: "" },
               ].map((m) => (
                 <button
                   key={m.id}
@@ -544,7 +545,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl space-y-5">
             <div className="text-center">
               <div className="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center mx-auto mb-3 text-3xl">
-                🎉
+
               </div>
               <p className="text-xl font-black text-gray-900">
                 {(course.pricing_mode === "admin_manuel" || course.source === "admin") ? "Livraison confirmée !" : "Course terminée !"}
@@ -578,7 +579,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 onClick={handleConfirmerLivraison}
                 disabled={isPending}
               >
-                OK ✅
+                OK
               </button>
             </div>
           </div>
@@ -622,7 +623,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
           {/* Contact dynamique : expéditeur avant récupération, destinataire après */}
           {(() => {
-            // 🚗 DÉPLACEMENT : afficher le passager comme contact unique
+            // DÉPLACEMENT : afficher le passager comme contact unique
             if (isDeplacement) {
               const contactNom = course.passager_nom || course.client_nom || "Passager";
               const contactTel = course.passager_telephone || course.client_telephone;
@@ -761,7 +762,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 <p className="text-[10px] text-gray-600 font-semibold uppercase">Livrer</p>
                 <p className="text-sm font-bold text-gray-800">
                   {colisRecupere && course.destination_inconnue
-                    ? "📍 GPS du destinataire requis"
+                    ? " GPS du destinataire requis"
                     : course.adresse_arrivee || "Destination"}
                 </p>
               </div>
@@ -775,22 +776,22 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               const prixBase = isPrixManuel ? Number(course.manual_price) : (course.prix_estimate || 0);
               const split = splitAmountByCommission(prixBase, commissionPct);
               const gain = split.montant_livreur;
-              
+
               if (prixBase <= 0) return null;
-              
+
               return (
                 <div className={cn(
                   "rounded-xl p-3 border",
-                  isPrixManuel 
-                    ? "bg-green-50 border-green-200" 
+                  isPrixManuel
+                    ? "bg-green-50 border-green-200"
                     : "bg-blue-50 border-blue-200"
                 )}>
                   <div className="flex items-center justify-between mb-1">
                     <span className={cn("text-xs font-semibold", isPrixManuel ? "text-green-700" : "text-blue-700")}>
-                      {isPrixManuel ? "Prix validé ✓" : "Prix estimé"}
+                      {isPrixManuel ? "Prix validé " : "Prix estimé"}
                     </span>
                     <span className={cn("text-lg font-black", isPrixManuel ? "text-green-900" : "text-blue-900")}>
-                      {isPrixManuel 
+                      {isPrixManuel
                         ? `${prixBase.toLocaleString()} ${course.devise || "F"}`
                         : `~${prixBase.toLocaleString()} ${course.devise || "F"}`
                       }
@@ -827,7 +828,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
           {course.notes && (
             <p className="text-xs text-gray-500 bg-amber-50 border border-amber-100 p-3 rounded-2xl leading-relaxed">
-              📝 {course.notes}
+               {course.notes}
             </p>
           )}
 
@@ -846,7 +847,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           {/* Navigation GPS — affiché si coordonnées GPS disponibles */}
           {!colisLivre && (
             !colisRecupere ? (
-              // ✅ CORRECTION AUDIT : NavigationGPS relit le GPS de l'expéditeur toutes les 5s via ClientExterne
+              // CORRECTION AUDIT : NavigationGPS relit le GPS de l'expéditeur toutes les 5s via ClientExterne
               // destLat/destLng sont les coords fixes enregistrées à la création (fallback)
               // Le GPS live de l'expéditeur est prioritaire si disponible
               <NavigationGPS
@@ -859,7 +860,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 contactClientId={course.expediteur_client_id || null}
               />
             ) : (
-              // ✅ CORRECTION AUDIT : NavigationGPS relit le GPS du destinataire toutes les 5s via ClientExterne
+              // CORRECTION AUDIT : NavigationGPS relit le GPS du destinataire toutes les 5s via ClientExterne
               // destLat/destLng sont les coords fixes enregistrées à la création (fallback)
               // Le GPS live du destinataire est prioritaire si disponible
               <NavigationGPS
@@ -901,7 +902,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   updateOptimisticStatut("pris_en_charge", data);
                   await base44.entities.CourseExterne.update(course.id, data).catch(() => null);
                   queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-                  toast.success("Passager pris en charge ! 🧑");
+                  toast.success("Passager pris en charge ! ");
                 },
                 (err) => {
                   console.warn("GPS indisponible pour prise en charge:", err?.message);
@@ -910,7 +911,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                   updateOptimisticStatut("pris_en_charge", data);
                   base44.entities.CourseExterne.update(course.id, data).catch(() => null);
                   queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-                  toast.success("Passager pris en charge ! 🧑");
+                  toast.success("Passager pris en charge ! ");
                 },
                 { enableHighAccuracy: true, timeout: 5000 }
               );
@@ -966,7 +967,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     onClick={handlePriseEnCharge}
                     disabled={isPending}
                   >
-                    <span className="text-xl">🧑</span>
+                    <span className="text-xl"></span>
                     PRIS EN CHARGE
                   </button>
                 )}
@@ -988,12 +989,12 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     onClick={() => setShowPrixModal(true)}
                     disabled={isPending}
                   >
-                    <span className="text-xl">💰</span>
+                    <span className="text-xl"></span>
                     SAISIR LE PRIX DE LA COURSE
                   </button>
                 )}
 
-                {/* 🚗 Bouton annulation — visible UNIQUEMENT avant prise en charge */}
+                {/* Bouton annulation — visible UNIQUEMENT avant prise en charge */}
                 {!isPrisEnCharge && !isArrivee && !isTermine && (
                   <button
                     className="w-full h-11 rounded-2xl border border-red-200 text-red-500 font-semibold text-sm flex items-center justify-center gap-2 active:bg-red-50 transition-colors disabled:opacity-50"
@@ -1011,7 +1012,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           {!isDeplacement && !colisLivre && (
             <div className="space-y-3 pt-1">
 
-              {/* 🔄 Bouton annulation livreur — visible UNIQUEMENT avant récupération */}
+              {/* Bouton annulation livreur — visible UNIQUEMENT avant récupération */}
               {!colisRecupere && (
                 <button
                   className="w-full h-11 rounded-2xl border border-red-200 text-red-500 font-semibold text-sm flex items-center justify-center gap-2 active:bg-red-50 transition-colors disabled:opacity-50"
@@ -1033,7 +1034,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                       disabled={isPending || multiPickupPending}
                     >
                       <Package className="w-6 h-6" />
-                      📦 Colis récupérés ({course.nb_colis} colis)
+                       Colis récupérés ({course.nb_colis} colis)
                     </button>
                   ) : (
                     <button
@@ -1072,7 +1073,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                       disabled={isPending}
                     >
                       <QrCode className="w-6 h-6" />
-                      Scanner pour livrer ✅
+                      Scanner pour livrer
                     </button>
                   )
                 ) : (
@@ -1089,7 +1090,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     disabled={isPending}
                   >
                     <Check className="w-6 h-6" />
-                    Colis livré ✅
+                    Colis livré
                     <ChevronRight className="w-5 h-5" />
                   </button>
                 )
@@ -1156,11 +1157,11 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             </div>
           )}
 
-          {/* 🚗 RÉCAPITULATIF DÉPLACEMENT — avant clic TERMINER */}
+          {/* RÉCAPITULATIF DÉPLACEMENT — avant clic TERMINER */}
           {deplacementRecap && (
             <div className="py-4 bg-blue-50 rounded-2xl border-2 border-blue-300 space-y-3 px-4">
               <div className="text-center">
-                <p className="text-2xl mb-1">🧑</p>
+                <p className="text-2xl mb-1"></p>
                 <p className="font-black text-blue-800 text-base">Récapitulatif — Se déplacer</p>
                 <p className="text-xs text-blue-600 mt-0.5">Vérifiez avant de terminer</p>
               </div>
@@ -1233,6 +1234,18 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             </div>
           )}
 
+          {/* Messagerie livreur-client-admin */}
+          {!colisLivre && livreurId && (
+            <div className="pt-2">
+              <ChatWindow
+                courseId={course.id}
+                senderType="livreur"
+                senderId={livreurId}
+                senderName={livreurNom || course.livreur_nom || "Livreur"}
+              />
+            </div>
+          )}
+
           {!isDeplacement && colisLivre && (() => {
             const isMulti = isExterne && course.is_multi_colis && (course.nb_colis || 1) > 1;
 
@@ -1245,7 +1258,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               return (
                 <div className="py-4 bg-green-50 rounded-2xl border border-green-200 space-y-3 px-4">
                   <div className="text-center">
-                    <p className="text-2xl mb-1">🎉</p>
+                    <p className="text-2xl mb-1"></p>
                     <p className="font-black text-green-700 text-base">Tournée terminée !</p>
                     <p className="text-xs text-green-600 mt-0.5">{course.nb_colis} colis livrés</p>
                   </div>
@@ -1279,7 +1292,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             return (
               <div className="py-4 bg-green-50 rounded-2xl border border-green-200 space-y-3 px-4">
                 <div className="text-center">
-                  <p className="text-2xl mb-1">🎉</p>
+                  <p className="text-2xl mb-1"></p>
                   <p className="font-black text-green-700 text-base">Course terminée !</p>
                 </div>
                 {isExterne ? (
@@ -1292,7 +1305,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     )}
                     <div className="bg-white rounded-xl p-2.5 text-center border border-green-100">
                       <p className="text-[10px] text-gray-600 font-semibold uppercase">
-                        Prix final {isPrixManuel && "✓"}
+                        Prix final {isPrixManuel && ""}
                       </p>
                       <p className="text-sm font-black text-blue-700">
                         {prix !== null ? `${prix.toLocaleString()} ${course.devise || "F"}` : "—"}

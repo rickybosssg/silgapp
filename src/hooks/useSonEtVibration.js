@@ -64,10 +64,10 @@ export function useSonEtVibration(active, repeatSound = true) {
 
   useEffect(() => {
     if (!active) return;
-    
+
     // Son immédiat
     playNotificationSound();
-    
+
     // Répétition toutes les 5s si repeatSound=true
     if (repeatSound) {
       const t = setInterval(playNotificationSound, 5000);

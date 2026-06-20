@@ -48,7 +48,7 @@ export default function ProfilModal({ clientProfil, onClose, onSave }) {
     if (!nom.trim()) { toast.error("Veuillez entrer votre nom"); return; }
     if (!prenom.trim()) { toast.error("Veuillez entrer votre prénom"); return; }
     if (!countryCode) { toast.error("Veuillez choisir votre pays"); return; }
-    if (telDigits.length !== countryInfo.len) { toast.error(`T�l�phone invalide (${countryInfo.len} chiffres requis)`); return; }
+    if (telDigits.length !== countryInfo.len) { toast.error(`T�l�phone invalide (${countryInfo.len} chiffres requis)`); return; }
 
     const telNormalise = normaliserTel(telDigits, countryCode);
     if (!telNormalise) { toast.error("Numéro de téléphone invalide"); return; }
@@ -61,7 +61,7 @@ export default function ProfilModal({ clientProfil, onClose, onSave }) {
         telephone: telNormalise,
         country_code: countryCode,
       });
-      toast.success("Profil mis à jour ✓");
+      toast.success("Profil mis à jour ");
       // Passer l'objet mis à jour au parent
       onSave?.(updated || { ...clientProfil, nom: nom.trim(), prenom: prenom.trim(), telephone: telNormalise, country_code: countryCode });
     } catch {
@@ -123,7 +123,7 @@ export default function ProfilModal({ clientProfil, onClose, onSave }) {
             />
           </div>
           <div>
-            <label className="text-xs font-bold text-gray-800 mb-1 block">T�l�phone * ({countryInfo.len} chiffres)</label>
+            <label className="text-xs font-bold text-gray-800 mb-1 block">T�l�phone * ({countryInfo.len} chiffres)</label>
             <div className="flex gap-2">
               <div className="h-12 rounded-xl border border-gray-200 bg-gray-100 px-3 flex items-center text-sm font-bold text-gray-700 flex-shrink-0">
                 {countryInfo.flag} +{countryInfo.dial}
@@ -175,7 +175,7 @@ export default function ProfilModal({ clientProfil, onClose, onSave }) {
           </button>
         ) : (
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-3">
-            <p className="text-sm font-bold text-red-700 text-center">⚠️ Confirmer la suppression ?</p>
+            <p className="text-sm font-bold text-red-700 text-center"> Confirmer la suppression ?</p>
             <p className="text-xs text-red-500 text-center">Cette action est irréversible. Votre compte client sera désactivé.</p>
             <div className="flex gap-2">
               <button

@@ -12,13 +12,13 @@ import { fr } from "date-fns/locale";
 
 const statusColors = {
   disponible: "#22c55e",
-  en_course:  "#f59e0b",
+  en_course: "#f59e0b",
   hors_ligne: "#6b7280",
 };
 
 const statusLabels = {
   disponible: "Disponible",
-  en_course:  "En course",
+  en_course: "En course",
   hors_ligne: "Hors ligne",
 };
 
@@ -129,7 +129,7 @@ function MapView({ livreurs, livreursInactifs = [], showInactifs = false, course
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
 
-    // ⚫ Inactifs en gris (dernière position connue) — en dessous
+    // Inactifs en gris (dernière position connue) — en dessous
     if (showInact) {
       inactifs.forEach(livreur => {
         if (!livreur.latitude || !livreur.longitude) return;
@@ -137,7 +137,7 @@ function MapView({ livreurs, livreursInactifs = [], showInactifs = false, course
           className: "",
           html: `<div style="position:relative;width:44px;height:44px;opacity:0.5;">
             <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:36px;height:36px;border-radius:50%;background:#374151;border:3px solid #9ca3af;box-shadow:0 0 0 1px rgba(0,0,0,0.3),0 4px 16px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1;">
-              🛵
+
             </div>
           </div>`,
           iconSize: [44, 44],
@@ -150,9 +150,9 @@ function MapView({ livreurs, livreursInactifs = [], showInactifs = false, course
         const m = L.marker([livreur.latitude, livreur.longitude], { icon })
           .bindPopup(`<div style="font-family:sans-serif;font-size:13px;">
             <b style="color:#1e293b">${livreur.prenom ? livreur.prenom + " " + livreur.nom : livreur.nom}</b><br/>
-            <span style="color:#6b7280">⚫ Inactif — non dispatchable</span><br/>
+            <span style="color:#6b7280"> Inactif — non dispatchable</span><br/>
             <span style="color:#9ca3af;font-size:11px;">Dernière position : ${minStr}</span><br/>
-            ${livreur.telephone ? `<span style="color:#475569">📞 ${formatTel(livreur.telephone, livreur.country_code)}</span>` : ""}
+            ${livreur.telephone ? `<span style="color:#475569"> ${formatTel(livreur.telephone, livreur.country_code)}</span>` : ""}
           </div>`)
           .addTo(map);
         m.on("click", () => onSelect && onSelect(livreur));
@@ -161,7 +161,7 @@ function MapView({ livreurs, livreursInactifs = [], showInactifs = false, course
     }
 
     livreurs.filter(l => l.latitude && l.longitude && l.validation === "valide").forEach(livreur => {
-      // 🎯 CORRECTION : "En course" = livreur avec course ACTIVE (peu importe le statut DB)
+      // CORRECTION : "En course" = livreur avec course ACTIVE (peu importe le statut DB)
       const estEnCourse = livreurIdsEnCourseReelle && livreurIdsEnCourseReelle.has(livreur.id);
       const color = estEnCourse ? statusColors.en_course : statusColors[livreur.statut] || "#6b7280";
       const isActive = estEnCourse;
@@ -172,7 +172,7 @@ function MapView({ livreurs, livreursInactifs = [], showInactifs = false, course
           <div style="position:relative;width:44px;height:44px;">
             ${isActive ? `<div style="position:absolute;inset:0;border-radius:50%;background:${color};opacity:0.25;animation:ping 1.5s cubic-bezier(0,0,0.2,1) infinite;"></div>` : ""}
             <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:36px;height:36px;border-radius:50%;background:#ffffff;border:3px solid ${color};box-shadow:0 0 0 1px rgba(0,0,0,0.3),0 4px 16px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1;">
-              🛵
+
             </div>
           </div>`,
         iconSize: [44, 44],
@@ -200,7 +200,7 @@ function MapView({ livreurs, livreursInactifs = [], showInactifs = false, course
           iconSize: [12, 12], iconAnchor: [6, 6],
         });
         const m = L.marker([course.gps_depart_lat, course.gps_depart_lng], { icon })
-          .bindPopup(`<div style="font-family:sans-serif;font-size:12px;"><span style="color:#fca5a5;font-weight:600">📍 Départ</span><br/><span style="color:#f1f5f9">${course.adresse_depart}</span><br/><span style="color:#94a3b8">${course.client_nom}</span></div>`)
+          .bindPopup(`<div style="font-family:sans-serif;font-size:12px;"><span style="color:#fca5a5;font-weight:600"> Départ</span><br/><span style="color:#f1f5f9">${course.adresse_depart}</span><br/><span style="color:#94a3b8">${course.client_nom}</span></div>`)
           .addTo(map);
         markersRef.current.push(m);
       }
@@ -211,7 +211,7 @@ function MapView({ livreurs, livreursInactifs = [], showInactifs = false, course
           iconSize: [12, 12], iconAnchor: [6, 6],
         });
         const m = L.marker([course.gps_arrivee_lat, course.gps_arrivee_lng], { icon })
-          .bindPopup(`<div style="font-family:sans-serif;font-size:12px;"><span style="color:#86efac;font-weight:600">🏁 Arrivée</span><br/><span style="color:#f1f5f9">${course.adresse_arrivee}</span><br/><span style="color:#94a3b8">${course.client_nom}</span></div>`)
+          .bindPopup(`<div style="font-family:sans-serif;font-size:12px;"><span style="color:#86efac;font-weight:600"> Arrivée</span><br/><span style="color:#f1f5f9">${course.adresse_arrivee}</span><br/><span style="color:#94a3b8">${course.client_nom}</span></div>`)
           .addTo(map);
         markersRef.current.push(m);
       }
@@ -255,7 +255,7 @@ export default function CarteLivreurs() {
   // Inactifs = validés mais OFF, ou pas d'app active, ou GPS expiré — avec coordonnées GPS
   const livreursInactifsGPS = useMemo(() =>
     validLivreurs.filter(l => !isON(l) && l.latitude && l.longitude), [validLivreurs]);
-  
+
   // Courses VRAIMENT actives : statuts de livraison en cours + livreur assigné
   const actives = useMemo(() => {
     const STATUTS_LIVREUR_OCCUPE = ["livreur_en_route", "colis_recupere", "en_livraison"];
@@ -277,34 +277,34 @@ export default function CarteLivreurs() {
     // "En course" = livreur avec course ACTIVE (peu importe le statut DB)
     const enCourseReel = validLivreurs.filter(l => livreurIdsEnCourseReelle.has(l.id));
     return {
-      on:       validLivreurs.filter(l => isON(l)).length,
-      off:      validLivreurs.filter(l => !isON(l)).length,
-      libres:   validLivreurs.filter(l => l.statut === "disponible").length,
+      on: validLivreurs.filter(l => isON(l)).length,
+      off: validLivreurs.filter(l => !isON(l)).length,
+      libres: validLivreurs.filter(l => l.statut === "disponible").length,
       enCourse: enCourseReel.length,
-      enLigne:  validLivreurs.filter(l => isEnLigne(l)).length,
+      enLigne: validLivreurs.filter(l => isEnLigne(l)).length,
     };
   }, [validLivreurs, livreurIdsEnCourseReelle]);
 
   const livreursAffiches = useMemo(() => {
     switch (filtre) {
-      case "on":        return validLivreurs.filter(l => isON(l));
-      case "off":       return validLivreurs.filter(l => !isON(l));
-      case "libres":    return validLivreurs.filter(l => l.statut === "disponible");
+      case "on": return validLivreurs.filter(l => isON(l));
+      case "off": return validLivreurs.filter(l => !isON(l));
+      case "libres": return validLivreurs.filter(l => l.statut === "disponible");
       case "en_course": return validLivreurs.filter(l => livreurIdsEnCourseReelle.has(l.id));
-      case "en_ligne":  return validLivreurs.filter(l => isEnLigne(l));
-      default:          return validLivreurs;
+      case "en_ligne": return validLivreurs.filter(l => isEnLigne(l));
+      default: return validLivreurs;
     }
   }, [validLivreurs, filtre, livreurIdsEnCourseReelle]);
 
   const livreursAvecGPS = useMemo(() => validLivreurs.filter(l => l.latitude && l.longitude), [validLivreurs]);
 
   const filtresBtns = [
-    { key: "tous",      label: `Tous (${validLivreurs.length})` },
-    { key: "on",        label: `ON (${compteurs.on})` },
-    { key: "off",       label: `OFF (${compteurs.off})` },
-    { key: "libres",    label: `Libres (${compteurs.libres})` },
+    { key: "tous", label: `Tous (${validLivreurs.length})` },
+    { key: "on", label: `ON (${compteurs.on})` },
+    { key: "off", label: `OFF (${compteurs.off})` },
+    { key: "libres", label: `Libres (${compteurs.libres})` },
     { key: "en_course", label: `En course (${compteurs.enCourse})` },
-    { key: "en_ligne",  label: `App ouverte (${compteurs.enLigne})` },
+    { key: "en_ligne", label: `App ouverte (${compteurs.enLigne})` },
   ];
 
   return (
@@ -318,7 +318,7 @@ export default function CarteLivreurs() {
         </div>
         <div className="relative flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-2xl">🗺️</div>
+            <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-2xl"></div>
             <div>
               <h1 className="text-xl font-black text-white tracking-tight">Carte — Livreurs Internes</h1>
               <p className="text-white/60 text-xs mt-0.5">
@@ -341,11 +341,11 @@ export default function CarteLivreurs() {
       {/* ── COMPTEURS ───────────────────────────────────────────── */}
       <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5">
         {[
-          { label: "ON",          count: compteurs.on,       grad: "from-green-500 to-emerald-500",  shadow: "shadow-green-100" },
-          { label: "OFF",         count: compteurs.off,      grad: "from-gray-400 to-gray-500",      shadow: "shadow-gray-100" },
-          { label: "Libres",      count: compteurs.libres,   grad: "from-emerald-500 to-teal-500",   shadow: "shadow-emerald-100" },
-          { label: "En course",   count: compteurs.enCourse, grad: "from-blue-500 to-indigo-500",    shadow: "shadow-blue-100" },
-          { label: "App ouverte", count: compteurs.enLigne,  grad: "from-cyan-500 to-sky-500",       shadow: "shadow-cyan-100" },
+          { label: "ON", count: compteurs.on, grad: "from-green-500 to-emerald-500", shadow: "shadow-green-100" },
+          { label: "OFF", count: compteurs.off, grad: "from-gray-400 to-gray-500", shadow: "shadow-gray-100" },
+          { label: "Libres", count: compteurs.libres, grad: "from-emerald-500 to-teal-500", shadow: "shadow-emerald-100" },
+          { label: "En course", count: compteurs.enCourse, grad: "from-blue-500 to-indigo-500", shadow: "shadow-blue-100" },
+          { label: "App ouverte", count: compteurs.enLigne, grad: "from-cyan-500 to-sky-500", shadow: "shadow-cyan-100" },
         ].map(c => (
           <div key={c.label} className={`bg-gradient-to-br ${c.grad} rounded-2xl p-3 text-center text-white shadow-md ${c.shadow}`}>
             <p className="text-2xl font-black leading-none">{c.count}</p>
@@ -360,7 +360,7 @@ export default function CarteLivreurs() {
         onClick={() => setShowMap(true)}
       >
         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center text-2xl shadow-md flex-shrink-0">
-          🗺️
+
         </div>
         <div className="flex-1">
           <p className="font-bold text-foreground">Ouvrir la carte interactive</p>
@@ -415,7 +415,7 @@ export default function CarteLivreurs() {
 
         {livreursAffiches.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
-            <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3 text-2xl">🛵</div>
+            <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3 text-2xl"></div>
             <p className="font-semibold text-sm">Aucun livreur dans cette catégorie</p>
           </div>
         ) : (
@@ -429,7 +429,7 @@ export default function CarteLivreurs() {
                   {livreur.photo_url ? (
                     <img src={livreur.photo_url} alt="" className="w-11 h-11 rounded-xl object-cover flex-shrink-0" />
                   ) : (
-                    <div className="w-11 h-11 rounded-xl bg-slate-200 flex items-center justify-center flex-shrink-0 text-xl">🛵</div>
+                    <div className="w-11 h-11 rounded-xl bg-slate-200 flex items-center justify-center flex-shrink-0 text-xl"></div>
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-sm text-foreground mb-1">
@@ -458,7 +458,7 @@ export default function CarteLivreurs() {
                     <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
                       {livreur.quartier && <span className="flex items-center gap-1"><MapPin className="w-2.5 h-2.5" />{livreur.quartier}</span>}
                       {lastGPS && <span className="flex items-center gap-1"><Clock className="w-2.5 h-2.5" />{lastGPS}</span>}
-                      {livreur.courses_du_jour > 0 && <span>🛵 {livreur.courses_du_jour} course(s) aujourd'hui</span>}
+                      {livreur.courses_du_jour > 0 && <span> {livreur.courses_du_jour} course(s) aujourd'hui</span>}
                     </div>
                   </div>
                   <a
@@ -551,7 +551,7 @@ export default function CarteLivreurs() {
                       {livreur.photo_url ? (
                         <img src={livreur.photo_url} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
                       ) : (
-                        <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0 text-lg">🛵</div>
+                        <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0 text-lg"></div>
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="text-white text-sm font-medium truncate">
@@ -559,14 +559,14 @@ export default function CarteLivreurs() {
                         </p>
                         <p className="text-slate-400 text-xs">{formatTel(livreur.telephone, livreur.country_code)}</p>
                       </div>
-                      {/* 🎯 CORRECTION : Couleur basée sur course active réelle */}
+                      {/* CORRECTION : Couleur basée sur course active réelle */}
                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: livreurIdsEnCourseReelle?.has(livreur.id) ? statusColors.en_course : statusColors[livreur.statut] }} />
                     </div>
                     {selectedLivreur?.id === livreur.id && (
                       <div className="mt-2.5 pt-2.5 border-t border-slate-600/50 space-y-1.5">
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-slate-400">Statut</span>
-                          {/* 🎯 CORRECTION : Statut réel basé sur course active */}
+                          {/* CORRECTION : Statut réel basé sur course active */}
                           <span className="font-medium" style={{ color: livreurIdsEnCourseReelle?.has(livreur.id) ? statusColors.en_course : statusColors[livreur.statut] }}>
                             {livreurIdsEnCourseReelle?.has(livreur.id) ? "En course" : statusLabels[livreur.statut]}
                           </span>

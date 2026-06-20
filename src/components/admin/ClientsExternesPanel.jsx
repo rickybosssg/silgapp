@@ -90,7 +90,7 @@ function AttribuerCodePromoModal({ client, onClose, onDone }) {
           />
         </div>
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 flex items-start gap-2">
-          <span className="text-base">💡</span>
+          <span className="text-base"></span>
           <span>Le client gagnera <strong>100 FCFA fixe</strong> à chaque première course d'un ami inscrit avec ce code.</span>
         </div>
         <div className="flex gap-2 pt-1">
@@ -153,7 +153,7 @@ function ClientDetailModal({ client, courses, migrationEnCours, onClose, onBloqu
                 <X className="w-4 h-4" />
               </Button>
               <Badge className={`text-xs ${client.actif === false ? "bg-red-500/90 text-white" : "bg-white/20 text-white border-white/30"}`}>
-                {client.actif === false ? "🔒 Bloqué" : "✅ Actif"}
+                {client.actif === false ? " Bloqué" : " Actif"}
               </Badge>
             </div>
           </div>
@@ -198,7 +198,7 @@ function ClientDetailModal({ client, courses, migrationEnCours, onClose, onBloqu
               <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
               <span className="text-gray-600">GPS :</span>
               <span className={`font-semibold ${client.latitude ? "text-green-600" : "text-red-500"}`}>
-                {client.latitude ? "✅ Activé" : "❌ Non activé"}
+                {client.latitude ? " Activé" : " Non activé"}
               </span>
             </div>
           </div>
@@ -221,7 +221,7 @@ function ClientDetailModal({ client, courses, migrationEnCours, onClose, onBloqu
                         "bg-orange-100 text-orange-700 border-orange-200"
                       }`}
                     >
-                      {c.statut === "livree" ? "✓ Livrée" : c.statut === "annulee" ? "✕ Annulée" : "En cours"}
+                      {c.statut === "livree" ? " Livrée" : c.statut === "annulee" ? " Annulée" : "En cours"}
                     </Badge>
                   </div>
                 ))}
@@ -264,7 +264,7 @@ function ClientDetailModal({ client, courses, migrationEnCours, onClose, onBloqu
               </div>
             ) : (
               <Button size="sm" className="w-full bg-purple-600 hover:bg-purple-700 text-white gap-2 rounded-xl" onClick={() => setShowAttribuerCode(true)}>
-                <Plus className="w-3.5 h-3.5" />🎁 Attribuer un code promo
+                <Plus className="w-3.5 h-3.5" /> Attribuer un code promo
               </Button>
             )}
           </div>
@@ -280,7 +280,7 @@ function ClientDetailModal({ client, courses, migrationEnCours, onClose, onBloqu
                 {migrationEnCours === client.id ? (
                   <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />Migration en cours...</>
                 ) : (
-                  <><Truck className="w-4 h-4 mr-2" />🚚 Migrer vers Livreur Externe</>
+                  <><Truck className="w-4 h-4 mr-2" /> Migrer vers Livreur Externe</>
                 )}
               </Button>
             )}
@@ -385,7 +385,7 @@ export default function ClientsExternesPanel({ countryCode: countryCodeProp }) {
           toast.error(result.error || "Erreur inconnue");
         }
       } else if (result.success) {
-        toast.success(`✅ ${result.livreur?.prenom || ''} ${result.livreur?.nom || ''} est maintenant livreur externe !`);
+        toast.success(` ${result.livreur?.prenom || ''} ${result.livreur?.nom || ''} est maintenant livreur externe !`);
         setClientDetail(null);
         refetch();
       } else {
@@ -533,7 +533,7 @@ export default function ClientsExternesPanel({ countryCode: countryCodeProp }) {
                       </span>
                     )}
                     <span className={`text-[10px] rounded-full px-2 py-0.5 ${client.latitude ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-400"}`}>
-                      📍 {client.latitude ? "GPS" : "No GPS"}
+                       {client.latitude ? "GPS" : "No GPS"}
                     </span>
                   </div>
                 </div>

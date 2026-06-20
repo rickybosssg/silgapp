@@ -1,0 +1,39 @@
+{
+  "name": "Conversation",
+  "type": "object",
+  "properties": {
+    "participants": {
+      "type": "string",
+      "description": "JSON: [{type: 'client'|'livreur'|'admin', id: string, name: string}] - participants \u00e0 la conversation"
+    },
+    "last_message": {
+      "type": "string",
+      "description": "Aper\u00e7u du dernier message"
+    },
+    "last_message_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date du dernier message"
+    },
+    "last_sender_name": {
+      "type": "string",
+      "description": "Nom du dernier exp\u00e9diteur"
+    },
+    "title": {
+      "type": "string",
+      "description": "Titre de la conversation (optionnel, auto-g\u00e9n\u00e9r\u00e9 si absent)"
+    },
+    "group_type": {
+      "type": "string",
+      "enum": [
+        "direct",
+        "group"
+      ],
+      "default": "direct",
+      "description": "Type de conversation"
+    }
+  },
+  "required": [
+    "participants"
+  ]
+}

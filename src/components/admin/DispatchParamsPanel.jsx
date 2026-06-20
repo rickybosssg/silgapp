@@ -38,7 +38,7 @@ export default function DispatchParamsPanel() {
     setSaved(false);
     try {
       await base44.functions.invoke("dispatchExterneAuto", { action: "set_config", config });
-      toast.success("Configuration sauvegardée ✓");
+      toast.success("Configuration sauvegardée ");
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
@@ -149,13 +149,13 @@ export default function DispatchParamsPanel() {
           className={`rounded-xl gap-2 flex-shrink-0 ${saved ? "bg-green-500 hover:bg-green-600" : ""}`}
         >
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : saved ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
-          {saving ? "Sauvegarde..." : saved ? "Sauvegardé ✓" : "Sauvegarder"}
+          {saving ? "Sauvegarde..." : saved ? "Sauvegardé " : "Sauvegarder"}
         </Button>
       </div>
 
       {/* Info */}
       <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-xs text-blue-800 space-y-1">
-        <p className="font-bold text-blue-900">📋 Fonctionnement :</p>
+        <p className="font-bold text-blue-900"> Fonctionnement :</p>
         <p>• La course est envoyée <strong>simultanément</strong> à {config.nb_livreurs_par_vague === 0 ? "tous les" : config.nb_livreurs_par_vague} livreur(s) éligibles.</p>
         <p>• Le <strong>premier</strong> à accepter obtient la course (verrou atomique).</p>
         <p>• Si aucun ne répond en {config.timeout_secondes}s → nouvelle sélection automatique.</p>

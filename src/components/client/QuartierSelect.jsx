@@ -6,14 +6,14 @@ import { MapPin } from "lucide-react";
 
 /**
  * QuartierSelect — dropdown de quartiers filtré par pays, avec saisie libre.
- * 
+ *
  * Props:
- *   - countryCode (string): code pays pour filtrer les quartiers
- *   - value (string): valeur actuelle
- *   - onChange (function): callback avec le nom du quartier sélectionné/saisi
- *   - placeholder (string): placeholder du champ
- *   - label (string): label optionnel
- *   - required (boolean): champ requis (default false)
+ * - countryCode (string): code pays pour filtrer les quartiers
+ * - value (string): valeur actuelle
+ * - onChange (function): callback avec le nom du quartier sélectionné/saisi
+ * - placeholder (string): placeholder du champ
+ * - label (string): label optionnel
+ * - required (boolean): champ requis (default false)
  */
 export default function QuartierSelect({
   countryCode,
@@ -91,11 +91,11 @@ export default function QuartierSelect({
           <SelectContent>
             {quartiers.map((q) => (
               <SelectItem key={q.id} value={q.nom}>
-                📍 {q.nom}
+                 {q.nom}
               </SelectItem>
             ))}
             <SelectItem value="__custom__" className="text-primary font-semibold">
-              ✏️ Autre quartier (saisie libre)...
+               Autre quartier (saisie libre)...
             </SelectItem>
           </SelectContent>
         </Select>

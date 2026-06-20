@@ -2,11 +2,11 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 /**
  * NETTOYAGE COURSE ANNULÉE
- * 
+ *
  * Quand une course est annulée, cette fonction :
  * 1. Nettoie les champs livreur de la course
  * 2. Remet le livreur en statut "disponible"
- * 
+ *
  * Peut être appelée par :
  * - Un admin (via dashboard)
  * - Une automation entity (sans user context)
@@ -15,7 +15,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    
+
     // Vérifier que c'est un admin qui appelle (sauf si appelé par automation)
     // Les automations n'ont pas de user context, donc on skip la vérification
     const user = await base44.auth.me().catch(() => null);
@@ -24,14 +24,14 @@ Deno.serve(async (req) => {
     }
 
     const { course_id } = await req.json();
-    
+
     if (!course_id) {
       return Response.json({ error: 'course_id requis' }, { status: 400 });
     }
 
     // Récupérer la course
     const course = await base44.entities.CourseExterne.get(course_id);
-    
+
     if (!course) {
       return Response.json({ error: 'Course non trouvée' }, { status: 404 });
     }
@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
     // Si la course est annulée et a un livreur assigné
     if (course.statut === 'annulee' && course.livreur_id) {
       console.log(`[nettoyerCourseAnnulee] Course ${course_id} annulée, livreur: ${course.livreur_nom}`);
-      
+
       // 1. Nettoyer les champs livreur de la course
       await base44.entities.CourseExterne.update(course_id, {
         dispatch_status: 'expire',
@@ -62,17 +62,17 @@ Deno.serve(async (req) => {
       });
 
       console.log(`[nettoyerCourseAnnulee] Livreur ${course.livreur_nom} réinitialisé selon encours`);
-      
-      return Response.json({ 
-        success: true, 
+
+      return Response.json({
+        success: true,
         message: 'Course et livreur nettoyés avec succès',
         course_id: course_id,
         livreur_id: course.livreur_id
       });
     }
 
-    return Response.json({ 
-      success: true, 
+    return Response.json({
+      success: true,
       message: 'Aucune action nécessaire (course sans livreur ou non annulée)',
       course_id: course_id,
       statut: course.statut,

@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 /**
  * Hook GPS natif Android via Capacitor Geolocation
  * Fallback sur navigator.geolocation pour le web
- * 
+ *
  * Retourne :
  * - position: { latitude, longitude, accuracy, timestamp }
  * - gpsActif: boolean

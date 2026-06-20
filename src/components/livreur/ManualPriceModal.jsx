@@ -108,7 +108,7 @@ export default function ManualPriceModal({ course, onConfirm, onCancel, isSubmit
 
             {/* Info minimum */}
             <p className="text-xs text-gray-400 mt-2">
-              ⚠️ Minimum : {PRIX_MIN.toLocaleString()} {course.devise || "FCFA"}
+               Minimum : {PRIX_MIN.toLocaleString()} {course.devise || "FCFA"}
             </p>
 
             {/* Aperçu gain livreur */}
@@ -143,7 +143,7 @@ export default function ManualPriceModal({ course, onConfirm, onCancel, isSubmit
           {/* Info workflow */}
           <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
             <p className="text-xs text-amber-700 font-medium leading-relaxed">
-              📋 Ce prix sera proposé au client. La course ne sera confirmée qu'après son accord.
+               Ce prix sera proposé au client. La course ne sera confirmée qu'après son accord.
             </p>
           </div>
 

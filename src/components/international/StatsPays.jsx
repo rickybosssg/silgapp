@@ -57,8 +57,8 @@ export default function StatsPays({ courses = [], livreurs = [], clients = [] })
               </div>
             </div>
             <div className="flex gap-2 text-xs text-muted-foreground pt-1 border-t">
-              <span>🛵 {lv} livreurs</span>
-              <span>👤 {cl} clients</span>
+              <span> {lv} livreurs</span>
+              <span> {cl} clients</span>
             </div>
           </Card>
         ))}

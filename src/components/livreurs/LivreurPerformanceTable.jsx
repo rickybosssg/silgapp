@@ -87,7 +87,7 @@ export default function LivreurPerformanceTable() {
     const validLivreurs = livreurs.filter(l => l.validation === "valide");
 
     return validLivreurs.map(livreur => {
-      const livreurCourses = courses.filter(c => 
+      const livreurCourses = courses.filter(c =>
         c.livreur_id === livreur.id &&
         new Date(c.created_date) >= dateRange.start &&
         new Date(c.created_date) <= dateRange.end
@@ -103,10 +103,10 @@ export default function LivreurPerformanceTable() {
       const isPaye = livreur.statut_paiement === "paye";
 
       // Dernière position
-      const lastPos = livreur.latitude && livreur.longitude 
+      const lastPos = livreur.latitude && livreur.longitude
         ? `${livreur.latitude.toFixed(4)}, ${livreur.longitude.toFixed(4)}`
         : "N/A";
-      const lastActivity = livreur.derniere_position_date 
+      const lastActivity = livreur.derniere_position_date
         ? format(new Date(livreur.derniere_position_date), "dd/MM HH:mm", { locale: fr })
         : "Jamais";
 
@@ -132,7 +132,7 @@ export default function LivreurPerformanceTable() {
     const disponibles = livreurs.filter(l => l.statut === "disponible").length;
     const enCourse = livreurs.filter(l => l.statut === "en_course").length;
     const horsLigne = livreurs.filter(l => l.statut === "hors_ligne" || !l.statut).length;
-    
+
     const totalCoursesLivrees = performanceData.reduce((sum, p) => sum + p.coursesLivrees, 0);
     const totalEncaisse = performanceData.reduce((sum, p) => sum + p.totalEncaisse, 0);
     const totalDu = totalEncaisse;
@@ -164,7 +164,7 @@ export default function LivreurPerformanceTable() {
         montant_du_silga: 0, // Remise à zéro du compteur
       },
     });
-    toast.success(`Paiement de ${montant.toLocaleString()} FCFA validé ✅ — Compteur remis à zéro`);
+    toast.success(`Paiement de ${montant.toLocaleString()} FCFA validé — Compteur remis à zéro`);
   };
 
   const handleViewDetail = (livreur) => {

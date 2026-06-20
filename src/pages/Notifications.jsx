@@ -7,15 +7,15 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
 const typeConfig = {
-  nouvelle_course:  { color: "bg-blue-100 text-blue-700",     dot: "bg-blue-500",    label: "Nouvelle course" },
-  course_assignee:  { color: "bg-amber-100 text-amber-700",   dot: "bg-amber-500",   label: "Assignée" },
-  course_acceptee:  { color: "bg-green-100 text-green-700",   dot: "bg-green-500",   label: "Acceptée" },
-  course_refusee:   { color: "bg-red-100 text-red-700",       dot: "bg-red-500",     label: "Refusée" },
-  colis_recupere:   { color: "bg-indigo-100 text-indigo-700", dot: "bg-indigo-500",  label: "Colis recupere" },
-  en_livraison:     { color: "bg-blue-100 text-blue-700",     dot: "bg-blue-500",    label: "En livraison" },
-  course_livree:    { color: "bg-emerald-100 text-emerald-700",dot: "bg-emerald-500", label: "Livrée" },
-  course_bloquee:   { color: "bg-orange-100 text-orange-700", dot: "bg-orange-500",  label: "Bloquée" },
-  course_annulee:   { color: "bg-red-100 text-red-700",       dot: "bg-red-400",     label: "Annulée" },
+  nouvelle_course: { color: "bg-blue-100 text-blue-700", dot: "bg-blue-500", label: "Nouvelle course" },
+  course_assignee: { color: "bg-amber-100 text-amber-700", dot: "bg-amber-500", label: "Assignée" },
+  course_acceptee: { color: "bg-green-100 text-green-700", dot: "bg-green-500", label: "Acceptée" },
+  course_refusee: { color: "bg-red-100 text-red-700", dot: "bg-red-500", label: "Refusée" },
+  colis_recupere: { color: "bg-indigo-100 text-indigo-700", dot: "bg-indigo-500", label: "Colis recupere" },
+  en_livraison: { color: "bg-blue-100 text-blue-700", dot: "bg-blue-500", label: "En livraison" },
+  course_livree: { color: "bg-emerald-100 text-emerald-700",dot: "bg-emerald-500", label: "Livrée" },
+  course_bloquee: { color: "bg-orange-100 text-orange-700", dot: "bg-orange-500", label: "Bloquée" },
+  course_annulee: { color: "bg-red-100 text-red-700", dot: "bg-red-400", label: "Annulée" },
 };
 
 export default function Notifications() {
@@ -27,7 +27,7 @@ export default function Notifications() {
     initialData: [],
   });
 
-  // 🛡️ ANTI-DOUBLON COURSE : une seule notification par course_id
+  // ANTI-DOUBLON COURSE : une seule notification par course_id
   // Priorité : non-lue > plus récente
   const notifications = React.useMemo(() => {
     const seen = new Map();
@@ -67,7 +67,7 @@ export default function Notifications() {
 
   const unreadCount = notifications.filter(n => !n.lue).length;
 
-  // 🛡️ Stats dédoublonnage (diagnostic)
+  // Stats dédoublonnage (diagnostic)
   const dedupCount = notificationsRaw.length - notifications.length;
 
   return (
@@ -96,7 +96,7 @@ export default function Notifications() {
               </p>
               {dedupCount > 0 && (
                 <p className="text-white/40 text-[10px] mt-0.5">
-                  🛡️ {dedupCount} doublon{dedupCount > 1 ? "s" : ""} filtré{dedupCount > 1 ? "s" : ""} (unicité par course)
+                   {dedupCount} doublon{dedupCount > 1 ? "s" : ""} filtré{dedupCount > 1 ? "s" : ""} (unicité par course)
                 </p>
               )}
             </div>

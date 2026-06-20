@@ -26,7 +26,7 @@ const STATUT_COLORS = {
 /**
  * Vue multi-colis pour le client — affiche la progression et les montants par colis.
  * Props:
- *   course - CourseExterne
+ * course - CourseExterne
  */
 export default function MultiColisClientView({ course }) {
   const { data: colis = [], isLoading } = useQuery({
@@ -105,8 +105,8 @@ export default function MultiColisClientView({ course }) {
                   colisItem.statut === "annule" ? "bg-gray-400" :
                   "bg-purple-600"
                 }`}>
-                  {colisItem.statut === "livre" ? "✓" :
-                   colisItem.statut === "annule" ? "✕" :
+                  {colisItem.statut === "livre" ? "" :
+                   colisItem.statut === "annule" ? "" :
                    colisItem.colis_uid || idx + 1}
                 </div>
                 <div>
@@ -150,7 +150,7 @@ export default function MultiColisClientView({ course }) {
       <div className="px-4 py-3 bg-purple-50 border-t border-purple-100 space-y-2">
         <p className="text-xs text-purple-700 font-semibold text-center">
           {nbLivres === nbTotal
-            ? "✅ Tous les colis ont été livrés"
+            ? " Tous les colis ont été livrés"
             : `${nbLivres}/${nbTotal} colis livré${nbLivres > 1 ? "s" : ""}`}
         </p>
         {totalEncaisse > 0 && (

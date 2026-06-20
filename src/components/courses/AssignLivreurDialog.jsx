@@ -27,7 +27,7 @@ export default function AssignLivreurDialog({ course, open, onClose, reseau = "i
 
   const { data: livreurs = [] } = useQuery({
     queryKey: ["livreurs", reseau, course?.country_code || ""],
-    queryFn: () => base44.entities.Livreur.filter({ 
+    queryFn: () => base44.entities.Livreur.filter({
       reseau,
       validation: "valide",
       actif: true,

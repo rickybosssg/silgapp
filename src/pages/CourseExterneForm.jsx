@@ -211,7 +211,7 @@ export default function CourseExterneForm() {
                 onClick={handleGetGPSDepart}
               >
                 <Navigation className="w-3 h-3 mr-2" />
-                {recuperationGPS ? "✓ GPS enregistré" : "Obtenir position GPS"}
+                {recuperationGPS ? " GPS enregistré" : "Obtenir position GPS"}
               </Button>
             </div>
 
@@ -235,7 +235,7 @@ export default function CourseExterneForm() {
                 onClick={handleGetGPSArrivee}
               >
                 <Navigation className="w-3 h-3 mr-2" />
-                {livraisonGPS ? "✓ GPS enregistré" : "Obtenir position GPS"}
+                {livraisonGPS ? " GPS enregistré" : "Obtenir position GPS"}
               </Button>
             </div>
 

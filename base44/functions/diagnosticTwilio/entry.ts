@@ -13,15 +13,15 @@ Deno.serve(async (req) => {
     }
 
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID') || '';
-    const authToken  = Deno.env.get('TWILIO_AUTH_TOKEN')  || '';
-    const fromRaw    = Deno.env.get('TWILIO_WHATSAPP_FROM') || '';
+    const authToken = Deno.env.get('TWILIO_AUTH_TOKEN') || '';
+    const fromRaw = Deno.env.get('TWILIO_WHATSAPP_FROM') || '';
 
     if (!accountSid || !authToken || !fromRaw) {
       return Response.json({
         ok: false,
         erreur: 'Variables TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN ou TWILIO_WHATSAPP_FROM manquantes',
-        accountSid: accountSid ? accountSid.substring(0, 6) + '…' : '❌ MANQUANT',
-        from_raw: fromRaw || '❌ MANQUANT',
+        accountSid: accountSid ? accountSid.substring(0, 6) + '…' : ' MANQUANT',
+        from_raw: fromRaw || ' MANQUANT',
       });
     }
 
@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
     // Le numéro Sandbox Twilio WhatsApp est toujours +14155238886
     const SANDBOX_NUMBER = '+14155238886';
     const isSandbox = fromNumero === SANDBOX_NUMBER;
-    const environnement = isSandbox ? '⚠️ SANDBOX (numéro partagé Twilio)' : '✅ PRODUCTION (numéro dédié)';
+    const environnement = isSandbox ? ' SANDBOX (numéro partagé Twilio)' : ' PRODUCTION (numéro dédié)';
 
     // ── Récupérer les infos du compte Twilio via l'API ───────────────────────
     const credentials = btoa(`${accountSid}:${authToken}`);

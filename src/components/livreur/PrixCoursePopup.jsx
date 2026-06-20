@@ -79,7 +79,7 @@ export default function PrixCoursePopup({ course, onClose }) {
           {/* Montant à payer — très grand */}
           <div className="bg-green-50 border-2 border-green-300 rounded-2xl p-5 text-center">
             <p className="text-sm font-bold text-green-700 uppercase tracking-wide mb-1">
-              💵 Montant à encaisser
+               Montant à encaisser
             </p>
             <p className="text-5xl font-black text-green-900">
               {prixFinal !== null ? `${prixFinal.toLocaleString()} F` : "—"}

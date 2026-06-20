@@ -7,11 +7,11 @@ import { fr } from "date-fns/locale";
 import { normalizeCommissionPct, splitAmountByCommission } from "@/lib/commissionUtils";
 
 const STATUT_CONFIG = {
-  en_attente:  { label: "En attente",   cls: "bg-gray-100 text-gray-600" },
-  recupere:    { label: "Récupéré",     cls: "bg-blue-100 text-blue-700" },
+  en_attente: { label: "En attente", cls: "bg-gray-100 text-gray-600" },
+  recupere: { label: "Récupéré", cls: "bg-blue-100 text-blue-700" },
   en_livraison:{ label: "En livraison", cls: "bg-purple-100 text-purple-700" },
-  livre:       { label: "Livré ✓",      cls: "bg-green-100 text-green-700" },
-  annule:      { label: "Annulé",       cls: "bg-red-100 text-red-500" },
+  livre: { label: "Livré ", cls: "bg-green-100 text-green-700" },
+  annule: { label: "Annulé", cls: "bg-red-100 text-red-500" },
 };
 
 /**

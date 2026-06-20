@@ -62,7 +62,7 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["livreurs"] });
-      toast.success(isEdit ? "Livreur mis à jour ✅" : "Livreur créé ✅");
+      toast.success(isEdit ? "Livreur mis à jour " : "Livreur créé ");
       onClose();
     },
     onError: (error) => {
@@ -72,13 +72,13 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Validation stricte
     const errors = [];
     if (!form.nom?.trim()) errors.push("Le nom est obligatoire");
     if (!form.telephone?.trim()) errors.push("Le téléphone est obligatoire");
     if (!form.user_email?.trim()) errors.push("L'email du compte livreur est obligatoire");
-    
+
     if (errors.length > 0) {
       errors.forEach(err => toast.error(err));
       return;
@@ -157,7 +157,7 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
                 }`}
                 onClick={() => setForm((p) => ({ ...p, type_livreur: "interne", reseau: "interne" }))}
               >
-                🏢 Interne
+                 Interne
               </button>
               <button
                 type="button"
@@ -168,7 +168,7 @@ export default function LivreurFormDialog({ open, onClose, livreur }) {
                 }`}
                 onClick={() => setForm((p) => ({ ...p, type_livreur: "externe", reseau: "externe" }))}
               >
-                🤝 Externe
+                 Externe
               </button>
             </div>
           </div>

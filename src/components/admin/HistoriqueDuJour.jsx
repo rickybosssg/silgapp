@@ -12,7 +12,7 @@ import { MapPin, Ruler, Clock, Banknote, User, Package } from "lucide-react";
 export default function HistoriqueDuJour({ courses }) {
   const today = new Date().toDateString();
   const coursesHistorique = courses
-    .filter(c => 
+    .filter(c =>
       (c.statut === "livree" || c.statut === "annulee") &&
       new Date(c.heure_livraison || c.updated_date || c.created_date).toDateString() === today
     )
@@ -117,7 +117,7 @@ function CourseHistoriqueRow({ course }) {
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <Badge className={isLivree ? "bg-green-600" : "bg-red-600"}>
-            {isLivree ? "✅ Livrée" : "❌ Annulée"}
+            {isLivree ? " Livrée" : " Annulée"}
           </Badge>
           <span className="text-xs text-muted-foreground">
             #{course.id.slice(-6)}

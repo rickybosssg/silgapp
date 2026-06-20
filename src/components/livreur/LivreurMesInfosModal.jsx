@@ -146,10 +146,10 @@ export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
         <label className="block text-xs font-semibold text-gray-500 mb-2">Type de véhicule</label>
         <div className="grid grid-cols-2 gap-2">
           {[
-            { val: "moto", label: "🏍️ Moto" },
-            { val: "velo", label: "🚲 Vélo" },
-            { val: "voiture", label: "🚗 Voiture" },
-            { val: "a_pied", label: "🚶 À pied" },
+            { val: "moto", label: " Moto" },
+            { val: "velo", label: " Vélo" },
+            { val: "voiture", label: " Voiture" },
+            { val: "a_pied", label: " À pied" },
           ].map(({ val, label }) => (
             <button
               key={val}
@@ -167,9 +167,9 @@ export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
       {/* Photos */}
       <div className="space-y-3">
         <label className="block text-xs font-semibold text-gray-500">Autres photos</label>
-        <PhotoPicker label="🚗 Photo du moyen de déplacement" value={photoMoto} onChange={setPhotoMoto} />
-        <PhotoPicker label="🪪 CNIB Recto" value={cnibRecto} onChange={setCnibRecto} />
-        <PhotoPicker label="🪪 CNIB Verso" value={cnibVerso} onChange={setCnibVerso} />
+        <PhotoPicker label=" Photo du moyen de déplacement" value={photoMoto} onChange={setPhotoMoto} />
+        <PhotoPicker label=" CNIB Recto" value={cnibRecto} onChange={setCnibRecto} />
+        <PhotoPicker label=" CNIB Verso" value={cnibVerso} onChange={setCnibVerso} />
       </div>
 
       <button
@@ -192,7 +192,7 @@ export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
         </button>
       ) : (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-3">
-          <p className="text-sm font-bold text-red-700 text-center">⚠️ Confirmer la suppression ?</p>
+          <p className="text-sm font-bold text-red-700 text-center"> Confirmer la suppression ?</p>
           <p className="text-xs text-red-500 text-center">Cette action est irréversible. Votre profil livreur sera désactivé.</p>
           <div className="flex gap-2">
             <button

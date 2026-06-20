@@ -36,7 +36,7 @@ export default function DispatchModeSelector() {
     },
     onSuccess: (_, newMode) => {
       queryClient.invalidateQueries({ queryKey: ["dispatch-config"] });
-      toast.success(newMode === "automatique" ? "Pilote Automatique Activé 🤖" : "Pilote Automatique Désactivé ✋");
+      toast.success(newMode === "automatique" ? "Pilote Automatique Activé " : "Pilote Automatique Désactivé ");
     },
   });
 

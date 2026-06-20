@@ -55,12 +55,12 @@ export default function WhatsAppNotifCard({ livreurProfil, onOptInUpdated }) {
       });
       const data = res?.data;
       if (data?.opt_in_actif) {
-        toast.success("✅ WhatsApp activé — vous allez recevoir les alertes !");
+        toast.success(" WhatsApp activé — vous allez recevoir les alertes !");
         onOptInUpdated?.(true);
       } else {
         // Afficher la raison précise
         const raison = data?.raison || "Non inscrit";
-        toast.error(`❌ ${raison} — Cliquez "Activer WhatsApp" pour vous inscrire`);
+        toast.error(` ${raison} — Cliquez "Activer WhatsApp" pour vous inscrire`);
         onOptInUpdated?.(false);
       }
     } catch (err) {
@@ -148,7 +148,7 @@ export default function WhatsAppNotifCard({ livreurProfil, onOptInUpdated }) {
       {optIn && expInfo?.urgent && (
         <div className="space-y-2">
           <p className="text-xs text-red-700 font-semibold leading-relaxed">
-            ⚠️ Votre accès expire bientôt. Renvoyez le code pour renouveler.
+             Votre accès expire bientôt. Renvoyez le code pour renouveler.
           </p>
           <button
             onClick={ouvrirWhatsApp}

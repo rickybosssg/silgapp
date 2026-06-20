@@ -31,6 +31,7 @@ import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
 import PricingModeSelector from "@/components/livreur/PricingModeSelector";
 import PrixManuelReponseAlert from "@/components/livreur/PrixManuelReponseAlert";
 import { normalizeCommissionPct, splitAmountByCommission } from "@/lib/commissionUtils";
+import MessagesPage from "@/components/chat/MessagesPage";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -124,6 +125,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   });
   // Réponse du client à une proposition de prix manuel
   const [prixManuelReponse, setPrixManuelReponse] = useState(null); // { accepted, prix, devise }
+  const [showMessages, setShowMessages] = useState(false);
+  const [sessionId, setSessionId] = useState(() => {
+    try { return localStorage.getItem("silgapp_livreur_session_id") || null; } catch { return null; }
+  });
+  const [sessionExpired, setSessionExpired] = useState(false);
   const prixManuelWatchedRef = useRef({}); // track les course_id déjà notifiés
 
   // Système anti-réapparition : courses écartées (refusées, expirées, déjà prises)
@@ -158,7 +164,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     select: (data) => Array.isArray(data) ? (data[0] || initialProfil) : initialProfil,
     initialData: [initialProfil],
     enabled: !!initialProfil?.id,
-    refetchInterval: 8000, // ⚡ 2s → 8s : profil change rarement
+    refetchInterval: 8000, // 2s → 8s : profil change rarement
     staleTime: 4000,
   });
 
@@ -179,11 +185,67 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   }, [livreurProfil?.pricing_mode, livreurProfil?.id]);
 
   // Heartbeat automatique
+  // --- GESTION SESSION UNIQUE ---
+  // Quand l'onboarding est terminé, enregistrer une nouvelle session unique
+  useEffect(() => {
+    if (!onboardingTermine || !livreurProfil?.id || sessionExpired) return;
+
+    const initSession = async () => {
+      try {
+        const deviceId = navigator.userAgent.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 50);
+        const res = await base44.functions.invoke("gestionSessionLivreur", {
+          device_id: deviceId,
+          plateforme: "android",
+        });
+
+        if (res?.data?.session_id) {
+          const newSessionId = res.data.session_id;
+          setSessionId(newSessionId);
+          try { localStorage.setItem("silgapp_livreur_session_id", newSessionId); } catch {}
+          console.log("[Session] Nouvelle session créée:", newSessionId);
+
+          if (res.data.ancienne_session_remplacee) {
+            toast.info("Nouvelle connexion détectée", {
+              description: "Les autres appareils ont été déconnectés.",
+            });
+          }
+        }
+      } catch (err) {
+        console.error("[Session] Erreur initialisation:", err);
+      }
+    };
+
+    initSession();
+  }, [onboardingTermine, livreurProfil?.id, sessionExpired]);
+
+  // Handler quand le heartbeat détecte une session expirée
+  const handleSessionExpired = () => {
+    console.log("[Session] Session expirée détectée par heartbeat");
+    setSessionExpired(true);
+    setGpsActif(false);
+    try { localStorage.removeItem("silgapp_livreur_session_id"); } catch {}
+
+    // Forcer le livreur hors ligne
+    if (livreurProfil?.id) {
+      saveLivreur(livreurProfil.id, {
+        statut: "hors_ligne",
+        app_active: false
+      }).catch(() => null);
+    }
+
+    toast.error("Session expirée", {
+      description: "Vous avez été déconnecté car une autre session a été ouverte sur un autre appareil. Reconnectez-vous pour continuer.",
+      duration: 8000,
+    });
+  };
+
   const { syncHeartbeat } = useHeartbeat({
     user_type: "livreur",
     position: livreurProfil?.latitude && livreurProfil?.longitude ? { latitude: livreurProfil.latitude, longitude: livreurProfil.longitude } : null,
-    enabled: onboardingTermine && gpsActif && livreurProfil?.statut !== "hors_ligne",
+    enabled: onboardingTermine && gpsActif && livreurProfil?.statut !== "hors_ligne" && !sessionExpired,
     debugLabel: "LivreurExterneGPS",
+    session_id: sessionId,
+    onSessionExpired: handleSessionExpired,
   });
 
   const { data: dispatchConfigs = [] } = useQuery({
@@ -507,7 +569,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     },
     enabled: !!livreurId,
     initialData: [],
-    refetchInterval: 4000, // ⚡ 1s → 4s : évite le rate limit (était 60 req/min)
+    refetchInterval: 4000, // 1s → 4s : évite le rate limit (était 60 req/min)
     staleTime: 2000,
   });
 
@@ -561,21 +623,21 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const coursesActives = useMemo(
     () => mesCourses.filter(c => {
       if (!sameLivreurId(c.livreur_id, livreurProfil?.id)) return false;
-      
-      // 🔒 GARDE ABSOLUE : une course livrée avec prix_final saisi ET heure_livraison
+
+      // GARDE ABSOLUE : une course livrée avec prix_final saisi ET heure_livraison
       // ne doit JAMAIS apparaître dans les courses actives, quel que soit le mode.
       if (c.statut === "livree" && c.prix_final > 0 && c.heure_livraison) return false;
 
-      // 🔒 GARDE ABSOLUE : course annulée = jamais active
+      // GARDE ABSOLUE : course annulée = jamais active
       if (c.statut === "annulee") return false;
 
       // Statuts explicitement actifs
       if (["livreur_en_route", "colis_recupere", "en_livraison", "acceptee"].includes(c.statut)) return true;
 
-      // 🚗 Déplacement : statuts intermédiaires pris_en_charge et arrivee
+      // Déplacement : statuts intermédiaires pris_en_charge et arrivee
       if (c.type_course === "deplacement" && ["pris_en_charge", "arrivee"].includes(c.statut)) return true;
 
-      // 🏛️ Admin_manuel : garder la carte visible tant que le montant n'est pas saisi,
+      // Admin_manuel : garder la carte visible tant que le montant n'est pas saisi,
       // même si le backend a déjà marqué la course "livree" via validateQRCode.
       if ((c.pricing_mode === "admin_manuel" || c.source === "admin") && c.statut === "livree" && !c.prix_final) return true;
 
@@ -587,31 +649,31 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // Détecter la réponse du client sur une proposition de prix manuel
   // Statuts finaux pour lesquels on n'affiche JAMAIS la modale
   const FINAL_STATUSES = ['livree', 'annulee', 'completed', 'delivered', 'canceled'];
-  
+
   useEffect(() => {
     if (!mesCourses.length || !livreurProfil?.id) return;
-    
+
     // Étape 1 : Marquer TOUTES les courses terminées comme "dismissed" AVANT toute autre logique
     mesCourses.forEach(course => {
       if (course.proposed_by_livreur_id !== livreurProfil.id) return;
       if (course.pricing_mode !== 'manual') return;
-      
+
       // Si la course est dans un statut final → JAMAIS de notification
       if (FINAL_STATUSES.includes(course.statut)) {
         prixManuelWatchedRef.current[course.id] = 'dismissed_by_final_status';
         return;
       }
     });
-    
+
     // Étape 2 : Détecter les réponses client pour les courses ACTIVES uniquement
     mesCourses.forEach(course => {
       if (course.proposed_by_livreur_id !== livreurProfil.id) return;
       if (course.pricing_mode !== 'manual') return;
       if (FINAL_STATUSES.includes(course.statut)) return;
-      
+
       const watched = prixManuelWatchedRef.current[course.id];
       const status = course.manual_price_status;
-      
+
       // Déclencher notification seulement si :
       // 1. Status accepted/refused
       // 2. Pas déjà watched OU dismissed
@@ -625,11 +687,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         });
       }
     });
-    
+
     // Étape 3 : Nettoyer la modale SI AFFICHÉE et qu'une course associée passe en statut final
     if (prixManuelReponse) {
-      const courseActuelle = mesCourses.find(c => 
-        c.pricing_mode === 'manual' && 
+      const courseActuelle = mesCourses.find(c =>
+        c.pricing_mode === 'manual' &&
         c.proposed_by_livreur_id === livreurProfil?.id &&
         FINAL_STATUSES.includes(c.statut)
       );
@@ -653,7 +715,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   const totalEncaisse = useMemo(() =>
     livreesToday.reduce((sum, c) => {
-      // ⚠️ CORRECTION PRIX MANUEL : Utiliser montant_livreur si déjà calculé,
+      // CORRECTION PRIX MANUEL : Utiliser montant_livreur si déjà calculé,
       // sinon recalculer en respectant le mode de prix
       if (c.montant_livreur > 0) return sum + c.montant_livreur;
       const isPrixManuel = c.pricing_mode === "manual" && c.manual_price_status === "accepted" && Number(c.manual_price) > 0;
@@ -666,7 +728,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   const montantDüSilga = useMemo(() =>
     livreesToday.reduce((sum, c) => {
-      // ⚠️ CORRECTION PRIX MANUEL : Utiliser commission_silga si déjà calculée,
+      // CORRECTION PRIX MANUEL : Utiliser commission_silga si déjà calculée,
       // sinon recalculer en respectant le mode de prix
       if (c.commission_silga > 0) return sum + c.commission_silga;
       const isPrixManuel = c.pricing_mode === "manual" && c.manual_price_status === "accepted" && Number(c.manual_price) > 0;
@@ -693,7 +755,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   const handleToggleLigne = () => {
     const estHorsLigne = livreurProfil.statut === "hors_ligne";
-    // 🚫 Bloquer le passage en ligne si l'encours est dépassé
+    // Bloquer le passage en ligne si l'encours est dépassé
     if (estHorsLigne && livreurProfil?.bloque_encours) {
       toast.error("Votre plafond d'encours SILGAPP a été atteint. Veuillez effectuer votre dépôt auprès de SILGAPP afin de réactiver votre compte.");
       return;
@@ -763,9 +825,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     queryClient.invalidateQueries({ queryKey: ["courses-externes-disponibles"] });
     if (!isPendingPrixManuel) {
       statutMutation.mutate("en_course");
-      toast.success("Course acceptée ! 🚀");
+      toast.success("Course acceptée ! ");
     } else {
-      toast.success("Prix proposé au client — en attente de sa validation 💰");
+      toast.success("Prix proposé au client — en attente de sa validation ");
     }
   };
 
@@ -959,7 +1021,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   };
 
   const handleColisLivre = async (course, montantSaisi) => {
-    // 🚗 Annulation déplacement : libérer le livreur sans calcul de prix
+    // Annulation déplacement : libérer le livreur sans calcul de prix
     if (course.statut === "annulee") {
       queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
@@ -968,7 +1030,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       return;
     }
 
-    // 🏛️ ADMIN : montant saisi par le livreur, split 70/30 — PRIORITAIRE avant tout autre check
+    // ADMIN : montant saisi par le livreur, split 70/30 — PRIORITAIRE avant tout autre check
     if ((course.pricing_mode === "admin_manuel" || course.source === "admin") && typeof montantSaisi === "number" && montantSaisi > 0) {
       const split = splitAmountByCommission(montantSaisi, commissionPct);
       if (split.commission_silga === null || split.montant_livreur === null) {
@@ -992,7 +1054,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
       await verifierEncoursApresCourse(course.id);
       await remettreDisponibleSiAutorise();
-      toast.success(`Livraison terminée ! 💰 ${montantSaisi.toLocaleString()} F`);
+      toast.success(`Livraison terminée ! ${montantSaisi.toLocaleString()} F`);
       return;
     }
 
@@ -1003,7 +1065,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
       await verifierEncoursApresCourse(course.id);
       await remettreDisponibleSiAutorise();
-      toast.success("Livraison terminée ! 🎉");
+      toast.success("Livraison terminée ! ");
       return;
     }
 
@@ -1045,7 +1107,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
     await verifierEncoursApresCourse(course.id);
     await remettreDisponibleSiAutorise();
-    toast.success("Livraison terminée ! 🎉");
+    toast.success("Livraison terminée ! ");
   };
 
   const handlePricingModeChange = (mode) => {
@@ -1106,9 +1168,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   // ─── Dashboard principal ──────────────────────────────────────────────────
   const TABS = [
-    { id: "courses",    label: "Courses",    emoji: "🚴" },
-    { id: "historique", label: "Historique", emoji: "📋" },
-    { id: "infos",      label: "Mon profil", emoji: "👤" },
+    { id: "courses", label: "Courses", emoji: "" },
+    { id: "historique", label: "Historique", emoji: "" },
+    { id: "messages", label: "Messages", emoji: "" },
+    { id: "infos", label: "Mon profil", emoji: "" },
   ];
 
   return (
@@ -1217,7 +1280,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
             {isEnLigne && !livreurVisible && (
               <div className="rounded-2xl bg-amber-50 border border-amber-100 px-4 py-3 flex items-center gap-3">
-                <span className="text-xl flex-shrink-0">📍</span>
+                <span className="text-xl flex-shrink-0"></span>
                 <p className="text-sm text-amber-700 font-semibold leading-tight">
                   Activez votre GPS pour être visible sur la carte
                 </p>
@@ -1305,6 +1368,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                     isExterne={true}
                     livreurLat={livreurProfil?.latitude}
                     livreurLng={livreurProfil?.longitude}
+                    livreurId={livreurProfil?.id}
+                    livreurNom={`${livreurProfil?.prenom || ""} ${livreurProfil?.nom || ""}`.trim()}
                   />
                 ))}
               </div>
@@ -1312,9 +1377,27 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
             {coursesActives.length === 0 && isEnLigne && <EmptyStateAttente />}
 
-            {!isEnLigne && livreurProfil?.bloque_encours ? (
+            {sessionExpired ? (
               <div className="rounded-2xl bg-red-600 text-white p-5 text-center space-y-2 shadow-lg">
-                <p className="text-2xl">🚫</p>
+                <p className="text-2xl"></p>
+                <p className="font-black text-base">Session expirée</p>
+                <p className="text-white/80 text-xs leading-relaxed">
+                  Vous avez été déconnecté car une autre session a été ouverte sur un autre appareil.
+                </p>
+                <button
+                  className="mt-3 w-full h-11 rounded-xl bg-white text-red-700 font-black text-sm active:scale-95 transition-all"
+                  onClick={() => {
+                    try { localStorage.removeItem("silgapp_livreur_session_id"); } catch {}
+                    base44.auth.logout();
+                    setTimeout(() => window.location.reload(), 300);
+                  }}
+                >
+                  Se reconnecter
+                </button>
+              </div>
+            ) : !isEnLigne && livreurProfil?.bloque_encours ? (
+              <div className="rounded-2xl bg-red-600 text-white p-5 text-center space-y-2 shadow-lg">
+                <p className="text-2xl"></p>
                 <p className="font-black text-base">Compte bloqué</p>
                 <p className="text-white/80 text-xs leading-relaxed">
                   Votre plafond d'encours SILGAPP a été atteint. Veuillez effectuer votre dépôt auprès de SILGAPP afin de réactiver votre compte.
@@ -1327,7 +1410,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               </div>
             ) : !isEnLigne && (
               <div className="rounded-2xl bg-slate-800 text-white p-5 text-center space-y-2 shadow-lg">
-                <p className="text-2xl">😴</p>
+                <p className="text-2xl"></p>
                 <p className="font-black text-base">Vous êtes hors ligne</p>
                 <p className="text-white/60 text-xs">Appuyez sur <strong>Activer</strong> dans le header pour recevoir des courses</p>
               </div>
@@ -1339,12 +1422,21 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           <LivreurHistorique mesCourses={mesCourses} livreurProfil={livreurProfil} isExterne={true} />
         )}
 
+        {activeTab === "messages" && (
+          <MessagesPage
+            myType="livreur"
+            myId={livreurProfil?.id}
+            myName={`${livreurProfil?.prenom || ""} ${livreurProfil?.nom || ""}`.trim() || livreurProfil?.telephone}
+            onBack={() => setActiveTab("courses")}
+          />
+        )}
+
         {activeTab === "infos" && livreurProfil && (
           <LivreurMesInfosModal
             livreurProfil={livreurProfil}
             onSave={() => {
               queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
-              toast.success("Profil mis à jour ✓");
+              toast.success("Profil mis à jour ");
             }}
           />
         )}

@@ -59,7 +59,7 @@ export default function NombreColisSelector({ value, onChange }) {
 
       {nb > 1 && (
         <div className="bg-purple-50 border border-purple-200 rounded-2xl p-3 flex items-center gap-2">
-          <span className="text-lg">📦</span>
+          <span className="text-lg"></span>
           <p className="text-xs text-purple-700 font-semibold">
             Mode multi-colis activé — {nb} destinataires à renseigner
           </p>

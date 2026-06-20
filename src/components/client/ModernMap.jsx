@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 
-export default function ModernMap({ 
-  position, 
-  livreursProches, 
+export default function ModernMap({
+  position,
+  livreursProches,
   courseActive,
   onMapReady,
   onMarkerClick
@@ -52,14 +52,14 @@ export default function ModernMap({
   // Mettre à jour la position du client
   useEffect(() => {
     if (!mapInstanceRef.current || !position) return;
-    
+
     const map = mapInstanceRef.current;
-    
+
     // Mettre à jour le marqueur client
     if (markersRef.current[0]) {
       markersRef.current[0].setLatLng([position.latitude, position.longitude]);
     }
-    
+
     // Centrer sur la position avec animation fluide
     map.flyTo([position.latitude, position.longitude], 14, {
       duration: 1.5,
@@ -142,14 +142,14 @@ export default function ModernMap({
         return `il y a ${Math.round(diff / 60)}h`;
       })();
 
-      const statutLabel = personne.statut === 'disponible' ? '🟢 Libre' : personne.statut === 'en_course' ? '🔵 En course' : '⚪ Hors ligne';
+      const statutLabel = personne.statut === 'disponible' ? ' Libre' : personne.statut === 'en_course' ? ' En course' : ' Hors ligne';
       marker.bindPopup(`
         <div style="min-width:200px;font-family:sans-serif;padding:4px 0">
           <p style="font-weight:700;font-size:14px;margin:0 0 6px 0;color:#1a1a1a">${personne.prenom || ''} ${personne.nom || ''}</p>
-          ${personne.telephone ? `<p style="font-size:12px;color:#444;margin:2px 0">📞 ${personne.telephone}</p>` : ''}
+          ${personne.telephone ? `<p style="font-size:12px;color:#444;margin:2px 0"> ${personne.telephone}</p>` : ''}
           <p style="font-size:12px;color:#444;margin:2px 0">${statutLabel}</p>
-          <p style="font-size:12px;color:#444;margin:2px 0">📍 ${zone}</p>
-          ${lastSeen ? `<p style="font-size:12px;color:#888;margin:2px 0">🕒 Dernier GPS : ${lastSeen}</p>` : ''}
+          <p style="font-size:12px;color:#444;margin:2px 0"> ${zone}</p>
+          ${lastSeen ? `<p style="font-size:12px;color:#888;margin:2px 0"> Dernier GPS : ${lastSeen}</p>` : ''}
         </div>
       `, { maxWidth: 260 });
 
@@ -186,7 +186,7 @@ export default function ModernMap({
     setTimeout(() => {
       const zoomIn = document.querySelector('.leaflet-control-zoom-in');
       const zoomOut = document.querySelector('.leaflet-control-zoom-out');
-      
+
       [zoomIn, zoomOut].forEach(btn => {
         if (btn) {
           btn.style.cssText = `
@@ -220,7 +220,7 @@ export default function ModernMap({
       iconAnchor: [30, 30],
     });
 
-    const clientMarker = window.L.marker([position.latitude, position.longitude], { 
+    const clientMarker = window.L.marker([position.latitude, position.longitude], {
       icon: clientIcon,
       zIndexOffset: 2000
     }).addTo(map);
@@ -232,7 +232,7 @@ export default function ModernMap({
 
     setMapLoaded(true);
     mapInstanceRef.current = map;
-    
+
     if (onMapReady) onMapReady(map);
   };
 
@@ -247,7 +247,7 @@ export default function ModernMap({
       .client-marker-container {
         pointer-events: none;
       }
-      
+
       .client-marker-wrapper {
         position: relative;
         width: 60px;
@@ -256,7 +256,7 @@ export default function ModernMap({
         align-items: center;
         justify-content: center;
       }
-      
+
       .client-marker-pulse {
         position: absolute;
         width: 60px;
@@ -265,7 +265,7 @@ export default function ModernMap({
         border-radius: 50%;
         animation: pulse-client 2s ease-out infinite;
       }
-      
+
       @keyframes pulse-client {
         0% {
           transform: scale(0.5);
@@ -276,7 +276,7 @@ export default function ModernMap({
           opacity: 0;
         }
       }
-      
+
       .client-marker {
         width: 20px;
         height: 20px;
@@ -286,7 +286,7 @@ export default function ModernMap({
         box-shadow: 0 2px 12px rgba(220, 38, 38, 0.4);
         position: relative;
       }
-      
+
       .client-marker-dot {
         width: 6px;
         height: 6px;
@@ -297,12 +297,12 @@ export default function ModernMap({
         left: 50%;
         transform: translate(-50%, -50%);
       }
-      
+
       /* Marqueurs livreurs - style Glovo */
       .livreur-marker-container {
         transition: all 0.3s ease;
       }
-      
+
       .livreur-marker-wrapper {
         position: relative;
         width: 48px;
@@ -311,7 +311,7 @@ export default function ModernMap({
         align-items: center;
         justify-content: center;
       }
-      
+
       .livreur-marker-pulse {
         position: absolute;
         width: 48px;
@@ -320,7 +320,7 @@ export default function ModernMap({
         border-radius: 50%;
         animation: pulse-livreur 2s ease-out infinite;
       }
-      
+
       @keyframes pulse-livreur {
         0% {
           transform: scale(0.5);
@@ -331,7 +331,7 @@ export default function ModernMap({
           opacity: 0;
         }
       }
-      
+
       .livreur-marker {
         width: 40px;
         height: 40px;
@@ -344,13 +344,13 @@ export default function ModernMap({
         align-items: center;
         justify-content: center;
       }
-      
+
       .livreur-photo {
         width: 100%;
         height: 100%;
         object-fit: cover;
       }
-      
+
       .livreur-avatar {
         width: 100%;
         height: 100%;
@@ -362,26 +362,26 @@ export default function ModernMap({
         font-weight: 700;
         font-size: 18px;
       }
-      
+
       /* Popup livreurs */
       .livreur-popup {
         min-width: 180px;
       }
-      
+
       .livreur-popup-header {
         display: flex;
         align-items: center;
         gap: 12px;
         margin-bottom: 8px;
       }
-      
+
       .livreur-popup-header img {
         width: 48px;
         height: 48px;
         border-radius: 50%;
         object-fit: cover;
       }
-      
+
       .livreur-popup-avatar {
         width: 48px;
         height: 48px;
@@ -394,38 +394,38 @@ export default function ModernMap({
         font-weight: 700;
         font-size: 20px;
       }
-      
+
       .livreur-popup-name {
         font-weight: 700;
         color: #1a1a1a;
         margin: 0;
         font-size: 14px;
       }
-      
+
       .livreur-popup-rating {
         font-size: 12px;
         color: #f59e0b;
         margin-top: 2px;
       }
-      
+
       .livreur-popup-vehicle {
         font-size: 12px;
         color: #666;
         margin: 0;
       }
-      
+
       /* Popup clients */
       .client-popup {
         min-width: 200px;
       }
-      
+
       .client-popup-header {
         display: flex;
         align-items: center;
         gap: 12px;
         margin-bottom: 8px;
       }
-      
+
       .client-popup-avatar {
         width: 48px;
         height: 48px;
@@ -438,60 +438,60 @@ export default function ModernMap({
         font-weight: 700;
         font-size: 20px;
       }
-      
+
       .client-popup-name {
         font-weight: 700;
         color: #1a1a1a;
         margin: 0;
         font-size: 14px;
       }
-      
+
       .client-popup-status {
         font-size: 11px;
         color: #dc2626;
         margin-top: 2px;
         font-weight: 600;
       }
-      
+
       .client-popup-phone {
         font-size: 12px;
         color: #666;
         margin: 0;
       }
-      
+
       /* Contrôles de zoom */
       .leaflet-control-zoom {
         border: none !important;
       }
-      
+
       .leaflet-control-zoom-in,
       .leaflet-control-zoom-out {
         transition: all 0.2s ease !important;
       }
-      
+
       .leaflet-control-zoom-in:hover,
       .leaflet-control-zoom-out:hover {
         background: #f5f5f5 !important;
         transform: scale(1.1);
       }
-      
+
       /* Responsive */
       @media (max-width: 640px) {
         .livreur-marker-wrapper {
           width: 40px;
           height: 40px;
         }
-        
+
         .livreur-marker {
           width: 32px;
           height: 32px;
         }
-        
+
         .client-marker-wrapper {
           width: 50px;
           height: 50px;
         }
-        
+
         .client-marker {
           width: 16px;
           height: 16px;
@@ -503,12 +503,12 @@ export default function ModernMap({
 
   return (
     <div className="relative w-full h-full" style={{ minHeight: "calc(100vh - 73px)" }}>
-      <div 
-        ref={mapRef} 
+      <div
+        ref={mapRef}
         className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-200"
         style={{ minHeight: "calc(100vh - 73px)" }}
       />
-      
+
       {/* Overlay de chargement */}
       {!mapLoaded && (
         <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
@@ -521,7 +521,7 @@ export default function ModernMap({
           </div>
         </div>
       )}
-      
+
       {/* Badge livreurs — même source que les marqueurs (avec GPS uniquement) */}
       {mapLoaded && (() => {
         const livreursAffiches = livreursProches.filter(p => (p.vehicule || p.type_vehicule || p.statut) && p.latitude && p.longitude);

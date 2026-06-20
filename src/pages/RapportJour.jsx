@@ -162,7 +162,7 @@ export default function RapportJour() {
             <Trophy className="w-4 h-4 text-secondary" /> Performance par livreur
             {stats.meilleur && (
               <span className="text-xs text-muted-foreground font-normal ml-2">
-                🏆 Meilleur : {stats.meilleur.nom} ({stats.meilleur.courses} courses)
+                 Meilleur : {stats.meilleur.nom} ({stats.meilleur.courses} courses)
               </span>
             )}
           </CardTitle>

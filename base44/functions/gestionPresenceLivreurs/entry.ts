@@ -45,9 +45,9 @@ Deno.serve(async (req) => {
             age_min: Math.round(ageMin),
             country_code: livreur.country_code,
           });
-          console.log(`[PRESENCE] 🚫 ${livreur.prenom || ''} ${livreur.nom} → hors_ligne (HB: ${Math.round(ageMin)} min)`);
+          console.log(`[PRESENCE] ${livreur.prenom || ''} ${livreur.nom} → hors_ligne (HB: ${Math.round(ageMin)} min)`);
         } catch (err) {
-          console.error(`[PRESENCE] ❌ Échec mise hors_ligne ${livreur.id}:`, err.message);
+          console.error(`[PRESENCE] Échec mise hors_ligne ${livreur.id}:`, err.message);
         }
       }
     }
@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
       parPays[cc] = (parPays[cc] || 0) + 1;
     });
 
-    console.log(`[PRESENCE] ✅ Balayage terminé — ${passesHorsLigne.length} livreur(s) mis hors_ligne sur ${livreursDisponibles.length} vérifiés`);
+    console.log(`[PRESENCE] Balayage terminé — ${passesHorsLigne.length} livreur(s) mis hors_ligne sur ${livreursDisponibles.length} vérifiés`);
 
     return Response.json({
       success: true,
@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
       timestamp: maintenant.toISOString(),
     });
   } catch (error) {
-    console.error('[PRESENCE] ❌ Erreur:', error.message);
+    console.error('[PRESENCE] Erreur:', error.message);
     return Response.json({ error: error.message }, { status: 500 });
   }
 });

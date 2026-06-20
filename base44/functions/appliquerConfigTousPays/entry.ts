@@ -4,7 +4,7 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    
+
     if (!user || user.role !== 'admin') {
       return Response.json({ error: 'Admin uniquement' }, { status: 403 });
     }
@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
 
     // Récupérer tous les pays
     const tousPays = await base44.entities.Country.list();
-    
+
     let updated = 0;
     for (const pays of tousPays) {
       // Appliquer la configuration de référence à tous les pays
@@ -32,10 +32,10 @@ Deno.serve(async (req) => {
       updated++;
     }
 
-    return Response.json({ 
-      success: true, 
+    return Response.json({
+      success: true,
       message: `${updated} pays mis à jour avec la configuration de référence`,
-      config: configReference 
+      config: configReference
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

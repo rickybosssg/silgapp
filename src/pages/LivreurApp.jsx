@@ -101,9 +101,9 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
   // Courses - filtrer par type_livreur pour séparation stricte
   const { data: mesCourses = [] } = useQuery({
     queryKey: ["mes-courses", livreurProfil?.id],
-    queryFn: () => base44.entities.Course.filter({ 
+    queryFn: () => base44.entities.Course.filter({
       livreur_id: livreurProfil.id,
-      reseau: livreurProfil.type_livreur || "interne" 
+      reseau: livreurProfil.type_livreur || "interne"
     }, "-created_date", 50),
     enabled: !!livreurProfil?.id,
     initialData: [],
@@ -158,7 +158,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
             livreurId: livreurProfil.id,
             requestContacts: true,
           }).catch(() => null);
-          toast.success("GPS activé ✓");
+          toast.success("GPS activé ");
         }).catch(() => toast.error("Position GPS non enregistrée"));
       },
       () => { setGpsActif(false); toast.error("Permission GPS refusée – obligatoire"); },
@@ -202,31 +202,31 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
 
   const handleAccepter = (course) => {
     // Enregistrer l'heure de début de sollicitation pour le timer
-    updateCourseMutation.mutate({ 
-      id: course.id, 
-      data: { 
-        statut: "acceptee", 
+    updateCourseMutation.mutate({
+      id: course.id,
+      data: {
+        statut: "acceptee",
         heure_acceptation: new Date().toISOString(),
         dispatch_status: "accepte"
-      } 
+      }
     });
     saveLivreur(livreurProfil.id, { statut: "en_course" }).then(() =>
       queryClient.invalidateQueries({ queryKey: ["livreur-profil"] })
     );
-    toast.success("Course acceptée ! 🚀");
+    toast.success("Course acceptée ! ");
   };
 
   const handleRefuser = async (course, raison) => {
-    const remarque = raison 
+    const remarque = raison
       ? `Livreur occupé : ${raison === "en_course" ? "déjà en cours de livraison" : "indisponible"}`
       : "Course refusée";
-    
-    console.log("🔴 REFUS:", course.id, "Raison:", raison);
-    
+
+    console.log(" REFUS:", course.id, "Raison:", raison);
+
     try {
       // Si dispatch automatique → appeler le moteur pour redispatch
       if (course.dispatch_mode === "automatique") {
-        console.log("🤖 Dispatch auto → appel dispatchMoteur pour redispatch");
+        console.log(" Dispatch auto → appel dispatchMoteur pour redispatch");
         await base44.functions.invoke("dispatchMoteur", {
           action: "refuser_course",
           course_id: course.id,
@@ -235,26 +235,26 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
         });
       } else {
         // Dispatch manuel → retour à l'admin
-        const updateData = { 
-          statut: "nouvelle", 
-          livreur_id: "", 
+        const updateData = {
+          statut: "nouvelle",
+          livreur_id: "",
           livreur_nom: "",
           remarque_livreur: remarque,
           dispatch_status: "en_attente_admin",
         };
         await base44.entities.Course.update(course.id, updateData);
       }
-      
-      console.log("✅ Course mise à jour, invalidation...");
-      
+
+      console.log(" Course mise à jour, invalidation...");
+
       // Invalider TOUTES les queries courses immédiatement
       await queryClient.invalidateQueries({ queryKey: ["courses"] });
       await queryClient.invalidateQueries({ queryKey: ["mes-courses"] });
-      
-      console.log("✅ Invalidation terminée");
+
+      console.log(" Invalidation terminée");
       toast("Course renvoyée à l'admin");
     } catch (err) {
-      console.error("❌ Erreur refus:", err);
+      console.error(" Erreur refus:", err);
       toast.error("Erreur : " + err.message);
     }
   };
@@ -277,7 +277,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
             longitude_depart_livraison: pos.coords.longitude,
           },
         });
-        toast.success("Colis récupéré ! 📦 Position GPS enregistrée");
+        toast.success("Colis récupéré ! Position GPS enregistrée");
       },
       (err) => {
         console.error("Erreur GPS:", err);
@@ -310,7 +310,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
       queryClient.invalidateQueries({ queryKey: ["mes-courses"] });
     });
 
-    toast.success("Livraison terminée ! 🎉");
+    toast.success("Livraison terminée ! ");
   };
 
   const handleClientAnnule = (course) => {
@@ -378,7 +378,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
       <div className="fixed inset-0 bg-gradient-to-br from-primary/10 to-red-50 flex items-center justify-center p-6">
         <div className="max-w-sm w-full bg-white rounded-3xl shadow-2xl p-6 space-y-6 text-center">
           <div className="w-20 h-20 rounded-2xl bg-red-50 flex items-center justify-center mx-auto">
-            <span className="text-4xl">📍</span>
+            <span className="text-4xl"></span>
           </div>
           <div>
             <p className="text-xl font-black text-gray-900 mb-2">GPS Obligatoire</p>
@@ -388,7 +388,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
           </div>
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
             <p className="text-xs text-amber-700 font-semibold">
-              ⚠️ Sans GPS, vous ne pourrez pas recevoir de courses ni être visible sur la carte.
+               Sans GPS, vous ne pourrez pas recevoir de courses ni être visible sur la carte.
             </p>
           </div>
           <button
@@ -467,7 +467,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
 
             {isEnLigne && !livreurVisible && (
               <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-center gap-3">
-                <span className="text-xl">📍</span>
+                <span className="text-xl"></span>
                 <p className="text-sm text-amber-700 font-medium leading-tight">
                   Activez votre GPS pour être visible sur la carte
                 </p>

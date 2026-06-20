@@ -43,11 +43,11 @@ export default function NavigationGPSButton({ course, isExterne = false }) {
 
   const handleNavigation = (app = "google") => {
     if (!destCoords) return;
-    
+
     const url = app === "google"
       ? `https://www.google.com/maps/dir/?api=1&destination=${destCoords.lat},${destCoords.lng},${destCoords.lat}`
       : `https://waze.com/ul?ll=${destCoords.lat},${destCoords.lng}&navigate=yes`;
-    
+
     window.open(url, "_blank", "noopener,noreferrer");
   };
 

@@ -3,9 +3,9 @@ import { Navigation, RefreshCw, AlertCircle } from "lucide-react";
 
 /**
  * Indicateur GPS universel pour livreurs et clients
- * 🟢 GPS récent (<2 min)
- * 🟠 GPS ancien (2-10 min)
- * 🔴 GPS perdu (>10 min)
+ * GPS récent (<2 min)
+ * GPS ancien (2-10 min)
+ * GPS perdu (>10 min)
  */
 export default function GPSIndicateur({ indicateur, ageMinutes, onActualiser, loading = false }) {
   const config = {

@@ -2,7 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 /**
  * Apprentissage automatique des quartiers.
- * 
+ *
  * Appelée à chaque création de CourseExterne.
  * Si un quartier_depart ou quartier_arrivee est saisi et n'existe pas dans la base Quartier,
  * il est automatiquement enregistré dans QuartiersProposes.
@@ -75,13 +75,13 @@ Deno.serve(async (req) => {
           nb_occurrences: 1,
         });
         resultats.push({ nom: q.nom, action: 'cree' });
-        console.log(`[QUARTIER] 📝 Nouveau quartier proposé: "${q.nom}" (${countryCode})`);
+        console.log(`[QUARTIER] Nouveau quartier proposé: "${q.nom}" (${countryCode})`);
       }
     }
 
     return Response.json({ success: true, appris: resultats.length, resultats });
   } catch (error) {
-    console.error('[QUARTIER] ❌ Erreur:', error.message);
+    console.error('[QUARTIER] Erreur:', error.message);
     return Response.json({ error: error.message }, { status: 500 });
   }
 });

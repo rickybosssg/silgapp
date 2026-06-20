@@ -31,11 +31,11 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 }
 
 const MOTIFS = [
-  { id: "trompe", label: "Je me suis trompé", icon: "🤔" },
-  { id: "besoin", label: "Plus besoin", icon: "❌" },
-  { id: "adresse", label: "Mauvaise adresse", icon: "📍" },
-  { id: "livreur", label: "Livreur trop long", icon: "⏱️" },
-  { id: "autre", label: "Autre", icon: "💬" },
+  { id: "trompe", label: "Je me suis trompé", icon: "" },
+  { id: "besoin", label: "Plus besoin", icon: "" },
+  { id: "adresse", label: "Mauvaise adresse", icon: "" },
+  { id: "livreur", label: "Livreur trop long", icon: "⏱" },
+  { id: "autre", label: "Autre", icon: "" },
 ];
 
 // step: "info" | "motif"

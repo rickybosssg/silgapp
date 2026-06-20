@@ -115,14 +115,14 @@ export default function CarteLivreursExterne() {
     try {
       const res = await base44.functions.invoke('correctionEnCourse', {});
       if (res.data?.success) {
-        alert(`✅ ${res.data.corriges} livreur(s) corrigé(s) !`);
+        alert(` ${res.data.corriges} livreur(s) corrigé(s) !`);
         // Rafraîchir les données
         await refetchLivreurs();
       } else {
-        alert('❌ Erreur: ' + (res.data?.error || 'Inconnue'));
+        alert(' Erreur: ' + (res.data?.error || 'Inconnue'));
       }
     } catch (err) {
-      alert('❌ Erreur: ' + err.message);
+      alert(' Erreur: ' + err.message);
     } finally {
       setCorrectionEnCours(false);
     }
@@ -182,11 +182,11 @@ export default function CarteLivreursExterne() {
     const unsubLivreurs = base44.entities.Livreur.subscribe(() => { refetchLivreurs(); });
     return () => { unsubCourses(); unsubLivreurs(); };
   }, [refetch, refetchLivreurs]);
-  
+
   // Filtrage strict : courses VRAIMENT en attente (statuts initiaux uniquement)
   const coursesEnAttente = useMemo(() => {
     const statutsFin = ["livree", "terminee", "completed", "annulee", "livreur_en_route", "colis_recupere", "en_livraison"];
-    
+
     return toutesCoursesExternes.filter(c =>
       (c.statut === "nouvelle" || c.statut === "recherche_livreur") &&
       (!c.livreur_id || c.dispatch_status === "propose") &&
@@ -195,13 +195,13 @@ export default function CarteLivreursExterne() {
   }, [toutesCoursesExternes]);
 
   // Courses en attente AVEC GPS (affichables sur la carte)
-  const coursesEnAttenteAvecGPS = useMemo(() => 
+  const coursesEnAttenteAvecGPS = useMemo(() =>
     coursesEnAttente.filter(c => c.gps_depart_lat && c.gps_depart_lng),
     [coursesEnAttente]
   );
 
   // Courses en attente SANS GPS (comptabilisées mais non affichables sur la carte)
-  const coursesEnAttenteSansGPS = useMemo(() => 
+  const coursesEnAttenteSansGPS = useMemo(() =>
     coursesEnAttente.filter(c => !c.gps_depart_lat || !c.gps_depart_lng),
     [coursesEnAttente]
   );
@@ -219,15 +219,15 @@ export default function CarteLivreursExterne() {
   useEffect(() => {
     const marqueursCourses = document.querySelectorAll('.dmap-course-container').length;
     const livreursEnCourse = livreurs.filter(l => l.statut === "en_course").length;
-    const marqueursLivreursEnCourse = livreurs.filter(l => 
+    const marqueursLivreursEnCourse = livreurs.filter(l =>
       l.statut === "en_course" && l.latitude && l.longitude && !isLivreurNoir(l)
     ).length;
-    
+
     if (marqueursCourses !== coursesEnAttenteAvecGPS.length) {
-      console.warn(`⚠️ Incohérence courses: ${marqueursCourses} marqueurs vs ${coursesEnAttenteAvecGPS.length} compteur`);
+      console.warn(` Incohérence courses: ${marqueursCourses} marqueurs vs ${coursesEnAttenteAvecGPS.length} compteur`);
     }
     if (marqueursLivreursEnCourse !== livreursEnCourse) {
-      console.warn(`⚠️ Incohérence livreurs en course: ${marqueursLivreursEnCourse} marqueurs vs ${livreursEnCourse} compteur`);
+      console.warn(` Incohérence livreurs en course: ${marqueursLivreursEnCourse} marqueurs vs ${livreursEnCourse} compteur`);
     }
   }, [coursesEnAttenteAvecGPS, livreurs]);
 
@@ -245,7 +245,7 @@ export default function CarteLivreursExterne() {
       c.livreur_id
     );
 
-    console.log("🔴 DIAGNOSTIC courses actives (livreur occupé):", {
+    console.log(" DIAGNOSTIC courses actives (livreur occupé):", {
       total_chargees: toutesCoursesExternes.length,
       statuts_repartition: toutesCoursesExternes.reduce((acc, c) => {
         acc[c.statut] = (acc[c.statut] || 0) + 1;
@@ -263,7 +263,7 @@ export default function CarteLivreursExterne() {
     [coursesVraimentActives]
   );
 
-  // ─── 🎯 COMPTEURS UNIFIÉS - Source unique de vérité ───────────────────
+  // ─── COMPTEURS UNIFIÉS - Source unique de vérité ───────────────────
   // Utilise les mêmes fonctions que DashboardExterne pour garantir l'uniformité
   const compteursLivreurs = useMemo(() => {
     const eligibles = livreurs.filter(l => l.validation === "valide" && l.actif !== false);
@@ -272,7 +272,7 @@ export default function CarteLivreursExterne() {
     // Recalcul strict de "en course" : livreur avec course ACTIVE (peu importe le statut DB)
     // Un livreur peut avoir statut="disponible" mais avoir une course active → doit être orange
     const vraisEnCourse = eligibles.filter(l => livreurIdsEnCourseReelle.has(l.id));
-    console.log("🟠 DIAGNOSTIC livreurs en course:", {
+    console.log(" DIAGNOSTIC livreurs en course:", {
       par_statut_db: eligibles.filter(l => l.statut === "en_course").length,
       avec_course_active: vraisEnCourse.length,
       ids: vraisEnCourse.map(l => l.id.slice(-8)),
@@ -282,9 +282,9 @@ export default function CarteLivreursExterne() {
         .map(l => ({ id: l.id.slice(-8), nom: `${l.prenom} ${l.nom}` })),
     });
 
-    // 🎯 CORRECTION : Utiliser isLibre() pour les "verts" (GPS < 10 min)
+    // CORRECTION : Utiliser isLibre() pour les "verts" (GPS < 10 min)
     const libres = eligibles.filter(l => isLibre(l));
-    
+
     return {
       ...base,
       enCourse: vraisEnCourse.length,
@@ -294,21 +294,21 @@ export default function CarteLivreursExterne() {
     };
   }, [livreurs, livreurIdsEnCourseReelle]);
 
-  const compteursClients = useMemo(() => 
+  const compteursClients = useMemo(() =>
     calculateClientCounters(clients),
     [clients]
   );
 
-  // 🔍 DIAGNOSTIC - Résumé de cohérence complet
+  // DIAGNOSTIC - Résumé de cohérence complet
   useEffect(() => {
     const eligibles = livreurs.filter(l => l.validation === "valide" && l.actif !== false);
-    const libres = eligibles.filter(l => isLibre(l)); // 🎯 GPS < 10 min
+    const libres = eligibles.filter(l => isLibre(l)); // GPS < 10 min
     const enCourseDB = eligibles.filter(l => l.statut === "en_course");
     const enCourseReelle = eligibles.filter(l => livreurIdsEnCourseReelle.has(l.id));
     const enCourseFantomes = enCourseDB.filter(l => !livreurIdsEnCourseReelle.has(l.id));
     const noirs = eligibles.filter(l => isLivreurNoir(l, livreurIdsEnCourseReelle));
 
-    console.log("🔍 DIAGNOSTIC CARTE COMPLET (RÈGLES UNIFIÉES) :", {
+    console.log(" DIAGNOSTIC CARTE COMPLET (RÈGLES UNIFIÉES) :", {
       total_livreurs: eligibles.length,
       libres_gps_recent: libres.length,
       libres_ids: libres.map(l => l.id.slice(-8)),
@@ -325,9 +325,9 @@ export default function CarteLivreursExterne() {
       courses_actives_en_db: coursesVraimentActives.length,
     });
 
-    // 🚨 ALERTE si livreurs "en_course" sans course active
+    // ALERTE si livreurs "en_course" sans course active
     if (enCourseFantomes.length > 0) {
-      console.warn(`⚠️ ${enCourseFantomes.length} livreur(s) "en_course" SANS course active !`);
+      console.warn(` ${enCourseFantomes.length} livreur(s) "en_course" SANS course active !`);
       console.warn("IDs:", enCourseFantomes.map(l => l.id.slice(-8)));
     }
   }, [livreurs, coursesVraimentActives, livreurIdsEnCourseReelle]);
@@ -335,11 +335,11 @@ export default function CarteLivreursExterne() {
   // ─── Listes filtrées ────────────────────────────────────────────────────
   const livreursAffiches = useMemo(() => {
     switch (filtreLivreur) {
-      case "noirs":     return livreurs.filter(l => isLivreurNoir(l, livreurIdsEnCourseReelle));
-      case "verts":     return livreurs.filter(l => isLibre(l)); // 🎯 GPS < 10 min
+      case "noirs": return livreurs.filter(l => isLivreurNoir(l, livreurIdsEnCourseReelle));
+      case "verts": return livreurs.filter(l => isLibre(l)); // GPS < 10 min
       // En course = livreur avec course ACTIVE (peu importe le statut DB)
-      case "oranges":   return livreurs.filter(l => livreurIdsEnCourseReelle.has(l.id));
-      default:          return livreurs;
+      case "oranges": return livreurs.filter(l => livreurIdsEnCourseReelle.has(l.id));
+      default: return livreurs;
     }
   }, [livreurs, filtreLivreur, livreurIdsEnCourseReelle]);
 
@@ -374,21 +374,21 @@ export default function CarteLivreursExterne() {
   }, [paysData, livreursSurCarte]);
 
   const filtresBtns = [
-    { key: "tous",      label: `Tous (${compteursLivreurs.total})` },
-    { key: "on",        label: `ON (${compteursLivreurs.on})` },
-    { key: "off",       label: `OFF (${compteursLivreurs.off})` },
-    { key: "libres",    label: `Libres (${compteursLivreurs.libres})` },
+    { key: "tous", label: `Tous (${compteursLivreurs.total})` },
+    { key: "on", label: `ON (${compteursLivreurs.on})` },
+    { key: "off", label: `OFF (${compteursLivreurs.off})` },
+    { key: "libres", label: `Libres (${compteursLivreurs.libres})` },
     { key: "en_course", label: `En course (${compteursLivreurs.enCourse})` },
     { key: "app_active",label: `App active (${compteursLivreurs.appActive})` },
-    { key: "carte",     label: `Sur carte (${compteursLivreurs.surCarte})` },
+    { key: "carte", label: `Sur carte (${compteursLivreurs.surCarte})` },
   ];
 
   // ─── Filtres livreurs (pour la liste) ─────────────────────────────────────
   const FILTRES = [
-    { key: "tous",    label: "Tous",       count: compteursLivreurs.total,    dot: "bg-gray-400" },
-    { key: "verts",   label: "Libres",     count: compteursLivreurs.verts,    dot: "bg-green-500" },
-    { key: "oranges", label: "En course",  count: compteursLivreurs.oranges,  dot: "bg-orange-500" },
-    { key: "noirs",   label: "Hors ligne", count: compteursLivreurs.noirs,    dot: "bg-gray-700" },
+    { key: "tous", label: "Tous", count: compteursLivreurs.total, dot: "bg-gray-400" },
+    { key: "verts", label: "Libres", count: compteursLivreurs.verts, dot: "bg-green-500" },
+    { key: "oranges", label: "En course", count: compteursLivreurs.oranges, dot: "bg-orange-500" },
+    { key: "noirs", label: "Hors ligne", count: compteursLivreurs.noirs, dot: "bg-gray-700" },
   ];
 
   return (
@@ -440,11 +440,11 @@ export default function CarteLivreursExterne() {
           {/* KPI tiles */}
           <div className="grid grid-cols-5 gap-2 mt-5">
             {[
-              { val: compteursLivreurs.verts,   label: "Libres",      sub: "livreurs",  dot: "bg-green-400",  glow: "shadow-green-500/20" },
-              { val: compteursLivreurs.oranges, label: "En mission",  sub: "livreurs",  dot: "bg-orange-400", glow: "shadow-orange-500/20" },
-              { val: compteursClients.bleus,    label: "Clients GPS", sub: "< 30 min",  dot: "bg-blue-400",   glow: "shadow-blue-500/20" },
-              { val: coursesEnAttente.length,   label: "En attente",  sub: `${coursesEnAttenteAvecGPS.length} avec GPS`, dot: "bg-red-400", glow: "shadow-red-500/20" },
-            { val: coursesVraimentActives.length, label: "En cours",   sub: `livreur assigné`,        dot: "bg-orange-400", glow: "shadow-orange-500/20" },
+              { val: compteursLivreurs.verts, label: "Libres", sub: "livreurs", dot: "bg-green-400", glow: "shadow-green-500/20" },
+              { val: compteursLivreurs.oranges, label: "En mission", sub: "livreurs", dot: "bg-orange-400", glow: "shadow-orange-500/20" },
+              { val: compteursClients.bleus, label: "Clients GPS", sub: "< 30 min", dot: "bg-blue-400", glow: "shadow-blue-500/20" },
+              { val: coursesEnAttente.length, label: "En attente", sub: `${coursesEnAttenteAvecGPS.length} avec GPS`, dot: "bg-red-400", glow: "shadow-red-500/20" },
+            { val: coursesVraimentActives.length, label: "En cours", sub: `livreur assigné`, dot: "bg-orange-400", glow: "shadow-orange-500/20" },
             ].map((item, i) => (
               <div key={i} className={`bg-white/8 backdrop-blur-sm border border-white/10 rounded-2xl p-3 text-center shadow-lg ${item.glow}`}>
                 <div className={`w-2 h-2 rounded-full ${item.dot} mx-auto mb-2`} />
@@ -493,11 +493,11 @@ export default function CarteLivreursExterne() {
           <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2.5">Légende couleurs</p>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             {[
-              { dot: "bg-gray-800",   label: "Hors ligne" },
-              { dot: "bg-green-500",  label: "Libre (GPS actif)" },
+              { dot: "bg-gray-800", label: "Hors ligne" },
+              { dot: "bg-green-500", label: "Libre (GPS actif)" },
               { dot: "bg-orange-500", label: "En course" },
-              { dot: "bg-blue-500",   label: "Client actif" },
-              { dot: "bg-red-600",    label: "Course attente" },
+              { dot: "bg-blue-500", label: "Client actif" },
+              { dot: "bg-red-600", label: "Course attente" },
               { dot: "bg-yellow-500", label: "Course en cours" },
             ].map((l, i) => (
               <div key={i} className="flex items-center gap-2">
@@ -568,8 +568,8 @@ export default function CarteLivreursExterne() {
           ) : (
             <div className="divide-y divide-gray-50">
               {livreursAffiches.map(livreur => {
-                const estNoir   = isLivreurNoir(livreur, livreurIdsEnCourseReelle);
-                const estVert   = isLibre(livreur); // 🎯 GPS < 10 min
+                const estNoir = isLivreurNoir(livreur, livreurIdsEnCourseReelle);
+                const estVert = isLibre(livreur); // GPS < 10 min
                 // "En mission" = livreur avec course ACTIVE (peu importe le statut DB)
                 const estOrange = livreurIdsEnCourseReelle.has(livreur.id);
                 return (
@@ -589,7 +589,7 @@ export default function CarteLivreursExterne() {
                       <div className="flex items-center gap-2">
                         <p className="font-semibold text-sm text-gray-900 truncate">{livreur.prenom} {livreur.nom}</p>
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
-                          estVert   ? "bg-green-100 text-green-700" :
+                          estVert ? "bg-green-100 text-green-700" :
                           estOrange ? "bg-orange-100 text-orange-700" :
                           "bg-gray-100 text-gray-500"
                         }`}>
@@ -711,7 +711,7 @@ export default function CarteLivreursExterne() {
                   }`}
                 >
                   <span className="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0" />
-                  {masquerInactifs ? "⚫ Masqués" : "Voir inactifs"}
+                  {masquerInactifs ? " Masqués" : "Voir inactifs"}
                 </button>
                 <button
                   onClick={() => setShowLivreurs(v => !v)}
@@ -722,7 +722,7 @@ export default function CarteLivreursExterne() {
                   }`}
                 >
                   <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
-                  🟢 Livreurs
+                   Livreurs
                 </button>
                 <button
                   onClick={() => setShowClients(v => !v)}
@@ -733,7 +733,7 @@ export default function CarteLivreursExterne() {
                   }`}
                 >
                   <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
-                  🔵 Clients
+                   Clients
                 </button>
               </div>
             </div>

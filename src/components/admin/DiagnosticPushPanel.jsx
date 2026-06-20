@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { getNativePushDebugState, openNativeNotificationSettings, registerPushToken } from "@/lib/notifications";
-import { 
-  Smartphone, Bell, CheckCircle2, AlertCircle, Clock, 
+import {
+  Smartphone, Bell, CheckCircle2, AlertCircle, Clock,
   RefreshCw, Send, Search, ChevronDown, ChevronUp, Wifi, WifiOff
 } from "lucide-react";
 import { format } from "date-fns";
@@ -29,13 +29,13 @@ function readPushDebugEvents() {
 function StatutBadge({ statut }) {
   const map = {
     success: "bg-green-100 text-green-700",
-    failed:  "bg-red-100 text-red-700",
+    failed: "bg-red-100 text-red-700",
     pending: "bg-amber-100 text-amber-700",
   };
   const icons = {
     success: <CheckCircle2 className="w-3 h-3" />,
-    failed:  <AlertCircle  className="w-3 h-3" />,
-    pending: <Clock        className="w-3 h-3" />,
+    failed: <AlertCircle className="w-3 h-3" />,
+    pending: <Clock className="w-3 h-3" />,
   };
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${map[statut] || "bg-gray-100 text-gray-500"}`}>
@@ -58,7 +58,7 @@ function TokenRow({ token }) {
     setTestResult(null);
     try {
       const res = await base44.functions.invoke("envoiNotificationPush", {
-        titre: "🔔 Test SILGAPP",
+        titre: " Test SILGAPP",
         message: `Test push pour ${token.user_type} — ${new Date().toLocaleTimeString("fr")}`,
         type: "test",
         destinataire_email: token.user_email,
@@ -94,7 +94,7 @@ function TokenRow({ token }) {
             <span className="text-xs font-bold text-foreground truncate">{token.user_email}</span>
             <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${
               token.user_type === "livreur" ? "bg-orange-100 text-orange-700" :
-              token.user_type === "client"  ? "bg-blue-100 text-blue-700" :
+              token.user_type === "client" ? "bg-blue-100 text-blue-700" :
               "bg-gray-100 text-gray-600"
             }`}>{token.user_type?.toUpperCase()}</span>
             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
@@ -168,8 +168,8 @@ function TokenRow({ token }) {
           {testResult && (
             <div className={`rounded-xl p-2.5 text-xs ${testResult.ok ? "bg-green-50 border border-green-100 text-green-800" : "bg-red-50 border border-red-100 text-red-700"}`}>
               {testResult.ok
-                ? `✅ Push envoyé avec succès (${testResult.data?.tokens_sent || 0} token(s))`
-                : `❌ Échec : ${testResult.error || JSON.stringify(testResult.data)}`}
+                ? ` Push envoyé avec succès (${testResult.data?.tokens_sent || 0} token(s))`
+                : ` Échec : ${testResult.error || JSON.stringify(testResult.data)}`}
             </div>
           )}
         </div>
@@ -316,12 +316,12 @@ export default function DiagnosticPushPanel({ defaultSearchEmail = "" }) {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-2">
         {[
-          { label: "Actifs",    val: stats.actifs,   color: "text-green-600", bg: "bg-green-50" },
-          { label: "Android",   val: stats.natifs,   color: "text-blue-600",  bg: "bg-blue-50" },
-          { label: "Livreurs",  val: stats.livreurs, color: "text-orange-600",bg: "bg-orange-50" },
-          { label: "Clients",   val: stats.clients,  color: "text-purple-600",bg: "bg-purple-50" },
-          { label: "Échecs",    val: stats.echecs,   color: "text-red-600",   bg: "bg-red-50" },
-          { label: "Total",     val: stats.total,    color: "text-gray-600",  bg: "bg-gray-100" },
+          { label: "Actifs", val: stats.actifs, color: "text-green-600", bg: "bg-green-50" },
+          { label: "Android", val: stats.natifs, color: "text-blue-600", bg: "bg-blue-50" },
+          { label: "Livreurs", val: stats.livreurs, color: "text-orange-600",bg: "bg-orange-50" },
+          { label: "Clients", val: stats.clients, color: "text-purple-600",bg: "bg-purple-50" },
+          { label: "Échecs", val: stats.echecs, color: "text-red-600", bg: "bg-red-50" },
+          { label: "Total", val: stats.total, color: "text-gray-600", bg: "bg-gray-100" },
         ].map(s => (
           <div key={s.label} className={`${s.bg} rounded-xl p-2.5 text-center`}>
             <p className={`text-lg font-black ${s.color}`}>{s.val}</p>

@@ -3,7 +3,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
-        
+
         // Service role pour accéder à toutes les données
         const asService = base44.asServiceRole;
 
@@ -26,10 +26,10 @@ Deno.serve(async (req) => {
         if (action === 'nouveau_livreur') {
             // Notification pour le dernier livreur inscrit
             const dernier = enAttente[enAttente.length - 1];
-            
+
             await asService.entities.Notification.create({
                 type: "demande_livreur",
-                titre: "🚨 Nouveau livreur en attente",
+                titre: " Nouveau livreur en attente",
                 message: `${dernier.prenom || ""} ${dernier.nom || "Inconnu"} · ${dernier.telephone || "N/A"} · ${dernier.country_code || "BF"}`,
                 lien: "/admin/demandes-livreurs",
                 lue: false,

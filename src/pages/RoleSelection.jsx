@@ -129,7 +129,7 @@ export default function RoleSelection() {
         <p className="text-sm text-muted-foreground">
           Votre demande de compte livreur a bien été reçue. Elle est en cours de vérification par l'administration SILGAPP. Vous serez informé dès validation de votre compte.
         </p>
-        <p className="text-xs text-muted-foreground">📞 Support : +226 66 92 51 90</p>
+        <p className="text-xs text-muted-foreground"> Support : +226 66 92 51 90</p>
         <Loader2 className="w-5 h-5 animate-spin mx-auto text-secondary" />
       </div>
     </div>

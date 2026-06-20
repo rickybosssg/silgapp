@@ -28,10 +28,10 @@ export default function TestDispatchLivreur() {
   const checkLivreurNotif = useMutation({
     mutationFn: async () => {
       if (!testResult?.course_id) throw new Error("Pas de course de test");
-      
+
       // Vérifier la course
       const course = await base44.entities.CourseExterne.get(testResult.course_id);
-      
+
       // Vérifier notifications
       const notifs = await base44.entities.Notification.filter({
         course_id: testResult.course_id,
@@ -52,7 +52,7 @@ export default function TestDispatchLivreur() {
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-2">
-            🧪 Test Dispatch Livreur
+             Test Dispatch Livreur
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Test complet : création course → notification → modal → acceptation
@@ -78,13 +78,13 @@ export default function TestDispatchLivreur() {
             >
               {createTestCourse.isPending ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Création...</>
-              ) : "🚀 Créer course de test"}
+              ) : " Créer course de test"}
             </Button>
-            
+
             {testResult && (
               <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
                 <p className="text-sm font-semibold text-green-800 dark:text-green-200">
-                  ✅ Course créée : {testResult.course_id}
+                   Course créée : {testResult.course_id}
                 </p>
                 <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                   Livreur ID: {testResult.livreur_id}
@@ -117,14 +117,14 @@ export default function TestDispatchLivreur() {
             >
               {checkLivreurNotif.isPending ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Vérification...</>
-              ) : "🔍 Vérifier état"}
+              ) : " Vérifier état"}
             </Button>
 
             {testResult?.check && (
               <div className="mt-4 space-y-3">
                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                   <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">
-                    📋 Course
+                     Course
                   </p>
                   <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
                     Statut: <strong>{testResult.check.course.statut}</strong>
@@ -139,7 +139,7 @@ export default function TestDispatchLivreur() {
 
                 <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
                   <p className="text-sm font-semibold text-purple-800 dark:text-purple-200">
-                    🔔 Notifications
+                     Notifications
                   </p>
                   <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
                     Count: <strong>{testResult.check.notifs?.length || 0}</strong>
@@ -153,7 +153,7 @@ export default function TestDispatchLivreur() {
         {/* Étape 3 : Instructions */}
         <Card>
           <CardHeader>
-            <CardTitle>📱 Instructions pour tester sur mobile</CardTitle>
+            <CardTitle> Instructions pour tester sur mobile</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <ol className="list-decimal list-inside space-y-2 text-gray-700 dark:text-gray-300">
@@ -168,7 +168,7 @@ export default function TestDispatchLivreur() {
             {step >= 1 && (
               <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
                 <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
-                  ⚠️ Si le modal ne s'affiche pas :
+                   Si le modal ne s'affiche pas :
                 </p>
                 <ul className="text-xs text-amber-600 dark:text-amber-400 mt-2 space-y-1">
                   <li>• Vérifiez que le livreur est en statut "disponible"</li>
@@ -185,7 +185,7 @@ export default function TestDispatchLivreur() {
         {testResult?.course_id && (
           <Card>
             <CardHeader>
-              <CardTitle>🔧 Lien rapide vers course</CardTitle>
+              <CardTitle> Lien rapide vers course</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-xs font-mono bg-gray-100 dark:bg-gray-800 p-2 rounded">

@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
 
       // ── PIN SECOURS 0000 (livraison uniquement) ──────────────────────
       const isBackupPin = !isPickup && method === 'manual_code' && value === '0000';
-      
+
       // Vérifier la valeur (sauf PIN secours qui bypass)
       const isValid = isBackupPin || (method === 'qr' ? value === expectedQR : value === expectedPIN);
       if (!isValid) {
@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
       // ── DELIVERY validé ──
       const now = new Date().toISOString();
 
-      // 🏛️ COURSE ADMIN : pas de calcul de prix automatique
+      // COURSE ADMIN : pas de calcul de prix automatique
       // Le prix est saisi par le livreur dans l'app après scan/PIN livraison.
       // Ne PAS mettre le livreur disponible — il doit d'abord saisir le montant.
       if (course.pricing_mode === "admin_manuel" || course.source === "admin") {
@@ -147,11 +147,11 @@ Deno.serve(async (req) => {
       // Règle métier SILGAPP : prix basé sur distance GPS expéditeur → destinataire
       // (gps_depart → gps_arrivee de la course), jamais sur la distance livreur.
       // Distance réelle parcourue = GPS récupération → GPS livraison (pour stats).
-      
-      // ⚠️ CORRECTION PRIX MANUEL : Si la course utilise un prix manuel accepté,
+
+      // CORRECTION PRIX MANUEL : Si la course utilise un prix manuel accepté,
       // ce montant devient le prix officiel. Ne JAMAIS recalculer.
       const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
-      
+
       const latRecup = course.latitude_recuperation;
       const lngRecup = course.longitude_recuperation;
       const latLivr = latitude;
@@ -180,7 +180,7 @@ Deno.serve(async (req) => {
       try {
         const countriesDB = await base44.asServiceRole.entities.Country.filter({ code: countryCode, actif: true });
         if (countriesDB?.[0]) {
-          prixParKm    = countriesDB[0].prix_par_km    || 100;
+          prixParKm = countriesDB[0].prix_par_km || 100;
           prixMinimumPays = countriesDB[0].prix_minimum || 500;
           commissionPct = normalizeCommissionPct(countriesDB[0].commission_pct);
         }
@@ -202,11 +202,11 @@ Deno.serve(async (req) => {
         const prixFinal = Number(course.manual_price);
         const commission = Math.round(prixFinal * (commissionPct / 100));
         const montantLivreur = prixFinal - commission;
-        
+
         updateData.prix_final = prixFinal;
         updateData.commission_silga = commission;
         updateData.montant_livreur = montantLivreur;
-        
+
         // Distance réelle pour stats uniquement (pas pour le calcul du prix)
         if (distReelle != null) {
           updateData.distance_reelle_km = Math.max(Number(distReelle) || 0, 0.01);
@@ -214,7 +214,7 @@ Deno.serve(async (req) => {
           const dist = haversine(latDepart, lngDepart, latArrivee, lngArrivee);
           updateData.distance_reelle_km = Math.max(Number(dist) || 0, 0.01);
         }
-        
+
         updateData.latitude_arrivee_livraison = latitude;
         updateData.longitude_arrivee_livraison = longitude;
       } else if (latDepart && lngDepart && latArrivee && lngArrivee) {

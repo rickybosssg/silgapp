@@ -53,7 +53,7 @@ export default function LivreursBloquesEncours({ countryCode }) {
       setConfirmId(null);
       setModeReduction({});
       setReductionMap({});
-      toast.success("Livreur débloqué ✓");
+      toast.success("Livreur débloqué ");
     },
     onError: () => toast.error("Erreur lors du déblocage"),
   });

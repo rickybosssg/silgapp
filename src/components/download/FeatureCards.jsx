@@ -20,7 +20,7 @@ const features = {
 
 export default function FeatureCards() {
   return (
-    <motion.div 
+    <motion.div
       className="grid sm:grid-cols-2 gap-6"
       initial={{ opacity: 0, y: 40 }}
       animate={{ opacity: 1, y: 0 }}
@@ -32,7 +32,7 @@ export default function FeatureCards() {
       >
         <Card className="group relative overflow-hidden border border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-blue-600/5 backdrop-blur-xl hover:border-blue-500/40 transition-all duration-500">
           <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-all duration-500" />
-          
+
           <div className="p-8 space-y-6 relative z-10">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg shadow-blue-500/30">
@@ -43,10 +43,10 @@ export default function FeatureCards() {
                 <p className="text-sm text-white/60">Simplicité & rapidité</p>
               </div>
             </div>
-            
+
             <ul className="space-y-4">
               {features.client.map((item, i) => (
-                <motion.li 
+                <motion.li
                   key={i}
                   className="flex items-start gap-3 text-white/80"
                   initial={{ opacity: 0, x: -20 }}
@@ -68,7 +68,7 @@ export default function FeatureCards() {
       >
         <Card className="group relative overflow-hidden border border-orange-500/20 bg-gradient-to-br from-orange-500/10 to-orange-600/5 backdrop-blur-xl hover:border-orange-500/40 transition-all duration-500">
           <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 rounded-full blur-2xl group-hover:bg-orange-500/20 transition-all duration-500" />
-          
+
           <div className="p-8 space-y-6 relative z-10">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 to-orange-700 flex items-center justify-center shadow-lg shadow-orange-500/30">
@@ -79,10 +79,10 @@ export default function FeatureCards() {
                 <p className="text-sm text-white/60">Gagnez plus</p>
               </div>
             </div>
-            
+
             <ul className="space-y-4">
               {features.livreur.map((item, i) => (
-                <motion.li 
+                <motion.li
                   key={i}
                   className="flex items-start gap-3 text-white/80"
                   initial={{ opacity: 0, x: -20 }}

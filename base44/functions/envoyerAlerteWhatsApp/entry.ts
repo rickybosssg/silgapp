@@ -16,42 +16,42 @@ function getMessageWhatsApp(type, destinataire) {
   // Messages pour LIVREUR
   if (destinataire === 'livreur') {
     if (type === 'nouvelle_course' || type === 'course_proximite') {
-      return `📦 *Nouvelle course disponible !*\nOuvrez SILGAPP pour accepter ou refuser la mission.`;
+      return ` *Nouvelle course disponible !*\nOuvrez SILGAPP pour accepter ou refuser la mission.`;
     }
     if (type === 'course_assignee') {
-      return `✅ *Course assignée*\nUne course vous a été attribuée. Ouvrez SILGAPP pour consulter les détails.`;
+      return ` *Course assignée*\nUne course vous a été attribuée. Ouvrez SILGAPP pour consulter les détails.`;
     }
     if (type === 'course_livree' || type === 'paiement_valide') {
-      return `✅ *Livraison finalisée*\nMerci pour votre travail ! Consultez SILGAPP pour le récapitulatif.`;
+      return ` *Livraison finalisée*\nMerci pour votre travail ! Consultez SILGAPP pour le récapitulatif.`;
     }
     if (type === 'course_annulee') {
-      return `❌ *Course annulée*\nLa course a été annulée. Consultez SILGAPP pour plus d'informations.`;
+      return ` *Course annulée*\nLa course a été annulée. Consultez SILGAPP pour plus d'informations.`;
     }
     if (type === 'course_bloquee' || type === 'rappel_reponse') {
       return `⏰ *Action requise*\nUne course attend votre réponse. Ouvrez SILGAPP rapidement.`;
     }
     if (type === 'batterie_faible') {
-      return `🔋 *Batterie faible signalée*\nVotre signalement a bien été reçu par l'équipe SILGAPP.`;
+      return ` *Batterie faible signalée*\nVotre signalement a bien été reçu par l'équipe SILGAPP.`;
     }
     // Fallback livreur
-    return `📦 *SILGAPP – Notification*\nOuvrez l'application pour consulter les détails.`;
+    return ` *SILGAPP – Notification*\nOuvrez l'application pour consulter les détails.`;
   }
 
   // Messages pour CLIENT
   if (type === 'nouvelle_course' || type === 'course_assignee') {
-    return `🚚 *SILGAPP*\nVotre demande de livraison a été prise en compte.\nOuvrez SILGAPP pour suivre votre course en temps réel.`;
+    return ` *SILGAPP*\nVotre demande de livraison a été prise en compte.\nOuvrez SILGAPP pour suivre votre course en temps réel.`;
   }
   if (type === 'livreur_en_route') {
-    return `🛵 *Votre livreur est en route !*\nOuvrez SILGAPP pour suivre la livraison en temps réel.`;
+    return ` *Votre livreur est en route !*\nOuvrez SILGAPP pour suivre la livraison en temps réel.`;
   }
   if (type === 'course_livree') {
-    return `✅ *Votre livraison a été finalisée.*\nMerci d'avoir utilisé SILGAPP.`;
+    return ` *Votre livraison a été finalisée.*\nMerci d'avoir utilisé SILGAPP.`;
   }
   if (type === 'course_annulee') {
-    return `❌ *La course a été annulée.*\nConsultez SILGAPP pour plus d'informations.`;
+    return ` *La course a été annulée.*\nConsultez SILGAPP pour plus d'informations.`;
   }
   // Fallback client
-  return `🚚 *SILGAPP – Notification*\nOuvrez l'application pour consulter les détails de votre livraison.`;
+  return ` *SILGAPP – Notification*\nOuvrez l'application pour consulter les détails de votre livraison.`;
 }
 
 const INDICATIFS_PAYS = {
@@ -213,7 +213,7 @@ Deno.serve(async (req) => {
       console.log(`\n[WhatsApp] === DÉBUT CHECK Course ${courseId} Livreur ${livreur.id} ===`);
       console.log(`[WhatsApp] app_active=${livreur.app_active}, last_seen_at=${livreur.last_seen_at}, whatsapp_opt_in=${livreur.whatsapp_opt_in}`);
 
-      // 🛡️ VÉRIFICATION OPT-IN SANDBOX
+      // VÉRIFICATION OPT-IN SANDBOX
       // On ne bloque QUE si opt_in=false ET whatsapp_opt_in_date est null (jamais inscrit)
       // Si le livreur s'est inscrit récemment (même si une erreur 63015 a remis le flag à false),
       // on tente quand même — c'est Twilio qui fait foi.
@@ -231,25 +231,25 @@ Deno.serve(async (req) => {
         return Response.json({ skipped: true, reason: 'livreur_no_telephone' });
       }
 
-      // 🎯 STRATÉGIE : WhatsApp uniquement si heartbeat >= 2 min (app fermée/inactive)
-      const heartbeatAgeMin = livreur.last_seen_at 
-        ? (Date.now() - new Date(livreur.last_seen_at).getTime()) / 60000 
+      // STRATÉGIE : WhatsApp uniquement si heartbeat >= 2 min (app fermée/inactive)
+      const heartbeatAgeMin = livreur.last_seen_at
+        ? (Date.now() - new Date(livreur.last_seen_at).getTime()) / 60000
         : null;
-      
+
       console.log(`[STRATÉGIE] Livreur ${livreur.nom} — Heartbeat: ${heartbeatAgeMin?.toFixed(1) || 'N/A'} min, App active: ${livreur.app_active}`);
-      
+
       // CAS 1: Heartbeat récent (< 2 min) → SILGAPP uniquement (app ouverte)
       if (heartbeatAgeMin !== null && heartbeatAgeMin < 2) {
-        console.log(`[STRATÉGIE] ✅ Heartbeat récent (${heartbeatAgeMin.toFixed(1)} min) → SILGAPP uniquement (gratuit)\n`);
-        return Response.json({ 
-          success: true, 
-          type: 'livreur', 
+        console.log(`[STRATÉGIE] Heartbeat récent (${heartbeatAgeMin.toFixed(1)} min) → SILGAPP uniquement (gratuit)\n`);
+        return Response.json({
+          success: true,
+          type: 'livreur',
           canal: 'silgapp',
           heartbeat_recent: true,
           message: 'App ouverte — SILGAPP uniquement'
         });
       }
-      
+
       // CAS 2: Heartbeat >= 2 min → WhatsApp
       console.log(`[STRATÉGIE] ⏳ Heartbeat ancien (${heartbeatAgeMin?.toFixed(1) || 'N/A'} min) → Tentative WhatsApp`);
 
@@ -259,30 +259,30 @@ Deno.serve(async (req) => {
         return Response.json({ skipped: true, reason: 'telephone_invalide' });
       }
 
-      // 🔍 LOG COMPLET AVANT ENVOI
-      console.log(`\n[WhatsApp] 🚀 TENTATIVE ENVOI LIVREUR`);
-      console.log(`   Course: ${courseId}`);
-      console.log(`   Livreur: ${livreur.nom} (${livreur.id})`);
-      console.log(`   Email: ${destinataireEmail}`);
-      console.log(`   Téléphone BRUT: "${livreur.telephone}"`);
-      console.log(`   Téléphone NORMALISÉ: "${telephone}"`);
-      console.log(`   To: "whatsapp:${telephone}"`);
-      console.log(`   From: "${fromNumber}"`);
-      console.log(`   Type: "nouvelle_course"`);
-      console.log(`   Notification ID: ${notification.id || 'N/A'}\n`);
+      // LOG COMPLET AVANT ENVOI
+      console.log(`\n[WhatsApp] TENTATIVE ENVOI LIVREUR`);
+      console.log(` Course: ${courseId}`);
+      console.log(` Livreur: ${livreur.nom} (${livreur.id})`);
+      console.log(` Email: ${destinataireEmail}`);
+      console.log(` Téléphone BRUT: "${livreur.telephone}"`);
+      console.log(` Téléphone NORMALISÉ: "${telephone}"`);
+      console.log(` To: "whatsapp:${telephone}"`);
+      console.log(` From: "${fromNumber}"`);
+      console.log(` Type: "nouvelle_course"`);
+      console.log(` Notification ID: ${notification.id || 'N/A'}\n`);
 
       // Vérifier anti-doublon WhatsApp pour cette course
-      const alertesCourse = await base44.asServiceRole.entities.WhatsAppAlerte.filter({ 
+      const alertesCourse = await base44.asServiceRole.entities.WhatsAppAlerte.filter({
         livreur_id: livreur.id,
         notification_id: notification.id || '',
         statut: 'sent'
       });
-      
+
       if (alertesCourse.length > 0) {
         console.log(`[WhatsApp] Course ${courseId}: WhatsApp DÉJÀ ENVOYÉ → SKIP\n`);
         return Response.json({ skipped: true, reason: 'whatsapp_deja_envoye_course' });
       }
-      
+
       const alerte = await base44.asServiceRole.entities.WhatsAppAlerte.create({
         country_code: livreur.country_code || '',
         livreur_id: livreur.id,
@@ -301,18 +301,18 @@ Deno.serve(async (req) => {
           heure_envoi: new Date().toISOString(),
           canal: 'whatsapp'
         });
-        // ✅ Confirmer opt-in actif
+        // Confirmer opt-in actif
         await base44.asServiceRole.entities.Livreur.update(livreur.id, {
           whatsapp_opt_in: true,
           whatsapp_opt_in_date: new Date().toISOString(),
           whatsapp_opt_in_expire_at: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(),
           whatsapp_derniere_erreur: null,
         });
-        console.log(`[WhatsApp] ✅ SUCCÈS LIVREUR: SID=${data.sid}, To=${to}, Canal: WhatsApp\n`);
-        return Response.json({ 
-          success: true, 
-          type: 'livreur', 
-          twilio_sid: data.sid, 
+        console.log(`[WhatsApp] SUCCÈS LIVREUR: SID=${data.sid}, To=${to}, Canal: WhatsApp\n`);
+        return Response.json({
+          success: true,
+          type: 'livreur',
+          twilio_sid: data.sid,
           to,
           course_id: courseId,
           livreur_id: livreur.id,
@@ -320,8 +320,8 @@ Deno.serve(async (req) => {
           push_echec: true
         });
       } else {
-        // 🔄 FALLBACK SMS — Dernier recours
-        console.log(`[WhatsApp] ⚠️ Échec WhatsApp (Code=${data.code}) → tentative SMS`);
+        // FALLBACK SMS — Dernier recours
+        console.log(`[WhatsApp] Échec WhatsApp (Code=${data.code}) → tentative SMS`);
 
         // Marquer opt-in expiré si erreur 63015
         if (data.code === 63015) {
@@ -330,12 +330,12 @@ Deno.serve(async (req) => {
             whatsapp_derniere_erreur: '63015',
             whatsapp_derniere_erreur_date: new Date().toISOString(),
           });
-          console.log(`[WhatsApp] ⚠️ Livreur ${livreur.id} — whatsapp_opt_in=false (63015 avant SMS fallback)`);
+          console.log(`[WhatsApp] Livreur ${livreur.id} — whatsapp_opt_in=false (63015 avant SMS fallback)`);
         }
 
         const messageSMS = messageLivreur.replace(/[*_`]/g, '').replace(/\n/g, ' ');
         const smsResult = await envoyerSMS(telephone, accountSid, authToken, fromNumber, messageSMS);
-        
+
         if (smsResult.ok && smsResult.data.sid) {
           await base44.asServiceRole.entities.WhatsAppAlerte.update(alerte.id, {
             statut: 'sent',
@@ -343,11 +343,11 @@ Deno.serve(async (req) => {
             heure_envoi: new Date().toISOString(),
             canal: 'sms'
           });
-          console.log(`[SMS] ✅ SUCCÈS LIVREUR: SID=${smsResult.data.sid}, To=${smsResult.to}, Canal: SMS (fallback)\n`);
-          return Response.json({ 
-            success: true, 
-            type: 'livreur', 
-            twilio_sid: smsResult.data.sid, 
+          console.log(`[SMS] SUCCÈS LIVREUR: SID=${smsResult.data.sid}, To=${smsResult.to}, Canal: SMS (fallback)\n`);
+          return Response.json({
+            success: true,
+            type: 'livreur',
+            twilio_sid: smsResult.data.sid,
             to: smsResult.to,
             course_id: courseId,
             livreur_id: livreur.id,
@@ -358,16 +358,16 @@ Deno.serve(async (req) => {
         } else {
           const erreur = `[${data.code || ''}] ${data.message || ''} raw:${JSON.stringify(data)}`.slice(0, 500);
           await base44.asServiceRole.entities.WhatsAppAlerte.update(alerte.id, { statut: 'failed', erreur, canal: 'whatsapp+sms' });
-          // 🔄 Mise à jour opt-in si erreur 63015
+          // Mise à jour opt-in si erreur 63015
           if (data.code === 63015) {
             await base44.asServiceRole.entities.Livreur.update(livreur.id, {
               whatsapp_opt_in: false,
               whatsapp_derniere_erreur: '63015',
               whatsapp_derniere_erreur_date: new Date().toISOString(),
             });
-            console.log(`[WhatsApp] ⚠️ Livreur ${livreur.id} — whatsapp_opt_in mis à false (63015)`);
+            console.log(`[WhatsApp] Livreur ${livreur.id} — whatsapp_opt_in mis à false (63015)`);
           }
-          console.error(`[WhatsApp/SMS] ❌ ÉCHEC DOUBLE: WhatsApp Code=${data.code}, SMS=${smsResult.data?.message || 'non tenté'}\n`);
+          console.error(`[WhatsApp/SMS] ÉCHEC DOUBLE: WhatsApp Code=${data.code}, SMS=${smsResult.data?.message || 'non tenté'}\n`);
           return Response.json({ success: false, type: 'livreur', erreur, course_id: courseId, canal: 'failed' });
         }
       }
@@ -402,35 +402,35 @@ Deno.serve(async (req) => {
         return Response.json({ skipped: true, reason: 'client_no_telephone' });
       }
 
-      // 🎯 STRATÉGIE : WhatsApp uniquement si heartbeat >= 2 min (app fermée/inactive)
-      const heartbeatAgeMinClient = client.last_seen_at 
-        ? (Date.now() - new Date(client.last_seen_at).getTime()) / 60000 
+      // STRATÉGIE : WhatsApp uniquement si heartbeat >= 2 min (app fermée/inactive)
+      const heartbeatAgeMinClient = client.last_seen_at
+        ? (Date.now() - new Date(client.last_seen_at).getTime()) / 60000
         : null;
-      
+
       console.log(`[STRATÉGIE CLIENT] ${client.nom} — Heartbeat: ${heartbeatAgeMinClient?.toFixed(1) || 'N/A'} min, App active: ${client.app_active}`);
-      
+
       // CAS 1: Heartbeat récent (< 2 min) → SILGAPP uniquement (app ouverte)
       if (heartbeatAgeMinClient !== null && heartbeatAgeMinClient < 2) {
-        console.log(`[STRATÉGIE CLIENT] ✅ Heartbeat récent → SILGAPP uniquement (gratuit)\n`);
-        return Response.json({ 
-          success: true, 
-          type: 'client', 
+        console.log(`[STRATÉGIE CLIENT] Heartbeat récent → SILGAPP uniquement (gratuit)\n`);
+        return Response.json({
+          success: true,
+          type: 'client',
           canal: 'silgapp',
           heartbeat_recent: true,
           message: 'App ouverte — SILGAPP uniquement'
         });
       }
-      
+
       // CAS 2: Heartbeat >= 2 min → WhatsApp
       console.log(`[STRATÉGIE CLIENT] ⏳ Heartbeat ancien (${heartbeatAgeMinClient?.toFixed(1) || 'N/A'} min) → Tentative WhatsApp`);
 
       // Vérifier si WhatsApp déjà envoyé pour cette course
-      const alertesCourse = await base44.asServiceRole.entities.WhatsAppAlerte.filter({ 
+      const alertesCourse = await base44.asServiceRole.entities.WhatsAppAlerte.filter({
         livreur_telephone: normaliserTelephone(client.telephone, client.country_code),
         notification_id: notification.id || '',
         statut: 'sent'
       });
-      
+
       if (alertesCourse.length > 0) {
         console.log(`[WhatsApp] Course ${courseId} Client ${client.id}: WhatsApp DÉJÀ ENVOYÉ → SKIP\n`);
         return Response.json({ skipped: true, reason: 'whatsapp_deja_envoye_client' });
@@ -453,17 +453,17 @@ Deno.serve(async (req) => {
         return Response.json({ skipped: true, reason: 'telephone_invalide_client' });
       }
 
-      // 🔍 LOG COMPLET AVANT ENVOI
-      console.log(`\n[WhatsApp] 🚀 TENTATIVE ENVOI CLIENT`);
-      console.log(`   Course: ${courseId}`);
-      console.log(`   Client: ${client.nom} (${client.id})`);
-      console.log(`   Email: ${destinataireEmail}`);
-      console.log(`   Téléphone BRUT: "${client.telephone}"`);
-      console.log(`   Téléphone NORMALISÉ: "${telephone}"`);
-      console.log(`   To: "whatsapp:${telephone}"`);
-      console.log(`   From: "${fromNumber}"`);
-      console.log(`   Type: "nouvelle_course"`);
-      console.log(`   Notification ID: ${notification.id || 'N/A'}\n`);
+      // LOG COMPLET AVANT ENVOI
+      console.log(`\n[WhatsApp] TENTATIVE ENVOI CLIENT`);
+      console.log(` Course: ${courseId}`);
+      console.log(` Client: ${client.nom} (${client.id})`);
+      console.log(` Email: ${destinataireEmail}`);
+      console.log(` Téléphone BRUT: "${client.telephone}"`);
+      console.log(` Téléphone NORMALISÉ: "${telephone}"`);
+      console.log(` To: "whatsapp:${telephone}"`);
+      console.log(` From: "${fromNumber}"`);
+      console.log(` Type: "nouvelle_course"`);
+      console.log(` Notification ID: ${notification.id || 'N/A'}\n`);
 
       const alerte = await base44.asServiceRole.entities.WhatsAppAlerte.create({
         country_code: client.country_code || '',
@@ -483,23 +483,23 @@ Deno.serve(async (req) => {
           heure_envoi: new Date().toISOString(),
           canal: 'whatsapp'
         });
-        console.log(`[WhatsApp] ✅ SUCCÈS CLIENT: SID=${data.sid}, To=${to}\n`);
-        return Response.json({ 
-          success: true, 
-          type: 'client', 
-          twilio_sid: data.sid, 
+        console.log(`[WhatsApp] SUCCÈS CLIENT: SID=${data.sid}, To=${to}\n`);
+        return Response.json({
+          success: true,
+          type: 'client',
+          twilio_sid: data.sid,
           to,
           course_id: courseId,
           client_id: client.id,
           canal: 'whatsapp'
         });
       } else {
-        // 🔄 FALLBACK SMS — Si WhatsApp échoue (erreur 63015 ou autre)
-        console.log(`[WhatsApp] ⚠️ Échec WhatsApp (Code=${data.code}) → tentative SMS pour ${telephone}`);
-        
+        // FALLBACK SMS — Si WhatsApp échoue (erreur 63015 ou autre)
+        console.log(`[WhatsApp] Échec WhatsApp (Code=${data.code}) → tentative SMS pour ${telephone}`);
+
         const messageSMS = messageClient.replace(/[*_`]/g, '').replace(/\n/g, ' ');
         const smsResult = await envoyerSMS(telephone, accountSid, authToken, fromNumber, messageSMS);
-        
+
         if (smsResult.ok && smsResult.data.sid) {
           await base44.asServiceRole.entities.WhatsAppAlerte.update(alerte.id, {
             statut: 'sent',
@@ -507,11 +507,11 @@ Deno.serve(async (req) => {
             heure_envoi: new Date().toISOString(),
             canal: 'sms'
           });
-          console.log(`[SMS] ✅ SUCCÈS CLIENT: SID=${smsResult.data.sid}, To=${smsResult.to}\n`);
-          return Response.json({ 
-            success: true, 
-            type: 'client', 
-            twilio_sid: smsResult.data.sid, 
+          console.log(`[SMS] SUCCÈS CLIENT: SID=${smsResult.data.sid}, To=${smsResult.to}\n`);
+          return Response.json({
+            success: true,
+            type: 'client',
+            twilio_sid: smsResult.data.sid,
             to: smsResult.to,
             course_id: courseId,
             client_id: client.id,
@@ -521,7 +521,7 @@ Deno.serve(async (req) => {
         } else {
           const erreur = `[${data.code || ''}] ${data.message || ''} raw:${JSON.stringify(data)}`.slice(0, 500);
           await base44.asServiceRole.entities.WhatsAppAlerte.update(alerte.id, { statut: 'failed', erreur, canal: 'whatsapp+sms' });
-          console.error(`[WhatsApp/SMS] ❌ ÉCHEC DOUBLE: WhatsApp Code=${data.code}, SMS=${smsResult.data?.message || 'non tenté'}\n`);
+          console.error(`[WhatsApp/SMS] ÉCHEC DOUBLE: WhatsApp Code=${data.code}, SMS=${smsResult.data?.message || 'non tenté'}\n`);
           return Response.json({ success: false, type: 'client', erreur, course_id: courseId, canal: 'failed' });
         }
       }

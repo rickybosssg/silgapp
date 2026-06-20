@@ -333,7 +333,7 @@ export default function CentreNotificationsPush() {
                       {camp.type_destinataires === "tous_utilisateurs" && <><Globe className="w-3 h-3" /> Tous</>}
                     </span>
                     <span className="text-[10px] text-gray-400">
-                      {camp.admin_nom && `👤 ${camp.admin_nom}`}
+                      {camp.admin_nom && ` ${camp.admin_nom}`}
                     </span>
                     {camp.date_envoi && (
                       <span className="text-[10px] text-gray-400">

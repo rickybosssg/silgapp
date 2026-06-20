@@ -14,7 +14,7 @@ Deno.serve(async (req) => {
     }
 
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-    const authToken  = Deno.env.get('TWILIO_AUTH_TOKEN');
+    const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
     if (!accountSid || !authToken) {
       return Response.json({ error: 'Variables Twilio manquantes' }, { status: 500 });
     }
@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
 
     // ── Parser les tarifs SMS BF ───────────────────────────────────────────────
     let prixSMSOutbound = null;
-    let prixSMSInbound  = null;
+    let prixSMSInbound = null;
     let operateurs = [];
 
     if (pricing && pricing.outbound_sms_prices) {

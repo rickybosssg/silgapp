@@ -31,9 +31,9 @@ export default function WhatsAppSandboxCard({ livreurProfil, onOptInUpdated }) {
       setStatut(optIn);
       onOptInUpdated?.(optIn);
       if (optIn) {
-        toast.success("✅ Notifications WhatsApp activées !");
+        toast.success(" Notifications WhatsApp activées !");
       } else {
-        toast.error("❌ Opt-in non détecté. Envoyez le code et réessayez.");
+        toast.error(" Opt-in non détecté. Envoyez le code et réessayez.");
       }
     } catch {
       toast.error("Erreur lors de la vérification");

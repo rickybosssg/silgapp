@@ -8,12 +8,12 @@ export function getGPSHealth(entity) {
   const dt = entity.derniere_position_date || entity.last_seen_at;
   if (!dt) {
     return {
-      emoji: "❤️‍🔥",
+      emoji: "",
       label: "GPS Expiré",
       description: "> 30 min",
       color: "text-red-600",
       bg: "bg-red-50 border-red-300",
-      heart: "❤️‍🔥"
+      heart: ""
     };
   }
 
@@ -21,55 +21,55 @@ export function getGPSHealth(entity) {
 
   if (min < 2) {
     return {
-      emoji: "❤️",
+      emoji: "",
       label: "GPS Excellent",
       description: "< 2 min",
       color: "text-red-600",
       bg: "bg-red-50 border-red-300",
-      heart: "❤️"
+      heart: ""
     };
   }
 
   if (min < 5) {
     return {
-      emoji: "💚",
+      emoji: "",
       label: "GPS Bon",
       description: "2-5 min",
       color: "text-green-600",
       bg: "bg-green-50 border-green-300",
-      heart: "💚"
+      heart: ""
     };
   }
 
   if (min < 15) {
     return {
-      emoji: "🧡",
+      emoji: "",
       label: "GPS Moyen",
       description: "5-15 min",
       color: "text-orange-600",
       bg: "bg-orange-50 border-orange-300",
-      heart: "🧡"
+      heart: ""
     };
   }
 
   if (min < 30) {
     return {
-      emoji: "❤️‍🩹",
+      emoji: "",
       label: "GPS Faible",
       description: "15-30 min",
       color: "text-pink-600",
       bg: "bg-pink-50 border-pink-300",
-      heart: "❤️‍🩹"
+      heart: ""
     };
   }
 
   return {
-    emoji: "❤️‍🔥",
+    emoji: "",
     label: "GPS Expiré",
     description: "> 30 min",
     color: "text-red-600",
     bg: "bg-red-50 border-red-300",
-    heart: "❤️‍🔥"
+    heart: ""
   };
 }
 

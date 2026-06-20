@@ -32,7 +32,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, re
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   useEffect(() => { base44.auth.me().then(setUser).catch(() => null); }, []);
-  
+
   // Hardware back button for Android
   useEffect(() => {
     const handleBackButton = (e) => {
@@ -44,7 +44,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, re
     document.addEventListener('backbutton', handleBackButton, false);
     return () => document.removeEventListener('backbutton', handleBackButton);
   }, [navigate, location]);
-  
+
   // Save scroll position before unmount/route change
   useEffect(() => {
     const savePosition = () => saveScrollPosition(location.pathname, window.scrollY);
@@ -54,7 +54,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, re
       window.removeEventListener('beforeunload', savePosition);
     };
   }, [location.pathname]);
-  
+
   // Restore scroll position on route change with slight delay for content render
   useEffect(() => {
     const savedY = restoreScrollPosition(location.pathname);
@@ -144,7 +144,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, re
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-base flex-shrink-0">
-                      {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
+                      {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.emoji_flag || "" : ""}
                     </span>
                     <span className="text-sm font-medium text-foreground truncate">
                       {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}

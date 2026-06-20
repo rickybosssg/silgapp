@@ -33,26 +33,26 @@ export default function DiagnosticPushComplet() {
   }, [logs]);
 
   const checkExistingTokens = async () => {
-    addLog("📋 Vérification des tokens existants en base de données...", "info");
+    addLog(" Vérification des tokens existants en base de données...", "info");
     try {
       const result = await base44.functions.invoke("diagnosticPushTokens", {});
       setTokenData(result);
-      
+
       if (result.tokens_count === 0) {
-        addLog("❌ AUCUN TOKEN TROUVÉ en base de données", "error");
+        addLog(" AUCUN TOKEN TROUVÉ en base de données", "error");
       } else {
-        addLog(`✅ ${result.tokens_count} token(s) trouvé(s) en BDD`, "success", result);
+        addLog(` ${result.tokens_count} token(s) trouvé(s) en BDD`, "success", result);
         if (result.android_tokens?.length > 0) {
-          addLog(`📱 ${result.android_tokens.length} token(s) Android`, "success");
+          addLog(` ${result.android_tokens.length} token(s) Android`, "success");
           result.android_tokens.forEach((t, i) => {
-            addLog(`   Token ${i+1}: ${t.token?.substring(0, 50)}... (actif: ${t.actif})`, "info");
+            addLog(` Token ${i+1}: ${t.token?.substring(0, 50)}... (actif: ${t.actif})`, "info");
           });
         } else {
-          addLog("⚠️ AUCUN token Android en base de données", "warn");
+          addLog(" AUCUN token Android en base de données", "warn");
         }
       }
     } catch (error) {
-      addLog(`❌ Erreur vérification BDD: ${error.message}`, "error");
+      addLog(` Erreur vérification BDD: ${error.message}`, "error");
     }
   };
 
@@ -65,100 +65,100 @@ export default function DiagnosticPushComplet() {
     setFirebaseInit(null);
     setAppInfo(null);
 
-    addLog("🚀 DÉBUT DU DIAGNOSTIC PUSH FCM COMPLET", "info");
+    addLog(" DÉBUT DU DIAGNOSTIC PUSH FCM COMPLET", "info");
     addLog("=".repeat(60), "debug");
 
     // ÉTAPE 0: Vérification configuration Firebase
-    addLog("\n🔥 ÉTAPE 0: Configuration Firebase", "info");
-    
+    addLog("\n ÉTAPE 0: Configuration Firebase", "info");
+
     const isNative = typeof window !== "undefined" && window.Capacitor;
     const platform = isNative ? window.Capacitor.getPlatform() : "web";
-    
+
     if (isNative && platform === "android") {
       try {
         const { App } = await import('@capacitor/app');
         const appInfoResult = await App.getInfo();
         setAppInfo(appInfoResult);
-        addLog(`   ✅ App native détectée`, "success");
-        addLog(`   Package: ${appInfoResult.id}`, "info");
-        addLog(`   Nom: ${appInfoResult.name}`, "info");
-        addLog(`   Version: ${appInfoResult.version} (${appInfoResult.build})`, "info");
-        
+        addLog(` App native détectée`, "success");
+        addLog(` Package: ${appInfoResult.id}`, "info");
+        addLog(` Nom: ${appInfoResult.name}`, "info");
+        addLog(` Version: ${appInfoResult.version} (${appInfoResult.build})`, "info");
+
         // Firebase sera vérifié indirectement via PushNotifications.register()
-        addLog(`   ℹ️ Firebase sera vérifié via PushNotifications.register()`, "info");
+        addLog(` ℹ Firebase sera vérifié via PushNotifications.register()`, "info");
       } catch (err) {
-        addLog(`   ⚠️ Impossible de lire les infos app: ${err.message}`, "warn");
+        addLog(` Impossible de lire les infos app: ${err.message}`, "warn");
       }
     }
 
     // ÉTAPE 1: Vérifier l'environnement
-    addLog("\n📱 ÉTAPE 1: Vérification environnement", "info");
-    addLog(`   Plateforme: ${platform}`, "info");
-    addLog(`   Native: ${isNative ? "OUI (Capacitor)" : "NON (Web)"}`, "info");
+    addLog("\n ÉTAPE 1: Vérification environnement", "info");
+    addLog(` Plateforme: ${platform}`, "info");
+    addLog(` Native: ${isNative ? "OUI (Capacitor)" : "NON (Web)"}`, "info");
 
     if (!isNative || platform !== "android") {
-      addLog("⚠️ Ce test doit être exécuté SUR L'APK ANDROID, pas sur le web", "error");
-      addLog("   Ouvrez cette page dans l'APK: https://silga-dispatch-go.base44.app/diagnostic-push-complet", "warn");
+      addLog(" Ce test doit être exécuté SUR L'APK ANDROID, pas sur le web", "error");
+      addLog(" Ouvrez cette page dans l'APK: https://silga-dispatch-go.base44.app/diagnostic-push-complet", "warn");
       setIsTesting(false);
       return;
     }
 
     // ÉTAPE 2: Importer le plugin PushNotifications
-    addLog("\n🔌 ÉTAPE 2: Initialisation plugin PushNotifications", "info");
+    addLog("\n ÉTAPE 2: Initialisation plugin PushNotifications", "info");
     let PushNotifications = null;
     try {
       const module = await import("@capacitor/push-notifications");
       PushNotifications = module.PushNotifications;
-      addLog(`✅ Plugin importé avec succès`, "success");
-      addLog(`   PushNotifications disponible: ${!!PushNotifications}`, "debug");
+      addLog(` Plugin importé avec succès`, "success");
+      addLog(` PushNotifications disponible: ${!!PushNotifications}`, "debug");
     } catch (error) {
-      addLog(`❌ Échec import plugin: ${error.message}`, "error");
-      addLog(`   Error stack: ${error.stack}`, "debug");
+      addLog(` Échec import plugin: ${error.message}`, "error");
+      addLog(` Error stack: ${error.stack}`, "debug");
       setIsTesting(false);
       return;
     }
 
     // ÉTAPE 3: Vérifier permissions
-    addLog("\n🔐 ÉTAPE 3: Vérification des permissions", "info");
+    addLog("\n ÉTAPE 3: Vérification des permissions", "info");
     try {
       const permResult = await PushNotifications.checkPermissions();
-      addLog(`   Permission RECEIVE: ${permResult.receive}`, "info");
-      addLog(`   Permission DISPLAY: ${permResult.display}`, "info");
-      
+      addLog(` Permission RECEIVE: ${permResult.receive}`, "info");
+      addLog(` Permission DISPLAY: ${permResult.display}`, "info");
+
       if (permResult.receive === "granted" || permResult.display === "granted") {
-        addLog(`✅ Permissions ACCORDÉES`, "success");
+        addLog(` Permissions ACCORDÉES`, "success");
         setPermissionGranted(true);
       } else {
-        addLog(`⚠️ Permissions NON accordées (mais ce n'est pas bloquant)`, "warn");
+        addLog(` Permissions NON accordées (mais ce n'est pas bloquant)`, "warn");
         setPermissionGranted(false);
       }
     } catch (error) {
-      addLog(`❌ Erreur checkPermissions: ${error.message}`, "error");
-      addLog(`   Stack: ${error.stack}`, "debug");
+      addLog(` Erreur checkPermissions: ${error.message}`, "error");
+      addLog(` Stack: ${error.stack}`, "debug");
       setPermissionGranted(false);
     }
 
     // ÉTAPE 4: Demander permissions si nécessaire
     if (permissionGranted === false) {
-      addLog("\n🙏 ÉTAPE 4: Demande de permissions", "info");
+      addLog("\n ÉTAPE 4: Demande de permissions", "info");
       try {
         const requestResult = await PushNotifications.requestPermissions();
-        addLog(`   RECEIVE after request: ${requestResult.receive}`, "info");
-        addLog(`   DISPLAY after request: ${requestResult.display}`, "info");
-        
+        addLog(` RECEIVE after request: ${requestResult.receive}`, "info");
+        addLog(` DISPLAY after request: ${requestResult.display}`, "info");
+
         if (requestResult.receive === "granted" || requestResult.display === "granted") {
-          addLog(`✅ Permissions ACCORDÉES après demande`, "success");
+          addLog(` Permissions ACCORDÉES après demande`, "success");
           setPermissionGranted(true);
         } else {
-          addLog(`❌ Permissions REFUSÉES par l'utilisateur`, "error");
+          addLog(` Permissions REFUSÉES par l'utilisateur`, "error");
         }
       } catch (error) {
-        addLog(`❌ Erreur requestPermissions: ${error.message}`, "error");
+        addLog(` Erreur requestPermissions: ${error.message}`, "error");
       }
     }
 
     // ÉTAPE 5: Créer le canal de notification Android
-    addLog("\n📢 ÉTAPE 5: Création canal de notification Android", "info");
+    addLog("\n ÉTAPE 5: Création canal de notification Android", "info");
     try {
       await PushNotifications.createChannel({
         id: "silgapp_default",
@@ -169,14 +169,14 @@ export default function DiagnosticPushComplet() {
         lights: true,
         vibration: true,
       });
-      addLog(`✅ Canal créé avec succès`, "success");
+      addLog(` Canal créé avec succès`, "success");
     } catch (error) {
-      addLog(`⚠️ Erreur createChannel (non bloquant): ${error.message}`, "warn");
+      addLog(` Erreur createChannel (non bloquant): ${error.message}`, "warn");
     }
 
     // ÉTAPE 6: S'inscrire à FCM
-    addLog("\n☁️ ÉTAPE 6: Inscription à Firebase Cloud Messaging", "info");
-    addLog(`   Appel PushNotifications.register()...`, "debug");
+    addLog("\n ÉTAPE 6: Inscription à Firebase Cloud Messaging", "info");
+    addLog(` Appel PushNotifications.register()...`, "debug");
 
     const registrationPromise = new Promise((resolve, reject) => {
       let settled = false;
@@ -200,40 +200,40 @@ export default function DiagnosticPushComplet() {
         "registration",
         (data) => {
           const token = data.value;
-          addLog(`\n✅ TOKEN FCM REÇU !`, "success");
-          addLog(`   Token: ${token}`, "success");
-          addLog(`   Longueur: ${token?.length} caractères`, "debug");
+          addLog(`\n TOKEN FCM REÇU !`, "success");
+          addLog(` Token: ${token}`, "success");
+          addLog(` Longueur: ${token?.length} caractères`, "debug");
           setFcmToken(token);
           setRegistrationComplete(true);
           finish(token);
         }
       ).then((listener) => {
         registrationListener = listener;
-        addLog(`   Listener 'registration' attaché`, "debug");
+        addLog(` Listener 'registration' attaché`, "debug");
       });
 
       // Attacher listener: erreur d'enregistrement
       PushNotifications.addListener(
         "registrationError",
         (error) => {
-          addLog(`\n❌ ERREUR D'ENREGISTREMENT FCM`, "error");
-          addLog(`   Error: ${JSON.stringify(error)}`, "error");
-          addLog(`   Message: ${error.message}`, "debug");
+          addLog(`\n ERREUR D'ENREGISTREMENT FCM`, "error");
+          addLog(` Error: ${JSON.stringify(error)}`, "error");
+          addLog(` Message: ${error.message}`, "debug");
           finish(error, true);
         }
       ).then((listener) => {
         errorListener = listener;
-        addLog(`   Listener 'registrationError' attaché`, "debug");
+        addLog(` Listener 'registrationError' attaché`, "debug");
       });
 
       // Appel à register()
-      addLog(`   Appel effectif de PushNotifications.register()...`, "info");
+      addLog(` Appel effectif de PushNotifications.register()...`, "info");
       PushNotifications.register()
         .then(() => {
-          addLog(`   register() appelé avec succès (en attente du token...)`, "success");
+          addLog(` register() appelé avec succès (en attente du token...)`, "success");
         })
         .catch((err) => {
-          addLog(`   register() a échoué: ${err.message}`, "error");
+          addLog(` register() a échoué: ${err.message}`, "error");
           finish(err, true);
         });
 
@@ -241,11 +241,11 @@ export default function DiagnosticPushComplet() {
       setTimeout(() => {
         if (!settled) {
           addLog(`\n⏰ TIMEOUT (60s) - Aucun token reçu`, "error");
-          addLog(`   Causes possibles:`, "warn");
-          addLog(`     1. google-services.json manquant ou incorrect`, "warn");
-          addLog(`     2. SHA-1/SHA-256 non configurés dans Firebase Console`, "warn");
-          addLog(`     3. Package name Android ne correspond pas à Firebase`, "warn");
-          addLog(`     4. Réseau/Firewall bloque FCM`, "warn");
+          addLog(` Causes possibles:`, "warn");
+          addLog(` 1. google-services.json manquant ou incorrect`, "warn");
+          addLog(` 2. SHA-1/SHA-256 non configurés dans Firebase Console`, "warn");
+          addLog(` 3. Package name Android ne correspond pas à Firebase`, "warn");
+          addLog(` 4. Réseau/Firewall bloque FCM`, "warn");
           finish(new Error("Timeout - aucun token reçu"), true);
         }
       }, 60000);
@@ -253,9 +253,9 @@ export default function DiagnosticPushComplet() {
 
     try {
       const token = await registrationPromise;
-      
+
       // ÉTAPE 7: Sauvegarder le token en BDD
-      addLog("\n💾 ÉTAPE 7: Sauvegarde du token en base de données", "info");
+      addLog("\n ÉTAPE 7: Sauvegarde du token en base de données", "info");
       try {
         const saveResult = await base44.functions.invoke("enregistrerTokenPush", {
           token: token,
@@ -263,38 +263,38 @@ export default function DiagnosticPushComplet() {
           user_email: "test@silgapp.local",
           user_type: "livreur",
         });
-        addLog(`✅ Token enregistré en BDD`, "success", saveResult);
-        addLog(`   Action: ${saveResult.action}`, "debug");
-        addLog(`   User email: ${saveResult.user_email}`, "debug");
+        addLog(` Token enregistré en BDD`, "success", saveResult);
+        addLog(` Action: ${saveResult.action}`, "debug");
+        addLog(` User email: ${saveResult.user_email}`, "debug");
       } catch (error) {
-        addLog(`❌ Erreur sauvegarde BDD: ${error.message}`, "error");
-        addLog(`   Stack: ${error.stack}`, "debug");
+        addLog(` Erreur sauvegarde BDD: ${error.message}`, "error");
+        addLog(` Stack: ${error.stack}`, "debug");
       }
 
     } catch (error) {
-      addLog(`\n❌ Échec enregistrement FCM: ${error.message}`, "error");
+      addLog(`\n Échec enregistrement FCM: ${error.message}`, "error");
     }
 
     // RÉSUMÉ FINAL
     addLog("\n" + "=".repeat(60), "debug");
-    addLog("📊 RÉSUMÉ DU DIAGNOSTIC", "info");
+    addLog(" RÉSUMÉ DU DIAGNOSTIC", "info");
     addLog("=".repeat(60), "debug");
-    addLog(`   Plateforme: ${platform}`, "info");
-    addLog(`   Firebase: ${firebaseInit ? "✅ Initialisé" : "❌ Non initialisé"}`, firebaseInit ? "success" : "error");
-    addLog(`   Permissions: ${permissionGranted ? "✅ Accordées" : "❌ Refusées"}`, permissionGranted ? "success" : "error");
-    addLog(`   Token FCM: ${fcmToken ? `✅ ${fcmToken?.substring(0, 30)}...` : "❌ Non reçu"}`, fcmToken ? "success" : "error");
-    addLog(`   Registration: ${registrationComplete ? "✅ Complète" : "❌ Incomplète"}`, registrationComplete ? "success" : "error");
-    
+    addLog(` Plateforme: ${platform}`, "info");
+    addLog(` Firebase: ${firebaseInit ? " Initialisé" : " Non initialisé"}`, firebaseInit ? "success" : "error");
+    addLog(` Permissions: ${permissionGranted ? " Accordées" : " Refusées"}`, permissionGranted ? "success" : "error");
+    addLog(` Token FCM: ${fcmToken ? ` ${fcmToken?.substring(0, 30)}...` : " Non reçu"}`, fcmToken ? "success" : "error");
+    addLog(` Registration: ${registrationComplete ? " Complète" : " Incomplète"}`, registrationComplete ? "success" : "error");
+
     if (fcmToken) {
-      addLog(`\n✅ DIAGNOSTIC TERMINÉ - Token généré avec succès`, "success");
-      addLog(`   Prochaine étape: Vérifier que le token est bien en base de données`, "info");
+      addLog(`\n DIAGNOSTIC TERMINÉ - Token généré avec succès`, "success");
+      addLog(` Prochaine étape: Vérifier que le token est bien en base de données`, "info");
     } else {
-      addLog(`\n❌ DIAGNOSTIC TERMINÉ - Token NON généré`, "error");
-      addLog(`   Vérifiez:`, "warn");
-      addLog(`     1. google-services.json présent dans android/app/`, "warn");
-      addLog(`     2. Package name: com.silgapp.app`, "warn");
-      addLog(`     3. SHA-1 et SHA-256 configurés dans Firebase Console`, "warn");
-      addLog(`     4. Firebase Cloud Messaging API activée dans Google Cloud`, "warn");
+      addLog(`\n DIAGNOSTIC TERMINÉ - Token NON généré`, "error");
+      addLog(` Vérifiez:`, "warn");
+      addLog(` 1. google-services.json présent dans android/app/`, "warn");
+      addLog(` 2. Package name: com.silgapp.app`, "warn");
+      addLog(` 3. SHA-1 et SHA-256 configurés dans Firebase Console`, "warn");
+      addLog(` 4. Firebase Cloud Messaging API activée dans Google Cloud`, "warn");
     }
 
     setIsTesting(false);
@@ -306,7 +306,7 @@ export default function DiagnosticPushComplet() {
         {/* Header */}
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-black text-gray-900 dark:text-white">
-            🔍 Diagnostic Push Notifications FCM
+             Diagnostic Push Notifications FCM
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Trace complète du processus d'enregistrement FCM
@@ -378,7 +378,7 @@ export default function DiagnosticPushComplet() {
             <div className="flex items-center gap-3">
               <CheckCircle2 className="w-6 h-6 text-green-600" />
               <div>
-                <h3 className="font-bold text-green-900 dark:text-green-100">✅ Firebase Initialisé</h3>
+                <h3 className="font-bold text-green-900 dark:text-green-100"> Firebase Initialisé</h3>
                 <p className="text-sm text-green-700 dark:text-green-300">
                   Project ID: {firebaseInit.projectId || 'N/A'}
                 </p>

@@ -68,13 +68,13 @@ const typeColisLabel = {
   autre: "Autre",
 };
 
-export default function CourseEnAttenteModal({ 
-  course, 
-  livreurId, 
-  onAccepter, 
-  onRefuser, 
+export default function CourseEnAttenteModal({
+  course,
+  livreurId,
+  onAccepter,
+  onRefuser,
   isPending,
-  onExpire 
+  onExpire
 }) {
   useVibration(true);
   const [showRaison, setShowRaison] = useState(false);
@@ -280,7 +280,7 @@ export default function CourseEnAttenteModal({
           <div className="absolute -top-4 -right-4 w-20 h-20 rounded-full bg-white/10" />
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-2xl animate-bounce">
-              🚨
+
             </div>
             <div>
               <p className="text-white font-black text-xl leading-tight">NOUVELLE COURSE !</p>
@@ -291,7 +291,7 @@ export default function CourseEnAttenteModal({
 
         {/* Barre de progression timer */}
         <div className="bg-gray-100 h-2 relative">
-          <div 
+          <div
             className={`h-full transition-all duration-1000 ${
               tempsRestant <= 10 ? 'bg-red-500' : tempsRestant <= 30 ? 'bg-amber-500' : 'bg-green-500'
             }`}
@@ -308,7 +308,7 @@ export default function CourseEnAttenteModal({
             </span>
           </div>
           <span className="text-xs text-gray-400">
-            {tempsRestant <= 10 ? '⚠️ Dépêchez-vous !' : tempsRestant <= 30 ? '⏰ Temps limité' : '⏱️ 90s pour accepter'}
+            {tempsRestant <= 10 ? ' Dépêchez-vous !' : tempsRestant <= 30 ? '⏰ Temps limité' : '⏱ 90s pour accepter'}
           </span>
         </div>
 

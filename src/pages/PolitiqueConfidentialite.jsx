@@ -30,8 +30,8 @@ export default function PolitiqueConfidentialite() {
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
           <h2 className="font-black text-gray-900 mb-3">À propos de SILGAPP</h2>
           <p className="text-sm text-gray-600 leading-relaxed">
-            SILGAPP est une application de livraison express opérant en Afrique de l'Ouest (Burkina Faso, 
-            Côte d'Ivoire, Sénégal, Togo, Bénin, Mali, Guinée, Niger). Nous accordons une importance 
+            SILGAPP est une application de livraison express opérant en Afrique de l'Ouest (Burkina Faso,
+            Côte d'Ivoire, Sénégal, Togo, Bénin, Mali, Guinée, Niger). Nous accordons une importance
             primordiale à la protection de vos données personnelles.
           </p>
           <p className="text-sm text-gray-600 leading-relaxed mt-3">
@@ -87,13 +87,13 @@ export default function PolitiqueConfidentialite() {
             <li>Déterminer le quartier automatiquement (reverse geocoding)</li>
           </ul>
           <p className="text-sm text-gray-600 mt-3">
-            <strong>Localisation en arrière-plan (livreurs uniquement) :</strong> Les livreurs doivent 
-            autoriser la localisation en arrière-plan pour que l'application puisse suivre la course 
+            <strong>Localisation en arrière-plan (livreurs uniquement) :</strong> Les livreurs doivent
+            autoriser la localisation en arrière-plan pour que l'application puisse suivre la course
             même quand l'écran est éteint. Cette permission est demandée séparément et explicitement.
           </p>
           <p className="text-sm text-gray-600 mt-3">
-            <strong>Conservation :</strong> Les coordonnées GPS sont mises à jour en temps réel et 
-            remplacées à chaque synchronisation. L'historique de positions n'est pas conservé au-delà 
+            <strong>Conservation :</strong> Les coordonnées GPS sont mises à jour en temps réel et
+            remplacées à chaque synchronisation. L'historique de positions n'est pas conservé au-delà
             de la course en cours.
           </p>
         </Section>
@@ -110,7 +110,7 @@ export default function PolitiqueConfidentialite() {
             <li>Alertes urgentes de l'administration</li>
           </ul>
           <p className="text-sm text-gray-600 mt-3">
-            Sur Android 13+, une permission explicite est demandée pour les notifications. Vous pouvez 
+            Sur Android 13+, une permission explicite est demandée pour les notifications. Vous pouvez
             les désactiver à tout moment dans les paramètres de votre appareil.
           </p>
         </Section>
@@ -126,7 +126,7 @@ export default function PolitiqueConfidentialite() {
             <li>Envoyer des alertes WhatsApp pour les courses urgentes</li>
           </ul>
           <p className="text-sm text-gray-600 mt-3">
-            <strong>SILGAPP n'accède pas à votre carnet de contacts.</strong> Les numéros sont 
+            <strong>SILGAPP n'accède pas à votre carnet de contacts.</strong> Les numéros sont
             saisis manuellement par l'utilisateur dans les formulaires de course.
           </p>
         </Section>
@@ -190,7 +190,7 @@ export default function PolitiqueConfidentialite() {
         {/* Footer */}
         <div className="bg-primary/5 rounded-2xl p-4 text-center">
           <p className="text-xs text-gray-500">
-            Cette politique peut être mise à jour. Toute modification importante sera notifiée 
+            Cette politique peut être mise à jour. Toute modification importante sera notifiée
             dans l'application.
           </p>
           <p className="text-xs text-gray-400 mt-1">Version 1.0 — Juin 2026</p>

@@ -24,7 +24,7 @@ function statutBadge(statut) {
     livreur_en_route: { label: "Livreur en route", className: "bg-blue-100 text-blue-700" },
     colis_recupere: { label: "Colis récupéré", className: "bg-indigo-100 text-indigo-700" },
     en_livraison: { label: "En livraison", className: "bg-purple-100 text-purple-700" },
-    livree: { label: "Livrée ✓", className: "bg-green-100 text-green-700" },
+    livree: { label: "Livrée ", className: "bg-green-100 text-green-700" },
     annulee: { label: "Annulée", className: "bg-red-100 text-red-700" },
   };
   const s = map[statut] || { label: statut, className: "bg-gray-100 text-gray-600" };
@@ -61,7 +61,7 @@ function ClientsList({ clients }) {
                   </p>
                 )}
                 {dateInscription && (
-                  <p className="text-xs text-muted-foreground mt-0.5">📅 Inscrit le {dateInscription}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5"> Inscrit le {dateInscription}</p>
                 )}
               </div>
               <span className={`text-xs font-semibold flex items-center gap-1 flex-shrink-0 ${appOuverte ? "text-green-600" : "text-gray-400"}`}>
@@ -105,7 +105,7 @@ function LivreursList({ livreurs }) {
               </div>
               <div className="flex flex-col items-end gap-1 flex-shrink-0">
                 <span className={`text-xs font-bold ${isON ? "text-green-600" : "text-gray-400"}`}>
-                  {isON ? "🟢 ON" : "⚪ OFF"}
+                  {isON ? " ON" : " OFF"}
                 </span>
                 {l.statut === "disponible" && <span className="text-xs text-emerald-600">Libre</span>}
                 {l.statut === "en_course" && <span className="text-xs text-blue-600">En course</span>}
@@ -134,18 +134,18 @@ function CoursesList({ courses }) {
                 {statutBadge(c.statut)}
               </div>
               {c.livreur_nom && (
-                <p className="text-xs text-muted-foreground mt-0.5">🚴 {c.livreur_nom}</p>
+                <p className="text-xs text-muted-foreground mt-0.5"> {c.livreur_nom}</p>
               )}
               {c.adresse_depart && (
                 <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                  📍 {c.adresse_depart} → {c.adresse_arrivee || "?"}
+                   {c.adresse_depart} → {c.adresse_arrivee || "?"}
                 </p>
               )}
               {c.remarque_livreur && (
-                <p className="text-xs text-red-500 mt-0.5">⚠️ {c.remarque_livreur}</p>
+                <p className="text-xs text-red-500 mt-0.5"> {c.remarque_livreur}</p>
               )}
               <p className="text-xs text-muted-foreground mt-0.5">
-                🕒 {c.created_date ? format(new Date(c.created_date), "HH:mm", { locale: fr }) : "—"}
+                 {c.created_date ? format(new Date(c.created_date), "HH:mm", { locale: fr }) : "—"}
               </p>
             </div>
             {(c.prix_final || c.prix_estimate) > 0 && (

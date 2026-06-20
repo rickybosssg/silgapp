@@ -9,14 +9,15 @@ import { useClientNotifications } from "@/hooks/useClientNotifications";
 import { registerPushToken } from "@/lib/notifications";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import { useQueryClient } from "@tanstack/react-query";
-import { 
-  MapPin, Navigation, MessageCircle, User, Package, 
+import {
+  MapPin, Navigation, MessageCircle, User, Package,
   Clock, ChevronRight, TrendingUp, Loader2, ArrowLeft, RefreshCw
 } from "lucide-react";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import CourseAnnuleeRelanceDialog from "@/components/client/CourseAnnuleeRelanceDialog";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import LiveCounterBadge from "@/components/ui/LiveCounterBadge";
+import MessagesPage from "@/components/chat/MessagesPage";
 import ModernMap from "@/components/client/ModernMap";
 import ProfilModal from "@/components/client/ProfilModal";
 import SupportWhatsApp from "@/components/client/SupportWhatsApp";
@@ -44,7 +45,7 @@ function GPSBadge({ profil, onForceSync }) {
       <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${synced ? "bg-green-500/90" : "bg-amber-500/90"}`}>
         <Navigation className="w-3 h-3 text-white" />
         <span className="text-xs text-white font-medium">
-          {synced ? "GPS actif ✓" : "GPS manquant"}
+          {synced ? "GPS actif " : "GPS manquant"}
         </span>
       </div>
       {!synced && (
@@ -78,6 +79,11 @@ export default function ClientExterneApp() {
   const [courseANoter, setCourseANoter] = useState(null);
   const [notationShownFor, setNotationShownFor] = useState(null);
   const [courseAnnuleeRelance, setCourseAnnuleeRelance] = useState(null); // course annulée auto → proposer relance
+  const [showMessages, setShowMessages] = useState(false);
+  const [sessionId, setSessionId] = useState(() => {
+    try { return localStorage.getItem("silgapp_client_session_id") || null; } catch { return null; }
+  });
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   const [userId, setUserId] = useState(null);
   const queryClient = useQueryClient();
@@ -115,10 +121,49 @@ export default function ClientExterneApp() {
 
   // Heartbeat automatique — sync toutes les 30s + événements lifecycle
   // Activé dès que le profil est chargé (même sans GPS pour anciens utilisateurs)
+  // --- GESTION SESSION UNIQUE CLIENT ---
+  useEffect(() => {
+    if (!onboardingDone || !clientProfil?.id || sessionExpired) return;
+
+    const initSession = async () => {
+      try {
+        const deviceId = navigator.userAgent.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 50);
+        const res = await base44.functions.invoke("gestionSessionClient", {
+          device_id: deviceId,
+          plateforme: "android",
+        });
+
+        if (res?.data?.session_id) {
+          const newSessionId = res.data.session_id;
+          setSessionId(newSessionId);
+          try { localStorage.setItem("silgapp_client_session_id", newSessionId); } catch {}
+          console.log("[Session Client] Nouvelle session:", newSessionId);
+        }
+      } catch (err) {
+        console.error("[Session Client] Erreur init:", err);
+      }
+    };
+
+    initSession();
+  }, [onboardingDone, clientProfil?.id, sessionExpired]);
+
+  const handleClientSessionExpired = () => {
+    console.log("[Session Client] Session expirée");
+    setSessionExpired(true);
+    try { localStorage.removeItem("silgapp_client_session_id"); } catch {}
+    toast.error("Session expirée", {
+      description: "Vous avez été déconnecté car une autre session a été ouverte sur un autre appareil.",
+      duration: 8000,
+    });
+  };
+
+  // Heartbeat automatique
   useHeartbeat({
     user_type: "client",
     position: position,
-    enabled: !!clientProfil, // heartbeat dès que profil chargé
+    enabled: !!clientProfil && !sessionExpired,
+    session_id: sessionId,
+    onSessionExpired: handleClientSessionExpired,
   });
 
   // Enregistrement token push pour les clients (notifications même app fermée)
@@ -158,7 +203,7 @@ export default function ClientExterneApp() {
     };
     // Vérifier au montage et toutes les 60s (notation non urgente)
     checkCourseNotation();
-    const iv = setInterval(checkCourseNotation, 60000); // ⚡ 10s → 60s
+    const iv = setInterval(checkCourseNotation, 60000); // 10s → 60s
     return () => clearInterval(iv);
   }, [clientProfil?.id, notationShownFor]);
 
@@ -173,38 +218,38 @@ export default function ClientExterneApp() {
   // ─── GPS — Architecture unifiée clients = livreurs ─────────────────────────
   // ═══════════════════════════════════════════════════════════════════════════
   // SYSTÈME GPS UNIFIÉ — MÊME LOGIQUE POUR CLIENTS ET LIVREURS
-  // 
-  // 📋 ARCHITECTURE (identique pour ClientExterneApp et LivreurExterneApp)
+  //
+  // ARCHITECTURE (identique pour ClientExterneApp et LivreurExterneApp)
   // ───────────────────────────────────────────────────────────────────────────
   // 1. ONBOARDING
-  //    → getCurrentPosition() 
-  //    → localStorage.setItem("client_gps_active", "true")
-  //    → base44.entities.ClientExterne.update(id, { latitude, longitude })
+  // → getCurrentPosition()
+  // → localStorage.setItem("client_gps_active", "true")
+  // → base44.entities.ClientExterne.update(id, { latitude, longitude })
   //
   // 2. WATCH GPS (toutes les 15 secondes)
-  //    → setInterval(getCurrentPosition → update BDD, 15000)
-  //    → Pas de filtrage distance/délai (sync systématique)
+  // → setInterval(getCurrentPosition → update BDD, 15000)
+  // → Pas de filtrage distance/délai (sync systématique)
   //
   // 3. VISIBILITY CHANGE
-  //    → document.visibilitychange → sync immédiate
+  // → document.visibilitychange → sync immédiate
   //
   // 4. DASHBOARD POLLING
-  //    → Clients: 5s | Livreurs: 2s
+  // → Clients: 5s | Livreurs: 2s
   //
   // 5. BADGE GPS
-  //    → Check simple: latitude && longitude
-  //    → Pas de calcul de date (juste présence coords)
+  // → Check simple: latitude && longitude
+  // → Pas de calcul de date (juste présence coords)
   //
-  // 🗄️ CHAMPS BDD
-  //    - latitude (number)
-  //    - longitude (number)
-  //    - Pas de champ gps_actif ou current_location
+  // CHAMPS BDD
+  // - latitude (number)
+  // - longitude (number)
+  // - Pas de champ gps_actif ou current_location
   //
-  // ✅ POURQUOI ÇA MARCHE
-  //    - Plus de logique conditionnelle complexe
-  //    - Sync directe et systématique
-  //    - Même code que livreurs (prouvé fonctionnel)
-  //    - BDD mise à jour immédiatement à chaque position
+  // POURQUOI ÇA MARCHE
+  // - Plus de logique conditionnelle complexe
+  // - Sync directe et systématique
+  // - Même code que livreurs (prouvé fonctionnel)
+  // - BDD mise à jour immédiatement à chaque position
   // ═══════════════════════════════════════════════════════════════════════════
   // Helper reverse geocoding
   const reverseGeocode = async (lat, lng) => {
@@ -233,7 +278,7 @@ export default function ClientExterneApp() {
         }).catch(() => null);
         if (quartierFinal) setClientProfil(prev => prev ? { ...prev, quartier: quartierFinal } : prev);
       },
-      (err) => console.error("[GPS Client] ❌ Permission refusée:", err),
+      (err) => console.error("[GPS Client] Permission refusée:", err),
       { enableHighAccuracy: true, timeout: 10000 }
     );
   }, [clientProfil?.id, onboardingDone]);
@@ -309,7 +354,7 @@ export default function ClientExterneApp() {
     if (!onboardingDone || !clientProfil || !position) return;
     const interval = setInterval(() => {
       checkStatus(position, clientProfil);
-    }, 8000); // ⚡ 5s → 8s : checkStatus fait 4-5 requêtes imbriquées
+    }, 8000); // 5s → 8s : checkStatus fait 4-5 requêtes imbriquées
     return () => clearInterval(interval);
   }, [onboardingDone, clientProfil?.id, position]);
 
@@ -326,7 +371,7 @@ export default function ClientExterneApp() {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
         }).then(() => {
-          toast.success("GPS synchronisé ✓");
+          toast.success("GPS synchronisé ");
         }).catch(() => {
           toast.error("Erreur synchronisation");
         }).finally(() => {
@@ -346,17 +391,17 @@ export default function ClientExterneApp() {
     try {
       if (!pos?.latitude || !pos?.longitude || !profil?.id) return;
       const user = await base44.auth.me();
-      
+
       // Normaliser le téléphone UNE FOIS
       const phoneNorm = profil.telephone ? profil.telephone.replace(/\D/g, "") : null;
       const local = phoneNorm && phoneNorm.startsWith("226") ? phoneNorm.slice(3) : phoneNorm;
-      
+
       // Trouver les courses où ce client est destinataire (PAR ID OU PAR TÉLÉPHONE)
       const coursesById = await base44.entities.CourseExterne.filter({
         destinataire_client_id: profil.id,
         statut: ["nouvelle", "recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison"]
       });
-      
+
       // Fallback : chercher par téléphone normalisé UNIQUEMENT
       let coursesByPhone = [];
       if (local) {
@@ -368,16 +413,16 @@ export default function ClientExterneApp() {
           coursesByPhone = res;
         }
       }
-      
+
       // Fusionner et dédupliquer
       const map = new Map();
       [...(coursesById || []), ...coursesByPhone].forEach(c => map.set(c.id, c));
       const courses = [...map.values()];
-      
+
       // Mettre à jour uniquement si GPS différent ou absent
       for (const course of courses) {
-        const needsUpdate = 
-          !course.gps_arrivee_lat || 
+        const needsUpdate =
+          !course.gps_arrivee_lat ||
           !course.gps_arrivee_lng ||
           Math.abs(course.gps_arrivee_lat - pos.latitude) > 0.001 ||
           Math.abs(course.gps_arrivee_lng - pos.longitude) > 0.001;
@@ -406,7 +451,7 @@ export default function ClientExterneApp() {
           telephone: "",
           user_email: user.email,
           actif: true,
-          // ⚠️ PAS de country_code ici — sera défini par l'onboarding (EtapeProfil)
+          // PAS de country_code ici — sera défini par l'onboarding (EtapeProfil)
           // Mettre BF par défaut causait des courses créées avec le mauvais pays
         });
       }
@@ -442,8 +487,8 @@ export default function ClientExterneApp() {
           latitude: gps.latitude,
           longitude: gps.longitude,
         }).then(() => {
-          console.log("[GPS Client] ✅ Onboarding sync BDD OK", gps.latitude, gps.longitude);
-        }).catch(err => console.error("[GPS Client] ❌ Erreur sync onboarding:", err));
+          console.log("[GPS Client] Onboarding sync BDD OK", gps.latitude, gps.longitude);
+        }).catch(err => console.error("[GPS Client] Erreur sync onboarding:", err));
       }
     }
     checkStatus(gps, profil);
@@ -452,7 +497,7 @@ export default function ClientExterneApp() {
   const checkStatus = async (pos, profil) => {
     try {
       const user = await base44.auth.me();
-      
+
       // 1. Courses créées par l'utilisateur
       const coursesClient = await base44.entities.CourseExterne.filter({ created_by_id: user.id }, "-created_date", 20);
       const actives = (coursesClient || []).filter(c => !["livree", "annulee"].includes(c.statut));
@@ -488,7 +533,7 @@ export default function ClientExterneApp() {
       const userNotifications = await base44.entities.Notification.filter({ destinataire_email: user.email, lue: false });
       if (userNotifications && userNotifications.length > 0) {
         const validCourseIds = new Map(toutes.map(c => [c.id, true]));
-        const notificationsValides = userNotifications.filter(n => 
+        const notificationsValides = userNotifications.filter(n =>
           !n.course_id || validCourseIds.has(n.course_id)
         );
         // Dédupliquer : garder une seule notif par course_id + type (la plus récente)
@@ -560,13 +605,42 @@ export default function ClientExterneApp() {
 
 
 
+  // ── Session expirée ───────────────────────────────────────────────────────
+  if (sessionExpired) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-50 p-6">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center space-y-5">
+          <div className="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center mx-auto">
+            <span className="text-4xl"></span>
+          </div>
+          <div>
+            <h2 className="text-xl font-black text-gray-900">Session expirée</h2>
+            <p className="text-sm text-gray-600 mt-3 leading-relaxed">
+              Vous avez été déconnecté car une autre session a été ouverte sur un autre appareil.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              try { localStorage.removeItem("silgapp_client_session_id"); } catch {}
+              base44.auth.logout();
+              setTimeout(() => window.location.reload(), 300);
+            }}
+            className="inline-flex items-center justify-center w-full h-12 rounded-2xl bg-primary hover:bg-primary/90 text-white font-bold text-sm transition-colors"
+          >
+            Se reconnecter
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // ── Client bloqué pour frais d'annulation impayés ─────────────────────────
   if (!loading && clientProfil?.bloque_frais_annulation) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-50 p-6">
         <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center space-y-5">
           <div className="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center mx-auto">
-            <span className="text-4xl">🔒</span>
+            <span className="text-4xl"></span>
           </div>
           <div>
             <h2 className="text-xl font-black text-gray-900">Compte bloqué</h2>
@@ -580,7 +654,7 @@ export default function ClientExterneApp() {
             rel="noopener noreferrer"
             className="inline-flex items-center justify-center w-full h-12 rounded-2xl bg-green-500 hover:bg-green-600 text-white font-bold text-sm transition-colors"
           >
-            💬 Contacter Silga via WhatsApp
+             Contacter Silga via WhatsApp
           </a>
         </div>
       </div>
@@ -633,14 +707,14 @@ export default function ClientExterneApp() {
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-black text-primary">
-                    {course.type_course === "deplacement" && course.statut === "recherche_livreur" ? "🔍 Recherche chauffeur..." :
-                     course.type_course === "deplacement" && course.statut === "livreur_en_route" ? "🚗 Chauffeur en route" :
-                     course.type_course === "deplacement" && course.statut === "arrive_prise_en_charge" ? "📍 Arrivé au point de prise en charge" :
-                     course.type_course === "deplacement" && course.statut === "passager_embarque" ? "👤 Passager à bord" :
-                     course.type_course === "deplacement" && course.statut === "livree" ? "✅ Déplacement terminé" :
-                     course.statut === "recherche_livreur" ? "🔍 Recherche livreur..." :
-                     course.statut === "livreur_en_route"  ? "🚀 Livreur en route" :
-                     course.statut === "colis_recupere"    ? "📦 Colis récupéré" : "🚚 En livraison"}
+                    {course.type_course === "deplacement" && course.statut === "recherche_livreur" ? " Recherche chauffeur..." :
+                     course.type_course === "deplacement" && course.statut === "livreur_en_route" ? " Chauffeur en route" :
+                     course.type_course === "deplacement" && course.statut === "arrive_prise_en_charge" ? " Arrivé au point de prise en charge" :
+                     course.type_course === "deplacement" && course.statut === "passager_embarque" ? " Passager à bord" :
+                     course.type_course === "deplacement" && course.statut === "livree" ? " Déplacement terminé" :
+                     course.statut === "recherche_livreur" ? " Recherche livreur..." :
+                     course.statut === "livreur_en_route" ? " Livreur en route" :
+                     course.statut === "colis_recupere" ? " Colis récupéré" : " En livraison"}
                   </p>
                   <p className="text-[11px] text-gray-500 truncate mt-0.5">
                     {course.livreur_nom || "Livreur assigné"} · {course.adresse_depart} → {course.adresse_arrivee}
@@ -673,13 +747,13 @@ export default function ClientExterneApp() {
                 onClick={() => setOngletActif("accueil")}
                 className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${ongletActif === "accueil" ? "bg-primary text-white shadow" : "text-gray-500 hover:text-gray-700"}`}
               >
-                🏠 Accueil
+                 Accueil
               </button>
               <button
                 onClick={() => setOngletActif("promo")}
                 className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${ongletActif === "promo" ? "bg-purple-600 text-white shadow" : "text-gray-500 hover:text-gray-700"}`}
               >
-                🎁 Code Promo
+                 Code Promo
               </button>
             </div>
           )}
@@ -728,7 +802,7 @@ export default function ClientExterneApp() {
                 <div className="relative">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-white/70 text-xs font-medium">Bonjour 👋</p>
+                      <p className="text-white/70 text-xs font-medium">Bonjour </p>
                       <h1 className="text-2xl font-black text-white mt-0.5">{prenom}</h1>
                       <div className="flex items-center gap-2 mt-3 flex-wrap">
                         <div className="flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full">
@@ -779,7 +853,7 @@ export default function ClientExterneApp() {
                   onClick={() => navigate("/client/course/recevoir", { state: { position, clientProfil } })}
                 >
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-lg shadow-green-200 mb-2 group-hover:scale-105 transition-transform">
-                    <span className="text-xl">📥</span>
+                    <span className="text-xl"></span>
                   </div>
                   <p className="font-black text-gray-900 text-xs">Recevoir</p>
                   <p className="text-[10px] text-gray-500 mt-0.5">Attendre un colis</p>
@@ -790,7 +864,7 @@ export default function ClientExterneApp() {
                   onClick={() => navigate("/client/course/deplacement", { state: { position, clientProfil } })}
                 >
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center shadow-lg shadow-sky-200 mb-2 group-hover:scale-105 transition-transform">
-                    <span className="text-xl">👤</span>
+                    <span className="text-xl"></span>
                   </div>
                   <p className="font-black text-gray-900 text-xs">Déplacement</p>
                   <p className="text-[10px] text-gray-500 mt-0.5">Transport personne</p>
@@ -808,8 +882,8 @@ export default function ClientExterneApp() {
                   </div>
                   <p className="flex-1 text-left font-semibold text-gray-800 text-sm">
                     {coursesActives.some(c => ["livreur_en_route","colis_recupere","en_livraison"].includes(c.statut))
-                      ? "📍 Voir le livreur en temps réel"
-                      : "🗺️ Voir la carte"}
+                      ? " Voir le livreur en temps réel"
+                      : " Voir la carte"}
                   </p>
                   <ChevronRight className="w-4 h-4 text-gray-600" />
                 </button>
@@ -820,16 +894,17 @@ export default function ClientExterneApp() {
                 <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-3">Accès rapide</p>
                 <div className="grid grid-cols-4 gap-2">
                   {[
-                    { icon: <Package className="w-5 h-5" />, label: "Courses",   color: "text-blue-600",   bg: "bg-blue-50",   action: () => navigate("/client/suivi") },
-                    { icon: <Clock className="w-5 h-5" />,   label: "Historique",color: "text-purple-600", bg: "bg-purple-50", action: () => navigate("/client/suivi") },
-                    { icon: <MessageCircle className="w-5 h-5" />, label: "Support", color: "text-green-600", bg: "bg-green-50", action: () => {
-                      const msg = encodeURIComponent("Bonjour SILGAPP 👋\nJ'ai besoin d'aide sur SILGAPP.");
+                    { icon: <Package className="w-5 h-5" />, label: "Courses", color: "text-blue-600", bg: "bg-blue-50", action: () => navigate("/client/suivi") },
+                    { icon: <Clock className="w-5 h-5" />, label: "Historique",color: "text-purple-600", bg: "bg-purple-50", action: () => navigate("/client/suivi") },
+                    { icon: <MessageCircle className="w-5 h-5" />, label: "Messages", color: "text-blue-600", bg: "bg-blue-50", action: () => setShowMessages(true) },
+                    { icon: <span className="text-xs"></span>, label: "Support", color: "text-green-600", bg: "bg-green-50", action: () => {
+                      const msg = encodeURIComponent("Bonjour SILGAPP \nJ'ai besoin d'aide sur SILGAPP.");
                       const a = document.createElement("a");
                       a.href = `whatsapp://send?phone=22667572857&text=${msg}`;
                       a.click();
                       setTimeout(() => { if (document.hasFocus()) window.open(`https://wa.me/22667572857?text=${msg}`, "_blank"); }, 500);
                     }},
-                    { icon: <User className="w-5 h-5" />,    label: "Profil",    color: "text-orange-600", bg: "bg-orange-50", action: () => setShowProfilModal(true) },
+                    { icon: <User className="w-5 h-5" />, label: "Profil", color: "text-orange-600", bg: "bg-orange-50", action: () => setShowProfilModal(true) },
                   ].map((item, i) => (
                     <button
                       key={i}
@@ -849,7 +924,7 @@ export default function ClientExterneApp() {
               {clientProfil?.code_promo_utilise && !clientProfil?.premiere_course_faite && (
                 <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl p-4 shadow-lg shadow-purple-200">
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">🎁</span>
+                    <span className="text-2xl"></span>
                     <div className="flex-1">
                       <p className="font-black text-white text-sm">Code promo actif</p>
                       <p className="text-white/80 text-xs mt-0.5">
@@ -873,10 +948,10 @@ export default function ClientExterneApp() {
                 </div>
                 <div className="space-y-2">
                   {[
-                    { icon: "⚡", color: "bg-green-50 text-green-700",   title: "Livraison rapide",  desc: "Livreurs disponibles 24/7" },
-                    { icon: "🔒", color: "bg-blue-50 text-blue-700",     title: "Service sécurisé",  desc: "Livreurs vérifiés et suivis" },
-                    { icon: "💬", color: "bg-purple-50 text-purple-700", title: "Support réactif",   desc: "Aide disponible à tout moment" },
-                    { icon: "💰", color: "bg-amber-50 text-amber-700",   title: "100 F/km",          desc: "Tarif transparent et calculé au km" },
+                    { icon: "", color: "bg-green-50 text-green-700", title: "Livraison rapide", desc: "Livreurs disponibles 24/7" },
+                    { icon: "", color: "bg-blue-50 text-blue-700", title: "Service sécurisé", desc: "Livreurs vérifiés et suivis" },
+                    { icon: "", color: "bg-purple-50 text-purple-700", title: "Support réactif", desc: "Aide disponible à tout moment" },
+                    { icon: "", color: "bg-amber-50 text-amber-700", title: "100 F/km", desc: "Tarif transparent et calculé au km" },
                   ].map((item, i) => (
                     <div key={i} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl ${item.color}`}>
                       <span className="text-base">{item.icon}</span>
@@ -900,8 +975,8 @@ export default function ClientExterneApp() {
           <div className="flex items-center justify-between p-4 border-b bg-card flex-shrink-0">
             <h2 className="text-lg font-bold text-foreground">
               {coursesActives.find(c => ["livreur_en_route","colis_recupere","en_livraison"].includes(c.statut))
-                ? "📍 Suivi en temps réel"
-                : "🗺️ Carte"}
+                ? " Suivi en temps réel"
+                : " Carte"}
             </h2>
             <Button variant="ghost" size="icon" onClick={() => setShowMap(false)} className="h-10 w-10">
               <ArrowLeft className="w-5 h-5" />
@@ -957,6 +1032,18 @@ export default function ClientExterneApp() {
 
       {/* ── PUBLICITÉ PLEIN ÉCRAN ── */}
       <PubliciteFullscreen cible="clients" userId={clientProfil?.id} userType="client" />
+
+      {/* ── MESSAGES ── */}
+      {showMessages && (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col">
+          <MessagesPage
+            myType="client"
+            myId={clientProfil?.id}
+            myName={prenom}
+            onBack={() => setShowMessages(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }

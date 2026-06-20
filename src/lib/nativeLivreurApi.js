@@ -10,16 +10,16 @@ export const isNativeLivreurRuntime = () => {
 export const nativeLivreurInvoke = async (payload) => {
   console.log('[NativeLivreurApi] nativeLivreurInvoke - payload:', JSON.stringify(payload));
   console.log('[NativeLivreurApi] Calling function: nativeLivreur');
-  
+
   try {
     const result = await base44.functions.invoke('nativeLivreur', payload);
     console.log('[NativeLivreurApi] Response received:', result);
-    
+
     if (result?.error) {
       console.error('[NativeLivreurApi] Error in response:', result.error);
       throw new Error(result.error);
     }
-    
+
     return result;
   } catch (error) {
     console.error('[NativeLivreurApi] Exception during invoke:', error.message);
@@ -29,7 +29,7 @@ export const nativeLivreurInvoke = async (payload) => {
 
 export const verifyNativeLivreurCode = async (code) => {
   console.log('[NativeLivreurApi] verifyNativeLivreurCode - code:', code);
-  
+
   try {
     const result = await nativeLivreurInvoke({ action: 'verifyCode', code });
     console.log('[NativeLivreurApi] verifyCode result:', result);

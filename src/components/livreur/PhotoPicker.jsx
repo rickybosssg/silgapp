@@ -6,10 +6,10 @@ import { toast } from "sonner";
 /**
  * PhotoPicker — boutons caméra + galerie fiables sur Android/iOS/web
  * Props:
- *  - label: string (titre affiché au-dessus)
- *  - value: string|null (URL actuelle)
- *  - onChange: (url: string) => void
- *  - darkMode: bool (style fond sombre pour onboarding)
+ * - label: string (titre affiché au-dessus)
+ * - value: string|null (URL actuelle)
+ * - onChange: (url: string) => void
+ * - darkMode: bool (style fond sombre pour onboarding)
  */
 export default function PhotoPicker({ label, value, onChange, darkMode = false }) {
   const cameraRef = useRef(null);

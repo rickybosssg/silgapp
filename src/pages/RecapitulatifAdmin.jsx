@@ -35,16 +35,16 @@ function ReseauCard({ title, icon: Icon, color, livreurs, coursesLivrees, isExte
     : totalEncaisse;
 
   const kpis = [
-    { label: "Livrées",     value: coursesLivrees.length,         grad: "from-primary to-red-600",       icon: "📦" },
-    { label: "Encaissés",   value: totalEncaisse.toLocaleString(), grad: "from-amber-500 to-orange-500",  icon: "💰", suffix: "F" },
-    { label: "Dû Silga",    value: totalDuSilga.toLocaleString(),  grad: "from-blue-500 to-indigo-600",   icon: "🏦", suffix: "F" },
-    { label: "En ligne",    value: enLigne,                        grad: "from-green-500 to-emerald-500", icon: "🟢" },
-    { label: "Disponibles", value: disponibles,                    grad: "from-emerald-400 to-teal-500",  icon: "✅" },
-    { label: "En course",   value: enCourse,                       grad: "from-orange-400 to-amber-500",  icon: "🚀" },
-    { label: "Hors ligne",  value: horsLigne,                      grad: "from-gray-400 to-slate-500",    icon: "⚫" },
-    { label: "Payés",       value: paiementsValides,               grad: "from-teal-500 to-cyan-500",     icon: "✔️" },
-    { label: "Non payés",   value: paiementsNonValides,            grad: "from-rose-400 to-pink-500",     icon: "⏳" },
-    { label: "Total",       value: totalLivreurs,                  grad: "from-violet-500 to-purple-600", icon: "👥" },
+    { label: "Livrées", value: coursesLivrees.length, grad: "from-primary to-red-600", icon: "" },
+    { label: "Encaissés", value: totalEncaisse.toLocaleString(), grad: "from-amber-500 to-orange-500", icon: "", suffix: "F" },
+    { label: "Dû Silga", value: totalDuSilga.toLocaleString(), grad: "from-blue-500 to-indigo-600", icon: "", suffix: "F" },
+    { label: "En ligne", value: enLigne, grad: "from-green-500 to-emerald-500", icon: "" },
+    { label: "Disponibles", value: disponibles, grad: "from-emerald-400 to-teal-500", icon: "" },
+    { label: "En course", value: enCourse, grad: "from-orange-400 to-amber-500", icon: "" },
+    { label: "Hors ligne", value: horsLigne, grad: "from-gray-400 to-slate-500", icon: "" },
+    { label: "Payés", value: paiementsValides, grad: "from-teal-500 to-cyan-500", icon: "" },
+    { label: "Non payés", value: paiementsNonValides, grad: "from-rose-400 to-pink-500", icon: "⏳" },
+    { label: "Total", value: totalLivreurs, grad: "from-violet-500 to-purple-600", icon: "" },
   ];
 
   return (
@@ -125,11 +125,11 @@ export default function RecapitulatifAdmin({ reseau }) {
     const today = now.toDateString();
     const yesterday = subDays(now, 1).toDateString();
     switch (period) {
-      case "today":     return { start: new Date(today), end: new Date() };
+      case "today": return { start: new Date(today), end: new Date() };
       case "yesterday": return { start: new Date(yesterday), end: new Date(yesterday) };
-      case "week":      return { start: startOfWeek(now, { weekStartsOn: 1 }), end: now };
-      case "month":     return { start: startOfMonth(now), end: now };
-      default:          return { start: new Date(today), end: new Date() };
+      case "week": return { start: startOfWeek(now, { weekStartsOn: 1 }), end: now };
+      case "month": return { start: startOfMonth(now), end: now };
+      default: return { start: new Date(today), end: new Date() };
     }
   }, [period]);
 
@@ -164,7 +164,7 @@ export default function RecapitulatifAdmin({ reseau }) {
         montant_du_silga: 0, // Remise à zéro du compteur
       },
     });
-    toast.success(`Paiement de ${montant.toLocaleString()} FCFA validé ✅ — Compteur remis à zéro`);
+    toast.success(`Paiement de ${montant.toLocaleString()} FCFA validé — Compteur remis à zéro`);
   };
 
   // Livreurs et courses selon l'onglet actif
@@ -183,7 +183,7 @@ export default function RecapitulatifAdmin({ reseau }) {
           <div className="absolute -bottom-12 -left-6 w-56 h-56 bg-white rounded-full" />
         </div>
         <div className="relative flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-2xl">📈</div>
+          <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-2xl"></div>
           <div>
             <h1 className="text-xl font-black text-white tracking-tight">Récapitulatif Admin</h1>
             <p className="text-white/60 text-xs mt-0.5 capitalize">
@@ -286,7 +286,7 @@ export default function RecapitulatifAdmin({ reseau }) {
           <div className="text-center py-12 text-muted-foreground">Chargement...</div>
         ) : livreursActifs.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
-            <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3 text-2xl">👤</div>
+            <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3 text-2xl"></div>
             <p className="text-sm font-semibold">Aucun livreur {activeTab} trouvé</p>
           </div>
         ) : (

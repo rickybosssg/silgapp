@@ -31,7 +31,7 @@ class ErrorBoundary extends React.Component {
     console.error('[ErrorBoundary] ComponentStack:', info?.componentStack);
     console.error('[ErrorBoundary] Stack trace:', error.stack);
     this.setState({ errorInfo: info });
-    
+
     // Log complet pour diagnostic
     try {
       const errorData = {
@@ -61,7 +61,7 @@ class ErrorBoundary extends React.Component {
             width: 64, height: 64, borderRadius: 16,
             background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 32
-          }}>🚚</div>
+          }}></div>
           <div>
             <p style={{ fontWeight: 'bold', fontSize: 18, margin: 0, color: '#dc2626' }}>SILGAPP - ERREUR CRITIQUE</p>
             <p style={{ color: '#666', fontSize: 13, marginTop: 4 }}>
@@ -69,7 +69,7 @@ class ErrorBoundary extends React.Component {
             </p>
           </div>
           <div style={{
-            background: '#fff', padding: '1rem', borderRadius: 8, 
+            background: '#fff', padding: '1rem', borderRadius: 8,
             maxWidth: '500px', textAlign: 'left', border: '1px solid #fee2e2',
             maxHeight: '200px', overflow: 'auto'
           }}>

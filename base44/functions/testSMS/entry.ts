@@ -17,8 +17,8 @@ Deno.serve(async (req) => {
     const messageTexte = body.message || 'SILGAPP Test SMS - Burkina Faso. Si vous recevez ce message, les SMS fonctionnent correctement.';
 
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-    const authToken  = Deno.env.get('TWILIO_AUTH_TOKEN');
-    const fromRaw    = Deno.env.get('TWILIO_WHATSAPP_FROM') || '';
+    const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+    const fromRaw = Deno.env.get('TWILIO_WHATSAPP_FROM') || '';
 
     // Pour SMS, on retire le préfixe whatsapp: et on utilise le numéro brut
     const fromNumero = fromRaw.replace(/^whatsapp:/i, '').trim();

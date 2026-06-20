@@ -28,9 +28,9 @@ export default function LivreurStatutCard({ statut, livreur, isExterne = false }
             isEnCourse && "bg-white/20",
             isHorsLigne && "bg-gray-200",
           )}>
-            {isDisponible && "🟢"}
-            {isEnCourse && "🔵"}
-            {isHorsLigne && "⚪"}
+            {isDisponible && ""}
+            {isEnCourse && ""}
+            {isHorsLigne && ""}
           </div>
           {/* Ping animé */}
           {(isDisponible || isEnCourse) && (
@@ -65,12 +65,12 @@ export default function LivreurStatutCard({ statut, livreur, isExterne = false }
         {/* Badge statut secondaire */}
         {isDisponible && (
           <div className="bg-white/20 px-2.5 py-1 rounded-full flex-shrink-0">
-            <span className="text-[11px] font-bold text-white">🟢 ON</span>
+            <span className="text-[11px] font-bold text-white"> ON</span>
           </div>
         )}
         {isEnCourse && (
           <div className="bg-white/20 px-2.5 py-1 rounded-full flex-shrink-0">
-            <span className="text-[11px] font-bold text-white">🔵 En mission</span>
+            <span className="text-[11px] font-bold text-white"> En mission</span>
           </div>
         )}
       </div>

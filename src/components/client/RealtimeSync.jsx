@@ -13,7 +13,7 @@ export function RealtimeSync({ courseIds, children }) {
 
     // CORRECTION CRITIQUE : Abonnements WebSocket pour chaque course
     const unsubscribers = [];
-    
+
     courseIds.forEach(id => {
       try {
         const unsub = base44.entities.CourseExterne.subscribe((event) => {

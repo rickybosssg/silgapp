@@ -75,7 +75,7 @@ export default function LivreurRechercheAnimation({ course, onRelancer }) {
           <div className="relative mx-auto w-24 h-24">
             <div className="absolute inset-0 bg-red-100 rounded-full animate-ping opacity-30" />
             <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-red-100 to-orange-100 flex items-center justify-center shadow-lg">
-              <span className="text-4xl">😔</span>
+              <span className="text-4xl"></span>
             </div>
           </div>
 
@@ -97,7 +97,7 @@ export default function LivreurRechercheAnimation({ course, onRelancer }) {
                 onClick={onRelancer}
               >
                 <RefreshCw className="w-5 h-5" />
-                🔄 Relancer la recherche
+                 Relancer la recherche
               </button>
             )}
 
@@ -105,12 +105,12 @@ export default function LivreurRechercheAnimation({ course, onRelancer }) {
               className="w-full h-12 rounded-2xl border-2 border-gray-200 text-gray-700 font-bold text-sm active:scale-95 transition-all hover:bg-gray-50"
               onClick={() => navigate("/client")}
             >
-              ✕ Terminer et rentrer à l'accueil
+               Terminer et rentrer à l'accueil
             </button>
           </div>
 
           <p className="text-xs text-gray-400">
-            💡 Astuce : réessayez dans quelques minutes, de nouveaux livreurs se connectent régulièrement.
+             Astuce : réessayez dans quelques minutes, de nouveaux livreurs se connectent régulièrement.
           </p>
         </div>
       </div>
@@ -162,7 +162,7 @@ export default function LivreurRechercheAnimation({ course, onRelancer }) {
           </h2>
           <div className="space-y-3">
             {[
-              { icon: <Truck className="w-4 h-4 text-primary" />, bg: "bg-primary/10", label: "Type", value: course.type_course === "expedier" ? "📦 Expédition" : "📥 Réception" },
+              { icon: <Truck className="w-4 h-4 text-primary" />, bg: "bg-primary/10", label: "Type", value: course.type_course === "expedier" ? " Expédition" : " Réception" },
               { icon: <MapPin className="w-4 h-4 text-red-600" />, bg: "bg-red-100", label: "Récupération", value: course.adresse_depart },
               { icon: <MapPin className="w-4 h-4 text-green-600" />, bg: "bg-green-100", label: "Livraison", value: course.adresse_arrivee },
               { icon: <User className="w-4 h-4 text-blue-600" />, bg: "bg-blue-100", label: "Contact", value: course.type_course === "expedier" ? `${course.destinataire_nom} - ${course.destinataire_telephone}` : `${course.expediteur_nom} - ${course.expediteur_telephone}` },
@@ -216,7 +216,7 @@ export default function LivreurRechercheAnimation({ course, onRelancer }) {
         </div>
 
         <div className="text-center">
-          <p className="text-sm text-muted-foreground">⏱️ Temps d'attente moyen : 2-5 minutes</p>
+          <p className="text-sm text-muted-foreground">⏱ Temps d'attente moyen : 2-5 minutes</p>
         </div>
 
         <AnnulerCourseDialog

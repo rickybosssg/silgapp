@@ -9,36 +9,36 @@ import { cn } from "@/lib/utils";
 
 export default function LivreurPerformanceCard({ livreur, courses, onVoirDetails, onValiderPaiement, isPending }) {
   const today = new Date().toDateString();
-  
+
   // Calculs pour aujourd'hui
   const coursesLivrees = courses.filter(c =>
     c.livreur_id === livreur.id &&
     c.statut === "livree" &&
     new Date(c.heure_livraison || c.updated_date).toDateString() === today
   );
-  
+
   const coursesAnnulees = courses.filter(c =>
     c.livreur_id === livreur.id &&
     c.statut === "annulee" &&
     new Date(c.updated_date).toDateString() === today
   );
-  
+
   const coursesEnCours = courses.filter(c =>
     c.livreur_id === livreur.id &&
     ["acceptee", "colis_recupere", "en_livraison"].includes(c.statut)
   );
-  
+
   const totalEncaisse = coursesLivrees.reduce((sum, c) => sum + (c.prix_reel || 0), 0);
   const montantDu = totalEncaisse; // 100% à Silga
   const isPaye = livreur.statut_paiement === "paye";
-  
+
   const nomComplet = `${livreur.prenom || ""} ${livreur.nom}`.trim();
-  
+
   // Dernière position
   const lastPosition = livreur.latitude && livreur.longitude
     ? `${livreur.latitude.toFixed(4)}, ${livreur.longitude.toFixed(4)}`
     : "N/A";
-  
+
   const lastActivity = livreur.derniere_position_date
     ? format(new Date(livreur.derniere_position_date), "HH:mm", { locale: fr })
     : "N/A";
@@ -111,7 +111,7 @@ export default function LivreurPerformanceCard({ livreur, courses, onVoirDetails
         <div className="flex items-center justify-between text-xs mb-2">
           <span className="text-muted-foreground">Montant dû à Silga</span>
           {isPaye ? (
-            <Badge className="bg-green-500 text-white text-[10px]">✅ Payé</Badge>
+            <Badge className="bg-green-500 text-white text-[10px]"> Payé</Badge>
           ) : totalEncaisse > 0 ? (
             <Badge className="bg-amber-500 text-white text-[10px]">Non payé</Badge>
           ) : null}

@@ -51,14 +51,14 @@ Deno.serve(async (req) => {
           `Bonjour ${nom},`,
           `Votre deplacement SILGAPP a ete cree.\n`,
           `*Details :*`,
-          `🚗 Type : Deplacement`,
-          `📍 Depart : ${lieuDepart}`,
-          `📍 Destination : ${lieuArrivee}`,
+          ` Type : Deplacement`,
+          ` Depart : ${lieuDepart}`,
+          ` Destination : ${lieuArrivee}`,
           ``,
-          `📲 *Suivez votre livreur en temps reel :*`,
+          ` *Suivez votre livreur en temps reel :*`,
           `${trackingLink}`,
           ``,
-          `📲 *Telechargez SILGAPP* : https://silgapp.com/telecharger`,
+          ` *Telechargez SILGAPP* : https://silgapp.com/telecharger`,
         ].join('\n');
       } else {
         message = [
@@ -66,16 +66,16 @@ Deno.serve(async (req) => {
           `Bonjour ${nom},`,
           `Votre course a ete creee avec succes.\n`,
           `*Details :*`,
-          `📦 Type : ${course.type_course === 'expedier' ? 'Expedition' : 'Reception'}`,
-          `📍 Depart : ${lieuDepart}`,
-          `📍 Arrivee : ${lieuArrivee}`,
+          ` Type : ${course.type_course === 'expedier' ? 'Expedition' : 'Reception'}`,
+          ` Depart : ${lieuDepart}`,
+          ` Arrivee : ${lieuArrivee}`,
           ``,
           `*Code de recuperation :*`,
-          `🔢 PIN : *${pickupCode}*`,
+          ` PIN : *${pickupCode}*`,
           ``,
           `Montrez ce code au livreur lors de la recuperation.`,
           ``,
-          `📲 *Telechargez SILGAPP* pour suivre votre course : https://silgapp.com/telecharger`,
+          ` *Telechargez SILGAPP* pour suivre votre course : https://silgapp.com/telecharger`,
         ].join('\n');
       }
     } else {
@@ -91,14 +91,14 @@ Deno.serve(async (req) => {
         `Bonjour ${nom},`,
         `Un colis est en route pour vous.\n`,
         `*Details :*`,
-        `📍 Livraison : ${lieuArrivee}`,
+        ` Livraison : ${lieuArrivee}`,
         ``,
         `*Code de livraison :*`,
-        `🔢 PIN : *${deliveryCode}*`,
+        ` PIN : *${deliveryCode}*`,
         ``,
         `Montrez ce code au livreur a la livraison.`,
         ``,
-        `📲 *Telechargez SILGAPP* : https://silgapp.com/telecharger`,
+        ` *Telechargez SILGAPP* : https://silgapp.com/telecharger`,
       ].join('\n');
     }
 

@@ -15,9 +15,9 @@ import DiagnosticPushPanel from "@/components/admin/DiagnosticPushPanel";
 
 function SeverityBadge({ severity }) {
   const map = {
-    haute:   "bg-red-100 text-red-700",
+    haute: "bg-red-100 text-red-700",
     moyenne: "bg-orange-100 text-orange-700",
-    faible:  "bg-yellow-100 text-yellow-700",
+    faible: "bg-yellow-100 text-yellow-700",
   };
   return (
     <span className={`inline-block text-[10px] font-black px-2 py-0.5 rounded-full ${map[severity] || "bg-gray-100 text-gray-600"}`}>
@@ -49,9 +49,9 @@ function RapportDetail({ rapport }) {
   const hasCritical = rapport.erreurs_critiques > 0;
 
   const borderColor = hasCritical ? "border-red-100" : isOk ? "border-green-100" : "border-orange-100";
-  const iconBg      = hasCritical ? "bg-red-100"    : isOk ? "bg-green-100"    : "bg-orange-100";
-  const IconComp    = hasCritical ? AlertTriangle    : isOk ? CheckCircle2      : Shield;
-  const iconColor   = hasCritical ? "text-red-600"  : isOk ? "text-green-600"  : "text-orange-600";
+  const iconBg = hasCritical ? "bg-red-100" : isOk ? "bg-green-100" : "bg-orange-100";
+  const IconComp = hasCritical ? AlertTriangle : isOk ? CheckCircle2 : Shield;
+  const iconColor = hasCritical ? "text-red-600" : isOk ? "text-green-600" : "text-orange-600";
 
   return (
     <div className={`rounded-2xl border ${borderColor} overflow-hidden bg-white transition-all`}>
@@ -68,7 +68,7 @@ function RapportDetail({ rapport }) {
               {format(new Date(rapport.date_scan), "EEEE d MMM yyyy · HH:mm", { locale: fr })}
             </p>
             <p className="text-[11px] text-gray-400 mt-0.5">
-              {rapport.declenchement === "manuel" ? "🖱️ Manuel" : "⏰ Auto"} · {rapport.duree_secondes || 0}s
+              {rapport.declenchement === "manuel" ? " Manuel" : "⏰ Auto"} · {rapport.duree_secondes || 0}s
             </p>
           </div>
         </div>
@@ -84,7 +84,7 @@ function RapportDetail({ rapport }) {
             </span>
           )}
           {isOk && (
-            <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">✅ OK</span>
+            <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full"> OK</span>
           )}
           {open ? <ChevronUp className="w-4 h-4 text-gray-300 ml-1" /> : <ChevronDown className="w-4 h-4 text-gray-300 ml-1" />}
         </div>
@@ -95,10 +95,10 @@ function RapportDetail({ rapport }) {
           {/* Stats mini */}
           <div className="grid grid-cols-4 gap-2">
             {[
-              { label: "Bugs",        val: rapport.bugs_trouves,            bg: "bg-red-50",    text: "text-red-600" },
-              { label: "Corrections", val: rapport.corrections_appliquees,  bg: "bg-green-50",  text: "text-green-600" },
-              { label: "Critiques",   val: rapport.erreurs_critiques,       bg: "bg-orange-50", text: "text-orange-600" },
-              { label: "Admin req.",  val: rapport.elements_non_corriges,   bg: "bg-blue-50",   text: "text-blue-600" },
+              { label: "Bugs", val: rapport.bugs_trouves, bg: "bg-red-50", text: "text-red-600" },
+              { label: "Corrections", val: rapport.corrections_appliquees, bg: "bg-green-50", text: "text-green-600" },
+              { label: "Critiques", val: rapport.erreurs_critiques, bg: "bg-orange-50", text: "text-orange-600" },
+              { label: "Admin req.", val: rapport.elements_non_corriges, bg: "bg-blue-50", text: "text-blue-600" },
             ].map(s => (
               <div key={s.label} className={`${s.bg} rounded-xl p-2.5 text-center`}>
                 <p className={`text-lg font-black ${s.text}`}>{s.val || 0}</p>
@@ -171,7 +171,7 @@ function RapportDetail({ rapport }) {
             <div className="text-center py-4">
               <CheckCircle2 className="w-8 h-8 text-green-500 mx-auto mb-2" />
               <p className="text-sm font-bold text-green-700">Aucun problème détecté</p>
-              <p className="text-xs text-gray-400">SILGAPP est en bonne santé 🎉</p>
+              <p className="text-xs text-gray-400">SILGAPP est en bonne santé </p>
             </div>
           )}
         </div>
@@ -238,11 +238,11 @@ export default function Maintenance() {
           </div>
           {statusSante && (
             <div className={`px-3 py-1.5 rounded-xl text-xs font-black border ${
-              statusSante === "ok"       ? "bg-green-500/20 border-green-400/30 text-green-300" :
+              statusSante === "ok" ? "bg-green-500/20 border-green-400/30 text-green-300" :
               statusSante === "critique" ? "bg-red-500/20 border-red-400/30 text-red-300" :
                                            "bg-orange-500/20 border-orange-400/30 text-orange-300"
             }`}>
-              {statusSante === "ok" ? "✅ OK" : statusSante === "critique" ? "⚠️ CRITIQUE" : "🔧 AVERTISSEMENT"}
+              {statusSante === "ok" ? " OK" : statusSante === "critique" ? " CRITIQUE" : " AVERTISSEMENT"}
             </div>
           )}
         </div>
@@ -289,7 +289,7 @@ export default function Maintenance() {
       {dernierRapport && (
         <div className={`rounded-2xl border p-4 ${
           statusSante === "critique" ? "border-red-100 bg-red-50/40" :
-          statusSante === "ok"       ? "border-green-100 bg-green-50/40" :
+          statusSante === "ok" ? "border-green-100 bg-green-50/40" :
                                        "border-orange-100 bg-orange-50/40"
         }`}>
           <div className="flex items-center gap-2.5 mb-2">
@@ -297,15 +297,15 @@ export default function Maintenance() {
               statusSante === "critique" ? "bg-red-100" : statusSante === "ok" ? "bg-green-100" : "bg-orange-100"
             }`}>
               {statusSante === "critique" ? <AlertTriangle className="w-4 h-4 text-red-600" /> :
-               statusSante === "ok"       ? <CheckCircle2  className="w-4 h-4 text-green-600" /> :
-                                            <Wrench        className="w-4 h-4 text-orange-600" />}
+               statusSante === "ok" ? <CheckCircle2 className="w-4 h-4 text-green-600" /> :
+                                            <Wrench className="w-4 h-4 text-orange-600" />}
             </div>
             <p className="font-black text-sm text-foreground">
               {statusSante === "critique"
-                ? `⚠️ ${dernierRapport.erreurs_critiques} erreur(s) critique(s) !`
+                ? ` ${dernierRapport.erreurs_critiques} erreur(s) critique(s) !`
                 : statusSante === "ok"
-                ? "✅ SILGAPP est en bonne santé"
-                : `🔧 ${dernierRapport.bugs_trouves} problème(s) — ${dernierRapport.corrections_appliquees} corrigé(s)`}
+                ? " SILGAPP est en bonne santé"
+                : ` ${dernierRapport.bugs_trouves} problème(s) — ${dernierRapport.corrections_appliquees} corrigé(s)`}
             </p>
           </div>
           {dernierRapport.resume && (
@@ -366,13 +366,13 @@ export default function Maintenance() {
           <div className={`mt-3 p-3 rounded-xl text-xs ${retrocorrResult.success ? "bg-green-50 border border-green-100 text-green-800" : "bg-red-50 border border-red-100 text-red-700"}`}>
             {retrocorrResult.success ? (
               <>
-                <p className="font-bold mb-1">✅ {retrocorrResult.corrigees} course(s) corrigée(s) sur {retrocorrResult.sans_prix}</p>
+                <p className="font-bold mb-1"> {retrocorrResult.corrigees} course(s) corrigée(s) sur {retrocorrResult.sans_prix}</p>
                 {retrocorrResult.details?.map((d, i) => (
                   <p key={i} className="text-[10px] text-green-700">#{d.id} · {d.distance} km · {d.prix} F · source: {d.source}</p>
                 ))}
               </>
             ) : (
-              <p>❌ {retrocorrResult.error}</p>
+              <p> {retrocorrResult.error}</p>
             )}
           </div>
         )}
@@ -385,7 +385,7 @@ export default function Maintenance() {
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${scanResult.success ? "bg-green-100" : "bg-red-100"}`}>
               {scanResult.success
                 ? <CheckCircle2 className="w-4 h-4 text-green-600" />
-                : <XCircle      className="w-4 h-4 text-red-600" />}
+                : <XCircle className="w-4 h-4 text-red-600" />}
             </div>
             <p className="font-black text-sm">{scanResult.success ? "Scan terminé avec succès" : "Erreur lors du scan"}</p>
           </div>

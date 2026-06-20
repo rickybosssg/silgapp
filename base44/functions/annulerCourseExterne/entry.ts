@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
         // Notification au livreur
         if (livreur.user_email) {
           await asService.entities.Notification.create({
-            titre: "ℹ️ Course annulée",
+            titre: "ℹ Course annulée",
             message: `La course #${course_id.slice(-8)} a été annulée. ${source === "livreur" ? "Vous êtes maintenant disponible." : ""}`,
             type: "course_annulee",
             course_id,
@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
       await asService.entities.CourseExterne.update(course_id, resetData);
       courseRedispatch = true;
 
-      // 🧹 Archiver toutes les notifications 'nouvelle_course' pour cette course
+      // Archiver toutes les notifications 'nouvelle_course' pour cette course
       // pour que les livreurs ne voient plus une course qui est retournée en dispatch
       const notifsNouvelleCourse = await asService.entities.Notification.filter({
         course_id,
@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
         await asService.entities.Notification.update(n.id, { lue: true }).catch(() => null);
       }
       if (notifsNouvelleCourse.length > 0) {
-        console.log(`[ANNULATION] 🧹 ${notifsNouvelleCourse.length} notifications 'nouvelle_course' archivées pour course ${course_id}`);
+        console.log(`[ANNULATION] ${notifsNouvelleCourse.length} notifications 'nouvelle_course' archivées pour course ${course_id}`);
       }
 
       // ── Historique d'annulation ──────────────────────────────────
@@ -155,7 +155,7 @@ Deno.serve(async (req) => {
 
       // ── Notification admin ───────────────────────────────────────
       await asService.entities.Notification.create({
-        titre: "🔄 Course remise en dispatch",
+        titre: " Course remise en dispatch",
         message: `Le livreur a annulé la course #${course_id.slice(-8)}. Motif: ${motif || "non spécifié"}. La course est retournée dans le circuit de dispatch.`,
         type: "course_redispatch",
         course_id,

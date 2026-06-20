@@ -114,7 +114,7 @@ export default function TelechargerSILGAPP() {
             <p className="text-xs font-semibold text-amber-800">À propos de l'installation</p>
           </div>
           <p className="text-xs text-amber-700 leading-relaxed">
-            Si Android affiche <strong>"fichier potentiellement dangereux"</strong>, confirmez l'installation. 
+            Si Android affiche <strong>"fichier potentiellement dangereux"</strong>, confirmez l'installation.
             Ce message apparaît car l'application est téléchargée hors Play Store.
           </p>
         </div>

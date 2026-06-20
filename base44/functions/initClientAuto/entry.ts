@@ -8,7 +8,7 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    
+
     if (!user) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -16,11 +16,11 @@ Deno.serve(async (req) => {
     const payload = await req.json();
     const { device_id, platform, notification_token, latitude, longitude, country_code } = payload;
 
-    // 🛡️ VALIDATION STRICTE : country_code OBLIGATOIRE
+    // VALIDATION STRICTE : country_code OBLIGATOIRE
     if (!country_code) {
-      console.error('[initClientAuto] ❌ country_code manquant — inscription rejetée');
-      return Response.json({ 
-        success: false, 
+      console.error('[initClientAuto] country_code manquant — inscription rejetée');
+      return Response.json({
+        success: false,
         error: "country_code_required",
         message: "Le pays est obligatoire pour utiliser SILGAPP. Veuillez sélectionner un pays lors de l'inscription."
       }, { status: 400 });
@@ -31,8 +31,8 @@ Deno.serve(async (req) => {
     if (existingLivreur && existingLivreur.length > 0) {
       // C'est un livreur ! Ne pas créer de profil client
       console.log(`[initClientAuto] Email ${user.email} trouvé dans Livreur → pas de création client`);
-      return Response.json({ 
-        success: false, 
+      return Response.json({
+        success: false,
         reason: "livreur_exists",
         message: "Cet email est enregistré comme livreur. Redirection vers le dashboard livreur."
       }, { status: 409 });
@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
         actif: true,
         latitude: latitude || null,
         longitude: longitude || null,
-        country_code: country_code, // ✅ OBLIGATOIRE - rejeté si manquant
+        country_code: country_code, // OBLIGATOIRE - rejeté si manquant
       });
     } else {
       client = client[0];
@@ -86,8 +86,8 @@ Deno.serve(async (req) => {
     // 4. Tester la notification
     await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
       user_email: user.email,
-      titre: "🎉 Bienvenue sur SILGAPP",
-      message: "Votre compte est configuré. GPS et notifications activés ✓"
+      titre: " Bienvenue sur SILGAPP",
+      message: "Votre compte est configuré. GPS et notifications activés "
     });
 
     return Response.json({

@@ -3,8 +3,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { 
-  ArrowLeft, ArrowRight, MapPin, Navigation, Package, 
+import {
+  ArrowLeft, ArrowRight, MapPin, Navigation, Package,
   User, FileText, CheckCircle, Truck, AlertCircle,
   Loader2, Search, Send, Inbox, Sparkles, Car
 } from "lucide-react";
@@ -79,13 +79,13 @@ function PremiumInput({ label, required, hint, children, ...props }) {
 
 
 
-export default function CourseStepForm({ 
-  step, 
-  totalSteps, 
+export default function CourseStepForm({
+  step,
+  totalSteps,
   formData,
   gpsHandlers,
-  setFormData, 
-  onNext, 
+  setFormData,
+  onNext,
   onBack,
   onAnnuler,
   isLoading,
@@ -117,7 +117,7 @@ export default function CourseStepForm({
     } catch (err) {
       console.error("Erreur sauvegarde brouillon:", err);
     }
-  }, [formDataStr]); // ✅ Stable : dépend de la string, pas de l'objet
+  }, [formDataStr]); // Stable : dépend de la string, pas de l'objet
 
   // ─── Vérification expéditeur ───────────────────────────────────────────────
   const verifyExpediteur = async () => {
@@ -153,8 +153,8 @@ export default function CourseStepForm({
             adresse_depart: "Position GPS de l'expéditeur",
           } : {}),
         }));
-        toast.success(`✅ ${client.nom || client.prenom} trouvé dans SILGAPP !`);
-        if (hasGps) toast.success("📍 Position GPS de l'expéditeur disponible !");
+        toast.success(` ${client.nom || client.prenom} trouvé dans SILGAPP !`);
+        if (hasGps) toast.success(" Position GPS de l'expéditeur disponible !");
         try {
           await base44.functions.invoke("notifyClientSync", {
             course_id: "pending", expediteur_id: client.id, notification_type: "preparation_expedition"
@@ -170,7 +170,7 @@ export default function CourseStepForm({
           expediteur_gps_lat: null,
           expediteur_gps_lng: null,
         }));
-        toast.info("ℹ️ Expéditeur non trouvé dans SILGAPP - flux standard activé");
+        toast.info("ℹ Expéditeur non trouvé dans SILGAPP - flux standard activé");
       }
     } catch (err) {
       toast.error("Erreur lors de la vérification");
@@ -211,8 +211,8 @@ export default function CourseStepForm({
             adresse_arrivee: "Position GPS du destinataire",
           } : {}),
         }));
-        toast.success(`✅ ${client.nom || client.prenom} trouvé dans SILGAPP !`);
-        if (hasGps) toast.success("📍 Position GPS du destinataire disponible !");
+        toast.success(` ${client.nom || client.prenom} trouvé dans SILGAPP !`);
+        if (hasGps) toast.success(" Position GPS du destinataire disponible !");
         try {
           await base44.functions.invoke("notifyClientSync", {
             course_id: "pending", destinataire_id: client.id, notification_type: "preparation_reception"
@@ -225,7 +225,7 @@ export default function CourseStepForm({
           destinataire_client_id: null,
           recipient_has_app: false,
         }));
-        toast.info("ℹ️ Destinataire non trouvé dans SILGAPP - flux standard activé");
+        toast.info("ℹ Destinataire non trouvé dans SILGAPP - flux standard activé");
       }
     } catch (err) {
       toast.error("Erreur lors de la vérification");
@@ -250,11 +250,11 @@ export default function CourseStepForm({
                 <strong>{nom}</strong> est inscrit dans SILGAPP
               </p>
               <div className="flex flex-wrap gap-2 mt-2">
-                <span className="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-medium">✓ Synchronisation</span>
-                <span className="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-medium">✓ Notifications</span>
+                <span className="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-medium"> Synchronisation</span>
+                <span className="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-medium"> Notifications</span>
                 {latitude && longitude
-                  ? <span className="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-medium">✓ GPS disponible</span>
-                  : <span className="text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-medium">⚠ GPS inactif</span>}
+                  ? <span className="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-medium"> GPS disponible</span>
+                  : <span className="text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-medium"> GPS inactif</span>}
               </div>
             </div>
           </div>
@@ -422,7 +422,7 @@ export default function CourseStepForm({
                   <button type="button" onClick={gpsHandlers?.onGetGPSDepart} className="w-full rounded-3xl bg-gradient-to-r from-primary to-red-600 text-white font-bold text-base shadow-xl shadow-primary/30 active:scale-[0.98] transition-all overflow-hidden">
                     <div className="flex flex-col items-center justify-center gap-1 py-5 px-4">
                       <div className="flex items-center gap-2 text-lg font-black"><Navigation className="w-6 h-6" />Utiliser ma position actuelle</div>
-                      <p className="text-xs text-red-100 font-normal">📍 Détection automatique de votre position</p>
+                      <p className="text-xs text-red-100 font-normal"> Détection automatique de votre position</p>
                     </div>
                   </button>
                   <div className="flex items-center gap-3"><div className="flex-1 h-px bg-gray-200" /><span className="text-xs text-gray-400 font-medium">ou saisir manuellement</span><div className="flex-1 h-px bg-gray-200" /></div>
@@ -503,7 +503,7 @@ export default function CourseStepForm({
                 nom={expediteurFound?.nom || expediteurFound?.prenom}
                 latitude={expediteurFound?.latitude}
                 longitude={expediteurFound?.longitude}
-                labelTrouve="✅ Expéditeur trouvé !"
+                labelTrouve=" Expéditeur trouvé !"
                 labelNonTrouve="Expéditeur non trouvé dans SILGAPP"
               />
             </div>
@@ -529,7 +529,7 @@ export default function CourseStepForm({
                   <p className="text-xs text-green-700 mt-0.5 truncate">{formData.adresse_depart || "Position GPS"}</p>
                   {formData.gps_depart_lat && formData.gps_depart_lng && (
                     <p className="text-xs text-green-600 mt-0.5">
-                      📍 {Number(formData.gps_depart_lat).toFixed(4)}, {Number(formData.gps_depart_lng).toFixed(4)}
+                       {Number(formData.gps_depart_lat).toFixed(4)}, {Number(formData.gps_depart_lng).toFixed(4)}
                     </p>
                   )}
                 </div>
@@ -553,7 +553,7 @@ export default function CourseStepForm({
                       <Navigation className="w-6 h-6" />
                       Utiliser ma position actuelle
                     </div>
-                    <p className="text-xs text-red-100 font-normal">📍 Détection automatique de votre position</p>
+                    <p className="text-xs text-red-100 font-normal"> Détection automatique de votre position</p>
                   </div>
                 </button>
 
@@ -607,7 +607,7 @@ export default function CourseStepForm({
               <button type="button" onClick={gpsHandlers?.onGetGPSArrivee} className="w-full rounded-3xl bg-gradient-to-r from-sky-500 to-blue-600 text-white font-bold text-base shadow-xl shadow-sky-200 active:scale-[0.98] transition-all overflow-hidden">
                 <div className="flex flex-col items-center justify-center gap-1 py-4 px-4">
                   <div className="flex items-center gap-2 text-base font-black"><Navigation className="w-5 h-5" />Utiliser ma position actuelle</div>
-                  <p className="text-xs text-blue-100 font-normal">📍 Définir la destination avec le GPS</p>
+                  <p className="text-xs text-blue-100 font-normal"> Définir la destination avec le GPS</p>
                 </div>
               </button>
             </div>
@@ -703,7 +703,7 @@ export default function CourseStepForm({
                 nom={destinataireFound?.nom || destinataireFound?.prenom}
                 latitude={destinataireFound?.latitude}
                 longitude={destinataireFound?.longitude}
-                labelTrouve="✅ Destinataire trouvé !"
+                labelTrouve=" Destinataire trouvé !"
                 labelNonTrouve="Destinataire non trouvé dans SILGAPP"
               />
             </div>
@@ -746,9 +746,9 @@ export default function CourseStepForm({
                   className="pointer-events-none data-[state=checked]:bg-accent"
                 />
                 <div className="flex-1">
-                  <p className="font-bold text-gray-900">📍 Position GPS de l'expéditeur</p>
+                  <p className="font-bold text-gray-900"> Position GPS de l'expéditeur</p>
                   {gpsDispo
-                    ? <p className="text-xs text-green-600 mt-0.5">Position disponible ✓</p>
+                    ? <p className="text-xs text-green-600 mt-0.5">Position disponible </p>
                     : <p className="text-xs text-gray-400 mt-0.5">Non disponible (expéditeur sans GPS)</p>}
                 </div>
               </div>
@@ -894,12 +894,12 @@ export default function CourseStepForm({
 
   function renderTypeColis() {
     const typesColis = [
-      { value: "petit_colis", label: "Petit colis", icon: "📦", desc: "< 2 kg" },
-      { value: "moyen_colis", label: "Moyen colis", icon: "📫", desc: "2 - 10 kg" },
-      { value: "gros_colis", label: "Gros colis", icon: "🗃️", desc: "> 10 kg" },
-      { value: "document", label: "Document", icon: "📄", desc: "Papiers, courrier" },
-      { value: "nourriture", label: "Nourriture", icon: "🍔", desc: "Repas, boissons" },
-      { value: "autre", label: "Autre", icon: "🎁", desc: "Autre type" },
+      { value: "petit_colis", label: "Petit colis", icon: "", desc: "< 2 kg" },
+      { value: "moyen_colis", label: "Moyen colis", icon: "", desc: "2 - 10 kg" },
+      { value: "gros_colis", label: "Gros colis", icon: "", desc: "> 10 kg" },
+      { value: "document", label: "Document", icon: "", desc: "Papiers, courrier" },
+      { value: "nourriture", label: "Nourriture", icon: "", desc: "Repas, boissons" },
+      { value: "autre", label: "Autre", icon: "", desc: "Autre type" },
     ];
     return (
       <div className="space-y-6">
@@ -962,7 +962,7 @@ export default function CourseStepForm({
   function renderRecap() {
     const rows = [
       { icon: <Truck className="w-4 h-4 text-primary" />, bg: "bg-red-50", border: "border-red-100", label: "Type", value: formData.type_course === "expedier" ? "Expédition" : "Réception" },
-      { icon: <MapPin className="w-4 h-4 text-red-600" />, bg: "bg-red-50", border: "border-red-100", label: "Récupération", value: formData.adresse_depart || (formData.recuperationGPS ? "📍 Position GPS" : "—") },
+      { icon: <MapPin className="w-4 h-4 text-red-600" />, bg: "bg-red-50", border: "border-red-100", label: "Récupération", value: formData.adresse_depart || (formData.recuperationGPS ? " Position GPS" : "—") },
       { icon: <MapPin className="w-4 h-4 text-green-600" />, bg: "bg-green-50", border: "border-green-100", label: "Livraison", value: formData.adresse_arrivee || "—" },
       { icon: <User className="w-4 h-4 text-blue-600" />, bg: "bg-blue-50", border: "border-blue-100", label: "Contact", value: formData.type_course === "expedier" ? `${formData.destinataire_nom || "Destinataire"} • ${formData.destinataire_telephone}` : `${formData.expediteur_nom || "Expéditeur"} • ${formData.expediteur_telephone}` },
       { icon: <Package className="w-4 h-4 text-purple-600" />, bg: "bg-purple-50", border: "border-purple-100", label: "Colis", value: formData.type_colis?.replace(/_/g, " ") || "—" },

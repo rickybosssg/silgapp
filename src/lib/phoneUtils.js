@@ -10,15 +10,15 @@
 
 /** Tous les pays SILGAPP avec indicatif et longueur du numéro local */
 export const SILGAPP_COUNTRIES = [
-  { code: "BF", dial: "226", len: 8, name: "Burkina Faso", flag: "🇧🇫" },
-  { code: "TG", dial: "228", len: 8, name: "Togo", flag: "🇹🇬" },
-  { code: "CI", dial: "225", len: 10, name: "Côte d'Ivoire", flag: "🇨🇮" },
-  { code: "BJ", dial: "229", len: 8, name: "Bénin", flag: "🇧🇯" },
-  { code: "SN", dial: "221", len: 9, name: "Sénégal", flag: "🇸🇳" },
-  { code: "ML", dial: "223", len: 8, name: "Mali", flag: "🇲🇱" },
-  { code: "GN", dial: "224", len: 9, name: "Guinée", flag: "🇬🇳" },
-  { code: "NE", dial: "227", len: 8, name: "Niger", flag: "🇳🇪" },
-  { code: "GH", dial: "233", len: 9, name: "Ghana", flag: "🇬🇭" },
+  { code: "BF", dial: "226", len: 8, name: "Burkina Faso", flag: "" },
+  { code: "TG", dial: "228", len: 8, name: "Togo", flag: "" },
+  { code: "CI", dial: "225", len: 10, name: "Côte d'Ivoire", flag: "" },
+  { code: "BJ", dial: "229", len: 8, name: "Bénin", flag: "" },
+  { code: "SN", dial: "221", len: 9, name: "Sénégal", flag: "" },
+  { code: "ML", dial: "223", len: 8, name: "Mali", flag: "" },
+  { code: "GN", dial: "224", len: 9, name: "Guinée", flag: "" },
+  { code: "NE", dial: "227", len: 8, name: "Niger", flag: "" },
+  { code: "GH", dial: "233", len: 9, name: "Ghana", flag: "" },
 ];
 
 const normalizeSearch = (value) =>
@@ -45,12 +45,12 @@ export function searchCountries(query) {
  * Retourne null si le numéro ne peut pas être normalisé.
  *
  * Exemples :
- *   normalizePhone("70123456")        → "22670123456"  (BF supposé si ambigu)
- *   normalizePhone("70123456", "BF")  → "22670123456"
- *   normalizePhone("+22670123456")    → "22670123456"
- *   normalizePhone("22670123456")     → "22670123456"
- *   normalizePhone("070123456", "BF") → "22670123456"
- *   normalizePhone("0712345678", "CI")→ "2250712345678"
+ * normalizePhone("70123456") → "22670123456" (BF supposé si ambigu)
+ * normalizePhone("70123456", "BF") → "22670123456"
+ * normalizePhone("+22670123456") → "22670123456"
+ * normalizePhone("22670123456") → "22670123456"
+ * normalizePhone("070123456", "BF") → "22670123456"
+ * normalizePhone("0712345678", "CI")→ "2250712345678"
  */
 export function normalizePhone(phone, countryCode = null) {
   if (!phone) return null;
@@ -131,7 +131,7 @@ export function phoneVariants(phone) {
 /**
  * Formate un numéro pour affichage lisible (groupes de 2)
  * Ex: "22670123456" → "+226 70 12 34 56"
- *     "22507012345678" → "+225 07 01 23 45 67 8"
+ * "22507012345678" → "+225 07 01 23 45 67 8"
  */
 export function formatPhoneDisplay(phone) {
   const n = (phone || "").replace(/\D/g, "");

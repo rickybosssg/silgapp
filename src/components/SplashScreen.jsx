@@ -45,7 +45,7 @@ export default function SplashScreen() {
             Bienvenue sur SILGAPP
           </p>
           <p className="text-white/90 text-sm font-medium tracking-wider">
-            ❤️ PLUS QU'UN SERVICE, UNE PROMESSE ❤️
+             PLUS QU'UN SERVICE, UNE PROMESSE
           </p>
         </div>
         <div className="flex gap-1.5 mt-4">
@@ -57,9 +57,9 @@ export default function SplashScreen() {
 
       <style>{`
         @keyframes starFall {
-          0%   { transform: translateY(-20px) rotate(0deg); opacity: 0; }
-          10%  { opacity: 1; }
-          90%  { opacity: 0.8; }
+          0% { transform: translateY(-20px) rotate(0deg); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 0.8; }
           100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
         }
       `}</style>

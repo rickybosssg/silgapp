@@ -1,12 +1,12 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 /**
- * ⛔ DÉSACTIVÉ — Les courses ne sont plus fermées automatiquement.
- * 
+ * DÉSACTIVÉ — Les courses ne sont plus fermées automatiquement.
+ *
  * Cette fonction est conservée pour rétrocompatibilité mais ne ferme plus
  * aucune course. Le dispatch externe continue de chercher des livreurs
  * indéfiniment (cycles de 3 livreurs, puis 2 min d'attente, puis nouveau cycle).
- * 
+ *
  * Une course n'est clôturée que par :
  * - Acceptation par un livreur
  * - Annulation par le client
@@ -31,15 +31,15 @@ Deno.serve(async (req) => {
       minutes: Math.round((now.getTime() - new Date(c.created_date).getTime()) / 60000),
     }));
 
-    console.log(`[FERMETURE] ⛔ DÉSACTIVÉ — ${coursesFiltrees.length} courses en recherche_livreur (surveillance uniquement)`);
+    console.log(`[FERMETURE] DÉSACTIVÉ — ${coursesFiltrees.length} courses en recherche_livreur (surveillance uniquement)`);
     if (dureesMin.length > 0) {
       const maxDuree = Math.max(...dureesMin.map(d => d.minutes));
-      console.log(`[FERMETURE] 📊 Durée max en recherche: ${maxDuree} min | Courses: ${JSON.stringify(dureesMin.slice(0, 10))}`);
+      console.log(`[FERMETURE] Durée max en recherche: ${maxDuree} min | Courses: ${JSON.stringify(dureesMin.slice(0, 10))}`);
     }
 
     return Response.json({ success: true, desactive: true, courses_en_recherche: coursesFiltrees.length, monitoring: dureesMin });
   } catch (error) {
-    console.error('[FERMETURE] ❌ Erreur:', error.message);
+    console.error('[FERMETURE] Erreur:', error.message);
     return Response.json({ error: error.message }, { status: 500 });
   }
 });

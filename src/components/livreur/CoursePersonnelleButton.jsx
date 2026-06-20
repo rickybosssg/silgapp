@@ -32,7 +32,7 @@ export default function CoursePersonnelleButton({ livreur }) {
 
       // Notifier l'admin via notification
       await base44.entities.Notification.create({
-        titre: "🚚 Nouvelle course personnelle déclarée",
+        titre: " Nouvelle course personnelle déclarée",
         message: `Livreur : ${livreur.prenom || ""} ${livreur.nom} | Client : ${telephone.trim()} | Heure : ${new Date().toLocaleTimeString("fr-FR")}`,
         type: "course_assignee",
         course_id: course.id,
@@ -43,7 +43,7 @@ export default function CoursePersonnelleButton({ livreur }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mes-courses"] });
       queryClient.invalidateQueries({ queryKey: ["livreur-profil"] });
-      toast.success("🚚 Course personnelle créée ! Vous êtes maintenant en course.");
+      toast.success(" Course personnelle créée ! Vous êtes maintenant en course.");
       setOpen(false);
       setTelephone("");
     },
@@ -110,7 +110,7 @@ export default function CoursePersonnelleButton({ livreur }) {
 
               <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-3">
                 <p className="text-xs text-yellow-700 font-medium">
-                  ⚡ La course sera immédiatement assignée à vous et vous passerez en statut <strong>En course</strong>.
+                   La course sera immédiatement assignée à vous et vous passerez en statut <strong>En course</strong>.
                 </p>
               </div>
 

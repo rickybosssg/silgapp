@@ -100,7 +100,7 @@ export default function StatsTelechargementsAdmin() {
       }
     });
 
-    const conversionRate = totalVisits > 0 
+    const conversionRate = totalVisits > 0
       ? ((totalDownloads / totalVisits) * 100).toFixed(2)
       : 0;
 
@@ -119,14 +119,14 @@ export default function StatsTelechargementsAdmin() {
   }, [allStats]);
 
   const countryNames = {
-    BF: "Burkina Faso 🇧🇫",
-    CI: "Côte d'Ivoire 🇨🇮",
-    TG: "Togo 🇹🇬",
-    BJ: "Bénin 🇧🇯",
-    SN: "Sénégal 🇸🇳",
-    ML: "Mali 🇲🇱",
-    GN: "Guinée 🇬🇳",
-    NE: "Niger 🇳🇪",
+    BF: "Burkina Faso ",
+    CI: "Côte d'Ivoire ",
+    TG: "Togo ",
+    BJ: "Bénin ",
+    SN: "Sénégal ",
+    ML: "Mali ",
+    GN: "Guinée ",
+    NE: "Niger ",
   };
 
   const sourceConfig = {
@@ -162,7 +162,7 @@ export default function StatsTelechargementsAdmin() {
                 <Download className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-black">📊 Téléchargements SILGAPP</h1>
+                <h1 className="text-2xl font-black"> Téléchargements SILGAPP</h1>
                 <p className="text-white/80 text-sm mt-0.5">Statistiques détaillées en temps réel</p>
               </div>
             </div>

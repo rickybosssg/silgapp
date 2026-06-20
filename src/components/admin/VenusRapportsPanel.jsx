@@ -12,7 +12,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieCha
 import { toast } from "sonner";
 import { useAdminContext } from "@/hooks/useAdminContext";
 
-const PAYS_FLAGS = { BF: "🇧🇫", CI: "🇨🇮", TG: "🇹🇬", BJ: "🇧🇯", SN: "🇸🇳", ML: "🇲🇱", GN: "🇬🇳", NE: "🇳🇪" };
+const PAYS_FLAGS = { BF: "", CI: "", TG: "", BJ: "", SN: "", ML: "", GN: "", NE: "" };
 const PAYS_NOMS = { BF: "Burkina Faso", CI: "Côte d'Ivoire", TG: "Togo", BJ: "Bénin", SN: "Sénégal", ML: "Mali", GN: "Guinée", NE: "Niger" };
 
 const COLORS = ["#e53e3e","#dd6b20","#d69e2e","#38a169","#3182ce","#805ad5","#d53f8c","#319795","#e53e3e","#744210"];
@@ -120,7 +120,7 @@ export default function VenusRapportsPanel() {
       });
       setLastRapport({ type, contenu: res.data.recommandations });
       setShowRapport(true);
-      toast.success(`Rapport ${type} généré ✓`);
+      toast.success(`Rapport ${type} généré `);
     } catch (err) {
       toast.error("Erreur : " + err.message);
     } finally {
@@ -138,7 +138,7 @@ export default function VenusRapportsPanel() {
           </div>
           <div>
             <p className="font-bold text-sm text-foreground flex items-center gap-2">
-              📊 Rapports VENUS
+               Rapports VENUS
               <Badge className="bg-violet-100 text-violet-700 border-violet-200 text-[10px] font-bold">IA</Badge>
             </p>
             <p className="text-xs text-muted-foreground">Observatoire intelligent des conversations</p>
@@ -178,7 +178,7 @@ export default function VenusRapportsPanel() {
             }`}
           >
             <Globe className="w-3.5 h-3.5" />
-            {viewAllCountries ? "🌍 Tous les pays" : `${PAYS_FLAGS[countryParam] || ""} ${PAYS_NOMS[countryParam] || countryParam}`}
+            {viewAllCountries ? " Tous les pays" : `${PAYS_FLAGS[countryParam] || ""} ${PAYS_NOMS[countryParam] || countryParam}`}
           </button>
         )}
 
@@ -226,7 +226,7 @@ export default function VenusRapportsPanel() {
           {/* Tendance 7 jours */}
           {stats.tendance?.length > 0 && (
             <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">📈 Tendance (7 jours)</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3"> Tendance (7 jours)</p>
               <TendanceChart data={stats.tendance} />
             </div>
           )}
@@ -234,7 +234,7 @@ export default function VenusRapportsPanel() {
           <div className="grid lg:grid-cols-2 gap-4">
             {/* Top questions */}
             <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">🔥 Top {topN} questions</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3"> Top {topN} questions</p>
               {stats.top_questions?.length === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-6">Aucune question enregistrée</p>
               ) : (
@@ -259,7 +259,7 @@ export default function VenusRapportsPanel() {
 
             {/* Répartition par catégorie */}
             <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">📊 Répartition par catégorie</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3"> Répartition par catégorie</p>
               {stats.categories?.length === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-6">Aucune donnée</p>
               ) : (
@@ -271,7 +271,7 @@ export default function VenusRapportsPanel() {
           {/* Catégories liste */}
           {stats.categories?.length > 0 && (
             <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">📋 Détail des catégories</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3"> Détail des catégories</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {stats.categories.map((cat, i) => (
                   <div key={cat.categorie} className="flex items-center gap-2 p-2.5 rounded-xl bg-gray-50 border border-gray-100">
@@ -296,7 +296,7 @@ export default function VenusRapportsPanel() {
               <div className="space-y-2">
                 {stats.problemes.map((p, i) => (
                   <div key={i} className="flex items-start gap-2 text-xs text-amber-900">
-                    <span className="mt-0.5 flex-shrink-0">⚠️</span>
+                    <span className="mt-0.5 flex-shrink-0"></span>
                     <span>{p.message}</span>
                   </div>
                 ))}
@@ -307,13 +307,13 @@ export default function VenusRapportsPanel() {
           {/* Répartition par pays (super admin ALL) */}
           {stats.par_pays?.length > 0 && (
             <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">🌍 Comparaison par pays</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3"> Comparaison par pays</p>
               <div className="grid lg:grid-cols-2 gap-4">
                 <PaysPieChart data={stats.par_pays} />
                 <div className="space-y-2">
                   {stats.par_pays.map((p, i) => (
                     <div key={p.code} className="flex items-center gap-2">
-                      <span className="text-base">{PAYS_FLAGS[p.code] || "🌍"}</span>
+                      <span className="text-base">{PAYS_FLAGS[p.code] || ""}</span>
                       <div className="flex-1">
                         <div className="flex justify-between text-xs mb-0.5">
                           <span className="font-semibold">{PAYS_NOMS[p.code] || p.code}</span>

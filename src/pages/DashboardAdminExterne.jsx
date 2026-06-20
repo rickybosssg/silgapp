@@ -30,7 +30,7 @@ import LivreursBloquesEncours from "@/components/admin/LivreursBloquesEncours";
 export default function DashboardAdminExterne() {
   const { isPays, countryCode: adminCountryCode } = useAdminContext();
   const effectiveCountry = isPays ? adminCountryCode : "BF"; // Fallback BF si global
-  
+
   const { data: courses = [] } = useQuery({
     queryKey: ["courses-externes", effectiveCountry],
     queryFn: () => base44.entities.CourseExterne.filter({ country_code: effectiveCountry }, "-created_date", 200),
@@ -72,7 +72,7 @@ export default function DashboardAdminExterne() {
           description: "Lien Google Drive vers le fichier APK SILGAPP Externe"
         });
       }
-      toast.success("Lien APK sauvegardé ✓");
+      toast.success("Lien APK sauvegardé ");
     } finally {
       setApkSaving(false);
     }
@@ -264,16 +264,16 @@ export default function DashboardAdminExterne() {
         <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Vue d'ensemble</p>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
           {[
-            { label: "Total courses",    value: stats.coursesTotale,               grad: "from-primary to-red-600",          shadow: "shadow-red-100" },
-            { label: "Aujourd'hui",      value: stats.coursesToday,                grad: "from-blue-500 to-indigo-500",       shadow: "shadow-blue-100" },
-            { label: "En traitement",    value: stats.enTraitement,                grad: "from-orange-500 to-amber-500",      shadow: "shadow-orange-100" },
-            { label: "Livrées",          value: stats.livrees,                     grad: "from-green-500 to-emerald-500",     shadow: "shadow-green-100" },
-            { label: "Annulées",         value: stats.annulees,                    grad: "from-red-400 to-rose-500",          shadow: "shadow-red-100" },
-            { label: "CA total",         value: `${stats.caTotal.toLocaleString()}`, grad: "from-indigo-500 to-violet-500",  shadow: "shadow-indigo-100", suffix: "F" },
+            { label: "Total courses", value: stats.coursesTotale, grad: "from-primary to-red-600", shadow: "shadow-red-100" },
+            { label: "Aujourd'hui", value: stats.coursesToday, grad: "from-blue-500 to-indigo-500", shadow: "shadow-blue-100" },
+            { label: "En traitement", value: stats.enTraitement, grad: "from-orange-500 to-amber-500", shadow: "shadow-orange-100" },
+            { label: "Livrées", value: stats.livrees, grad: "from-green-500 to-emerald-500", shadow: "shadow-green-100" },
+            { label: "Annulées", value: stats.annulees, grad: "from-red-400 to-rose-500", shadow: "shadow-red-100" },
+            { label: "CA total", value: `${stats.caTotal.toLocaleString()}`, grad: "from-indigo-500 to-violet-500", shadow: "shadow-indigo-100", suffix: "F" },
             { label: "Commission Silga", value: `${stats.commissionSilga.toLocaleString()}`, grad: "from-purple-500 to-fuchsia-500", shadow: "shadow-purple-100", suffix: "F" },
-            { label: "Livreurs en ligne",value: stats.livreursEnLigne,             grad: "from-emerald-500 to-teal-500",      shadow: "shadow-emerald-100" },
-            { label: "Disponibles",      value: stats.livreursDisponibles,         grad: "from-cyan-500 to-sky-500",          shadow: "shadow-cyan-100" },
-            { label: "Clients",          value: stats.clientsTotal,                grad: "from-pink-500 to-rose-500",         shadow: "shadow-pink-100" },
+            { label: "Livreurs en ligne",value: stats.livreursEnLigne, grad: "from-emerald-500 to-teal-500", shadow: "shadow-emerald-100" },
+            { label: "Disponibles", value: stats.livreursDisponibles, grad: "from-cyan-500 to-sky-500", shadow: "shadow-cyan-100" },
+            { label: "Clients", value: stats.clientsTotal, grad: "from-pink-500 to-rose-500", shadow: "shadow-pink-100" },
           ].map(s => (
             <div key={s.label} className={`bg-gradient-to-br ${s.grad} rounded-2xl p-3.5 text-white shadow-md ${s.shadow}`}>
               <p className="text-[10px] font-semibold opacity-80 uppercase tracking-wide mb-1">{s.label}</p>
@@ -429,11 +429,11 @@ export default function DashboardAdminExterne() {
               .sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
               .map(course => {
                 const statutConfig = {
-                  colis_recupere: { label: "📦 Récupéré",  cls: "bg-blue-100 text-blue-700" },
-                  en_livraison:   { label: "🚀 En livraison", cls: "bg-indigo-100 text-indigo-700" },
-                  livreur_en_route: { label: "🛵 En route", cls: "bg-cyan-100 text-cyan-700" },
-                  recherche_livreur: { label: "🔍 Recherche", cls: "bg-amber-100 text-amber-700" },
-                  nouvelle:       { label: "🆕 Nouvelle",   cls: "bg-gray-100 text-gray-600" },
+                  colis_recupere: { label: " Récupéré", cls: "bg-blue-100 text-blue-700" },
+                  en_livraison: { label: " En livraison", cls: "bg-indigo-100 text-indigo-700" },
+                  livreur_en_route: { label: " En route", cls: "bg-cyan-100 text-cyan-700" },
+                  recherche_livreur: { label: " Recherche", cls: "bg-amber-100 text-amber-700" },
+                  nouvelle: { label: "🆕 Nouvelle", cls: "bg-gray-100 text-gray-600" },
                 }[course.statut] || { label: course.statut, cls: "bg-gray-100 text-gray-500" };
 
                 return (
@@ -450,7 +450,7 @@ export default function DashboardAdminExterne() {
                         {course.adresse_depart} → {course.adresse_arrivee || "?"}
                       </p>
                       <p className="text-[10px] text-muted-foreground mt-0.5">
-                        {course.livreur_nom && `👤 ${course.livreur_nom} • `}
+                        {course.livreur_nom && ` ${course.livreur_nom} • `}
                         {format(new Date(course.created_date), "dd/MM HH:mm", { locale: fr })}
                       </p>
                     </div>
@@ -499,7 +499,7 @@ function DiagnosticInterne() {
     try {
       const response = await base44.functions.invoke("diagnosticLivraison", { course_id: courseId.trim() });
       setResult(response.data);
-      if (response.data.success) toast.success("Diagnostic terminé ✅");
+      if (response.data.success) toast.success("Diagnostic terminé ");
       else toast.error("Erreur: " + response.data.error);
     } catch (err) {
       toast.error("Erreur: " + err.message);
@@ -539,8 +539,8 @@ function DiagnosticInterne() {
                 {[
                   { label: "Statut", value: result.diagnostics.statut },
                   { label: "Confirmé par", value: result.diagnostics.delivery_confirmed_by || "—" },
-                  { label: "Token QR", value: result.diagnostics.delivery_qr_token ? "✅ Présent" : "❌ Manquant", ok: result.checks.delivery_token_exists },
-                  { label: "Code 4 chiffres", value: result.diagnostics.delivery_code_4_digits || "❌ Manquant", ok: result.checks.delivery_code_exists },
+                  { label: "Token QR", value: result.diagnostics.delivery_qr_token ? " Présent" : " Manquant", ok: result.checks.delivery_token_exists },
+                  { label: "Code 4 chiffres", value: result.diagnostics.delivery_code_4_digits || " Manquant", ok: result.checks.delivery_code_exists },
                 ].map(item => (
                   <div key={item.label} className="bg-gray-50 border border-gray-100 p-2.5 rounded-xl">
                     <p className="text-gray-600 mb-0.5">{item.label}</p>

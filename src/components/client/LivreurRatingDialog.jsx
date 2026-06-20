@@ -6,11 +6,11 @@ import { Star, X, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 const LABELS = {
-  1: "😞 Très insatisfait",
-  2: "😕 Insatisfait",
-  3: "😐 Satisfait",
-  4: "😊 Très satisfait",
-  5: "🌟 Excellent !",
+  1: " Très insatisfait",
+  2: " Insatisfait",
+  3: " Satisfait",
+  4: " Très satisfait",
+  5: " Excellent !",
 };
 
 export default function LivreurRatingDialog({ course, onClose, onRated }) {

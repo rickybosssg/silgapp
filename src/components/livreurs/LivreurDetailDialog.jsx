@@ -24,7 +24,7 @@ export default function LivreurDetailDialog({ livreur, open, onClose }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["livreurs-all"] });
       queryClient.invalidateQueries({ queryKey: ["livreurs-internes"] });
-      toast.success("Paiement validé ✅ — Compteur remis à zéro");
+      toast.success("Paiement validé — Compteur remis à zéro");
     },
     onError: () => toast.error("Erreur lors de la validation du paiement"),
   });
@@ -36,10 +36,10 @@ export default function LivreurDetailDialog({ livreur, open, onClose }) {
   });
 
   const today = new Date().toDateString();
-  
+
   const stats = useMemo(() => {
     const livreurCourses = courses.filter(c => c.livreur_id === livreur.id);
-    const todayCourses = livreurCourses.filter(c => 
+    const todayCourses = livreurCourses.filter(c =>
       new Date(c.created_date).toDateString() === today
     );
 
@@ -61,10 +61,10 @@ export default function LivreurDetailDialog({ livreur, open, onClose }) {
     };
   }, [courses, livreur.id, today]);
 
-  const lastPos = livreur.latitude && livreur.longitude 
+  const lastPos = livreur.latitude && livreur.longitude
     ? `${livreur.latitude.toFixed(4)}, ${livreur.longitude.toFixed(4)}`
     : "N/A";
-  const lastActivity = livreur.derniere_position_date 
+  const lastActivity = livreur.derniere_position_date
     ? format(new Date(livreur.derniere_position_date), "dd/MM/yyyy HH:mm", { locale: fr })
     : "Jamais";
 
@@ -129,9 +129,9 @@ export default function LivreurDetailDialog({ livreur, open, onClose }) {
               <StatItem label="Courses livrées" value={stats.coursesLivrees} icon={CheckCircle2} color="text-green-600" />
               <StatItem label="Total encaissé" value={`${stats.totalEncaisse.toLocaleString()} F`} icon={Banknote} color="text-blue-600" />
               <StatItem label="Dû à Silga" value={`${stats.montantDu.toLocaleString()} F`} color="text-blue-600" />
-              <StatItem 
-                label="Paiement" 
-                value={livreur.statut_paiement === "paye" ? "Payé ✅" : "Non payé"} 
+              <StatItem
+                label="Paiement"
+                value={livreur.statut_paiement === "paye" ? "Payé " : "Non payé"}
                 color={livreur.statut_paiement === "paye" ? "text-green-600" : "text-amber-600"}
               />
               {/* Bouton paiement */}
@@ -143,12 +143,12 @@ export default function LivreurDetailDialog({ livreur, open, onClose }) {
                     disabled={paiementMutation.isPending}
                   >
                     <Banknote className="w-4 h-4" />
-                    {paiementMutation.isPending ? "Validation..." : `💰 Valider paiement — ${stats.montantDu.toLocaleString()} FCFA → Compteur à zéro`}
+                    {paiementMutation.isPending ? "Validation..." : ` Valider paiement — ${stats.montantDu.toLocaleString()} FCFA → Compteur à zéro`}
                   </Button>
                 </div>
               ) : livreur.statut_paiement === "paye" ? (
                 <div className="col-span-2 mt-1 bg-green-50 border border-green-200 rounded-lg p-2 text-center text-sm text-green-700 font-semibold">
-                  ✅ Paiement déjà validé — Compteur à zéro
+                   Paiement déjà validé — Compteur à zéro
                   {livreur.heure_paiement && (
                     <span className="block text-xs font-normal text-green-600">
                       à {format(new Date(livreur.heure_paiement), "HH:mm", { locale: fr })}

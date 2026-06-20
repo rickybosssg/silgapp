@@ -2,7 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 /**
  * GESTION DES COURSES EN PAUSE - SILGA INTERNE
- * 
+ *
  * Permet au livreur de mettre une course en pause temporairement
  * et de la reprendre plus tard.
  */
@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
 
     // ─── 1. Mettre la course en pause ───────────────────────────────────────
     if (action === 'mettre_pause') {
-      console.log(`[PAUSE COURSE] 📋 Livreur ${livreur_id} met en pause la course ${course_id}`);
+      console.log(`[PAUSE COURSE] Livreur ${livreur_id} met en pause la course ${course_id}`);
 
       if (!course_id || !livreur_id) {
         return Response.json({ error: 'course_id et livreur_id requis' }, { status: 400 });
@@ -38,8 +38,8 @@ Deno.serve(async (req) => {
       // Vérifier que la course est dans un statut acceptable pour pause
       const statutsAcceptes = ['acceptee', 'en_route_recuperation', 'colis_recupere', 'en_livraison'];
       if (!statutsAcceptes.includes(course.statut)) {
-        return Response.json({ 
-          error: `Impossible de mettre en pause une course avec le statut "${course.statut}"` 
+        return Response.json({
+          error: `Impossible de mettre en pause une course avec le statut "${course.statut}"`
         }, { status: 400 });
       }
 
@@ -57,9 +57,9 @@ Deno.serve(async (req) => {
         statut: 'disponible'
       });
 
-      console.log(`[PAUSE COURSE] ✅ Course ${course_id} en pause (motif: ${motif})`);
-      return Response.json({ 
-        success: true, 
+      console.log(`[PAUSE COURSE] Course ${course_id} en pause (motif: ${motif})`);
+      return Response.json({
+        success: true,
         message: 'Course mise en pause avec succès',
         course_id: course_id
       });
@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
 
     // ─── 2. Reprendre la course ───────────────────────────────────────────────
     if (action === 'reprendre_course') {
-      console.log(`[PAUSE COURSE] ▶️ Livreur ${livreur_id} reprend la course ${course_id}`);
+      console.log(`[PAUSE COURSE] ▶ Livreur ${livreur_id} reprend la course ${course_id}`);
 
       if (!course_id || !livreur_id) {
         return Response.json({ error: 'course_id et livreur_id requis' }, { status: 400 });
@@ -85,8 +85,8 @@ Deno.serve(async (req) => {
 
       // Vérifier que la course est bien en pause
       if (course.statut !== 'pause') {
-        return Response.json({ 
-          error: `Cette course n'est pas en pause (statut: ${course.statut})` 
+        return Response.json({
+          error: `Cette course n'est pas en pause (statut: ${course.statut})`
         }, { status: 400 });
       }
 
@@ -96,7 +96,7 @@ Deno.serve(async (req) => {
 
       // Reprendre la course - retour au statut précédent
       const statutPrecedent = course.statut_pre_pause || 'acceptee';
-      
+
       await base44.asServiceRole.entities.Course.update(course_id, {
         statut: statutPrecedent,
         pause_motif: null,
@@ -112,9 +112,9 @@ Deno.serve(async (req) => {
         statut: 'en_course'
       });
 
-      console.log(`[PAUSE COURSE] ✅ Course ${course_id} reprise (pause: ${pauseDurationMinutes} min)`);
-      return Response.json({ 
-        success: true, 
+      console.log(`[PAUSE COURSE] Course ${course_id} reprise (pause: ${pauseDurationMinutes} min)`);
+      return Response.json({
+        success: true,
         message: 'Course reprise avec succès',
         course_id: course_id,
         pause_duree_minutes: pauseDurationMinutes
@@ -143,7 +143,7 @@ Deno.serve(async (req) => {
         };
       });
 
-      return Response.json({ 
+      return Response.json({
         success: true,
         courses: coursesAvecDuree,
         count: coursesAvecDuree.length
@@ -171,7 +171,7 @@ Deno.serve(async (req) => {
       // Trier par durée de pause (les plus anciennes en premier)
       coursesAvecDuree.sort((a, b) => b.pause_duree_secondes - a.pause_duree_secondes);
 
-      return Response.json({ 
+      return Response.json({
         success: true,
         courses: coursesAvecDuree,
         count: coursesAvecDuree.length,

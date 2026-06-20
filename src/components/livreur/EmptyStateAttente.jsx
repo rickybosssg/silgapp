@@ -5,7 +5,7 @@ const VENUS_PHOTO = "https://media.base44.com/images/public/6a0ec08f3af5e1d12842
 const messages = [
   "Je te trouve une course dans un instant...",
   "Je cherche une course proche de ta zone...",
-  "Reste prêt, une mission arrive bientôt ! 🎯",
+  "Reste prêt, une mission arrive bientôt ! ",
 ];
 
 export default function EmptyStateAttente() {
@@ -76,7 +76,7 @@ export default function EmptyStateAttente() {
         {/* Infos de recherche */}
         <div className="bg-white/5 rounded-2xl p-4 border border-white/8 space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-white/50 font-medium">🎯 Rayon actuel</span>
+            <span className="text-xs text-white/50 font-medium"> Rayon actuel</span>
             <span className="text-sm font-black text-green-400">3 km</span>
           </div>
           <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
@@ -87,7 +87,7 @@ export default function EmptyStateAttente() {
             <span>→ 5 km → 8 km</span>
           </div>
           <p className="text-[11px] text-white/40 pt-1">
-            🔔 Extension automatique • Alertes sonores + vibrations
+             Extension automatique • Alertes sonores + vibrations
           </p>
         </div>
       </div>

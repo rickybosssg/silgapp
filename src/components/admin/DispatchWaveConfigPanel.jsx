@@ -100,7 +100,7 @@ export default function DispatchWaveConfigPanel() {
           waves_json: wavesJson,
         });
       }
-      toast.success("Configuration vagues GPS sauvegardée ✓");
+      toast.success("Configuration vagues GPS sauvegardée ");
     } catch (err) {
       toast.error("Erreur: " + err.message);
     } finally {

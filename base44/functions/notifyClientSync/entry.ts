@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
     const courseId = payload.event?.entity_id || payload.course_id || payload.data?.id;
 
     if (!courseId) {
-      console.error('[notifyClientSync] ❌ course_id manquant');
+      console.error('[notifyClientSync] course_id manquant');
       return Response.json({ error: "course_id manquant" }, { status: 400 });
     }
 
@@ -82,14 +82,14 @@ Deno.serve(async (req) => {
 
     // Indicatifs SILGAPP multi-pays
     const COUNTRY_DIALCODES = [
-      { code: "226", len: 8 },  // BF
+      { code: "226", len: 8 }, // BF
       { code: "225", len: 10 }, // CI
-      { code: "228", len: 8 },  // TG
-      { code: "229", len: 8 },  // BJ
-      { code: "221", len: 9 },  // SN
-      { code: "223", len: 8 },  // ML
-      { code: "224", len: 9 },  // GN
-      { code: "227", len: 8 },  // NE
+      { code: "228", len: 8 }, // TG
+      { code: "229", len: 8 }, // BJ
+      { code: "221", len: 9 }, // SN
+      { code: "223", len: 8 }, // ML
+      { code: "224", len: 9 }, // GN
+      { code: "227", len: 8 }, // NE
     ];
 
     // Génère toutes les variantes d'un numéro (tous pays)
@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
           const sorted = existing.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
           for (let i = 1; i < sorted.length; i++) {
             await base44.asServiceRole.entities.Notification.delete(sorted[i].id);
-            console.log(`[notifyClientSync] 🗑 Doublon supprimé: ${sorted[i].id}`);
+            console.log(`[notifyClientSync] Doublon supprimé: ${sorted[i].id}`);
           }
         }
         return null;
@@ -166,7 +166,7 @@ Deno.serve(async (req) => {
         lue: false,
       });
 
-      console.log(`[notifyClientSync] ✅ Notif créée pour ${userEmail}: "${content.titre}"`);
+      console.log(`[notifyClientSync] Notif créée pour ${userEmail}: "${content.titre}"`);
 
       // Envoi push FCM natif (son + vibration Android)
       try {
@@ -177,9 +177,9 @@ Deno.serve(async (req) => {
           type: content.type,
           course_id: course.id,
         });
-        console.log(`[notifyClientSync] 📲 Push FCM envoyé à ${userEmail}`);
+        console.log(`[notifyClientSync] Push FCM envoyé à ${userEmail}`);
       } catch (pushErr) {
-        console.warn(`[notifyClientSync] ⚠️ Push FCM échoué (non bloquant): ${pushErr.message}`);
+        console.warn(`[notifyClientSync] Push FCM échoué (non bloquant): ${pushErr.message}`);
       }
 
       return notif;
@@ -218,7 +218,7 @@ Deno.serve(async (req) => {
     return Response.json({ success: true, notifications_created: notifications.length });
 
   } catch (error) {
-    console.error('[notifyClientSync] ❌ Erreur:', error.message);
+    console.error('[notifyClientSync] Erreur:', error.message);
     return Response.json({ error: error.message }, { status: 500 });
   }
 });

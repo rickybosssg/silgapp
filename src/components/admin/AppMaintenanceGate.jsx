@@ -34,7 +34,7 @@ export default function AppMaintenanceGate({ children }) {
             SILGAPP est temporairement indisponible pour maintenance.<br />
             Veuillez réessayer dans quelques minutes.
           </p>
-          <p className="text-xs text-muted-foreground">📞 Support : +226 66 92 51 90</p>
+          <p className="text-xs text-muted-foreground"> Support : +226 66 92 51 90</p>
           <button
             onClick={() => window.location.reload()}
             className="text-sm text-primary underline"

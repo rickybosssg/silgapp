@@ -30,17 +30,17 @@ function computeETA(distKm) {
  * ETADisplay — affiche l'ETA + distance style Uber/Glovo
  *
  * Props:
- *   livreurLat, livreurLng: position du livreur (mise à jour en temps réel)
- *   targetLat, targetLng: position de la destination (récupération ou livraison)
- *   livreurNom: prénom du livreur
- *   phase: "vers_recuperation" | "vers_livraison"
- *   statut: statut de la course
+ * livreurLat, livreurLng: position du livreur (mise à jour en temps réel)
+ * targetLat, targetLng: position de la destination (récupération ou livraison)
+ * livreurNom: prénom du livreur
+ * phase: "vers_recuperation" | "vers_livraison"
+ * statut: statut de la course
  */
 export default function ETADisplay({ livreurLat, livreurLng, targetLat, targetLng, livreurNom, phase, statut, gpsLastUpdate }) {
   const isRecup = phase === "vers_recuperation";
   const prenom = livreurNom?.split(" ")[0] || "Le livreur";
 
-  // ✅ Logging pour debugging
+  // Logging pour debugging
   console.log(`[ETADisplay] phase=${phase}, livreurLat=${livreurLat}, targetLat=${targetLat}`);
 
   // Afficher même sans GPS (message générique)

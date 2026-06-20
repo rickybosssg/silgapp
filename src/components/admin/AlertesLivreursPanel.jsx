@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { 
+import {
   Bell, Plus, Trash2, Loader2, X, ChevronDown, ChevronUp
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,9 +11,9 @@ import { toast } from "sonner";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 
 const NIVEAU_CONFIG = {
-  information: { emoji: "🟢", label: "Information", color: "bg-green-100 text-green-700 border-green-200", dot: "bg-green-500" },
-  important:   { emoji: "🟠", label: "Important",   color: "bg-orange-100 text-orange-700 border-orange-200", dot: "bg-orange-500" },
-  urgent:      { emoji: "🔴", label: "Urgent",      color: "bg-red-100 text-red-700 border-red-200", dot: "bg-red-500" },
+  information: { emoji: "", label: "Information", color: "bg-green-100 text-green-700 border-green-200", dot: "bg-green-500" },
+  important: { emoji: "", label: "Important", color: "bg-orange-100 text-orange-700 border-orange-200", dot: "bg-orange-500" },
+  urgent: { emoji: "", label: "Urgent", color: "bg-red-100 text-red-700 border-red-200", dot: "bg-red-500" },
 };
 
 function NouvelleAlerteForm({ onClose, onCreated, countryCode }) {
@@ -46,7 +46,7 @@ function NouvelleAlerteForm({ onClose, onCreated, countryCode }) {
         date_expiration: form.date_expiration ? new Date(form.date_expiration).toISOString() : null,
       };
       await base44.entities.AlerteLivreur.create(data);
-      toast.success("Alerte créée et envoyée aux livreurs ✓");
+      toast.success("Alerte créée et envoyée aux livreurs ");
       onCreated?.();
       onClose?.();
     } catch (err) {
@@ -97,9 +97,9 @@ function NouvelleAlerteForm({ onClose, onCreated, countryCode }) {
             <label className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-2 block">Livreurs ciblés</label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { val: "tous", label: "Tous", emoji: "👥" },
-                { val: "interne", label: "Interne", emoji: "🏠" },
-                { val: "externe", label: "Externe", emoji: "🌍" },
+                { val: "tous", label: "Tous", emoji: "" },
+                { val: "interne", label: "Interne", emoji: "" },
+                { val: "externe", label: "Externe", emoji: "" },
               ].map(opt => (
                 <button
                   key={opt.val}
@@ -215,7 +215,7 @@ function AlerteStatsRow({ alerte, totalLivreurs, onArchiver }) {
                 </span>
               )}
               {alerte.reseau !== "tous" && (
-                <span className="text-[10px] font-semibold text-gray-600">{alerte.reseau === "interne" ? "🏠 Interne" : "🌍 Externe"}</span>
+                <span className="text-[10px] font-semibold text-gray-600">{alerte.reseau === "interne" ? " Interne" : " Externe"}</span>
               )}
             </div>
             <p className="font-bold text-gray-900 mt-1 text-sm leading-snug">{alerte.titre}</p>

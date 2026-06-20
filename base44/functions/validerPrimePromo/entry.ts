@@ -18,7 +18,7 @@ async function chargerCommissionPays(base44, countryCode) {
 /**
  * Valide et applique la prime code promo lors de la livraison d'une première course.
  * Appelé après qu'une course est marquée "livree".
- * 
+ *
  * Règles :
  * - Client doit avoir un code_promo_utilise
  * - C'est la première course du client (premiere_course_faite = false)
@@ -48,8 +48,8 @@ Deno.serve(async (req) => {
 
     const prixFinal = course.prix_final || 0;
     if (prixFinal < 1000) {
-      return Response.json({ 
-        success: false, 
+      return Response.json({
+        success: false,
         reason: 'Prix minimum non atteint',
         message: 'Le montant minimum pour le code promo est 1000 FCFA'
       });
@@ -63,14 +63,14 @@ Deno.serve(async (req) => {
     // Chercher le client par téléphone de l'expéditeur
     let client = null;
     if (course.expediteur_telephone) {
-      const byPhone = await base44.asServiceRole.entities.ClientExterne.filter({ 
-        telephone: course.expediteur_telephone 
+      const byPhone = await base44.asServiceRole.entities.ClientExterne.filter({
+        telephone: course.expediteur_telephone
       });
       if (byPhone?.length > 0) client = byPhone[0];
     }
     if (!client && course.client_telephone) {
-      const byPhone = await base44.asServiceRole.entities.ClientExterne.filter({ 
-        telephone: course.client_telephone 
+      const byPhone = await base44.asServiceRole.entities.ClientExterne.filter({
+        telephone: course.client_telephone
       });
       if (byPhone?.length > 0) client = byPhone[0];
     }
@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
     // Calculer la répartition avec code promo
     // Prix final > 1000 → réduction fixe 100 FCFA (pas 10% du total)
     const PRIME_FIXE = 100;
-    const prixClientPaye = prixFinal - PRIME_FIXE;       // Client paie prix - 100
+    const prixClientPaye = prixFinal - PRIME_FIXE; // Client paie prix - 100
     const commissionPct = await chargerCommissionPays(base44, course.country_code);
     const commissionBrute = Math.round(prixFinal * (commissionPct / 100));
     const montantLivreur = prixFinal - commissionBrute;

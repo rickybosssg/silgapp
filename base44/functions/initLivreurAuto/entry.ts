@@ -8,17 +8,17 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    
+
     if (!user) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const payload = await req.json();
-    const { 
-      device_id, 
-      platform, 
-      notification_token, 
-      latitude, 
+    const {
+      device_id,
+      platform,
+      notification_token,
+      latitude,
       longitude,
       telephone,
       vehicule,
@@ -26,11 +26,11 @@ Deno.serve(async (req) => {
       country_code
     } = payload;
 
-    // 🛡️ VALIDATION STRICTE : country_code OBLIGATOIRE
+    // VALIDATION STRICTE : country_code OBLIGATOIRE
     if (!country_code) {
-      console.error('[initLivreurAuto] ❌ country_code manquant — inscription livreur rejetée');
-      return Response.json({ 
-        success: false, 
+      console.error('[initLivreurAuto] country_code manquant — inscription livreur rejetée');
+      return Response.json({
+        success: false,
         error: "country_code_required",
         message: "Le pays est obligatoire pour utiliser SILGAPP. Veuillez sélectionner un pays lors de l'inscription."
       }, { status: 400 });
@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
         quartier: quartier || "",
         app_active: false,
         last_seen_at: new Date().toISOString(),
-        country_code: country_code, // ✅ OBLIGATOIRE - rejeté si manquant
+        country_code: country_code, // OBLIGATOIRE - rejeté si manquant
       });
     } else {
       livreur = livreur[0];
@@ -101,8 +101,8 @@ Deno.serve(async (req) => {
     // 5. Tester la notification
     await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
       user_email: user.email,
-      titre: "🎉 Bienvenue Livreur SILGAPP",
-      message: `Votre compte est activé. Code: ${codeIdentification}. GPS et notifications activés ✓`
+      titre: " Bienvenue Livreur SILGAPP",
+      message: `Votre compte est activé. Code: ${codeIdentification}. GPS et notifications activés `
     });
 
     return Response.json({

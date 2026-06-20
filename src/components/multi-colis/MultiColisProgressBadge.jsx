@@ -6,11 +6,11 @@ import { Package, CheckCircle } from "lucide-react";
  * Utilisé sur les cartes de course côté livreur, client et admin.
  *
  * Props:
- *   nbColis        - nombre total de colis
- *   nbLivres       - nombre livrés
- *   nbAnnules      - nombre annulés
- *   showDetails    - afficher la barre de progression (défaut false)
- *   size           - "sm" | "md" (défaut "md")
+ * nbColis - nombre total de colis
+ * nbLivres - nombre livrés
+ * nbAnnules - nombre annulés
+ * showDetails - afficher la barre de progression (défaut false)
+ * size - "sm" | "md" (défaut "md")
  */
 export default function MultiColisProgressBadge({
   nbColis = 1,

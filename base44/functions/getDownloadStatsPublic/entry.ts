@@ -4,13 +4,13 @@ Deno.serve(async (req) => {
   try {
     // IMPORTANT: Cette fonction est PUBLIQUE - pas d'authentification requise
     const base44 = createClientFromRequest(req);
-    
+
     // Récupérer le mois actuel
     const today = new Date();
     const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-    
+
     // Récupérer toutes les stats du mois (service role pour accès public)
-    const allStats = await base44.asServiceRole.entities.DownloadStats.filter({ 
+    const allStats = await base44.asServiceRole.entities.DownloadStats.filter({
       month: monthKey
     });
 
@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
       stats.total_page_visits += (s.page_visits || 0);
       stats.total_clicks += (s.clicks || 0);
       stats.total_downloads += (s.downloads || 0);
-      
+
       // Par pays
       const cc = s.country_code || 'BF';
       if (!stats.by_country[cc]) {
@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
       stats.by_country[cc].visits += (s.page_visits || 0);
       stats.by_country[cc].clicks += (s.clicks || 0);
       stats.by_country[cc].downloads += (s.downloads || 0);
-      
+
       // Par plateforme
       const plat = s.platform || 'web';
       if (stats.by_platform[plat] !== undefined) {
@@ -48,15 +48,15 @@ Deno.serve(async (req) => {
 
     stats.month_downloads = stats.total_downloads;
 
-    return Response.json({ 
-      success: true, 
-      stats 
+    return Response.json({
+      success: true,
+      stats
     });
   } catch (error) {
     console.error('[getDownloadStatsPublic] Error:', error);
-    return Response.json({ 
-      success: false, 
-      error: error.message 
+    return Response.json({
+      success: false,
+      error: error.message
     }, { status: 500 });
   }
 });

@@ -168,10 +168,10 @@ export default function RecapCourseLivreur() {
 
 
   // ── Calcul avec fallbacks (données parfois manquantes) ──────────────────
-  const dist = Number(course.distance_reelle_km) > 0 
+  const dist = Number(course.distance_reelle_km) > 0
     ? Number(course.distance_reelle_km)
-    : (course.gps_depart_lat && course.gps_arrivee_lat 
-        ? haversine(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng) 
+    : (course.gps_depart_lat && course.gps_arrivee_lat
+        ? haversine(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng)
         : 0);
 
   // Prix manuel accepté → priorité absolue
@@ -294,7 +294,7 @@ export default function RecapCourseLivreur() {
             </div>
           )}
 
-          {/* 🚗 Déplacement : grille spécifique avec heures détaillées */}
+          {/* Déplacement : grille spécifique avec heures détaillées */}
           {course.type_course === "deplacement" ? (
             <>
               <div className="grid grid-cols-2 gap-3">
@@ -325,7 +325,7 @@ export default function RecapCourseLivreur() {
               )}
               <div className="flex items-center justify-between px-1">
                 <p className="text-gray-500 text-sm">Type de course</p>
-                <p className="text-white font-semibold text-sm">🚗 Déplacement</p>
+                <p className="text-white font-semibold text-sm"> Déplacement</p>
               </div>
             </>
           ) : (

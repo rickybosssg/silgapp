@@ -1,15 +1,15 @@
 // ─── Constantes de seuils ────────────────────────────────────────────────────
 
-export const GPS_SEUIL_MIN = 5;           // GPS valide si < 5 min (affichage badge)
+export const GPS_SEUIL_MIN = 5; // GPS valide si < 5 min (affichage badge)
 export const GPS_DISPATCH_SEUIL_MIN = 10; // GPS éligible dispatch si < 10 min (= moteur dispatch)
-export const HEARTBEAT_SEUIL_MIN = 2;    // App active si heartbeat < 2 min (dispatch niveau 1)
+export const HEARTBEAT_SEUIL_MIN = 2; // App active si heartbeat < 2 min (dispatch niveau 1)
 export const HEARTBEAT_ON_SEUIL_MIN = 10; // ON si heartbeat < 10 min
-export const GPS_CLIENT_SEUIL_MIN = 30;  // Client GPS valide si < 30 min
+export const GPS_CLIENT_SEUIL_MIN = 30; // Client GPS valide si < 30 min
 
 // ─── Nouveaux seuils de dispatch par niveaux ───────────────────────────────
-export const DISPATCH_NIVEAU_1_HEARTBEAT_MIN = 2;   // Priorité absolue
-export const DISPATCH_NIVEAU_2_HEARTBEAT_MIN = 10;  // Secours
-export const DISPATCH_NIVEAU_3_HEARTBEAT_MIN = 30;  // Secours étendu
+export const DISPATCH_NIVEAU_1_HEARTBEAT_MIN = 2; // Priorité absolue
+export const DISPATCH_NIVEAU_2_HEARTBEAT_MIN = 10; // Secours
+export const DISPATCH_NIVEAU_3_HEARTBEAT_MIN = 30; // Secours étendu
 // Niveau 4 : tous les livreurs libres (pas de limite heartbeat)
 
 // ─── Helpers (règles unifiées) ───────────────────────────────────────────────
@@ -46,16 +46,16 @@ export function isON(livreur) {
 /**
  * Libre = disponibilité métier (indépendant du GPS et heartbeat)
  * Critères :
- *   - statut = "disponible"
- *   - actif = true
- *   - validation = "valide"
- *   - a des coordonnées GPS (lat/lng)
- * 
- * ⚠️ IMPORTANT : Le GPS et heartbeat ne sont PAS des critères d'exclusion
+ * - statut = "disponible"
+ * - actif = true
+ * - validation = "valide"
+ * - a des coordonnées GPS (lat/lng)
+ *
+ * IMPORTANT : Le GPS et heartbeat ne sont PAS des critères d'exclusion
  * Ils servent uniquement à :
- *   - prioriser les propositions (niveau 1 → 4)
- *   - choisir le canal de notification (SILGAPP vs WhatsApp)
- * 
+ * - prioriser les propositions (niveau 1 → 4)
+ * - choisir le canal de notification (SILGAPP vs WhatsApp)
+ *
  * Un livreur avec GPS ancien ou heartbeat ancien reste "Libre" et dispatchable.
  */
 export function isLibre(livreur) {

@@ -36,21 +36,21 @@ function buildQrUrl(token) {
 const SILGAPP_DL = "https://silga-dispatch-go.base44.app/telecharger";
 
 const PAYS = [
-  { code: "BF", nom: "Burkina Faso", drapeau: "🇧🇫" },
-  { code: "CI", nom: "Côte d'Ivoire", drapeau: "🇨🇮" },
-  { code: "TG", nom: "Togo", drapeau: "🇹🇬" },
-  { code: "BJ", nom: "Bénin", drapeau: "🇧🇯" },
-  { code: "SN", nom: "Sénégal", drapeau: "🇸🇳" },
-  { code: "ML", nom: "Mali", drapeau: "🇲🇱" },
-  { code: "GN", nom: "Guinée", drapeau: "🇬🇳" },
-  { code: "NE", nom: "Niger", drapeau: "🇳🇪" },
-  { code: "GH", nom: "Ghana", drapeau: "🇬🇭" },
+  { code: "BF", nom: "Burkina Faso", drapeau: "" },
+  { code: "CI", nom: "Côte d'Ivoire", drapeau: "" },
+  { code: "TG", nom: "Togo", drapeau: "" },
+  { code: "BJ", nom: "Bénin", drapeau: "" },
+  { code: "SN", nom: "Sénégal", drapeau: "" },
+  { code: "ML", nom: "Mali", drapeau: "" },
+  { code: "GN", nom: "Guinée", drapeau: "" },
+  { code: "NE", nom: "Niger", drapeau: "" },
+  { code: "GH", nom: "Ghana", drapeau: "" },
 ];
 
 const TYPE_OPTIONS = [
-  { key: "expedier", label: "Expédition", icon: "📦", desc: "Envoyer un colis" },
-  { key: "recevoir", label: "Réception", icon: "📥", desc: "Récupérer un colis" },
-  { key: "deplacement", label: "Déplacement", icon: "👤", desc: "Transport personne" },
+  { key: "expedier", label: "Expédition", icon: "", desc: "Envoyer un colis" },
+  { key: "recevoir", label: "Réception", icon: "", desc: "Récupérer un colis" },
+  { key: "deplacement", label: "Déplacement", icon: "", desc: "Transport personne" },
 ];
 
 // ── Success view after course creation ──
@@ -65,42 +65,42 @@ function CourseCreated({ course, onNewCourse, formData, onClearStorage }) {
   const destinataireName = formData.destinataireNom || "Destinataire";
 
   const msgExpediteur = [
-    `✅ *Course SILGAPP confirmée !*`,
+    ` *Course SILGAPP confirmée !*`,
     ``,
     `Votre course a été créée avec succès.`,
     ``,
-    `📦 *Destinataire :* ${destinataireName || "—"}`,
-    `📍 *Adresse de livraison :* ${course.adresse_arrivee || "—"}`,
-    `#️⃣ *N° de course :* ${course.id?.slice(-8) || course.id}`,
+    ` *Destinataire :* ${destinataireName || "—"}`,
+    ` *Adresse de livraison :* ${course.adresse_arrivee || "—"}`,
+    `#⃣ *N° de course :* ${course.id?.slice(-8) || course.id}`,
     ``,
-    `🔐 *PIN de récupération :* *${course.pickup_code_4_digits}*`,
-    `📱 *QR Code récupération :* ${buildQrUrl(course.pickup_qr_token)}`,
+    ` *PIN de récupération :* *${course.pickup_code_4_digits}*`,
+    ` *QR Code récupération :* ${buildQrUrl(course.pickup_qr_token)}`,
     ``,
-    `🔗 *Suivez votre course en temps réel :*`,
+    ` *Suivez votre course en temps réel :*`,
     trackingUrl,
     ``,
-    `📲 *Téléchargez SILGAPP :*`,
+    ` *Téléchargez SILGAPP :*`,
     SILGAPP_DL,
     ``,
-    `Merci de votre confiance ! 🏍️`,
+    `Merci de votre confiance ! `,
   ].join("\n");
 
   const msgDestinataire = [
-    `📦 *Un colis vous est destiné !*`,
+    ` *Un colis vous est destiné !*`,
     ``,
-    `${expediteurName ? `👤 *Expéditeur :* ${expediteurName}` : ""}`,
-    `#️⃣ *N° de course :* ${course.id?.slice(-8) || course.id}`,
+    `${expediteurName ? ` *Expéditeur :* ${expediteurName}` : ""}`,
+    `#⃣ *N° de course :* ${course.id?.slice(-8) || course.id}`,
     ``,
-    `🔐 *PIN de livraison :* *${course.delivery_code_4_digits}*`,
-    `📱 *QR Code livraison :* ${buildQrUrl(course.delivery_qr_token)}`,
+    ` *PIN de livraison :* *${course.delivery_code_4_digits}*`,
+    ` *QR Code livraison :* ${buildQrUrl(course.delivery_qr_token)}`,
     ``,
-    `🔗 *Suivez votre colis en temps réel :*`,
+    ` *Suivez votre colis en temps réel :*`,
     trackingUrl,
     ``,
-    `📲 *Téléchargez SILGAPP :*`,
+    ` *Téléchargez SILGAPP :*`,
     SILGAPP_DL,
     ``,
-    `Merci de votre confiance ! 🏍️`,
+    `Merci de votre confiance ! `,
   ].filter(Boolean).join("\n");
 
   const copyTracking = () => {
@@ -473,13 +473,13 @@ export default function AdminCourseForm() {
             <Select value={countryCode} onValueChange={setCountryCode}>
               <SelectTrigger className="rounded-xl h-12 bg-gray-50 border-gray-200 text-sm">
                 <SelectValue>
-                  {selectedPays ? `${selectedPays.drapeau}  ${selectedPays.nom}` : "Choisir un pays"}
+                  {selectedPays ? `${selectedPays.drapeau} ${selectedPays.nom}` : "Choisir un pays"}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {PAYS.map(p => (
                   <SelectItem key={p.code} value={p.code}>
-                    {p.drapeau}  {p.nom}
+                    {p.drapeau} {p.nom}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -536,12 +536,12 @@ export default function AdminCourseForm() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="petit_colis">📦  Petit colis</SelectItem>
-                  <SelectItem value="moyen_colis">📦  Moyen colis</SelectItem>
-                  <SelectItem value="gros_colis">📦  Gros colis</SelectItem>
-                  <SelectItem value="document">📄  Document</SelectItem>
-                  <SelectItem value="nourriture">🍽️  Nourriture</SelectItem>
-                  <SelectItem value="autre">📋  Autre</SelectItem>
+                  <SelectItem value="petit_colis"> Petit colis</SelectItem>
+                  <SelectItem value="moyen_colis"> Moyen colis</SelectItem>
+                  <SelectItem value="gros_colis"> Gros colis</SelectItem>
+                  <SelectItem value="document"> Document</SelectItem>
+                  <SelectItem value="nourriture"> Nourriture</SelectItem>
+                  <SelectItem value="autre"> Autre</SelectItem>
                 </SelectContent>
               </Select>
             </div>

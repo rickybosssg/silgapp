@@ -94,7 +94,7 @@ function EtapeGPS({ onSuccess, clientId, clientProfil }) {
               ...(q ? { quartier: q } : {}),
             });
           } catch (err) {
-            console.error("[GPS Onboarding] ❌ Erreur BDD:", err);
+            console.error("[GPS Onboarding] Erreur BDD:", err);
           }
         }
         await requestPostGpsPermissions(clientProfil);
@@ -129,7 +129,7 @@ function EtapeGPS({ onSuccess, clientId, clientProfil }) {
         ) : (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3">
             <p className="text-xs text-amber-700 font-semibold">
-              ⚠️ Sans GPS, vous ne pourrez pas commander une livraison.
+               Sans GPS, vous ne pourrez pas commander une livraison.
             </p>
           </div>
         )}
@@ -209,7 +209,7 @@ function EtapeProfil({ clientProfil, onSuccess }) {
           return;
         }
       }
-      
+
       let updated;
       const profileData = {
         nom: nom.trim(),
@@ -225,7 +225,7 @@ function EtapeProfil({ clientProfil, onSuccess }) {
           code_promo_id: codePromoData.id,
         } : {}),
       };
-      
+
       if (clientProfil?.id) {
         updated = await base44.entities.ClientExterne.update(clientProfil.id, profileData);
       } else {
@@ -256,7 +256,7 @@ function EtapeProfil({ clientProfil, onSuccess }) {
       }
 
       try { localStorage.setItem("client_profil_complet", "true"); } catch (_) {}
-      toast.success(codePromoStatut === "valide" ? "Profil complété ! Code promo appliqué 🎉" : "Profil complété !");
+      toast.success(codePromoStatut === "valide" ? "Profil complété ! Code promo appliqué " : "Profil complété !");
 
       base44.functions.invoke('initClientAuto', {
         device_id: navigator.userAgent.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 50),
@@ -289,7 +289,7 @@ function EtapeProfil({ clientProfil, onSuccess }) {
         <div className="space-y-3">
           {/* Pays */}
           <div>
-            <label className="text-xs font-bold text-gray-800 mb-1 block">🌍 Pays *</label>
+            <label className="text-xs font-bold text-gray-800 mb-1 block"> Pays *</label>
             <CountryCodeSelect
               value={countryCode}
               onChange={(code) => { setCountryCode(code); setTelAffiche(""); }}
@@ -338,7 +338,7 @@ function EtapeProfil({ clientProfil, onSuccess }) {
             </label>
             <div className="flex gap-2">
               <div className="h-12 rounded-xl border-2 border-gray-300 bg-gray-100 px-3 flex items-center text-sm font-bold text-gray-800 flex-shrink-0">
-                {paysSelectionne ? `${paysSelectionne.emoji} ${paysSelectionne.indicatif}` : "🌍"}
+                {paysSelectionne ? `${paysSelectionne.emoji} ${paysSelectionne.indicatif}` : ""}
               </div>
               <input
                 inputMode="numeric"
@@ -362,7 +362,7 @@ function EtapeProfil({ clientProfil, onSuccess }) {
           {/* Champ code promo */}
           {!clientProfil?.code_promo_utilise && (
             <div>
-              <label className="text-xs font-bold text-gray-800 mb-1 block">🎁 Code promo (optionnel)</label>
+              <label className="text-xs font-bold text-gray-800 mb-1 block"> Code promo (optionnel)</label>
               <input
                 value={codePromo}
                 onChange={e => {
@@ -383,7 +383,7 @@ function EtapeProfil({ clientProfil, onSuccess }) {
                 </p>
               )}
               {codePromoStatut === "invalide" && (
-                <p className="text-xs text-red-500 mt-1">❌ Code promo invalide ou désactivé</p>
+                <p className="text-xs text-red-500 mt-1"> Code promo invalide ou désactivé</p>
               )}
               {!codePromoStatut && (
                 <p className="text-xs text-gray-600 mt-1">Bénéficiez de 10% de réduction sur votre première course !</p>

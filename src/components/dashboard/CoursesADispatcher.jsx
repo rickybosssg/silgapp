@@ -22,18 +22,18 @@ function CourseItem({ course, onAssign, onView }) {
   });
 
   const lancerAutoMutation = useMutation({
-    mutationFn: () => base44.functions.invoke("dispatchMoteur", { 
-      action: "lancer_auto", 
-      course_id: course.id 
+    mutationFn: () => base44.functions.invoke("dispatchMoteur", {
+      action: "lancer_auto",
+      course_id: course.id
     }),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["courses"] });
-      console.log("🤖 Dispatch auto response:", res);
+      console.log(" Dispatch auto response:", res);
       if (res?.data?.success && res?.data?.livreur) {
         toast.success(`Dispatch auto : proposé à ${res.data.livreur.nom} (${res.data.livreur.distance_km}km)`);
       } else if (res?.data?.noLivreur) {
         if (res?.data?.missing_gps) {
-          toast.error("⚠️ Course sans GPS — veuillez ajouter la position de départ");
+          toast.error(" Course sans GPS — veuillez ajouter la position de départ");
         } else {
           toast.warning(res?.data?.message || "Aucun livreur interne disponible");
         }
@@ -44,7 +44,7 @@ function CourseItem({ course, onAssign, onView }) {
       }
     },
     onError: (e) => {
-      console.error("❌ Erreur dispatch:", e);
+      console.error(" Erreur dispatch:", e);
       toast.error("Erreur dispatch : " + e.message);
     },
   });
@@ -144,7 +144,7 @@ export default function CoursesADispatcher({ courses, onAssign, onView, reseau =
       <div className="p-3 space-y-2 max-h-[400px] overflow-y-auto">
         {coursesFiltrees.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground text-sm">
-            ✅ Aucune course en attente de dispatch
+             Aucune course en attente de dispatch
           </div>
         ) : (
           coursesFiltrees.map(c => (

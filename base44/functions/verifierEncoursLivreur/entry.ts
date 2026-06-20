@@ -5,7 +5,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
  * - Accumule la commission dans l'encours
  * - Alerte à 80% du seuil
  * - Bloque automatiquement à 100% du seuil
- * 
+ *
  * Déclenché par automation entity sur CourseExterne (statut → livree).
  */
 Deno.serve(async (req) => {
@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
       // Notification push au livreur
       if (livreur.user_email) {
         await base44.asServiceRole.entities.Notification.create({
-          titre: '🚫 Compte bloqué — Plafond d\'encours atteint',
+          titre: ' Compte bloqué — Plafond d\'encours atteint',
           message: `Votre plafond d'encours SILGAPP a été atteint (${nouvelEncours.toLocaleString()} ${devise}). Veuillez effectuer votre dépôt auprès de SILGAPP afin de réactiver votre compte.`,
           type: 'generic',
           destinataire_email: livreur.user_email,
@@ -154,7 +154,7 @@ Deno.serve(async (req) => {
           await base44.functions.invoke('envoiNotificationPush', {
             destinataire_email: livreur.user_email,
             livreur_id: livreurId,
-            titre: '🚫 Compte bloqué',
+            titre: ' Compte bloqué',
             message: `Plafond d'encours atteint (${nouvelEncours.toLocaleString()} ${devise}). Contactez SILGAPP pour régulariser.`,
             type: 'generic',
           });
@@ -163,7 +163,7 @@ Deno.serve(async (req) => {
 
       // Notification aux admins
       await notifierAdmins(base44, countryCode,
-        `🚫 Blocage encours — ${livreur.nom}`,
+        ` Blocage encours — ${livreur.nom}`,
         `${livreur.nom} (${livreur.telephone}) bloqué automatiquement. Encours: ${nouvelEncours.toLocaleString()} ${devise} (${pourcentage}% du seuil).`
       );
 
@@ -188,7 +188,7 @@ Deno.serve(async (req) => {
       if (!derniereAlerte || (maintenant.getTime() - derniereAlerte.getTime()) > uneHeure) {
         if (livreur.user_email) {
           await base44.asServiceRole.entities.Notification.create({
-            titre: '⚠️ Alerte encours — Approche du plafond',
+            titre: ' Alerte encours — Approche du plafond',
             message: `Attention, vous approchez du plafond d'encours autorisé (${pourcentage}% — ${nouvelEncours.toLocaleString()} / ${seuil.toLocaleString()} ${devise}). Veuillez effectuer votre dépôt auprès de SILGAPP afin d'éviter le blocage automatique de votre compte.`,
             type: 'generic',
             destinataire_email: livreur.user_email,
@@ -198,7 +198,7 @@ Deno.serve(async (req) => {
             await base44.functions.invoke('envoiNotificationPush', {
               destinataire_email: livreur.user_email,
               livreur_id: livreurId,
-              titre: '⚠️ Alerte encours',
+              titre: ' Alerte encours',
               message: `Vous êtes à ${pourcentage}% du plafond (${nouvelEncours.toLocaleString()} ${devise}). Pensez à régulariser.`,
               type: 'generic',
             });
@@ -297,7 +297,7 @@ async function handleDeblocage(base44, body) {
   if (livreur.user_email) {
     const devise = countries?.[0]?.devise || 'FCFA';
     await base44.asServiceRole.entities.Notification.create({
-      titre: encoreBloque ? '⚠️ Encours réduit' : '✅ Compte réactivé',
+      titre: encoreBloque ? ' Encours réduit' : ' Compte réactivé',
       message: encoreBloque
         ? `Votre encours a été réduit mais reste au-dessus du plafond (${nouvelEncours.toLocaleString()} / ${seuil.toLocaleString()} ${devise}). Votre compte reste bloqué jusqu'à régularisation.`
         : (reset_complet === false

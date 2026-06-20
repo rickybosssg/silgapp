@@ -4,17 +4,17 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    
+
     if (!user || user.role !== 'admin') {
       return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
 
     // Récupérer tous les clients externes
     const clients = await base44.entities.ClientExterne.filter({});
-    
+
     if (!clients || clients.length === 0) {
-      return Response.json({ 
-        success: true, 
+      return Response.json({
+        success: true,
         message: 'Aucun client trouvé',
         stats: { total: 0, synced: 0, sans_gps: 0 }
       });
@@ -62,9 +62,9 @@ Deno.serve(async (req) => {
       details: results
     });
   } catch (error) {
-    return Response.json({ 
+    return Response.json({
       success: false,
-      error: error.message 
+      error: error.message
     }, { status: 500 });
   }
 });

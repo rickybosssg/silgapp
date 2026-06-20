@@ -8,7 +8,7 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    
+
     if (!user) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
     try {
       await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
         user_email: user.email,
-        titre: "✅ Test Notification",
+        titre: " Test Notification",
         message: "Votre système de notification fonctionne correctement."
       });
       results.notifications = true;
@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
         session_actif: true,
       });
       results.synchronisation = !!session.id;
-      
+
       // Nettoyer la session test
       await base44.asServiceRole.entities.DeviceSession.delete(session.id);
     } catch (e) {
@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
       tests: results,
       score: `${score}/${total}`,
       pourcentage: `${pourcentage}%`,
-      statut: pourcentage === 100 ? "✅ Configuration complète" : "⚠️ Configuration partielle",
+      statut: pourcentage === 100 ? " Configuration complète" : " Configuration partielle",
     });
   } catch (error) {
     console.error('[testAuto] Erreur:', error);

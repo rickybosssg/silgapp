@@ -10,6 +10,7 @@ import { fr } from "date-fns/locale";
 import CourseStatusBadge from "./CourseStatusBadge";
 import UrgenceBadge from "./UrgenceBadge";
 import MultiColisAdminView from "./MultiColisAdminView";
+import ChatWindow from "@/components/chat/ChatWindow";
 import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -25,7 +26,7 @@ const STATUTS_EXTERNE = [
   "colis_recupere", "passager_embarque", "en_livraison", "livree", "annulee"
 ];
 
-const TYPE_LABELS = { expedier: "📦 Expédition", recevoir: "📥 Réception", deplacement: "👤 Déplacement" };
+const TYPE_LABELS = { expedier: " Expédition", recevoir: " Réception", deplacement: " Déplacement" };
 
 export default function CourseDetailDialog({ course, open, onClose, reseau = "interne" }) {
   const queryClient = useQueryClient();
@@ -124,7 +125,7 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
             {course.urgence && <UrgenceBadge urgence={course.urgence} />}
             {course.prix && <span className="text-sm font-bold">{course.prix.toLocaleString()} FCFA</span>}
             {course.delivery_confirmed_by === 'pin_secours' && (
-              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">🔑 PIN secours</span>
+              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold"> PIN secours</span>
             )}
           </div>
 
@@ -191,7 +192,7 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
                 <Navigation className="w-4 h-4 text-blue-600" />
                 <p className="text-xs font-bold text-blue-700 uppercase">Suivi GPS</p>
               </div>
-              
+
               {course.distance_km && (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -275,14 +276,27 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
                 ))}
               </SelectContent>
             </Select>
-            <Button 
-              onClick={handleStatusUpdate} 
+            <Button
+              onClick={handleStatusUpdate}
               disabled={newStatut === course.statut || updateMutation.isPending}
               size="sm"
             >
               Mettre à jour
             </Button>
           </div>
+
+          {/* Messagerie admin */}
+          {reseau === "externe" && course.livreur_id && !["livree", "annulee"].includes(course.statut) && (
+            <div className="pt-2 border-t">
+              <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2"> Messagerie</p>
+              <ChatWindow
+                courseId={course.id}
+                senderType="admin"
+                senderId="admin"
+                senderName="Admin SILGAPP"
+              />
+            </div>
+          )}
 
           {/* Annulation rapide */}
           {course.statut !== "annulee" && course.statut !== "livree" && (

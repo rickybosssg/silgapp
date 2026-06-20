@@ -31,7 +31,7 @@ export default function DownloadCard({ downloadCount }) {
         a_telecharge: false
       });
       setLeadSaved(true);
-      toast.success("✅ Merci ! Vos coordonnées sont enregistrées.");
+      toast.success(" Merci ! Vos coordonnées sont enregistrées.");
     } catch (err) {
       toast.error("Erreur: " + err.message);
     } finally {
@@ -41,17 +41,17 @@ export default function DownloadCard({ downloadCount }) {
 
   const trackDownloadClick = () => {
     // Tracking non-bloquant - ne bloque jamais l'ouverture du lien
-    const country = navigator.language?.includes('BF') ? 'BF' : 
-                    navigator.language?.includes('CI') ? 'CI' : 
-                    navigator.language?.includes('TG') ? 'TG' : 
-                    navigator.language?.includes('BJ') ? 'BJ' : 
-                    navigator.language?.includes('SN') ? 'SN' : 
-                    navigator.language?.includes('ML') ? 'ML' : 
-                    navigator.language?.includes('GN') ? 'GN' : 
+    const country = navigator.language?.includes('BF') ? 'BF' :
+                    navigator.language?.includes('CI') ? 'CI' :
+                    navigator.language?.includes('TG') ? 'TG' :
+                    navigator.language?.includes('BJ') ? 'BJ' :
+                    navigator.language?.includes('SN') ? 'SN' :
+                    navigator.language?.includes('ML') ? 'ML' :
+                    navigator.language?.includes('GN') ? 'GN' :
                     navigator.language?.includes('NE') ? 'NE' : 'BF';
-    const platform = navigator.userAgent?.includes('Android') ? 'android' : 
+    const platform = navigator.userAgent?.includes('Android') ? 'android' :
                      navigator.userAgent?.includes('iPhone') || navigator.userAgent?.includes('iPad') ? 'ios' : 'web';
-    
+
     // Appel asynchrone sans await - ne bloque jamais
     base44.functions.invoke('trackDownloadPublic', {
       event_type: 'download_click',
@@ -69,7 +69,7 @@ export default function DownloadCard({ downloadCount }) {
     >
       <Card className="relative overflow-hidden border border-white/10 bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-2xl shadow-2xl shadow-black/50">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent opacity-50" />
-        
+
         <div className="p-4 sm:p-6 md:p-8 lg:p-12 space-y-6 md:space-y-8">
           {/* Formulaire d'inscription rapide */}
           {!leadSaved && (
@@ -79,7 +79,7 @@ export default function DownloadCard({ downloadCount }) {
               className="space-y-3 sm:space-y-4"
             >
               <div className="text-center">
-                <h3 className="text-base sm:text-lg font-bold text-white mb-1">📝 Inscription rapide</h3>
+                <h3 className="text-base sm:text-lg font-bold text-white mb-1"> Inscription rapide</h3>
                 <p className="text-xs sm:text-sm text-white/60">Recevez des updates et soyez contacté par SILGA</p>
               </div>
               <div className="grid gap-3 sm:gap-4">
@@ -115,24 +115,24 @@ export default function DownloadCard({ downloadCount }) {
                       variant={formData.profil === "client" ? "default" : "outline"}
                       onClick={() => setFormData({ ...formData, profil: "client" })}
                       className={`text-xs sm:text-sm font-semibold ${
-                        formData.profil === "client" 
-                          ? "bg-red-600 hover:bg-red-500 text-white" 
+                        formData.profil === "client"
+                          ? "bg-red-600 hover:bg-red-500 text-white"
                           : "border-white/20 text-white hover:bg-white/10"
                       }`}
                     >
-                      👤 Client
+                       Client
                     </Button>
                     <Button
                       type="button"
                       variant={formData.profil === "livreur" ? "default" : "outline"}
                       onClick={() => setFormData({ ...formData, profil: "livreur" })}
                       className={`text-xs sm:text-sm font-semibold ${
-                        formData.profil === "livreur" 
-                          ? "bg-red-600 hover:bg-red-500 text-white" 
+                        formData.profil === "livreur"
+                          ? "bg-red-600 hover:bg-red-500 text-white"
                           : "border-white/20 text-white hover:bg-white/10"
                       }`}
                     >
-                      🛵 Livreur
+                       Livreur
                     </Button>
                   </div>
                 </div>
@@ -141,7 +141,7 @@ export default function DownloadCard({ downloadCount }) {
                   disabled={saving}
                   className="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white font-bold text-sm sm:text-base py-5"
                 >
-                  {saving ? "Enregistrement..." : "✅ Enregistrer mes coordonnées"}
+                  {saving ? "Enregistrement..." : " Enregistrer mes coordonnées"}
                 </Button>
               </div>
             </motion.div>
@@ -164,7 +164,7 @@ export default function DownloadCard({ downloadCount }) {
                     className="block w-full h-14 sm:h-16 md:h-20 bg-gradient-to-r from-red-600 via-red-500 to-red-600 hover:from-red-500 hover:to-red-400 text-white text-base sm:text-xl font-bold shadow-2xl shadow-red-500/40 transition-all duration-300 rounded-xl sm:rounded-2xl flex items-center justify-center"
                   >
                     <Download className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 mr-2 sm:mr-3 flex-shrink-0" />
-                    <span className="truncate">📲 Télécharger SILGAPP</span>
+                    <span className="truncate"> Télécharger SILGAPP</span>
                     <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 ml-2 flex-shrink-0" />
                   </a>
                 </motion.div>
@@ -183,7 +183,7 @@ export default function DownloadCard({ downloadCount }) {
                     className="block w-full h-12 sm:h-14 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-white text-sm sm:text-base font-semibold shadow-lg shadow-orange-500/30 transition-all duration-300 rounded-xl flex items-center justify-center gap-2"
                   >
                     <RefreshCcw className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-                    <span className="truncate">🔁 Si le téléchargement ne démarre pas, cliquez ici</span>
+                    <span className="truncate"> Si le téléchargement ne démarre pas, cliquez ici</span>
                   </a>
                 </motion.div>
 
@@ -200,7 +200,7 @@ export default function DownloadCard({ downloadCount }) {
                     </div>
                     <div className="flex-1">
                       <p className="text-xs sm:text-sm text-blue-200 font-medium mb-2">
-                        💡 Si le téléchargement ne fonctionne pas :
+                         Si le téléchargement ne fonctionne pas :
                       </p>
                       <ul className="text-[10px] sm:text-xs text-blue-300/80 space-y-1">
                         <li>• Essayez d'ouvrir le lien avec <strong>Chrome</strong></li>
@@ -244,7 +244,7 @@ export default function DownloadCard({ downloadCount }) {
                 </Button>
               </motion.div>
             )}
-            
+
             <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 text-xs sm:text-sm">
               <span className="flex items-center gap-1.5 sm:gap-2 text-white/70">
                 <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-400 flex-shrink-0" />
@@ -269,12 +269,12 @@ export default function DownloadCard({ downloadCount }) {
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-red-500/20 to-emerald-500/20 blur-2xl" />
             <div className="relative flex flex-col sm:flex-row items-center gap-4 sm:gap-6 md:gap-8 p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl bg-white/5 border border-white/10">
-              <motion.div 
+              <motion.div
                 className="bg-white p-2.5 sm:p-3 md:p-4 rounded-xl sm:rounded-2xl shadow-2xl flex-shrink-0"
                 whileHover={{ scale: 1.05, rotate: 2 }}
                 transition={{ type: "spring", stiffness: 300 }}
               >
-                <QRCodeSVG 
+                <QRCodeSVG
                   value={apkUrl}
                   size={120}
                   level="H"
@@ -283,7 +283,7 @@ export default function DownloadCard({ downloadCount }) {
                 />
               </motion.div>
               <div className="text-center sm:text-left space-y-2 sm:space-y-3 flex-1">
-                <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-white">📱 Scan & Go</h3>
+                <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-white"> Scan & Go</h3>
                 <p className="text-white/60 text-xs sm:text-sm md:text-base font-light leading-relaxed">
                   Scannez ce QR code pour télécharger instantanément l'application
                 </p>

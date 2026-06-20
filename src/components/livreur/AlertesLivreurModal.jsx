@@ -6,7 +6,7 @@ import { CheckCircle, AlertTriangle, Info } from "lucide-react";
 
 const NIVEAU_CONFIG = {
   information: {
-    emoji: "🟢",
+    emoji: "",
     label: "Information",
     bg: "from-green-50 to-emerald-50",
     border: "border-green-300",
@@ -16,7 +16,7 @@ const NIVEAU_CONFIG = {
     iconColor: "text-green-600",
   },
   important: {
-    emoji: "🟠",
+    emoji: "",
     label: "Important",
     bg: "from-orange-50 to-amber-50",
     border: "border-orange-300",
@@ -26,7 +26,7 @@ const NIVEAU_CONFIG = {
     iconColor: "text-orange-500",
   },
   urgent: {
-    emoji: "🔴",
+    emoji: "",
     label: "URGENT",
     bg: "from-red-50 to-rose-50",
     border: "border-red-400",
@@ -204,13 +204,13 @@ export default function AlertesLivreurModal({ livreurId, livreurNom, livreurRese
               className={`w-full h-14 rounded-2xl ${cfg.btnBg} text-white font-black text-base shadow-lg active:scale-[0.97] transition-all flex items-center justify-center gap-2.5 disabled:opacity-60`}
             >
               <CheckCircle className="w-5 h-5" />
-              ✅ Compris
+               Compris
             </button>
 
             {/* Info urgent : pas de fermeture sans clic */}
             {isUrgent && (
               <p className="text-center text-xs text-red-600 font-semibold mt-2.5">
-                ⚠️ Vous devez appuyer sur "Compris" pour continuer
+                 Vous devez appuyer sur "Compris" pour continuer
               </p>
             )}
           </div>

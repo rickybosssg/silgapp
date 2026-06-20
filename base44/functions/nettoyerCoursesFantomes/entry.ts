@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
     const coursesOrphelines = await base44.asServiceRole.entities.CourseExterne.filter({});
     const now = new Date().getTime();
     const twentyFourHours = 24 * 60 * 60 * 1000;
-    
+
     const aNettoyer = (coursesOrphelines || []).filter(c => {
       const age = now - new Date(c.created_date).getTime();
       return (
@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
     // 2. Notifications orphelines (course supprimée ou inexistante)
     const notifications = await base44.asServiceRole.entities.Notification.filter({});
     const courseIds = new Set((coursesOrphelines || []).map(c => c.id));
-    
+
     const notificationsOrphelines = (notifications || []).filter(n => {
       return n.course_id && !courseIds.has(n.course_id);
     });

@@ -2,11 +2,11 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 /**
  * Vérifie si un livreur est opt-in dans le Sandbox WhatsApp Twilio.
- * Méthode : chercher si le numéro a envoyé "join rise-bit" ET 
- *           si le dernier message sortant vers ce numéro a réussi.
- * 
+ * Méthode : chercher si le numéro a envoyé "join rise-bit" ET
+ * si le dernier message sortant vers ce numéro a réussi.
+ *
  * Peut aussi être appelé par le moteur de dispatch pour vérifier avant envoi.
- * 
+ *
  * Payload : { livreur_id } ou { telephone }
  */
 Deno.serve(async (req) => {
@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
     const { livreur_id, telephone: telParam } = body;
 
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-    const authToken  = Deno.env.get('TWILIO_AUTH_TOKEN');
+    const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
     if (!accountSid || !authToken) {
       return Response.json({ error: 'Variables Twilio manquantes' }, { status: 500 });
     }
@@ -69,9 +69,9 @@ Deno.serve(async (req) => {
 
     // ── 3. Déterminer le statut opt-in ────────────────────────────────────────
     // Opt-in valide si :
-    //   - A envoyé "join rise-bit" ET
-    //   - Le dernier message sortant n'est pas 63015
-    //   - OU dernier succès < 72h
+    // - A envoyé "join rise-bit" ET
+    // - Le dernier message sortant n'est pas 63015
+    // - OU dernier succès < 72h
     const now = Date.now();
     const OPT_IN_DURATION_MS = 72 * 60 * 60 * 1000; // 72h
 

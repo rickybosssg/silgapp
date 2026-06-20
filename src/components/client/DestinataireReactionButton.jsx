@@ -28,7 +28,7 @@ export default function DestinataireReactionButton({ course, onDone }) {
       <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-2xl">
         <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
         <p className="text-sm font-semibold text-green-800">
-          {choix === "bon" ? "👍 Merci pour votre retour positif !" : "👎 Retour enregistré, nous allons nous améliorer."}
+          {choix === "bon" ? " Merci pour votre retour positif !" : " Retour enregistré, nous allons nous améliorer."}
         </p>
       </div>
     );

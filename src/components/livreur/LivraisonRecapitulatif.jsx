@@ -27,7 +27,7 @@ export default function LivraisonRecapitulatif({ course, onClose }) {
   }
 
   // Fallbacks pour données manquantes
-  const distance = Number(course.distance_reelle_km) > 0 
+  const distance = Number(course.distance_reelle_km) > 0
     ? Number(course.distance_reelle_km)
     : haversine(course.latitude_recuperation, course.longitude_recuperation, course.latitude_livraison, course.longitude_livraison)
     || haversine(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng)
@@ -141,7 +141,7 @@ export default function LivraisonRecapitulatif({ course, onClose }) {
 
           {/* Message d'instruction */}
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-center">
-            <p className="text-sm font-bold text-amber-800">💵 Encaissez le paiement du client</p>
+            <p className="text-sm font-bold text-amber-800"> Encaissez le paiement du client</p>
             <p className="text-xs text-amber-600 mt-0.5">Appuyez sur PAYER après avoir reçu le montant</p>
           </div>
 
@@ -151,7 +151,7 @@ export default function LivraisonRecapitulatif({ course, onClose }) {
             style={{ minHeight: "72px", letterSpacing: "0.05em" }}
             onClick={onClose}
           >
-            💰 PAYER
+             PAYER
           </button>
         </div>
       </div>

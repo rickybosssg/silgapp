@@ -10,7 +10,7 @@ Deno.serve(async (req) => {
     }
 
     const livreurs = await base44.entities.Livreur.list();
-    
+
     let updatedCount = 0;
     const results = [];
 
@@ -19,17 +19,17 @@ Deno.serve(async (req) => {
         const nomPart = (livreur.nom || 'LIV').substring(0, 3).toUpperCase();
         const telPart = (livreur.telephone || '000').replace(/\D/g, '').slice(-3);
         const code = `LVR-${nomPart}${telPart}`;
-        
+
         await base44.entities.Livreur.update(livreur.id, { code_identification: code });
         results.push({ id: livreur.id, nom: livreur.nom, code });
         updatedCount++;
       }
     }
 
-    return Response.json({ 
-      success: true, 
+    return Response.json({
+      success: true,
       message: `${updatedCount} livreurs mis à jour`,
-      results 
+      results
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

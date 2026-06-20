@@ -43,7 +43,7 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
     const now = new Date();
     const today = now.toDateString();
     const yesterday = subDays(now, 1).toDateString();
-    
+
     switch (period) {
       case "today":
         return { start: new Date(today), end: new Date(today) };
@@ -74,24 +74,24 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
     const refDate = new Date(c.heure_livraison || c.updated_date || c.created_date);
     return refDate.toDateString() === today;
   });
-  
+
   const livreesToday = coursesToday.filter(c => c.statut === "livree");
   const totalEncaisseToday = isExterne
     ? livreesToday.reduce((sum, c) => {
-        // ⚠️ CORRECTION PRIX MANUEL : Utiliser manual_price si accepté
+        // CORRECTION PRIX MANUEL : Utiliser manual_price si accepté
         const isPrixManuel = c.pricing_mode === "manual" && c.manual_price_status === "accepted" && Number(c.manual_price) > 0;
         return sum + (isPrixManuel ? Number(c.manual_price) : (c.prix_final || 0));
       }, 0)
     : livreesToday.reduce((sum, c) => sum + (c.prix_reel || 0), 0);
   const gainLivreurToday = livreesToday.reduce((sum, c) => {
-    // ⚠️ CORRECTION PRIX MANUEL : Utiliser montant_livreur si déjà calculé, sinon recalculer avec respect du mode
+    // CORRECTION PRIX MANUEL : Utiliser montant_livreur si déjà calculé, sinon recalculer avec respect du mode
     if (c.montant_livreur > 0) return sum + c.montant_livreur;
     const isPrixManuel = c.pricing_mode === "manual" && c.manual_price_status === "accepted" && Number(c.manual_price) > 0;
     const prixBase = isPrixManuel ? Number(c.manual_price) : (c.prix_final || 0);
     return sum + (splitForCourse(c, prixBase).montant_livreur || 0);
   }, 0);
   const commissionToday = livreesToday.reduce((sum, c) => {
-    // ⚠️ CORRECTION PRIX MANUEL : Utiliser commission_silga si déjà calculée
+    // CORRECTION PRIX MANUEL : Utiliser commission_silga si déjà calculée
     if (c.commission_silga > 0) return sum + c.commission_silga;
     const isPrixManuel = c.pricing_mode === "manual" && c.manual_price_status === "accepted" && Number(c.manual_price) > 0;
     const prixBase = isPrixManuel ? Number(c.manual_price) : (c.prix_final || 0);
@@ -226,7 +226,7 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
                         {format(new Date(course.created_date), "dd/MM/yyyy 'à' HH:mm", { locale: fr })}
                       </span>
                     </div>
-                    
+
                     <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
                       <MapPin className="w-3 h-3" />
                       <span className="truncate">{course.adresse_depart}</span>
@@ -239,7 +239,7 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
                     {course.statut === "livree" && (
                       isExterne ? (
                         <div className="space-y-1.5 mt-1">
-                          {/* 🚗 Déplacement : affichage spécifique avec heures détaillées */}
+                          {/* Déplacement : affichage spécifique avec heures détaillées */}
                           {course.type_course === "deplacement" ? (
                             <>
                               <div className="grid grid-cols-3 gap-1">
@@ -261,17 +261,17 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
                               <div className="flex flex-wrap gap-1">
                                 {course.distance_reelle_km > 0 && (
                                   <span className="text-xs text-blue-600 bg-blue-50 rounded px-2 py-0.5">
-                                    📏 {Number(course.distance_reelle_km).toFixed(1)} km
+                                     {Number(course.distance_reelle_km).toFixed(1)} km
                                   </span>
                                 )}
                                 {Number(course.prix_final) > 0 && (
                                   <span className="text-xs font-semibold text-gray-700 bg-gray-50 rounded px-2 py-0.5">
-                                    💰 {Number(course.prix_final).toLocaleString()} F
+                                     {Number(course.prix_final).toLocaleString()} F
                                   </span>
                                 )}
                                 {Number(course.montant_livreur) > 0 && (
                                   <span className="text-xs font-bold text-green-700 bg-green-50 rounded px-2 py-0.5">
-                                    ✅ +{Number(course.montant_livreur).toLocaleString()} F
+                                     +{Number(course.montant_livreur).toLocaleString()} F
                                   </span>
                                 )}
                               </div>
@@ -280,7 +280,7 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
                             <div className="flex flex-wrap gap-1">
                               {(() => {
                                 const dist = course.distance_reelle_km > 0 ? Number(course.distance_reelle_km) : 0;
-                                // ⚠️ CORRECTION PRIX MANUEL
+                                // CORRECTION PRIX MANUEL
                                 const isPrixManuel = course.pricing_mode === "manual" && course.manual_price_status === "accepted" && Number(course.manual_price) > 0;
                                 const prix = isPrixManuel ? Number(course.manual_price) : (course.prix_final > 0 ? Number(course.prix_final) : 0);
                                 const gain = course.montant_livreur > 0 ? Number(course.montant_livreur) : 0;
@@ -292,7 +292,7 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
                                 return <>
                                   {dist > 0 && (
                                     <span className="text-xs text-blue-600 bg-blue-50 rounded px-2 py-0.5">
-                                      📏 {dist.toFixed(1)} km
+                                       {dist.toFixed(1)} km
                                     </span>
                                   )}
                                   {dureeMin !== null && dureeMin > 0 && (
@@ -301,15 +301,15 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
                                     </span>
                                   )}
                                   {prix > 0 && (
-                                    <span className={cn("text-xs font-semibold rounded px-2 py-0.5", 
+                                    <span className={cn("text-xs font-semibold rounded px-2 py-0.5",
                                       isPrixManuel ? "text-green-700 bg-green-50" : "text-gray-700 bg-gray-50"
                                     )}>
-                                      {isPrixManuel ? "✓ " : "💰 "}{prix.toLocaleString()} F
+                                      {isPrixManuel ? " " : " "}{prix.toLocaleString()} F
                                     </span>
                                   )}
                                   {gain > 0 && (
                                     <span className="text-xs font-bold text-green-700 bg-green-50 rounded px-2 py-0.5">
-                                      ✅ +{gain.toLocaleString()} F
+                                       +{gain.toLocaleString()} F
                                     </span>
                                   )}
                                   {commission > 0 && (

@@ -43,7 +43,7 @@ export const useGlobalErrors = () => {
     };
     errorListeners.push(listener);
     setErrors([...globalErrors]);
-    
+
     return () => {
       errorListeners = errorListeners.filter(l => l !== listener);
     };
@@ -78,7 +78,7 @@ export const GlobalErrorDisplay = () => {
           <X className="w-4 h-4" />
         </Button>
       </div>
-      
+
       <div className="space-y-2 text-xs font-mono">
         {errors.map((error, idx) => (
           <div key={idx} className="bg-red-950/50 rounded p-2 border border-red-700">

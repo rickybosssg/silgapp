@@ -35,10 +35,10 @@ export default function CanalNotifBadge({ course }) {
       return { label: "SILGAPP", icon: Smartphone, color: "bg-blue-100 text-blue-700 border-blue-200" };
     }
     if (canal === "whatsapp" && statut === "sent") {
-      return { label: "WhatsApp ✓", icon: MessageCircle, color: "bg-green-100 text-green-700 border-green-200" };
+      return { label: "WhatsApp ", icon: MessageCircle, color: "bg-green-100 text-green-700 border-green-200" };
     }
     if (canal === "sms" && statut === "sent") {
-      return { label: "SMS ✓", icon: MessageCircle, color: "bg-purple-100 text-purple-700 border-purple-200" };
+      return { label: "SMS ", icon: MessageCircle, color: "bg-purple-100 text-purple-700 border-purple-200" };
     }
     if (statut === "failed") {
       return { label: "Échec", icon: AlertCircle, color: "bg-red-100 text-red-700 border-red-200" };
@@ -68,7 +68,7 @@ export default function CanalNotifBadge({ course }) {
           onClick={(e) => e.stopPropagation()}
         >
           <p className="text-[11px] font-black text-foreground mb-2 flex items-center gap-1.5">
-            <span>📡</span> Audit notifications
+            <span></span> Audit notifications
           </p>
 
           {alertes.length === 0 ? (
@@ -92,7 +92,7 @@ export default function CanalNotifBadge({ course }) {
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
                         a.canal === "whatsapp" ? "bg-green-100 text-green-700" :
-                        a.canal === "sms"      ? "bg-purple-100 text-purple-700" :
+                        a.canal === "sms" ? "bg-purple-100 text-purple-700" :
                         "bg-blue-100 text-blue-700"
                       }`}>
                         {a.canal?.toUpperCase() || "SILGAPP"}
@@ -105,15 +105,15 @@ export default function CanalNotifBadge({ course }) {
                       </span>
                     </div>
                     {a.livreur_telephone && (
-                      <p className="text-[10px] text-muted-foreground mt-0.5">📞 {a.livreur_telephone}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5"> {a.livreur_telephone}</p>
                     )}
                     {a.heure_envoi && (
                       <p className="text-[10px] text-muted-foreground">
-                        🕐 {format(new Date(a.heure_envoi), "dd/MM · HH:mm", { locale: fr })}
+                         {format(new Date(a.heure_envoi), "dd/MM · HH:mm", { locale: fr })}
                       </p>
                     )}
                     {a.erreur && (
-                      <p className="text-[10px] text-red-500 mt-0.5 truncate" title={a.erreur}>⚠️ {a.erreur.slice(0, 60)}…</p>
+                      <p className="text-[10px] text-red-500 mt-0.5 truncate" title={a.erreur}> {a.erreur.slice(0, 60)}…</p>
                     )}
                   </div>
                 </div>
@@ -124,7 +124,7 @@ export default function CanalNotifBadge({ course }) {
           {/* Livreur assigné */}
           {course.livreur_nom && (
             <div className="mt-2 pt-2 border-t border-gray-100">
-              <p className="text-[10px] text-muted-foreground">👤 Livreur : <span className="font-bold text-foreground">{course.livreur_nom}</span></p>
+              <p className="text-[10px] text-muted-foreground"> Livreur : <span className="font-bold text-foreground">{course.livreur_nom}</span></p>
               {course.heure_sollicitation && (
                 <p className="text-[10px] text-muted-foreground">
                   Sollicité : {format(new Date(course.heure_sollicitation), "HH:mm:ss", { locale: fr })}

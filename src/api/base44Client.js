@@ -42,9 +42,9 @@ const isCapacitor = () => {
   try {
     console.log('[base44Client] Check Capacitor:', !!(window.Capacitor));
     return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-  } catch(e) { 
+  } catch(e) {
     console.error('[base44Client] Erreur Capacitor:', e);
-    return false; 
+    return false;
   }
 };
 

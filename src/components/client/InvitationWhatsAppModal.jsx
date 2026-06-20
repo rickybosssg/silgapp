@@ -6,11 +6,11 @@ import React from "react";
  * (expéditeur ou destinataire) n'est pas inscrite sur SILGAPP.
  *
  * Props:
- *   telephone      — numéro de la personne à inviter
- *   nomContact     — nom de la personne à inviter (si connu)
- *   nomExpediteur  — nom du client qui envoie l'invitation
- *   onClose        — fermer sans envoyer
- *   onSend         — appelé juste avant d'ouvrir WhatsApp (pour future API)
+ * telephone — numéro de la personne à inviter
+ * nomContact — nom de la personne à inviter (si connu)
+ * nomExpediteur — nom du client qui envoie l'invitation
+ * onClose — fermer sans envoyer
+ * onSend — appelé juste avant d'ouvrir WhatsApp (pour future API)
  */
 export default function InvitationWhatsAppModal({ telephone, nomContact, nomExpediteur, onClose, onSend }) {
   const normaliserTel = (tel) => {
@@ -26,7 +26,7 @@ export default function InvitationWhatsAppModal({ telephone, nomContact, nomExpe
     onSend?.();
 
     const expediteur = nomExpediteur || "Votre contact";
-    const message = `Bonjour 👋
+    const message = `Bonjour
 
 ${expediteur} est en train de vous envoyer un colis via SILGAPP.
 
@@ -35,9 +35,9 @@ Pour suivre vos livraisons, recevoir vos colis plus facilement et profiter de to
 https://silga-dispatch-go.base44.app
 https://silga-dispatch-go.base44.app/telecharger
 
-📦 Suivi des colis
-🚚 Livraisons rapides
-📍 Géolocalisation en temps réel
+ Suivi des colis
+ Livraisons rapides
+ Géolocalisation en temps réel
 
 Merci et bienvenue sur SILGAPP.`;
 
@@ -56,7 +56,7 @@ Merci et bienvenue sur SILGAPP.`;
         {/* Header vert */}
         <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-6 pt-7 pb-5 text-center">
           <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-3">
-            <span className="text-4xl">🎉</span>
+            <span className="text-4xl"></span>
           </div>
           <h2 className="text-xl font-black text-white">Course créée avec succès !</h2>
         </div>

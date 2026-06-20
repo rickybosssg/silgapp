@@ -5,7 +5,7 @@ export default function PricingModeSelector({ pricingMode, onChange }) {
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       {/* En-tête */}
       <div className="px-4 pt-4 pb-2">
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">💰 MODE TARIFAIRE</p>
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider"> MODE TARIFAIRE</p>
       </div>
 
       {/* Option : Prix automatique */}

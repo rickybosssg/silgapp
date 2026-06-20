@@ -10,12 +10,12 @@ import UrgenceBadge from "@/components/courses/UrgenceBadge";
 // Statuts externes traduits lisiblement
 const STATUT_EXTERNE_LABELS = {
   nouvelle: "Nouvelle",
-  recherche_livreur: "🔍 Recherche livreur",
-  livreur_en_route: "🚴 En route",
-  colis_recupere: "📦 Colis récupéré",
-  en_livraison: "🚀 En livraison",
-  livree: "✅ Livrée",
-  annulee: "❌ Annulée",
+  recherche_livreur: " Recherche livreur",
+  livreur_en_route: " En route",
+  colis_recupere: " Colis récupéré",
+  en_livraison: " En livraison",
+  livree: " Livrée",
+  annulee: " Annulée",
 };
 
 function CourseItemExterne({ course, onView }) {
@@ -53,7 +53,7 @@ function CourseItemExterne({ course, onView }) {
 
           <div className="flex items-center gap-2 flex-wrap">
             {course.livreur_nom && (
-              <span className="text-xs font-medium text-foreground">🚴 {course.livreur_nom}</span>
+              <span className="text-xs font-medium text-foreground"> {course.livreur_nom}</span>
             )}
             {course.destinataire_nom && (
               <span className="text-xs text-muted-foreground">→ {course.destinataire_nom}</span>
@@ -83,7 +83,7 @@ function CourseItemExterne({ course, onView }) {
 function CourseItemInterne({ course, onView }) {
   // Badge spécial pour dispatch automatique en cours
   const isDispatchAuto = course.dispatch_status === 'propose' && course.statut === 'en_attente_livreur';
-  
+
   return (
     <Card className={`p-3 hover:shadow-sm transition-shadow ${isDispatchAuto ? 'border-l-4 border-l-amber-400 bg-amber-50/30' : ''}`}>
       <div className="flex items-start justify-between gap-3">
@@ -98,7 +98,7 @@ function CourseItemInterne({ course, onView }) {
             )}
             {isDispatchAuto && (
               <span className="text-xs px-2 py-0.5 rounded-full border font-medium bg-amber-100 text-amber-700 border-amber-200 flex items-center gap-1">
-                <span className="animate-pulse">🔍</span> Recherche livreur en cours
+                <span className="animate-pulse"></span> Recherche livreur en cours
               </span>
             )}
           </div>
@@ -114,7 +114,7 @@ function CourseItemInterne({ course, onView }) {
           <div className="flex items-center gap-2 flex-wrap">
             {!isDispatchAuto && <CourseStatusBadge statut={course.statut} dispatchStatus={course.dispatch_status} />}
             {course.livreur_nom && (
-              <span className="text-xs font-medium text-foreground">🚴 {course.livreur_nom}</span>
+              <span className="text-xs font-medium text-foreground"> {course.livreur_nom}</span>
             )}
             {(course.prix_reel || course.prix) > 0 && (
               <span className="text-xs font-bold text-green-700 ml-auto">

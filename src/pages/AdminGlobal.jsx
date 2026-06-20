@@ -54,7 +54,7 @@ export default function AdminGlobal() {
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["countries-all"] });
       queryClient.invalidateQueries({ queryKey: ["pays-actifs"] });
-      toast.success(vars.actif ? "Pays activé ✓" : "Pays désactivé");
+      toast.success(vars.actif ? "Pays activé " : "Pays désactivé");
     },
   });
 
@@ -120,7 +120,7 @@ export default function AdminGlobal() {
         </div>
         <div className="relative flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-2xl">🌍</div>
+            <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-2xl"></div>
             <div>
               <h1 className="text-xl font-black text-white tracking-tight">Admin Global SILGAPP</h1>
               <p className="text-white/60 text-xs mt-0.5">Supervision de toutes les opérations multi-pays</p>
@@ -138,13 +138,13 @@ export default function AdminGlobal() {
       {/* ── KPI GLOBAUX ──────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
         {[
-          { label: "Pays actifs",     value: globalStats.paysActifs,                        grad: "from-emerald-500 to-teal-500",    icon: "🌍" },
-          { label: "Clients",         value: globalStats.totalClients,                       grad: "from-violet-500 to-purple-600",   icon: "👥" },
-          { label: "Livreurs",        value: globalStats.totalLivreurs,                      grad: "from-blue-500 to-indigo-600",     icon: "🛵" },
-          { label: "Actifs",          value: globalStats.livreursActifs,                     grad: "from-cyan-500 to-sky-500",        icon: "✅" },
-          { label: "Courses auj.",    value: globalStats.coursesToday,                       grad: "from-orange-500 to-amber-500",    icon: "📦" },
-          { label: "Livrées auj.",    value: globalStats.livreesToday,                       grad: "from-green-500 to-emerald-500",   icon: "🚀" },
-          { label: "CA du jour",      value: `${globalStats.caToday.toLocaleString()}`,      grad: "from-primary to-red-600",         icon: "💰" },
+          { label: "Pays actifs", value: globalStats.paysActifs, grad: "from-emerald-500 to-teal-500", icon: "" },
+          { label: "Clients", value: globalStats.totalClients, grad: "from-violet-500 to-purple-600", icon: "" },
+          { label: "Livreurs", value: globalStats.totalLivreurs, grad: "from-blue-500 to-indigo-600", icon: "" },
+          { label: "Actifs", value: globalStats.livreursActifs, grad: "from-cyan-500 to-sky-500", icon: "" },
+          { label: "Courses auj.", value: globalStats.coursesToday, grad: "from-orange-500 to-amber-500", icon: "" },
+          { label: "Livrées auj.", value: globalStats.livreesToday, grad: "from-green-500 to-emerald-500", icon: "" },
+          { label: "CA du jour", value: `${globalStats.caToday.toLocaleString()}`, grad: "from-primary to-red-600", icon: "" },
         ].map(s => (
           <div key={s.label} className={`bg-gradient-to-br ${s.grad} rounded-2xl p-3 text-white shadow-md`}>
             <div className="flex items-center justify-between mb-1.5">
@@ -178,7 +178,7 @@ export default function AdminGlobal() {
                 {/* Info pays */}
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 shadow-sm ${actif ? "bg-green-100" : "bg-gray-100"}`}>
-                    {paysInfo?.emoji_flag || "🌍"}
+                    {paysInfo?.emoji_flag || ""}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -195,11 +195,11 @@ export default function AdminGlobal() {
                     </div>
                     <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 mt-2">
                       {[
-                        { label: "Courses", value: total,           bg: "bg-gray-100",    text: "text-gray-700" },
-                        { label: "Livrées", value: livrees,         bg: "bg-green-100",   text: "text-green-700" },
-                        { label: "En cours",value: enCours,         bg: "bg-blue-100",    text: "text-blue-700" },
-                        { label: "Livreurs",value: lv,              bg: "bg-orange-100",  text: "text-orange-700" },
-                        { label: "Clients", value: cl,              bg: "bg-violet-100",  text: "text-violet-700" },
+                        { label: "Courses", value: total, bg: "bg-gray-100", text: "text-gray-700" },
+                        { label: "Livrées", value: livrees, bg: "bg-green-100", text: "text-green-700" },
+                        { label: "En cours",value: enCours, bg: "bg-blue-100", text: "text-blue-700" },
+                        { label: "Livreurs",value: lv, bg: "bg-orange-100", text: "text-orange-700" },
+                        { label: "Clients", value: cl, bg: "bg-violet-100", text: "text-violet-700" },
                         { label: `CA (${devise})`, value: ca.toLocaleString(), bg: "bg-amber-100", text: "text-amber-700" },
                       ].map(m => (
                         <div key={m.label} className={`${m.bg} rounded-xl p-1.5 text-center`}>
@@ -218,7 +218,7 @@ export default function AdminGlobal() {
                       size="sm"
                       variant="outline"
                       className="gap-1.5 text-xs rounded-xl border-gray-200"
-                      onClick={() => setShowCreateAdmin({ code, nom: paysInfo?.nom || code, emoji: paysInfo?.emoji_flag || "🌍" })}
+                      onClick={() => setShowCreateAdmin({ code, nom: paysInfo?.nom || code, emoji: paysInfo?.emoji_flag || "" })}
                     >
                       <Plus className="w-3 h-3" />
                       Admin
@@ -263,7 +263,7 @@ export default function AdminGlobal() {
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ["all-admins"] });
             setShowCreateAdmin(null);
-            toast.success("Admin pays configuré ✓");
+            toast.success("Admin pays configuré ");
           }}
         />
       )}

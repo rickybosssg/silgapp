@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
     }
 
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-    const authToken  = Deno.env.get('TWILIO_AUTH_TOKEN');
+    const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
     if (!accountSid || !authToken) {
       return Response.json({ error: 'Variables Twilio manquantes' }, { status: 500 });
     }
@@ -75,9 +75,9 @@ Deno.serve(async (req) => {
 
     // ── Parser les opt-ins ─────────────────────────────────────────────────────
     const tousEntrantsMessages = tousEntrants?.messages || [];
-    
+
     // Numéros qui ont envoyé "join xxx" = participants Sandbox
-    const optIns = tousEntrantsMessages.filter(m => 
+    const optIns = tousEntrantsMessages.filter(m =>
       m.body && m.body.toLowerCase().startsWith('join')
     );
 
@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
     }, []).sort((a, b) => new Date(b.date_sent) - new Date(a.date_sent));
 
     // Dernier opt-in du numéro visé
-    const optInNumeroCible = tousEntrantsMessages.find(m => 
+    const optInNumeroCible = tousEntrantsMessages.find(m =>
       m.from === 'whatsapp:' + numeroVise && m.body?.toLowerCase().startsWith('join')
     );
 
@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
     const messagesReussis = (msgsSortants?.messages || []).filter(m => ['delivered', 'read', 'sent'].includes(m.status));
 
     const premierSucces = messagesReussis.sort((a, b) => new Date(a.date_sent) - new Date(b.date_sent))[0];
-    const premierEchec  = messagesFailed.sort((a, b) => new Date(a.date_sent) - new Date(b.date_sent))[0];
+    const premierEchec = messagesFailed.sort((a, b) => new Date(a.date_sent) - new Date(b.date_sent))[0];
 
     return Response.json({
       numero_vise: numeroVise,

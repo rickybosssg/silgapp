@@ -23,10 +23,10 @@ const typeColisLabel = {
   autre: "Autre",
 };
 
-export default function CourseEnAttenteModalExterne({ 
-  course, 
-  livreurId, 
-  onAccepter, 
+export default function CourseEnAttenteModalExterne({
+  course,
+  livreurId,
+  onAccepter,
   onRefuser,
   onExpire,
   pricingMode = "automatic", // "automatic" | "manual"
@@ -46,7 +46,7 @@ export default function CourseEnAttenteModalExterne({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showManualPriceModal, setShowManualPriceModal] = useState(false);
 
-  // 🏛️ Course admin : Accepter / Refuser uniquement, quel que soit le mode du livreur
+  // Course admin : Accepter / Refuser uniquement, quel que soit le mode du livreur
   const isAdminCourse = course?.source === "admin" || course?.pricing_mode === "admin_manuel";
   const showAdminBlock = isAdminCourse;
   const isDeplacement = course?.type_course === "deplacement";
@@ -110,7 +110,7 @@ export default function CourseEnAttenteModalExterne({
           livreur_id: livreurId,
         });
         const d = data?.data;
-        // 🔧 CORRECTION : si c'est NOUS qui avons accepté, ne pas afficher "Course déjà prise"
+        // CORRECTION : si c'est NOUS qui avons accepté, ne pas afficher "Course déjà prise"
         if (d?.you_accepted) {
           return; // Tout va bien, on attend que onAccepter() soit appelé par handleAccepterAuto
         }
@@ -141,7 +141,7 @@ export default function CourseEnAttenteModalExterne({
     }
   };
 
-  // 🏛️ Accepter une course admin
+  // Accepter une course admin
   const handleAccepterAdminManuel = async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
@@ -181,7 +181,7 @@ export default function CourseEnAttenteModalExterne({
       });
       const data = res?.data;
 
-      // 🔧 CORRECTION : already_accepted = requête concurrente du même livreur déjà traitée
+      // CORRECTION : already_accepted = requête concurrente du même livreur déjà traitée
       if (data?.already_accepted) {
         stopUrgentCourseAlert("course-accepted");
         onAccepter();
@@ -217,7 +217,7 @@ export default function CourseEnAttenteModalExterne({
       });
       const data = res?.data;
 
-      // 🔧 CORRECTION : already_accepted = requête concurrente du même livreur déjà traitée
+      // CORRECTION : already_accepted = requête concurrente du même livreur déjà traitée
       if (data?.already_accepted) {
         stopUrgentCourseAlert("course-accepted-manual");
         setShowManualPriceModal(false);
@@ -349,7 +349,7 @@ export default function CourseEnAttenteModalExterne({
           <div className="absolute -top-4 -right-4 w-20 h-20 rounded-full bg-white/10" />
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-2xl animate-bounce">
-              🚨
+
             </div>
             <div>
               <p className="text-white font-black text-xl leading-tight">NOUVELLE COURSE !</p>
@@ -360,7 +360,7 @@ export default function CourseEnAttenteModalExterne({
 
         {/* Timer */}
         <div className="bg-gray-100 h-2 relative">
-          <div 
+          <div
             className={`h-full transition-all duration-1000 ${
               tempsRestant <= 10 ? 'bg-red-500' : tempsRestant <= 30 ? 'bg-amber-500' : 'bg-green-500'
             }`}
@@ -433,7 +433,7 @@ export default function CourseEnAttenteModalExterne({
                 return (
                   <>
                     <p className={cn("text-2xl font-black", isPrixManuel ? "text-green-700" : "text-gray-900")}>
-                      {isPrixManuel 
+                      {isPrixManuel
                         ? `${prixBase.toLocaleString()} `
                         : `~${prixBase.toLocaleString()} `
                       }
@@ -448,7 +448,7 @@ export default function CourseEnAttenteModalExterne({
                     {!isPrixManuel && (
                       isDeplacement ? (
                         <div className="flex items-center gap-1 mt-0.5">
-                          <span className="text-[10px] text-gray-500 uppercase">🚗 Déplacement</span>
+                          <span className="text-[10px] text-gray-500 uppercase"> Déplacement</span>
                         </div>
                       ) : course.type_colis && (
                         <div className="flex items-center gap-1 mt-0.5">
@@ -481,7 +481,7 @@ export default function CourseEnAttenteModalExterne({
             })()}
           </div>
 
-          {/* 🚗 DÉPLACEMENT : distances détaillées avant acceptation */}
+          {/* DÉPLACEMENT : distances détaillées avant acceptation */}
           {isDeplacement && (() => {
             const distPickup = haversine(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng);
             if (!distPickup || distPickup <= 0) return null;
@@ -490,14 +490,14 @@ export default function CourseEnAttenteModalExterne({
               <div className="bg-cyan-50 border border-cyan-200 rounded-2xl px-4 py-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm">📍</span>
+                    <span className="text-sm"></span>
                     <span className="text-xs font-semibold text-cyan-800">Distance prise en charge</span>
                   </div>
                   <span className="text-sm font-black text-cyan-700">{distLabelPickup}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm">🏁</span>
+                    <span className="text-sm"></span>
                     <span className="text-xs font-semibold text-cyan-800">Distance totale déplacement</span>
                   </div>
                   <span className="text-sm font-black text-cyan-700">{distLabelPickup}</span>
@@ -509,11 +509,11 @@ export default function CourseEnAttenteModalExterne({
           {/* Badge mode tarification — affiché uniquement pour courses NON admin */}
           {!isAdminCourse && pricingMode === "manual" && (
             <div className="flex items-center justify-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-1.5">
-              <span className="text-xs font-bold text-blue-700">💰 Mode prix manuel activé — vous allez saisir votre prix</span>
+              <span className="text-xs font-bold text-blue-700"> Mode prix manuel activé — vous allez saisir votre prix</span>
             </div>
           )}
 
-          {/* 🏛️ Bloc course administrative — acceptation uniquement */}
+          {/* Bloc course administrative — acceptation uniquement */}
           {showAdminBlock && (
             <div className="bg-blue-600 rounded-2xl px-4 py-3 flex items-center gap-3 shadow-lg shadow-blue-200">
               <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">

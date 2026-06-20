@@ -13,20 +13,20 @@ import { toast } from "sonner";
 import { phoneVariants } from "@/lib/phoneUtils";
 
 const TYPE_COLIS_OPTIONS = [
-  { value: "petit_colis",  label: "Petit",    icon: "📦", desc: "< 2 kg" },
-  { value: "moyen_colis",  label: "Moyen",    icon: "📫", desc: "2-10 kg" },
-  { value: "gros_colis",   label: "Gros",     icon: "🗃️", desc: "> 10 kg" },
-  { value: "document",     label: "Document", icon: "📄", desc: "Papiers" },
-  { value: "nourriture",   label: "Repas",    icon: "🍔", desc: "Alimentaire" },
-  { value: "autre",        label: "Autre",    icon: "🎁", desc: "Autre" },
+  { value: "petit_colis", label: "Petit", icon: "", desc: "< 2 kg" },
+  { value: "moyen_colis", label: "Moyen", icon: "", desc: "2-10 kg" },
+  { value: "gros_colis", label: "Gros", icon: "", desc: "> 10 kg" },
+  { value: "document", label: "Document", icon: "", desc: "Papiers" },
+  { value: "nourriture", label: "Repas", icon: "", desc: "Alimentaire" },
+  { value: "autre", label: "Autre", icon: "", desc: "Autre" },
 ];
 
 const LETTER_IDS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
 
 export default function ColisDestinataireForm({
-  index,           // 0-based
-  colisData,       // objet du colis
-  onChange,        // (index, field, value) => void
+  index, // 0-based
+  colisData, // objet du colis
+  onChange, // (index, field, value) => void
   clientId,
   countryCode,
   savedLat,
@@ -66,12 +66,12 @@ export default function ColisDestinataireForm({
           update("gps_livraison_lng", client.longitude);
           update("adresse_livraison", colisData.adresse_livraison || "Position GPS du destinataire");
         }
-        toast.success(`✅ ${client.nom || client.prenom} trouvé dans SILGAPP !`);
+        toast.success(` ${client.nom || client.prenom} trouvé dans SILGAPP !`);
       } else {
         setDestinataireFound(null);
         update("destinataire_client_id", null);
         update("recipient_has_app", false);
-        toast.info("ℹ️ Destinataire non trouvé dans SILGAPP");
+        toast.info("ℹ Destinataire non trouvé dans SILGAPP");
       }
     } catch (_) {
       toast.error("Erreur lors de la vérification");
@@ -95,7 +95,7 @@ export default function ColisDestinataireForm({
         } catch (_) {}
       }
       setGpsLoading(false);
-      toast.success("📍 Position GPS récupérée !");
+      toast.success(" Position GPS récupérée !");
     };
 
     if (!navigator.geolocation) {
@@ -142,7 +142,7 @@ export default function ColisDestinataireForm({
           </p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          {hasGPS && <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">📍 GPS</span>}
+          {hasGPS && <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold"> GPS</span>}
           {colisData.recipient_has_app && <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">SILGAPP</span>}
           {expanded ? <ChevronUp className="w-4 h-4 text-gray-600" /> : <ChevronDown className="w-4 h-4 text-gray-600" />}
         </div>
@@ -219,7 +219,7 @@ export default function ColisDestinataireForm({
             )}
             {destinataireFound === null && (
               <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-700 font-semibold">
-                ℹ️ Non inscrit — la course fonctionnera quand même
+                ℹ Non inscrit — la course fonctionnera quand même
               </div>
             )}
           </div>

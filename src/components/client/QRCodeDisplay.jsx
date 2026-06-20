@@ -26,7 +26,7 @@ export default function QRCodeDisplay({ course, type }) {
           </div>
           <div>
             <h3 className="font-bold text-green-900">
-              {isPickup ? "Récupération confirmée ✅" : "Livraison confirmée ✅"}
+              {isPickup ? "Récupération confirmée " : "Livraison confirmée "}
             </h3>
             <p className="text-sm text-green-700">
               Validé par {confirmedBy === "qr" ? "QR code" : "code manuel"}
@@ -70,7 +70,7 @@ export default function QRCodeDisplay({ course, type }) {
       </div>
 
       <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
-        📲 Présentez ce QR code ou donnez le code à 4 chiffres au livreur pour confirmer{" "}
+         Présentez ce QR code ou donnez le code à 4 chiffres au livreur pour confirmer{" "}
         {isPickup ? "la récupération du colis" : "la livraison"}.
       </p>
 

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { 
-  LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
+import {
+  LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell,
   Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
@@ -34,7 +34,7 @@ export const navItems = [
   { path: "/rapport", label: "Rapport du jour", icon: BarChart3, reseauOnly: "externe" },
   { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp, reseauOnly: "interne" },
   { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp, reseauOnly: "externe" },
-  { path: "/admin/externe/dus-livreurs", label: "Comptabilité", icon: Wallet, reseauOnly: "externe" },
+  { path: "/admin/comptabilite", label: "Comptabilité", icon: Wallet, reseauOnly: "externe" },
   { path: "/admin/global", label: "Admin Global", icon: Globe, reseauOnly: "externe" },
   { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Settings, reseauOnly: "externe" },
   { path: "/admin/externe/clients", label: "Clients externes", icon: Users, reseauOnly: "externe" },
@@ -45,6 +45,8 @@ export const navItems = [
   { path: "/admin/demandes-livreurs", label: "Livreurs à valider", icon: UserCheck, reseauOnly: "interne" },
   { path: "/admin/demandes-livreurs", label: "Livreurs à valider", icon: UserCheck, reseauOnly: "externe" },
   { path: "/admin/livreurs-bloques", label: "Livreurs bloqués", icon: ShieldAlert, reseauOnly: "externe" },
+  { path: "/admin/anti-fraude", label: "Anti-Fraude", icon: Shield, reseauOnly: "externe" },
+  { path: "/admin/support", label: "Support tickets", icon: MessageCircle, reseauOnly: "externe" },
   { path: "/notifications", label: "Notifications", icon: Bell, reseauOnly: "interne" },
   { path: "/notifications", label: "Notifications", icon: Bell, reseauOnly: "externe" },
   { path: "/maintenance", label: "Maintenance", icon: Shield, reseauOnly: "interne" },
@@ -70,7 +72,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, rese
         "h-16 flex items-center border-b border-white/8 flex-shrink-0 overflow-hidden",
         collapsed ? "px-4 justify-center" : "px-5 gap-3"
       )}>
-        <img 
+        <img
           src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/2c20ad136_SILGAPPLOGO2.jpg"
           alt="SILGAPP ET"
           className="w-9 h-9 rounded-xl flex-shrink-0 ring-2 ring-white/10"
@@ -142,7 +144,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, rese
                 title={effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
               >
                 <span className="text-base">
-                  {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
+                  {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.emoji_flag || "" : ""}
                 </span>
               </button>
             ) : (
@@ -152,7 +154,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, rese
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-base flex-shrink-0">
-                    {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
+                    {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.emoji_flag || "" : ""}
                   </span>
                   <span className="text-xs font-semibold text-white/70 truncate">
                     {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}

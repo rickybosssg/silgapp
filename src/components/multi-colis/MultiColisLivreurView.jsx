@@ -37,7 +37,7 @@ function ConfirmMontantDialog({ colis, devise, onConfirm, onCancel, isPending })
         {/* Header */}
         <div className="text-center">
           <div className="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center mx-auto mb-3 text-3xl">
-            📦
+
           </div>
           <p className="text-lg font-black text-gray-900">Livraison confirmée ?</p>
           <p className="text-sm text-gray-600 mt-1">
@@ -86,7 +86,7 @@ function ConfirmMontantDialog({ colis, devise, onConfirm, onCancel, isPending })
             onClick={handleSubmit}
             disabled={!isValid || isPending}
           >
-            ✅ Valider
+             Valider
           </button>
         </div>
       </div>
@@ -97,7 +97,7 @@ function ConfirmMontantDialog({ colis, devise, onConfirm, onCancel, isPending })
 /**
  * Vue multi-colis pour le livreur externe.
  * - Pas de QR Code ni de PIN Code
- * - Bouton "✅ Livrer ce colis" → dialogue confirmation + saisie montant
+ * - Bouton " Livrer ce colis" → dialogue confirmation + saisie montant
  * - Calcul automatique : total, gain livreur, commission Silga
  * - Fin de course automatique quand tous les colis sont livrés/annulés
  */
@@ -187,7 +187,7 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
     onSuccess: ({ tousTermines, montantTotal, gainLivreur, courseData }) => {
       setConfirmColis(null);
       if (tousTermines) {
-        toast.success(`🎉 Tournée terminée ! Total : ${montantTotal.toLocaleString()} ${course.devise || "F"}`);
+        toast.success(` Tournée terminée ! Total : ${montantTotal.toLocaleString()} ${course.devise || "F"}`);
         onAllLivres?.(courseData);
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ["colis-externes", course.id] });
@@ -196,7 +196,7 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
       } else {
         queryClient.invalidateQueries({ queryKey: ["colis-externes", course.id] });
         queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-        toast.success(`Colis livré ✅ — +${gainLivreur.toLocaleString()} ${course.devise || "F"}`);
+        toast.success(`Colis livré — +${gainLivreur.toLocaleString()} ${course.devise || "F"}`);
       }
     },
     onError: () => toast.error("Erreur lors de la mise à jour"),
@@ -326,7 +326,7 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
           <div className="flex items-center gap-2">
             <Package className="w-4 h-4 text-purple-700" />
             <span className="text-sm font-black text-purple-900">
-              📦 {nbTotal} colis à livrer
+               {nbTotal} colis à livrer
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -373,7 +373,7 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
                         estAnnule ? "bg-gray-400" :
                         "bg-purple-600"
                       }`}>
-                        {estLivre ? "✓" : estAnnule ? "✕" : colisItem.colis_uid || idx + 1}
+                        {estLivre ? "" : estAnnule ? "" : colisItem.colis_uid || idx + 1}
                       </div>
                       <div>
                         <p className="text-sm font-black text-gray-900">
@@ -459,7 +459,7 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
                         disabled={livrerColisMutation.isPending || annulerColisMutation.isPending}
                       >
                         <CheckCircle className="w-4 h-4" />
-                        ✅ Colis {colisItem.colis_uid || idx + 1} livré
+                         Colis {colisItem.colis_uid || idx + 1} livré
                       </button>
                       <button
                         className="flex-none h-11 px-3 rounded-xl bg-red-50 border border-red-200 text-red-600 font-black text-xs active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-1"
