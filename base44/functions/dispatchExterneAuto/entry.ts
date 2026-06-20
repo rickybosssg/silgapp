@@ -285,7 +285,8 @@ async function notifierLivreur(base44, courseId, course, livreur, timeoutSec) {
   const message = `Course à ${distanceSafe}km — ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`;
 
   const heartbeatAgeMin = livreur.heartbeatAgeMin;
-  const appActive = heartbeatAgeMin !== null && heartbeatAgeMin < 5; // N1: app active si HB < 5 min
+  const appOrBgActive = livreur.app_active === true || livreur.background_active === true;
+  const appActive = heartbeatAgeMin !== null && heartbeatAgeMin < 5 && appOrBgActive;
 
   try {
     await base44.asServiceRole.entities.Notification.create({
@@ -413,6 +414,10 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
   } else if (useGPSWaves) {
     candidats = candidatsTous; // Déjà triés par distance (GPS)
     console.log(`[DISPATCH] Mode vagues GPS — vague ${wave}/${gpsConfig.waves.length} (${candidatsTous.length} candidats triés par distance)`);
+    if (wave === 1) candidats = niveau1;
+    else if (wave === 2) candidats = [...niveau1, ...niveau2];
+    else if (wave === 3) candidats = candidatsTous;
+    else candidats = [];
   } else {
     candidats = candidatsTous;
   }

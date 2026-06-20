@@ -176,6 +176,11 @@
       "type": "boolean",
       "default": false
     },
+    "background_active": {
+      "type": "boolean",
+      "default": false,
+      "description": "Foreground Service Android actif en arriere-plan"
+    },
     "last_seen_at": {
       "type": "string",
       "format": "date-time"
