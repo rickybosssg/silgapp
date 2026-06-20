@@ -23,16 +23,28 @@
       "type": "string",
       "description": "Nom affich\u00e9 du sender"
     },
+    "message_type": {
+      "type": "string",
+      "enum": [
+        "text",
+        "audio"
+      ],
+      "default": "text",
+      "description": "Type de message"
+    },
     "content": {
       "type": "string",
-      "description": "Contenu du message"
+      "description": "Contenu du message texte"
+    },
+    "audio_url": {
+      "type": "string",
+      "description": "URL du fichier audio"
     }
   },
   "required": [
     "course_id",
     "sender_type",
     "sender_id",
-    "sender_name",
-    "content"
+    "sender_name"
   ]
 }

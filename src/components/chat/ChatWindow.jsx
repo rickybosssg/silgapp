@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Send, Loader2, MessageCircle } from "lucide-react";
 import ChatBubble from "@/components/chat/ChatBubble";
+import AudioRecorder from "@/components/chat/AudioRecorder";
 import { playNotificationSound } from "@/hooks/useSonEtVibration";
 
 export default function ChatWindow({ courseId, senderType, senderId, senderName, clientName, livreurName, compact = false }) {
@@ -46,10 +47,8 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!input.trim() || sending || !courseId) return;
-    const content = input.trim();
-    setInput("");
+  const sendMessage = async (msgData) => {
+    if (sending || !courseId) return;
     setSending(true);
     try {
       await base44.entities.Message.create({
@@ -57,13 +56,23 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
         sender_type: senderType,
         sender_id: senderId,
         sender_name: senderName,
-        content,
+        ...msgData,
       });
     } catch (err) {
       console.error("Erreur envoi message:", err);
-      setInput(content);
     }
     setSending(false);
+  };
+
+  const handleSend = async () => {
+    if (!input.trim() || sending || !courseId) return;
+    const content = input.trim();
+    setInput("");
+    await sendMessage({ content, message_type: "text" });
+  };
+
+  const handleAudioSend = async (audioData) => {
+    await sendMessage(audioData);
   };
 
   const handleKeyDown = (e) => {
@@ -119,7 +128,12 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
       </div>
 
       {/* Input */}
-      <div className="p-3 bg-white border-t border-gray-100 flex gap-2">
+      <div className="p-3 bg-white border-t border-gray-100 flex items-center gap-2">
+        <AudioRecorder
+          onSend={handleAudioSend}
+          disabled={sending}
+          senderName={senderName}
+        />
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
