@@ -93,6 +93,34 @@ Deno.serve(async (req) => {
         </tr>
       `).join('');
 
+    const tableClients = clients
+      .sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
+      .slice(0, 15)
+      .map(c => `
+        <tr>
+          <td>${c.nom || '-'} ${c.prenom || ''}</td>
+          <td>${c.telephone || '-'}</td>
+          <td>${c.ville || '-'}</td>
+          <td>${c.country_code || '-'}</td>
+          <td><span class="badge ${c.actif ? 'badge-green' : 'badge-red'}">${c.actif ? 'Actif' : 'Inactif'}</span></td>
+          <td>${c.last_seen_at ? new Date(c.last_seen_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : '-'}</td>
+        </tr>
+      `).join('');
+
+    const tableLivreurs = livreurs
+      .sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
+      .slice(0, 15)
+      .map(l => `
+        <tr>
+          <td>${l.nom || '-'} ${l.prenom || ''}</td>
+          <td>${l.telephone || '-'}</td>
+          <td>${l.ville || '-'}</td>
+          <td>${l.country_code || '-'}</td>
+          <td><span class="badge ${l.validation === 'valide' ? 'badge-green' : l.validation === 'en_attente' ? 'badge-orange' : 'badge-red'}">${l.validation === 'valide' ? 'Validé' : l.validation === 'en_attente' ? 'En attente' : 'Refusé'}</span></td>
+          <td><span class="badge ${l.statut === 'disponible' ? 'badge-green' : l.statut === 'en_course' ? 'badge-blue' : 'badge-gray'}">${l.statut === 'disponible' ? 'Disponible' : l.statut === 'en_course' ? 'En course' : 'Hors ligne'}</span></td>
+        </tr>
+      `).join('');
+
     const paysRows = statsByPays.map(p => `
       <div class="pays-card">
         <span class="flag">${p.emoji}</span>
@@ -150,7 +178,13 @@ th{text-align:left;padding:8px 10px;color:#86868b;font-weight:600;font-size:11px
 td{padding:8px 10px;border-bottom:1px solid #f3f4f6}
 .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:600;border:1px solid #d1d5db;color:#4b5563}
 .badge-green{background:#dcfce7;color:#166534;border-color:#bbf7d0}
-footer{text-align:center;padding:30px;font-size:11px;color:#9ca3af}
+ .badge-orange{background:#fff7ed;color:#c2410c;border-color:#fed7aa}
+ .badge-red{background:#fef2f2;color:#991b1b;border-color:#fecaca}
+ .badge-blue{background:#eff6ff;color:#1e40af;border-color:#bfdbfe}
+ .badge-gray{background:#f3f4f6;color:#4b5563;border-color:#d1d5db}
+ .section-title{font-size:14px;font-weight:700;margin-bottom:4px;color:#1d1d1f}
+ .section-subtitle{font-size:11px;color:#86868b;margin-bottom:12px}
+ footer{text-align:center;padding:30px;font-size:11px;color:#9ca3af}
 a{color:#ef4444;text-decoration:none}
 @media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.type-grid{grid-template-columns:1fr}}
 </style>
@@ -199,6 +233,24 @@ a{color:#ef4444;text-decoration:none}
 <table>
 <thead><tr><th>Date</th><th>Type</th><th>Pays</th><th>Client</th><th>Statut</th></tr></thead>
 <tbody>${dernieresLivrees}</tbody>
+</table>
+</div>
+
+<div class="card">
+<div class="section-title">👥 Clients inscrits</div>
+<div class="section-subtitle">${clients.length} clients · ${clientsActifs} actifs · Affichage des 15 plus récents</div>
+<table>
+<thead><tr><th>Nom</th><th>Téléphone</th><th>Ville</th><th>Pays</th><th>Statut</th><th>Vu le</th></tr></thead>
+<tbody>${tableClients}</tbody>
+</table>
+</div>
+
+<div class="card">
+<div class="section-title">🏍️ Livreurs inscrits</div>
+<div class="section-subtitle">${livreurs.length} livreurs · ${livreursValides} validés · Affichage des 15 plus récents</div>
+<table>
+<thead><tr><th>Nom</th><th>Téléphone</th><th>Ville</th><th>Pays</th><th>Validation</th><th>Statut</th></tr></thead>
+<tbody>${tableLivreurs}</tbody>
 </table>
 </div>
 
