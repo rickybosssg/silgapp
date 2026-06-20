@@ -1,5 +1,15 @@
 apply plugin: 'com.android.application'
 
+def localReleaseSigning = new Properties()
+def localReleaseSigningFile = [
+        rootProject.file("../work-certs/codex-upload-key.properties"),
+        rootProject.file("work-certs/codex-upload-key.properties"),
+        project.file("../../work-certs/codex-upload-key.properties")
+].find { it.exists() }
+if (localReleaseSigningFile != null) {
+    localReleaseSigningFile.withInputStream { localReleaseSigning.load(it) }
+}
+
 android {
     namespace "com.base6a0ec08f3af5e1d1284254c1.app"
     compileSdkVersion rootProject.ext.compileSdkVersion
@@ -7,8 +17,8 @@ android {
         applicationId "com.base6a0ec08f3af5e1d1284254c1.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 11
-        versionName "1.0.4"
+        versionCode 12
+        versionName "1.0.5"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -18,10 +28,13 @@ android {
     }
     signingConfigs {
         release {
-            def releaseStoreFile = project.findProperty("MYAPP_RELEASE_STORE_FILE")
-            def releaseStorePassword = project.findProperty("MYAPP_RELEASE_STORE_PASSWORD")
-            def releaseKeyAlias = project.findProperty("MYAPP_RELEASE_KEY_ALIAS")
-            def releaseKeyPassword = project.findProperty("MYAPP_RELEASE_KEY_PASSWORD")
+            def releaseStoreFile = project.findProperty("MYAPP_RELEASE_STORE_FILE") ?: localReleaseSigning.getProperty("MYAPP_RELEASE_STORE_FILE")
+            def releaseStorePassword = project.findProperty("MYAPP_RELEASE_STORE_PASSWORD") ?: localReleaseSigning.getProperty("MYAPP_RELEASE_STORE_PASSWORD")
+            def releaseKeyAlias = project.findProperty("MYAPP_RELEASE_KEY_ALIAS") ?: localReleaseSigning.getProperty("MYAPP_RELEASE_KEY_ALIAS")
+            def releaseKeyPassword = project.findProperty("MYAPP_RELEASE_KEY_PASSWORD") ?: localReleaseSigning.getProperty("MYAPP_RELEASE_KEY_PASSWORD")
+            if (!releaseStoreFile && localReleaseSigningFile != null) {
+                releaseStoreFile = new File(localReleaseSigningFile.parentFile, "codex-upload-keystore.jks").absolutePath
+            }
             if (releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword) {
                 storeFile file(releaseStoreFile)
                 storePassword releaseStorePassword

@@ -32,11 +32,13 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
         device_id: navigator.userAgent.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 50),
         session_id: session_id || undefined,
       };
+
       const res = await base44.functions.invoke("heartbeatAuto", payload);
       if (res?.data?.error === "session_expired" && onSessionExpired) {
         onSessionExpired();
         return;
       }
+
       if (debugLabel) {
         console.info(
           `[${debugLabel}] heartbeatAuto OK lat=${Number(payload.latitude).toFixed(6)} lng=${Number(payload.longitude).toFixed(6)} active=${payload.app_active} background=${payload.background_active}`
@@ -59,9 +61,10 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
       syncHeartbeat(position);
     }, 30000);
 
+    let cancelled = false;
     let nativeBgHeartbeatStop = null;
+
     if (isNativeMobile()) {
-      let cancelled = false;
       startNativeLocationSync({
         enabled,
         intervalMs: 5000,
@@ -88,18 +91,14 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
           console.warn("[useHeartbeat] Background heartbeat natif indisponible:", error?.message);
         });
       }
-
-      return () => {
-        cancelled = true;
-        if (intervalRef.current) clearInterval(intervalRef.current);
-        nativeStopRef.current?.();
-        nativeStopRef.current = null;
-        nativeBgHeartbeatStop?.();
-      };
     }
 
     return () => {
+      cancelled = true;
       if (intervalRef.current) clearInterval(intervalRef.current);
+      nativeStopRef.current?.();
+      nativeStopRef.current = null;
+      nativeBgHeartbeatStop?.();
     };
   }, [enabled, user_type]);
 

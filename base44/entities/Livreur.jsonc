@@ -63,24 +63,21 @@
       "default": "en_attente"
     },
     "valide_par": {
-      "type": "string",
-      "description": "Email admin ayant valid\u00e9"
+      "type": "string"
     },
     "valide_at": {
       "type": "string",
       "format": "date-time"
     },
     "refuse_par": {
-      "type": "string",
-      "description": "Email admin ayant refus\u00e9"
+      "type": "string"
     },
     "refuse_at": {
       "type": "string",
       "format": "date-time"
     },
     "motif_refus": {
-      "type": "string",
-      "description": "Motif du refus (optionnel)"
+      "type": "string"
     },
     "actif": {
       "type": "boolean",
@@ -179,24 +176,21 @@
     "background_active": {
       "type": "boolean",
       "default": false,
-      "description": "Foreground Service Android actif en arriere-plan"
+      "description": "Foreground Service Android actif en arri\u00e8re-plan"
     },
     "last_seen_at": {
       "type": "string",
       "format": "date-time"
     },
     "session_active_id": {
-      "type": "string",
-      "description": "ID de la session active unique. Une seule session autoris\u00e9e par livreur."
+      "type": "string"
     },
     "session_active_device": {
-      "type": "string",
-      "description": "Device ID de la session active"
+      "type": "string"
     },
     "session_active_date": {
       "type": "string",
-      "format": "date-time",
-      "description": "Date de cr\u00e9ation de la session active"
+      "format": "date-time"
     },
     "montant_du_silga": {
       "type": "number",
@@ -204,23 +198,19 @@
     },
     "encours": {
       "type": "number",
-      "default": 0,
-      "description": "Encours cumul\u00e9 d\u00fb \u00e0 SILGAPP (montant total non encore revers\u00e9)"
+      "default": 0
     },
     "bloque_encours": {
       "type": "boolean",
-      "default": false,
-      "description": "Livreur bloqu\u00e9 automatiquement pour d\u00e9passement du seuil d'encours"
+      "default": false
     },
     "encours_bloque_at": {
       "type": "string",
-      "format": "date-time",
-      "description": "Date du blocage automatique pour d\u00e9passement d'encours"
+      "format": "date-time"
     },
     "encours_alerte_at": {
       "type": "string",
-      "format": "date-time",
-      "description": "Date de la derni\u00e8re alerte 80% envoy\u00e9e"
+      "format": "date-time"
     },
     "note_moyenne": {
       "type": "number",

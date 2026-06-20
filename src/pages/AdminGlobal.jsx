@@ -4,17 +4,41 @@ import { base44 } from "@/api/base44Client";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
-  Globe, ArrowRight, ToggleLeft, ToggleRight, Plus, Settings, LayoutDashboard, ShieldCheck
+  Globe, ArrowRight, ToggleLeft, ToggleRight, Plus, Settings, LayoutDashboard, ShieldCheck, FileText, Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 import { isToday } from "date-fns";
 import { PAYS_SILGAPP } from "@/components/international/CountrySelector.jsx";
 import AdminPaysDialog from "@/components/admin/AdminPaysDialog.jsx";
+import DemoAccessManager from "@/components/admin/DemoAccessManager.jsx";
 
 export default function AdminGlobal() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [showCreateAdmin, setShowCreateAdmin] = useState(null); // pays object
+  const [downloadingReport, setDownloadingReport] = useState(false);
+
+  const handleDownloadReport = async () => {
+    setDownloadingReport(true);
+    try {
+      const res = await base44.functions.invoke("genererRapportGooglePlay", {});
+      // La réponse est un PDF binaire
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "SILGAPP_Rapport_Closed_Testing.pdf";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Rapport PDF téléchargé ✓");
+    } catch (err) {
+      console.error(err);
+      toast.error("Erreur lors du téléchargement du rapport");
+    }
+    setDownloadingReport(false);
+  };
 
   const { data: pays = [], isLoading: loadingPays } = useQuery({
     queryKey: ["countries-all"],
@@ -126,12 +150,24 @@ export default function AdminGlobal() {
               <p className="text-white/60 text-xs mt-0.5">Supervision de toutes les opérations multi-pays</p>
             </div>
           </div>
-          <Link to="/admin/gestion-pays">
-            <Button variant="ghost" size="sm" className="gap-1.5 text-white hover:bg-white/20 border border-white/30">
-              <Settings className="w-4 h-4" />
-              <span className="hidden sm:inline">Configurer</span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-white hover:bg-white/20 border border-white/30"
+              onClick={handleDownloadReport}
+              disabled={downloadingReport}
+            >
+              {downloadingReport ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+              <span className="hidden sm:inline">Rapport Google Play</span>
             </Button>
-          </Link>
+            <Link to="/admin/gestion-pays">
+              <Button variant="ghost" size="sm" className="gap-1.5 text-white hover:bg-white/20 border border-white/30">
+                <Settings className="w-4 h-4" />
+                <span className="hidden sm:inline">Configurer</span>
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -253,6 +289,9 @@ export default function AdminGlobal() {
           ))}
         </div>
       </div>
+
+      {/* Gestion accès démo Google Play */}
+      <DemoAccessManager />
 
       {/* Dialog créer admin pays */}
       {showCreateAdmin && (

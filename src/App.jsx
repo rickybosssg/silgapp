@@ -66,6 +66,7 @@ const TestNotifications = lazy(() => import('./pages/TestNotifications.jsx'));
 const DiagnosticPushComplet = lazy(() => import('./pages/DiagnosticPushComplet.jsx'));
 const TestDispatchLivreur = lazy(() => import('./pages/TestDispatchLivreur.jsx'));
 const CentreNotificationsPush = lazy(() => import('./pages/CentreNotificationsPush.jsx'));
+const DemoDashboard = lazy(() => import('./pages/DemoDashboard.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -108,7 +109,7 @@ function AppContent() {
     mediaQuery.addEventListener('change', applyTheme);
     return () => mediaQuery.removeEventListener('change', applyTheme);
   }, []);
-
+  
   // Hook for Android hardware back button
   const navigate = useNavigate();
   const location = useLocation();
@@ -119,21 +120,33 @@ function AppContent() {
         navigate(-1);
       }
     };
-
+    
     document.addEventListener('backbutton', handleBackButton, false);
     return () => document.removeEventListener('backbutton', handleBackButton);
   }, [navigate, location]);
-
+  
   const [livreurProfil, setLivreurProfil] = useState(null);
   const [isClient, setIsClient] = useState(false);
   const [reseau, setReseau] = useState(null);
 
-  // ROUTES PUBLIQUES - ACCESSIBLES SANS AUTHENTIFICATION (PRIORITÉ ABSOLUE)
+  // 🌍 ROUTES PUBLIQUES - ACCESSIBLES SANS AUTHENTIFICATION (PRIORITÉ ABSOLUE)
   // Ces routes doivent être vérifiées AVANT toute logique d'authentification
-  const isPublicRoute = location.pathname === '/telecharger' ||
-                        location.pathname === '/privacy-policy' ||
-                        location.pathname === '/suivi-public/:token' ||
-                        location.pathname.startsWith('/suivi-public/');
+  // 🌍 ROUTES PUBLIQUES - PRIORITÉ ABSOLUE (vérification avant tout)
+  const currentPath = location.pathname || window.location.pathname;
+  const isPublicRoute = currentPath === '/telecharger' || 
+                        currentPath === '/privacy-policy' ||
+                        currentPath.startsWith('/suivi-public/') ||
+                        currentPath.startsWith('/demo/');
+
+  // /demo/ : rendu DIRECT sans passer par le Router pour éviter toute ingérence
+  if (currentPath.startsWith('/demo/')) {
+    const token = currentPath.replace('/demo/', '').split('?')[0].split('#')[0];
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <DemoDashboard token={token} />
+      </Suspense>
+    );
+  }
 
   if (isPublicRoute) {
     return (
@@ -212,7 +225,7 @@ function AppContent() {
           <Route
             path="*"
             element={
-              <AuthGate
+              <AuthGate 
                 onLivreur={setLivreurProfil}
                 onClient={() => setIsClient(true)}
               >
@@ -294,7 +307,20 @@ function AppContent() {
   );
 }
 
+// Module-level check pour /demo/ — court-circuite tout le routing React
+const isDemoUrl = window.location.pathname.startsWith('/demo/');
+const demoToken = isDemoUrl ? window.location.pathname.replace('/demo/', '').split('?')[0].split('#')[0] : null;
+
 function App() {
+  // Si URL démo, rendre DIRECTEMENT le dashboard sans Router ni auth
+  if (isDemoUrl && demoToken) {
+    return (
+      <React.Suspense fallback={<SplashScreen />}>
+        <DemoDashboard token={demoToken} />
+      </React.Suspense>
+    );
+  }
+
   return (
     <Router>
       <AppContent />

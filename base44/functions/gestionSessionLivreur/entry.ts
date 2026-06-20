@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-
+    
     if (!user) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -32,20 +32,20 @@ Deno.serve(async (req) => {
 
     // Si une session existait déjà, on la remplace (nouvelle connexion)
     const ancienneSession = livreur.session_active_id;
-
+    
     // 1. Mettre à jour le livreur avec la nouvelle session
     await base44.asServiceRole.entities.Livreur.update(livreur.id, {
       session_active_id: sessionId,
       session_active_device: device_id || 'inconnu',
       session_active_date: now,
       app_active: true,
-      background_active: true,
+      background_active: true, // App native = foreground service actif
       last_seen_at: now,
       statut: 'disponible', // Forcer disponible pour la nouvelle session
     });
 
     // 2. Désactiver TOUS les anciens tokens FCM de ce livreur
-    // (pour qu'ils ne reçoivent plus de notifications)
+    //    (pour qu'ils ne reçoivent plus de notifications)
     const allTokens = await base44.asServiceRole.entities.NotificationToken.filter({
       livreur_id: livreur.id,
       actif: true,
