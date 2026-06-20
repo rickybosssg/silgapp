@@ -1,0 +1,103 @@
+{
+  "name": "AlerteFraude",
+  "type": "object",
+  "properties": {
+    "country_code": {
+      "type": "string",
+      "description": "Code pays"
+    },
+    "type_fraude": {
+      "type": "string",
+      "enum": [
+        "gps_spoof",
+        "course_trop_rapide",
+        "prix_anormal",
+        "collusion",
+        "compte_double",
+        "annulations_abusives",
+        "vitesse_impossible",
+        "positions_incoherentes"
+      ],
+      "description": "Type de fraude d\u00e9tect\u00e9e"
+    },
+    "niveau": {
+      "type": "string",
+      "enum": [
+        "faible",
+        "moyen",
+        "eleve",
+        "critique"
+      ],
+      "default": "moyen",
+      "description": "Niveau de s\u00e9v\u00e9rit\u00e9"
+    },
+    "score_risque": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 50
+    },
+    "livreur_id": {
+      "type": "string",
+      "description": "ID du livreur concern\u00e9"
+    },
+    "livreur_nom": {
+      "type": "string"
+    },
+    "livreur_telephone": {
+      "type": "string"
+    },
+    "client_id": {
+      "type": "string",
+      "description": "ID du client concern\u00e9 (si applicable)"
+    },
+    "client_nom": {
+      "type": "string"
+    },
+    "course_id": {
+      "type": "string",
+      "description": "ID de la course concern\u00e9e"
+    },
+    "details": {
+      "type": "string",
+      "description": "JSON stringifi\u00e9 avec les d\u00e9tails de l'analyse"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description lisible de l'alerte"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "nouveau",
+        "en_cours",
+        "confirme",
+        "rejete",
+        "bloque"
+      ],
+      "default": "nouveau"
+    },
+    "traite_par": {
+      "type": "string",
+      "description": "Email admin ayant trait\u00e9 l'alerte"
+    },
+    "traite_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "action_prise": {
+      "type": "string",
+      "description": "Action prise (blocage, avertissement, etc.)"
+    },
+    "date_detection": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de d\u00e9tection de la fraude"
+    }
+  },
+  "required": [
+    "type_fraude",
+    "niveau",
+    "description"
+  ]
+}

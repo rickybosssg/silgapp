@@ -45,6 +45,7 @@ export const navItems = [
   { path: "/admin/demandes-livreurs", label: "Livreurs à valider", icon: UserCheck, reseauOnly: "interne" },
   { path: "/admin/demandes-livreurs", label: "Livreurs à valider", icon: UserCheck, reseauOnly: "externe" },
   { path: "/admin/livreurs-bloques", label: "Livreurs bloqués", icon: ShieldAlert, reseauOnly: "externe" },
+  { path: "/admin/anti-fraude", label: "Anti-Fraude", icon: Shield, reseauOnly: "externe" },
   { path: "/notifications", label: "Notifications", icon: Bell, reseauOnly: "interne" },
   { path: "/notifications", label: "Notifications", icon: Bell, reseauOnly: "externe" },
   { path: "/maintenance", label: "Maintenance", icon: Shield, reseauOnly: "interne" },
