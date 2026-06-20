@@ -262,7 +262,9 @@ async function notifierLivreur(base44, courseId, course, livreur, timeoutSec) {
   const message = `Course à ${distanceSafe}km — ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`;
 
   const heartbeatAgeMin = livreur.heartbeatAgeMin;
-  const appActive = heartbeatAgeMin !== null && heartbeatAgeMin < 5; // N1: app active si HB < 5 min
+  // N'envoyer WhatsApp que si le livreur n'a ni app ouverte ni foreground service actif
+  const appOrBgActive = (livreur.app_active === true || livreur.background_active === true);
+  const appActive = heartbeatAgeMin !== null && heartbeatAgeMin < 5 && appOrBgActive;
 
   try {
     await base44.asServiceRole.entities.Notification.create({
@@ -370,14 +372,14 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
   const gpsConfig = await chargerConfigVaguesGPS(base44);
   const useGPSWaves = pickupSource === 'gps' && gpsConfig.gps_waves_enabled;
 
-  // 📍 Mode vagues GPS (distance-based, configurable) — pour courses AVEC GPS
-  // 🌊 Mode vagues heartbeat (N1/N2/N3) — pour courses SANS GPS (quartier/none, non-admin)
+  // 📍 Mode vagues GPS (distance + heartbeat N1/N2/N3) — courses AVEC GPS
+  // 🌊 Mode vagues heartbeat (N1/N2/N3) — courses SANS GPS (quartier/none, non-admin)
   // ⚡ Mode direct (tous simultanés) — admin courses sans GPS waves actif
   const modeVaguesHeartbeat = !useGPSWaves && pickupSource !== 'gps' && course.source !== 'admin';
   let wave = modeVaguesHeartbeat
     ? (course.dispatch_wave || 1)      // heartbeat: 1=N1, 2=N2, 3=N3
     : useGPSWaves
-      ? (course.dispatch_wave || 1)    // GPS: 1, 2, 3, ... = indices vagues config
+      ? (course.dispatch_wave || 1)    // GPS: 1=N1, 2=N1+N2, 3=N1+N2+N3
       : 0;                              // direct: pas de vagues
 
   let candidats;
@@ -388,8 +390,13 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
     else candidats = [];
     console.log(`[DISPATCH] 🌊 Mode vagues heartbeat — vague ${wave} (N${wave}: ${candidats.length} candidats)`);
   } else if (useGPSWaves) {
-    candidats = candidatsTous; // Déjà triés par distance (GPS)
-    console.log(`[DISPATCH] 📍 Mode vagues GPS — vague ${wave}/${gpsConfig.waves.length} (${candidatsTous.length} candidats triés par distance)`);
+    // 🎯 GPS waves respectent les niveaux heartbeat N1/N2/N3
+    // N1 = HB 0-15min (triés GPS recency → distance), N2 = 15-30min, N3 = 30-60min
+    if (wave === 1) candidats = niveau1;
+    else if (wave === 2) candidats = [...niveau1, ...niveau2];
+    else if (wave === 3) candidats = candidatsTous;
+    else candidats = [];
+    console.log(`[DISPATCH] 📍 Mode vagues GPS + heartbeat — vague ${wave}/${gpsConfig.waves.length} → N1:${niveau1.length} N2:${niveau2.length} N3:${niveau3.length} = ${candidats.length} candidats`);
   } else {
     candidats = candidatsTous;
   }

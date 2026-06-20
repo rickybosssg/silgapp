@@ -20,6 +20,7 @@ Deno.serve(async (req) => {
       latitude, 
       longitude,
       app_active = true,
+      background_active = false,
       device_id,
       session_id, // NEW : ID de session unique
     } = payload;
@@ -108,6 +109,7 @@ Deno.serve(async (req) => {
           longitude: longitude || livreur.longitude,
           last_seen_at: now,
           app_active: app_active,
+          background_active: background_active,
         });
       }
     }

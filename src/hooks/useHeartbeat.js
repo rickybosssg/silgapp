@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
-import { isNativeMobile, startNativeLocationSync } from "@/lib/nativeAndroid";
+import { isNativeMobile, isNativeAndroid, startNativeLocationSync, startNativeBackgroundHeartbeat } from "@/lib/nativeAndroid";
 
 export function useHeartbeat({ user_type, position, enabled = true, debugLabel = "", session_id, onSessionExpired }) {
   const intervalRef = useRef(null);
@@ -17,11 +17,13 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
     lastSyncRef.current = now;
 
     try {
+      const isNative = isNativeMobile();
       const payload = {
         user_type,
         latitude: pos?.latitude || position?.latitude || 0,
         longitude: pos?.longitude || position?.longitude || 0,
         app_active: document.visibilityState === "visible",
+        background_active: isNative, // Foreground service Android = background_active toujours vrai sur natif
         device_id: navigator.userAgent.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 50),
         session_id: session_id || undefined,
       };
@@ -56,6 +58,7 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
     }, 30000);
 
     // 🎯 GPS NATIF : précision haute fréquence (5s) si disponible
+    let nativeBgHeartbeatStop = null;
     if (isNativeMobile()) {
       let cancelled = false;
       startNativeLocationSync({
@@ -71,12 +74,26 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
       }).catch((error) => {
         console.warn("[useHeartbeat] GPS natif indisponible — heartbeat web actif en secours:", error?.message);
       });
+
+      // 🛡️ Heartbeat natif Android dédié (foreground service indépendant du JS)
+      if (isNativeAndroid()) {
+        startNativeBackgroundHeartbeat({
+          userType: user_type,
+          intervalMs: 15000,
+          distanceFilter: 0,
+        }).then((stop) => {
+          if (!cancelled) nativeBgHeartbeatStop = stop;
+        }).catch((error) => {
+          console.warn("[useHeartbeat] Background heartbeat natif indisponible:", error?.message);
+        });
+      }
     }
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
       nativeStopRef.current?.();
       nativeStopRef.current = null;
+      if (nativeBgHeartbeatStop) nativeBgHeartbeatStop();
     };
   }, [enabled, user_type]);
 

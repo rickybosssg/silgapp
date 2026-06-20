@@ -39,6 +39,7 @@ Deno.serve(async (req) => {
       session_active_device: device_id || 'inconnu',
       session_active_date: now,
       app_active: true,
+      background_active: true, // App native = foreground service actif
       last_seen_at: now,
       statut: 'disponible', // Forcer disponible pour la nouvelle session
     });
