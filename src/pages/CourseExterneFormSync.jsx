@@ -104,6 +104,8 @@ export default function CourseExterneFormSync() {
     quartier_arrivee: "",
     destination_inconnue: false,
     notes: "",
+    date_souhaitee: "",
+    mode_immediat: true,
     // Pour "recevoir" : départ = chez l'expéditeur (à saisir), arrivée = position client (auto)
     gps_depart_lat: null,
     gps_depart_lng: null,
@@ -351,13 +353,16 @@ export default function CourseExterneFormSync() {
       } catch (err) {
         console.error("Erreur notification:", err);
       }
-      try {
-        await base44.functions.invoke("dispatchExterneAuto", {
-          action: "lancer_recherche_auto",
-          course_id: course.id
-        });
-      } catch (err) {
-        console.error("Erreur dispatch:", err);
+      // Ne pas lancer le dispatch pour les courses programmées
+      if (!formData.date_souhaitee) {
+        try {
+          await base44.functions.invoke("dispatchExterneAuto", {
+            action: "lancer_recherche_auto",
+            course_id: course.id
+          });
+        } catch (err) {
+          console.error("Erreur dispatch:", err);
+        }
       }
       return course;
     },
@@ -593,8 +598,9 @@ export default function CourseExterneFormSync() {
       gps_arrivee_lng: isMulti ? null : gpsArriveLng,
       destination_inconnue: destInconnue,
       prix_estimate: isMulti ? 0 : prixEstime,
-      statut: "recherche_livreur",
+      statut: formData.date_souhaitee ? "programmee" : "recherche_livreur",
       dispatch_status: "en_attente",
+      date_souhaitee: formData.date_souhaitee || null,
       // Champs déplacement
       passager_nom: isDeplacement ? (formData.passager_nom || "") : "",
       passager_telephone: isDeplacement ? (formData.passager_telephone || "") : "",
@@ -680,13 +686,41 @@ export default function CourseExterneFormSync() {
           <Button variant="outline" size="sm" onClick={handleAnnuler} className="h-10 w-10 p-0">
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-xl font-bold text-foreground">
               {formData.type_course === "expedier" ? "Expédier un colis" : formData.type_course === "deplacement" ? "Déplacement" : "Recevoir un colis"}
             </h1>
-            <p className="text-xs text-muted-foreground">Formulaire étape par étape</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setFormData(prev => ({ ...prev, mode_immediat: true }))}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${formData.mode_immediat ? "bg-primary text-white shadow" : "bg-gray-100 text-gray-500"}`}
+            >
+              Maintenant
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormData(prev => ({ ...prev, mode_immediat: false }))}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${!formData.mode_immediat ? "bg-primary text-white shadow" : "bg-gray-100 text-gray-500"}`}
+            >
+              Programmer
+            </button>
           </div>
         </div>
+
+        {!formData.mode_immediat && (
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-2xl">
+            <p className="text-xs font-bold text-amber-700 mb-2">📅 Date et heure souhaitées</p>
+            <input
+              type="datetime-local"
+              value={formData.date_souhaitee ? formData.date_souhaitee.slice(0, 16) : ""}
+              onChange={e => setFormData(prev => ({ ...prev, date_souhaitee: e.target.value ? new Date(e.target.value).toISOString() : "" }))}
+              min={new Date().toISOString().slice(0, 16)}
+              className="w-full h-11 rounded-xl border border-amber-300 bg-white px-3 text-sm text-gray-900"
+            />
+          </div>
+        )}
 
         <Card className="p-6" style={{ background: "#ffffff" }}>
           <form onSubmit={handleSubmit}>

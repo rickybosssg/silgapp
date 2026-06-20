@@ -24,7 +24,7 @@
         "admin"
       ],
       "default": "client",
-      "description": "Origine de la creation : client (app mobile) ou admin (dashboard)"
+      "description": "Origine de la creation"
     },
     "client_nom": {
       "type": "string",
@@ -42,6 +42,11 @@
         "deplacement"
       ],
       "description": "Type de course"
+    },
+    "date_souhaitee": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date et heure souhaitee pour la course (reservation). Si vide = immediate."
     },
     "is_multi_colis": {
       "type": "boolean",
@@ -94,12 +99,10 @@
       "type": "string"
     },
     "quartier_depart": {
-      "type": "string",
-      "description": "Quartier de recuperation (selectionne ou saisi librement)"
+      "type": "string"
     },
     "quartier_arrivee": {
-      "type": "string",
-      "description": "Quartier de livraison (selectionne ou saisi librement)"
+      "type": "string"
     },
     "ville_depart": {
       "type": "string"
@@ -161,6 +164,7 @@
       "type": "string",
       "enum": [
         "nouvelle",
+        "programmee",
         "recherche_livreur",
         "livreur_en_route",
         "arrive_prise_en_charge",
@@ -188,8 +192,7 @@
     },
     "dispatch_wave": {
       "type": "number",
-      "default": 0,
-      "description": "Vague de dispatch actuelle (1=N1, 2=N2, 3=N3). 0 = mode normal (distance). Utilise uniquement quand GPS ET quartier absents."
+      "default": 0
     },
     "timeout_expires_at": {
       "type": "string",
@@ -234,29 +237,23 @@
     },
     "heure_prise_en_charge": {
       "type": "string",
-      "format": "date-time",
-      "description": "Heure de prise en charge du passager (deplacement)"
+      "format": "date-time"
     },
     "heure_arrivee": {
       "type": "string",
-      "format": "date-time",
-      "description": "Heure d'arrivee a destination (deplacement)"
+      "format": "date-time"
     },
     "latitude_prise_en_charge": {
-      "type": "number",
-      "description": "Latitude au moment de la prise en charge (deplacement)"
+      "type": "number"
     },
     "longitude_prise_en_charge": {
-      "type": "number",
-      "description": "Longitude au moment de la prise en charge (deplacement)"
+      "type": "number"
     },
     "latitude_arrivee_dest": {
-      "type": "number",
-      "description": "Latitude au moment de l'arrivee a destination (deplacement)"
+      "type": "number"
     },
     "longitude_arrivee_dest": {
-      "type": "number",
-      "description": "Longitude au moment de l'arrivee a destination (deplacement)"
+      "type": "number"
     },
     "heure_recuperation": {
       "type": "string",
@@ -407,8 +404,7 @@
       "format": "date-time"
     },
     "dispatch_notified_ids": {
-      "type": "string",
-      "description": "JSON stringifie des IDs des livreurs notifies"
+      "type": "string"
     },
     "whatsapp_expediteur_statut": {
       "type": "string",

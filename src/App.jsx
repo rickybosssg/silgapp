@@ -58,6 +58,8 @@ const DemandesLivreursAdmin = lazy(() => import('./components/admin/DemandesLivr
 const LivreursBloquesEncours = lazy(() => import('./components/admin/LivreursBloquesEncours.jsx'));
 const Comptabilite = lazy(() => import('./pages/Comptabilite.jsx'));
 const AntiFraudePanel = lazy(() => import('./components/admin/AntiFraudePanel.jsx'));
+const SupportAdmin = lazy(() => import('./components/admin/SupportAdmin.jsx'));
+const SupportClient = lazy(() => import('./pages/SupportClient.jsx'));
 const PolitiqueConfidentialite = lazy(() => import('./pages/PolitiqueConfidentialite.jsx'));
 const TestNotifications = lazy(() => import('./pages/TestNotifications.jsx'));
 const DiagnosticPushComplet = lazy(() => import('./pages/DiagnosticPushComplet.jsx'));
@@ -281,6 +283,8 @@ function AppContent() {
           <Route path="/admin/livreurs-bloques" element={<AnimatedRoutes><LivreursBloquesEncours /></AnimatedRoutes>} />
           <Route path="/admin/comptabilite" element={<AnimatedRoutes><Comptabilite /></AnimatedRoutes>} />
           <Route path="/admin/anti-fraude" element={<AnimatedRoutes><AntiFraudePanel /></AnimatedRoutes>} />
+          <Route path="/admin/support" element={<AnimatedRoutes><SupportAdmin /></AnimatedRoutes>} />
+          <Route path="/support" element={<AnimatedRoutes><SupportClient /></AnimatedRoutes>} />
         </Route>
         <Route path="*" element={<PageNotFound />} />
       </Routes>

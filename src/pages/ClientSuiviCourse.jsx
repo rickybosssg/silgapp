@@ -33,6 +33,7 @@ import DestinataireReactionButton from "@/components/client/DestinataireReaction
 import QRCodeDisplay from "@/components/client/QRCodeDisplay";
 import AnnulerCourseDialog from "@/components/client/AnnulerCourseDialog";
 import ChatWindow from "@/components/chat/ChatWindow";
+import CarteLivreurClient from "@/components/chat/CarteLivreurClient";
 import ETADisplay from "@/components/client/ETADisplay";
 import HistoriqueCoursesClient from "@/components/client/HistoriqueCoursesClient";
 import FraisAnnulationBannerClient from "@/components/client/FraisAnnulationBannerClient";
@@ -473,6 +474,24 @@ export default function ClientSuiviCourse() {
             livreurName={maCourse.livreur_nom}
           />
         )}
+
+        {/* 🗺️ Carte live du livreur */}
+        {["livreur_en_route", "colis_recupere", "en_livraison"].includes(maCourse.statut) && (() => {
+          const l = maCourse._livreur;
+          const isVersRecup = maCourse.statut === "livreur_en_route";
+          return (
+            <CarteLivreurClient
+              livreurLat={l?.latitude}
+              livreurLng={l?.longitude}
+              livreurNom={maCourse.livreur_nom}
+              departLat={maCourse.gps_depart_lat}
+              departLng={maCourse.gps_depart_lng}
+              arriveeLat={maCourse.gps_arrivee_lat}
+              arriveeLng={maCourse.gps_arrivee_lng}
+              statut={maCourse.statut}
+            />
+          );
+        })()}
 
         {/* ETA temps réel — expéditeur : vers récupération puis vers livraison */}
         {/* CORRECTION CRITIQUE : ETA TOUJOURS affiché, même <100m */}

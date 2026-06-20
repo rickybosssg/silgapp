@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Send, Loader2, MessageCircle } from "lucide-react";
 import ChatBubble from "@/components/chat/ChatBubble";
+import { playNotificationSound } from "@/hooks/useSonEtVibration";
 
 export default function ChatWindow({ courseId, senderType, senderId, senderName, clientName, livreurName, compact = false }) {
   const [messages, setMessages] = useState([]);
@@ -19,11 +20,17 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
       .catch(() => setMessages([]));
   }, [courseId, open]);
 
-  // Subscription temps réel
+  // Subscription temps réel + son notification
   useEffect(() => {
     if (!courseId || !open) return;
     const unsub = base44.entities.Message.subscribe((event) => {
       if (event.type === "create" && event.data?.course_id === courseId) {
+        // Son + vibration si le message vient de quelqu'un d'autre
+        const isFromMe = event.data.sender_type === senderType && event.data.sender_id === senderId;
+        if (!isFromMe) {
+          playNotificationSound();
+          navigator.vibrate?.([200, 100, 200]);
+        }
         setMessages(prev => {
           const exists = prev.some(m => m.id === event.data.id);
           return exists ? prev : [...prev, event.data].sort((a, b) =>
@@ -33,7 +40,7 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
       }
     });
     return () => unsub?.();
-  }, [courseId, open]);
+  }, [courseId, open, senderType, senderId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
