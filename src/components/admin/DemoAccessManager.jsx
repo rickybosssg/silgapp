@@ -34,7 +34,7 @@ export default function DemoAccessManager() {
       queryClient.invalidateQueries({ queryKey: ["demo-access-tokens"] });
       setNote("");
 
-      const url = r.data?.demo_url;
+      const url = `${window.location.origin}/api/functions/servirDemoPage?token=${r.data?.token}`;
       if (url) {
         await navigator.clipboard.writeText(url);
         toast.success("Lien copié dans le presse-papier !", {
@@ -59,7 +59,7 @@ export default function DemoAccessManager() {
   };
 
   const copyLink = async (token) => {
-    const url = `${window.location.origin}/demo/${token}`;
+    const url = `${window.location.origin}/api/functions/servirDemoPage?token=${token}`;
     await navigator.clipboard.writeText(url);
     toast.success("Lien copié !");
   };

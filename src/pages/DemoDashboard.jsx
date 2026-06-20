@@ -1,118 +1,58 @@
 import React, { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
+import { useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Users, Package, Bike, Globe, TrendingUp, CheckCircle2, XCircle, Clock,
-  Calendar, MapPin, Phone, Flag, ExternalLink, Database
+  Calendar, Flag, Database
 } from "lucide-react";
 
-export default function DemoDashboard() {
-  const { token } = useParams();
+export default function DemoDashboard({ token: propToken }) {
+  const { token: paramToken } = useParams();
+  const token = propToken || paramToken;
   const [loading, setLoading] = useState(true);
   const [invalid, setInvalid] = useState(false);
   const [stats, setStats] = useState(null);
 
   useEffect(() => {
-    async function verify() {
+    if (!token) {
+      setInvalid(true);
+      setLoading(false);
+      return;
+    }
+    async function load() {
       try {
-        const res = await base44.functions.invoke('gererDemoAccess', { token });
-        if (!res.data?.valid) {
+        const res = await fetch('/api/functions/getDemoStats', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        });
+        const data = await res.json();
+
+        if (!data.valid) {
           setInvalid(true);
           setLoading(false);
           return;
         }
-        await loadStats();
+
+        // Formater la date de dernière connexion
+        const lastConn = data.stats.derniereConnexion;
+        const formattedConn = lastConn
+          ? new Date(lastConn).toLocaleDateString('fr-FR', {
+              day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
+            })
+          : 'N/A';
+
+        setStats({ ...data.stats, derniereConnexion: formattedConn });
+        setLoading(false);
       } catch (err) {
+        console.error(err);
         setInvalid(true);
         setLoading(false);
       }
     }
-    verify();
+    load();
   }, [token]);
-
-  async function loadStats() {
-    try {
-      const [clients, livreurs, courses, pays] = await Promise.all([
-        base44.entities.ClientExterne.list(),
-        base44.entities.Livreur.list(),
-        base44.entities.CourseExterne.list('-created_date', 500),
-        base44.entities.Country.list('ordre'),
-      ]);
-
-      const clientsActifs = clients.filter(c => c.actif).length;
-      const livreursValides = livreurs.filter(l => l.validation === 'valide' && l.actif).length;
-      const coursesLivrees = courses.filter(c => c.statut === 'livree');
-      const coursesAnnulees = courses.filter(c => c.statut === 'annulee').length;
-      const coursesEnCoursCount = courses.filter(c => !['nouvelle', 'annulee', 'livree', 'programmee'].includes(c.statut)).length;
-      const paysUniques = [...new Set(courses.filter(c => c.country_code).map(c => c.country_code))];
-      const paysActifs = pays.filter(p => p.actif);
-
-      const ilYa30Jours = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      const coursesRecentes = courses.filter(c => new Date(c.created_date) >= ilYa30Jours);
-
-      const coursesExpedier = courses.filter(c => c.type_course === 'expedier').length;
-      const coursesRecevoir = courses.filter(c => c.type_course === 'recevoir').length;
-      const coursesDeplacement = courses.filter(c => c.type_course === 'deplacement').length;
-
-      const statsByPays = paysActifs.map(p => {
-        const crs = courses.filter(c => c.country_code === p.code);
-        const lvres = crs.filter(c => c.statut === 'livree');
-        const lvrs = livreurs.filter(l => l.country_code === p.code && l.validation === 'valide');
-        const cls = clients.filter(c => c.country_code === p.code);
-        return {
-          code: p.code,
-          nom: p.nom,
-          emoji: p.emoji_flag || '🌍',
-          courses: crs.length,
-          livrees: lvres.length,
-          livreurs: lvrs.length,
-          clients: cls.length,
-        };
-      }).sort((a, b) => b.courses - a.courses);
-
-      const dernieresLivrees = coursesLivrees
-        .sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
-        .slice(0, 10);
-
-      const derniereActivite = courses[courses.length - 1];
-      const derniereConnexion = Math.max(
-        ...clients.filter(c => c.last_seen_at).map(c => new Date(c.last_seen_at).getTime()),
-        ...livreurs.filter(l => l.last_seen_at).map(l => new Date(l.last_seen_at).getTime()),
-        0
-      );
-
-      setStats({
-        clients: clients.length,
-        clientsActifs,
-        livreurs: livreurs.length,
-        livreursValides,
-        courses: courses.length,
-        coursesLivrees: coursesLivrees.length,
-        coursesAnnulees,
-        coursesEnCours: coursesEnCoursCount,
-        coursesRecentes: coursesRecentes.length,
-        paysUniques: paysUniques.length,
-        paysNoms: paysUniques.join(', '),
-        coursesExpedier,
-        coursesRecevoir,
-        coursesDeplacement,
-        statsByPays,
-        dernieresLivrees,
-        derniereActivite,
-        derniereConnexion: derniereConnexion > 0 ? new Date(derniereConnexion).toLocaleDateString('fr-FR', {
-          day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
-        }) : 'N/A',
-      });
-
-      setLoading(false);
-    } catch (err) {
-      console.error(err);
-      setLoading(false);
-    }
-  }
 
   if (loading) {
     return (

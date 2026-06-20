@@ -130,11 +130,22 @@ function AppContent() {
 
   // 🌍 ROUTES PUBLIQUES - ACCESSIBLES SANS AUTHENTIFICATION (PRIORITÉ ABSOLUE)
   // Ces routes doivent être vérifiées AVANT toute logique d'authentification
-  const isPublicRoute = location.pathname === '/telecharger' || 
-                        location.pathname === '/privacy-policy' ||
-                        location.pathname === '/suivi-public/:token' || 
-                        location.pathname.startsWith('/suivi-public/') ||
-                        location.pathname.startsWith('/demo/');
+  // 🌍 ROUTES PUBLIQUES - PRIORITÉ ABSOLUE (vérification avant tout)
+  const currentPath = location.pathname || window.location.pathname;
+  const isPublicRoute = currentPath === '/telecharger' || 
+                        currentPath === '/privacy-policy' ||
+                        currentPath.startsWith('/suivi-public/') ||
+                        currentPath.startsWith('/demo/');
+
+  // /demo/ : rendu DIRECT sans passer par le Router pour éviter toute ingérence
+  if (currentPath.startsWith('/demo/')) {
+    const token = currentPath.replace('/demo/', '').split('?')[0].split('#')[0];
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <DemoDashboard token={token} />
+      </Suspense>
+    );
+  }
 
   if (isPublicRoute) {
     return (
@@ -144,8 +155,6 @@ function AppContent() {
           <Route path="/telecharger" element={<TelechargerSILGAPP />} />
           {/* Route publique de suivi de course */}
           <Route path="/suivi-public/:token" element={<PublicSuiviCourse />} />
-          {/* Route publique dashboard démo Google Play */}
-          <Route path="/demo/:token" element={<DemoDashboard />} />
           {/* Politique de confidentialité — requise Google Play */}
           <Route path="/privacy-policy" element={<PolitiqueConfidentialite />} />
           <Route path="*" element={<PageNotFound />} />
@@ -296,7 +305,20 @@ function AppContent() {
   );
 }
 
+// Module-level check pour /demo/ — court-circuite tout le routing React
+const isDemoUrl = window.location.pathname.startsWith('/demo/');
+const demoToken = isDemoUrl ? window.location.pathname.replace('/demo/', '').split('?')[0].split('#')[0] : null;
+
 function App() {
+  // Si URL démo, rendre DIRECTEMENT le dashboard sans Router ni auth
+  if (isDemoUrl && demoToken) {
+    return (
+      <React.Suspense fallback={<SplashScreen />}>
+        <DemoDashboard token={demoToken} />
+      </React.Suspense>
+    );
+  }
+
   return (
     <Router>
       <AppContent />
