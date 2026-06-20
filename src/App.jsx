@@ -133,7 +133,8 @@ function AppContent() {
   const isPublicRoute = location.pathname === '/telecharger' || 
                         location.pathname === '/privacy-policy' ||
                         location.pathname === '/suivi-public/:token' || 
-                        location.pathname.startsWith('/suivi-public/');
+                        location.pathname.startsWith('/suivi-public/') ||
+                        location.pathname.startsWith('/demo/');
 
   if (isPublicRoute) {
     return (
