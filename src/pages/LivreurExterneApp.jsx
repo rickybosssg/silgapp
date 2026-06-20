@@ -125,6 +125,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // Réponse du client à une proposition de prix manuel
   const [prixManuelReponse, setPrixManuelReponse] = useState(null); // { accepted, prix, devise }
   const [showMessages, setShowMessages] = useState(false);
+  const [sessionId, setSessionId] = useState(() => {
+    try { return localStorage.getItem("silgapp_livreur_session_id") || null; } catch { return null; }
+  });
+  const [sessionExpired, setSessionExpired] = useState(false);
   const prixManuelWatchedRef = useRef({}); // track les course_id déjà notifiés
 
   // Système anti-réapparition : courses écartées (refusées, expirées, déjà prises)
@@ -172,11 +176,67 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   }, [livreurProfil?.pricing_mode, livreurProfil?.id]);
 
   // Heartbeat automatique
+  // --- GESTION SESSION UNIQUE ---
+  // Quand l'onboarding est terminé, enregistrer une nouvelle session unique
+  useEffect(() => {
+    if (!onboardingTermine || !livreurProfil?.id || sessionExpired) return;
+    
+    const initSession = async () => {
+      try {
+        const deviceId = navigator.userAgent.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 50);
+        const res = await base44.functions.invoke("gestionSessionLivreur", {
+          device_id: deviceId,
+          plateforme: "android",
+        });
+        
+        if (res?.data?.session_id) {
+          const newSessionId = res.data.session_id;
+          setSessionId(newSessionId);
+          try { localStorage.setItem("silgapp_livreur_session_id", newSessionId); } catch {}
+          console.log("[Session] Nouvelle session créée:", newSessionId);
+          
+          if (res.data.ancienne_session_remplacee) {
+            toast.info("Nouvelle connexion détectée", {
+              description: "Les autres appareils ont été déconnectés.",
+            });
+          }
+        }
+      } catch (err) {
+        console.error("[Session] Erreur initialisation:", err);
+      }
+    };
+    
+    initSession();
+  }, [onboardingTermine, livreurProfil?.id, sessionExpired]);
+
+  // Handler quand le heartbeat détecte une session expirée
+  const handleSessionExpired = () => {
+    console.log("[Session] Session expirée détectée par heartbeat");
+    setSessionExpired(true);
+    setGpsActif(false);
+    try { localStorage.removeItem("silgapp_livreur_session_id"); } catch {}
+    
+    // Forcer le livreur hors ligne
+    if (livreurProfil?.id) {
+      saveLivreur(livreurProfil.id, { 
+        statut: "hors_ligne", 
+        app_active: false 
+      }).catch(() => null);
+    }
+    
+    toast.error("Session expirée", {
+      description: "Vous avez été déconnecté car une autre session a été ouverte sur un autre appareil. Reconnectez-vous pour continuer.",
+      duration: 8000,
+    });
+  };
+
   const { syncHeartbeat } = useHeartbeat({
     user_type: "livreur",
     position: livreurProfil?.latitude && livreurProfil?.longitude ? { latitude: livreurProfil.latitude, longitude: livreurProfil.longitude } : null,
-    enabled: onboardingTermine && gpsActif && livreurProfil?.statut !== "hors_ligne",
+    enabled: onboardingTermine && gpsActif && livreurProfil?.statut !== "hors_ligne" && !sessionExpired,
     debugLabel: "LivreurExterneGPS",
+    session_id: sessionId,
+    onSessionExpired: handleSessionExpired,
   });
 
   const { data: dispatchConfigs = [] } = useQuery({
@@ -1293,7 +1353,25 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
             {coursesActives.length === 0 && isEnLigne && <EmptyStateAttente />}
 
-            {!isEnLigne && livreurProfil?.bloque_encours ? (
+            {sessionExpired ? (
+              <div className="rounded-2xl bg-red-600 text-white p-5 text-center space-y-2 shadow-lg">
+                <p className="text-2xl">📱</p>
+                <p className="font-black text-base">Session expirée</p>
+                <p className="text-white/80 text-xs leading-relaxed">
+                  Vous avez été déconnecté car une autre session a été ouverte sur un autre appareil.
+                </p>
+                <button
+                  className="mt-3 w-full h-11 rounded-xl bg-white text-red-700 font-black text-sm active:scale-95 transition-all"
+                  onClick={() => {
+                    try { localStorage.removeItem("silgapp_livreur_session_id"); } catch {}
+                    base44.auth.logout();
+                    setTimeout(() => window.location.reload(), 300);
+                  }}
+                >
+                  Se reconnecter
+                </button>
+              </div>
+            ) : !isEnLigne && livreurProfil?.bloque_encours ? (
               <div className="rounded-2xl bg-red-600 text-white p-5 text-center space-y-2 shadow-lg">
                 <p className="text-2xl">🚫</p>
                 <p className="font-black text-base">Compte bloqué</p>
