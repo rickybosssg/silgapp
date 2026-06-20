@@ -17,6 +17,7 @@ import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import CourseAnnuleeRelanceDialog from "@/components/client/CourseAnnuleeRelanceDialog";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import LiveCounterBadge from "@/components/ui/LiveCounterBadge";
+import MessagesPage from "@/components/chat/MessagesPage";
 import ModernMap from "@/components/client/ModernMap";
 import ProfilModal from "@/components/client/ProfilModal";
 import SupportWhatsApp from "@/components/client/SupportWhatsApp";
@@ -78,6 +79,7 @@ export default function ClientExterneApp() {
   const [courseANoter, setCourseANoter] = useState(null);
   const [notationShownFor, setNotationShownFor] = useState(null);
   const [courseAnnuleeRelance, setCourseAnnuleeRelance] = useState(null); // course annulée auto → proposer relance
+  const [showMessages, setShowMessages] = useState(false);
 
   const [userId, setUserId] = useState(null);
   const queryClient = useQueryClient();
@@ -822,7 +824,8 @@ export default function ClientExterneApp() {
                   {[
                     { icon: <Package className="w-5 h-5" />, label: "Courses",   color: "text-blue-600",   bg: "bg-blue-50",   action: () => navigate("/client/suivi") },
                     { icon: <Clock className="w-5 h-5" />,   label: "Historique",color: "text-purple-600", bg: "bg-purple-50", action: () => navigate("/client/suivi") },
-                    { icon: <MessageCircle className="w-5 h-5" />, label: "Support", color: "text-green-600", bg: "bg-green-50", action: () => {
+                    { icon: <MessageCircle className="w-5 h-5" />, label: "Messages", color: "text-blue-600", bg: "bg-blue-50", action: () => setShowMessages(true) },
+                    { icon: <span className="text-xs">💬</span>, label: "Support", color: "text-green-600", bg: "bg-green-50", action: () => {
                       const msg = encodeURIComponent("Bonjour SILGAPP 👋\nJ'ai besoin d'aide sur SILGAPP.");
                       const a = document.createElement("a");
                       a.href = `whatsapp://send?phone=22667572857&text=${msg}`;
@@ -957,6 +960,18 @@ export default function ClientExterneApp() {
 
       {/* ── PUBLICITÉ PLEIN ÉCRAN ── */}
       <PubliciteFullscreen cible="clients" userId={clientProfil?.id} userType="client" />
+
+      {/* ── MESSAGES ── */}
+      {showMessages && (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col">
+          <MessagesPage
+            myType="client"
+            myId={clientProfil?.id}
+            myName={prenom}
+            onBack={() => setShowMessages(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }

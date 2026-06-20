@@ -30,6 +30,7 @@ import PubliciteCarousel from "@/components/publicite/PubliciteCarousel";
 import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
 import PricingModeSelector from "@/components/livreur/PricingModeSelector";
 import PrixManuelReponseAlert from "@/components/livreur/PrixManuelReponseAlert";
+import MessagesPage from "@/components/chat/MessagesPage";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -123,6 +124,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   });
   // Réponse du client à une proposition de prix manuel
   const [prixManuelReponse, setPrixManuelReponse] = useState(null); // { accepted, prix, devise }
+  const [showMessages, setShowMessages] = useState(false);
   const prixManuelWatchedRef = useRef({}); // track les course_id déjà notifiés
 
   // Système anti-réapparition : courses écartées (refusées, expirées, déjà prises)
@@ -1084,6 +1086,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const TABS = [
     { id: "courses",    label: "Courses",    emoji: "🚴" },
     { id: "historique", label: "Historique", emoji: "📋" },
+    { id: "messages",   label: "Messages",   emoji: "💬" },
     { id: "infos",      label: "Mon profil", emoji: "👤" },
   ];
 
@@ -1315,6 +1318,15 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
         {activeTab === "historique" && (
           <LivreurHistorique mesCourses={mesCourses} livreurProfil={livreurProfil} isExterne={true} />
+        )}
+
+        {activeTab === "messages" && (
+          <MessagesPage
+            myType="livreur"
+            myId={livreurProfil?.id}
+            myName={`${livreurProfil?.prenom || ""} ${livreurProfil?.nom || ""}`.trim() || livreurProfil?.telephone}
+            onBack={() => setActiveTab("courses")}
+          />
         )}
 
         {activeTab === "infos" && livreurProfil && (

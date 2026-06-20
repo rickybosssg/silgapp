@@ -4,7 +4,11 @@
   "properties": {
     "course_id": {
       "type": "string",
-      "description": "ID de la course concern\u00e9e"
+      "description": "ID de la course concern\u00e9e (optionnel pour conversations g\u00e9n\u00e9rales)"
+    },
+    "conversation_id": {
+      "type": "string",
+      "description": "ID de la conversation g\u00e9n\u00e9rale (optionnel pour chat de course)"
     },
     "sender_type": {
       "type": "string",
@@ -47,7 +51,6 @@
     }
   },
   "required": [
-    "course_id",
     "sender_type",
     "sender_id",
     "sender_name"
