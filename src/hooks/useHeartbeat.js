@@ -82,6 +82,7 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
       if (isNativeAndroid()) {
         startNativeBackgroundHeartbeat({
           userType: user_type,
+          sessionId: session_id || "",
           intervalMs: 15000,
           distanceFilter: 0,
         }).then((stop) => {
@@ -100,7 +101,7 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
       nativeStopRef.current = null;
       nativeBgHeartbeatStop?.();
     };
-  }, [enabled, user_type]);
+  }, [enabled, user_type, session_id]);
 
   useEffect(() => {
     if (!enabled) return;

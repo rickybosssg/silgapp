@@ -46,6 +46,7 @@ public class SilgappLocationService extends Service {
     private String appId = "6a0ec08f3af5e1d1284254c1";
     private String functionsVersion = "prod";
     private String userType = "livreur";
+    private String sessionId = "";
     private long intervalMs = 5000L;
     private float distanceFilter = 3f;
 
@@ -64,6 +65,7 @@ public class SilgappLocationService extends Service {
             appId = intent.getStringExtra("appId") != null ? intent.getStringExtra("appId") : appId;
             functionsVersion = intent.getStringExtra("functionsVersion") != null ? intent.getStringExtra("functionsVersion") : functionsVersion;
             userType = intent.getStringExtra("userType") != null ? intent.getStringExtra("userType") : userType;
+            sessionId = intent.getStringExtra("sessionId") != null ? intent.getStringExtra("sessionId") : sessionId;
             intervalMs = Math.max(3000L, intent.getLongExtra("intervalMs", intervalMs));
             distanceFilter = intent.getFloatExtra("distanceFilter", distanceFilter);
         }
@@ -165,13 +167,15 @@ public class SilgappLocationService extends Service {
                 }
 
                 String deviceId = ("android_native_" + Build.MODEL + "_" + Build.ID).replaceAll("[^A-Za-z0-9_]", "_");
+                String safeSessionId = sessionId == null ? "" : sessionId.replace("\\", "\\\\").replace("\"", "\\\"");
                 String payload = String.format(
                     Locale.US,
-                    "{\"user_type\":\"%s\",\"latitude\":%.8f,\"longitude\":%.8f,\"app_active\":false,\"device_id\":\"%s\"}",
+                    "{\"user_type\":\"%s\",\"latitude\":%.8f,\"longitude\":%.8f,\"app_active\":false,\"background_active\":true,\"device_id\":\"%s\",\"session_id\":\"%s\"}",
                     userType,
                     latitude,
                     longitude,
-                    deviceId
+                    deviceId,
+                    safeSessionId
                 );
 
                 try (OutputStream outputStream = connection.getOutputStream()) {
@@ -181,6 +185,10 @@ public class SilgappLocationService extends Service {
                 int code = connection.getResponseCode();
                 if (code >= 200 && code < 300) {
                     Log.i(TAG, String.format(Locale.US, "service heartbeatAuto OK userType=%s lat=%.6f lng=%.6f code=%d", userType, latitude, longitude, code));
+                } else if (code == 409) {
+                    Log.w(TAG, String.format(Locale.US, "service heartbeatAuto session expired userType=%s code=%d", userType, code));
+                    stopLocationUpdates();
+                    stopSelf();
                 } else {
                     Log.w(TAG, String.format(Locale.US, "service heartbeatAuto failed userType=%s lat=%.6f lng=%.6f code=%d", userType, latitude, longitude, code));
                 }

@@ -140,6 +140,7 @@ function getStoredAccessToken() {
 
 export async function startNativeBackgroundHeartbeat({
   userType = "livreur",
+  sessionId = "",
   intervalMs = 5000,
   distanceFilter = 0,
 } = {}) {
@@ -149,6 +150,7 @@ export async function startNativeBackgroundHeartbeat({
   const result = await SilgappNative.startBackgroundHeartbeat({
     token,
     userType,
+    sessionId,
     intervalMs,
     distanceFilter,
     serverUrl: APP_PUBLIC_URL,

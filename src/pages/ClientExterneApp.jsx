@@ -466,6 +466,7 @@ export default function ClientExterneApp() {
           longitude: profil.longitude || 0,
           app_active: true,
           device_id: navigator.userAgent.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 50),
+          session_id: sessionId || undefined,
         }).catch(() => null);
       }
     } catch (err) {

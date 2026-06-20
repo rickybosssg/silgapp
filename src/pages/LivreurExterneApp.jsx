@@ -268,6 +268,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
     startNativeBackgroundHeartbeat({
       userType: "livreur",
+      sessionId: sessionId || "",
       intervalMs: 5000,
       distanceFilter: 0,
     }).then((stop) => {
@@ -281,7 +282,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       cancelled = true;
       stopNativeHeartbeat?.();
     };
-  }, [onboardingTermine, gpsActif, livreurProfil?.statut]);
+  }, [onboardingTermine, gpsActif, livreurProfil?.statut, sessionId]);
 
   // ─── Notifications push ───────────────────────────────────────────────────
   const livreurId = livreurProfil?.id;

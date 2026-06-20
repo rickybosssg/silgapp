@@ -43,6 +43,7 @@ public class SilgappNativePlugin extends Plugin {
     private String heartbeatAppId = "6a0ec08f3af5e1d1284254c1";
     private String heartbeatFunctionsVersion = "prod";
     private String heartbeatUserType = "livreur";
+    private String heartbeatSessionId = "";
 
     @PluginMethod
     public void checkContactsPermission(PluginCall call) {
@@ -167,6 +168,7 @@ public class SilgappNativePlugin extends Plugin {
         heartbeatAppId = call.getString("appId", heartbeatAppId);
         heartbeatFunctionsVersion = call.getString("functionsVersion", heartbeatFunctionsVersion);
         heartbeatUserType = call.getString("userType", "livreur");
+        heartbeatSessionId = call.getString("sessionId", "");
         Double intervalValue = call.getDouble("intervalMs", 5000.0);
         Double distanceValue = call.getDouble("distanceFilter", 3.0);
         long intervalMs = Math.max(3000L, intervalValue.longValue());
@@ -184,6 +186,7 @@ public class SilgappNativePlugin extends Plugin {
             intent.putExtra("appId", heartbeatAppId);
             intent.putExtra("functionsVersion", heartbeatFunctionsVersion);
             intent.putExtra("userType", heartbeatUserType);
+            intent.putExtra("sessionId", heartbeatSessionId);
             intent.putExtra("intervalMs", intervalMs);
             intent.putExtra("distanceFilter", distanceFilter);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
