@@ -211,7 +211,7 @@ a{color:#ef4444;text-decoration:none}
 <div class="kpi-card"><div class="kpi-color" style="background:linear-gradient(90deg,#f97316,#f59e0b)"></div><span class="kpi-label">📦 Courses</span><div class="kpi-value">${courses.length}</div><div class="kpi-sub">${coursesLivrees.length} livrées</div></div>
 <div class="kpi-card"><div class="kpi-color" style="background:linear-gradient(90deg,#10b981,#14b8a6)"></div><span class="kpi-label">🌍 Pays</span><div class="kpi-value">${paysUniques.length}</div><div class="kpi-sub">couverts</div></div>
 <div class="kpi-card"><div class="kpi-color" style="background:linear-gradient(90deg,#06b6d4,#0ea5e9)"></div><span class="kpi-label">⏳ En cours</span><div class="kpi-value">${coursesEnCoursCount}</div><div class="kpi-sub">actives</div></div>
-<div class="kpi-card"><div class="kpi-color" style="background:linear-gradient(90deg,#f43f5e,#ec4899)"></div><span class="kpi-label">📈 30j</span><div class="kpi-value">${coursesRecentes}</div><div class="kpi-sub">courses récentes</div></div>
+<div class="kpi-card"><div class="kpi-color" style="background:linear-gradient(90deg,#f43f5e,#ec4899)"></div><span class="kpi-label">📈 30j</span><div class="kpi-value">${coursesRecentes.length}</div><div class="kpi-sub">courses récentes</div></div>
 </div>
 
 <div class="card">
