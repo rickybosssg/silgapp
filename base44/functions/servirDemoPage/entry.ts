@@ -93,13 +93,29 @@ Deno.serve(async (req) => {
         </tr>
       `).join('');
 
+    const masquerTel = (tel) => {
+      if (!tel) return '-';
+      // Garder les 2 derniers chiffres, remplacer le reste par XX
+      const cleaned = tel.replace(/\s/g, '');
+      if (cleaned.length <= 2) return tel;
+      const visible = cleaned.slice(-2);
+      const masked = cleaned.slice(0, -2).replace(/\d/g, 'X');
+      // Reformater avec espaces tous les 2 car.
+      const full = masked + visible;
+      const parts = [];
+      for (let i = 0; i < full.length; i += 2) {
+        parts.push(full.slice(i, i + 2));
+      }
+      return parts.join(' ');
+    };
+
     const tableClients = clients
       .sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
       .slice(0, 15)
       .map(c => `
         <tr>
           <td>${c.nom || '-'} ${c.prenom || ''}</td>
-          <td>${c.telephone || '-'}</td>
+          <td>${masquerTel(c.telephone)}</td>
           <td>${c.ville || '-'}</td>
           <td>${c.country_code || '-'}</td>
           <td><span class="badge ${c.actif ? 'badge-green' : 'badge-red'}">${c.actif ? 'Actif' : 'Inactif'}</span></td>
@@ -113,7 +129,7 @@ Deno.serve(async (req) => {
       .map(l => `
         <tr>
           <td>${l.nom || '-'} ${l.prenom || ''}</td>
-          <td>${l.telephone || '-'}</td>
+          <td>${masquerTel(l.telephone)}</td>
           <td>${l.ville || '-'}</td>
           <td>${l.country_code || '-'}</td>
           <td><span class="badge ${l.validation === 'valide' ? 'badge-green' : l.validation === 'en_attente' ? 'badge-orange' : 'badge-red'}">${l.validation === 'valide' ? 'Validé' : l.validation === 'en_attente' ? 'En attente' : 'Refusé'}</span></td>
