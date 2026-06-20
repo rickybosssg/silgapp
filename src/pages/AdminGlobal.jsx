@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { isToday } from "date-fns";
 import { PAYS_SILGAPP } from "@/components/international/CountrySelector.jsx";
 import AdminPaysDialog from "@/components/admin/AdminPaysDialog.jsx";
+import DemoAccessManager from "@/components/admin/DemoAccessManager.jsx";
 
 export default function AdminGlobal() {
   const queryClient = useQueryClient();
@@ -288,6 +289,9 @@ export default function AdminGlobal() {
           ))}
         </div>
       </div>
+
+      {/* Gestion accès démo Google Play */}
+      <DemoAccessManager />
 
       {/* Dialog créer admin pays */}
       {showCreateAdmin && (

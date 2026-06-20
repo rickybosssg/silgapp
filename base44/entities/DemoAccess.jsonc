@@ -1,0 +1,32 @@
+{
+  "name": "DemoAccess",
+  "type": "object",
+  "properties": {
+    "token": {
+      "type": "string",
+      "description": "Token unique d'acc\u00e8s d\u00e9mo"
+    },
+    "expire_le": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date d'expiration du token"
+    },
+    "actif": {
+      "type": "boolean",
+      "default": true,
+      "description": "Token actif ou r\u00e9voqu\u00e9"
+    },
+    "cree_par": {
+      "type": "string",
+      "description": "Email admin ayant cr\u00e9\u00e9 le token"
+    },
+    "note": {
+      "type": "string",
+      "description": "Note interne (ex: 'Envoy\u00e9 \u00e0 Google Play le 20/06/2026')"
+    }
+  },
+  "required": [
+    "token",
+    "expire_le"
+  ]
+}

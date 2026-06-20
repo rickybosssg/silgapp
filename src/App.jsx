@@ -65,6 +65,7 @@ const TestNotifications = lazy(() => import('./pages/TestNotifications.jsx'));
 const DiagnosticPushComplet = lazy(() => import('./pages/DiagnosticPushComplet.jsx'));
 const TestDispatchLivreur = lazy(() => import('./pages/TestDispatchLivreur.jsx'));
 const CentreNotificationsPush = lazy(() => import('./pages/CentreNotificationsPush.jsx'));
+const DemoDashboard = lazy(() => import('./pages/DemoDashboard.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -142,6 +143,8 @@ function AppContent() {
           <Route path="/telecharger" element={<TelechargerSILGAPP />} />
           {/* Route publique de suivi de course */}
           <Route path="/suivi-public/:token" element={<PublicSuiviCourse />} />
+          {/* Route publique dashboard démo Google Play */}
+          <Route path="/demo/:token" element={<DemoDashboard />} />
           {/* Politique de confidentialité — requise Google Play */}
           <Route path="/privacy-policy" element={<PolitiqueConfidentialite />} />
           <Route path="*" element={<PageNotFound />} />
