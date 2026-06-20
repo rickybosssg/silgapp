@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { Send, Loader2, MessageCircle } from "lucide-react";
+import { Send, Loader2, MessageCircle, Camera, ImagePlus } from "lucide-react";
 import ChatBubble from "@/components/chat/ChatBubble";
 import AudioRecorder from "@/components/chat/AudioRecorder";
 import { playNotificationSound } from "@/hooks/useSonEtVibration";
@@ -75,6 +75,22 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
     await sendMessage(audioData);
   };
 
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+const handlePhotoSend = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || sending) return;
+    setUploadingPhoto(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      await sendMessage({ message_type: "photo", photo_url: file_url, content: "" });
+    } catch (err) {
+      console.error("Erreur envoi photo:", err);
+    }
+    setUploadingPhoto(false);
+    e.target.value = "";
+  };
+
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -134,6 +150,12 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
           disabled={sending}
           senderName={senderName}
         />
+        <label className="cursor-pointer">
+          <input type="file" accept="image/*" onChange={handlePhotoSend} className="hidden" disabled={sending || uploadingPhoto} />
+          <div className="h-9 w-9 rounded-full flex items-center justify-center text-gray-400 hover:text-primary hover:bg-red-50 transition-colors">
+            {uploadingPhoto ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+          </div>
+        </label>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}

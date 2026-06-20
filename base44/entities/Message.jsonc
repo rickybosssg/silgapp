@@ -27,7 +27,8 @@
       "type": "string",
       "enum": [
         "text",
-        "audio"
+        "audio",
+        "photo"
       ],
       "default": "text",
       "description": "Type de message"
@@ -39,6 +40,10 @@
     "audio_url": {
       "type": "string",
       "description": "URL du fichier audio"
+    },
+    "photo_url": {
+      "type": "string",
+      "description": "URL de la photo"
     }
   },
   "required": [

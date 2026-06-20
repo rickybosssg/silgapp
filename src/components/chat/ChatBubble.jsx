@@ -85,6 +85,19 @@ export default function ChatBubble({ message, isMine }) {
         )}
         {message.message_type === "audio" && message.audio_url ? (
           <AudioBubble audioUrl={message.audio_url} isMine={isMine} />
+        ) : message.message_type === "photo" && message.photo_url ? (
+          <div className={cn(
+            "rounded-2xl overflow-hidden max-w-[220px]",
+            isMine ? "rounded-br-md" : "rounded-bl-md shadow-sm border border-gray-200"
+          )}>
+            <img
+              src={message.photo_url}
+              alt="Photo"
+              className="w-full h-auto object-cover cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={() => window.open(message.photo_url, "_blank")}
+              loading="lazy"
+            />
+          </div>
         ) : (
           <div className={cn(
             "rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
