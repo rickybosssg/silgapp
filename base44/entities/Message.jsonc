@@ -25,7 +25,11 @@
     },
     "sender_name": {
       "type": "string",
-      "description": "Nom affich\u00e9 du sender"
+      "description": "Nom affich\u00e9 du sender (r\u00e9solu c\u00f4t\u00e9 serveur)"
+    },
+    "sender_photo_url": {
+      "type": "string",
+      "description": "URL de la photo de profil de l'exp\u00e9diteur au moment de l'envoi"
     },
     "message_type": {
       "type": "string",

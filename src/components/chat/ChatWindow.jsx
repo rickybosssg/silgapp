@@ -1,23 +1,30 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { Send, Loader2, MessageCircle, Camera, ImagePlus } from "lucide-react";
+import { Send, Loader2, MessageCircle, ImagePlus, X } from "lucide-react";
 import ChatBubble from "@/components/chat/ChatBubble";
 import AudioRecorder from "@/components/chat/AudioRecorder";
 import { playNotificationSound } from "@/hooks/useSonEtVibration";
 
-export default function ChatWindow({ courseId, senderType, senderId, senderName, clientName, livreurName, compact = false }) {
+export default function ChatWindow({ courseId, senderType, senderId, senderName, compact = false }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [open, setOpen] = useState(!compact);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const bottomRef = useRef(null);
+  const sendingRef = useRef(false);
+  const knownIdsRef = useRef(new Set());
 
   // Charger les messages existants
   useEffect(() => {
     if (!courseId || !open) return;
     base44.entities.Message.filter({ course_id: courseId }, "created_date", 100)
-      .then(msgs => setMessages(msgs || []))
+      .then(msgs => {
+        const list = msgs || [];
+        knownIdsRef.current = new Set(list.map(m => m.id));
+        setMessages(list);
+      })
       .catch(() => setMessages([]));
   }, [courseId, open]);
 
@@ -26,18 +33,18 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
     if (!courseId || !open) return;
     const unsub = base44.entities.Message.subscribe((event) => {
       if (event.type === "create" && event.data?.course_id === courseId) {
-        // Son + vibration si le message vient de quelqu'un d'autre
+        // Anti-doublon : vérifier le ref
+        if (knownIdsRef.current.has(event.data.id)) return;
+        knownIdsRef.current.add(event.data.id);
+
         const isFromMe = event.data.sender_type === senderType && event.data.sender_id === senderId;
         if (!isFromMe) {
           playNotificationSound();
           navigator.vibrate?.([200, 100, 200]);
         }
-        setMessages(prev => {
-          const exists = prev.some(m => m.id === event.data.id);
-          return exists ? prev : [...prev, event.data].sort((a, b) =>
-            new Date(a.created_date) - new Date(b.created_date)
-          );
-        });
+        setMessages(prev => [...prev, event.data].sort((a, b) =>
+          new Date(a.created_date) - new Date(b.created_date)
+        ));
       }
     });
     return () => unsub?.();
@@ -47,25 +54,37 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Envoi sécurisé via la fonction backend envoyerMessage
   const sendMessage = async (msgData) => {
-    if (sending || !courseId) return;
+    if (sendingRef.current || !courseId) return;
+    sendingRef.current = true;
     setSending(true);
     try {
-      await base44.entities.Message.create({
+      const res = await base44.functions.invoke("envoyerMessage", {
         course_id: courseId,
         sender_type: senderType,
         sender_id: senderId,
-        sender_name: senderName,
         ...msgData,
       });
+      const newMsg = res?.data?.message;
+      if (newMsg) {
+        // Anti-doublon : ne pas ajouter si déjà présent
+        if (!knownIdsRef.current.has(newMsg.id)) {
+          knownIdsRef.current.add(newMsg.id);
+          setMessages(prev => [...prev, newMsg].sort((a, b) =>
+            new Date(a.created_date) - new Date(b.created_date)
+          ));
+        }
+      }
     } catch (err) {
       console.error("Erreur envoi message:", err);
     }
+    sendingRef.current = false;
     setSending(false);
   };
 
   const handleSend = async () => {
-    if (!input.trim() || sending || !courseId) return;
+    if (!input.trim() || sendingRef.current || !courseId) return;
     const content = input.trim();
     setInput("");
     await sendMessage({ content, message_type: "text" });
@@ -75,11 +94,9 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
     await sendMessage(audioData);
   };
 
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-
-const handlePhotoSend = async (e) => {
+  const handlePhotoSend = async (e) => {
     const file = e.target.files?.[0];
-    if (!file || sending) return;
+    if (!file || sendingRef.current) return;
     setUploadingPhoto(true);
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
@@ -118,14 +135,14 @@ const handlePhotoSend = async (e) => {
           <span className="text-sm font-bold">Messagerie SILGAPP</span>
         </div>
         {compact && (
-          <button onClick={() => setOpen(false)} className="text-white/80 hover:text-white text-xs font-semibold">
-            Minus
+          <button onClick={() => setOpen(false)} className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors">
+            <X className="w-4 h-4" />
           </button>
         )}
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-1">
+      <div className="flex-1 overflow-y-auto p-3">
         {messages.length === 0 && (
           <div className="flex items-center justify-center h-full">
             <p className="text-xs text-gray-400 text-center">
@@ -143,17 +160,17 @@ const handlePhotoSend = async (e) => {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <div className="p-3 bg-white border-t border-gray-100 flex items-center gap-2">
+      {/* Barre de saisie — bouton Envoyer toujours visible */}
+      <div className="p-3 bg-white border-t border-gray-200 flex items-center gap-2 safe-area-bottom">
         <AudioRecorder
           onSend={handleAudioSend}
           disabled={sending}
           senderName={senderName}
         />
-        <label className="cursor-pointer">
+        <label className="cursor-pointer flex-shrink-0">
           <input type="file" accept="image/*" onChange={handlePhotoSend} className="hidden" disabled={sending || uploadingPhoto} />
-          <div className="h-9 w-9 rounded-full flex items-center justify-center text-gray-400 hover:text-primary hover:bg-red-50 transition-colors">
-            {uploadingPhoto ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+          <div className="h-10 w-10 rounded-full flex items-center justify-center text-gray-500 hover:text-primary hover:bg-gray-100 transition-colors">
+            {uploadingPhoto ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImagePlus className="w-5 h-5" />}
           </div>
         </label>
         <input
@@ -162,15 +179,15 @@ const handlePhotoSend = async (e) => {
           onKeyDown={handleKeyDown}
           placeholder="Votre message..."
           disabled={sending}
-          className="flex-1 h-10 rounded-xl border border-gray-200 px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/20"
+          className="flex-1 h-11 min-w-0 rounded-xl border border-gray-200 px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/30"
         />
         <Button
           size="icon"
           onClick={handleSend}
           disabled={sending || !input.trim()}
-          className="h-10 w-10 rounded-xl bg-primary hover:bg-primary/90"
+          className="h-11 w-11 rounded-xl bg-primary hover:bg-primary/90 shadow-md flex-shrink-0 disabled:opacity-60"
         >
-          {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+          {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
         </Button>
       </div>
     </div>
