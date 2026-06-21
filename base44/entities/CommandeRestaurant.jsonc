@@ -1,0 +1,105 @@
+{
+  "name": "CommandeRestaurant",
+  "type": "object",
+  "properties": {
+    "restaurant_id": {
+      "type": "string",
+      "description": "ID du restaurant"
+    },
+    "restaurant_nom": {
+      "type": "string"
+    },
+    "client_id": {
+      "type": "string",
+      "description": "ClientExterne ID du client"
+    },
+    "client_nom": {
+      "type": "string"
+    },
+    "client_telephone": {
+      "type": "string"
+    },
+    "pays_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE",
+        "GH"
+      ],
+      "description": "Code pays \u2014 isolation stricte"
+    },
+    "items": {
+      "type": "string",
+      "description": "JSON: [{id, nom, prix, quantite, photo_url}]"
+    },
+    "total": {
+      "type": "number",
+      "description": "Total plats uniquement (pas de frais livraison)"
+    },
+    "adresse_livraison": {
+      "type": "string"
+    },
+    "quartier_livraison": {
+      "type": "string"
+    },
+    "gps_lat": {
+      "type": "number"
+    },
+    "gps_lng": {
+      "type": "number"
+    },
+    "note_client": {
+      "type": "string"
+    },
+    "preuve_paiement_url": {
+      "type": "string",
+      "description": "Photo preuve de paiement Orange Money"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "commande_envoyee",
+        "commande_recue",
+        "paiement_verification",
+        "paiement_valide",
+        "en_preparation",
+        "prete_recuperation",
+        "livreur_assigne",
+        "en_livraison",
+        "livree",
+        "annulee"
+      ],
+      "default": "commande_envoyee"
+    },
+    "course_id": {
+      "type": "string",
+      "description": "ID de la CourseExterne cr\u00e9\u00e9e quand pr\u00eate"
+    },
+    "partenaire_id": {
+      "type": "string",
+      "description": "User ID du partenaire (filtrage rapide)"
+    },
+    "commission_pct": {
+      "type": "number"
+    },
+    "commission_montant": {
+      "type": "number"
+    },
+    "motif_annulation": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "restaurant_id",
+    "client_id",
+    "pays_code",
+    "total",
+    "statut"
+  ]
+}

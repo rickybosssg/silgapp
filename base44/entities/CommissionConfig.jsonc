@@ -1,0 +1,34 @@
+{
+  "name": "CommissionConfig",
+  "type": "object",
+  "properties": {
+    "pays_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE",
+        "GH"
+      ],
+      "description": "Code pays \u2014 isolation stricte"
+    },
+    "commission_boutique_defaut": {
+      "type": "number",
+      "default": 10,
+      "description": "Commission par d\u00e9faut boutiques (%)"
+    },
+    "commission_restaurant_defaut": {
+      "type": "number",
+      "default": 10,
+      "description": "Commission par d\u00e9faut restaurants (%)"
+    }
+  },
+  "required": [
+    "pays_code"
+  ]
+}
