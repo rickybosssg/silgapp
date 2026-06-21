@@ -25,8 +25,8 @@ function waLink(phone, message) {
   return `https://wa.me/${cleanPhone(phone)}?text=${encodeURIComponent(message)}`;
 }
 
-function buildTrackingUrl(courseId) {
-  return `https://silga-dispatch-go.base44.app/suivi-public/${courseId}`;
+function buildTrackingUrl(token) {
+  return `https://silga-dispatch-go.base44.app/suivi-public/${token}`;
 }
 
 function buildQrUrl(token) {
@@ -56,7 +56,7 @@ const TYPE_OPTIONS = [
 // ── Success view after course creation ──
 function CourseCreated({ course, onNewCourse, formData, onClearStorage }) {
   const navigate = useNavigate();
-  const trackingUrl = buildTrackingUrl(course.id);
+  const trackingUrl = buildTrackingUrl(course.tracking_token || course.id);
 
   const expediteurPhone = formData.expediteurTelephone || formData.clientTelephone || "";
   const destinatairePhone = formData.destinataireTelephone || "";
@@ -356,6 +356,8 @@ export default function AdminCourseForm() {
     setSubmitting(true);
     try {
       const { pickupQrToken, deliveryQrToken, pickupCode4, deliveryCode4 } = generarQRData();
+      const trackingToken = crypto.randomUUID().replace(/-/g, "");
+      const trackingLink = `https://silga-dispatch-go.base44.app/suivi-public/${trackingToken}`;
 
       const formData = {
         expediteurTelephone: expediteurTelephone.trim(),
@@ -386,6 +388,8 @@ export default function AdminCourseForm() {
         dispatch_status: "en_attente",
         pricing_mode: "admin_manuel",
         prix_estimate: 0,
+        tracking_token: trackingToken,
+        tracking_link: trackingLink,
         pickup_qr_token: pickupQrToken,
         pickup_code_4_digits: pickupCode4,
         delivery_qr_token: deliveryQrToken,
