@@ -11,7 +11,8 @@ import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import { useQueryClient } from "@tanstack/react-query";
 import { 
   MapPin, Navigation, MessageCircle, User, Package, 
-  Clock, ChevronRight, TrendingUp, Loader2, ArrowLeft, RefreshCw
+  Clock, ChevronRight, TrendingUp, Loader2, ArrowLeft, RefreshCw,
+  Store, UtensilsCrossed
 } from "lucide-react";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import CourseAnnuleeRelanceDialog from "@/components/client/CourseAnnuleeRelanceDialog";
@@ -880,6 +881,28 @@ export default function ClientExterneApp() {
                   <p className="font-black text-gray-900 text-xs">Messages</p>
                   <p className="text-[10px] text-gray-500 mt-0.5">Discuter avec clients / livreurs</p>
                 </button>
+
+                <button
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-blue-200"
+                  onClick={() => navigate("/client/boutiques")}
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-200 mb-2 group-hover:scale-105 transition-transform">
+                    <Store className="w-5 h-5 text-white" />
+                  </div>
+                  <p className="font-black text-gray-900 text-xs">Boutiques</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">Commander en boutique</p>
+                </button>
+
+                <button
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-orange-200"
+                  onClick={() => navigate("/client/restaurants")}
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg shadow-orange-200 mb-2 group-hover:scale-105 transition-transform">
+                    <UtensilsCrossed className="w-5 h-5 text-white" />
+                  </div>
+                  <p className="font-black text-gray-900 text-xs">Restaurants</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">Commander à manger</p>
+                </button>
               </div>
 
               {/* ── BOUTON CARTE ──────────────────── */}
@@ -907,6 +930,7 @@ export default function ClientExterneApp() {
                   {[
                     { icon: <Package className="w-5 h-5" />, label: "Courses",   color: "text-blue-600",   bg: "bg-blue-50",   action: () => navigate("/client/suivi") },
                     { icon: <Clock className="w-5 h-5" />,   label: "Historique",color: "text-purple-600", bg: "bg-purple-50", action: () => navigate("/client/suivi") },
+                    { icon: <Package className="w-5 h-5" />, label: "Commandes", color: "text-indigo-600", bg: "bg-indigo-50", action: () => navigate("/client/mes-commandes") },
                     { icon: <span className="text-xs">💬</span>, label: "Support", color: "text-green-600", bg: "bg-green-50", action: () => {
                       const msg = encodeURIComponent("Bonjour SILGAPP 👋\nJ'ai besoin d'aide sur SILGAPP.");
                       const a = document.createElement("a");

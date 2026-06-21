@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
-  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert
+  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
@@ -47,6 +47,8 @@ export const navItems = [
   { path: "/admin/livreurs-bloques", label: "Livreurs bloqués", icon: ShieldAlert, reseauOnly: "externe" },
   { path: "/admin/anti-fraude", label: "Anti-Fraude", icon: Shield, reseauOnly: "externe" },
   { path: "/admin/support", label: "Support tickets", icon: MessageCircle, reseauOnly: "externe" },
+  { path: "/admin/boutiques", label: "Boutiques", icon: Store, reseauOnly: "externe" },
+  { path: "/admin/restaurants", label: "Restaurants", icon: UtensilsCrossed, reseauOnly: "externe" },
   { path: "/notifications", label: "Notifications", icon: Bell, reseauOnly: "interne" },
   { path: "/notifications", label: "Notifications", icon: Bell, reseauOnly: "externe" },
   { path: "/maintenance", label: "Maintenance", icon: Shield, reseauOnly: "interne" },
