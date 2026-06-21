@@ -882,10 +882,6 @@ export default function ClientExterneApp() {
                   <p className="text-[10px] text-gray-500 mt-0.5">Discuter avec clients / livreurs</p>
                 </button>
 
-              </div>
-
-              {/* ── BOUTIQUES & RESTAURANTS ────────── */}
-              <div className="grid grid-cols-2 gap-3">
                 <button
                   className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-blue-200"
                   onClick={() => navigate("/client/boutiques")}
