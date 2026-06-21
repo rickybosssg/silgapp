@@ -15,13 +15,14 @@
       "enum": [
         "client",
         "livreur",
-        "admin"
+        "admin",
+        "partenaire"
       ],
       "description": "Qui envoie le message"
     },
     "sender_id": {
       "type": "string",
-      "description": "ID du sender (client_id, livreur_id, ou email admin)"
+      "description": "ID du sender (client_id, livreur_id, email admin, ou boutique_id/restaurant_id pour partenaire)"
     },
     "sender_name": {
       "type": "string",

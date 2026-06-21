@@ -61,6 +61,7 @@ const ROLE_CONFIG = {
   client: { color: "bg-emerald-500", initial: "C", label: "Client" },
   livreur: { color: "bg-blue-500", initial: "L", label: "Livreur" },
   admin: { color: "bg-amber-500", initial: "A", label: "Admin" },
+  partenaire: { color: "bg-purple-500", initial: "P", label: "Partenaire" },
 };
 
 function Avatar({ message, size = "w-9 h-9" }) {

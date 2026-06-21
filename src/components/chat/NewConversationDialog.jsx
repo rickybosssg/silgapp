@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, UserPlus, Loader2, User, Truck } from "lucide-react";
+import { Search, UserPlus, Loader2, User, Truck, Store, UtensilsCrossed } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -91,8 +91,52 @@ export default function NewConversationDialog({ open, onClose, myType, myId, myN
           }).catch(() => [])
         );
         
+        // 🔓 Client peut contacter librement les boutiques & restaurants (renseignements / commandes)
+        if (myType === "client") {
+          // Récupérer le pays du client pour l'isolation
+          let clientPays = null;
+          try {
+            const me = await base44.entities.ClientExterne.filter({ id: myId });
+            if (me && me.length > 0) clientPays = me[0].country_code;
+          } catch (_) {}
+
+          promises.push(
+            base44.entities.Boutique.filter({ actif: true }).then(all => {
+              return (all || []).filter(b => {
+                if (clientPays && b.pays_code !== clientPays) return false;
+                const txt = `${b.nom || ""} ${b.ville || ""} ${b.quartier || ""} ${b.categorie || ""}`.toLowerCase();
+                return txt.includes(s);
+              }).slice(0, 10).map(b => ({
+                type: "partenaire",
+                subType: "boutique",
+                id: b.id,
+                name: b.nom,
+                phone: b.telephone,
+                photo: b.logo_url,
+              }));
+            }).catch(() => [])
+          );
+
+          promises.push(
+            base44.entities.Restaurant.filter({ actif: true }).then(all => {
+              return (all || []).filter(r => {
+                if (clientPays && r.pays_code !== clientPays) return false;
+                const txt = `${r.nom || ""} ${r.ville || ""} ${r.quartier || ""} ${r.specialite || ""}`.toLowerCase();
+                return txt.includes(s);
+              }).slice(0, 10).map(r => ({
+                type: "partenaire",
+                subType: "restaurant",
+                id: r.id,
+                name: r.nom,
+                phone: r.telephone,
+                photo: r.logo_url,
+              }));
+            }).catch(() => [])
+          );
+        }
+
         const arr = await Promise.all(promises);
-        setResults([...arr[0], ...arr[1]].slice(0, 15));
+        setResults([...arr[0], ...arr[1], ...(arr[2] || []), ...(arr[3] || [])].slice(0, 15));
       } catch {}
       setLoading(false);
     }, 400);
@@ -160,7 +204,12 @@ export default function NewConversationDialog({ open, onClose, myType, myId, myN
         </DialogHeader>
         <div className="px-4 pb-2">
           {(myType === "client" || myType === "livreur") && (
-            <div className="flex items-center gap-1.5 mb-2 px-1">
+            <div className="flex items-center gap-1.5 mb-2 px-1 flex-wrap">
+              {myType === "client" && (
+                <span className="text-[10px] text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full font-semibold">
+                  🏪 Boutiques & restaurants librement contactables
+                </span>
+              )}
               <span className="text-[10px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full font-semibold">
                 {myType === "client" ? "🔒 Livreurs avec course active uniquement" : "🔒 Clients avec course active uniquement"}
               </span>
@@ -171,7 +220,7 @@ export default function NewConversationDialog({ open, onClose, myType, myId, myN
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder={myType === "client" ? "Rechercher un livreur lié à vos courses..." : myType === "livreur" ? "Rechercher un client lié à vos courses..." : "Rechercher un livreur ou client..."}
+              placeholder={myType === "client" ? "Rechercher un livreur, une boutique, un restaurant..." : myType === "livreur" ? "Rechercher un client lié à vos courses..." : "Rechercher un livreur ou client..."}
               autoFocus
               className="w-full h-10 pl-9 pr-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
@@ -209,14 +258,18 @@ export default function NewConversationDialog({ open, onClose, myType, myId, myN
               className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors text-left"
             >
               <div className={cn(
-                "w-10 h-10 rounded-full flex items-center justify-center text-sm font-black text-white flex-shrink-0",
-                user.type === "livreur" ? "bg-blue-500" : "bg-emerald-500"
+                "w-10 h-10 rounded-full flex items-center justify-center text-sm font-black text-white flex-shrink-0 overflow-hidden",
+                user.type === "livreur" ? "bg-blue-500" : user.type === "partenaire" ? "bg-purple-500" : "bg-emerald-500"
               )}>
-                {user.type === "livreur" ? <Truck className="w-4 h-4" /> : <User className="w-4 h-4" />}
+                {user.photo
+                  ? <img src={user.photo} alt="" className="w-full h-full object-cover" />
+                  : user.type === "livreur" ? <Truck className="w-4 h-4" />
+                  : user.type === "partenaire" ? (user.subType === "restaurant" ? <UtensilsCrossed className="w-4 h-4" /> : <Store className="w-4 h-4" />)
+                  : <User className="w-4 h-4" />}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-gray-900 truncate">{user.name}</p>
-                <p className="text-xs text-gray-500 capitalize">{user.type}</p>
+                <p className="text-xs text-gray-500 capitalize">{user.subType === "restaurant" ? "Restaurant" : user.subType === "boutique" ? "Boutique" : user.type}</p>
               </div>
               <div className="flex items-center gap-1">
                 {user.restricted && (
@@ -225,7 +278,7 @@ export default function NewConversationDialog({ open, onClose, myType, myId, myN
                   </span>
                 )}
                 <span className="text-[10px] font-semibold uppercase text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                  {user.type === "livreur" ? "Livreur" : "Client"}
+                  {user.subType === "restaurant" ? "Restaurant" : user.subType === "boutique" ? "Boutique" : user.type === "livreur" ? "Livreur" : "Client"}
                 </span>
               </div>
             </button>

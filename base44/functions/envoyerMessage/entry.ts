@@ -68,6 +68,22 @@ Deno.serve(async (req) => {
       }
       realName = user.full_name || user.email || 'Admin';
       photoUrl = '';
+    } else if (sender_type === 'partenaire') {
+      // Le partenaire est identifié par son établissement (Boutique ou Restaurant)
+      // sender_id = ID de la boutique ou du restaurant
+      // On vérifie que l'utilisateur authentifié est bien propriétaire de cet établissement
+      const boutiques = await base44.asServiceRole.entities.Boutique.filter({ user_email: user.email });
+      const restaurants = await base44.asServiceRole.entities.Restaurant.filter({ user_email: user.email });
+      const allEtabs = [
+        ...(boutiques || []).map(b => ({ ...b, _kind: 'boutique' })),
+        ...(restaurants || []).map(r => ({ ...r, _kind: 'restaurant' })),
+      ];
+      const etab = allEtabs.find(e => e.id === sender_id);
+      if (!etab) {
+        return Response.json({ error: 'Vous n\'êtes pas propriétaire de cet établissement' }, { status: 403 });
+      }
+      realName = etab.nom || 'Partenaire';
+      photoUrl = etab.logo_url || '';
     } else {
       return Response.json({ error: 'sender_type invalide' }, { status: 400 });
     }

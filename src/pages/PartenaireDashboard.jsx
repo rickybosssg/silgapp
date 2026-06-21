@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Store, UtensilsCrossed, Loader2 } from "lucide-react";
+import { Store, UtensilsCrossed, Loader2, MessageCircle } from "lucide-react";
 import EtablissementForm from "@/components/partenaire/EtablissementForm";
 import ProduitsManager from "@/components/partenaire/ProduitsManager";
 import CommandesManager from "@/components/partenaire/CommandesManager";
+import MessagesPage from "@/components/chat/MessagesPage";
 
 export default function PartenaireDashboard() {
   const [user, setUser] = useState(null);
@@ -107,6 +108,7 @@ export default function PartenaireDashboard() {
           <button onClick={() => setTab("infos")} className={"flex-1 py-2.5 rounded-xl text-xs font-bold transition-all " + (tab === "infos" ? "bg-purple-600 text-white shadow" : "text-gray-500")}>📋 Infos</button>
           <button onClick={() => setTab("produits")} className={"flex-1 py-2.5 rounded-xl text-xs font-bold transition-all " + (tab === "produits" ? "bg-purple-600 text-white shadow" : "text-gray-500")}>📦 {etablissementType === "boutique" ? "Produits" : "Plats"}</button>
           <button onClick={() => setTab("commandes")} className={"flex-1 py-2.5 rounded-xl text-xs font-bold transition-all " + (tab === "commandes" ? "bg-purple-600 text-white shadow" : "text-gray-500")}>🛍️ Commandes</button>
+          <button onClick={() => setTab("messages")} className={"flex-1 py-2.5 rounded-xl text-xs font-bold transition-all " + (tab === "messages" ? "bg-purple-600 text-white shadow" : "text-gray-500")}>💬 Messages</button>
         </div>
       </div>
       <div className="max-w-lg mx-auto px-4 py-4 pb-24">
@@ -116,6 +118,15 @@ export default function PartenaireDashboard() {
         )}
         {tab === "produits" && <ProduitsManager type={etablissementType} etablissementId={etablissement.id} />}
         {tab === "commandes" && <CommandesManager type={etablissementType} etablissementId={etablissement.id} />}
+        {tab === "messages" && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-[70vh]">
+            <MessagesPage
+              myType="partenaire"
+              myId={etablissement.id}
+              myName={etablissement.nom}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

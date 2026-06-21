@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Send, Loader2, MessageCircle, User, Truck, Shield, UserPlus, Users, ImagePlus } from "lucide-react";
+import { ArrowLeft, Send, Loader2, MessageCircle, User, Truck, Shield, UserPlus, Users, ImagePlus, Store } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -35,10 +35,12 @@ function ConversationItem({ conv, myType, myId, active, onClick }) {
         "w-10 h-10 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0",
         roleKey === "livreur" ? "bg-blue-500" :
         roleKey === "admin" ? "bg-amber-500" :
-        roleKey === "group" ? "bg-purple-500" : "bg-emerald-500"
+        roleKey === "partenaire" ? "bg-purple-500" :
+        roleKey === "group" ? "bg-violet-500" : "bg-emerald-500"
       )}>
         {roleKey === "livreur" ? <Truck className="w-4 h-4" /> :
          roleKey === "admin" ? <Shield className="w-4 h-4" /> :
+         roleKey === "partenaire" ? <Store className="w-4 h-4" /> :
          roleKey === "group" ? <Users className="w-4 h-4" /> :
          <User className="w-4 h-4" />}
       </div>
