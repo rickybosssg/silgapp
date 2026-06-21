@@ -907,7 +907,6 @@ export default function ClientExterneApp() {
                   {[
                     { icon: <Package className="w-5 h-5" />, label: "Courses",   color: "text-blue-600",   bg: "bg-blue-50",   action: () => navigate("/client/suivi") },
                     { icon: <Clock className="w-5 h-5" />,   label: "Historique",color: "text-purple-600", bg: "bg-purple-50", action: () => navigate("/client/suivi") },
-                    { icon: <MessageCircle className="w-5 h-5" />, label: "Messages", color: "text-blue-600", bg: "bg-blue-50", action: () => setShowMessages(true) },
                     { icon: <span className="text-xs">💬</span>, label: "Support", color: "text-green-600", bg: "bg-green-50", action: () => {
                       const msg = encodeURIComponent("Bonjour SILGAPP 👋\nJ'ai besoin d'aide sur SILGAPP.");
                       const a = document.createElement("a");
