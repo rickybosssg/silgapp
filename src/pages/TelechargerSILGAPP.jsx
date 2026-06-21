@@ -4,14 +4,23 @@ import { Download, Shield, Smartphone } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { base44 } from "@/api/base44Client";
 
-const APK_URL = "https://drive.google.com/file/d/1izBbXXLTgRvAWgTBkyCj0lAUCClv2Uyz/view";
-const APK_URL_DIRECT = "https://drive.google.com/uc?export=download&id=1izBbXXLTgRvAWgTBkyCj0lAUCClv2Uyz";
+const FALLBACK_APK_URL = "https://drive.google.com/file/d/1uuL4Ace9Hk9flL2leRv6CFK1FEsU-F0z/view?usp=sharing";
 
 export default function TelechargerSILGAPP() {
   const [mounted, setMounted] = useState(false);
+  const [apkUrl, setApkUrl] = useState(FALLBACK_APK_URL);
 
   useEffect(() => {
     setMounted(true);
+
+    // Charger le lien APK depuis AppConfig
+    base44.entities.AppConfig.filter({ cle: "GOOGLE_DRIVE_APK_URL" })
+      .then(configs => {
+        if (configs && configs.length > 0 && configs[0].valeur) {
+          setApkUrl(configs[0].valeur);
+        }
+      })
+      .catch(() => {});
 
     // Tracking visite
     const country = (() => {
@@ -70,7 +79,7 @@ export default function TelechargerSILGAPP() {
 
         {/* Bouton principal */}
         <motion.a
-          href={APK_URL}
+          href={apkUrl}
           target="_blank"
           rel="noopener noreferrer"
           onClick={trackDownload}
@@ -84,7 +93,7 @@ export default function TelechargerSILGAPP() {
 
         {/* Lien alternatif discret */}
         <a
-          href={APK_URL_DIRECT}
+          href={apkUrl}
           target="_blank"
           rel="noopener noreferrer"
           onClick={trackDownload}
@@ -97,7 +106,7 @@ export default function TelechargerSILGAPP() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
           <p className="text-sm font-semibold text-gray-500">Scannez pour télécharger</p>
           <div className="bg-white p-3 rounded-xl inline-block shadow-md">
-            <QRCodeSVG value={APK_URL} size={140} level="H" includeMargin />
+            <QRCodeSVG value={apkUrl} size={140} level="H" includeMargin />
           </div>
         </div>
 
