@@ -118,9 +118,11 @@ Deno.serve(async (req) => {
       // ── Créer la CourseExterne ──────────────────────────────────────
       const trackingToken = generateToken();
       const pickupToken = generateToken();
-      const deliveryToken = generateToken();
+      let deliveryToken = generateToken();
+      while (deliveryToken === pickupToken) deliveryToken = generateToken();
       const pickupPIN = generatePIN();
-      const deliveryPIN = generatePIN();
+      let deliveryPIN = generatePIN();
+      while (deliveryPIN === pickupPIN) deliveryPIN = generatePIN();
 
       const appBaseUrl = Deno.env.get('VITE_BASE44_APP_BASE_URL') || '';
       const trackingLink = appBaseUrl ? `${appBaseUrl}/suivi-public/${trackingToken}` : '';

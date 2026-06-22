@@ -12,6 +12,14 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
   const [verifying, setVerifying] = useState(false);
   const [result, setResult] = useState(null); // "success" | "error"
   const [showBackupPinConfirm, setShowBackupPinConfirm] = useState(false); // confirmation avant PIN 0000
+  const isPartnerCourse = !!(course?.commande_boutique_id || course?.commande_restaurant_id);
+  const isPickup = type === "pickup";
+  const title = isPickup
+    ? (isPartnerCourse ? "Recuperation chez le partenaire" : "Scanner pour recuperer")
+    : "Livraison chez le client";
+  const subtitle = isPickup
+    ? (isPartnerCourse ? "QR code ou PIN partenaire" : "QR code ou PIN expediteur")
+    : "QR code ou PIN client";
 
   useEffect(() => {
     if (mode === "camera") {
@@ -95,18 +103,27 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
       const data = res?.data;
       if (data?.success) {
         setResult("success");
+        const gpsData = type === "pickup"
+          ? {
+              latitude_recuperation: gps.latitude,
+              longitude_recuperation: gps.longitude,
+            }
+          : {
+              latitude_livraison: gps.latitude,
+              longitude_livraison: gps.longitude,
+            };
         const courseData = {
           ...data.course,
           prix_final: data.prix_final ?? data.course?.prix_final,
           distance_reelle_km: data.distance_km ?? data.course?.distance_reelle_km,
           montant_livreur: data.montant_livreur ?? data.course?.montant_livreur,
           commission_silga: data.commission_silga ?? data.course?.commission_silga,
-          latitude_livraison: gps.latitude,
-          longitude_livraison: gps.longitude,
+          ...gpsData,
         };
         setTimeout(() => onSuccess(courseData), 700);
       } else {
         setResult("error");
+        if (data?.error) toast.error(data.error);
         setTimeout(() => setResult(null), 1600);
       }
     } catch (err) {
@@ -139,10 +156,10 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
         <div className="bg-gradient-to-r from-gray-900 to-gray-800 px-5 py-4 flex items-center justify-between">
           <div>
             <p className="text-white font-black text-base">
-              {type === "pickup" ? "Scanner pour recuperer" : "Scanner pour livrer"}
+              {title}
             </p>
             <p className="text-white/60 text-xs mt-0.5">
-              QR code ou code PIN du client
+              {subtitle}
             </p>
           </div>
           <button onClick={onClose} className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
@@ -156,7 +173,7 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
               <CheckCircle2 className="w-10 h-10 text-white" />
             </div>
             <p className="text-xl font-black text-green-700">
-              {type === "pickup" ? "Colis recupere !" : "Livraison confirmee !"}
+              {type === "pickup" ? (isPartnerCourse ? "Commande recuperee !" : "Colis recupere !") : "Livraison confirmee !"}
             </p>
           </div>
         )}
@@ -218,7 +235,7 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
                 <div className="text-center">
                   <p className="text-base font-bold text-gray-800 mb-1">Code a 4 chiffres</p>
                   <p className="text-xs text-gray-500">
-                    Demandez le code au {type === "pickup" ? "client expediteur" : "destinataire"}
+                    Demandez le code au {type === "pickup" ? (isPartnerCourse ? "partenaire" : "client expediteur") : "client destinataire"}
                   </p>
                 </div>
                 <Input

@@ -54,14 +54,55 @@ Deno.serve(async (req) => {
     // ── Validation unifiée (nouveau système QRScannerModal) ─────────────────
     // Appelée avec : { course_id, type: "pickup"|"delivery", value, method: "qr"|"manual_code" }
     if (type && value && method) {
+      if (!['pickup', 'delivery'].includes(type)) {
+        return Response.json({ success: false, error: 'Type de validation invalide' });
+      }
+
       const isPickup = type === 'pickup';
+      const isPartnerCourse = !!(course.commande_boutique_id || course.commande_restaurant_id);
+      const scannedValue = String(value || '').trim();
 
       // Vérifier que les codes existent
       const expectedQR = isPickup ? course.pickup_qr_token : course.delivery_qr_token;
       const expectedPIN = isPickup ? course.pickup_code_4_digits : course.delivery_code_4_digits;
+      const oppositeQR = isPickup ? course.delivery_qr_token : course.pickup_qr_token;
+      const oppositePIN = isPickup ? course.delivery_code_4_digits : course.pickup_code_4_digits;
 
       if (!expectedQR || !expectedPIN) {
         return Response.json({ success: false, error: 'Codes non générés pour cette course' });
+      }
+
+      // Refuser explicitement les codes de l'autre etape.
+      // Critique pour les commandes partenaires: le QR/PIN partenaire ne doit jamais livrer chez le client.
+      if (method === 'qr' && oppositeQR && scannedValue === String(oppositeQR).trim()) {
+        return Response.json({
+          success: false,
+          error: isPickup
+            ? 'Code client detecte: utilisez le QR/PIN partenaire pour recuperer.'
+            : 'Code partenaire detecte: utilisez le QR/PIN client pour livrer.',
+          blocked_reason: 'wrong_step_code',
+        });
+      }
+      if (method === 'manual_code' && oppositePIN && scannedValue === String(oppositePIN).trim()) {
+        return Response.json({
+          success: false,
+          error: isPickup
+            ? 'PIN client detecte: utilisez le PIN partenaire pour recuperer.'
+            : 'PIN partenaire detecte: utilisez le PIN client pour livrer.',
+          blocked_reason: 'wrong_step_pin',
+        });
+      }
+
+      // Une commande partenaire ne peut pas etre livree avant validation de recuperation chez le partenaire.
+      if (isPartnerCourse && !isPickup) {
+        const pickupDone = !!course.pickup_confirmed_at || ['colis_recupere', 'en_livraison'].includes(course.statut);
+        if (!pickupDone) {
+          return Response.json({
+            success: false,
+            error: "Validez d'abord la recuperation chez le partenaire.",
+            blocked_reason: 'partner_pickup_required',
+          });
+        }
       }
 
       // Vérifier si déjà confirmé
@@ -78,10 +119,10 @@ Deno.serve(async (req) => {
       }
 
       // ── PIN SECOURS 0000 (livraison uniquement) ──────────────────────
-      const isBackupPin = !isPickup && method === 'manual_code' && value === '0000';
+      const isBackupPin = !isPickup && method === 'manual_code' && scannedValue === '0000';
 
       // Vérifier la valeur (sauf PIN secours qui bypass)
-      const isValid = isBackupPin || (method === 'qr' ? value === expectedQR : value === expectedPIN);
+      const isValid = isBackupPin || (method === 'qr' ? scannedValue === String(expectedQR).trim() : scannedValue === String(expectedPIN).trim());
       if (!isValid) {
         return Response.json({ success: false, error: 'Code invalide' });
       }
@@ -96,7 +137,15 @@ Deno.serve(async (req) => {
           pickup_confirmed_by: method,
           pickup_confirmed_at: new Date().toISOString(),
         });
-        return Response.json({ success: true, message: 'Colis récupéré !', course: { statut: 'colis_recupere' } });
+        return Response.json({
+          success: true,
+          message: isPartnerCourse ? 'Commande recuperee chez le partenaire.' : 'Colis recupere !',
+          next_step: 'delivery_client',
+          course: {
+            statut: 'colis_recupere',
+            prochaine_etape: isPartnerCourse ? 'scanner_qr_pin_client' : 'livraison',
+          },
+        });
       }
 
       // ── DELIVERY validé ──

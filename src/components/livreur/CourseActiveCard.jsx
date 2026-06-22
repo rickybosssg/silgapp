@@ -147,6 +147,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
   const effectiveStatut = optimisticStatut || course.statut;
   const isDeplacement = course.type_course === "deplacement";
+  const isPartnerCourse = !!(course.commande_boutique_id || course.commande_restaurant_id);
   const { data: countryCommissionRows = [] } = useQuery({
     queryKey: ["country-commission", course.country_code],
     queryFn: () => base44.entities.Country.filter({ code: course.country_code, actif: true }),
@@ -276,13 +277,16 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   // Handler succès scan QR pickup (externe) — GPS déjà validé côté QRScannerModal
   const handleQRPickupSuccess = (courseData) => {
     setShowQRScanner(null);
+    const now = courseData?.heure_recuperation || new Date().toISOString();
+    const pickupData = {
+      ...courseData,
+      statut: "colis_recupere",
+      heure_recuperation: now,
+    };
     // OPTIMISTIC UI: Update cache immediately
-    updateOptimisticStatut("colis_recupere", {
-      heure_recuperation: new Date().toISOString(),
-      ...courseData
-    });
-    onColisRecupere({ ...course, ...courseData });
-    toast.success("Colis récupéré avec succès ! ");
+    updateOptimisticStatut("colis_recupere", pickupData);
+    onColisRecupere({ ...course, ...pickupData });
+    toast.success(isPartnerCourse ? "Commande récupérée chez le partenaire." : "Colis récupéré avec succès !");
   };
 
   // Handler succès scan QR delivery (externe) — livraison confirmée par le backend
@@ -832,6 +836,15 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             </p>
           )}
 
+          {isPartnerCourse && colisRecupere && !colisLivre && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 space-y-1">
+              <p className="text-sm font-black text-amber-800">Commande récupérée chez le partenaire</p>
+              <p className="text-xs font-semibold text-amber-700">
+                Étape suivante : se rendre chez le client puis scanner le QR/PIN client pour terminer la livraison.
+              </p>
+            </div>
+          )}
+
           {/* Vue multi-colis livreur — remplace le bouton "Scanner pour livrer" côté externe */}
           {isExterne && course.is_multi_colis && colisRecupere && !colisLivre && (
             <MultiColisLivreurView
@@ -1043,7 +1056,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                       disabled={isPending}
                     >
                       <QrCode className="w-6 h-6" />
-                      Scanner pour récupérer le colis
+                      {isPartnerCourse ? "Scanner QR/PIN partenaire" : "Scanner pour récupérer le colis"}
                     </button>
                   )
                 ) : (
@@ -1073,7 +1086,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                       disabled={isPending}
                     >
                       <QrCode className="w-6 h-6" />
-                      Scanner pour livrer
+                      {isPartnerCourse ? "Scanner QR/PIN client" : "Scanner pour livrer"}
                     </button>
                   )
                 ) : (

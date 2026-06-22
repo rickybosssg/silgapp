@@ -13,6 +13,7 @@ const STATUTS = {
   en_preparation: { label: "En préparation", color: "bg-purple-100 text-purple-700" },
   prete_recuperation: { label: "Prête — livreur recherché", color: "bg-indigo-100 text-indigo-700" },
   livreur_assigne: { label: "Livreur assigné", color: "bg-blue-100 text-blue-700" },
+  commande_recuperee: { label: "Commande récupérée", color: "bg-amber-100 text-amber-700" },
   en_livraison: { label: "En livraison", color: "bg-blue-100 text-blue-700" },
   livree: { label: "Livrée", color: "bg-green-100 text-green-700" },
   annulee: { label: "Annulée", color: "bg-red-100 text-red-700" },

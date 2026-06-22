@@ -31,6 +31,7 @@ const STATUTS_LABELS = {
   en_preparation: "En préparation",
   prete_recuperation: "Prête",
   livreur_assigne: "Livreur assigné",
+  commande_recuperee: "Récupérée",
   en_livraison: "En livraison",
   livree: "Livrée",
   annulee: "Annulée",

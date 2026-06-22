@@ -14,6 +14,7 @@ const STATUTS = {
   en_preparation: { label: "En préparation", color: "bg-orange-50 text-orange-600", border: "border-l-orange-500", icon: ChefHat },
   prete_recuperation: { label: "Prête — livraison", color: "bg-purple-50 text-purple-600", border: "border-l-purple-500", icon: Package },
   livreur_assigne: { label: "Livreur assigné", color: "bg-indigo-50 text-indigo-600", border: "border-l-indigo-500", icon: Truck },
+  commande_recuperee: { label: "Récupérée", color: "bg-amber-50 text-amber-600", border: "border-l-amber-500", icon: Package },
   en_livraison: { label: "En livraison", color: "bg-indigo-50 text-indigo-600", border: "border-l-indigo-500", icon: Truck },
   livree: { label: "Livrée", color: "bg-green-50 text-green-600", border: "border-l-green-500", icon: CheckCircle },
   annulee: { label: "Annulée", color: "bg-red-50 text-red-600", border: "border-l-red-500", icon: X },
@@ -54,7 +55,11 @@ export default function CommandesManager({ type, etablissementId }) {
     setActionLoading(null);
   };
 
-  const filtered = filter === "all" ? commandes : commandes.filter(c => c.statut === filter);
+  const filtered = filter === "all"
+    ? commandes
+    : filter === "en_livraison"
+      ? commandes.filter(c => ["livreur_assigne", "commande_recuperee", "en_livraison"].includes(c.statut))
+      : commandes.filter(c => c.statut === filter);
   const counts = commandes.reduce((acc, c) => { acc[c.statut] = (acc[c.statut] || 0) + 1; return acc; }, {});
 
   const activeFilters = [
@@ -63,7 +68,7 @@ export default function CommandesManager({ type, etablissementId }) {
     { key: "paiement_verification", label: "À vérifier", count: counts.paiement_verification || 0 },
     { key: "en_preparation", label: "En préparation", count: counts.en_preparation || 0 },
     { key: "prete_recuperation", label: "Prêtes", count: counts.prete_recuperation || 0 },
-    { key: "en_livraison", label: "En livraison", count: (counts.en_livraison || 0) + (counts.livreur_assigne || 0) },
+    { key: "en_livraison", label: "En livraison", count: (counts.en_livraison || 0) + (counts.commande_recuperee || 0) + (counts.livreur_assigne || 0) },
     { key: "livree", label: "Livrées", count: counts.livree || 0 },
   ].filter(f => f.count > 0 || f.key === "all");
 
@@ -192,13 +197,16 @@ export default function CommandesManager({ type, etablissementId }) {
                 {cmd.course_id && ["prete_recuperation", "livreur_assigne"].includes(cmd.statut) && (
                   <CommandeQRPartenaire courseId={cmd.course_id} />
                 )}
+                {cmd.statut === "commande_recuperee" && (
+                  <p className="text-xs text-amber-600 font-bold flex items-center gap-1 py-1"><Package className="w-3 h-3" /> Commande récupérée - livreur en route vers le client</p>
+                )}
                 {cmd.statut === "en_livraison" && (
                   <p className="text-xs text-indigo-600 font-bold flex items-center gap-1 py-1"><Truck className="w-3 h-3" /> En livraison</p>
                 )}
                 {cmd.statut === "livree" && (
                   <p className="text-xs text-green-600 font-bold flex items-center gap-1 py-1"><CheckCircle className="w-3 h-3" /> Livrée</p>
                 )}
-                {!["livree", "annulee", "prete_recuperation", "livreur_assigne", "en_livraison"].includes(cmd.statut) && (
+                {!["livree", "annulee", "prete_recuperation", "livreur_assigne", "commande_recuperee", "en_livraison"].includes(cmd.statut) && (
                   <Button size="sm" variant="ghost" onClick={() => { if (confirm("Annuler cette commande ?")) handleAction(cmd, "annuler"); }} disabled={actionLoading === cmd.id} className="text-red-500 text-xs h-9 ml-auto">Annuler</Button>
                 )}
               </div>

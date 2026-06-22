@@ -22,7 +22,7 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
   const commandesToday = commandes.filter(c => new Date(c.created_date) >= today);
   const revenusToday = commandesToday.filter(c => c.statut === "livree").reduce((sum, c) => sum + (c.total || 0), 0);
   const enPreparation = commandes.filter(c => c.statut === "en_preparation").length;
-  const enLivraison = commandes.filter(c => ["livreur_assigne", "en_livraison"].includes(c.statut)).length;
+  const enLivraison = commandes.filter(c => ["livreur_assigne", "commande_recuperee", "en_livraison"].includes(c.statut)).length;
   const livreesToday = commandesToday.filter(c => c.statut === "livree").length;
   const annuleesToday = commandesToday.filter(c => c.statut === "annulee").length;
   const pendingCount = commandes.filter(c => !["livree", "annulee"].includes(c.statut)).length;

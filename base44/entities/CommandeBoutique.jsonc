@@ -72,6 +72,7 @@
         "en_preparation",
         "prete_recuperation",
         "livreur_assigne",
+        "commande_recuperee",
         "en_livraison",
         "livree",
         "annulee"
