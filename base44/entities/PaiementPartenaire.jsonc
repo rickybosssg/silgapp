@@ -1,0 +1,74 @@
+{
+  "name": "PaiementPartenaire",
+  "type": "object",
+  "properties": {
+    "partenaire_id": {
+      "type": "string",
+      "description": "User ID du partenaire"
+    },
+    "etablissement_id": {
+      "type": "string",
+      "description": "ID de la boutique ou restaurant"
+    },
+    "etablissement_nom": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "boutique",
+        "restaurant"
+      ]
+    },
+    "pays_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE",
+        "GH"
+      ]
+    },
+    "montant": {
+      "type": "number",
+      "description": "Montant vers\u00e9 \u00e0 SILGAPP"
+    },
+    "preuve_url": {
+      "type": "string",
+      "description": "Photo preuve de d\u00e9p\u00f4t (Orange Money etc.)"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "en_attente",
+        "confirme",
+        "refuse"
+      ],
+      "default": "en_attente"
+    },
+    "traite_par": {
+      "type": "string",
+      "description": "Email admin ayant trait\u00e9"
+    },
+    "traite_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "motif_refus": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "partenaire_id",
+    "etablissement_id",
+    "type",
+    "montant",
+    "preuve_url",
+    "statut"
+  ]
+}
