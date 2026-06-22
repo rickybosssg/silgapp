@@ -580,18 +580,15 @@ function buildPartenairePopup(partenaire) {
   const statutLabel = partenaire.ouvert === false
     ? '<span style="color:#dc2626;font-weight:600">🔴 Fermé</span>'
     : '<span style="color:#16a34a;font-weight:600">🟢 Ouvert</span>';
-  const gpsMin = getLastGPSMin(partenaire);
-  const gpsStr = gpsMin === null ? "?" : gpsMin < 1 ? "à l'instant" : `${gpsMin} min`;
-
   return `
     <div style="min-width:220px;font-family:sans-serif;padding:4px 0">
       <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#1a1a1a">${partenaire.nom || ""}</p>
       <p style="font-size:12px;margin:2px 0;color:${typeColor};font-weight:600">${typeLabel}</p>
       <p style="font-size:12px;margin:2px 0">${statutLabel}</p>
-      ${partenaire.quartier ? `<p style="font-size:12px;margin:2px 0;color:#6b7280">📍 ${partenaire.quartier}</p>` : ""}
+      ${partenaire.adresse ? `<p style="font-size:12px;margin:2px 0;color:#6b7280">📍 ${partenaire.adresse}</p>` : ""}
+      ${partenaire.quartier ? `<p style="font-size:12px;margin:2px 0;color:#6b7280">📌 ${partenaire.quartier}</p>` : ""}
       ${partenaire.ville ? `<p style="font-size:11px;margin:2px 0;color:#9ca3af">${partenaire.ville}</p>` : ""}
       ${partenaire.telephone ? `<p style="font-size:12px;margin:2px 0;color:#444">📞 ${partenaire.telephone}</p>` : ""}
-      <p style="font-size:11px;margin:2px 0;color:#6b7280">📡 GPS il y a ${gpsStr}</p>
       ${partenaire._commandes_en_attente > 0 ? `<p style="font-size:12px;margin:4px 0 0 0;color:#dc2626;font-weight:600">📦 ${partenaire._commandes_en_attente} commande(s) en attente</p>` : ""}
     </div>
   `;

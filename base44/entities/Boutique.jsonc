@@ -39,21 +39,17 @@
     "quartier": {
       "type": "string"
     },
+    "adresse": {
+      "type": "string",
+      "description": "Adresse pr\u00e9cise de l'\u00e9tablissement (g\u00e9olocalis\u00e9e)"
+    },
     "latitude": {
-      "type": "number"
+      "type": "number",
+      "description": "Position GPS FIXE de l'\u00e9tablissement (enregistr\u00e9e manuellement)"
     },
     "longitude": {
-      "type": "number"
-    },
-    "derniere_position_date": {
-      "type": "string",
-      "format": "date-time",
-      "description": "Derni\u00e8re mise \u00e0 jour GPS du partenaire"
-    },
-    "gps_actif": {
-      "type": "boolean",
-      "default": false,
-      "description": "GPS actif sur l'app partenaire"
+      "type": "number",
+      "description": "Position GPS FIXE de l'\u00e9tablissement (enregistr\u00e9e manuellement)"
     },
     "telephone": {
       "type": "string",

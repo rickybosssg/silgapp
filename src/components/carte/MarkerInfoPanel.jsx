@@ -175,30 +175,44 @@ export default function MarkerInfoPanel({ entity, onClose }) {
           </div>
         </div>
 
-        {/* Santé GPS */}
-        <div className="p-3 rounded-xl bg-gray-50">
-          <p className="text-xs text-gray-500 mb-2">Qualité GPS</p>
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">{gpsHealth.emoji}</span>
-            <div>
-              <p className={`text-sm font-bold ${gpsHealth.color}`}>{gpsHealth.label}</p>
-              {lastGPS && <p className="text-xs text-gray-500">{lastGPS}</p>}
+        {/* Santé GPS (livreurs et clients uniquement — pas pour partenaires fixes) */}
+        {!isPart && (
+          <div className="p-3 rounded-xl bg-gray-50">
+            <p className="text-xs text-gray-500 mb-2">Qualité GPS</p>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">{gpsHealth.emoji}</span>
+              <div>
+                <p className={`text-sm font-bold ${gpsHealth.color}`}>{gpsHealth.label}</p>
+                {lastGPS && <p className="text-xs text-gray-500">{lastGPS}</p>}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Statut application */}
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${enLigne ? "bg-green-100" : "bg-gray-100"}`}>
-            {enLigne ? <Wifi className="w-4 h-4 text-green-600" /> : <WifiOff className="w-4 h-4 text-gray-400" />}
-          </div>
-          <div>
-            <p className="text-xs text-gray-500">Application</p>
-            <p className={`text-sm font-semibold ${enLigne ? "text-green-700" : "text-gray-500"}`}>
-              {enLigne ? "Ouverte" : "Fermée"}
+        {/* Adresse fixe (partenaires uniquement) */}
+        {isPart && entity.adresse && (
+          <div className="p-3 rounded-xl bg-gray-50">
+            <p className="text-xs text-gray-500 mb-1">Adresse</p>
+            <p className="text-sm text-gray-700 flex items-start gap-1">
+              <MapPin className="w-3 h-3 mt-0.5 flex-shrink-0" /> {entity.adresse}
             </p>
           </div>
-        </div>
+        )}
+
+        {/* Statut application (livreurs et clients uniquement) */}
+        {!isPart && (
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${enLigne ? "bg-green-100" : "bg-gray-100"}`}>
+              {enLigne ? <Wifi className="w-4 h-4 text-green-600" /> : <WifiOff className="w-4 h-4 text-gray-400" />}
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Application</p>
+              <p className={`text-sm font-semibold ${enLigne ? "text-green-700" : "text-gray-500"}`}>
+                {enLigne ? "Ouverte" : "Fermée"}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Infos partenaire spécifiques */}
         {isPart && (

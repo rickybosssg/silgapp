@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { useNavigate } from "react-router-dom";
@@ -9,7 +9,7 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useClientNotifications } from "@/hooks/useClientNotifications";
 import { registerPushToken } from "@/lib/notifications";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { 
   MapPin, Navigation, MessageCircle, User, Package, 
   Clock, ChevronRight, TrendingUp, Loader2, ArrowLeft, RefreshCw,
@@ -91,6 +91,29 @@ export default function ClientExterneApp() {
   const queryClient = useQueryClient();
   const clientProfilRef = useRef(null);
   useEffect(() => { clientProfilRef.current = clientProfil; }, [clientProfil]);
+
+  // ── Partenaires (boutiques + restaurants) pour la carte client — filtrés par pays ──
+  const partenaireFilter = clientProfil?.country_code
+    ? { pays_code: clientProfil.country_code, actif: true }
+    : { actif: true };
+  const { data: boutiquesCarte = [] } = useQuery({
+    queryKey: ["boutiques-carte-client", clientProfil?.country_code],
+    queryFn: () => base44.entities.Boutique.filter(partenaireFilter),
+    initialData: [],
+    enabled: !!clientProfil?.country_code,
+    staleTime: 60000,
+  });
+  const { data: restaurantsCarte = [] } = useQuery({
+    queryKey: ["restaurants-carte-client", clientProfil?.country_code],
+    queryFn: () => base44.entities.Restaurant.filter(partenaireFilter),
+    initialData: [],
+    enabled: !!clientProfil?.country_code,
+    staleTime: 60000,
+  });
+  const partenairesCarte = useMemo(() => [
+    ...boutiquesCarte.map(b => ({ ...b, _type: "boutique" })),
+    ...restaurantsCarte.map(r => ({ ...r, _type: "restaurant" })),
+  ], [boutiquesCarte, restaurantsCarte]);
 
   // Pull-to-refresh
   const { pulling, refreshing } = usePullToRefresh(async () => {
@@ -1022,6 +1045,7 @@ export default function ClientExterneApp() {
               position={position}
               livreursProches={livreursProches}
               courseActive={coursesActives.find(c => ["livreur_en_route","colis_recupere","en_livraison"].includes(c.statut)) || null}
+              partenaires={partenairesCarte}
             />
           </div>
         </div>
