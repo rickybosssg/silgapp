@@ -45,6 +45,16 @@
     "longitude": {
       "type": "number"
     },
+    "derniere_position_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Derni\u00e8re mise \u00e0 jour GPS du partenaire"
+    },
+    "gps_actif": {
+      "type": "boolean",
+      "default": false,
+      "description": "GPS actif sur l'app partenaire"
+    },
     "telephone": {
       "type": "string",
       "description": "T\u00e9l\u00e9phone de la boutique"

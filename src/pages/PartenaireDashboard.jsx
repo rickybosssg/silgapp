@@ -9,6 +9,7 @@ import MessagesPage from "@/components/chat/MessagesPage";
 import ComptabilitePartenaire from "@/components/partenaire/ComptabilitePartenaire";
 import PartenaireHome from "@/components/partenaire/PartenaireHome";
 import PartenaireBottomNav from "@/components/partenaire/PartenaireBottomNav";
+import PartenaireGPSManager from "@/components/partenaire/PartenaireGPSManager";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { registerPushToken } from "@/lib/notifications";
 
@@ -134,9 +135,12 @@ export default function PartenaireDashboard() {
               </div>
             </div>
           </div>
-          <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0 hover:bg-white/30 transition-colors">
-            <LogOut className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <PartenaireGPSManager />
+            <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors">
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 

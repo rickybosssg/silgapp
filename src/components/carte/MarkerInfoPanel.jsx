@@ -1,5 +1,5 @@
 import React from "react";
-import { X, Phone, MessageCircle, MapPin, Wifi, WifiOff, Truck, User } from "lucide-react";
+import { X, Phone, MessageCircle, MapPin, Wifi, WifiOff, Truck, User, Store, UtensilsCrossed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -42,6 +42,10 @@ function isLivreur(entity) {
   return !!(entity?.vehicule || entity?.type_vehicule || entity?.statut);
 }
 
+function isPartenaire(entity) {
+  return !!(entity?._isPartenaire || entity?._type === "boutique" || entity?._type === "restaurant");
+}
+
 function formatTel(tel, countryCode) {
   if (!tel) return "";
   let cleaned = tel.replace(/\s/g, "");
@@ -64,7 +68,9 @@ export default function MarkerInfoPanel({ entity, onClose }) {
   const gpsHealth = getGPSHealthEmoji(lastGPSMin);
   const zone = entity.quartier || entity.ville || "Zone inconnue";
   const isLiv = isLivreur(entity);
-  const countryCode = entity.country_code || "BF";
+  const isPart = isPartenaire(entity);
+  const isBoutique = entity._type === "boutique";
+  const countryCode = entity.country_code || entity.pays_code || "BF";
   const paysEmoji = PAYS_EMOJIS[countryCode] || "🌍";
 
   const statutLabel = isLiv
@@ -77,13 +83,31 @@ export default function MarkerInfoPanel({ entity, onClose }) {
   const telFormatted = formatTel(entity.telephone, countryCode);
   const whatsappUrl = `https://wa.me/${entity.telephone?.replace(/\+/g, "")}`;
 
+  const headerBg = isPart
+    ? (isBoutique ? "bg-violet-600" : "bg-pink-600")
+    : isLiv ? "bg-green-600" : "bg-red-600";
+  const headerIcon = isPart
+    ? (isBoutique ? <Store className="w-4 h-4 text-white" /> : <UtensilsCrossed className="w-4 h-4 text-white" />)
+    : isLiv ? <Truck className="w-4 h-4 text-white" /> : <User className="w-4 h-4 text-white" />;
+  const headerLabel = isPart
+    ? (isBoutique ? "Boutique" : "Restaurant")
+    : isLiv ? "Livreur" : "Client";
+  const avatarBorder = isPart
+    ? (isBoutique ? "border-2 border-violet-500" : "border-2 border-pink-500")
+    : isLiv ? "border-2 border-green-500" : "border-2 border-red-400";
+  const avatarBg = isPart
+    ? (isBoutique ? "bg-violet-500" : "bg-pink-500")
+    : isLiv ? "bg-green-500" : "bg-red-500";
+  const photoUrl = isPart ? entity.logo_url : entity.photo_url;
+  const displayName = isPart ? entity.nom : `${entity.prenom || ""} ${entity.nom || ""}`.trim();
+
   return (
     <div className="flex flex-col h-full bg-white border-l border-gray-200 w-80 flex-shrink-0 shadow-xl">
       {/* Header */}
-      <div className={`flex items-center justify-between px-4 py-3 ${isLiv ? "bg-green-600" : "bg-red-600"}`}>
+      <div className={`flex items-center justify-between px-4 py-3 ${headerBg}`}>
         <div className="flex items-center gap-2">
-          {isLiv ? <Truck className="w-4 h-4 text-white" /> : <User className="w-4 h-4 text-white" />}
-          <span className="text-white text-sm font-semibold">{isLiv ? "Livreur" : "Client"}</span>
+          {headerIcon}
+          <span className="text-white text-sm font-semibold">{headerLabel}</span>
         </div>
         <Button variant="ghost" size="icon" className="h-7 w-7 text-white hover:bg-white/20" onClick={onClose}>
           <X className="w-4 h-4" />
@@ -92,18 +116,18 @@ export default function MarkerInfoPanel({ entity, onClose }) {
 
       {/* Avatar + Nom + Pays */}
       <div className="flex items-center gap-3 p-4 border-b border-gray-100">
-        <div className={`w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden ${isLiv ? "border-2 border-green-500" : "border-2 border-red-400"}`}>
-          {entity.photo_url ? (
-            <img src={entity.photo_url} alt={entity.nom} className="w-full h-full object-cover" />
+        <div className={`w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden ${avatarBorder}`}>
+          {photoUrl ? (
+            <img src={photoUrl} alt={displayName} className="w-full h-full object-cover" />
           ) : (
-            <div className={`w-full h-full flex items-center justify-center font-bold text-xl text-white ${isLiv ? "bg-green-500" : "bg-red-500"}`}>
-              {(entity.prenom || entity.nom || "?").charAt(0).toUpperCase()}
+            <div className={`w-full h-full flex items-center justify-center font-bold text-xl text-white ${avatarBg}`}>
+              {(displayName || "?").charAt(0).toUpperCase()}
             </div>
           )}
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-bold text-gray-900 text-base leading-tight truncate">
-            {entity.prenom} {entity.nom}
+            {displayName}
           </p>
           <div className="flex items-center gap-1 mt-1">
             <span className="text-lg">{paysEmoji}</span>
@@ -175,6 +199,30 @@ export default function MarkerInfoPanel({ entity, onClose }) {
             </p>
           </div>
         </div>
+
+        {/* Infos partenaire spécifiques */}
+        {isPart && (
+          <>
+            <div className="p-3 rounded-xl bg-gray-50">
+              <p className="text-xs text-gray-500 mb-1">Statut établissement</p>
+              <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${entity.ouvert === false ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+                {entity.ouvert === false ? "🔴 Fermé" : "🟢 Ouvert"}
+              </span>
+            </div>
+            {entity._commandes_en_attente > 0 && (
+              <div className="p-3 rounded-xl bg-violet-50 border border-violet-200">
+                <p className="text-xs text-violet-600 font-semibold mb-1">Commandes en attente</p>
+                <p className="text-2xl font-bold text-violet-700">{entity._commandes_en_attente}</p>
+              </div>
+            )}
+            {entity.description && (
+              <div className="p-3 rounded-xl bg-gray-50">
+                <p className="text-xs text-gray-500 mb-1">Description</p>
+                <p className="text-sm text-gray-700">{entity.description}</p>
+              </div>
+            )}
+          </>
+        )}
 
         {/* Infos livreur spécifiques */}
         {isLiv && (
