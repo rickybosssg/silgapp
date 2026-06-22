@@ -97,7 +97,7 @@ function ConfirmMontantDialog({ colis, devise, onConfirm, onCancel, isPending })
  * Vue multi-colis pour le livreur externe.
  * - Pas de QR Code ni de PIN Code
  * - Bouton "✅ Livrer ce colis" → dialogue confirmation + saisie montant
- * - Calcul automatique : total, gain livreur, commission Silga
+ * - Calcul automatique : total, gain livreur, commission SILGAPP
  * - Fin de course automatique quand tous les colis sont livrés/annulés
  */
 export default function MultiColisLivreurView({ course, colisRecupere, onAllLivres }) {

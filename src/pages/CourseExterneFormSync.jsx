@@ -655,7 +655,7 @@ export default function CourseExterneFormSync() {
           <div>
             <h2 className="text-xl font-black text-gray-900">Compte bloqué</h2>
             <p className="text-sm text-gray-600 mt-3 leading-relaxed">
-              Votre compte est temporairement bloqué pour frais d'annulation impayés. Veuillez contacter Silga.
+              Votre compte est temporairement bloqué pour frais d'annulation impayés. Veuillez contacter SILGAPP.
             </p>
           </div>
           <a
@@ -664,7 +664,7 @@ export default function CourseExterneFormSync() {
             rel="noopener noreferrer"
             className="inline-flex items-center justify-center w-full h-12 rounded-2xl bg-green-500 hover:bg-green-600 text-white font-bold text-sm transition-colors"
           >
-            💬 Contacter Silga via WhatsApp
+            💬 Contacter SILGAPP via WhatsApp
           </a>
           <button
             onClick={() => navigate("/")}

@@ -152,7 +152,7 @@ function LivreurCard({ livreur, courses, onValider, onRefuser, onToggleStatut, o
         </div>
       )}
 
-      {/* Montant dû à Silga */}
+      {/* Montant dû à SILGAPP */}
       {livreur.validation === "valide" && (
         <div className={cn(
           "rounded-lg p-3 space-y-2",
@@ -168,7 +168,7 @@ function LivreurCard({ livreur, courses, onValider, onRefuser, onToggleStatut, o
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <span className={cn("font-bold text-sm", isPaye ? "text-green-700" : "text-blue-700")}>
-              Doit à Silga : {totalDu.toLocaleString()} FCFA
+              Doit à SILGAPP : {totalDu.toLocaleString()} FCFA
             </span>
           </div>
           {isPaye && livreur.heure_paiement && (

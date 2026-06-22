@@ -37,7 +37,7 @@ function ReseauCard({ title, icon: Icon, color, livreurs, coursesLivrees, isExte
   const kpis = [
     { label: "Livrées",     value: coursesLivrees.length,         grad: "from-primary to-red-600",       icon: "📦" },
     { label: "Encaissés",   value: totalEncaisse.toLocaleString(), grad: "from-amber-500 to-orange-500",  icon: "💰", suffix: "F" },
-    { label: "Dû Silga",    value: totalDuSilga.toLocaleString(),  grad: "from-blue-500 to-indigo-600",   icon: "🏦", suffix: "F" },
+    { label: "Dû SILGAPP",    value: totalDuSilga.toLocaleString(),  grad: "from-blue-500 to-indigo-600",   icon: "🏦", suffix: "F" },
     { label: "En ligne",    value: enLigne,                        grad: "from-green-500 to-emerald-500", icon: "🟢" },
     { label: "Disponibles", value: disponibles,                    grad: "from-emerald-400 to-teal-500",  icon: "✅" },
     { label: "En course",   value: enCourse,                       grad: "from-orange-400 to-amber-500",  icon: "🚀" },

@@ -82,10 +82,10 @@ function DetailPaiementModal({ entry, livreurInfo, onClose, onPaiement, onBloque
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${sf.color}`}>{sf.label}</span>
             </div>
             <div className="flex justify-between text-sm"><span className="text-muted-foreground">Courses ({entry.courses.length})</span><span className="font-semibold">{entry.montantTotal.toLocaleString()} FCFA</span></div>
-            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Commission Silga</span><span className="font-semibold text-orange-600">{entry.commissionTotal.toLocaleString()} FCFA</span></div>
+            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Commission SILGAPP</span><span className="font-semibold text-orange-600">{entry.commissionTotal.toLocaleString()} FCFA</span></div>
             <div className="flex justify-between text-sm"><span className="text-muted-foreground">Déjà payé</span><span className="font-semibold text-green-600">{entry.montantPaye.toLocaleString()} FCFA</span></div>
             <div className="border-t pt-2 flex justify-between text-sm font-bold">
-              <span>Reste dû à Silga</span>
+              <span>Reste dû à SILGAPP</span>
               <span className={entry.montantDu > 0 ? "text-red-600 text-base" : "text-green-600"}>{entry.montantDu.toLocaleString()} FCFA</span>
             </div>
           </div>
@@ -120,7 +120,7 @@ function DetailPaiementModal({ entry, livreurInfo, onClose, onPaiement, onBloque
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-xs text-muted-foreground">
                     {c.distance_reelle_km != null && <span>📏 {Number(c.distance_reelle_km).toFixed(1)} km</span>}
                     {c.prix_final != null && <span>💰 {c.prix_final.toLocaleString()} F</span>}
-                    {c.commission_silga != null && <span className="text-orange-600 font-semibold">Silga: {c.commission_silga.toLocaleString()} F</span>}
+                    {c.commission_silga != null && <span className="text-orange-600 font-semibold">SILGAPP: {c.commission_silga.toLocaleString()} F</span>}
                   </div>
                 </div>
               ))}

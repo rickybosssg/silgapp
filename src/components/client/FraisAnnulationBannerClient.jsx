@@ -17,7 +17,7 @@ export default function FraisAnnulationBannerClient({ fraisImpayes = [] }) {
         </p>
         <p className="text-xs text-red-700 mt-0.5 leading-relaxed">
           {fraisImpayes.length} annulation{fraisImpayes.length > 1 ? "s" : ""} après acceptation livreur. 
-          Réglez vos frais auprès de Silga pour éviter le blocage de votre compte.
+          Réglez vos frais auprès de SILGAPP pour éviter le blocage de votre compte.
         </p>
         <a
           href="https://wa.me/22667572857"
@@ -25,7 +25,7 @@ export default function FraisAnnulationBannerClient({ fraisImpayes = [] }) {
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 mt-2 text-xs font-bold text-red-800 bg-red-100 px-3 py-1.5 rounded-xl"
         >
-          💬 Contacter Silga pour régulariser
+          💬 Contacter SILGAPP pour régulariser
         </a>
       </div>
     </div>

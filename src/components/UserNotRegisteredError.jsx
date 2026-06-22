@@ -1,10 +1,10 @@
 import React from 'react';
 import { Truck, AlertTriangle, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useSilgappAuth } from '@/lib/silgappAuth';
+import { useSILGAPPppAuth } from '@/lib/silgappAuth';
 
 const UserNotRegisteredError = () => {
-  const { logout } = useSilgappAuth();
+  const { logout } = useSILGAPPppAuth();
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background p-6">
@@ -16,7 +16,7 @@ const UserNotRegisteredError = () => {
           <Truck className="w-12 h-12 text-primary mx-auto" />
           <h1 className="text-2xl font-bold">Compte non autorisé</h1>
           <p className="text-muted-foreground text-sm">
-            Votre email n'est pas enregistré dans Silga Livraison.
+            Votre email n'est pas enregistré dans SILGAPP Livraison.
           </p>
         </div>
 

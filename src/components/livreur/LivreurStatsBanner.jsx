@@ -43,7 +43,7 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
           {[
             { icon: <Package className="w-4 h-4 text-blue-500" />,   bg: "bg-blue-50",   val: coursesAujourdHui,       label: "Courses",   valClass: "text-blue-800" },
             { icon: <CheckCircle className="w-4 h-4 text-green-500" />, bg: "bg-green-50", val: livreesToday.length,    label: "Livrées",   valClass: "text-green-800" },
-            { icon: <AlertCircle className="w-4 h-4 text-orange-500" />, bg: "bg-orange-50", val: null, label: "Dû Silga", valClass: "text-orange-700" },
+            { icon: <AlertCircle className="w-4 h-4 text-orange-500" />, bg: "bg-orange-50", val: null, label: "Dû SILGAPP", valClass: "text-orange-700" },
           ].map((item, i) => (
             <div key={i} className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 text-center">
               <div className={`w-8 h-8 rounded-xl ${item.bg} flex items-center justify-center mx-auto mb-1.5`}>

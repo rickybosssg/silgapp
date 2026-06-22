@@ -225,7 +225,7 @@ export default function DashboardAdminExterne() {
             <div>
               <div className="flex items-center gap-2">
                 <Zap className="w-5 h-5 text-yellow-300" />
-                <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">Silga Externe</h1>
+                <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">SILGAPP Externe</h1>
               </div>
               <p className="text-white/70 text-xs mt-0.5 capitalize">
                 {format(new Date(), "EEEE d MMMM yyyy", { locale: fr })}
@@ -270,7 +270,7 @@ export default function DashboardAdminExterne() {
             { label: "Livrées",          value: stats.livrees,                     grad: "from-green-500 to-emerald-500",     shadow: "shadow-green-100" },
             { label: "Annulées",         value: stats.annulees,                    grad: "from-red-400 to-rose-500",          shadow: "shadow-red-100" },
             { label: "CA total",         value: `${stats.caTotal.toLocaleString()}`, grad: "from-indigo-500 to-violet-500",  shadow: "shadow-indigo-100", suffix: "F" },
-            { label: "Commission Silga", value: `${stats.commissionSilga.toLocaleString()}`, grad: "from-purple-500 to-fuchsia-500", shadow: "shadow-purple-100", suffix: "F" },
+            { label: "Commission SILGAPP", value: `${stats.commissionSilga.toLocaleString()}`, grad: "from-purple-500 to-fuchsia-500", shadow: "shadow-purple-100", suffix: "F" },
             { label: "Livreurs en ligne",value: stats.livreursEnLigne,             grad: "from-emerald-500 to-teal-500",      shadow: "shadow-emerald-100" },
             { label: "Disponibles",      value: stats.livreursDisponibles,         grad: "from-cyan-500 to-sky-500",          shadow: "shadow-cyan-100" },
             { label: "Clients",          value: stats.clientsTotal,                grad: "from-pink-500 to-rose-500",         shadow: "shadow-pink-100" },

@@ -59,7 +59,7 @@ export default function HistoriqueDuJour({ courses }) {
         <StatBox label="Livrées" value={coursesHistorique.filter(c => c.statut === "livree").length} color="bg-green-500" />
         <StatBox label="Annulées" value={coursesHistorique.filter(c => c.statut === "annulee").length} color="bg-red-400" />
         <StatBox label="CA du jour" value={`${totalCA.toLocaleString()} F`} color="bg-indigo-500" />
-        <StatBox label="Commission Silga" value={`${totalCommission.toLocaleString()} F`} color="bg-purple-500" />
+        <StatBox label="Commission SILGAPP" value={`${totalCommission.toLocaleString()} F`} color="bg-purple-500" />
       </div>
 
       {/* Liste détaillée */}

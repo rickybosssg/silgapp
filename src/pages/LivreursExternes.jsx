@@ -181,7 +181,7 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
               <span className="font-semibold">{montantTotal.toLocaleString()} FCFA</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Montant dû à Silga</span>
+              <span className="text-muted-foreground">Montant dû à SILGAPP</span>
               <span className="font-bold text-orange-600">{montantDu.toLocaleString()} {livreur.devise || "FCFA"}</span>
             </div>
             <div className="border-t pt-2 flex justify-between text-sm font-bold">

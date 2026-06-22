@@ -16,7 +16,7 @@ const STATUT_CONFIG = {
 /**
  * Section affichée dans CourseDetailDialog pour les courses externes multi-colis.
  * Affiche chaque sous-colis avec : destinataire, statut, montant encaissé.
- * + Totaux : total encaissé, gain livreur, commission Silga (dynamique par pays).
+ * + Totaux : total encaissé, gain livreur, commission SILGAPP (dynamique par pays).
  */
 export default function MultiColisAdminView({ course }) {
   const { data: colis = [], isLoading } = useQuery({

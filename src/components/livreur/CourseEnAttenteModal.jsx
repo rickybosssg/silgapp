@@ -145,7 +145,7 @@ export default function CourseEnAttenteModal({
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      // SILGA INTERNE UNIQUEMENT - dispatchMoteur
+      // SILGAPP INTERNE UNIQUEMENT - dispatchMoteur
       const res = await base44.functions.invoke('dispatchMoteur', {
         action: 'accepter_course',
         course_id: course.id,
@@ -179,7 +179,7 @@ export default function CourseEnAttenteModal({
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      // SILGA INTERNE UNIQUEMENT - dispatchMoteur
+      // SILGAPP INTERNE UNIQUEMENT - dispatchMoteur
       const res = await base44.functions.invoke('dispatchMoteur', {
         action: 'refuser_course',
         course_id: course.id,

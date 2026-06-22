@@ -77,12 +77,12 @@ export default function PartenaireDashboard() {
           </div>
           <button onClick={() => base44.auth.logout()} className="w-full text-sm text-gray-400 underline">Se déconnecter</button>
           {tab === "boutique_form" && (
-            <EtablissementForm type="boutique" partenaireId={user.id} userEmail={user.email}
+            <EtablissementForm type="boutique" partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === 'admin'}
               onSaved={() => { setTab("infos"); queryClient.invalidateQueries({ queryKey: ["ma-boutique"] }); }}
               onCancel={() => setTab("infos")} />
           )}
           {tab === "restaurant_form" && (
-            <EtablissementForm type="restaurant" partenaireId={user.id} userEmail={user.email}
+            <EtablissementForm type="restaurant" partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === 'admin'}
               onSaved={() => { setTab("infos"); queryClient.invalidateQueries({ queryKey: ["mon-restaurant"] }); }}
               onCancel={() => setTab("infos")} />
           )}
@@ -113,7 +113,7 @@ export default function PartenaireDashboard() {
       </div>
       <div className="max-w-lg mx-auto px-4 py-4 pb-24">
         {tab === "infos" && (
-          <EtablissementForm type={etablissementType} existing={etablissement} partenaireId={user.id} userEmail={user.email}
+          <EtablissementForm type={etablissementType} existing={etablissement} partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === 'admin'}
             onSaved={() => queryClient.invalidateQueries({ queryKey: etablissementType === "boutique" ? ["ma-boutique"] : ["mon-restaurant"] })} />
         )}
         {tab === "produits" && <ProduitsManager type={etablissementType} etablissementId={etablissement.id} />}

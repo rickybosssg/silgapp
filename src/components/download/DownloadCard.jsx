@@ -80,7 +80,7 @@ export default function DownloadCard({ downloadCount }) {
             >
               <div className="text-center">
                 <h3 className="text-base sm:text-lg font-bold text-white mb-1">📝 Inscription rapide</h3>
-                <p className="text-xs sm:text-sm text-white/60">Recevez des updates et soyez contacté par SILGA</p>
+                <p className="text-xs sm:text-sm text-white/60">Recevez des updates et soyez contacté par SILGAPP</p>
               </div>
               <div className="grid gap-3 sm:gap-4">
                 <div className="space-y-1.5">
@@ -164,7 +164,7 @@ export default function DownloadCard({ downloadCount }) {
                     className="block w-full h-14 sm:h-16 md:h-20 bg-gradient-to-r from-red-600 via-red-500 to-red-600 hover:from-red-500 hover:to-red-400 text-white text-base sm:text-xl font-bold shadow-2xl shadow-red-500/40 transition-all duration-300 rounded-xl sm:rounded-2xl flex items-center justify-center"
                   >
                     <Download className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 mr-2 sm:mr-3 flex-shrink-0" />
-                    <span className="truncate">📲 Télécharger SILGAPP</span>
+                    <span className="truncate">📲 Télécharger SILGAPPPP</span>
                     <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 ml-2 flex-shrink-0" />
                   </a>
                 </motion.div>

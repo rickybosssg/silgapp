@@ -25,7 +25,7 @@ import { toast } from "sonner";
 import { format, startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { fr } from "date-fns/locale";
 import LivreurDetailDialog from "./LivreurDetailDialog";
-import { useSilgappAuth } from "@/lib/silgappAuth";
+import { useSILGAPPppAuth } from "@/lib/silgappAuth";
 
 const periodOptions = [
   { value: "today", label: "Aujourd'hui" },
@@ -37,7 +37,7 @@ const periodOptions = [
 
 export default function LivreurPerformanceTable() {
   const queryClient = useQueryClient();
-  const { user: currentUser } = useSilgappAuth();
+  const { user: currentUser } = useSILGAPPppAuth();
   const [selectedPeriod, setSelectedPeriod] = useState("today");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
@@ -188,7 +188,7 @@ export default function LivreurPerformanceTable() {
           <StatBox label="Hors ligne" value={globalSummary.horsLigne} color="text-slate-600" />
           <StatBox label="Courses livrées" value={globalSummary.totalCoursesLivrees} icon={CheckCircle2} />
           <StatBox label="Total encaissé" value={`${globalSummary.totalEncaisse.toLocaleString()} F`} icon={Banknote} />
-          <StatBox label="Dû à Silga" value={`${globalSummary.totalDu.toLocaleString()} F`} color="text-blue-600" />
+          <StatBox label="Dû à SILGAPP" value={`${globalSummary.totalDu.toLocaleString()} F`} color="text-blue-600" />
           <StatBox label="Payés" value={globalSummary.payesCount} color="text-green-600" />
           <StatBox label="Non payés" value={globalSummary.nonPayesCount} color="text-amber-600" />
         </div>
@@ -235,7 +235,7 @@ export default function LivreurPerformanceTable() {
               <TableHead>Statut</TableHead>
               <TableHead className="text-right">Courses livrées</TableHead>
               <TableHead className="text-right">Total encaissé</TableHead>
-              <TableHead className="text-right">Dû à Silga</TableHead>
+              <TableHead className="text-right">Dû à SILGAPP</TableHead>
               <TableHead>Paiement</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
