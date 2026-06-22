@@ -9,6 +9,7 @@ const STATUTS = {
   commande_recue: { label: "Commande reçue", color: "bg-blue-50 text-blue-600", icon: Clock },
   paiement_verification: { label: "Paiement à vérifier", color: "bg-amber-50 text-amber-600", icon: Clock },
   paiement_valide: { label: "Paiement validé", color: "bg-green-50 text-green-600", icon: CheckCircle },
+  paiement_refuse: { label: "Paiement refusé", color: "bg-red-50 text-red-600", icon: X },
   en_preparation: { label: "En préparation", color: "bg-orange-50 text-orange-600", icon: Clock },
   prete_recuperation: { label: "Prête — déclencher livraison", color: "bg-purple-50 text-purple-600", icon: Package },
   livreur_assigne: { label: "Livreur assigné", color: "bg-indigo-50 text-indigo-600", icon: Package },

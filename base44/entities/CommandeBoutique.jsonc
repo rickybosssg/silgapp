@@ -68,6 +68,7 @@
         "commande_recue",
         "paiement_verification",
         "paiement_valide",
+        "paiement_refuse",
         "en_preparation",
         "prete_recuperation",
         "livreur_assigne",

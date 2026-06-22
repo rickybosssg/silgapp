@@ -18,6 +18,7 @@ import { format, startOfMonth, endOfMonth } from "date-fns";
 import { fr } from "date-fns/locale";
 import ComptabiliteLivreurDetail from "@/components/comptabilite/ComptabiliteLivreurDetail";
 import PaiementsPartenairesAdmin from "@/components/admin/PaiementsPartenairesAdmin";
+import CommandesPartenairesAdmin from "@/components/admin/CommandesPartenairesAdmin";
 
 const COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316'];
 
@@ -477,6 +478,9 @@ export default function Comptabilite() {
           </CardContent>
         </Card>
       )}
+
+      {/* Commandes Boutiques & Restaurants — suivi admin */}
+      <CommandesPartenairesAdmin countryCode={selectedCountry !== "all" ? selectedCountry : null} />
 
       {/* Paiements Partenaires — validation admin */}
       <PaiementsPartenairesAdmin countryCode={selectedCountry !== "all" ? selectedCountry : null} />

@@ -57,6 +57,7 @@ const AdminCourseForm = lazy(() => import('./pages/AdminCourseForm.jsx'));
 const DemandesLivreursAdmin = lazy(() => import('./components/admin/DemandesLivreursPanel.jsx'));
 const LivreursBloquesEncours = lazy(() => import('./components/admin/LivreursBloquesEncours.jsx'));
 const Comptabilite = lazy(() => import('./pages/Comptabilite.jsx'));
+const CommandesPartenaires = lazy(() => import('./pages/CommandesPartenaires.jsx'));
 const AntiFraudePanel = lazy(() => import('./components/admin/AntiFraudePanel.jsx'));
 const SupportAdmin = lazy(() => import('./components/admin/SupportAdmin.jsx'));
 const SupportClient = lazy(() => import('./pages/SupportClient.jsx'));
@@ -325,6 +326,7 @@ function AppContent() {
           <Route path="/admin/support" element={<AnimatedRoutes><SupportAdmin /></AnimatedRoutes>} />
           <Route path="/admin/boutiques" element={<AnimatedRoutes><GestionBoutiques /></AnimatedRoutes>} />
           <Route path="/admin/restaurants" element={<AnimatedRoutes><GestionRestaurants /></AnimatedRoutes>} />
+          <Route path="/admin/commandes-partenaires" element={<AnimatedRoutes><CommandesPartenaires /></AnimatedRoutes>} />
           <Route path="/support" element={<AnimatedRoutes><SupportClient /></AnimatedRoutes>} />
         </Route>
         <Route path="*" element={<PageNotFound />} />

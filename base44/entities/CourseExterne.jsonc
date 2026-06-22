@@ -431,6 +431,14 @@
     },
     "whatsapp_destinataire_erreur": {
       "type": "string"
+    },
+    "commande_boutique_id": {
+      "type": "string",
+      "description": "ID de la CommandeBoutique li\u00e9e (si course issue d'une commande partenaire)"
+    },
+    "commande_restaurant_id": {
+      "type": "string",
+      "description": "ID de la CommandeRestaurant li\u00e9e (si course issue d'une commande partenaire)"
     }
   },
   "required": [
