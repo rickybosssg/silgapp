@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { clearPersistedToken } from "@/lib/authPersistence";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
   Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed
@@ -14,7 +15,7 @@ const doLogout = () => {
   ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
     try { localStorage.removeItem(k); } catch(_) {}
   });
-  base44.auth.logout();
+  { clearPersistedToken(); base44.auth.logout(); };
   setTimeout(() => window.location.reload(), 300);
 };
 

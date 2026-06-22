@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
+import { clearPersistedToken } from "@/lib/authPersistence";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -623,7 +624,7 @@ export default function ClientExterneApp() {
           <button
             onClick={() => {
               try { localStorage.removeItem("silgapp_client_session_id"); } catch {}
-              base44.auth.logout();
+              { clearPersistedToken(); base44.auth.logout(); };
               setTimeout(() => window.location.reload(), 300);
             }}
             className="inline-flex items-center justify-center w-full h-12 rounded-2xl bg-primary hover:bg-primary/90 text-white font-bold text-sm transition-colors"

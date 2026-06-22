@@ -4,6 +4,7 @@ import { APP_PUBLIC_URL, BASE44_APP_ID } from "@/lib/app-params";
 import { Loader2, Lock, Mail, Truck } from "lucide-react";
 import AppMaintenanceGate from "@/components/admin/AppMaintenanceGate";
 import { registerPushToken } from "@/lib/notifications";
+import { persistToken, clearPersistedToken } from "@/lib/authPersistence";
 import RoleSelection from "@/pages/RoleSelection";
 
 const AUTH_TOKEN_KEYS = ["base44_access_token", "access_token", "base44_token", "token"];
@@ -24,6 +25,7 @@ const saveAuthToken = (token) => {
     } catch (_) {}
   });
   base44.setToken?.(token);
+  persistToken(token);
   return true;
 };
 
@@ -501,7 +503,7 @@ export default function AuthGate({ children, onLivreur, onClient }) {
           </p>
           <p className="text-xs text-muted-foreground">📞 Support : +226 66 92 51 90</p>
           <button
-            onClick={() => base44.auth.logout()}
+            onClick={() => { clearPersistedToken(); base44.auth.logout(); }}
             className="text-xs text-primary underline"
           >
             Se déconnecter
@@ -524,7 +526,7 @@ export default function AuthGate({ children, onLivreur, onClient }) {
           </p>
           <p className="text-xs text-muted-foreground">📞 Support : +226 66 92 51 90</p>
           <button
-            onClick={() => base44.auth.logout()}
+            onClick={() => { clearPersistedToken(); base44.auth.logout(); }}
             className="text-xs text-primary underline"
           >
             Se déconnecter
@@ -547,7 +549,7 @@ export default function AuthGate({ children, onLivreur, onClient }) {
           </p>
           <p className="text-xs text-muted-foreground">📞 Support : +226 66 92 51 90</p>
           <button
-            onClick={() => base44.auth.logout()}
+            onClick={() => { clearPersistedToken(); base44.auth.logout(); }}
             className="text-xs text-primary underline"
           >
             Se déconnecter

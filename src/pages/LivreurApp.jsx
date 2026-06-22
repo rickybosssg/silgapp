@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { clearPersistedToken } from "@/lib/authPersistence";
 import { Truck } from "lucide-react";
 import { toast } from "sonner";
 import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
@@ -355,7 +356,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
     ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
       try { localStorage.removeItem(k); } catch(_) {}
     });
-    base44.auth.logout();
+    { clearPersistedToken(); base44.auth.logout(); };
     setTimeout(() => window.location.reload(), 300);
   };
 

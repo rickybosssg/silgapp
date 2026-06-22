@@ -9,6 +9,7 @@ import MessagesPage from "@/components/chat/MessagesPage";
 import ComptabilitePartenaire from "@/components/partenaire/ComptabilitePartenaire";
 import PartenaireHome from "@/components/partenaire/PartenaireHome";
 import PartenaireBottomNav from "@/components/partenaire/PartenaireBottomNav";
+import { clearPersistedToken } from "@/lib/authPersistence";
 
 export default function PartenaireDashboard() {
   const [user, setUser] = useState(null);
@@ -87,7 +88,7 @@ export default function PartenaireDashboard() {
               </div>
             </button>
           </div>
-          <button onClick={() => base44.auth.logout()} className="w-full text-sm text-gray-400 underline">Se déconnecter</button>
+          <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="w-full text-sm text-gray-400 underline">Se déconnecter</button>
           {tab === "boutique_form" && (
             <EtablissementForm type="boutique" partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === 'admin'}
               onSaved={() => { setTab("home"); queryClient.invalidateQueries({ queryKey: ["ma-boutique"] }); }}
@@ -126,7 +127,7 @@ export default function PartenaireDashboard() {
               </div>
             </div>
           </div>
-          <button onClick={() => base44.auth.logout()} className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0 hover:bg-white/30 transition-colors">
+          <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0 hover:bg-white/30 transition-colors">
             <LogOut className="w-4 h-4" />
           </button>
         </div>
