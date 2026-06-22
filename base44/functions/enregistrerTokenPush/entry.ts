@@ -35,6 +35,7 @@ Deno.serve(async (req) => {
     let resolvedUserType = 'livreur';
     if (user_type === 'client') resolvedUserType = 'client';
     else if (user_type === 'admin') resolvedUserType = 'admin';
+    else if (user_type === 'partenaire') resolvedUserType = 'partenaire';
     else if (client_id && !livreur_id) resolvedUserType = 'client';
 
     const existingTokens = await base44.asServiceRole.entities.NotificationToken.filter({
