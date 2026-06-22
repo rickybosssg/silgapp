@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Package, MapPin, Phone, CheckCircle, Clock, X, Truck, ChefHat, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import CommandeQRPartenaire from "@/components/partenaire/CommandeQRPartenaire";
 
 const STATUTS = {
   commande_envoyee: { label: "Reçue", color: "bg-blue-50 text-blue-600", border: "border-l-blue-500", icon: Clock },
@@ -185,6 +186,11 @@ export default function CommandesManager({ type, etablissementId }) {
                 )}
                 {cmd.statut === "livreur_assigne" && (
                   <p className="text-xs text-indigo-600 font-bold flex items-center gap-1 py-1"><Truck className="w-3 h-3" /> Livreur assigné — course #{(cmd.course_id || "").slice(-6)}</p>
+                )}
+
+                {/* ── QR Code & PIN de récupération partenaire ── */}
+                {cmd.course_id && ["prete_recuperation", "livreur_assigne"].includes(cmd.statut) && (
+                  <CommandeQRPartenaire courseId={cmd.course_id} />
                 )}
                 {cmd.statut === "en_livraison" && (
                   <p className="text-xs text-indigo-600 font-bold flex items-center gap-1 py-1"><Truck className="w-3 h-3" /> En livraison</p>

@@ -35,7 +35,7 @@ echo " Clean Gradle terminé"
 echo ""
 
 # 4. Build APK
-echo "️  Étape 4/5: Build APK Debug..."
+echo "  Étape 4/5: Build APK Debug..."
 ./gradlew assembleDebug
 if [ $? -ne 0 ]; then
     echo " Build APK échoué"
@@ -52,7 +52,7 @@ if [ -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
     echo " Taille: $APK_SIZE"
     echo " Chemin: android/app/build/outputs/apk/debug/app-debug.apk"
     echo ""
-    echo "️  IMPORTANT: Désinstaller l'ancienne APK avant d'installer la nouvelle"
+    echo "  IMPORTANT: Désinstaller l'ancienne APK avant d'installer la nouvelle"
     echo "   adb uninstall com.base6a0ec08f3af5e1d1284254c1.app"
     echo ""
     echo " Pour installer:"

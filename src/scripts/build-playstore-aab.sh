@@ -69,7 +69,7 @@ if [ -f "$BUILD_GRADLE" ]; then
   sed -i.bak "s/applicationId \"[^\"]*\"/applicationId \"$APP_ID\"/" "$BUILD_GRADLE"
   echo "    versionName=$VERSION_NAME, versionCode=$VERSION_CODE"
 else
-  echo "   ️  build.gradle non trouvé — vérifier le dossier android/"
+  echo "     build.gradle non trouvé — vérifier le dossier android/"
 fi
 echo ""
 
@@ -78,9 +78,9 @@ echo " Étape 6/7 : Vérification du keystore de signature..."
 
 if [ ! -f "$KEYSTORE_FILE" ]; then
   echo "    ERREUR : Keystore '$KEYSTORE_FILE' introuvable !"
-  echo "   ️  Ce fichier contient votre clé d'upload Google Play."
-  echo "   ️  NE GÉNÉREZ PAS de nouveau keystore — utilisez celui"
-  echo "   ️  déjà enregistré auprès de Google Play."
+  echo "     Ce fichier contient votre clé d'upload Google Play."
+  echo "     NE GÉNÉREZ PAS de nouveau keystore — utilisez celui"
+  echo "     déjà enregistré auprès de Google Play."
   echo ""
   echo "   Pour extraire le certificat au format PEM :"
   echo "   keytool -export -rfc -keystore $KEYSTORE_FILE -alias $KEYSTORE_ALIAS -file codex-upload-certificate.pem"
@@ -141,7 +141,7 @@ if [ -f "android/$AAB_OUTPUT" ]; then
   echo "   6. Soumettre pour review"
   echo ""
   echo " Keystore sauvegardé : $KEYSTORE_FILE"
-  echo "   ️  NE JAMAIS PERDRE CE FICHIER !"
+  echo "     NE JAMAIS PERDRE CE FICHIER !"
 else
   echo "║   BUILD ÉCHOUÉ                                  ║"
   echo "╚══════════════════════════════════════════════════╝"

@@ -10,6 +10,7 @@ import ComptabilitePartenaire from "@/components/partenaire/ComptabilitePartenai
 import PartenaireHome from "@/components/partenaire/PartenaireHome";
 import PartenaireBottomNav from "@/components/partenaire/PartenaireBottomNav";
 import { clearPersistedToken } from "@/lib/authPersistence";
+import { registerPushToken } from "@/lib/notifications";
 
 export default function PartenaireDashboard() {
   const [user, setUser] = useState(null);
@@ -17,7 +18,13 @@ export default function PartenaireDashboard() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    base44.auth.me().then(u => setUser(u)).catch(() => {});
+    base44.auth.me().then(u => {
+      setUser(u);
+      // ── Enregistrer le token FCM pour les notifications push partenaire ──
+      if (u?.email) {
+        registerPushToken(null, { ...u, user_type: "partenaire" }).catch(() => {});
+      }
+    }).catch(() => {});
   }, []);
 
   const { data: maBoutique, isLoading: loadingBoutique } = useQuery({
@@ -127,9 +134,11 @@ export default function PartenaireDashboard() {
               </div>
             </div>
           </div>
-          <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0 hover:bg-white/30 transition-colors">
-            <LogOut className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors">
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 

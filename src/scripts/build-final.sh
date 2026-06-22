@@ -32,7 +32,7 @@ echo " Clean Gradle terminé"
 echo ""
 
 # Étape 4 : Build APK
-echo "️  Étape 4/5: Build APK Debug..."
+echo "  Étape 4/5: Build APK Debug..."
 ./gradlew assembleDebug
 echo " Build APK terminé"
 echo ""
@@ -63,7 +63,7 @@ if [ -f "$APK_PATH" ]; then
     echo "   Livreur: TEST 2"
     echo "   Statut: Valide, Disponible"
     echo ""
-    echo "️  IMPORTANT : Désinstaller l'ancienne APK avant d'installer la nouvelle !"
+    echo "  IMPORTANT : Désinstaller l'ancienne APK avant d'installer la nouvelle !"
 else
     echo " APK non trouvée"
     exit 1

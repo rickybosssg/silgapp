@@ -38,7 +38,7 @@ echo " Clean Gradle terminé"
 echo ""
 
 # 5. Build APK Debug
-echo "️ 5. Build APK Debug..."
+echo " 5. Build APK Debug..."
 ./gradlew assembleDebug
 echo " APK Debug générée"
 echo ""

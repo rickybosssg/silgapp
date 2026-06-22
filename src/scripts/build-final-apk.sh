@@ -38,7 +38,7 @@ echo " Clean Gradle terminé"
 echo ""
 
 # 5. Build APK Debug
-echo "️ 5. Build APK Debug..."
+echo " 5. Build APK Debug..."
 ./gradlew assembleDebug
 echo " APK Debug générée"
 echo ""
@@ -57,7 +57,7 @@ echo ""
 
 # 7. Désinstallation ancienne APK
 echo " 7. Désinstallation ancienne APK..."
-adb uninstall com.base6a0ec08f3af5e1d1284254c1.app || echo "️ APK déjà désinstallée"
+adb uninstall com.base6a0ec08f3af5e1d1284254c1.app || echo " APK déjà désinstallée"
 echo " Désinstallation terminée"
 echo ""
 

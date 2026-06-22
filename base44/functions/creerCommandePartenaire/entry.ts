@@ -80,6 +80,20 @@ Deno.serve(async (req) => {
 
     console.log(`[creerCommandePartenaire]  Commande ${type} créée: ${commande.id} (num: ${numeroCommande})`);
 
+    // ── Notification push au partenaire ─────────────────────────────────
+    try {
+      await base44.functions.invoke('envoiNotificationPush', {
+        titre: 'Nouvelle commande reçue',
+        message: `Client: ${commande.client_nom} — Montant: ${(commande.total || 0).toLocaleString()} FCFA`,
+        type: 'nouvelle_commande_partenaire',
+        destinataire_email: etablissement.user_email,
+        user_type: 'partenaire',
+      });
+      console.log(`[creerCommandePartenaire]  Notification envoyée au partenaire: ${etablissement.user_email}`);
+    } catch (notifErr) {
+      console.error(`[creerCommandePartenaire]  Erreur notification partenaire: ${notifErr.message}`);
+    }
+
     return Response.json({ success: true, commande, numero_commande: numeroCommande });
   } catch (error) {
     console.error('[creerCommandePartenaire] Erreur:', error);

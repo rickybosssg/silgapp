@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Upload, Save, X, AlertTriangle } from "lucide-react";
+import PartenaireLocalisation from "@/components/partenaire/PartenaireLocalisation";
 
 const PAYS = [
   { code: "BF", nom: "Burkina Faso" }, { code: "CI", nom: "Côte d'Ivoire" },
@@ -96,6 +97,23 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
       <div className="grid grid-cols-2 gap-3">
         <div><Label className="text-xs">Quartier</Label><Input value={form.quartier || ""} onChange={e => set("quartier", e.target.value)} placeholder="Quartier" className="mt-1" /></div>
         <div><Label className="text-xs">Téléphone</Label><Input value={form.telephone || ""} onChange={e => set("telephone", e.target.value)} placeholder="Téléphone" className="mt-1" /></div>
+      </div>
+
+      {/* ── Localisation GPS fixe ── */}
+      <div className="border border-gray-100 rounded-xl p-3 space-y-2 bg-gray-50/50">
+        <PartenaireLocalisation
+          type={type}
+          existingLat={form.latitude}
+          existingLng={form.longitude}
+          existingAdresse={form.adresse}
+          onConfirm={(loc) => {
+            set("latitude", loc.latitude);
+            set("longitude", loc.longitude);
+            if (loc.ville) set("ville", loc.ville);
+            if (loc.quartier) set("quartier", loc.quartier);
+            if (loc.adresse) set("adresse", loc.adresse);
+          }}
+        />
       </div>
       <div>
         <Label className="text-xs">Numéro Orange Money (dépôt) *</Label>

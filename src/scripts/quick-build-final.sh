@@ -22,7 +22,7 @@ echo " Sync Capacitor terminé"
 echo ""
 
 # 3. Build APK
-echo "️ 3. Build APK Debug..."
+echo " 3. Build APK Debug..."
 cd android
 ./gradlew assembleDebug
 echo " APK Debug générée"
@@ -41,7 +41,7 @@ echo ""
 
 # 5. Installation
 echo " 5. Installation APK..."
-adb uninstall com.silgapp2.app || echo "️ Déjà désinstallée"
+adb uninstall com.silgapp2.app || echo " Déjà désinstallée"
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 echo " APK installée"
 echo ""

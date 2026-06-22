@@ -223,7 +223,7 @@ a{color:#ef4444;text-decoration:none}
 
 <div class="kpi-grid">
 <div class="kpi-card"><div class="kpi-color" style="background:linear-gradient(90deg,#8b5cf6,#a855f7)"></div><span class="kpi-label"> Clients</span><div class="kpi-value">${clients.length}</div><div class="kpi-sub">${clientsActifs} actifs</div></div>
-<div class="kpi-card"><div class="kpi-color" style="background:linear-gradient(90deg,#3b82f6,#6366f1)"></div><span class="kpi-label">️ Livreurs</span><div class="kpi-value">${livreurs.length}</div><div class="kpi-sub">${livreursValides} validés</div></div>
+<div class="kpi-card"><div class="kpi-color" style="background:linear-gradient(90deg,#3b82f6,#6366f1)"></div><span class="kpi-label"> Livreurs</span><div class="kpi-value">${livreurs.length}</div><div class="kpi-sub">${livreursValides} validés</div></div>
 <div class="kpi-card"><div class="kpi-color" style="background:linear-gradient(90deg,#f97316,#f59e0b)"></div><span class="kpi-label"> Courses</span><div class="kpi-value">${courses.length}</div><div class="kpi-sub">${coursesLivrees.length} livrées</div></div>
 <div class="kpi-card"><div class="kpi-color" style="background:linear-gradient(90deg,#10b981,#14b8a6)"></div><span class="kpi-label"> Pays</span><div class="kpi-value">${paysUniques.length}</div><div class="kpi-sub">couverts</div></div>
 <div class="kpi-card"><div class="kpi-color" style="background:linear-gradient(90deg,#06b6d4,#0ea5e9)"></div><span class="kpi-label">⏳ En cours</span><div class="kpi-value">${coursesEnCoursCount}</div><div class="kpi-sub">actives</div></div>
@@ -240,7 +240,7 @@ a{color:#ef4444;text-decoration:none}
 </div>
 
 <div class="card">
-<div class="card-title">️ Performance par pays</div>
+<div class="card-title"> Performance par pays</div>
 <div class="pays-grid">${paysRows}</div>
 </div>
 
@@ -262,7 +262,7 @@ a{color:#ef4444;text-decoration:none}
 </div>
 
 <div class="card">
-<div class="section-title">️ Livreurs inscrits</div>
+<div class="section-title"> Livreurs inscrits</div>
 <div class="section-subtitle">${livreurs.length} livreurs · ${livreursValides} validés · Affichage des 15 plus récents</div>
 <table>
 <thead><tr><th>Nom</th><th>Téléphone</th><th>Ville</th><th>Pays</th><th>Validation</th><th>Statut</th></tr></thead>

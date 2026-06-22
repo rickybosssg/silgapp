@@ -23,7 +23,7 @@ rm -rf node_modules/.cache
 
 # Nettoyer le cache npm
 echo " Nettoyage cache npm..."
-npm cache clean --force 2>/dev/null || echo "️  npm cache clean skipped"
+npm cache clean --force 2>/dev/null || echo "  npm cache clean skipped"
 
 # Nettoyer Capacitor
 echo " Nettoyage Capacitor..."

@@ -42,7 +42,7 @@ echo " Clean réussi"
 echo ""
 
 # Build APK
-echo "️  Build APK Debug..."
+echo "  Build APK Debug..."
 ./gradlew assembleDebug
 
 if [ $? -ne 0 ]; then

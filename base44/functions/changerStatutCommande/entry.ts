@@ -47,6 +47,45 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Non autorisé' }, { status: 403 });
     }
 
+    // ── Récupérer l'email du client pour les notifications ──────────────
+    let clientEmail = '';
+    try {
+      const clientProfile = await asService.entities.ClientExterne.get(commande.client_id);
+      clientEmail = clientProfile?.user_email || '';
+    } catch (_) {}
+
+    // ── Helper: envoyer notification push au client ──────────────────────
+    async function notifierClient(titre, message, typeNotif, courseId) {
+      if (!clientEmail) return;
+      try {
+        await base44.functions.invoke('envoiNotificationPush', {
+          titre, message, type: typeNotif,
+          destinataire_email: clientEmail,
+          user_type: 'client',
+          client_id: commande.client_id,
+          course_id: courseId || '',
+        });
+        console.log(`[changerStatutCommande]  Client notifié: ${titre}`);
+      } catch (err) {
+        console.error(`[changerStatutCommande]  Erreur notif client: ${err.message}`);
+      }
+    }
+
+    // ── Helper: envoyer notification push au partenaire ──────────────────
+    async function notifierPartenaire(titre, message, typeNotif) {
+      if (!etablissement.user_email) return;
+      try {
+        await base44.functions.invoke('envoiNotificationPush', {
+          titre, message, type: typeNotif,
+          destinataire_email: etablissement.user_email,
+          user_type: 'partenaire',
+        });
+        console.log(`[changerStatutCommande]  Partenaire notifié: ${titre}`);
+      } catch (err) {
+        console.error(`[changerStatutCommande]  Erreur notif partenaire: ${err.message}`);
+      }
+    }
+
     // ── Anti-double-action: vérifier le statut actuel ───────────────────
     const ACTIONS = {
       verifier_paiement: { from: 'commande_envoyee', to: 'paiement_verification' },
@@ -69,7 +108,7 @@ Deno.serve(async (req) => {
     if (action === 'prete_recuperation') {
       // Anti-double-création de course
       if (commande.course_id) {
-        console.log(`[changerStatutCommande] ️ Course déjà créée pour commande ${commande_id}: ${commande.course_id}`);
+        console.log(`[changerStatutCommande]  Course déjà créée pour commande ${commande_id}: ${commande.course_id}`);
         return Response.json({ success: true, message: 'Course déjà créée', course_id: commande.course_id, already_exists: true });
       }
 
@@ -146,8 +185,20 @@ Deno.serve(async (req) => {
         console.error(`[changerStatutCommande]  Erreur dispatch: ${err.message}`);
       }
 
+      // ── Notifications push ────────────────────────────────────────────
+      await notifierClient(
+        'Commande prête — livraison en cours',
+        `Votre commande chez ${etablissement.nom} est prête. Recherche d'un livreur en cours...`,
+        'commande_prete', course.id
+      );
+      await notifierPartenaire(
+        'Livraison déclenchée',
+        `Recherche d'un livreur pour la commande de ${commande.client_nom}`,
+        'livraison_declenchee'
+      );
+
       return Response.json({ success: true, course_id: course.id, message: 'Livraison déclenchée — recherche livreur en cours' });
-    }
+      }
 
     // ── Cas spécial: annulation → annuler aussi la course si elle existe ─
     if (action === 'annuler') {
@@ -167,13 +218,18 @@ Deno.serve(async (req) => {
               motif: `Commande annulée par le partenaire: ${motif}`,
               source: 'admin',
             });
-            console.log(`[changerStatutCommande] ️ Course ${commande.course_id} annulée suite à annulation commande`);
+            console.log(`[changerStatutCommande]  Course ${commande.course_id} annulée suite à annulation commande`);
           }
         } catch (err) {
-          console.error(`[changerStatutCommande] ️ Erreur annulation course: ${err.message}`);
+          console.error(`[changerStatutCommande]  Erreur annulation course: ${err.message}`);
         }
       }
 
+      await notifierClient(
+        'Commande annulée',
+        `Votre commande chez ${etablissement.nom} a été annulée. ${motif}`,
+        'commande_annulee', commande.course_id || ''
+      );
       return Response.json({ success: true, message: 'Commande annulée' });
     }
 
@@ -183,11 +239,26 @@ Deno.serve(async (req) => {
         statut: 'paiement_refuse',
         motif_annulation: 'Paiement refusé par le partenaire',
       });
+      await notifierClient(
+        'Paiement refusé',
+        `Le paiement pour votre commande chez ${etablissement.nom} a été refusé. Contactez l'établissement.`,
+        'paiement_refuse', ''
+      );
       return Response.json({ success: true, message: 'Paiement refusé' });
     }
 
     // ── Actions simples (vérifier, valider, commencer) ──────────────────
     await asService.entities[commandeEntity].update(commande_id, { statut: transition.to });
+
+    // ── Notifications selon l'action ───────────────────────────────────
+    const NOTIFS = {
+      verifier_paiement: { titre: 'Paiement en vérification', msg: `Le paiement de votre commande chez ${etablissement.nom} est en cours de vérification.`, type: 'paiement_verification' },
+      valider_paiement: { titre: 'Paiement validé ', msg: `Le paiement de votre commande chez ${etablissement.nom} a été validé. Préparation en cours...`, type: 'paiement_valide' },
+      commencer_preparation: { titre: 'Commande en préparation', msg: `Votre commande chez ${etablissement.nom} est en cours de préparation.`, type: 'en_preparation' },
+    };
+    if (NOTIFS[action]) {
+      await notifierClient(NOTIFS[action].titre, NOTIFS[action].msg, NOTIFS[action].type, '');
+    }
 
     console.log(`[changerStatutCommande]  Commande ${commande_id} → ${transition.to}`);
 

@@ -366,7 +366,7 @@ export default function DusLivreursExternes() {
           {/* KPI STATS */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             {[
-              { label: "Total dû", value: totalDu.toLocaleString(), suffix: "F", grad: "from-orange-500 to-amber-500", shadow: "shadow-orange-100", icon: "️" },
+              { label: "Total dû", value: totalDu.toLocaleString(), suffix: "F", grad: "from-orange-500 to-amber-500", shadow: "shadow-orange-100", icon: "" },
               { label: "Livreurs", value: recapLivreurs.length, suffix: null, grad: "from-primary to-red-600", shadow: "shadow-red-100", icon: "" },
               { label: "Commission totale", value: totalCommission.toLocaleString(), suffix: "F", grad: "from-blue-500 to-indigo-600", shadow: "shadow-blue-100", icon: "" },
               { label: "Encaissé", value: totalPaye.toLocaleString(), suffix: "F", grad: "from-green-500 to-emerald-500", shadow: "shadow-green-100", icon: "" },

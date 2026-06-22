@@ -6,7 +6,8 @@ export default function ModernMap({
   livreursProches,
   courseActive,
   onMapReady,
-  onMarkerClick
+  onMarkerClick,
+  partenaires = [],
 }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -69,6 +70,7 @@ export default function ModernMap({
 
   // Map des marqueurs livreurs par id — pour mise à jour stable sans recréation
   const livreurMarkersRef = useRef({}); // { [id]: marker }
+  const partenaireMarkersRef = useRef({}); // { [id]: marker }
 
   // Mettre à jour les marqueurs de livreurs — diff intelligent (pas de suppression totale)
   useEffect(() => {
@@ -156,6 +158,86 @@ export default function ModernMap({
       livreurMarkersRef.current[personne.id] = marker;
     });
   }, [livreursProches]);
+
+  // ── Marqueurs partenaires (boutiques violet + restaurants rose) — position FIXE ──
+  useEffect(() => {
+    if (!mapInstanceRef.current || !window.L) return;
+    if (!partenaires || partenaires.length === 0) {
+      // Nettoyer les marqueurs existants si pas de partenaires
+      Object.keys(partenaireMarkersRef.current).forEach(id => {
+        partenaireMarkersRef.current[id].remove();
+        delete partenaireMarkersRef.current[id];
+      });
+      return;
+    }
+
+    const map = mapInstanceRef.current;
+    const currentIds = new Set(partenaires.map(p => p.id));
+
+    // Supprimer les marqueurs qui ne sont plus dans la liste
+    Object.keys(partenaireMarkersRef.current).forEach(id => {
+      if (!currentIds.has(id)) {
+        partenaireMarkersRef.current[id].remove();
+        delete partenaireMarkersRef.current[id];
+      }
+    });
+
+    // Créer / mettre à jour les marqueurs
+    partenaires.forEach((partenaire) => {
+      if (!partenaire.latitude || !partenaire.longitude) return;
+      if (!partenaire.id) return;
+
+      // Déjà un marqueur → ne pas recréer (position fixe)
+      if (partenaireMarkersRef.current[partenaire.id]) return;
+
+      const isBoutique = partenaire._type === "boutique" || !partenaire._type;
+      const borderColor = isBoutique ? "#8b5cf6" : "#ec4899";
+      const emoji = isBoutique ? "" : "";
+
+      const markerIcon = window.L.divIcon({
+        html: `
+          <div class="partenaire-marker-wrapper">
+            <div class="partenaire-marker" style="border-color: ${borderColor}">
+              ${partenaire.logo_url
+                ? `<img src="${partenaire.logo_url}" alt="${partenaire.nom}" class="partenaire-photo" />`
+                : `<div class="partenaire-avatar" style="background: ${borderColor}">${emoji}</div>`
+              }
+            </div>
+          </div>
+        `,
+        className: "partenaire-marker-container",
+        iconSize: [44, 44],
+        iconAnchor: [22, 22],
+      });
+
+      const marker = window.L.marker([partenaire.latitude, partenaire.longitude], {
+        icon: markerIcon,
+        zIndexOffset: 700,
+      }).addTo(map);
+
+      const statutLabel = partenaire.ouvert === false
+        ? '<span style="color:#dc2626;font-weight:600"> Fermé</span>'
+        : '<span style="color:#16a34a;font-weight:600"> Ouvert</span>';
+      const typeLabel = isBoutique ? " Boutique" : " Restaurant";
+
+      marker.bindPopup(`
+        <div style="min-width:200px;font-family:sans-serif;padding:4px 0">
+          <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#1a1a1a">${partenaire.nom || ""}</p>
+          <p style="font-size:12px;margin:2px 0;color:${borderColor};font-weight:600">${typeLabel}</p>
+          <p style="font-size:12px;margin:2px 0">${statutLabel}</p>
+          ${partenaire.adresse ? `<p style="font-size:12px;margin:2px 0;color:#6b7280"> ${partenaire.adresse}</p>` : ""}
+          ${partenaire.quartier ? `<p style="font-size:12px;margin:2px 0;color:#6b7280"> ${partenaire.quartier}</p>` : ""}
+          ${partenaire.telephone ? `<p style="font-size:12px;margin:2px 0;color:#444"> ${partenaire.telephone}</p>` : ""}
+        </div>
+      `, { maxWidth: 260 });
+
+      if (onMarkerClick) {
+        marker.on('click', () => onMarkerClick(partenaire));
+      }
+
+      partenaireMarkersRef.current[partenaire.id] = marker;
+    });
+  }, [partenaires]);
 
   const initMap = () => {
     if (!window.L || !mapRef.current || !document.body.contains(mapRef.current)) return;
@@ -459,6 +541,49 @@ export default function ModernMap({
         margin: 0;
       }
 
+      /* Marqueurs partenaires (boutiques violet + restaurants rose) */
+      .partenaire-marker-container {
+        transition: all 0.3s ease;
+      }
+
+      .partenaire-marker-wrapper {
+        position: relative;
+        width: 44px;
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .partenaire-marker {
+        width: 38px;
+        height: 38px;
+        background: white;
+        border-radius: 50%;
+        border: 3px solid #8b5cf6;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .partenaire-photo {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .partenaire-avatar {
+        width: 100%;
+        height: 100%;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+      }
+
       /* Contrôles de zoom */
       .leaflet-control-zoom {
         border: none !important;
@@ -534,6 +659,34 @@ export default function ModernMap({
                 <span className="text-xs font-bold text-slate-700">
                   {livreursAffiches.length} livr{livreursAffiches.length === 1 ? "eur" : "eurs"} disponible{livreursAffiches.length === 1 ? "" : "s"}
                 </span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Badge partenaires — boutiques + restaurants à proximité */}
+      {mapLoaded && (() => {
+        const partenairesAffiches = (partenaires || []).filter(p => p.latitude && p.longitude);
+        if (partenairesAffiches.length === 0) return null;
+        const nbBoutiques = partenairesAffiches.filter(p => p._type === "boutique").length;
+        const nbRestaurants = partenairesAffiches.filter(p => p._type === "restaurant").length;
+        return (
+          <div className="absolute top-4 left-4 z-[1000]">
+            <div className="bg-white/95 backdrop-blur-sm rounded-2xl px-4 py-2.5 shadow-lg border border-slate-200">
+              <div className="flex items-center gap-3">
+                {nbBoutiques > 0 && (
+                  <span className="flex items-center gap-1.5 text-xs font-bold text-violet-700">
+                    <span className="w-2.5 h-2.5 rounded-full bg-violet-500"></span>
+                    {nbBoutiques} boutique{nbBoutiques > 1 ? "s" : ""}
+                  </span>
+                )}
+                {nbRestaurants > 0 && (
+                  <span className="flex items-center gap-1.5 text-xs font-bold text-pink-700">
+                    <span className="w-2.5 h-2.5 rounded-full bg-pink-500"></span>
+                    {nbRestaurants} restaurant{nbRestaurants > 1 ? "s" : ""}
+                  </span>
+                )}
               </div>
             </div>
           </div>

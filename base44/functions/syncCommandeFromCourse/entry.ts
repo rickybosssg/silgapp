@@ -18,6 +18,16 @@ const STATUS_MAP = {
   'annulee': 'annulee',
 };
 
+// Notifications à envoyer au client selon le statut de la course
+const CLIENT_NOTIFS = {
+  'livreur_en_route': { titre: 'Livreur en route ', msg: 'Un livreur a accepté votre commande et se dirige vers le partenaire.', type: 'livreur_assigne' },
+  'arrive_prise_en_charge': { titre: 'Livreur arrivé chez le partenaire', msg: 'Le livreur est arrivé chez le partenaire pour récupérer votre commande.', type: 'livreur_arrive_partenaire' },
+  'colis_recupere': { titre: 'Commande récupérée ', msg: 'Le livreur a récupéré votre commande et se dirige vers vous.', type: 'colis_recupere' },
+  'en_livraison': { titre: 'Commande en livraison ', msg: 'Votre commande est en cours de livraison.', type: 'en_livraison' },
+  'livree': { titre: 'Commande livrée ', msg: 'Votre commande a été livrée. Merci d\'utiliser SILGAPP !', type: 'commande_livree' },
+  'annulee': { titre: 'Commande annulée', msg: 'Votre commande a été annulée.', type: 'commande_annulee' },
+};
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -42,6 +52,28 @@ Deno.serve(async (req) => {
     }
 
     const asService = base44.asServiceRole;
+
+    // ── Envoyer notification push au client ──────────────────────────────
+    const notifInfo = CLIENT_NOTIFS[course.statut];
+    if (notifInfo && course.destinataire_client_id) {
+      try {
+        const client = await asService.entities.ClientExterne.get(course.destinataire_client_id);
+        if (client?.user_email) {
+          await base44.functions.invoke('envoiNotificationPush', {
+            titre: notifInfo.titre,
+            message: notifInfo.msg,
+            type: notifInfo.type,
+            destinataire_email: client.user_email,
+            user_type: 'client',
+            client_id: client.id,
+            course_id: course.id || '',
+          });
+          console.log(`[syncCommandeFromCourse]  Client notifié: ${notifInfo.titre}`);
+        }
+      } catch (err) {
+        console.error(`[syncCommandeFromCourse]  Erreur notif client: ${err.message}`);
+      }
+    }
 
     // Mettre à jour la commande boutique liée
     if (course.commande_boutique_id) {

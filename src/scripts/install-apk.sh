@@ -18,7 +18,7 @@ echo " APK found: $APK_PATH"
 echo ""
 
 # Uninstall old version
-echo "️  Uninstalling old version..."
+echo "  Uninstalling old version..."
 adb uninstall com.silga.livraison
 echo " Uninstalled"
 echo ""

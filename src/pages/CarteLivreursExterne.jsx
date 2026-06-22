@@ -107,6 +107,7 @@ export default function CarteLivreursExterne() {
   const [masquerInactifs, setMasquerInactifs] = useState(false);
   const [showClients, setShowClients] = useState(true);
   const [showLivreurs, setShowLivreurs] = useState(true);
+  const [showPartenaires, setShowPartenaires] = useState(true);
   const [correctionEnCours, setCorrectionEnCours] = useState(false);
 
   const handleCorrectionEnCourse = async () => {
@@ -163,6 +164,27 @@ export default function CarteLivreursExterne() {
     initialData: [],
     refetchInterval: 15000,
   });
+
+  // ── Partenaires : boutiques + restaurants (filtrés par pays) ────────
+  const partenaireFilter = effectiveCountry ? { pays_code: effectiveCountry, actif: true } : { actif: true };
+  const { data: boutiquesCarte = [] } = useQuery({
+    queryKey: ["boutiques-carte", effectiveCountry],
+    queryFn: () => base44.entities.Boutique.filter(partenaireFilter),
+    initialData: [],
+    refetchInterval: 30000,
+  });
+  const { data: restaurantsCarte = [] } = useQuery({
+    queryKey: ["restaurants-carte", effectiveCountry],
+    queryFn: () => base44.entities.Restaurant.filter(partenaireFilter),
+    initialData: [],
+    refetchInterval: 30000,
+  });
+
+  // Combiner boutiques + restaurants avec _type pour différenciation visuelle
+  const partenaires = useMemo(() => [
+    ...boutiquesCarte.map(b => ({ ...b, _type: "boutique" })),
+    ...restaurantsCarte.map(r => ({ ...r, _type: "restaurant" })),
+  ], [boutiquesCarte, restaurantsCarte]);
 
   // Courses en attente : créées, sans livreur assigné, non terminées/annulées
   const coursesAttenteFilter = effectiveCountry
@@ -499,6 +521,8 @@ export default function CarteLivreursExterne() {
               { dot: "bg-blue-500", label: "Client actif" },
               { dot: "bg-red-600", label: "Course attente" },
               { dot: "bg-yellow-500", label: "Course en cours" },
+              { dot: "bg-violet-500", label: "Boutique" },
+              { dot: "bg-pink-500",   label: "Restaurant" },
             ].map((l, i) => (
               <div key={i} className="flex items-center gap-2">
                 <span className={`w-3 h-3 rounded-full flex-shrink-0 ${l.dot}`} />
@@ -735,6 +759,17 @@ export default function CarteLivreursExterne() {
                   <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
                    Clients
                 </button>
+                <button
+                  onClick={() => setShowPartenaires(v => !v)}
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                    showPartenaires
+                      ? "bg-violet-600 text-white border-violet-600"
+                      : "bg-white/10 text-white/70 border-white/20 hover:bg-white/20"
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-violet-500 flex-shrink-0" />
+                  Partenaires
+                </button>
               </div>
             </div>
           </div>
@@ -745,6 +780,7 @@ export default function CarteLivreursExterne() {
                 livreurs={livreursSurCarte}
                 clients={clientsSurCarte}
                 courses={coursesRecents}
+                partenaires={partenaires}
                 onMarkerClick={(entity) => setSelectedMarker(entity)}
                 heatmapMode={heatmapMode}
                 countryCode={effectiveCountry}
@@ -753,6 +789,7 @@ export default function CarteLivreursExterne() {
                 masquerInactifs={masquerInactifs}
                 showClients={showClients}
                 showLivreurs={showLivreurs}
+                showPartenaires={showPartenaires}
                 livreurIdsEnCourseReelle={livreurIdsEnCourseReelle}
               />
             </div>

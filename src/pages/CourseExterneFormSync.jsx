@@ -408,7 +408,7 @@ export default function CourseExterneFormSync() {
     if (isSubmitting || createMutation.isPending) return;
     setIsSubmitting(true);
 
-    // ️ country_code DOIT être déclaré AVANT toute utilisation dans normalizePhone()
+    //  country_code DOIT être déclaré AVANT toute utilisation dans normalizePhone()
     // ─── Validation des champs obligatoires ───────────────────────────────────
     const isExpedie = formData.type_course === "expedier";
     const isRecevoir = formData.type_course === "recevoir";

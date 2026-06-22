@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { useNavigate } from "react-router-dom";
@@ -9,7 +9,7 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useClientNotifications } from "@/hooks/useClientNotifications";
 import { registerPushToken } from "@/lib/notifications";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import {
   MapPin, Navigation, MessageCircle, User, Package,
   Clock, ChevronRight, TrendingUp, Loader2, ArrowLeft, RefreshCw,
@@ -91,6 +91,31 @@ export default function ClientExterneApp() {
   const queryClient = useQueryClient();
   const clientProfilRef = useRef(null);
   useEffect(() => { clientProfilRef.current = clientProfil; }, [clientProfil]);
+
+  // ── Partenaires (boutiques + restaurants) pour la carte client — filtrés par pays ──
+  const partenaireFilter = clientProfil?.country_code
+    ? { pays_code: clientProfil.country_code, actif: true }
+    : { actif: true };
+  const { data: boutiquesCarte = [] } = useQuery({
+    queryKey: ["boutiques-carte-client", clientProfil?.country_code],
+    queryFn: () => base44.entities.Boutique.filter(partenaireFilter),
+    initialData: [],
+    enabled: !!clientProfil?.country_code,
+    staleTime: 15000,
+    refetchInterval: 30000,
+  });
+  const { data: restaurantsCarte = [] } = useQuery({
+    queryKey: ["restaurants-carte-client", clientProfil?.country_code],
+    queryFn: () => base44.entities.Restaurant.filter(partenaireFilter),
+    initialData: [],
+    enabled: !!clientProfil?.country_code,
+    staleTime: 15000,
+    refetchInterval: 30000,
+  });
+  const partenairesCarte = useMemo(() => [
+    ...boutiquesCarte.map(b => ({ ...b, _type: "boutique" })),
+    ...restaurantsCarte.map(r => ({ ...r, _type: "restaurant" })),
+  ], [boutiquesCarte, restaurantsCarte]);
 
   // Pull-to-refresh
   const { pulling, refreshing } = usePullToRefresh(async () => {
@@ -242,7 +267,7 @@ export default function ClientExterneApp() {
   //    → Check simple: latitude && longitude
   //    → Pas de calcul de date (juste présence coords)
   //
-  // ️ CHAMPS BDD
+  //  CHAMPS BDD
   //    - latitude (number)
   //    - longitude (number)
   //    - Pas de champ gps_actif ou current_location
@@ -453,7 +478,7 @@ export default function ClientExterneApp() {
           telephone: "",
           user_email: user.email,
           actif: true,
-          // ️ PAS de country_code ici — sera défini par l'onboarding (EtapeProfil)
+          //  PAS de country_code ici — sera défini par l'onboarding (EtapeProfil)
           // Mettre BF par défaut causait des courses créées avec le mauvais pays
         });
       }
@@ -918,7 +943,7 @@ export default function ClientExterneApp() {
                   <p className="flex-1 text-left font-semibold text-gray-800 text-sm">
                     {coursesActives.some(c => ["livreur_en_route","colis_recupere","en_livraison"].includes(c.statut))
                       ? " Voir le livreur en temps réel"
-                      : "️ Voir la carte"}
+                      : " Voir la carte"}
                   </p>
                   <ChevronRight className="w-4 h-4 text-gray-600" />
                 </button>
@@ -1011,7 +1036,7 @@ export default function ClientExterneApp() {
             <h2 className="text-lg font-bold text-foreground">
               {coursesActives.find(c => ["livreur_en_route","colis_recupere","en_livraison"].includes(c.statut))
                 ? " Suivi en temps réel"
-                : "️ Carte"}
+                : " Carte"}
             </h2>
             <Button variant="ghost" size="icon" onClick={() => setShowMap(false)} className="h-10 w-10">
               <ArrowLeft className="w-5 h-5" />
@@ -1022,6 +1047,7 @@ export default function ClientExterneApp() {
               position={position}
               livreursProches={livreursProches}
               courseActive={coursesActives.find(c => ["livreur_en_route","colis_recupere","en_livraison"].includes(c.statut)) || null}
+              partenaires={partenairesCarte}
             />
           </div>
         </div>

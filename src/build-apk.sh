@@ -25,7 +25,7 @@ cd android
 ./gradlew clean
 
 # 5. Build APK Debug
-echo "️ Build APK Debug..."
+echo " Build APK Debug..."
 ./gradlew assembleDebug
 
 # 6. Résultat
@@ -33,6 +33,6 @@ echo ""
 echo " Build terminé !"
 echo " APK générée : android/app/build/outputs/apk/debug/app-debug.apk"
 echo ""
-echo "️ IMPORTANT : Désinstaller l'ancienne APK avant d'installer la nouvelle"
+echo " IMPORTANT : Désinstaller l'ancienne APK avant d'installer la nouvelle"
 echo "   adb uninstall com.base6a0ec08f3af5e1d1284254c1.app"
 echo ""

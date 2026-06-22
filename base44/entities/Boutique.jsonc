@@ -39,11 +39,17 @@
     "quartier": {
       "type": "string"
     },
+    "adresse": {
+      "type": "string",
+      "description": "Adresse pr\u00e9cise de l'\u00e9tablissement (g\u00e9olocalis\u00e9e)"
+    },
     "latitude": {
-      "type": "number"
+      "type": "number",
+      "description": "Position GPS FIXE de l'\u00e9tablissement (enregistr\u00e9e manuellement)"
     },
     "longitude": {
-      "type": "number"
+      "type": "number",
+      "description": "Position GPS FIXE de l'\u00e9tablissement (enregistr\u00e9e manuellement)"
     },
     "telephone": {
       "type": "string",

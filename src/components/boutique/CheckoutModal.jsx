@@ -105,7 +105,7 @@ export default function CheckoutModal({ type, etablissementId, etablissementNom,
               </label>
             )}
           </div>
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3"><p className="text-xs text-amber-700">️ La commande n'est effective qu'après validation du paiement par le partenaire.</p></div>
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3"><p className="text-xs text-amber-700"> La commande n'est effective qu'après validation du paiement par le partenaire.</p></div>
           <Button onClick={handleSubmit} disabled={submitting || !adresse || !preuveUrl} className="w-full h-12 bg-primary hover:bg-primary/90 text-base font-bold">
             {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Confirmer la commande"}
           </Button>

@@ -34,7 +34,7 @@ BUILD_GRADLE="android/app/build.gradle"
 echo " 2. Vérification $BUILD_GRADLE..."
 
 if [ ! -f "$BUILD_GRADLE" ]; then
-  echo "   ️  build.gradle non trouvé. Lancer d'abord : npx cap add android"
+  echo "     build.gradle non trouvé. Lancer d'abord : npx cap add android"
   echo "   → Continuez avec l'étape de sync ci-dessous"
 else
   CURRENT_ID=$(grep 'applicationId' "$BUILD_GRADLE" | head -1 | sed 's/.*"\(.*\)".*/\1/' | tr -d '[:space:]')
@@ -60,11 +60,11 @@ if [ -f "$MANIFEST" ]; then
   if grep -q "com.silgapp.app" "$MANIFEST"; then
     echo "    AndroidManifest.xml OK"
   else
-    echo "   ️  AndroidManifest.xml ne contient pas explicitement com.silgapp.app"
+    echo "     AndroidManifest.xml ne contient pas explicitement com.silgapp.app"
     echo "   → C'est normal : le package est défini dans build.gradle (namespace)"
   fi
 else
-  echo "   ️  AndroidManifest.xml non trouvé — android/ pas encore initialisé"
+  echo "     AndroidManifest.xml non trouvé — android/ pas encore initialisé"
 fi
 echo ""
 
@@ -91,7 +91,7 @@ if command -v npx &> /dev/null; then
   npx cap sync android 2>&1 | tail -5
   echo "    Sync terminé"
 else
-  echo "   ️  npx non disponible — lancez manuellement : npx cap sync android"
+  echo "     npx non disponible — lancez manuellement : npx cap sync android"
 fi
 echo ""
 

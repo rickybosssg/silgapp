@@ -155,6 +155,7 @@ function resolveNotificationIdentity(livreurId = null, currentUser = null) {
   const userType =
     currentUser?.user_type === "client" ? "client" :
     currentUser?.user_type === "admin" || currentUser?.role === "admin" ? "admin" :
+    currentUser?.user_type === "partenaire" ? "partenaire" :
     "livreur";
   const resolvedLivreurId = livreurId || currentUser?.livreur_id || currentUser?.livreur?.id || null;
   const resolvedClientId = currentUser?.client_id || currentUser?.client?.id || null;
@@ -162,7 +163,9 @@ function resolveNotificationIdentity(livreurId = null, currentUser = null) {
     ? "admin@silgapp2.local"
     : userType === "client"
       ? `client-${resolvedClientId || "unknown"}@silgapp2.local`
-      : `livreur-${resolvedLivreurId || "unknown"}@silgapp2.local`;
+      : userType === "partenaire"
+        ? `partenaire-${currentUser?.id || "unknown"}@silgapp2.local`
+        : `livreur-${resolvedLivreurId || "unknown"}@silgapp2.local`;
 
   return {
     user_email: (currentUser?.email || currentUser?.user_email || currentUser?.livreur?.user_email || fallbackEmail).trim().toLowerCase(),

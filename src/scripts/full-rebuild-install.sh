@@ -30,7 +30,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-echo "️ Step 4: Building APK..."
+echo " Step 4: Building APK..."
 ./gradlew assembleDebug
 if [ $? -ne 0 ]; then
     echo " APK build failed!"

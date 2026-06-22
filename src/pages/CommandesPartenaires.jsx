@@ -29,7 +29,7 @@ export default function CommandesPartenaires() {
           <SelectContent>
             <SelectItem value="all"> Tous les pays</SelectItem>
             {countries.map(c => (
-              <SelectItem key={c.code} value={c.code}>{c.emoji_flag || "️"} {c.nom}</SelectItem>
+              <SelectItem key={c.code} value={c.code}>{c.emoji_flag || ""} {c.nom}</SelectItem>
             ))}
           </SelectContent>
         </Select>

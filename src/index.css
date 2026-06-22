@@ -106,18 +106,18 @@
   .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom);
   }
-  
+
   .safe-area-top {
     padding-top: env(safe-area-inset-top);
   }
-  
+
   /* Mobile optimizations */
   @media (max-width: 640px) {
     /* Prevent text overflow */
     .truncate-mobile {
       @apply truncate;
     }
-    
+
     /* Larger touch targets */
     button, a {
       @apply min-h-[44px];

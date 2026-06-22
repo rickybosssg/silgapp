@@ -42,7 +42,7 @@ function ReseauCard({ title, icon: Icon, color, livreurs, coursesLivrees, isExte
     { label: "Disponibles", value: disponibles,                    grad: "from-emerald-400 to-teal-500",  icon: "" },
     { label: "En course",   value: enCourse,                       grad: "from-orange-400 to-amber-500",  icon: "" },
     { label: "Hors ligne",  value: horsLigne,                      grad: "from-gray-400 to-slate-500",    icon: "" },
-    { label: "Payés",       value: paiementsValides,               grad: "from-teal-500 to-cyan-500",     icon: "️" },
+    { label: "Payés",       value: paiementsValides,               grad: "from-teal-500 to-cyan-500",     icon: "" },
     { label: "Non payés",   value: paiementsNonValides,            grad: "from-rose-400 to-pink-500",     icon: "⏳" },
     { label: "Total",       value: totalLivreurs,                  grad: "from-violet-500 to-purple-600", icon: "" },
   ];

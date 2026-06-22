@@ -42,7 +42,7 @@ echo " Gradle clean completed"
 echo ""
 
 # Step 5: Build APK
-echo "️ Step 5/5: ./gradlew assembleDebug..."
+echo " Step 5/5: ./gradlew assembleDebug..."
 ./gradlew assembleDebug
 if [ $? -ne 0 ]; then
     echo " APK build failed!"
