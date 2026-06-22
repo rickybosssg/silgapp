@@ -101,14 +101,16 @@ export default function ClientExterneApp() {
     queryFn: () => base44.entities.Boutique.filter(partenaireFilter),
     initialData: [],
     enabled: !!clientProfil?.country_code,
-    staleTime: 60000,
+    staleTime: 15000,
+    refetchInterval: 30000,
   });
   const { data: restaurantsCarte = [] } = useQuery({
     queryKey: ["restaurants-carte-client", clientProfil?.country_code],
     queryFn: () => base44.entities.Restaurant.filter(partenaireFilter),
     initialData: [],
     enabled: !!clientProfil?.country_code,
-    staleTime: 60000,
+    staleTime: 15000,
+    refetchInterval: 30000,
   });
   const partenairesCarte = useMemo(() => [
     ...boutiquesCarte.map(b => ({ ...b, _type: "boutique" })),
