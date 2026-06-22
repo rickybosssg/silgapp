@@ -15,17 +15,26 @@
       "enum": [
         "client",
         "livreur",
-        "admin"
+        "admin",
+        "partenaire"
       ],
       "description": "Qui envoie le message"
     },
     "sender_id": {
       "type": "string",
-      "description": "ID du sender (client_id, livreur_id, ou email admin)"
+      "description": "ID du sender (client_id, livreur_id, email admin, ou boutique_id/restaurant_id pour partenaire)"
     },
     "sender_name": {
       "type": "string",
-      "description": "Nom affich\u00e9 du sender"
+      "description": "Nom affich\u00e9 du sender (r\u00e9solu c\u00f4t\u00e9 serveur)"
+    },
+    "sender_photo_url": {
+      "type": "string",
+      "description": "URL de la photo de profil de l'exp\u00e9diteur au moment de l'envoi"
+    },
+    "client_message_id": {
+      "type": "string",
+      "description": "Cl\u00e9 idempotente g\u00e9n\u00e9r\u00e9e par le client pour emp\u00eacher les doublons d'envoi"
     },
     "message_type": {
       "type": "string",

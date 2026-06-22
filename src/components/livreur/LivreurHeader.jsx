@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { LogOut, Wifi, WifiOff, MapPin, MapPinOff, Power, Navigation, Star, Smartphone, Users, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { base44 } from "@/api/base44Client";

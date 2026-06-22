@@ -4,7 +4,7 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const url = new URL(req.url);
-    
+
     // Lire le token depuis les query params ou le body JSON
     let token = url.searchParams.get('token');
 
@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
       return {
         code: p.code,
         nom: p.nom,
-        emoji: p.emoji_flag || '🌍',
+        emoji: p.emoji_flag || '',
         courses: crs.length,
         livrees: lvres.length,
         livreurs: lvrs.length,
@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
       .map(c => `
         <tr>
           <td>${new Date(c.created_date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
-          <td><span class="badge">${c.type_course === 'expedier' ? '📤 Expédition' : c.type_course === 'recevoir' ? '📥 Réception' : '🚗 Déplacement'}</span></td>
+          <td><span class="badge">${c.type_course === 'expedier' ? ' Expédition' : c.type_course === 'recevoir' ? ' Réception' : ' Déplacement'}</span></td>
           <td>${c.country_code || '-'}</td>
           <td>${c.client_nom || '-'}</td>
           <td><span class="badge badge-green">Livrée</span></td>
@@ -209,43 +209,43 @@ a{color:#ef4444;text-decoration:none}
 <div class="banner">
 <div class="banner-inner">
 <div style="display:flex;align-items:center;gap:10px">
-<span style="font-size:28px">📦</span>
+<span style="font-size:28px"></span>
 <div>
 <h1>SILGAPP</h1>
 <sub>Dashboard de démonstration — Closed Testing Google Play</sub>
 </div>
 </div>
-<span class="live-badge">🟢 Données réelles en direct</span>
+<span class="live-badge"> Données réelles en direct</span>
 </div>
 </div>
 
 <div class="main">
 
 <div class="kpi-grid">
-<div class="kpi-card"><div class="kpi-color" style="background:linear-gradient(90deg,#8b5cf6,#a855f7)"></div><span class="kpi-label">👥 Clients</span><div class="kpi-value">${clients.length}</div><div class="kpi-sub">${clientsActifs} actifs</div></div>
-<div class="kpi-card"><div class="kpi-color" style="background:linear-gradient(90deg,#3b82f6,#6366f1)"></div><span class="kpi-label">🏍️ Livreurs</span><div class="kpi-value">${livreurs.length}</div><div class="kpi-sub">${livreursValides} validés</div></div>
-<div class="kpi-card"><div class="kpi-color" style="background:linear-gradient(90deg,#f97316,#f59e0b)"></div><span class="kpi-label">📦 Courses</span><div class="kpi-value">${courses.length}</div><div class="kpi-sub">${coursesLivrees.length} livrées</div></div>
-<div class="kpi-card"><div class="kpi-color" style="background:linear-gradient(90deg,#10b981,#14b8a6)"></div><span class="kpi-label">🌍 Pays</span><div class="kpi-value">${paysUniques.length}</div><div class="kpi-sub">couverts</div></div>
+<div class="kpi-card"><div class="kpi-color" style="background:linear-gradient(90deg,#8b5cf6,#a855f7)"></div><span class="kpi-label"> Clients</span><div class="kpi-value">${clients.length}</div><div class="kpi-sub">${clientsActifs} actifs</div></div>
+<div class="kpi-card"><div class="kpi-color" style="background:linear-gradient(90deg,#3b82f6,#6366f1)"></div><span class="kpi-label">️ Livreurs</span><div class="kpi-value">${livreurs.length}</div><div class="kpi-sub">${livreursValides} validés</div></div>
+<div class="kpi-card"><div class="kpi-color" style="background:linear-gradient(90deg,#f97316,#f59e0b)"></div><span class="kpi-label"> Courses</span><div class="kpi-value">${courses.length}</div><div class="kpi-sub">${coursesLivrees.length} livrées</div></div>
+<div class="kpi-card"><div class="kpi-color" style="background:linear-gradient(90deg,#10b981,#14b8a6)"></div><span class="kpi-label"> Pays</span><div class="kpi-value">${paysUniques.length}</div><div class="kpi-sub">couverts</div></div>
 <div class="kpi-card"><div class="kpi-color" style="background:linear-gradient(90deg,#06b6d4,#0ea5e9)"></div><span class="kpi-label">⏳ En cours</span><div class="kpi-value">${coursesEnCoursCount}</div><div class="kpi-sub">actives</div></div>
-<div class="kpi-card"><div class="kpi-color" style="background:linear-gradient(90deg,#f43f5e,#ec4899)"></div><span class="kpi-label">📈 30j</span><div class="kpi-value">${coursesRecentes.length}</div><div class="kpi-sub">courses récentes</div></div>
+<div class="kpi-card"><div class="kpi-color" style="background:linear-gradient(90deg,#f43f5e,#ec4899)"></div><span class="kpi-label"> 30j</span><div class="kpi-value">${coursesRecentes.length}</div><div class="kpi-sub">courses récentes</div></div>
 </div>
 
 <div class="card">
-<div class="card-title">📦 Répartition par type de course</div>
+<div class="card-title"> Répartition par type de course</div>
 <div class="type-grid">
-<div class="type-card blue"><div class="type-icon">📤</div><div class="type-val">${coursesExpedier}</div><div class="type-label">Expéditions</div></div>
-<div class="type-card green"><div class="type-icon">📥</div><div class="type-val">${coursesRecevoir}</div><div class="type-label">Réceptions</div></div>
-<div class="type-card purple"><div class="type-icon">🚗</div><div class="type-val">${coursesDeplacement}</div><div class="type-label">Déplacements</div></div>
+<div class="type-card blue"><div class="type-icon"></div><div class="type-val">${coursesExpedier}</div><div class="type-label">Expéditions</div></div>
+<div class="type-card green"><div class="type-icon"></div><div class="type-val">${coursesRecevoir}</div><div class="type-label">Réceptions</div></div>
+<div class="type-card purple"><div class="type-icon"></div><div class="type-val">${coursesDeplacement}</div><div class="type-label">Déplacements</div></div>
 </div>
 </div>
 
 <div class="card">
-<div class="card-title">🏳️ Performance par pays</div>
+<div class="card-title">️ Performance par pays</div>
 <div class="pays-grid">${paysRows}</div>
 </div>
 
 <div class="card">
-<div class="card-title">📋 Dernières courses livrées</div>
+<div class="card-title"> Dernières courses livrées</div>
 <table>
 <thead><tr><th>Date</th><th>Type</th><th>Pays</th><th>Client</th><th>Statut</th></tr></thead>
 <tbody>${dernieresLivrees}</tbody>
@@ -253,7 +253,7 @@ a{color:#ef4444;text-decoration:none}
 </div>
 
 <div class="card">
-<div class="section-title">👥 Clients inscrits</div>
+<div class="section-title"> Clients inscrits</div>
 <div class="section-subtitle">${clients.length} clients · ${clientsActifs} actifs · Affichage des 15 plus récents</div>
 <table>
 <thead><tr><th>Nom</th><th>Téléphone</th><th>Ville</th><th>Pays</th><th>Statut</th><th>Vu le</th></tr></thead>
@@ -262,7 +262,7 @@ a{color:#ef4444;text-decoration:none}
 </div>
 
 <div class="card">
-<div class="section-title">🏍️ Livreurs inscrits</div>
+<div class="section-title">️ Livreurs inscrits</div>
 <div class="section-subtitle">${livreurs.length} livreurs · ${livreursValides} validés · Affichage des 15 plus récents</div>
 <table>
 <thead><tr><th>Nom</th><th>Téléphone</th><th>Ville</th><th>Pays</th><th>Validation</th><th>Statut</th></tr></thead>
@@ -300,6 +300,6 @@ function errorHtml(message) {
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>SILGAPP - Erreur</title>
 <style>body{font-family:-apple-system,sans-serif;background:#f5f5f7;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}.card{background:#fff;padding:40px;border-radius:20px;text-align:center;max-width:400px;box-shadow:0 4px 20px rgba(0,0,0,.06)}.icon{font-size:48px;margin-bottom:12px}h1{font-size:18px;color:#1d1d1f;margin-bottom:8px}p{font-size:14px;color:#86868b}</style>
 </head>
-<body><div class="card"><div class="icon">🚫</div><h1>${message}</h1><p>Ce lien n'est plus valide. Il a peut-être expiré ou a été révoqué.</p></div></body>
+<body><div class="card"><div class="icon"></div><h1>${message}</h1><p>Ce lien n'est plus valide. Il a peut-être expiré ou a été révoqué.</p></div></body>
 </html>`;
 }

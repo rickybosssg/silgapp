@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    
+
     if (!user) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
 
     // Si une session existait déjà, on la remplace (nouvelle connexion)
     const ancienneSession = livreur.session_active_id;
-    
+
     // 1. Mettre à jour le livreur avec la nouvelle session
     await base44.asServiceRole.entities.Livreur.update(livreur.id, {
       session_active_id: sessionId,
@@ -44,35 +44,13 @@ Deno.serve(async (req) => {
       statut: 'disponible', // Forcer disponible pour la nouvelle session
     });
 
-    // 2. Désactiver TOUS les anciens tokens FCM de ce livreur
-    //    (pour qu'ils ne reçoivent plus de notifications)
-    const allTokens = await base44.asServiceRole.entities.NotificationToken.filter({
-      livreur_id: livreur.id,
-      actif: true,
-    });
+    // 2. NE PAS désactiver les tokens FCM ici.
+    //    La gestion des tokens FCM est assurée par enregistrerTokenPush,
+    //    qui réactive le token actuel et désactive les anciens tokens du même user.
+    //    Désactiver ici cassait le token du livreur connecté → plus de push physique.
+    const deactivatedCount = 0;
 
-    const deactivatedCount = allTokens ? allTokens.length : 0;
-    if (allTokens && allTokens.length > 0) {
-      await Promise.all(allTokens.map(t =>
-        base44.asServiceRole.entities.NotificationToken.update(t.id, { actif: false })
-      ));
-    }
-
-    // 3. Désactiver aussi par email (fallback)
-    const tokensByEmail = await base44.asServiceRole.entities.NotificationToken.filter({
-      user_email: user.email,
-      user_type: 'livreur',
-      actif: true,
-    });
-
-    if (tokensByEmail && tokensByEmail.length > 0) {
-      const toDeactivate = tokensByEmail.filter(t => t.livreur_id === livreur.id);
-      await Promise.all(toDeactivate.map(t =>
-        base44.asServiceRole.entities.NotificationToken.update(t.id, { actif: false })
-      ));
-    }
-
-    // 4. Désactiver les DeviceSessions existantes
+    // 3. Désactiver les DeviceSessions existantes
     const oldSessions = await base44.asServiceRole.entities.DeviceSession.filter({
       user_email: user.email,
       user_type: 'livreur',
@@ -88,7 +66,7 @@ Deno.serve(async (req) => {
       ));
     }
 
-    // 5. Créer la nouvelle DeviceSession
+    // 4. Créer la nouvelle DeviceSession
     await base44.asServiceRole.entities.DeviceSession.create({
       user_email: user.email,
       user_type: 'livreur',

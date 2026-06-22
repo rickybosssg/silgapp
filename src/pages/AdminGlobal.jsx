@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+﻿import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link, useNavigate } from "react-router-dom";
@@ -32,7 +32,7 @@ export default function AdminGlobal() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success("Rapport PDF téléchargé ✓");
+      toast.success("Rapport PDF telecharge");
     } catch (err) {
       console.error(err);
       toast.error("Erreur lors du téléchargement du rapport");

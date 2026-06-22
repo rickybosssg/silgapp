@@ -5,7 +5,7 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    
+
     if (!user) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -28,27 +28,27 @@ Deno.serve(async (req) => {
     const coursesLivrees = courses.filter(c => c.statut === 'livree');
     const coursesAnnulees = courses.filter(c => c.statut === 'annulee').length;
     const coursesEnCours = courses.filter(c => !['nouvelle', 'annulee', 'livree', 'programmee'].includes(c.statut)).length;
-    
+
     const paysUniques = [...new Set(courses.filter(c => c.country_code).map(c => c.country_code))];
-    
+
     const ilYa30Jours = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const coursesRecentes = courses.filter(c => {
       const d = new Date(c.created_date);
       return d >= ilYa30Jours;
     });
-    
+
     const coursesExpedier = courses.filter(c => c.type_course === 'expedier').length;
     const coursesRecevoir = courses.filter(c => c.type_course === 'recevoir').length;
     const coursesDeplacement = courses.filter(c => c.type_course === 'deplacement').length;
-    
-    const derniereCourse = courses.length > 0 
+
+    const derniereCourse = courses.length > 0
       ? courses.sort((a,b) => new Date(b.created_date) - new Date(a.created_date))[0]
       : null;
-    
+
     const derniereConnexionClient = clients
       .filter(c => c.last_seen_at)
       .sort((a,b) => new Date(b.last_seen_at) - new Date(a.last_seen_at))[0];
-    
+
     const derniereConnexionLivreur = livreurs
       .filter(l => l.last_seen_at)
       .sort((a,b) => new Date(b.last_seen_at) - new Date(a.last_seen_at))[0];
@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
 
     // --- GÉNÉRATION PDF ---
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    
+
     const pageWidth = doc.internal.pageSize.getWidth();
     let y = 15;
 
@@ -225,7 +225,7 @@ Deno.serve(async (req) => {
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(40, 40, 40);
     doc.setFontSize(8);
-    
+
     const dernieresLivrees = coursesLivrees
       .sort((a,b) => new Date(b.created_date) - new Date(a.created_date))
       .slice(0, 15);
@@ -308,7 +308,7 @@ Deno.serve(async (req) => {
 
 Veuillez trouver ci-dessous le rapport d'activité SILGAPP pour le Closed Testing Google Play.
 
-📊 CHIFFRES CLÉS :
+ CHIFFRES CLÉS :
 • ${clients.length} clients inscrits (${clientsActifs} actifs)
 • ${livreurs.length} livreurs inscrits (${livreursValides} validés)
 • ${courses.length} courses totales
@@ -316,7 +316,7 @@ Veuillez trouver ci-dessous le rapport d'activité SILGAPP pour le Closed Testin
 • ${paysUniques.length} pays couverts : ${paysUniques.join(', ')}
 • Dernière activité : ${derniereCourse ? new Date(derniereCourse.created_date).toLocaleDateString('fr-FR') : 'N/A'}
 
-📎 Le rapport PDF complet est téléchargeable ici (lien valide 7 jours) :
+ Le rapport PDF complet est téléchargeable ici (lien valide 7 jours) :
 ${downloadLink}
 
 Rapport généré le ${dateStr} à ${heureStr}.

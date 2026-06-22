@@ -47,7 +47,7 @@ npx cap sync android
 
 echo ""
 echo "=========================================="
-echo "✅ NETTOYAGE TERMINÉ"
+echo " NETTOYAGE TERMINÉ"
 echo "=========================================="
 echo ""
 echo "Prochaines étapes :"

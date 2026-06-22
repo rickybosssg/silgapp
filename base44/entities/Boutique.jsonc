@@ -1,0 +1,88 @@
+{
+  "name": "Boutique",
+  "type": "object",
+  "properties": {
+    "nom": {
+      "type": "string",
+      "description": "Nom de la boutique"
+    },
+    "logo_url": {
+      "type": "string",
+      "description": "Logo ou photo de la boutique"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description de la boutique"
+    },
+    "categorie": {
+      "type": "string",
+      "description": "Cat\u00e9gorie (ex: alimentation, mode, electronique)"
+    },
+    "pays_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE",
+        "GH"
+      ],
+      "description": "Code pays \u2014 isolation stricte"
+    },
+    "ville": {
+      "type": "string"
+    },
+    "quartier": {
+      "type": "string"
+    },
+    "latitude": {
+      "type": "number"
+    },
+    "longitude": {
+      "type": "number"
+    },
+    "telephone": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone de la boutique"
+    },
+    "telephone_depot": {
+      "type": "string",
+      "description": "Num\u00e9ro Orange Money pour d\u00e9p\u00f4t paiement"
+    },
+    "horaires": {
+      "type": "string",
+      "description": "JSON: [{jour, ouverture, fermeture}]"
+    },
+    "ouvert": {
+      "type": "boolean",
+      "default": true,
+      "description": "Statut ouvert/ferm\u00e9 (manuel ou calcul\u00e9)"
+    },
+    "actif": {
+      "type": "boolean",
+      "default": true,
+      "description": "Boutique active sur la plateforme"
+    },
+    "commission_pct": {
+      "type": "number",
+      "description": "Commission configurable (fallback global si null)"
+    },
+    "partenaire_id": {
+      "type": "string",
+      "description": "User ID du partenaire propri\u00e9taire"
+    },
+    "user_email": {
+      "type": "string",
+      "description": "Email du partenaire propri\u00e9taire"
+    }
+  },
+  "required": [
+    "nom",
+    "pays_code",
+    "partenaire_id"
+  ]
+}

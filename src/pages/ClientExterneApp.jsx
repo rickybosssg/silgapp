@@ -11,7 +11,8 @@ import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   MapPin, Navigation, MessageCircle, User, Package,
-  Clock, ChevronRight, TrendingUp, Loader2, ArrowLeft, RefreshCw
+  Clock, ChevronRight, TrendingUp, Loader2, ArrowLeft, RefreshCw,
+  Store, UtensilsCrossed, Smartphone, Lock, Gift, Zap, Shield, DollarSign
 } from "lucide-react";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import CourseAnnuleeRelanceDialog from "@/components/client/CourseAnnuleeRelanceDialog";
@@ -203,7 +204,7 @@ export default function ClientExterneApp() {
     };
     // Vérifier au montage et toutes les 60s (notation non urgente)
     checkCourseNotation();
-    const iv = setInterval(checkCourseNotation, 60000); // 10s → 60s
+    const iv = setInterval(checkCourseNotation, 60000); //  10s → 60s
     return () => clearInterval(iv);
   }, [clientProfil?.id, notationShownFor]);
 
@@ -219,37 +220,37 @@ export default function ClientExterneApp() {
   // ═══════════════════════════════════════════════════════════════════════════
   // SYSTÈME GPS UNIFIÉ — MÊME LOGIQUE POUR CLIENTS ET LIVREURS
   //
-  // ARCHITECTURE (identique pour ClientExterneApp et LivreurExterneApp)
+  //  ARCHITECTURE (identique pour ClientExterneApp et LivreurExterneApp)
   // ───────────────────────────────────────────────────────────────────────────
   // 1. ONBOARDING
-  // → getCurrentPosition()
-  // → localStorage.setItem("client_gps_active", "true")
-  // → base44.entities.ClientExterne.update(id, { latitude, longitude })
+  //    → getCurrentPosition()
+  //    → localStorage.setItem("client_gps_active", "true")
+  //    → base44.entities.ClientExterne.update(id, { latitude, longitude })
   //
   // 2. WATCH GPS (toutes les 15 secondes)
-  // → setInterval(getCurrentPosition → update BDD, 15000)
-  // → Pas de filtrage distance/délai (sync systématique)
+  //    → setInterval(getCurrentPosition → update BDD, 15000)
+  //    → Pas de filtrage distance/délai (sync systématique)
   //
   // 3. VISIBILITY CHANGE
-  // → document.visibilitychange → sync immédiate
+  //    → document.visibilitychange → sync immédiate
   //
   // 4. DASHBOARD POLLING
-  // → Clients: 5s | Livreurs: 2s
+  //    → Clients: 5s | Livreurs: 2s
   //
   // 5. BADGE GPS
-  // → Check simple: latitude && longitude
-  // → Pas de calcul de date (juste présence coords)
+  //    → Check simple: latitude && longitude
+  //    → Pas de calcul de date (juste présence coords)
   //
-  // CHAMPS BDD
-  // - latitude (number)
-  // - longitude (number)
-  // - Pas de champ gps_actif ou current_location
+  // ️ CHAMPS BDD
+  //    - latitude (number)
+  //    - longitude (number)
+  //    - Pas de champ gps_actif ou current_location
   //
-  // POURQUOI ÇA MARCHE
-  // - Plus de logique conditionnelle complexe
-  // - Sync directe et systématique
-  // - Même code que livreurs (prouvé fonctionnel)
-  // - BDD mise à jour immédiatement à chaque position
+  //  POURQUOI ÇA MARCHE
+  //    - Plus de logique conditionnelle complexe
+  //    - Sync directe et systématique
+  //    - Même code que livreurs (prouvé fonctionnel)
+  //    - BDD mise à jour immédiatement à chaque position
   // ═══════════════════════════════════════════════════════════════════════════
   // Helper reverse geocoding
   const reverseGeocode = async (lat, lng) => {
@@ -278,7 +279,7 @@ export default function ClientExterneApp() {
         }).catch(() => null);
         if (quartierFinal) setClientProfil(prev => prev ? { ...prev, quartier: quartierFinal } : prev);
       },
-      (err) => console.error("[GPS Client] Permission refusée:", err),
+      (err) => console.error("[GPS Client]  Permission refusée:", err),
       { enableHighAccuracy: true, timeout: 10000 }
     );
   }, [clientProfil?.id, onboardingDone]);
@@ -354,7 +355,7 @@ export default function ClientExterneApp() {
     if (!onboardingDone || !clientProfil || !position) return;
     const interval = setInterval(() => {
       checkStatus(position, clientProfil);
-    }, 8000); // 5s → 8s : checkStatus fait 4-5 requêtes imbriquées
+    }, 8000); //  5s → 8s : checkStatus fait 4-5 requêtes imbriquées
     return () => clearInterval(interval);
   }, [onboardingDone, clientProfil?.id, position]);
 
@@ -451,7 +452,7 @@ export default function ClientExterneApp() {
           telephone: "",
           user_email: user.email,
           actif: true,
-          // PAS de country_code ici — sera défini par l'onboarding (EtapeProfil)
+          // ️ PAS de country_code ici — sera défini par l'onboarding (EtapeProfil)
           // Mettre BF par défaut causait des courses créées avec le mauvais pays
         });
       }
@@ -466,7 +467,6 @@ export default function ClientExterneApp() {
           longitude: profil.longitude || 0,
           app_active: true,
           device_id: navigator.userAgent.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 50),
-          session_id: sessionId || undefined,
         }).catch(() => null);
       }
     } catch (err) {
@@ -488,8 +488,8 @@ export default function ClientExterneApp() {
           latitude: gps.latitude,
           longitude: gps.longitude,
         }).then(() => {
-          console.log("[GPS Client] Onboarding sync BDD OK", gps.latitude, gps.longitude);
-        }).catch(err => console.error("[GPS Client] Erreur sync onboarding:", err));
+          console.log("[GPS Client]  Onboarding sync BDD OK", gps.latitude, gps.longitude);
+        }).catch(err => console.error("[GPS Client]  Erreur sync onboarding:", err));
       }
     }
     checkStatus(gps, profil);
@@ -612,7 +612,7 @@ export default function ClientExterneApp() {
       <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-50 p-6">
         <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center space-y-5">
           <div className="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center mx-auto">
-            <span className="text-4xl"></span>
+            <Smartphone className="w-10 h-10 text-red-600" />
           </div>
           <div>
             <h2 className="text-xl font-black text-gray-900">Session expirée</h2>
@@ -641,7 +641,7 @@ export default function ClientExterneApp() {
       <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-50 p-6">
         <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center space-y-5">
           <div className="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center mx-auto">
-            <span className="text-4xl"></span>
+            <Lock className="w-10 h-10 text-red-600" />
           </div>
           <div>
             <h2 className="text-xl font-black text-gray-900">Compte bloqué</h2>
@@ -655,7 +655,8 @@ export default function ClientExterneApp() {
             rel="noopener noreferrer"
             className="inline-flex items-center justify-center w-full h-12 rounded-2xl bg-green-500 hover:bg-green-600 text-white font-bold text-sm transition-colors"
           >
-             Contacter Silga via WhatsApp
+            <MessageCircle className="w-4 h-4 mr-2" />
+            Contacter Silga via WhatsApp
           </a>
         </div>
       </div>
@@ -708,17 +709,17 @@ export default function ClientExterneApp() {
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-black text-primary">
-                    {course.type_course === "deplacement" && course.statut === "recherche_livreur" ? " Recherche chauffeur..." :
-                     course.type_course === "deplacement" && course.statut === "livreur_en_route" ? " Chauffeur en route" :
-                     course.type_course === "deplacement" && course.statut === "arrive_prise_en_charge" ? " Arrivé au point de prise en charge" :
-                     course.type_course === "deplacement" && course.statut === "passager_embarque" ? " Passager à bord" :
-                     course.type_course === "deplacement" && course.statut === "livree" ? " Déplacement terminé" :
-                     course.statut === "recherche_livreur" ? " Recherche livreur..." :
-                     course.statut === "livreur_en_route" ? " Livreur en route" :
-                     course.statut === "colis_recupere" ? " Colis récupéré" : " En livraison"}
+                    {course.type_course === "deplacement" && course.statut === "recherche_livreur" ? "Recherche chauffeur..." :
+                     course.type_course === "deplacement" && course.statut === "livreur_en_route" ? "Chauffeur en route" :
+                     course.type_course === "deplacement" && course.statut === "arrive_prise_en_charge" ? "Arrivé au point de prise en charge" :
+                     course.type_course === "deplacement" && course.statut === "passager_embarque" ? "Passager à bord" :
+                     course.type_course === "deplacement" && course.statut === "livree" ? "Déplacement terminé" :
+                     course.statut === "recherche_livreur" ? "Recherche livreur..." :
+                     course.statut === "livreur_en_route"  ? "Livreur en route" :
+                     course.statut === "colis_recupere"    ? "Colis récupéré" : "En livraison"}
                   </p>
                   <p className="text-[11px] text-gray-500 truncate mt-0.5">
-                    {course.livreur_nom || "Livreur assigné"} · {course.adresse_depart} → {course.adresse_arrivee}
+                    {course.livreur_nom || "Livreur assigné"} - {course.adresse_depart} vers {course.adresse_arrivee}
                   </p>
                   {course.is_multi_colis && (
                     <div className="mt-1">
@@ -748,13 +749,13 @@ export default function ClientExterneApp() {
                 onClick={() => setOngletActif("accueil")}
                 className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${ongletActif === "accueil" ? "bg-primary text-white shadow" : "text-gray-500 hover:text-gray-700"}`}
               >
-                 Accueil
+                Accueil
               </button>
               <button
                 onClick={() => setOngletActif("promo")}
                 className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${ongletActif === "promo" ? "bg-purple-600 text-white shadow" : "text-gray-500 hover:text-gray-700"}`}
               >
-                 Code Promo
+                Code Promo
               </button>
             </div>
           )}
@@ -783,7 +784,7 @@ export default function ClientExterneApp() {
                             className="mt-2 text-xs font-bold text-amber-800 underline"
                             onClick={() => navigate("/client/suivi")}
                           >
-                            Voir la course →
+                            Voir la course
                           </button>
                         )}
                       </div>
@@ -803,7 +804,7 @@ export default function ClientExterneApp() {
                 <div className="relative">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-white/70 text-xs font-medium">Bonjour </p>
+                      <p className="text-white/70 text-xs font-medium">Bonjour</p>
                       <h1 className="text-2xl font-black text-white mt-0.5">{prenom}</h1>
                       <div className="flex items-center gap-2 mt-3 flex-wrap">
                         <div className="flex items-center gap-1.5 bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full">
@@ -829,7 +830,7 @@ export default function ClientExterneApp() {
                     <div className="mt-4 bg-white/15 backdrop-blur-sm rounded-2xl px-4 py-2.5 flex items-center gap-2">
                       <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
                       <p className="text-white text-xs font-semibold">
-                        {coursesActives.length} course{coursesActives.length > 1 ? "s" : ""} en cours · appuyez ci-dessus
+                        {coursesActives.length} course{coursesActives.length > 1 ? "s" : ""} en cours - appuyez ci-dessus
                       </p>
                     </div>
                   )}
@@ -854,7 +855,7 @@ export default function ClientExterneApp() {
                   onClick={() => navigate("/client/course/recevoir", { state: { position, clientProfil } })}
                 >
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-lg shadow-green-200 mb-2 group-hover:scale-105 transition-transform">
-                    <span className="text-xl"></span>
+                    <Package className="w-5 h-5 text-white" />
                   </div>
                   <p className="font-black text-gray-900 text-xs">Recevoir</p>
                   <p className="text-[10px] text-gray-500 mt-0.5">Attendre un colis</p>
@@ -865,7 +866,7 @@ export default function ClientExterneApp() {
                   onClick={() => navigate("/client/course/deplacement", { state: { position, clientProfil } })}
                 >
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center shadow-lg shadow-sky-200 mb-2 group-hover:scale-105 transition-transform">
-                    <span className="text-xl"></span>
+                    <User className="w-5 h-5 text-white" />
                   </div>
                   <p className="font-black text-gray-900 text-xs">Déplacement</p>
                   <p className="text-[10px] text-gray-500 mt-0.5">Transport personne</p>
@@ -881,6 +882,28 @@ export default function ClientExterneApp() {
                   <p className="font-black text-gray-900 text-xs">Messages</p>
                   <p className="text-[10px] text-gray-500 mt-0.5">Discuter avec clients / livreurs</p>
                 </button>
+
+                <button
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-blue-200"
+                  onClick={() => navigate("/client/boutiques")}
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-200 mb-2 group-hover:scale-105 transition-transform">
+                    <Store className="w-5 h-5 text-white" />
+                  </div>
+                  <p className="font-black text-gray-900 text-xs">Boutiques</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">Commander en boutique</p>
+                </button>
+
+                <button
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-orange-200"
+                  onClick={() => navigate("/client/restaurants")}
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg shadow-orange-200 mb-2 group-hover:scale-105 transition-transform">
+                    <UtensilsCrossed className="w-5 h-5 text-white" />
+                  </div>
+                  <p className="font-black text-gray-900 text-xs">Restaurants</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">Commander à manger</p>
+                </button>
               </div>
 
               {/* ── BOUTON CARTE ──────────────────── */}
@@ -894,8 +917,8 @@ export default function ClientExterneApp() {
                   </div>
                   <p className="flex-1 text-left font-semibold text-gray-800 text-sm">
                     {coursesActives.some(c => ["livreur_en_route","colis_recupere","en_livraison"].includes(c.statut))
-                      ? " Voir le livreur en temps réel"
-                      : " Voir la carte"}
+                      ? "Voir le livreur en temps réel"
+                      : "Voir la carte"}
                   </p>
                   <ChevronRight className="w-4 h-4 text-gray-600" />
                 </button>
@@ -906,17 +929,17 @@ export default function ClientExterneApp() {
                 <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-3">Accès rapide</p>
                 <div className="grid grid-cols-4 gap-2">
                   {[
-                    { icon: <Package className="w-5 h-5" />, label: "Courses", color: "text-blue-600", bg: "bg-blue-50", action: () => navigate("/client/suivi") },
-                    { icon: <Clock className="w-5 h-5" />, label: "Historique",color: "text-purple-600", bg: "bg-purple-50", action: () => navigate("/client/suivi") },
-                    { icon: <MessageCircle className="w-5 h-5" />, label: "Messages", color: "text-blue-600", bg: "bg-blue-50", action: () => setShowMessages(true) },
-                    { icon: <span className="text-xs"></span>, label: "Support", color: "text-green-600", bg: "bg-green-50", action: () => {
-                      const msg = encodeURIComponent("Bonjour SILGAPP \nJ'ai besoin d'aide sur SILGAPP.");
+                    { icon: <Package className="w-5 h-5" />, label: "Courses",   color: "text-blue-600",   bg: "bg-blue-50",   action: () => navigate("/client/suivi") },
+                    { icon: <Clock className="w-5 h-5" />,   label: "Historique",color: "text-purple-600", bg: "bg-purple-50", action: () => navigate("/client/suivi") },
+                    { icon: <Package className="w-5 h-5" />, label: "Commandes", color: "text-indigo-600", bg: "bg-indigo-50", action: () => navigate("/client/mes-commandes") },
+                    { icon: <MessageCircle className="w-5 h-5" />, label: "Support", color: "text-green-600", bg: "bg-green-50", action: () => {
+                      const msg = encodeURIComponent("Bonjour SILGAPP\nJ'ai besoin d'aide sur SILGAPP.");
                       const a = document.createElement("a");
                       a.href = `whatsapp://send?phone=22667572857&text=${msg}`;
                       a.click();
                       setTimeout(() => { if (document.hasFocus()) window.open(`https://wa.me/22667572857?text=${msg}`, "_blank"); }, 500);
                     }},
-                    { icon: <User className="w-5 h-5" />, label: "Profil", color: "text-orange-600", bg: "bg-orange-50", action: () => setShowProfilModal(true) },
+                    { icon: <User className="w-5 h-5" />,    label: "Profil",    color: "text-orange-600", bg: "bg-orange-50", action: () => setShowProfilModal(true) },
                   ].map((item, i) => (
                     <button
                       key={i}
@@ -936,7 +959,7 @@ export default function ClientExterneApp() {
               {clientProfil?.code_promo_utilise && !clientProfil?.premiere_course_faite && (
                 <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl p-4 shadow-lg shadow-purple-200">
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl"></span>
+                    <Gift className="w-6 h-6 text-white" />
                     <div className="flex-1">
                       <p className="font-black text-white text-sm">Code promo actif</p>
                       <p className="text-white/80 text-xs mt-0.5">
@@ -960,13 +983,13 @@ export default function ClientExterneApp() {
                 </div>
                 <div className="space-y-2">
                   {[
-                    { icon: "", color: "bg-green-50 text-green-700", title: "Livraison rapide", desc: "Livreurs disponibles 24/7" },
-                    { icon: "", color: "bg-blue-50 text-blue-700", title: "Service sécurisé", desc: "Livreurs vérifiés et suivis" },
-                    { icon: "", color: "bg-purple-50 text-purple-700", title: "Support réactif", desc: "Aide disponible à tout moment" },
-                    { icon: "", color: "bg-amber-50 text-amber-700", title: "100 F/km", desc: "Tarif transparent et calculé au km" },
+                    { icon: <Zap className="w-4 h-4" />, color: "bg-green-50 text-green-700", title: "Livraison rapide", desc: "Livreurs disponibles 24/7" },
+                    { icon: <Shield className="w-4 h-4" />, color: "bg-blue-50 text-blue-700", title: "Service sécurisé", desc: "Livreurs vérifiés et suivis" },
+                    { icon: <MessageCircle className="w-4 h-4" />, color: "bg-purple-50 text-purple-700", title: "Support réactif", desc: "Aide disponible à tout moment" },
+                    { icon: <DollarSign className="w-4 h-4" />, color: "bg-amber-50 text-amber-700", title: "100 F/km", desc: "Tarif transparent et calculé au km" },
                   ].map((item, i) => (
                     <div key={i} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl ${item.color}`}>
-                      <span className="text-base">{item.icon}</span>
+                      {item.icon}
                       <div>
                         <p className="text-xs font-bold">{item.title}</p>
                         <p className="text-[10px] opacity-70">{item.desc}</p>
@@ -987,8 +1010,8 @@ export default function ClientExterneApp() {
           <div className="flex items-center justify-between p-4 border-b bg-card flex-shrink-0">
             <h2 className="text-lg font-bold text-foreground">
               {coursesActives.find(c => ["livreur_en_route","colis_recupere","en_livraison"].includes(c.statut))
-                ? " Suivi en temps réel"
-                : " Carte"}
+                ? "Suivi en temps réel"
+                : "Carte"}
             </h2>
             <Button variant="ghost" size="icon" onClick={() => setShowMap(false)} className="h-10 w-10">
               <ArrowLeft className="w-5 h-5" />

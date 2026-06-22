@@ -1,0 +1,50 @@
+{
+  "name": "PlatRestaurant",
+  "type": "object",
+  "properties": {
+    "restaurant_id": {
+      "type": "string",
+      "description": "ID du restaurant propri\u00e9taire"
+    },
+    "nom": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "photo_url": {
+      "type": "string"
+    },
+    "prix": {
+      "type": "number"
+    },
+    "devise": {
+      "type": "string",
+      "default": "FCFA"
+    },
+    "categorie": {
+      "type": "string",
+      "enum": [
+        "entree",
+        "plat",
+        "dessert",
+        "boisson",
+        "accompagnement"
+      ],
+      "default": "plat"
+    },
+    "disponible": {
+      "type": "boolean",
+      "default": true
+    },
+    "actif": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "restaurant_id",
+    "nom",
+    "prix"
+  ]
+}

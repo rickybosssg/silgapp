@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
       return {
         code: p.code,
         nom: p.nom,
-        emoji: p.emoji_flag || '🌍',
+        emoji: p.emoji_flag || '',
         courses: crs.length,
         livrees: lvres.length,
         livreurs: lvrs.length,

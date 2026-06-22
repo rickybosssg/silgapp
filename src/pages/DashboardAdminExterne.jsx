@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+﻿import React, { useMemo, useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
@@ -433,7 +433,7 @@ export default function DashboardAdminExterne() {
                   en_livraison: { label: " En livraison", cls: "bg-indigo-100 text-indigo-700" },
                   livreur_en_route: { label: " En route", cls: "bg-cyan-100 text-cyan-700" },
                   recherche_livreur: { label: " Recherche", cls: "bg-amber-100 text-amber-700" },
-                  nouvelle: { label: "🆕 Nouvelle", cls: "bg-gray-100 text-gray-600" },
+                  nouvelle: { label: " Nouvelle", cls: "bg-gray-100 text-gray-600" },
                 }[course.statut] || { label: course.statut, cls: "bg-gray-100 text-gray-500" };
 
                 return (

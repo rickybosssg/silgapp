@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -100,7 +100,7 @@ export default function DemoDashboard({ token: propToken }) {
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-xl">📦</div>
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-xl"></div>
               <div>
                 <h1 className="text-xl font-black tracking-tight">SILGAPP</h1>
                 <p className="text-white/60 text-xs">Dashboard de démonstration — Closed Testing Google Play</p>
@@ -143,9 +143,9 @@ export default function DemoDashboard({ token: propToken }) {
           <CardContent>
             <div className="grid grid-cols-3 gap-4">
               {[
-                { label: "Expéditions", value: stats.coursesExpedier, icon: "📤", color: "bg-blue-50 text-blue-700" },
-                { label: "Réceptions", value: stats.coursesRecevoir, icon: "📥", color: "bg-green-50 text-green-700" },
-                { label: "Déplacements", value: stats.coursesDeplacement, icon: "🚗", color: "bg-purple-50 text-purple-700" },
+                { label: "Expéditions", value: stats.coursesExpedier, icon: "", color: "bg-blue-50 text-blue-700" },
+                { label: "Réceptions", value: stats.coursesRecevoir, icon: "", color: "bg-green-50 text-green-700" },
+                { label: "Déplacements", value: stats.coursesDeplacement, icon: "", color: "bg-purple-50 text-purple-700" },
               ].map(t => (
                 <div key={t.label} className={`${t.color} rounded-xl p-4 text-center`}>
                   <span className="text-2xl">{t.icon}</span>
@@ -218,7 +218,7 @@ export default function DemoDashboard({ token: propToken }) {
                       </td>
                       <td className="py-2.5">
                         <Badge variant="outline" className="text-[10px]">
-                          {c.type_course === 'expedier' ? '📤 Expédition' : c.type_course === 'recevoir' ? '📥 Réception' : '🚗 Déplacement'}
+                          {c.type_course === 'expedier' ? ' Expédition' : c.type_course === 'recevoir' ? ' Réception' : ' Déplacement'}
                         </Badge>
                       </td>
                       <td className="py-2.5 text-gray-700 text-xs">{c.country_code || '-'}</td>

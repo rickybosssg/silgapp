@@ -4,7 +4,7 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    
+
     if (!user || user.role !== 'admin') {
       return Response.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
     } else if (action === 'revoke') {
       const { token } = payload;
       const existing = await base44.asServiceRole.entities.DemoAccess.filter({ token, actif: true });
-      
+
       if (existing.length === 0) {
         return Response.json({ error: 'Token non trouvé' }, { status: 404 });
       }
@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
 
       const t = tokens[0];
       const expired = new Date(t.expire_le) < new Date();
-      
+
       if (expired) {
         await base44.asServiceRole.entities.DemoAccess.update(t.id, { actif: false });
         return Response.json({ valid: false, reason: 'expired' });

@@ -163,6 +163,49 @@ Deno.serve(async (req) => {
         lue: false,
       }).catch(() => null);
 
+      // ── Notification + Push au client ────────────────────────────
+      let clientEmail = null;
+      if (course.expediteur_client_id) {
+        const expediteur = await asService.entities.ClientExterne.get(course.expediteur_client_id).catch(() => null);
+        clientEmail = expediteur?.user_email;
+      }
+      if (!clientEmail && course.destinataire_client_id) {
+        const destinataire = await asService.entities.ClientExterne.get(course.destinataire_client_id).catch(() => null);
+        clientEmail = destinataire?.user_email;
+      }
+
+      if (clientEmail) {
+        const motifLabel = {
+          client_injoignable: "Client injoignable",
+          mauvaise_adresse: "Mauvaise adresse",
+          colis_inexistant: "Colis inexistant",
+          client_change_avis: "Client a changé d'avis",
+          colis_interdit: "Colis interdit",
+          panne_vehicule: "Panne de véhicule",
+          accident: "Accident",
+          autre: motif_detail || "Autre",
+        }[motif] || motif || "non spécifié";
+
+        await asService.entities.Notification.create({
+          titre: " Votre livreur a annulé",
+          message: `Le livreur a annulé votre course. Motif: ${motifLabel}. Nous recherchons un nouveau livreur...`,
+          type: "course_refusee",
+          course_id,
+          destinataire_email: clientEmail,
+          lue: false,
+        }).catch(() => null);
+
+        // Push notification au client
+        await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
+          titre: " Votre livreur a annulé",
+          message: `Motif: ${motifLabel}. Nous recherchons un nouveau livreur...`,
+          type: "course_refusee",
+          destinataire_email: clientEmail,
+          user_type: "client",
+          course_id,
+        }).catch(() => null);
+      }
+
     } else {
       // ── ANNULATION ADMIN : course définitivement annulée ──────────
       const annulData = {

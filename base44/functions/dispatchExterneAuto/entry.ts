@@ -58,7 +58,7 @@ async function chargerConfigDispatch(base44) {
     const timeout = timeoutConfig ? (parseInt(timeoutConfig.valeur, 10) || 60) : 60;
     return { nb, timeout };
   } catch (err) {
-    console.warn('[DISPATCH] ⚠️ Impossible de charger config dispatch, valeurs par défaut utilisées:', err.message);
+    console.warn('[DISPATCH] ️ Impossible de charger config dispatch, valeurs par défaut utilisées:', err.message);
     return { nb: 3, timeout: 120 };
   }
 }
@@ -87,7 +87,7 @@ async function chargerConfigVaguesGPS(base44) {
       ],
     };
   } catch (err) {
-    console.warn('[DISPATCH] ⚠️ Impossible de charger config vagues GPS, défaut utilisé:', err.message);
+    console.warn('[DISPATCH] ️ Impossible de charger config vagues GPS, défaut utilisé:', err.message);
     return {
       gps_waves_enabled: true,
       waves: [
@@ -105,7 +105,7 @@ async function chargerConfigVaguesGPS(base44) {
  */
 async function trouverLivreursCandidats(base44, course, exclusions = []) {
   if (!course.country_code) {
-    console.error(`[DISPATCH] ❌ BLOQUÉ — course ${course.id} sans country_code`);
+    console.error(`[DISPATCH]  BLOQUÉ — course ${course.id} sans country_code`);
     return { tous: [], niveau1: [], niveau2: [], niveau3: [], pickupSource: 'none' };
   }
 
@@ -140,12 +140,12 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
   });
 
   // Classer par priorité : heartbeat récent > GPS récent > distance
-  // 🕐 0-15 min = N1 (priorité max), 15-30 min = N2 (réduite), 30-60 min = N3 (faible)
-  // 🚫 > 60 min = exclusion automatique + mise hors ligne
+  //  0-15 min = N1 (priorité max), 15-30 min = N2 (réduite), 30-60 min = N3 (faible)
+  //  > 60 min = exclusion automatique + mise hors ligne
   const niveau1 = [], niveau2 = [], niveau3 = [];
   let nbMarquesHorsLigne = 0;
 
-  // 🧠 Résoudre les coordonnées de pickup : GPS > quartier > fallback large
+  //  Résoudre les coordonnées de pickup : GPS > quartier > fallback large
   let pickupLat = course.gps_depart_lat;
   let pickupLng = course.gps_depart_lng;
   let pickupSource = 'gps';
@@ -159,7 +159,7 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
         pickupLat = quartiers[0].latitude;
         pickupLng = quartiers[0].longitude;
         pickupSource = 'quartier';
-        console.log(`[DISPATCH] 📍 Fallback quartier: ${course.quartier_depart} (${pickupLat}, ${pickupLng})`);
+        console.log(`[DISPATCH]  Fallback quartier: ${course.quartier_depart} (${pickupLat}, ${pickupLng})`);
       }
     } catch (_) {}
   }
@@ -177,7 +177,7 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
       if (!isNaN(hb.getTime())) heartbeatAgeMin = (now - hb.getTime()) / 60000;
     }
 
-    // 🚫 Exclusion automatique : heartbeat > 60 min → hors_ligne immédiat
+    //  Exclusion automatique : heartbeat > 60 min → hors_ligne immédiat
     if (heartbeatAgeMin !== null && heartbeatAgeMin > 60) {
       base44.asServiceRole.entities.Livreur.update(l.id, { statut: 'hors_ligne' }).catch(() => {});
       nbMarquesHorsLigne++;
@@ -230,35 +230,35 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
 
   const tous = [...niveau1, ...niveau2, ...niveau3];
   if (nbMarquesHorsLigne > 0) {
-    console.log(`[DISPATCH] 🚫 ${nbMarquesHorsLigne} livreur(s) marqué(s) hors_ligne (HB > 60 min)`);
+    console.log(`[DISPATCH]  ${nbMarquesHorsLigne} livreur(s) marqué(s) hors_ligne (HB > 60 min)`);
   }
-  console.log(`[DISPATCH] 📊 ${tous.length} candidats (exclus: ${exclusions.length}, hors_ligne: ${nbMarquesHorsLigne}) — N1:${niveau1.length} N2:${niveau2.length} N3:${niveau3.length} — pickup: ${pickupSource}${pickupSource === 'quartier' ? ` (${course.quartier_depart})` : ''}`);
+  console.log(`[DISPATCH]  ${tous.length} candidats (exclus: ${exclusions.length}, hors_ligne: ${nbMarquesHorsLigne}) — N1:${niveau1.length} N2:${niveau2.length} N3:${niveau3.length} — pickup: ${pickupSource}${pickupSource === 'quartier' ? ` (${course.quartier_depart})` : ''}`);
   return { tous, niveau1, niveau2, niveau3, pickupSource };
 }
 
 async function notifierLivreur(base44, courseId, course, livreur, timeoutSec) {
   if (!livreur.user_email) return;
 
-  // 🛡️ ANTI-DOUBLON PERMANENT — une seule notification par course par livreur
+  // ️ ANTI-DOUBLON PERMANENT — une seule notification par course par livreur
   const existantes = await base44.asServiceRole.entities.Notification.filter({
     course_id: courseId,
     destinataire_email: livreur.user_email,
     type: 'nouvelle_course',
   });
   if (existantes.length > 0) {
-    console.log(`[DISPATCH] 🛡️ Anti-doublon permanent — ${existantes.length} notif(s) existante(s) pour course ${courseId} / livreur ${livreur.user_email}`);
+    console.log(`[DISPATCH] ️ Anti-doublon permanent — ${existantes.length} notif(s) existante(s) pour course ${courseId} / livreur ${livreur.user_email}`);
     // Si une notif non-lue existe, pas besoin d'en créer une nouvelle
     const nonLue = existantes.find(n => !n.lue);
     if (nonLue) {
-      console.log(`[DISPATCH] 🛡️ Notif non-lue déjà existante (id=${nonLue.id}) — skip`);
+      console.log(`[DISPATCH] ️ Notif non-lue déjà existante (id=${nonLue.id}) — skip`);
       return;
     }
     // Si toutes sont lues, on peut en créer une nouvelle (re-dispatch après reset)
-    console.log(`[DISPATCH] 📤 Toutes les notifs sont lues — nouvelle notif autorisée`);
+    console.log(`[DISPATCH]  Toutes les notifs sont lues — nouvelle notif autorisée`);
   }
 
   const distanceSafe = livreur.distance ? Number(livreur.distance).toFixed(1) : '?';
-  const titre = '🚨 Nouvelle course disponible !';
+  const titre = ' Nouvelle course disponible !';
   const message = `Course à ${distanceSafe}km — ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`;
 
   const heartbeatAgeMin = livreur.heartbeatAgeMin;
@@ -271,14 +271,14 @@ async function notifierLivreur(base44, courseId, course, livreur, timeoutSec) {
       titre, message, type: 'nouvelle_course',
       course_id: courseId, destinataire_email: livreur.user_email, lue: false,
     });
-  } catch (err) { console.error('[DISPATCH] ❌ Notif BDD:', err.message); }
+  } catch (err) { console.error('[DISPATCH]  Notif BDD:', err.message); }
 
   try {
     await base44.functions.invoke('envoiNotificationPush', {
       destinataire_email: livreur.user_email, livreur_id: livreur.id,
       titre, message, type: 'nouvelle_course', course_id: courseId,
     });
-  } catch (err) { console.error('[DISPATCH] ❌ Push Firebase:', err.message); }
+  } catch (err) { console.error('[DISPATCH]  Push Firebase:', err.message); }
 
   if (!appActive && livreur.telephone) {
     try {
@@ -296,7 +296,7 @@ async function notifierLivreur(base44, courseId, course, livreur, timeoutSec) {
           const formData = new URLSearchParams();
           formData.append('From', fromNumber);
           formData.append('To', `whatsapp:${tel}`);
-          formData.append('Body', `📦 *Nouvelle course disponible !*\nOuvrez SILGAPP pour accepter ou refuser.`);
+          formData.append('Body', ` *Nouvelle course disponible !*\nOuvrez SILGAPP pour accepter ou refuser.`);
 
           const creds = btoa(`${accountSid}:${authToken}`);
           const resp = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
@@ -319,10 +319,10 @@ async function notifierLivreur(base44, courseId, course, livreur, timeoutSec) {
           }
         }
       }
-    } catch (err) { console.error('[DISPATCH] ❌ WhatsApp:', err.message); }
+    } catch (err) { console.error('[DISPATCH]  WhatsApp:', err.message); }
   }
 
-  console.log(`[DISPATCH] 📤 Notifié: ${livreur.nom} (${distanceSafe}km, HB: ${heartbeatAgeMin?.toFixed(1) || '?'}min)`);
+  console.log(`[DISPATCH]  Notifié: ${livreur.nom} (${distanceSafe}km, HB: ${heartbeatAgeMin?.toFixed(1) || '?'}min)`);
 }
 
 /**
@@ -351,30 +351,30 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
     }
   }
 
-  // 🛡️ Garde anti-double-traitement : course en vague active non expirée → ne pas retraiter
+  // ️ Garde anti-double-traitement : course en vague active non expirée → ne pas retraiter
   if (course.dispatch_status === 'propose' && !course.livreur_id && course.timeout_expires_at) {
     const expires = new Date(course.timeout_expires_at);
     if (expires > new Date()) {
       const remaining = Math.round((expires - Date.now()) / 1000);
-      console.log(`[DISPATCH] 🛡️ Vague active sur course ${courseId} (${remaining}s restantes) — pas de retraitement`);
+      console.log(`[DISPATCH] ️ Vague active sur course ${courseId} (${remaining}s restantes) — pas de retraitement`);
       return { en_attente: true, remaining, wave_active: true };
     }
   }
 
   const config = await chargerConfigDispatch(base44);
-  console.log(`[DISPATCH] ⚙️ Config: ${config.nb} livreurs, ${config.timeout}s`);
+  console.log(`[DISPATCH] ️ Config: ${config.nb} livreurs, ${config.timeout}s`);
 
   // Trouver les meilleurs candidats hors exclusions (tous les déjà notifiés)
   const resultat = await trouverLivreursCandidats(base44, course, exclusions);
   const { tous: candidatsTous, niveau1, niveau2, niveau3, pickupSource } = resultat;
 
-  // 🧠 Charger la config vagues GPS
+  //  Charger la config vagues GPS
   const gpsConfig = await chargerConfigVaguesGPS(base44);
   const useGPSWaves = pickupSource === 'gps' && gpsConfig.gps_waves_enabled;
 
-  // 📍 Mode vagues GPS (distance + heartbeat N1/N2/N3) — courses AVEC GPS
-  // 🌊 Mode vagues heartbeat (N1/N2/N3) — courses SANS GPS (quartier/none, non-admin)
-  // ⚡ Mode direct (tous simultanés) — admin courses sans GPS waves actif
+  //  Mode vagues GPS (distance + heartbeat N1/N2/N3) — courses AVEC GPS
+  //  Mode vagues heartbeat (N1/N2/N3) — courses SANS GPS (quartier/none, non-admin)
+  //  Mode direct (tous simultanés) — admin courses sans GPS waves actif
   const modeVaguesHeartbeat = !useGPSWaves && pickupSource !== 'gps' && course.source !== 'admin';
   let wave = modeVaguesHeartbeat
     ? (course.dispatch_wave || 1)      // heartbeat: 1=N1, 2=N2, 3=N3
@@ -388,15 +388,15 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
     else if (wave === 2) candidats = niveau2;
     else if (wave === 3) candidats = niveau3;
     else candidats = [];
-    console.log(`[DISPATCH] 🌊 Mode vagues heartbeat — vague ${wave} (N${wave}: ${candidats.length} candidats)`);
+    console.log(`[DISPATCH]  Mode vagues heartbeat — vague ${wave} (N${wave}: ${candidats.length} candidats)`);
   } else if (useGPSWaves) {
-    // 🎯 GPS waves respectent les niveaux heartbeat N1/N2/N3
+    //  GPS waves respectent les niveaux heartbeat N1/N2/N3
     // N1 = HB 0-15min (triés GPS recency → distance), N2 = 15-30min, N3 = 30-60min
     if (wave === 1) candidats = niveau1;
     else if (wave === 2) candidats = [...niveau1, ...niveau2];
     else if (wave === 3) candidats = candidatsTous;
     else candidats = [];
-    console.log(`[DISPATCH] 📍 Mode vagues GPS + heartbeat — vague ${wave}/${gpsConfig.waves.length} → N1:${niveau1.length} N2:${niveau2.length} N3:${niveau3.length} = ${candidats.length} candidats`);
+    console.log(`[DISPATCH]  Mode vagues GPS + heartbeat — vague ${wave}/${gpsConfig.waves.length} → N1:${niveau1.length} N2:${niveau2.length} N3:${niveau3.length} = ${candidats.length} candidats`);
   } else {
     candidats = candidatsTous;
   }
@@ -406,18 +406,18 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
   try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
 
   if (candidats.length === 0) {
-    // 🌊 Heartbeat: vague 3 épuisée → cycle_epuise
+    //  Heartbeat: vague 3 épuisée → cycle_epuise
     if (modeVaguesHeartbeat && wave >= 3) {
-      console.log(`[DISPATCH] 🌊 Vague 3 heartbeat épuisée — cycle_epuise pour course ${courseId}`);
+      console.log(`[DISPATCH]  Vague 3 heartbeat épuisée — cycle_epuise pour course ${courseId}`);
       await base44.asServiceRole.entities.CourseExterne.update(courseId, {
         dispatch_status: 'cycle_epuise',
         dispatch_wave: 3,
       });
       return { cycleEpuise: true };
     }
-    // 📍 GPS waves: dernière vague épuisée → cycle_epuise
+    //  GPS waves: dernière vague épuisée → cycle_epuise
     if (useGPSWaves && wave > gpsConfig.waves.length) {
-      console.log(`[DISPATCH] 📍 Vague GPS ${wave} épuisée (dernière: ${gpsConfig.waves.length}) — cycle_epuise pour course ${courseId}`);
+      console.log(`[DISPATCH]  Vague GPS ${wave} épuisée (dernière: ${gpsConfig.waves.length}) — cycle_epuise pour course ${courseId}`);
       await base44.asServiceRole.entities.CourseExterne.update(courseId, {
         dispatch_status: 'cycle_epuise',
         dispatch_wave: gpsConfig.waves.length,
@@ -435,7 +435,7 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
 
       if (attenteEcoulee) {
         // Nouveau cycle : vider la liste des notifiés, recalculer les disponibilités
-        console.log(`[DISPATCH] 🔄 Nouveau cycle — réinitialisation des notifiés pour course ${courseId}`);
+        console.log(`[DISPATCH]  Nouveau cycle — réinitialisation des notifiés pour course ${courseId}`);
         await base44.asServiceRole.entities.CourseExterne.update(courseId, {
           dispatch_status: 'en_attente',
           dispatch_notified_ids: '[]',
@@ -460,7 +460,7 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
         livreur_id: '',
         livreur_nom: '',
       });
-      console.log(`[DISPATCH] ⚠️ Aucun livreur disponible — course ${courseId} en attente`);
+      console.log(`[DISPATCH] ️ Aucun livreur disponible — course ${courseId} en attente`);
       return { noLivreur: true };
     }
   }
@@ -479,7 +479,7 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
     timeoutSec = config.timeout;
     waveLabel = modeVaguesHeartbeat ? `heartbeat N${wave}` : 'direct';
   }
-  console.log(`[DISPATCH] 🎯 ${waveLabel} — ${selection.length}/${candidats.length} livreurs pour course ${courseId}`);
+  console.log(`[DISPATCH]  ${waveLabel} — ${selection.length}/${candidats.length} livreurs pour course ${courseId}`);
 
   const timeoutAt = new Date(Date.now() + timeoutSec * 1000).toISOString();
   const nouveauxNotifiedIds = selection.map(l => l.id);
@@ -500,18 +500,18 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
     dispatch_notified_ids: JSON.stringify(tousNotifies),
   });
 
-  // 🧹 Nettoyer les notifications de la vague précédente avant la nouvelle vague
+  //  Nettoyer les notifications de la vague précédente avant la nouvelle vague
   // Seulement si on avance dans les vagues (wave > 1) — évite de supprimer en N1
   if (wave > 1) {
     await supprimerNotificationsCourse(base44, courseId);
-    console.log(`[DISPATCH] 🧹 Notifications vague précédente archivées pour course ${courseId} (vague ${wave})`);
+    console.log(`[DISPATCH]  Notifications vague précédente archivées pour course ${courseId} (vague ${wave})`);
   }
 
   // Notifier tous les livreurs sélectionnés en parallèle
   const notifPromises = selection.map(l => notifierLivreur(base44, courseId, course, l, timeoutSec));
   await Promise.allSettled(notifPromises);
 
-  console.log(`[DISPATCH] ✅ ${selection.length} livreur(s) notifiés (total cumulé: ${totalNotifies}) pour course ${courseId}, timeout: ${timeoutSec}s`);
+  console.log(`[DISPATCH]  ${selection.length} livreur(s) notifiés (total cumulé: ${totalNotifies}) pour course ${courseId}, timeout: ${timeoutSec}s`);
   return {
     propose: true,
     nb_notifies: selection.length,
@@ -528,8 +528,8 @@ async function supprimerNotificationsCourse(base44, courseId) {
     for (const n of nonLues) {
       await base44.asServiceRole.entities.Notification.update(n.id, { lue: true });
     }
-    if (nonLues.length > 0) console.log(`[DISPATCH] 🧹 ${nonLues.length} notification(s) archivée(s)`);
-  } catch (err) { console.warn('[DISPATCH] ⚠️ Erreur archivage:', err.message); }
+    if (nonLues.length > 0) console.log(`[DISPATCH]  ${nonLues.length} notification(s) archivée(s)`);
+  } catch (err) { console.warn('[DISPATCH] ️ Erreur archivage:', err.message); }
 }
 
 // ============================================================================
@@ -555,7 +555,7 @@ Deno.serve(async (req) => {
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
 
       if (!course.gps_depart_lat || !course.gps_depart_lng) {
-        console.warn(`[DISPATCH] ⚠️ Course ${course_id} sans GPS`);
+        console.warn(`[DISPATCH] ️ Course ${course_id} sans GPS`);
       }
 
       const result = await lancerDispatchMulti(base44, course_id, []);
@@ -582,9 +582,9 @@ Deno.serve(async (req) => {
       const countryGuard = await verifierPaysCourseLivreur(base44, course, livreur_id, 'check_course_pour_livreur');
       if (!countryGuard.ok) return Response.json(countryGuard.response, { status: countryGuard.status });
 
-      // 🚫 Vérifier blocage encours du livreur
+      //  Vérifier blocage encours du livreur
     if (countryGuard.ok && countryGuard.livreur?.bloque_encours) {
-      return Response.json({ 
+      return Response.json({
         found: false, bloque_encours: true,
         error: 'Votre plafond d\'encours SILGAPP a été atteint.',
       });
@@ -603,17 +603,17 @@ Deno.serve(async (req) => {
         return Response.json({ found: false, cancelled: true });
       }
 
-      // 🚫 Vérifier blocage encours du livreur
+      //  Vérifier blocage encours du livreur
       const livreurCheck = countryGuard.livreur;
       if (livreurCheck?.bloque_encours) {
-        return Response.json({ 
+        return Response.json({
           found: false, bloque_encours: true,
           error: 'Votre plafond d\'encours SILGAPP a été atteint. Veuillez effectuer votre dépôt auprès de SILGAPP afin de réactiver votre compte.',
         });
       }
 
       if (course.dispatch_status === 'accepte') {
-        // 🔧 CORRECTION : distinguer "j'ai accepté" vs "un autre a accepté"
+        //  CORRECTION : distinguer "j'ai accepté" vs "un autre a accepté"
         if (String(course.livreur_id) === String(livreur_id) || String(course.accepted_by_livreur_id) === String(livreur_id)) {
           return Response.json({ found: false, you_accepted: true, taken_by: course.livreur_id });
         }
@@ -640,9 +640,9 @@ Deno.serve(async (req) => {
       if (!countryGuard.ok) return Response.json(countryGuard.response, { status: countryGuard.status });
       const livreur = countryGuard.livreur;
 
-      // 🚫 Vérifier blocage encours
+      //  Vérifier blocage encours
       if (livreur.bloque_encours) {
-        return Response.json({ 
+        return Response.json({
           success: false, accepted: false, reason: 'bloque_encours',
           error: 'Votre plafond d\'encours SILGAPP a été atteint. Veuillez effectuer votre dépôt auprès de SILGAPP afin de réactiver votre compte.',
         });
@@ -712,25 +712,25 @@ Deno.serve(async (req) => {
         existing_livreur_id: courseFinal.livreur_id || '',
         accepted_by_livreur_id: courseFinal.accepted_by_livreur_id || '',
       });
-      
-      // 🔧 CORRECTION : si le verrou est déjà posé mais par CE MÊME livreur → succès (requête concurrente du même client)
-      const dejaVerrouilleParMoi = 
+
+      //  CORRECTION : si le verrou est déjà posé mais par CE MÊME livreur → succès (requête concurrente du même client)
+      const dejaVerrouilleParMoi =
         (courseFinal.livreur_id && String(courseFinal.livreur_id) === String(livreur_id)) ||
         (courseFinal.accepted_by_livreur_id && String(courseFinal.accepted_by_livreur_id) === String(livreur_id));
-      
+
       if (dejaVerrouilleParMoi) {
-        console.log(`[DISPATCH] 🔒 Course ${course_id} déjà verrouillée par le même livreur ${livreur_id} — succès confirmé`);
-        return Response.json({ 
+        console.log(`[DISPATCH]  Course ${course_id} déjà verrouillée par le même livreur ${livreur_id} — succès confirmé`);
+        return Response.json({
           success: true, accepted: true, course_id, livreur_id,
           already_accepted: true,
         });
       }
-      
+
       if (courseFinal.dispatch_status !== 'propose' || courseFinal.livreur_id || courseFinal.accepted_by_livreur_id) {
         return Response.json(reponseDejaPrise('final_check_already_taken', courseFinal));
       }
 
-      // 🔐 Préserver les tokens/PINs existants — ne JAMAIS les regénérer
+      //  Préserver les tokens/PINs existants — ne JAMAIS les regénérer
       // (générés une fois à la création de la course pour garantir l'unicité partout)
       const pickupToken = course.pickup_qr_token || generateToken();
       const deliveryToken = course.delivery_qr_token || generateToken();
@@ -738,9 +738,9 @@ Deno.serve(async (req) => {
       const deliveryPIN = course.delivery_code_4_digits || generatePIN();
       const tokensOntEteGeneres = !!(course.pickup_qr_token && course.pickup_code_4_digits);
       if (!tokensOntEteGeneres) {
-        console.log(`[DISPATCH] 🔐 Génération nouveaux tokens/PINs pour course ${course_id} (absents à la création)`);
+        console.log(`[DISPATCH]  Génération nouveaux tokens/PINs pour course ${course_id} (absents à la création)`);
       } else {
-        console.log(`[DISPATCH] 🔒 Conservation tokens/PINs existants pour course ${course_id}`);
+        console.log(`[DISPATCH]  Conservation tokens/PINs existants pour course ${course_id}`);
       }
 
       const updateData = {
@@ -776,7 +776,7 @@ Deno.serve(async (req) => {
       if (!isManual) {
         await base44.asServiceRole.entities.Livreur.update(livreur_id, { statut: 'en_course' });
         await supprimerNotificationsCourse(base44, course_id);
-        console.log(`[DISPATCH] 🎉 Course ${course_id} verrouillée (auto) par ${livreur_id}`);
+        console.log(`[DISPATCH]  Course ${course_id} verrouillée (auto) par ${livreur_id}`);
         return Response.json({ success: true, accepted: true, course_id, livreur_id });
       }
 
@@ -792,7 +792,7 @@ Deno.serve(async (req) => {
         }
         if (clientEmail) {
           await base44.asServiceRole.entities.Notification.create({
-            titre: '💰 Prix proposé par le livreur',
+            titre: ' Prix proposé par le livreur',
             message: `${livreur.prenom || ''} ${livreur.nom} propose cette course à ${Number(manual_price).toLocaleString()} FCFA. Acceptez-vous ?`,
             type: 'generic', course_id: course_id, destinataire_email: clientEmail, lue: false,
           });
@@ -814,7 +814,7 @@ Deno.serve(async (req) => {
         return Response.json({ success: true, message: 'Course déjà prise par un autre' });
       }
 
-      // 🚫 Ajouter le livreur aux exclus définitifs (tous les cycles)
+      //  Ajouter le livreur aux exclus définitifs (tous les cycles)
       let dejaNotifies = [];
       try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
       if (!dejaNotifies.includes(livreur_id)) {
@@ -822,7 +822,7 @@ Deno.serve(async (req) => {
         await base44.asServiceRole.entities.CourseExterne.update(course_id, {
           dispatch_notified_ids: JSON.stringify(dejaNotifies),
         });
-        console.log(`[DISPATCH] 🚫 Livreur ${livreur_id} ajouté aux exclus définitifs — course ${course_id}`);
+        console.log(`[DISPATCH]  Livreur ${livreur_id} ajouté aux exclus définitifs — course ${course_id}`);
       }
 
       const etaitVerrouillee = course.livreur_id === livreur_id;
@@ -884,14 +884,14 @@ Deno.serve(async (req) => {
           const maxWave = isGPSWave ? gpsCfg.waves.length : 3;
 
           if (nextWave > maxWave) {
-            console.log(`[DISPATCH] ${isGPSWave ? '📍 GPS' : '🌊 Heartbeat'} vague ${currentWave} expirée (max: ${maxWave}) — cycle_epuise pour course ${course_id}`);
+            console.log(`[DISPATCH] ${isGPSWave ? ' GPS' : ' Heartbeat'} vague ${currentWave} expirée (max: ${maxWave}) — cycle_epuise pour course ${course_id}`);
             await base44.asServiceRole.entities.CourseExterne.update(course_id, {
               dispatch_status: 'cycle_epuise',
               dispatch_wave: maxWave,
             });
             return Response.json({ expired: true, wave_epuise: true });
           }
-          console.log(`[DISPATCH] ${isGPSWave ? '📍 GPS' : '🌊 Heartbeat'} avancement vague ${currentWave} → ${nextWave} pour course ${course_id}`);
+          console.log(`[DISPATCH] ${isGPSWave ? ' GPS' : ' Heartbeat'} avancement vague ${currentWave} → ${nextWave} pour course ${course_id}`);
           await base44.asServiceRole.entities.CourseExterne.update(course_id, {
             dispatch_status: 'redispatch',
             dispatch_wave: nextWave,
@@ -923,7 +923,7 @@ Deno.serve(async (req) => {
 
       for (const course of courses) {
         try {
-          // 🔄 cycle_epuise : après 2 min d'attente → reset et retour N1
+          //  cycle_epuise : après 2 min d'attente → reset et retour N1
           if (course.dispatch_status === 'cycle_epuise') {
             const derniereSollicitation = course.heure_sollicitation ? new Date(course.heure_sollicitation) : null;
             const deuxMinutesPassees = derniereSollicitation
@@ -931,7 +931,7 @@ Deno.serve(async (req) => {
               : true;
 
             if (deuxMinutesPassees) {
-              console.log(`[DISPATCH] 🔄 Cycle épuisé → reset N1 pour course ${course.id}`);
+              console.log(`[DISPATCH]  Cycle épuisé → reset N1 pour course ${course.id}`);
               await base44.asServiceRole.entities.CourseExterne.update(course.id, {
                 dispatch_status: 'en_attente',
                 dispatch_notified_ids: '[]',
@@ -945,7 +945,7 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          // 📌 Courses en attente / redispatch (hors vagues) → relancer
+          //  Courses en attente / redispatch (hors vagues) → relancer
           if (['en_attente', 'redispatch'].includes(course.dispatch_status)) {
             let dejaNotifies = [];
             try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
@@ -954,7 +954,7 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          // 🌊/📍 Vagues expirées (propose sans verrou, mode vagues heartbeat ou GPS)
+          // / Vagues expirées (propose sans verrou, mode vagues heartbeat ou GPS)
           const expired = !!(course.timeout_expires_at && new Date(course.timeout_expires_at) < now);
           if (!expired || course.dispatch_status !== 'propose' || course.livreur_id) continue;
 
@@ -968,7 +968,7 @@ Deno.serve(async (req) => {
 
             const nextWave = currentWave + 1;
             if (nextWave > maxWave) {
-              console.log(`[DISPATCH] ${isGPSWave ? '📍 GPS' : '🌊 Heartbeat'} vague ${currentWave} expirée (max: ${maxWave}) — cycle_epuise pour course ${course.id}`);
+              console.log(`[DISPATCH] ${isGPSWave ? ' GPS' : ' Heartbeat'} vague ${currentWave} expirée (max: ${maxWave}) — cycle_epuise pour course ${course.id}`);
               await base44.asServiceRole.entities.CourseExterne.update(course.id, {
                 dispatch_status: 'cycle_epuise',
                 dispatch_wave: maxWave,
@@ -976,7 +976,7 @@ Deno.serve(async (req) => {
               resultats.push({ course_id: course.id, wave: `${currentWave}→epuise` });
               continue;
             }
-            console.log(`[DISPATCH] ${isGPSWave ? '📍 GPS' : '🌊 Heartbeat'} avancement vague ${currentWave} → ${nextWave} pour course ${course.id}`);
+            console.log(`[DISPATCH] ${isGPSWave ? ' GPS' : ' Heartbeat'} avancement vague ${currentWave} → ${nextWave} pour course ${course.id}`);
             await base44.asServiceRole.entities.CourseExterne.update(course.id, {
               dispatch_status: 'redispatch',
               dispatch_wave: nextWave,
@@ -988,7 +988,7 @@ Deno.serve(async (req) => {
           const result = await lancerDispatchMulti(base44, course.id, dejaNotifies);
           resultats.push({ course_id: course.id, wave: `${currentWave}→${currentWave + 1}`, ...result });
         } catch (err) {
-          console.error(`[DISPATCH] ❌ Erreur sur course ${course.id}:`, err.message);
+          console.error(`[DISPATCH]  Erreur sur course ${course.id}:`, err.message);
           resultats.push({ course_id: course.id, error: err.message });
         }
       }
@@ -1017,7 +1017,7 @@ Deno.serve(async (req) => {
           const result = await lancerDispatchMulti(base44, course.id, dejaNotifies);
           resultats.push({ course_id: course.id, ...result });
         } catch (err) {
-          console.error(`[DISPATCH] ❌ Erreur retry course ${course.id}:`, err.message);
+          console.error(`[DISPATCH]  Erreur retry course ${course.id}:`, err.message);
           resultats.push({ course_id: course.id, error: err.message });
         }
       }
@@ -1034,7 +1034,7 @@ Deno.serve(async (req) => {
 
       if (accepted) {
         const prixManuel = Number(course.manual_price);
-        // 🎯 Commission dynamique du pays de la course
+        //  Commission dynamique du pays de la course
         let commissionPct = 30; // fallback
         try {
           if (course.country_code) {
@@ -1058,19 +1058,19 @@ Deno.serve(async (req) => {
             const livreurData = await base44.asServiceRole.entities.Livreur.get(livreurId);
             if (livreurData?.user_email) {
               await base44.asServiceRole.entities.Notification.create({
-                titre: '✅ Prix accepté — La course peut commencer !',
+                titre: ' Prix accepté — La course peut commencer !',
                 message: `Le client a accepté votre prix de ${prixManuel.toLocaleString()} ${course.devise || 'FCFA'}.`,
                 type: 'course_acceptee', course_id: course_id, destinataire_email: livreurData.user_email, lue: false,
               });
               try {
                 await base44.functions.invoke('envoiNotificationPush', {
                   destinataire_email: livreurData.user_email, livreur_id: livreurId,
-                  titre: '✅ Prix accepté !', message: `Le client a validé ${prixManuel.toLocaleString()} ${course.devise || 'FCFA'}.`,
+                  titre: ' Prix accepté !', message: `Le client a validé ${prixManuel.toLocaleString()} ${course.devise || 'FCFA'}.`,
                   type: 'course_acceptee', course_id: course_id,
                 });
               } catch (_) {}
             }
-          } catch (e) { console.error('[DISPATCH] ❌ Notif livreur prix accepté:', e.message); }
+          } catch (e) { console.error('[DISPATCH]  Notif livreur prix accepté:', e.message); }
         }
 
         await supprimerNotificationsCourse(base44, course_id);
@@ -1157,7 +1157,7 @@ Deno.serve(async (req) => {
     // ─── 12. Diagnostic anti-doublon notifications ────────────────────────
     if (action === 'diagnostic_notifications') {
       const toutes = await base44.asServiceRole.entities.Notification.filter({ type: 'nouvelle_course' }, '-created_date', 500);
-      
+
       // Grouper par course_id + destinataire_email
       const grouped = {};
       for (const n of toutes) {

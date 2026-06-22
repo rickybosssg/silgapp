@@ -28,10 +28,10 @@ const APK_DOWNLOAD_URL = "/telecharger-app";
 const LOADING_TIMEOUT_MS = 8000; // 8 secondes max avant d'afficher une erreur
 
 export default function PublicSuiviCourse() {
-  // CORRECTION : lire le token depuis l'URL via useParams (React Router v6)
+  //  CORRECTION : lire le token depuis l'URL via useParams (React Router v6)
   const { token } = useParams();
   const [course, setCourse] = useState(null);
-  const [error, setError] = useState(null); // "not_found" | "timeout" | "server_error"
+  const [error, setError] = useState(null);       // "not_found" | "timeout" | "server_error"
   const [loading, setLoading] = useState(true);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [livreurPos, setLivreurPos] = useState(null);
@@ -39,65 +39,42 @@ export default function PublicSuiviCourse() {
   // Récupérer la course avec timeout
   useEffect(() => {
     if (!token) {
-      console.warn("[PublicSuivi] Aucun token dans l'URL");
+      console.warn("[PublicSuivi]  Aucun token dans l'URL");
       setError("not_found");
       setLoading(false);
       return;
     }
 
-    console.log("[PublicSuivi] Token reçu:", token);
+    console.log("[PublicSuivi]  Token reçu:", token);
 
     let cancelled = false;
     let timeoutId = null;
 
     async function fetchCourse() {
       try {
-        console.log("[PublicSuivi] Recherche course...");
-
-        // Timeout de sécurité : si la requête prend plus de 8s, afficher erreur
         const timeoutPromise = new Promise((_, reject) => {
           timeoutId = setTimeout(() => reject(new Error("TIMEOUT")), LOADING_TIMEOUT_MS);
         });
 
-        // Chercher d'abord par tracking_token
-        let courses = await Promise.race([
-          base44.entities.CourseExterne.filter({ tracking_token: token }),
-          timeoutPromise.then(() => { throw new Error("TIMEOUT"); }),
-        ]);
+        const fetchPromise = base44.functions.invoke("getSuiviCourse", { token });
+        const res = await Promise.race([fetchPromise, timeoutPromise]);
 
         if (cancelled) return;
         clearTimeout(timeoutId);
 
-        // Fallback : chercher par ID direct
-        if (!courses || courses.length === 0) {
-          console.log("[PublicSuivi] Pas trouvé par tracking_token, essai par ID:", token);
-          try {
-            const byId = await base44.entities.CourseExterne.get(token);
-            if (byId) {
-              courses = [byId];
-              console.log("[PublicSuivi] Course trouvée par ID:", byId.id);
-            }
-          } catch (idErr) {
-            console.warn("[PublicSuivi] Erreur recherche par ID:", idErr?.message || idErr);
-          }
-        } else {
-          console.log("[PublicSuivi] Course trouvée par tracking_token");
-        }
+        const data = res?.data;
 
-        if (cancelled) return;
-
-        if (courses && courses.length > 0) {
-          console.log("[PublicSuivi] Course chargée:", courses[0].id, "statut:", courses[0].statut);
-          setCourse(courses[0]);
+        if (data?.error === "not_found") {
+          setError("not_found");
+        } else if (data?.course) {
+          setCourse(data.course);
+          if (data.livreurPos) setLivreurPos(data.livreurPos);
           setError(null);
         } else {
-          console.warn("[PublicSuivi] Aucune course trouvée pour le token:", token);
           setError("not_found");
         }
       } catch (err) {
         if (cancelled) return;
-        console.error("[PublicSuivi] Erreur:", err?.message || err);
-
         if (err?.message === "TIMEOUT") {
           setError("timeout");
         } else {
@@ -123,17 +100,11 @@ export default function PublicSuiviCourse() {
   }, [token]);
 
   // Rafraîchir toutes les 10 secondes (seulement si course trouvée)
-  const { data: freshCourse } = useQuery({
+  const { data: freshData } = useQuery({
     queryKey: ["public-course", token],
     queryFn: async () => {
-      const courses = await base44.entities.CourseExterne.filter({ tracking_token: token });
-      if (!courses || courses.length === 0) {
-        try {
-          const byId = await base44.entities.CourseExterne.get(token);
-          return byId || null;
-        } catch (_) { return null; }
-      }
-      return courses[0] || null;
+      const res = await base44.functions.invoke("getSuiviCourse", { token });
+      return res?.data || null;
     },
     initialData: null,
     refetchInterval: 10000,
@@ -141,28 +112,13 @@ export default function PublicSuiviCourse() {
   });
 
   useEffect(() => {
-    if (freshCourse) {
-      setCourse(freshCourse);
+    if (freshData?.course) {
+      setCourse(freshData.course);
+      if (freshData.livreurPos) setLivreurPos(freshData.livreurPos);
     }
-  }, [freshCourse]);
+  }, [freshData]);
 
-  // Charger la position live du livreur (GPS temps réel depuis entité Livreur)
-  useEffect(() => {
-    if (!course?.livreur_id) return;
-    const fetchPos = () => {
-      base44.entities.Livreur.filter({ id: course.livreur_id })
-        .then(r => {
-          const l = r?.[0];
-          if (l?.latitude && l?.longitude) {
-            setLivreurPos({ lat: l.latitude, lng: l.longitude, nom: l.prenom ? `${l.prenom} ${l.nom}` : l.nom });
-          }
-        })
-        .catch(() => null);
-    };
-    fetchPos();
-    const iv = setInterval(fetchPos, 10000);
-    return () => clearInterval(iv);
-  }, [course?.livreur_id]);
+  // La position live du livreur est maintenant récupérée via getSuiviCourse (refetchInterval 10s)
 
   // Charger Leaflet pour la carte
   useEffect(() => {

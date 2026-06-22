@@ -1,0 +1,43 @@
+{
+  "name": "ProduitBoutique",
+  "type": "object",
+  "properties": {
+    "boutique_id": {
+      "type": "string",
+      "description": "ID de la boutique propri\u00e9taire"
+    },
+    "nom": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "photo_url": {
+      "type": "string"
+    },
+    "prix": {
+      "type": "number"
+    },
+    "devise": {
+      "type": "string",
+      "default": "FCFA"
+    },
+    "categorie": {
+      "type": "string",
+      "description": "Cat\u00e9gorie de produit"
+    },
+    "disponible": {
+      "type": "boolean",
+      "default": true
+    },
+    "actif": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "boutique_id",
+    "nom",
+    "prix"
+  ]
+}

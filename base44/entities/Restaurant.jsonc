@@ -1,0 +1,89 @@
+{
+  "name": "Restaurant",
+  "type": "object",
+  "properties": {
+    "nom": {
+      "type": "string",
+      "description": "Nom du restaurant"
+    },
+    "logo_url": {
+      "type": "string",
+      "description": "Logo ou photo du restaurant"
+    },
+    "description": {
+      "type": "string"
+    },
+    "specialite": {
+      "type": "string",
+      "description": "Sp\u00e9cialit\u00e9 culinaire (ex: africain, fast-food)"
+    },
+    "pays_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE",
+        "GH"
+      ],
+      "description": "Code pays \u2014 isolation stricte"
+    },
+    "ville": {
+      "type": "string"
+    },
+    "quartier": {
+      "type": "string"
+    },
+    "latitude": {
+      "type": "number"
+    },
+    "longitude": {
+      "type": "number"
+    },
+    "telephone": {
+      "type": "string"
+    },
+    "telephone_depot": {
+      "type": "string",
+      "description": "Num\u00e9ro Orange Money pour d\u00e9p\u00f4t paiement"
+    },
+    "horaires": {
+      "type": "string",
+      "description": "JSON: [{jour, ouverture, fermeture}]"
+    },
+    "temps_preparation_min": {
+      "type": "number",
+      "default": 30,
+      "description": "Temps estim\u00e9 de pr\u00e9paration en minutes"
+    },
+    "ouvert": {
+      "type": "boolean",
+      "default": true
+    },
+    "actif": {
+      "type": "boolean",
+      "default": true
+    },
+    "commission_pct": {
+      "type": "number",
+      "description": "Commission configurable (fallback global si null)"
+    },
+    "partenaire_id": {
+      "type": "string",
+      "description": "User ID du partenaire propri\u00e9taire"
+    },
+    "user_email": {
+      "type": "string",
+      "description": "Email du partenaire propri\u00e9taire"
+    }
+  },
+  "required": [
+    "nom",
+    "pays_code",
+    "partenaire_id"
+  ]
+}

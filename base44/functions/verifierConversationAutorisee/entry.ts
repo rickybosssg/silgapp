@@ -23,6 +23,12 @@ Deno.serve(async (req) => {
 
     const hasClient = types.includes('client');
     const hasLivreur = types.includes('livreur');
+    const hasPartenaire = types.includes('partenaire');
+
+    // client↔partenaire : toujours autorisé (renseignements ou cadre d'une commande)
+    if (hasClient && hasPartenaire && !hasLivreur) {
+      return Response.json({ autorise: true });
+    }
 
     // Même type → toujours autorisé
     if (!(hasClient && hasLivreur)) {

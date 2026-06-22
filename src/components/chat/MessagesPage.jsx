@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Send, Loader2, MessageCircle, User, Truck, Shield, UserPlus, Users } from "lucide-react";
+import { ArrowLeft, Send, Loader2, MessageCircle, User, Truck, Shield, UserPlus, Users, ImagePlus, Store } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -9,10 +9,17 @@ import ChatBubble from "@/components/chat/ChatBubble";
 import AudioRecorder from "@/components/chat/AudioRecorder";
 import NewConversationDialog from "@/components/chat/NewConversationDialog";
 import { playNotificationSound } from "@/hooks/useSonEtVibration";
+import {
+  buildClientMessageId,
+  buildSenderProfiles,
+  dedupeAndSortMessages,
+  enrichMessagesWithProfiles,
+  getMessageKey,
+  mergeMessageList,
+} from "@/lib/chatUtils";
 
 function ConversationItem({ conv, myType, myId, active, onClick }) {
   const [otherParticipant, setOtherParticipant] = useState(null);
-  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     try {
@@ -21,6 +28,8 @@ function ConversationItem({ conv, myType, myId, active, onClick }) {
       setOtherParticipant(other || parts[0]);
     } catch { setOtherParticipant(null); }
   }, [conv, myType, myId]);
+
+  const roleKey = otherParticipant?.type || (conv.group_type === "group" ? "group" : "client");
 
   return (
     <button
@@ -32,12 +41,15 @@ function ConversationItem({ conv, myType, myId, active, onClick }) {
     >
       <div className={cn(
         "w-10 h-10 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0",
-        (otherParticipant?.type || conv.group_type) === "livreur" ? "bg-blue-500" :
-        (otherParticipant?.type || conv.group_type) === "admin" ? "bg-amber-500" : "bg-emerald-500"
+        roleKey === "livreur" ? "bg-blue-500" :
+        roleKey === "admin" ? "bg-amber-500" :
+        roleKey === "partenaire" ? "bg-purple-500" :
+        roleKey === "group" ? "bg-violet-500" : "bg-emerald-500"
       )}>
-        {(otherParticipant?.type || conv.group_type) === "livreur" ? <Truck className="w-4 h-4" /> :
-         (otherParticipant?.type || conv.group_type) === "admin" ? <Shield className="w-4 h-4" /> :
-         conv.group_type === "group" ? <Users className="w-4 h-4" /> :
+        {roleKey === "livreur" ? <Truck className="w-4 h-4" /> :
+         roleKey === "admin" ? <Shield className="w-4 h-4" /> :
+         roleKey === "partenaire" ? <Store className="w-4 h-4" /> :
+         roleKey === "group" ? <Users className="w-4 h-4" /> :
          <User className="w-4 h-4" />}
       </div>
       <div className="flex-1 min-w-0">
@@ -68,11 +80,19 @@ function GeneralChatWindow({ conversationId, myType, myId, myName, onBack }) {
   const [sending, setSending] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const bottomRef = useRef(null);
+  const sendingRef = useRef(false);
+  const knownIdsRef = useRef(new Set());
 
   useEffect(() => {
     if (!conversationId) return;
     base44.entities.Message.filter({ conversation_id: conversationId }, "created_date", 100)
-      .then(msgs => setMessages(msgs || []))
+      .then(async (msgs) => {
+        const list = dedupeAndSortMessages(msgs || []);
+        const profiles = await buildSenderProfiles(base44, list);
+        const enriched = enrichMessagesWithProfiles(list, profiles);
+        knownIdsRef.current = new Set(enriched.map(getMessageKey));
+        setMessages(enriched);
+      })
       .catch(() => setMessages([]));
   }, [conversationId]);
 
@@ -80,23 +100,17 @@ function GeneralChatWindow({ conversationId, myType, myId, myName, onBack }) {
     if (!conversationId) return;
     const unsub = base44.entities.Message.subscribe((event) => {
       if (event.type === "create" && event.data?.conversation_id === conversationId) {
+        // Anti-doublon : vérifier le ref
+        const eventKey = getMessageKey(event.data);
+        if (knownIdsRef.current.has(eventKey)) return;
+        knownIdsRef.current.add(eventKey);
+
         const isFromMe = event.data.sender_type === myType && event.data.sender_id === myId;
         if (!isFromMe) {
           playNotificationSound();
           navigator.vibrate?.([200, 100, 200]);
         }
-        setMessages(prev => {
-          const exists = prev.some(m => m.id === event.data.id);
-          return exists ? prev : [...prev, event.data].sort((a, b) =>
-            new Date(a.created_date) - new Date(b.created_date)
-          );
-        });
-        // Mettre à jour la conversation (last_message)
-        base44.entities.Conversation.update(conversationId, {
-          last_message: event.data.message_type === "text" ? event.data.content?.slice(0, 80) || "" : event.data.message_type === "audio" ? " Message vocal" : " Photo",
-          last_message_date: event.data.created_date,
-          last_sender_name: event.data.sender_name,
-        }).catch(() => {});
+        setMessages(prev => mergeMessageList(prev, event.data));
       }
     });
     return () => unsub?.();
@@ -106,32 +120,44 @@ function GeneralChatWindow({ conversationId, myType, myId, myName, onBack }) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Envoi sécurisé via la fonction backend envoyerMessage
   const sendMessage = async (msgData) => {
-    if (sending || !conversationId) return;
+    if (sendingRef.current || !conversationId) return;
+    sendingRef.current = true;
     setSending(true);
     try {
-      await base44.entities.Message.create({
+      const clientMessageId = msgData.client_message_id || buildClientMessageId(conversationId, myType, myId);
+      const res = await base44.functions.invoke("envoyerMessage", {
         conversation_id: conversationId,
         sender_type: myType,
         sender_id: myId,
-        sender_name: myName,
+        client_message_id: clientMessageId,
         ...msgData,
       });
+      const newMsg = res?.data?.message;
+      if (newMsg) {
+        const key = getMessageKey(newMsg);
+        if (!knownIdsRef.current.has(key)) {
+          knownIdsRef.current.add(key);
+          setMessages(prev => mergeMessageList(prev, newMsg));
+        }
+      }
     } catch (err) {
       console.error("Erreur envoi message:", err);
     }
+    sendingRef.current = false;
     setSending(false);
   };
 
   const handleSend = async () => {
-    if (!input.trim() || sending) return;
+    if (!input.trim() || sendingRef.current) return;
     setInput("");
     await sendMessage({ content: input.trim(), message_type: "text" });
   };
 
   const handlePhotoSend = async (e) => {
     const file = e.target.files?.[0];
-    if (!file || sending) return;
+    if (!file || sendingRef.current) return;
     setUploadingPhoto(true);
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
@@ -151,10 +177,10 @@ function GeneralChatWindow({ conversationId, myType, myId, myName, onBack }) {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-slate-50">
       {/* Header */}
-      <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-primary to-primary/80 text-white">
-        <button onClick={onBack} className="text-white/80 hover:text-white">
+      <div className="flex items-center gap-2 p-3 bg-slate-950 text-white">
+        <button onClick={onBack} className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </button>
         <MessageCircle className="w-4 h-4" />
@@ -162,7 +188,7 @@ function GeneralChatWindow({ conversationId, myType, myId, myName, onBack }) {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-1 bg-gray-50">
+      <div className="flex-1 overflow-y-auto p-3 bg-gradient-to-b from-slate-50 to-white">
         {messages.length === 0 && (
           <div className="flex items-center justify-center h-full">
             <p className="text-xs text-gray-400 text-center">
@@ -180,38 +206,35 @@ function GeneralChatWindow({ conversationId, myType, myId, myName, onBack }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <div className="p-3 bg-white border-t border-gray-100 flex items-center gap-2">
+      {/* Barre de saisie — bouton Envoyer toujours visible */}
+      <div className="p-3 bg-white border-t border-slate-200 flex items-center gap-2 safe-area-bottom shadow-[0_-8px_24px_rgba(15,23,42,0.06)]">
         <AudioRecorder
           onSend={(data) => sendMessage(data)}
           disabled={sending}
           senderName={myName}
         />
-        <label className="cursor-pointer">
+        <label className="cursor-pointer flex-shrink-0">
           <input type="file" accept="image/*" onChange={handlePhotoSend} className="hidden" disabled={sending || uploadingPhoto} />
-          <div className="h-9 w-9 rounded-full flex items-center justify-center text-gray-400 hover:text-primary transition-colors">
-            {uploadingPhoto ? <Loader2 className="w-4 h-4 animate-spin" /> : (
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
-              </svg>
-            )}
+          <div className="h-10 w-10 rounded-full flex items-center justify-center text-gray-500 hover:text-primary hover:bg-gray-100 transition-colors">
+            {uploadingPhoto ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImagePlus className="w-5 h-5" />}
           </div>
         </label>
-        <input
+        <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Votre message..."
           disabled={sending}
-          className="flex-1 h-10 rounded-xl border border-gray-200 px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/20"
+          rows={1}
+          className="flex-1 min-h-11 max-h-24 min-w-0 resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40"
         />
         <Button
-          size="icon"
           onClick={handleSend}
           disabled={sending || !input.trim()}
-          className="h-10 w-10 rounded-xl bg-primary hover:bg-primary/90"
+          className="h-11 min-w-[104px] rounded-xl bg-primary hover:bg-primary/90 shadow-md flex-shrink-0 disabled:opacity-60 gap-2 px-4 font-black text-white"
         >
-          {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+          {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+          <span>Envoyer</span>
         </Button>
       </div>
     </div>
@@ -272,7 +295,7 @@ export default function MessagesPage({ myType, myId, myName, onBack }) {
       <div className="flex items-center justify-between p-3 border-b border-gray-100">
         <div className="flex items-center gap-2">
           {onBack && (
-            <button onClick={onBack} className="text-gray-500 hover:text-gray-700">
+            <button onClick={onBack} className="text-gray-500 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100 transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </button>
           )}

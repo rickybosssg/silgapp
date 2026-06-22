@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { Truck, Package, ArrowRight, Loader2, CheckCircle } from "lucide-react";
+import { Truck, Package, ArrowRight, Loader2, CheckCircle, Store } from "lucide-react";
 import ClientOnboarding from "@/components/client/ClientOnboarding";
 import LivreurRegistrationForm from "@/components/auth/LivreurRegistrationForm";
 
-export default function RoleSelection() {
+export default function RoleSelection({ onPartenaire }) {
   const [step, setStep] = useState("choix"); // choix | client_form | livreur_form | client_done | livreur_done
   const [user, setUser] = useState(null);
 
@@ -21,6 +21,15 @@ export default function RoleSelection() {
   const handleLivreurComplete = () => {
     setStep("livreur_done");
     setTimeout(() => window.location.reload(), 2000);
+  };
+
+  const handlePartenaire = () => {
+    try {
+      localStorage.setItem("silgapp_preferred_role", "partenaire");
+      if (user?.email) localStorage.setItem("silgapp_preferred_role_email", user.email);
+    } catch (_) {}
+    onPartenaire?.();
+    setTimeout(() => window.location.reload(), 300);
   };
 
   // Écran de choix
@@ -66,6 +75,22 @@ export default function RoleSelection() {
                   <p className="text-sm text-muted-foreground">Livrer des colis et gagner de l'argent</p>
                 </div>
                 <ArrowRight className="w-5 h-5 text-primary opacity-0 group-hover:opacity-100 transition-all" />
+              </div>
+            </button>
+
+            <button
+              onClick={handlePartenaire}
+              className="w-full p-6 rounded-3xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-fuchsia-50 hover:border-purple-500 hover:shadow-lg transition-all text-left group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-purple-100 flex items-center justify-center group-hover:bg-purple-200 transition-colors">
+                  <Store className="w-7 h-7 text-purple-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-black text-lg text-foreground">Partenaire</p>
+                  <p className="text-sm text-muted-foreground">Gérer une boutique ou un restaurant</p>
+                </div>
+                <ArrowRight className="w-5 h-5 text-purple-600 opacity-0 group-hover:opacity-100 transition-all" />
               </div>
             </button>
           </div>

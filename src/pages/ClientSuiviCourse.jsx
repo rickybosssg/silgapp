@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useClientNotifications } from "@/hooks/useClientNotifications";
@@ -32,6 +32,7 @@ import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import DestinataireReactionButton from "@/components/client/DestinataireReactionButton";
 import QRCodeDisplay from "@/components/client/QRCodeDisplay";
 import AnnulerCourseDialog from "@/components/client/AnnulerCourseDialog";
+import LivreurAnnulationDialog from "@/components/client/LivreurAnnulationDialog";
 import ChatWindow from "@/components/chat/ChatWindow";
 import CarteLivreurClient from "@/components/chat/CarteLivreurClient";
 import ETADisplay from "@/components/client/ETADisplay";
@@ -78,6 +79,9 @@ export default function ClientSuiviCourse() {
   const [userId, setUserId] = useState(null);
   const [showRating, setShowRating] = useState(false);
   const [showAnnulerDialog, setShowAnnulerDialog] = useState(false);
+  const [showAnnulationLivreur, setShowAnnulationLivreur] = useState(false);
+  const [motifAnnulation, setMotifAnnulation] = useState(null);
+  const prevLivreurIdRef = useRef(null);
   const [ratingShownForCourse, setRatingShownForCourse] = useState(null);
   const [onglet, setOnglet] = useState("actives"); // "actives" | "historique"
   // Pré-sélectionner la course depuis la navigation (bouton "Voir la course")
@@ -216,6 +220,44 @@ export default function ClientSuiviCourse() {
 
     setPrevStatut(maCourse.statut);
   }, [maCourse?.statut, prevStatut]);
+
+  // ── Détection annulation par le livreur ──
+  // Si on avait un livreur (prevLivreurIdRef) et qu'il n'y en a plus (statut "nouvelle"),
+  // on affiche une modale avec le motif d'annulation.
+  useEffect(() => {
+    if (!maCourse) return;
+
+    const hadLivreur = !!prevLivreurIdRef.current;
+    const hasLivreurNow = !!maCourse.livreur_id;
+    const isRedispatch = maCourse.statut === "nouvelle" && !hasLivreurNow;
+
+    if (hadLivreur && !hasLivreurNow && isRedispatch) {
+      // Récupérer le motif depuis AnnulationLivreur
+      base44.entities.AnnulationLivreur.filter({ course_id: maCourse.id }, "-date_annulation", 1)
+        .then(annulations => {
+          if (annulations?.length > 0) {
+            const a = annulations[0];
+            const motifLabel = {
+              client_injoignable: "Client injoignable",
+              mauvaise_adresse: "Mauvaise adresse",
+              colis_inexistant: "Colis inexistant",
+              client_change_avis: "Client a changé d'avis",
+              colis_interdit: "Colis interdit",
+              panne_vehicule: "Panne de véhicule",
+              accident: "Accident",
+              autre: a.motif_detail || "Autre",
+            }[a.motif] || a.motif || "non spécifié";
+            setMotifAnnulation(motifLabel);
+            setShowAnnulationLivreur(true);
+            playNotificationSound();
+            navigator.vibrate?.([300, 150, 300]);
+          }
+        })
+        .catch(() => {});
+    }
+
+    prevLivreurIdRef.current = maCourse.livreur_id || null;
+  }, [maCourse?.livreur_id, maCourse?.statut, maCourse?.id]);
 
   // Auto-affichage notation quand course passe en "livree"
   useEffect(() => {
@@ -909,6 +951,14 @@ export default function ClientSuiviCourse() {
           onSuccess={() => navigate("/")}
           clientId={clientProfilId}
         />
+
+        {/* Modale : livreur a annulé la course */}
+        {showAnnulationLivreur && (
+          <LivreurAnnulationDialog
+            motif={motifAnnulation}
+            onClose={() => setShowAnnulationLivreur(false)}
+          />
+        )}
         </>
         )} {/* fin onglet actives && maCourse */}
       </div>

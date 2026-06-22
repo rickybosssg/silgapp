@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+﻿import React, { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
@@ -181,7 +181,7 @@ export default function ToutesCoursesExternes() {
                 }`}>
                   {course.statut === "livree" ? "" :
                    course.statut === "annulee" ? "" :
-                   course.statut === "nouvelle" ? "🆕" : ""}
+                   course.statut === "nouvelle" ? "" : ""}
                 </div>
 
                 {/* Infos */}

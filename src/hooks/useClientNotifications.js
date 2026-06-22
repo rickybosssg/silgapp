@@ -17,7 +17,7 @@ const CLIENT_IMPORTANT_TYPES = [
 ];
 
 const TYPE_LABELS = {
-  nouvelle_course: "🆕 Nouvelle course",
+  nouvelle_course: " Nouvelle course",
   course_assignee: " Livreur assigné",
   course_acceptee: " Course acceptée",
   colis_recupere: " Colis récupéré",

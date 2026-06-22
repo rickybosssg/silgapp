@@ -206,7 +206,7 @@ async function resetPasswordWithToken(resetToken, newPassword) {
  * - base44Client lit localStorage au moment de createClient()
  * - detectedToken permet de savoir si un token a été trouvé
  */
-export default function AuthGate({ children, onLivreur, onClient }) {
+export default function AuthGate({ children, onLivreur, onClient, onPartenaire }) {
   const [state, setState] = useState("loading");
   const [authRetry, setAuthRetry] = useState(0);
   const initialResetToken = getPasswordResetTokenFromUrl();
@@ -317,6 +317,34 @@ export default function AuthGate({ children, onLivreur, onClient }) {
       }
 
       // 3. Vérifier si un profil client existe déjà
+      let partenairePreference = false;
+      try {
+        partenairePreference =
+          localStorage.getItem("silgapp_preferred_role") === "partenaire" &&
+          localStorage.getItem("silgapp_preferred_role_email") === user.email;
+      } catch (_) {}
+
+      const [boutiquesPartenaire, restaurantsPartenaire] = await Promise.all([
+        base44.entities.Boutique.filter({ user_email: user.email }).catch(() => []),
+        base44.entities.Restaurant.filter({ user_email: user.email }).catch(() => []),
+      ]);
+      if (!mounted) return;
+
+      if (
+        partenairePreference ||
+        (boutiquesPartenaire && boutiquesPartenaire.length > 0) ||
+        (restaurantsPartenaire && restaurantsPartenaire.length > 0)
+      ) {
+        registerPushToken(null, {
+          email: user.email,
+          user_email: user.email,
+          user_type: "partenaire",
+        }).catch(() => null);
+        onPartenaire?.();
+        setState("partenaire");
+        return;
+      }
+
       const clients = await base44.entities.ClientExterne.filter({
         user_email: user.email
       });
@@ -708,7 +736,7 @@ export default function AuthGate({ children, onLivreur, onClient }) {
 
   // Choix du rôle (nouvel utilisateur sans profil)
   if (state === "choix_role") {
-    return <RoleSelection />;
+    return <RoleSelection onPartenaire={onPartenaire} />;
   }
 
   // Admin → toujours accessible, pas de gate maintenance
@@ -719,6 +747,17 @@ export default function AuthGate({ children, onLivreur, onClient }) {
   // Client → bloqué si app OFF
   if (state === "client") {
     return <AppMaintenanceGate>{children}</AppMaintenanceGate>;
+  }
+
+  if (state === "partenaire") {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
+          <p className="text-sm text-muted-foreground">Chargement de l'espace partenaire...</p>
+        </div>
+      </div>
+    );
   }
 
   // Livreur → rendu géré par App.jsx via onLivreur (le gate est dans LivreurApp/LivreurExterneApp)

@@ -67,6 +67,15 @@ const DiagnosticPushComplet = lazy(() => import('./pages/DiagnosticPushComplet.j
 const TestDispatchLivreur = lazy(() => import('./pages/TestDispatchLivreur.jsx'));
 const CentreNotificationsPush = lazy(() => import('./pages/CentreNotificationsPush.jsx'));
 const DemoDashboard = lazy(() => import('./pages/DemoDashboard.jsx'));
+// ── Module Boutiques / Restaurants / Partenaires ──
+const BoutiquesList = lazy(() => import('./pages/BoutiquesList.jsx'));
+const BoutiqueDetail = lazy(() => import('./pages/BoutiqueDetail.jsx'));
+const RestaurantsList = lazy(() => import('./pages/RestaurantsList.jsx'));
+const RestaurantDetail = lazy(() => import('./pages/RestaurantDetail.jsx'));
+const PartenaireDashboard = lazy(() => import('./pages/PartenaireDashboard.jsx'));
+const GestionBoutiques = lazy(() => import('./pages/GestionBoutiques.jsx'));
+const GestionRestaurants = lazy(() => import('./pages/GestionRestaurants.jsx'));
+const MesCommandesBoutique = lazy(() => import('./pages/MesCommandesBoutique.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -109,7 +118,7 @@ function AppContent() {
     mediaQuery.addEventListener('change', applyTheme);
     return () => mediaQuery.removeEventListener('change', applyTheme);
   }, []);
-  
+
   // Hook for Android hardware back button
   const navigate = useNavigate();
   const location = useLocation();
@@ -120,20 +129,21 @@ function AppContent() {
         navigate(-1);
       }
     };
-    
+
     document.addEventListener('backbutton', handleBackButton, false);
     return () => document.removeEventListener('backbutton', handleBackButton);
   }, [navigate, location]);
-  
+
   const [livreurProfil, setLivreurProfil] = useState(null);
   const [isClient, setIsClient] = useState(false);
+  const [isPartenaire, setIsPartenaire] = useState(false);
   const [reseau, setReseau] = useState(null);
 
-  // 🌍 ROUTES PUBLIQUES - ACCESSIBLES SANS AUTHENTIFICATION (PRIORITÉ ABSOLUE)
+  //  ROUTES PUBLIQUES - ACCESSIBLES SANS AUTHENTIFICATION (PRIORITÉ ABSOLUE)
   // Ces routes doivent être vérifiées AVANT toute logique d'authentification
-  // 🌍 ROUTES PUBLIQUES - PRIORITÉ ABSOLUE (vérification avant tout)
+  //  ROUTES PUBLIQUES - PRIORITÉ ABSOLUE (vérification avant tout)
   const currentPath = location.pathname || window.location.pathname;
-  const isPublicRoute = currentPath === '/telecharger' || 
+  const isPublicRoute = currentPath === '/telecharger' ||
                         currentPath === '/privacy-policy' ||
                         currentPath.startsWith('/suivi-public/') ||
                         currentPath.startsWith('/demo/');
@@ -160,6 +170,15 @@ function AppContent() {
           <Route path="/privacy-policy" element={<PolitiqueConfidentialite />} />
           <Route path="*" element={<PageNotFound />} />
         </Routes>
+      </Suspense>
+    );
+  }
+
+  // Partenaire → dashboard partenaire
+  if (isPartenaire) {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <PartenaireDashboard />
       </Suspense>
     );
   }
@@ -199,6 +218,11 @@ function AppContent() {
           <Route path="/client/course/recevoir" element={<CourseExterneFormSync />} />
           <Route path="/client/course/deplacement" element={<CourseExterneFormSync />} />
           <Route path="/client/suivi" element={<ClientSuiviCourse />} />
+          <Route path="/client/boutiques" element={<BoutiquesList />} />
+          <Route path="/client/boutiques/:id" element={<BoutiqueDetail />} />
+          <Route path="/client/restaurants" element={<RestaurantsList />} />
+          <Route path="/client/restaurants/:id" element={<RestaurantDetail />} />
+          <Route path="/client/mes-commandes" element={<MesCommandesBoutique />} />
           <Route path="/livreur/recap-course/:courseId" element={<RecapCourseLivreur />} />
           <Route path="*" element={<ClientExterneApp />} />
         </Routes>
@@ -217,6 +241,7 @@ function AppContent() {
               <AuthGate
                 onLivreur={setLivreurProfil}
                 onClient={() => setIsClient(true)}
+                onPartenaire={() => setIsPartenaire(true)}
               >
                 <DiagnosticPushComplet />
               </AuthGate>
@@ -225,9 +250,10 @@ function AppContent() {
           <Route
             path="*"
             element={
-              <AuthGate 
+              <AuthGate
                 onLivreur={setLivreurProfil}
                 onClient={() => setIsClient(true)}
+                onPartenaire={() => setIsPartenaire(true)}
               >
                 <SelectionReseau onSelect={setReseau} />
               </AuthGate>
@@ -299,6 +325,8 @@ function AppContent() {
           <Route path="/admin/anti-fraude" element={<AnimatedRoutes><AntiFraudePanel /></AnimatedRoutes>} />
           <Route path="/admin/support" element={<AnimatedRoutes><SupportAdmin /></AnimatedRoutes>} />
           <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
+          <Route path="/admin/boutiques" element={<AnimatedRoutes><GestionBoutiques /></AnimatedRoutes>} />
+          <Route path="/admin/restaurants" element={<AnimatedRoutes><GestionRestaurants /></AnimatedRoutes>} />
           <Route path="/support" element={<AnimatedRoutes><SupportClient /></AnimatedRoutes>} />
         </Route>
         <Route path="*" element={<PageNotFound />} />

@@ -8,7 +8,7 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    
+
     if (!user) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -28,31 +28,31 @@ Deno.serve(async (req) => {
     const coursesLivrees = courses.filter(c => c.statut === 'livree');
     const coursesAnnulees = courses.filter(c => c.statut === 'annulee').length;
     const coursesEnCours = courses.filter(c => !['nouvelle', 'annulee', 'livree', 'programmee'].includes(c.statut)).length;
-    
+
     // Pays actifs
     const paysUniques = [...new Set(courses.filter(c => c.country_code).map(c => c.country_code))];
-    
+
     // Activité récente (30 derniers jours)
     const ilYa30Jours = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const coursesRecentes = courses.filter(c => {
       const d = new Date(c.created_date);
       return d >= ilYa30Jours;
     });
-    
+
     // Types de courses
     const coursesExpedier = courses.filter(c => c.type_course === 'expedier').length;
     const coursesRecevoir = courses.filter(c => c.type_course === 'recevoir').length;
     const coursesDeplacement = courses.filter(c => c.type_course === 'deplacement').length;
-    
+
     // Dernières dates d'activité
-    const derniereCourse = courses.length > 0 
+    const derniereCourse = courses.length > 0
       ? courses.sort((a,b) => new Date(b.created_date) - new Date(a.created_date))[0]
       : null;
-    
+
     const derniereConnexionClient = clients
       .filter(c => c.last_seen_at)
       .sort((a,b) => new Date(b.last_seen_at) - new Date(a.last_seen_at))[0];
-    
+
     const derniereConnexionLivreur = livreurs
       .filter(l => l.last_seen_at)
       .sort((a,b) => new Date(b.last_seen_at) - new Date(a.last_seen_at))[0];
@@ -63,14 +63,14 @@ Deno.serve(async (req) => {
 
     // --- GÉNÉRATION PDF ---
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    
+
     const pageWidth = doc.internal.pageSize.getWidth();
     let y = 15;
 
     // En-tête
     doc.setFillColor(220, 38, 38); // Rouge SILGAPP
     doc.rect(0, 0, pageWidth, 35, 'F');
-    
+
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
       'acceptation par un livreur, suivi en direct, validation par QR code, et paiement.',
       15, y, { maxWidth: pageWidth - 30 }
     );
-    
+
     y += 30;
 
     // Section 2: Utilisateurs
@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
     // Tableau utilisateurs
     doc.setTextColor(40, 40, 40);
     doc.setFontSize(10);
-    
+
     const userRows = [
       ['Clients inscrits', `${clients.length}`, `${clientsActifs} actifs`],
       ['Livreurs inscrits', `${livreurs.length}`, `${livreursValides} validés`],
@@ -143,7 +143,7 @@ Deno.serve(async (req) => {
       doc.text(row[0], 17, y + 5);
       doc.text(row[1], 90, y + 5);
       doc.text(row[2], 120, y + 5);
-      
+
       if (y > 260) {
         doc.addPage();
         y = 20;
@@ -230,7 +230,7 @@ Deno.serve(async (req) => {
 
     const ticketsOuverts = tickets ? tickets.filter(t => t.statut === 'ouvert' || t.statut === 'en_cours').length : 0;
     doc.text(`Tickets support ouverts : ${ticketsOuverts}`, 15, y);
-    
+
     y += 14;
 
     // Section 5: Dernières courses livrées
@@ -257,7 +257,7 @@ Deno.serve(async (req) => {
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(40, 40, 40);
     doc.setFontSize(8);
-    
+
     const dernieresLivrees = coursesLivrees
       .sort((a,b) => new Date(b.created_date) - new Date(a.created_date))
       .slice(0, 15);
@@ -304,7 +304,7 @@ Deno.serve(async (req) => {
       `messagerie intégrée, validation par QR code, et paiement.`
       , 15, y, { maxWidth: pageWidth - 30 }
     );
-    
+
     y += 24;
     doc.text(
       `Ces métriques confirment que le closed testing a été mené avec rigueur, sur une durée suffisante, ` +
