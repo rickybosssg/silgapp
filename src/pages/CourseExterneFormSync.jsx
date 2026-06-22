@@ -157,7 +157,7 @@ export default function CourseExterneFormSync() {
       }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Exécuté UNE fois au mount uniquement
+  }, []); //  Exécuté UNE fois au mount uniquement
 
   // Sauvegarder l'étape dans localStorage
   useEffect(() => {
@@ -408,7 +408,7 @@ export default function CourseExterneFormSync() {
     if (isSubmitting || createMutation.isPending) return;
     setIsSubmitting(true);
 
-    // country_code DOIT être déclaré AVANT toute utilisation dans normalizePhone()
+    // ️ country_code DOIT être déclaré AVANT toute utilisation dans normalizePhone()
     // ─── Validation des champs obligatoires ───────────────────────────────────
     const isExpedie = formData.type_course === "expedier";
     const isRecevoir = formData.type_course === "recevoir";
@@ -655,7 +655,7 @@ export default function CourseExterneFormSync() {
           <div>
             <h2 className="text-xl font-black text-gray-900">Compte bloqué</h2>
             <p className="text-sm text-gray-600 mt-3 leading-relaxed">
-              Votre compte est temporairement bloqué pour frais d'annulation impayés. Veuillez contacter Silga.
+              Votre compte est temporairement bloqué pour frais d'annulation impayés. Veuillez contacter SILGAPP.
             </p>
           </div>
           <a
@@ -664,7 +664,7 @@ export default function CourseExterneFormSync() {
             rel="noopener noreferrer"
             className="inline-flex items-center justify-center w-full h-12 rounded-2xl bg-green-500 hover:bg-green-600 text-white font-bold text-sm transition-colors"
           >
-             Contacter Silga via WhatsApp
+             Contacter SILGAPP via WhatsApp
           </a>
           <button
             onClick={() => navigate("/")}

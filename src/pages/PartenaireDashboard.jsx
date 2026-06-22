@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Store, UtensilsCrossed, Loader2, ClipboardList, Package, ShoppingBag, MessageCircle } from "lucide-react";
+import { Store, UtensilsCrossed, Loader2, LogOut, MapPin } from "lucide-react";
 import EtablissementForm from "@/components/partenaire/EtablissementForm";
 import ProduitsManager from "@/components/partenaire/ProduitsManager";
 import CommandesManager from "@/components/partenaire/CommandesManager";
 import MessagesPage from "@/components/chat/MessagesPage";
+import ComptabilitePartenaire from "@/components/partenaire/ComptabilitePartenaire";
+import PartenaireHome from "@/components/partenaire/PartenaireHome";
+import PartenaireBottomNav from "@/components/partenaire/PartenaireBottomNav";
+import { clearPersistedToken } from "@/lib/authPersistence";
 
 export default function PartenaireDashboard() {
   const [user, setUser] = useState(null);
-  const [tab, setTab] = useState("infos");
+  const [tab, setTab] = useState("home");
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -34,6 +38,21 @@ export default function PartenaireDashboard() {
     enabled: !!user?.id,
   });
 
+  const hasBoutique = !!maBoutique;
+  const hasRestaurant = !!monRestaurant;
+  const hasEtablissement = hasBoutique || hasRestaurant;
+  const etablissementType = hasBoutique ? "boutique" : hasRestaurant ? "restaurant" : null;
+  const etablissement = maBoutique || monRestaurant || null;
+
+  // Query commandes avant les retours conditionnels (Rules of Hooks)
+  const cmdEntityName = etablissementType === "restaurant" ? "CommandeRestaurant" : "CommandeBoutique";
+  const cmdIdField = etablissementType === "restaurant" ? "restaurant_id" : "boutique_id";
+  const { data: commandes = [] } = useQuery({
+    queryKey: ["commandes", etablissementType, etablissement?.id],
+    queryFn: () => base44.entities[cmdEntityName].filter({ [cmdIdField]: etablissement.id }, "-created_date", 100),
+    enabled: !!etablissement?.id,
+  });
+
   const loading = loadingBoutique || loadingRestaurant;
 
   if (!user || loading) {
@@ -43,12 +62,6 @@ export default function PartenaireDashboard() {
       </div>
     );
   }
-
-  const hasBoutique = !!maBoutique;
-  const hasRestaurant = !!monRestaurant;
-  const hasEtablissement = hasBoutique || hasRestaurant;
-  const etablissementType = hasBoutique ? "boutique" : hasRestaurant ? "restaurant" : null;
-  const etablissement = maBoutique || monRestaurant || null;
 
   if (!hasEtablissement) {
     return (
@@ -75,70 +88,71 @@ export default function PartenaireDashboard() {
               </div>
             </button>
           </div>
-          <button onClick={() => base44.auth.logout()} className="w-full text-sm text-gray-400 underline">Se déconnecter</button>
+          <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="w-full text-sm text-gray-400 underline">Se déconnecter</button>
           {tab === "boutique_form" && (
-            <EtablissementForm type="boutique" partenaireId={user.id} userEmail={user.email}
-              onSaved={() => { setTab("infos"); queryClient.invalidateQueries({ queryKey: ["ma-boutique"] }); }}
-              onCancel={() => setTab("infos")} />
+            <EtablissementForm type="boutique" partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === 'admin'}
+              onSaved={() => { setTab("home"); queryClient.invalidateQueries({ queryKey: ["ma-boutique"] }); }}
+              onCancel={() => setTab("home")} />
           )}
           {tab === "restaurant_form" && (
-            <EtablissementForm type="restaurant" partenaireId={user.id} userEmail={user.email}
-              onSaved={() => { setTab("infos"); queryClient.invalidateQueries({ queryKey: ["mon-restaurant"] }); }}
-              onCancel={() => setTab("infos")} />
+            <EtablissementForm type="restaurant" partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === 'admin'}
+              onSaved={() => { setTab("home"); queryClient.invalidateQueries({ queryKey: ["mon-restaurant"] }); }}
+              onCancel={() => setTab("home")} />
           )}
         </div>
       </div>
     );
   }
 
+  const pendingCount = commandes.filter(c => !["livree", "annulee"].includes(c.statut)).length;
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-gradient-to-r from-purple-600 to-violet-600 text-white px-4 py-4 sticky top-0 z-20">
+    <div className="min-h-screen bg-gray-50 pb-20">
+      {/* ── En-tête premium ── */}
+      <div className="bg-gradient-to-br from-purple-600 via-violet-600 to-indigo-600 text-white px-4 py-4 sticky top-0 z-20 shadow-lg">
         <div className="max-w-lg mx-auto flex items-center justify-between">
-          <div>
-            <p className="text-white/70 text-xs">Espace Partenaire</p>
-            <h1 className="text-lg font-black">{etablissement.nom}</h1>
-            <p className="text-white/70 text-xs flex items-center gap-1">
-              {etablissementType === "boutique" ? <Store className="w-3 h-3" /> : <UtensilsCrossed className="w-3 h-3" />}
-              <span>{etablissementType === "boutique" ? "Boutique" : "Restaurant"} - {etablissement.quartier || etablissement.ville || ""}</span>
-            </p>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center overflow-hidden flex-shrink-0">
+              {etablissement.logo_url
+                ? <img src={etablissement.logo_url} alt="logo" className="w-full h-full object-cover" />
+                : (etablissementType === "boutique" ? <Store className="w-6 h-6" /> : <UtensilsCrossed className="w-6 h-6" />)}
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-lg font-black leading-tight truncate">{etablissement.nom}</h1>
+              <div className="flex items-center gap-1.5 text-white/70 text-xs">
+                <MapPin className="w-3 h-3 flex-shrink-0" />
+                <span className="truncate">{etablissement.quartier || etablissement.ville || ""}</span>
+                <span className={"w-1.5 h-1.5 rounded-full flex-shrink-0 " + (etablissement.ouvert ? "bg-green-400" : "bg-red-400")} />
+                <span className="flex-shrink-0">{etablissement.ouvert ? "Ouvert" : "Fermé"}</span>
+              </div>
+            </div>
           </div>
-          <button onClick={() => base44.auth.logout()} className="text-white/70 text-xs underline">Déconnexion</button>
-        </div>
-      </div>
-      <div className="max-w-lg mx-auto px-4 pt-4">
-        <div className="flex bg-white rounded-2xl p-1 gap-1 shadow-sm border border-gray-100">
-          <button onClick={() => setTab("infos")} className={"flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 " + (tab === "infos" ? "bg-purple-600 text-white shadow" : "text-gray-500")}>
-            <ClipboardList className="w-3.5 h-3.5" /> Infos
-          </button>
-          <button onClick={() => setTab("produits")} className={"flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 " + (tab === "produits" ? "bg-purple-600 text-white shadow" : "text-gray-500")}>
-            <Package className="w-3.5 h-3.5" /> {etablissementType === "boutique" ? "Produits" : "Plats"}
-          </button>
-          <button onClick={() => setTab("commandes")} className={"flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 " + (tab === "commandes" ? "bg-purple-600 text-white shadow" : "text-gray-500")}>
-            <ShoppingBag className="w-3.5 h-3.5" /> Commandes
-          </button>
-          <button onClick={() => setTab("messages")} className={"flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 " + (tab === "messages" ? "bg-purple-600 text-white shadow" : "text-gray-500")}>
-            <MessageCircle className="w-3.5 h-3.5" /> Messages
+          <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0 hover:bg-white/30 transition-colors">
+            <LogOut className="w-4 h-4" />
           </button>
         </div>
       </div>
-      <div className="max-w-lg mx-auto px-4 py-4 pb-24">
-        {tab === "infos" && (
-          <EtablissementForm type={etablissementType} existing={etablissement} partenaireId={user.id} userEmail={user.email}
-            onSaved={() => queryClient.invalidateQueries({ queryKey: etablissementType === "boutique" ? ["ma-boutique"] : ["mon-restaurant"] })} />
-        )}
-        {tab === "produits" && <ProduitsManager type={etablissementType} etablissementId={etablissement.id} />}
+
+      {/* ── Contenu ── */}
+      <div className="max-w-lg mx-auto px-4 py-4">
+        {tab === "home" && <PartenaireHome etablissement={etablissement} etablissementType={etablissementType} onNavigate={setTab} />}
         {tab === "commandes" && <CommandesManager type={etablissementType} etablissementId={etablissement.id} />}
+        {tab === "produits" && <ProduitsManager type={etablissementType} etablissementId={etablissement.id} />}
         {tab === "messages" && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-[70vh]">
-            <MessagesPage
-              myType="partenaire"
-              myId={etablissement.id}
-              myName={etablissement.nom}
-            />
+            <MessagesPage myType="partenaire" myId={etablissement.id} myName={etablissement.nom} />
           </div>
         )}
+        {tab === "statistiques" && <ComptabilitePartenaire type={etablissementType} />}
+        {tab === "revenus" && <ComptabilitePartenaire type={etablissementType} />}
+        {tab === "infos" && (
+          <EtablissementForm type={etablissementType} existing={etablissement} partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === 'admin'}
+            onSaved={() => queryClient.invalidateQueries({ queryKey: etablissementType === "boutique" ? ["ma-boutique"] : ["mon-restaurant"] })} />
+        )}
       </div>
+
+      {/* ── Bottom Nav ── */}
+      <PartenaireBottomNav tab={tab} setTab={setTab} badgeCount={pendingCount} />
     </div>
   );
 }

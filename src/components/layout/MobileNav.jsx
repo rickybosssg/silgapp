@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, X, LogOut, Bell, ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { clearPersistedToken } from "@/lib/authPersistence";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
@@ -67,7 +68,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, re
     ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
       try { localStorage.removeItem(k); } catch(_) {}
     });
-    base44.auth.logout();
+    { clearPersistedToken(); base44.auth.logout(); };
     setTimeout(() => window.location.reload(), 300);
   };
   const [showMenu, setShowMenu] = useState(false);
@@ -86,7 +87,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, re
           </div>
           <div>
             <h1 className="font-extrabold text-sm text-foreground leading-tight">SILGAPP</h1>
-            <p className="text-[9px] text-muted-foreground leading-tight">Silga Livraison</p>
+            <p className="text-[9px] text-muted-foreground leading-tight">SILGAPP Livraison</p>
           </div>
         </div>
 

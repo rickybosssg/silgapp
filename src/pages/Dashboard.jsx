@@ -137,7 +137,7 @@ export default function Dashboard() {
           <Link to="/admin/externe" className="flex-1 sm:flex-none">
             <Button variant="outline" size="sm" className="w-full sm:w-auto gap-1.5 bg-accent text-accent-foreground hover:bg-accent/90">
               <Users className="w-4 h-4" />
-              <span className="hidden sm:inline">Silga Externe</span>
+              <span className="hidden sm:inline">SILGAPP Externe</span>
               <span className="sm:hidden">Externe</span>
             </Button>
           </Link>

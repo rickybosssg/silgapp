@@ -172,7 +172,7 @@ export default function DashboardExterne() {
                 <div className="flex items-center gap-2 mb-0.5">
                   <Zap className="w-4 h-4 text-yellow-400" />
                   <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                    Silga Externe
+                    SILGAPP Externe
                     {isPays && adminCountryCode && (
                       <span className="ml-2 text-base font-normal text-white/50">· {adminCountryCode}</span>
                     )}

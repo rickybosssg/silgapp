@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Upload, Save, X } from "lucide-react";
+import { Loader2, Upload, Save, X, AlertTriangle } from "lucide-react";
 
 const PAYS = [
   { code: "BF", nom: "Burkina Faso" }, { code: "CI", nom: "Côte d'Ivoire" },
@@ -13,7 +13,7 @@ const PAYS = [
   { code: "GN", nom: "Guinée" }, { code: "NE", nom: "Niger" }, { code: "GH", nom: "Ghana" },
 ];
 
-export default function EtablissementForm({ type, existing, partenaireId, userEmail, onSaved, onCancel }) {
+export default function EtablissementForm({ type, existing, partenaireId, userEmail, onSaved, onCancel, isAdmin }) {
   const isRestaurant = type === "restaurant";
   const [form, setForm] = useState(existing || {
     nom: "", logo_url: "", description: "",
@@ -56,6 +56,15 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
       <h2 className="font-bold text-gray-900 text-sm">{existing ? "Modifier" : "Créer"} {isRestaurant ? "le restaurant" : "la boutique"}</h2>
+      {existing && !existing.actif && !isAdmin && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-xs font-bold text-red-700">Établissement bloqué</p>
+            <p className="text-xs text-red-600">Votre établissement est actuellement bloqué. Veuillez contacter SILGAPP pour plus d'informations.</p>
+          </div>
+        </div>
+      )}
       <div>
         <Label className="text-xs">Logo / Photo</Label>
         <div className="flex items-center gap-3 mt-1">
@@ -99,9 +108,9 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
       )}
       <div className="flex items-center gap-4">
         <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.ouvert} onChange={e => set("ouvert", e.target.checked)} className="w-4 h-4" /> Ouvert actuellement</label>
-        <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.actif} onChange={e => set("actif", e.target.checked)} className="w-4 h-4" /> Actif sur la plateforme</label>
+        {isAdmin && <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.actif} onChange={e => set("actif", e.target.checked)} className="w-4 h-4" /> Actif sur la plateforme</label>}
       </div>
-      <div><Label className="text-xs">Commission (%) — laisser vide pour défaut</Label><Input type="number" value={form.commission_pct ?? ""} onChange={e => set("commission_pct", e.target.value ? parseInt(e.target.value) : null)} placeholder="Ex: 10" className="mt-1" /></div>
+      {isAdmin && <div><Label className="text-xs">Commission (%) — laisser vide pour défaut</Label><Input type="number" value={form.commission_pct ?? ""} onChange={e => set("commission_pct", e.target.value ? parseInt(e.target.value) : null)} placeholder="Ex: 10" className="mt-1" /></div>}
       <div className="flex gap-2 pt-2">
         <Button onClick={handleSave} disabled={saving || !form.nom} className="flex-1 bg-purple-600 hover:bg-purple-700">
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Enregistrer

@@ -9,6 +9,7 @@ import PageNotFound from './lib/PageNotFound';
 import AuthGate from './components/auth/AuthGate.jsx';
 import SelectionReseau from './pages/SelectionReseau.jsx';
 import AppMaintenanceGate from './components/admin/AppMaintenanceGate.jsx';
+import { restoreTokenFromCookie, syncTokenFromPreferences, clearPersistedToken } from '@/lib/authPersistence';
 
 // LoadingScreen défini IMMÉDIATEMENT avant lazy loading
 const LoadingScreen = () => <SplashScreen />;
@@ -57,6 +58,7 @@ const AdminCourseForm = lazy(() => import('./pages/AdminCourseForm.jsx'));
 const DemandesLivreursAdmin = lazy(() => import('./components/admin/DemandesLivreursPanel.jsx'));
 const LivreursBloquesEncours = lazy(() => import('./components/admin/LivreursBloquesEncours.jsx'));
 const Comptabilite = lazy(() => import('./pages/Comptabilite.jsx'));
+const CommandesPartenaires = lazy(() => import('./pages/CommandesPartenaires.jsx'));
 const AntiFraudePanel = lazy(() => import('./components/admin/AntiFraudePanel.jsx'));
 const SupportAdmin = lazy(() => import('./components/admin/SupportAdmin.jsx'));
 const SupportClient = lazy(() => import('./pages/SupportClient.jsx'));
@@ -133,6 +135,40 @@ function AppContent() {
     document.addEventListener('backbutton', handleBackButton, false);
     return () => document.removeEventListener('backbutton', handleBackButton);
   }, [navigate, location]);
+
+  // ── Heartbeat d'authentification — empêche la déconnexion involontaire ──
+  // Sur Android WebView, localStorage peut être effacé quand l'app passe en
+  // arrière-plan. Ce heartbeat restaure le token depuis le cookie/Preferences
+  // si localStorage l'a perdu, et garde la session active.
+  useEffect(() => {
+    const checkAndRestoreToken = async () => {
+      const token = localStorage.getItem('base44_access_token');
+      if (!token || token.length < 10) {
+        // localStorage a perdu le token — tenter restauration depuis cookie
+        const restored = restoreTokenFromCookie();
+        if (!restored) {
+          // Cookie aussi perdu — tenter Capacitor Preferences
+          await syncTokenFromPreferences();
+        }
+      }
+    };
+
+    // Vérification toutes les 60 secondes
+    const interval = setInterval(checkAndRestoreToken, 60000);
+
+    // Vérification immédiate quand l'app revient au premier plan
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        checkAndRestoreToken();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
 
   const [livreurProfil, setLivreurProfil] = useState(null);
   const [isClient, setIsClient] = useState(false);
@@ -324,9 +360,10 @@ function AppContent() {
           <Route path="/admin/comptabilite" element={<AnimatedRoutes><Comptabilite /></AnimatedRoutes>} />
           <Route path="/admin/anti-fraude" element={<AnimatedRoutes><AntiFraudePanel /></AnimatedRoutes>} />
           <Route path="/admin/support" element={<AnimatedRoutes><SupportAdmin /></AnimatedRoutes>} />
-          <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
           <Route path="/admin/boutiques" element={<AnimatedRoutes><GestionBoutiques /></AnimatedRoutes>} />
           <Route path="/admin/restaurants" element={<AnimatedRoutes><GestionRestaurants /></AnimatedRoutes>} />
+          <Route path="/admin/commandes-partenaires" element={<AnimatedRoutes><CommandesPartenaires /></AnimatedRoutes>} />
+          <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
           <Route path="/support" element={<AnimatedRoutes><SupportClient /></AnimatedRoutes>} />
         </Route>
         <Route path="*" element={<PageNotFound />} />

@@ -1,23 +1,22 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Package, CheckCircle, XCircle, Clock, Banknote, MapPin } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { normalizeCommissionPct, splitAmountByCommission } from "@/lib/commissionUtils";
 
 const STATUT_CONFIG = {
-  en_attente: { label: "En attente", cls: "bg-gray-100 text-gray-600" },
-  recupere: { label: "Récupéré", cls: "bg-blue-100 text-blue-700" },
+  en_attente:  { label: "En attente",   cls: "bg-gray-100 text-gray-600" },
+  recupere:    { label: "Récupéré",     cls: "bg-blue-100 text-blue-700" },
   en_livraison:{ label: "En livraison", cls: "bg-purple-100 text-purple-700" },
-  livre: { label: "Livré ", cls: "bg-green-100 text-green-700" },
-  annule: { label: "Annulé", cls: "bg-red-100 text-red-500" },
+  livre:       { label: "Livré ",      cls: "bg-green-100 text-green-700" },
+  annule:      { label: "Annulé",       cls: "bg-red-100 text-red-500" },
 };
 
 /**
  * Section affichée dans CourseDetailDialog pour les courses externes multi-colis.
  * Affiche chaque sous-colis avec : destinataire, statut, montant encaissé.
- * + Totaux : total encaissé, gain livreur, commission Silga.
+ * + Totaux : total encaissé, gain livreur, commission SILGAPP (dynamique par pays).
  */
 export default function MultiColisAdminView({ course }) {
   const { data: colis = [], isLoading } = useQuery({
@@ -26,21 +25,21 @@ export default function MultiColisAdminView({ course }) {
     enabled: !!course.id && course.is_multi_colis,
     initialData: [],
   });
-  const { data: countryCommissionRows = [] } = useQuery({
-    queryKey: ["country-commission", course.country_code],
-    queryFn: () => base44.entities.Country.filter({ code: course.country_code, actif: true }),
-    enabled: !!course.country_code && course.is_multi_colis,
-    staleTime: 30000,
-  });
+
+  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+  useEffect(() => {
+    if (!course?.country_code) return;
+    base44.entities.Country.filter({ code: course.country_code, actif: true })
+      .then(countries => { if (countries?.[0]?.commission_pct) setCountryCommissionPct(countries[0].commission_pct); })
+      .catch(() => {});
+  }, [course?.country_code]);
 
   if (!course.is_multi_colis || course.nb_colis <= 1) return null;
 
   const devise = course.devise || "F";
   const totalEncaisse = colis.filter(c => c.statut === "livre").reduce((s, c) => s + (c.montant_a_encaisser || 0), 0);
-  const commissionPct = normalizeCommissionPct(countryCommissionRows?.[0]?.commission_pct);
-  const split = splitAmountByCommission(totalEncaisse, commissionPct);
-  const gainLivreur = split.montant_livreur || 0;
-  const commissionSilga = split.commission_silga || 0;
+  const gainLivreur = Math.round(totalEncaisse * ((100 - countryCommissionPct) / 100));
+  const commissionSilga = Math.round(totalEncaisse * (countryCommissionPct / 100));
   const nbLivres = colis.filter(c => c.statut === "livre").length;
   const nbAnnules = colis.filter(c => c.statut === "annule").length;
 
@@ -150,11 +149,12 @@ export default function MultiColisAdminView({ course }) {
                 <div className="bg-white rounded-xl p-2 text-center border border-green-100">
                   <p className="text-[9px] text-gray-600 font-bold uppercase">Gain livreur</p>
                   <p className="text-sm font-black text-green-700">{gainLivreur.toLocaleString()} {devise}</p>
+                  <p className="text-[8px] text-green-500">{100 - countryCommissionPct}%</p>
                 </div>
                 <div className="bg-white rounded-xl p-2 text-center border border-orange-100">
                   <p className="text-[9px] text-gray-600 font-bold uppercase">Commission</p>
                   <p className="text-sm font-black text-orange-600">{commissionSilga.toLocaleString()} {devise}</p>
-                  {commissionPct !== null && <p className="text-[8px] text-orange-400">{commissionPct}%</p>}
+                  <p className="text-[8px] text-orange-400">{countryCommissionPct}%</p>
                 </div>
               </div>
             </div>

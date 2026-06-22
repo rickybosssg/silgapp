@@ -274,7 +274,7 @@ export default function RecapCourseLivreur() {
           <div className="flex items-center justify-between py-2">
             <div>
               <p className="text-red-400 font-bold text-sm">Commission SILGAPP</p>
-              <p className="text-gray-500 text-xs">À reverser à Silga</p>
+              <p className="text-gray-500 text-xs">À reverser à SILGAPP</p>
             </div>
             <p className="text-red-400 text-xl font-black">{commissionSilga.toLocaleString()} F</p>
           </div>

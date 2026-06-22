@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
@@ -225,7 +225,7 @@ export default function DashboardAdminExterne() {
             <div>
               <div className="flex items-center gap-2">
                 <Zap className="w-5 h-5 text-yellow-300" />
-                <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">Silga Externe</h1>
+                <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">SILGAPP Externe</h1>
               </div>
               <p className="text-white/70 text-xs mt-0.5 capitalize">
                 {format(new Date(), "EEEE d MMMM yyyy", { locale: fr })}
@@ -264,16 +264,16 @@ export default function DashboardAdminExterne() {
         <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Vue d'ensemble</p>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
           {[
-            { label: "Total courses", value: stats.coursesTotale, grad: "from-primary to-red-600", shadow: "shadow-red-100" },
-            { label: "Aujourd'hui", value: stats.coursesToday, grad: "from-blue-500 to-indigo-500", shadow: "shadow-blue-100" },
-            { label: "En traitement", value: stats.enTraitement, grad: "from-orange-500 to-amber-500", shadow: "shadow-orange-100" },
-            { label: "Livrées", value: stats.livrees, grad: "from-green-500 to-emerald-500", shadow: "shadow-green-100" },
-            { label: "Annulées", value: stats.annulees, grad: "from-red-400 to-rose-500", shadow: "shadow-red-100" },
-            { label: "CA total", value: `${stats.caTotal.toLocaleString()}`, grad: "from-indigo-500 to-violet-500", shadow: "shadow-indigo-100", suffix: "F" },
-            { label: "Commission Silga", value: `${stats.commissionSilga.toLocaleString()}`, grad: "from-purple-500 to-fuchsia-500", shadow: "shadow-purple-100", suffix: "F" },
-            { label: "Livreurs en ligne",value: stats.livreursEnLigne, grad: "from-emerald-500 to-teal-500", shadow: "shadow-emerald-100" },
-            { label: "Disponibles", value: stats.livreursDisponibles, grad: "from-cyan-500 to-sky-500", shadow: "shadow-cyan-100" },
-            { label: "Clients", value: stats.clientsTotal, grad: "from-pink-500 to-rose-500", shadow: "shadow-pink-100" },
+            { label: "Total courses",    value: stats.coursesTotale,               grad: "from-primary to-red-600",          shadow: "shadow-red-100" },
+            { label: "Aujourd'hui",      value: stats.coursesToday,                grad: "from-blue-500 to-indigo-500",       shadow: "shadow-blue-100" },
+            { label: "En traitement",    value: stats.enTraitement,                grad: "from-orange-500 to-amber-500",      shadow: "shadow-orange-100" },
+            { label: "Livrées",          value: stats.livrees,                     grad: "from-green-500 to-emerald-500",     shadow: "shadow-green-100" },
+            { label: "Annulées",         value: stats.annulees,                    grad: "from-red-400 to-rose-500",          shadow: "shadow-red-100" },
+            { label: "CA total",         value: `${stats.caTotal.toLocaleString()}`, grad: "from-indigo-500 to-violet-500",  shadow: "shadow-indigo-100", suffix: "F" },
+            { label: "Commission SILGAPP", value: `${stats.commissionSilga.toLocaleString()}`, grad: "from-purple-500 to-fuchsia-500", shadow: "shadow-purple-100", suffix: "F" },
+            { label: "Livreurs en ligne",value: stats.livreursEnLigne,             grad: "from-emerald-500 to-teal-500",      shadow: "shadow-emerald-100" },
+            { label: "Disponibles",      value: stats.livreursDisponibles,         grad: "from-cyan-500 to-sky-500",          shadow: "shadow-cyan-100" },
+            { label: "Clients",          value: stats.clientsTotal,                grad: "from-pink-500 to-rose-500",         shadow: "shadow-pink-100" },
           ].map(s => (
             <div key={s.label} className={`bg-gradient-to-br ${s.grad} rounded-2xl p-3.5 text-white shadow-md ${s.shadow}`}>
               <p className="text-[10px] font-semibold opacity-80 uppercase tracking-wide mb-1">{s.label}</p>
@@ -429,11 +429,11 @@ export default function DashboardAdminExterne() {
               .sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
               .map(course => {
                 const statutConfig = {
-                  colis_recupere: { label: " Récupéré", cls: "bg-blue-100 text-blue-700" },
-                  en_livraison: { label: " En livraison", cls: "bg-indigo-100 text-indigo-700" },
+                  colis_recupere: { label: " Récupéré",  cls: "bg-blue-100 text-blue-700" },
+                  en_livraison:   { label: " En livraison", cls: "bg-indigo-100 text-indigo-700" },
                   livreur_en_route: { label: " En route", cls: "bg-cyan-100 text-cyan-700" },
                   recherche_livreur: { label: " Recherche", cls: "bg-amber-100 text-amber-700" },
-                  nouvelle: { label: " Nouvelle", cls: "bg-gray-100 text-gray-600" },
+                  nouvelle:       { label: " Nouvelle",   cls: "bg-gray-100 text-gray-600" },
                 }[course.statut] || { label: course.statut, cls: "bg-gray-100 text-gray-500" };
 
                 return (

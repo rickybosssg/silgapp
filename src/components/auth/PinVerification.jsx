@@ -75,7 +75,7 @@ export default function PinVerification({ onVerify, onCancel, networkName }) {
             className="w-32 h-32 object-contain mx-auto"
           />
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Silga Externe</h1>
+            <h1 className="text-2xl font-bold text-foreground">SILGAPP Externe</h1>
             <p className="text-muted-foreground mt-1">Accès sécurisé</p>
           </div>
         </div>

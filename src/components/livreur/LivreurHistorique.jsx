@@ -137,7 +137,7 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
               </div>
               <div className="bg-red-50 rounded-lg p-2 border border-red-200 text-center">
                 <p className="text-xs font-bold text-red-700">{commissionToday.toLocaleString()} FCFA</p>
-                <p className="text-[10px] text-red-600 mt-0.5">Dû à Silga (auj.)</p>
+                <p className="text-[10px] text-red-600 mt-0.5">Dû à SILGAPP (auj.)</p>
               </div>
             </div>
           </div>
@@ -314,7 +314,7 @@ export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne
                                   )}
                                   {commission > 0 && (
                                     <span className="text-xs text-orange-600 bg-orange-50 rounded px-2 py-0.5">
-                                      Silga: {commission.toLocaleString()} F
+                                      SILGAPP: {commission.toLocaleString()} F
                                     </span>
                                   )}
                                   {course.note_livreur > 0 && (

@@ -85,7 +85,7 @@ function DetailPaiementModal({ entry, livreurInfo, onClose, onPaiement, onBloque
             <div className="flex justify-between text-sm"><span className="text-muted-foreground">Commission SILGAPP</span><span className="font-semibold text-orange-600">{entry.commissionTotal.toLocaleString()} FCFA</span></div>
             <div className="flex justify-between text-sm"><span className="text-muted-foreground">Déjà payé</span><span className="font-semibold text-green-600">{entry.montantPaye.toLocaleString()} FCFA</span></div>
             <div className="border-t pt-2 flex justify-between text-sm font-bold">
-              <span>Reste dû à Silga</span>
+              <span>Reste dû à SILGAPP</span>
               <span className={entry.montantDu > 0 ? "text-red-600 text-base" : "text-green-600"}>{entry.montantDu.toLocaleString()} FCFA</span>
             </div>
           </div>
@@ -120,7 +120,7 @@ function DetailPaiementModal({ entry, livreurInfo, onClose, onPaiement, onBloque
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-xs text-muted-foreground">
                     {c.distance_reelle_km != null && <span> {Number(c.distance_reelle_km).toFixed(1)} km</span>}
                     {c.prix_final != null && <span> {c.prix_final.toLocaleString()} F</span>}
-                    {c.commission_silga != null && <span className="text-orange-600 font-semibold">Silga: {c.commission_silga.toLocaleString()} F</span>}
+                    {c.commission_silga != null && <span className="text-orange-600 font-semibold">SILGAPP: {c.commission_silga.toLocaleString()} F</span>}
                   </div>
                 </div>
               ))}
@@ -341,7 +341,7 @@ export default function DusLivreursExternes() {
             <div className="w-10 h-10 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center text-xl flex-shrink-0"></div>
             <div>
               <h1 className="text-xl font-black text-white tracking-tight">Comptabilité Livreurs & Clients</h1>
-              <p className="text-white/65 text-xs mt-0.5">Commissions · Frais d'annulation · Clôture à 20h00</p>
+              <p className="text-white/65 text-xs mt-0.5">Commissions selon pays · Frais d'annulation · Clôture à 20h00</p>
             </div>
           </div>
         </div>
@@ -366,7 +366,7 @@ export default function DusLivreursExternes() {
           {/* KPI STATS */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             {[
-              { label: "Total dû", value: totalDu.toLocaleString(), suffix: "F", grad: "from-orange-500 to-amber-500", shadow: "shadow-orange-100", icon: "" },
+              { label: "Total dû", value: totalDu.toLocaleString(), suffix: "F", grad: "from-orange-500 to-amber-500", shadow: "shadow-orange-100", icon: "️" },
               { label: "Livreurs", value: recapLivreurs.length, suffix: null, grad: "from-primary to-red-600", shadow: "shadow-red-100", icon: "" },
               { label: "Commission totale", value: totalCommission.toLocaleString(), suffix: "F", grad: "from-blue-500 to-indigo-600", shadow: "shadow-blue-100", icon: "" },
               { label: "Encaissé", value: totalPaye.toLocaleString(), suffix: "F", grad: "from-green-500 to-emerald-500", shadow: "shadow-green-100", icon: "" },

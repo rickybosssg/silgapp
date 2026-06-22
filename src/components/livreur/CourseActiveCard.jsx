@@ -1330,7 +1330,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 )}
                 {isExterne && commission !== null && (
                   <p className="text-center text-xs text-gray-600">
-                    Commission Silga : {commission.toLocaleString()} {course.devise || "F"}
+                    Commission SILGAPP : {commission.toLocaleString()} {course.devise || "F"}
                   </p>
                 )}
               </div>

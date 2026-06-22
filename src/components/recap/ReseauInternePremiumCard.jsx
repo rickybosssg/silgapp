@@ -51,8 +51,8 @@ const STAT_CONFIGS = [
     isMoney: true,
   },
   {
-    key: "totalDuSilga",
-    label: "Dû à Silga",
+    key: "totalDuSILGAPP",
+    label: "Dû à SILGAPP",
     icon: Landmark,
     activeColor: "text-orange-600",
     activeBg: "bg-orange-50",
@@ -181,13 +181,13 @@ export default function ReseauInternePremiumCard({ livreurs, coursesLivrees }) {
   const paiementsEnAttente = livreurs.filter(l => l.statut_paiement !== "paye").length;
 
   const totalEncaisse = coursesLivrees.reduce((sum, c) => sum + (c.prix_reel || c.prix || 0), 0);
-  const totalDuSilga = totalEncaisse;
-  const netLivreurs = coursesLivrees.reduce((sum, c) => sum + (Number(c.montant_livreur) || 0), 0);
+  const totalDuSILGAPP = totalEncaisse;
+  const netLivreurs = Math.round(totalEncaisse * 0.7);
 
   const stats = {
     coursesLivrees: coursesLivrees.length,
     totalEncaisse,
-    totalDuSilga,
+    totalDuSILGAPP,
     disponibles,
     enCourse,
     enLigne,
@@ -236,8 +236,8 @@ export default function ReseauInternePremiumCard({ livreurs, coursesLivrees }) {
             <p className="text-gray-500 text-[10px]">FCFA</p>
           </div>
           <div className="text-center border-x border-gray-700">
-            <p className="text-xs text-gray-400 mb-1">Dû à Silga</p>
-            <p className="text-orange-400 font-black text-lg leading-none">{totalDuSilga.toLocaleString()}</p>
+            <p className="text-xs text-gray-400 mb-1">Dû à SILGAPP</p>
+            <p className="text-orange-400 font-black text-lg leading-none">{totalDuSILGAPP.toLocaleString()}</p>
             <p className="text-gray-500 text-[10px]">FCFA</p>
           </div>
           <div className="text-center">

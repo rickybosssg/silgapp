@@ -41,39 +41,84 @@ export default function ProduitsManager({ type, etablissementId }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="font-bold text-gray-900 text-sm">{isRestaurant ? "Plats" : "Produits"}</h2>
-        <Button size="sm" onClick={() => { setEditing(null); setShowForm(true); }} className="bg-purple-600 hover:bg-purple-700 gap-1">
+      <div className="flex items-center justify-between px-1">
+        <h2 className="font-bold text-gray-900 text-base">{isRestaurant ? "Plats" : "Produits"}</h2>
+        <Button size="sm" onClick={() => { setEditing(null); setShowForm(true); }} className="bg-purple-600 hover:bg-purple-700 gap-1 rounded-xl">
           <Plus className="w-4 h-4" /> Ajouter
         </Button>
       </div>
 
-      {isLoading && <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>}
-
-      {!isLoading && items.length === 0 && (
-        <div className="text-center py-8">
-          {isRestaurant ? <UtensilsCrossed className="w-10 h-10 text-gray-300 mx-auto mb-2" /> : <Package className="w-10 h-10 text-gray-300 mx-auto mb-2" />}
-          <p className="text-sm text-gray-400">Aucun {isRestaurant ? "plat" : "produit"} pour le moment</p>
+      {/* Stats rapides */}
+      {!isLoading && items.length > 0 && (
+        <div className="grid grid-cols-3 gap-2 px-1">
+          <div className="bg-white rounded-xl p-2.5 text-center border border-gray-50 shadow-sm">
+            <p className="text-lg font-black text-gray-900">{items.length}</p>
+            <p className="text-[9px] text-gray-400 font-medium">Total</p>
+          </div>
+          <div className="bg-white rounded-xl p-2.5 text-center border border-gray-50 shadow-sm">
+            <p className="text-lg font-black text-green-600">{items.filter(i => i.disponible).length}</p>
+            <p className="text-[9px] text-gray-400 font-medium">Disponibles</p>
+          </div>
+          <div className="bg-white rounded-xl p-2.5 text-center border border-gray-50 shadow-sm">
+            <p className="text-lg font-black text-gray-400">{items.filter(i => !i.disponible).length}</p>
+            <p className="text-[9px] text-gray-400 font-medium">Rupture</p>
+          </div>
         </div>
       )}
 
-      <div className="space-y-2">
+      {isLoading && <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-purple-400" /></div>}
+
+      {!isLoading && items.length === 0 && (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-3">
+            {isRestaurant ? <UtensilsCrossed className="w-8 h-8 text-gray-300" /> : <Package className="w-8 h-8 text-gray-300" />}
+          </div>
+          <p className="text-sm text-gray-400 font-medium">Aucun {isRestaurant ? "plat" : "produit"} pour le moment</p>
+          <p className="text-xs text-gray-400 mt-1">Cliquez sur « Ajouter » pour commencer</p>
+        </div>
+      )}
+
+      {/* Grille de produits — style marketplace */}
+      <div className="grid grid-cols-2 gap-3">
         {items.map(item => (
-          <div key={item.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
-              {item.photo_url ? <img src={item.photo_url} alt={item.nom} className="w-full h-full object-cover" /> : (isRestaurant ? <UtensilsCrossed className="w-5 h-5 text-gray-300" /> : <Package className="w-5 h-5 text-gray-300" />)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-gray-900 text-sm truncate">{item.nom}</p>
-              <p className="text-xs text-gray-500 truncate">{item.categorie || ""}</p>
-              <p className="font-bold text-primary text-sm">{(item.prix || 0).toLocaleString()} FCFA</p>
-            </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <button onClick={() => handleToggleDispo(item)} className={"px-2 py-1 rounded-lg text-[10px] font-bold " + (item.disponible ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-400")}>
+          <div key={item.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden group">
+            {/* Photo */}
+            <div className="relative w-full aspect-square bg-gray-50 overflow-hidden">
+              {item.photo_url ? (
+                <img src={item.photo_url} alt={item.nom} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  {isRestaurant ? <UtensilsCrossed className="w-8 h-8 text-gray-200" /> : <Package className="w-8 h-8 text-gray-200" />}
+                </div>
+              )}
+              {/* Badge dispo */}
+              <button
+                onClick={() => handleToggleDispo(item)}
+                className={"absolute top-2 right-2 text-[9px] font-bold px-2 py-1 rounded-full backdrop-blur-sm " + (item.disponible ? "bg-green-500/90 text-white" : "bg-gray-500/90 text-white")}
+              >
                 {item.disponible ? "Dispo" : "Rupture"}
               </button>
-              <button onClick={() => { setEditing(item); setShowForm(true); }} className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center"><Pencil className="w-4 h-4 text-gray-500" /></button>
-              <button onClick={() => handleDelete(item.id)} className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center"><Trash2 className="w-4 h-4 text-red-500" /></button>
+              {/* Catégorie */}
+              {item.categorie && (
+                <span className="absolute top-2 left-2 text-[9px] font-bold px-2 py-0.5 rounded-full bg-white/90 text-gray-600 backdrop-blur-sm">
+                  {isRestaurant ? (CATEGORIES_PLAT.find(c => c.value === item.categorie)?.label || item.categorie) : item.categorie}
+                </span>
+              )}
+            </div>
+            {/* Info */}
+            <div className="p-2.5">
+              <p className="font-bold text-gray-900 text-sm truncate">{item.nom}</p>
+              {item.description && <p className="text-[10px] text-gray-400 truncate">{item.description}</p>}
+              <p className="font-black text-primary text-sm mt-1">{(item.prix || 0).toLocaleString()} FCFA</p>
+              {/* Actions */}
+              <div className="flex gap-1.5 mt-2">
+                <button onClick={() => { setEditing(item); setShowForm(true); }} className="flex-1 h-8 rounded-lg bg-purple-50 flex items-center justify-center gap-1 text-[10px] font-bold text-purple-600 hover:bg-purple-100 transition-colors">
+                  <Pencil className="w-3 h-3" /> Modifier
+                </button>
+                <button onClick={() => handleDelete(item.id)} className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center hover:bg-red-100 transition-colors">
+                  <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                </button>
+              </div>
             </div>
           </div>
         ))}

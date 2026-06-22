@@ -31,10 +31,10 @@ export default function CheckoutModal({ type, etablissementId, etablissementNom,
     setSubmitting(true);
     try {
       const items = cart.map(item => ({ id: item.id, nom: item.nom, prix: item.prix, quantite: item.quantite, photo_url: item.photo_url || "" }));
-      const fnName = type === "restaurant" ? "creerCommandeRestaurant" : "creerCommandeBoutique";
-      const idField = type === "restaurant" ? "restaurant_id" : "boutique_id";
-      await base44.functions.invoke(fnName, {
-        [idField]: etablissementId,
+      await base44.functions.invoke("creerCommandePartenaire", {
+        type,
+        boutique_id: type === "boutique" ? etablissementId : undefined,
+        restaurant_id: type === "restaurant" ? etablissementId : undefined,
         items,
         total,
         adresse_livraison: adresse,

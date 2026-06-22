@@ -60,9 +60,9 @@ export default function SelectionReseau({ onSelect }) {
                 <Building className="w-7 h-7 text-primary" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-foreground">Silga Interne</h2>
+                <h2 className="text-xl font-bold text-foreground">SILGAPP Interne</h2>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Espace de gestion interne Silga Livraison
+                  Espace de gestion interne SILGAPP Livraison
                 </p>
               </div>
               <div className="space-y-2 text-sm text-muted-foreground">
@@ -71,7 +71,7 @@ export default function SelectionReseau({ onSelect }) {
                 <p>• Rapports internes</p>
               </div>
               <Button className="w-full bg-primary hover:bg-primary/90">
-                Accéder à Silga Interne
+                Accéder à SILGAPP Interne
               </Button>
             </div>
           </Card>
@@ -82,7 +82,7 @@ export default function SelectionReseau({ onSelect }) {
                 <Users className="w-7 h-7 text-accent" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-foreground">Silga Externe</h2>
+                <h2 className="text-xl font-bold text-foreground">SILGAPP Externe</h2>
                 <p className="text-sm text-muted-foreground mt-2">
                   Plateforme clients et livreurs externes
                 </p>
@@ -93,7 +93,7 @@ export default function SelectionReseau({ onSelect }) {
                 <p>• Dispatch automatique</p>
               </div>
               <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                Accéder à Silga Externe
+                Accéder à SILGAPP Externe
               </Button>
             </div>
           </Card>

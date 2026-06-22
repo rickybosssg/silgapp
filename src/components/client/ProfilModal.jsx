@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
+import { clearPersistedToken } from "@/lib/authPersistence";
 import { toast } from "sonner";
 import { User, Save, X, Check, Trash2 } from "lucide-react";
 import CountryCodeSelect from "@/components/ui/CountryCodeSelect";
@@ -191,7 +192,7 @@ export default function ProfilModal({ clientProfil, onClose, onSave }) {
                   try {
                     await base44.entities.ClientExterne.update(clientProfil.id, { actif: false });
                     toast.success("Compte désactivé. Contactez le support pour toute question.");
-                    base44.auth.logout();
+                    { clearPersistedToken(); base44.auth.logout(); };
                   } catch {
                     toast.error("Erreur lors de la suppression");
                     setDeleting(false);

@@ -50,11 +50,9 @@ function isLivreurNoir(livreur, livreurIdsEnCourseReelle) {
   if (livreur.statut === "hors_ligne") return true;
   if (livreur.actif === false) return true;
   if (livreur.validation !== "valide") return true;
-  // En course = avec course ACTIVE (peu importe le statut DB)
   if (livreurIdsEnCourseReelle?.has(livreur.id)) return false;
-  // Disponible avec GPS = vert (même si GPS/heartbeat ancien)
-  if (livreur.statut === "disponible") return false;
-  return true;
+  // Tout livreur actif, valide, avec GPS et non hors ligne reste visible sur la carte temps reel.
+  return false;
 }
 
 function getClientStatut(client) {

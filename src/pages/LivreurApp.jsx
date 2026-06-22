@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { clearPersistedToken } from "@/lib/authPersistence";
 import { Truck } from "lucide-react";
 import { toast } from "sonner";
 import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
@@ -355,7 +356,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
     ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
       try { localStorage.removeItem(k); } catch(_) {}
     });
-    base44.auth.logout();
+    { clearPersistedToken(); base44.auth.logout(); };
     setTimeout(() => window.location.reload(), 300);
   };
 
@@ -514,7 +515,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
         <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-3xl p-5 border border-amber-100 shadow-sm mt-4 max-w-lg mx-auto">
           <p className="text-xs text-amber-600 font-bold uppercase tracking-wide mb-1">Bilan du jour</p>
           <p className="text-3xl font-black text-amber-700">{totalEncaisse.toLocaleString()} <span className="text-base font-semibold text-amber-500">FCFA</span></p>
-          <p className="text-xs text-amber-500 mt-1">Montant à reverser à Silga Livraison</p>
+          <p className="text-xs text-amber-500 mt-1">Montant à reverser à SILGAPP Livraison</p>
         </div>
       )}
     </div>

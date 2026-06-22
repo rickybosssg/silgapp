@@ -47,6 +47,28 @@
       })();
     </script>
     <script>
+      // ── Restauration du token depuis le cookie (synchrone, avant tout module ES) ──
+      // Sur Android WebView, localStorage peut être effacé quand le système récupère
+      // de la mémoire. Ce script restaure le token depuis le cookie AVANT que le SDK
+      // Base44 ne lise localStorage, empêchant la déconnexion involontaire.
+      (function() {
+        try {
+          var match = document.cookie.match(new RegExp('(^| )silgapp_auth_token=([^;]+)'));
+          if (match && match[2] && match[2].length > 10) {
+            var token = match[2];
+            var current = localStorage.getItem('base44_access_token');
+            if (!current || current.length < 10) {
+              localStorage.setItem('base44_access_token', token);
+              localStorage.setItem('access_token', token);
+              console.log('[TOKEN] Token restauré depuis cookie (index.html)');
+            }
+          }
+        } catch(e) {
+          console.error('[TOKEN] Erreur restauration cookie:', e);
+        }
+      })();
+    </script>
+    <script>
       (function() {
         console.log('[TOKEN] Début capture token');
         try {

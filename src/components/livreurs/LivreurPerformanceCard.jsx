@@ -29,7 +29,7 @@ export default function LivreurPerformanceCard({ livreur, courses, onVoirDetails
   );
 
   const totalEncaisse = coursesLivrees.reduce((sum, c) => sum + (c.prix_reel || 0), 0);
-  const montantDu = totalEncaisse; // 100% à Silga
+  const montantDu = totalEncaisse; // 100% à SILGAPP
   const isPaye = livreur.statut_paiement === "paye";
 
   const nomComplet = `${livreur.prenom || ""} ${livreur.nom}`.trim();
@@ -109,7 +109,7 @@ export default function LivreurPerformanceCard({ livreur, courses, onVoirDetails
         isPaye ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-200"
       )}>
         <div className="flex items-center justify-between text-xs mb-2">
-          <span className="text-muted-foreground">Montant dû à Silga</span>
+          <span className="text-muted-foreground">Montant dû à SILGAPP</span>
           {isPaye ? (
             <Badge className="bg-green-500 text-white text-[10px]"> Payé</Badge>
           ) : totalEncaisse > 0 ? (

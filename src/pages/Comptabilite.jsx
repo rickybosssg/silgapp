@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   TrendingUp, Users, AlertTriangle,
   BarChart3, Download, FileText, Wallet,
-  Calendar, MapPin, TrendingDown, Minus
+  Calendar, MapPin, TrendingDown, Minus, Store, UtensilsCrossed
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -17,6 +17,8 @@ import {
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { fr } from "date-fns/locale";
 import ComptabiliteLivreurDetail from "@/components/comptabilite/ComptabiliteLivreurDetail";
+import PaiementsPartenairesAdmin from "@/components/admin/PaiementsPartenairesAdmin";
+import CommandesPartenairesAdmin from "@/components/admin/CommandesPartenairesAdmin";
 
 const COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316'];
 
@@ -72,6 +74,7 @@ export default function Comptabilite() {
   const evolution = compta?.evolution || [];
   const parPays = compta?.par_pays || {};
   const topLivreurs = compta?.top_livreurs || [];
+  const topPartenaires = compta?.top_partenaires || [];
   const paysConfig = compta?.pays_config || {};
 
   const devisePays = selectedCountry !== "all" && paysConfig[selectedCountry]
@@ -166,7 +169,7 @@ export default function Comptabilite() {
             <SelectContent>
               <SelectItem value="all"> Tous les pays</SelectItem>
               {countries.map(c => (
-                <SelectItem key={c.code} value={c.code}>{c.emoji_flag || ""} {c.nom}</SelectItem>
+                <SelectItem key={c.code} value={c.code}>{c.emoji_flag || "️"} {c.nom}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -247,6 +250,46 @@ export default function Comptabilite() {
             <p className="text-[10px] text-gray-400 mt-1">
               {kpis.nb_bloques || 0} bloqué(s) / {kpis.nb_livreurs_actifs || 0} actifs
             </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* KPIs Partenaires */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-violet-50">
+          <CardContent className="p-4">
+            <p className="text-xs text-purple-600 font-medium uppercase tracking-wider flex items-center gap-1">
+              <Store className="w-3.5 h-3.5" /> CA Partenaires
+            </p>
+            <div className="flex items-baseline gap-1 mt-1">
+              <p className="text-xl font-black text-purple-700">{formatMontant(kpis.ca_partenaires)}</p>
+              <span className="text-xs text-gray-400">{devisePays}</span>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1">{kpis.nb_commandes_partenaires || 0} commandes boutiques/restaurants</p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm bg-gradient-to-br from-red-50 to-rose-50">
+          <CardContent className="p-4">
+            <p className="text-xs text-red-600 font-medium uppercase tracking-wider flex items-center gap-1">
+              <Wallet className="w-3.5 h-3.5" /> Commission due (Partenaires)
+            </p>
+            <div className="flex items-baseline gap-1 mt-1">
+              <p className="text-xl font-black text-red-600">{formatMontant(kpis.commission_partenaires)}</p>
+              <span className="text-xs text-gray-400">{devisePays}</span>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1">
+              {kpis.ca_partenaires > 0 ? `${Math.round((kpis.commission_partenaires / kpis.ca_partenaires) * 100)}% du CA partenaires` : '—'}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm bg-gradient-to-br from-emerald-50 to-green-50">
+          <CardContent className="p-4">
+            <p className="text-xs text-emerald-600 font-medium uppercase tracking-wider">Commission totale SILGAPP</p>
+            <div className="flex items-baseline gap-1 mt-1">
+              <p className="text-xl font-black text-emerald-700">{formatMontant((kpis.commission_totale || 0) + (kpis.commission_partenaires || 0))}</p>
+              <span className="text-xs text-gray-400">{devisePays}</span>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1">Courses + Partenaires</p>
           </CardContent>
         </Card>
       </div>
@@ -385,6 +428,62 @@ export default function Comptabilite() {
           )}
         </CardContent>
       </Card>
+
+      {/* Top Partenaires */}
+      {topPartenaires.length > 0 && (
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-bold text-gray-700 flex items-center gap-2">
+              <Store className="w-4 h-4 text-purple-500" />
+              Top Partenaires ({topPartenaires.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="text-left py-2 text-xs text-gray-500 font-medium">#</th>
+                    <th className="text-left py-2 text-xs text-gray-500 font-medium">Établissement</th>
+                    <th className="text-left py-2 text-xs text-gray-500 font-medium">Type</th>
+                    <th className="text-right py-2 text-xs text-gray-500 font-medium">Commandes</th>
+                    <th className="text-right py-2 text-xs text-gray-500 font-medium">CA</th>
+                    <th className="text-right py-2 text-xs text-gray-500 font-medium">Commission SILGAPP</th>
+                    <th className="text-right py-2 text-xs text-gray-500 font-medium">Net partenaire</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topPartenaires.map((p, i) => (
+                    <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50">
+                      <td className="py-2.5">
+                        <Badge variant={i < 3 ? "default" : "outline"} className="text-[10px] w-6 h-5 flex items-center justify-center">
+                          {i + 1}
+                        </Badge>
+                      </td>
+                      <td className="py-2.5 font-semibold text-gray-900">{p.nom || '—'}</td>
+                      <td className="py-2.5">
+                        {p.type === 'restaurant'
+                          ? <span className="text-[10px] font-bold text-orange-600 flex items-center gap-1"><UtensilsCrossed className="w-3 h-3" /> Restaurant</span>
+                          : <span className="text-[10px] font-bold text-blue-600 flex items-center gap-1"><Store className="w-3 h-3" /> Boutique</span>}
+                      </td>
+                      <td className="py-2.5 text-right text-gray-600">{p.nb}</td>
+                      <td className="py-2.5 text-right font-bold text-purple-700">{formatMontant(p.ca)}</td>
+                      <td className="py-2.5 text-right text-red-600 font-bold">{formatMontant(p.commission)}</td>
+                      <td className="py-2.5 text-right text-violet-600">{formatMontant(p.net)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Commandes Boutiques & Restaurants — suivi admin */}
+      <CommandesPartenairesAdmin countryCode={selectedCountry !== "all" ? selectedCountry : null} />
+
+      {/* Paiements Partenaires — validation admin */}
+      <PaiementsPartenairesAdmin countryCode={selectedCountry !== "all" ? selectedCountry : null} />
 
       {/* Modal détail livreur */}
       {selectedLivreur && (

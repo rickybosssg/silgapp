@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { clearPersistedToken } from "@/lib/authPersistence";
 import {
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell,
   Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed
@@ -14,7 +15,7 @@ const doLogout = () => {
   ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
     try { localStorage.removeItem(k); } catch(_) {}
   });
-  base44.auth.logout();
+  { clearPersistedToken(); base44.auth.logout(); };
   setTimeout(() => window.location.reload(), 300);
 };
 
@@ -50,6 +51,7 @@ export const navItems = [
   { path: "/admin/messages", label: "Messages", icon: MessageCircle, reseauOnly: "externe" },
   { path: "/admin/boutiques", label: "Boutiques", icon: Store, reseauOnly: "externe" },
   { path: "/admin/restaurants", label: "Restaurants", icon: UtensilsCrossed, reseauOnly: "externe" },
+  { path: "/admin/commandes-partenaires", label: "Commandes Partenaires", icon: Package, reseauOnly: "externe" },
   { path: "/notifications", label: "Notifications", icon: Bell, reseauOnly: "interne" },
   { path: "/notifications", label: "Notifications", icon: Bell, reseauOnly: "externe" },
   { path: "/maintenance", label: "Maintenance", icon: Shield, reseauOnly: "interne" },
@@ -83,7 +85,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, rese
         {!collapsed && (
           <div>
             <h1 className="font-extrabold text-sm text-white tracking-wide">SILGAPP</h1>
-            <p className="text-[10px] text-white/40">Silga Livraison</p>
+            <p className="text-[10px] text-white/40">SILGAPP Livraison</p>
           </div>
         )}
       </div>

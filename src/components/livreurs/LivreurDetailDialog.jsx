@@ -24,7 +24,7 @@ export default function LivreurDetailDialog({ livreur, open, onClose }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["livreurs-all"] });
       queryClient.invalidateQueries({ queryKey: ["livreurs-internes"] });
-      toast.success("Paiement validé — Compteur remis à zéro");
+      toast.success("Paiement validé  — Compteur remis à zéro");
     },
     onError: () => toast.error("Erreur lors de la validation du paiement"),
   });
@@ -128,7 +128,7 @@ export default function LivreurDetailDialog({ livreur, open, onClose }) {
             <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <StatItem label="Courses livrées" value={stats.coursesLivrees} icon={CheckCircle2} color="text-green-600" />
               <StatItem label="Total encaissé" value={`${stats.totalEncaisse.toLocaleString()} F`} icon={Banknote} color="text-blue-600" />
-              <StatItem label="Dû à Silga" value={`${stats.montantDu.toLocaleString()} F`} color="text-blue-600" />
+              <StatItem label="Dû à SILGAPP" value={`${stats.montantDu.toLocaleString()} F`} color="text-blue-600" />
               <StatItem
                 label="Paiement"
                 value={livreur.statut_paiement === "paye" ? "Payé " : "Non payé"}

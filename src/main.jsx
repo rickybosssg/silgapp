@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import { installNativeGeolocationShim } from '@/lib/nativeAndroid'
+import { syncTokenFromPreferences, restoreTokenFromCookie } from '@/lib/authPersistence'
 import '@/index.css'
 
 installNativeGeolocationShim()
@@ -105,11 +106,19 @@ class ErrorBoundary extends React.Component {
 const rootElement = document.getElementById('root');
 rootElement?.setAttribute('data-dynamic-content', 'silgapp2-root');
 
-ReactDOM.createRoot(rootElement).render(
-  <ErrorBoundary>
-    <App />
-  </ErrorBoundary>
-)
+// ── Sync du token depuis Capacitor Preferences avant le render ──
+// Sur Android, localStorage peut être effacé. On restaure le token depuis
+// le stockage natif (Preferences) avant que le SDK ne lise localStorage.
+async function initApp() {
+  restoreTokenFromCookie();
+  await syncTokenFromPreferences();
+  ReactDOM.createRoot(rootElement).render(
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  );
+  window.setTimeout(notifyBase44Mounted, 250);
+  window.setTimeout(notifyBase44Mounted, 1500);
+}
 
-window.setTimeout(notifyBase44Mounted, 250);
-window.setTimeout(notifyBase44Mounted, 1500);
+initApp();

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { toast } from "sonner";
+import { clearPersistedToken } from "@/lib/authPersistence";
 import { Check, Trash2 } from "lucide-react";
 import { formaterTelephone } from "./LivreurExterneOnboarding";
 import PhotoPicker from "./PhotoPicker";
@@ -208,7 +209,7 @@ export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
                 try {
                   await base44.functions.invoke('updateLivreur', { id: livreurProfil.id, data: { actif: false, validation: "refuse" } });
                   toast.success("Compte désactivé. Contactez le support pour toute question.");
-                  base44.auth.logout();
+                  { clearPersistedToken(); base44.auth.logout(); };
                 } catch {
                   toast.error("Erreur lors de la suppression");
                   setDeleting(false);

@@ -1,10 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Phone, Copy, MapPin, CheckCircle, Lock, Package, ChevronDown, ChevronUp, XCircle } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import MultiColisProgressBadge from "./MultiColisProgressBadge";
-import { normalizeCommissionPct, splitAmountByCommission } from "@/lib/commissionUtils";
 
 // Bouton WhatsApp SVG inline
 function WhatsAppIcon({ className }) {
@@ -98,13 +97,21 @@ function ConfirmMontantDialog({ colis, devise, onConfirm, onCancel, isPending })
  * Vue multi-colis pour le livreur externe.
  * - Pas de QR Code ni de PIN Code
  * - Bouton " Livrer ce colis" → dialogue confirmation + saisie montant
- * - Calcul automatique : total, gain livreur, commission Silga
+ * - Calcul automatique : total, gain livreur, commission SILGAPP
  * - Fin de course automatique quand tous les colis sont livrés/annulés
  */
 export default function MultiColisLivreurView({ course, colisRecupere, onAllLivres }) {
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(true);
   const [confirmColis, setConfirmColis] = useState(null); // colis en attente de confirmation
+  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+
+  useEffect(() => {
+    if (!course?.country_code) return;
+    base44.entities.Country.filter({ code: course.country_code, actif: true })
+      .then(countries => { if (countries?.[0]?.commission_pct) setCountryCommissionPct(countries[0].commission_pct); })
+      .catch(() => {});
+  }, [course?.country_code]);
 
   // Charger les sous-colis
   const { data: colis = [], isLoading } = useQuery({
@@ -114,13 +121,6 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
     refetchInterval: 5000,
     initialData: [],
   });
-  const { data: countryCommissionRows = [] } = useQuery({
-    queryKey: ["country-commission", course.country_code],
-    queryFn: () => base44.entities.Country.filter({ code: course.country_code, actif: true }),
-    enabled: !!course.country_code,
-    staleTime: 30000,
-  });
-  const commissionPct = normalizeCommissionPct(countryCommissionRows?.[0]?.commission_pct);
 
   // Mutation : livrer un colis individuel + mettre à jour les totaux de la course
   const livrerColisMutation = useMutation({
@@ -149,12 +149,8 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
       const nbTotal = course.nb_colis || 1;
       const tousTermines = nbLivres + nbAnnules >= nbTotal;
 
-      const split = splitAmountByCommission(montantTotal, commissionPct);
-      if (split.commission_silga === null || split.montant_livreur === null) {
-        throw new Error(`Commission non configuree pour ${course.country_code || "ce pays"}`);
-      }
-      const gainLivreur = split.montant_livreur;
-      const commissionSilga = split.commission_silga;
+      const gainLivreur = Math.round(montantTotal * ((100 - countryCommissionPct) / 100));
+      const commissionSilga = Math.round(montantTotal * (countryCommissionPct / 100));
 
       const updateData = {
         nb_colis_livres: nbLivres,
@@ -196,7 +192,7 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
       } else {
         queryClient.invalidateQueries({ queryKey: ["colis-externes", course.id] });
         queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-        toast.success(`Colis livré — +${gainLivreur.toLocaleString()} ${course.devise || "F"}`);
+        toast.success(`Colis livré  — +${gainLivreur.toLocaleString()} ${course.devise || "F"}`);
       }
     },
     onError: () => toast.error("Erreur lors de la mise à jour"),
@@ -219,12 +215,8 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
       const nbAnnules = colis.filter(c => c.id === colisItem.id || c.statut === "annule").length;
       const nbTotal = course.nb_colis || 1;
       const tousTermines = nbLivres + nbAnnules >= nbTotal;
-      const split = splitAmountByCommission(montantTotal, commissionPct);
-      if (split.commission_silga === null || split.montant_livreur === null) {
-        throw new Error(`Commission non configuree pour ${course.country_code || "ce pays"}`);
-      }
-      const gainLivreur = split.montant_livreur;
-      const commissionSilga = split.commission_silga;
+      const gainLivreur = Math.round(montantTotal * ((100 - countryCommissionPct) / 100));
+      const commissionSilga = Math.round(montantTotal * (countryCommissionPct / 100));
 
       const updateData = {
         nb_colis_livres: nbLivres,
@@ -289,9 +281,8 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
   const nbLivres = colis.filter(c => c.statut === "livre").length;
   const nbAnnules = colis.filter(c => c.statut === "annule").length;
   const totalEncaisse = colis.filter(c => c.statut === "livre").reduce((s, c) => s + (c.montant_a_encaisser || 0), 0);
-  const split = splitAmountByCommission(totalEncaisse, commissionPct);
-  const gainLivreur = split.montant_livreur || 0;
-  const commission = split.commission_silga || 0;
+  const gainLivreur = Math.round(totalEncaisse * ((100 - countryCommissionPct) / 100));
+  const commission = Math.round(totalEncaisse * (countryCommissionPct / 100));
 
   if (isLoading) {
     return (
@@ -497,7 +488,7 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
                 <p className="text-xs font-black text-green-700">+{gainLivreur.toLocaleString()} {course.devise || "F"}</p>
               </div>
               <div className="bg-white rounded-xl p-2 text-center border border-gray-100">
-                <p className="text-[9px] text-gray-600 font-bold uppercase">Commission</p>
+                <p className="text-[9px] text-gray-600 font-bold uppercase">Commission SILGAPP</p>
                 <p className="text-xs font-black text-gray-500">{commission.toLocaleString()} {course.devise || "F"}</p>
               </div>
             </div>

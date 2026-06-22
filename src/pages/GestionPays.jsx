@@ -269,7 +269,7 @@ export default function GestionPays() {
           <ul className="text-xs text-blue-700 space-y-1.5">
             <li>• <strong>Activer un pays</strong> → il apparaît dans les sélecteurs livreurs/clients</li>
             <li>• <strong>Prix/km</strong> → utilisé automatiquement au calcul de la course</li>
-            <li>• <strong>Commission %</strong> → part de Silga sur chaque course</li>
+            <li>• <strong>Commission %</strong> → part de SILGAPP sur chaque course</li>
             <li>• <strong>Seuil encours</strong> → plafond avant blocage automatique du livreur</li>
             <li>• Les livreurs/clients s'enregistrent avec leur pays → les stats se filtrent automatiquement</li>
           </ul>

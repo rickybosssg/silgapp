@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { clearPersistedToken } from "@/lib/authPersistence";
 import { AlertTriangle, Check, Truck, X } from "lucide-react";
 import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
@@ -1127,7 +1128,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
       try { localStorage.removeItem(k); } catch (_) {}
     });
-    base44.auth.logout();
+    { clearPersistedToken(); base44.auth.logout(); };
     setTimeout(() => window.location.reload(), 300);
   };
 
@@ -1389,7 +1390,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                   className="mt-3 w-full h-11 rounded-xl bg-white text-red-700 font-black text-sm active:scale-95 transition-all"
                   onClick={() => {
                     try { localStorage.removeItem("silgapp_livreur_session_id"); } catch {}
-                    base44.auth.logout();
+                    { clearPersistedToken(); base44.auth.logout(); };
                     setTimeout(() => window.location.reload(), 300);
                   }}
                 >

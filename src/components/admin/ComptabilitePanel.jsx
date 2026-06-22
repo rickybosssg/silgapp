@@ -81,7 +81,7 @@ function DetailPaiementModal({ entry, onClose, onPaiement, onBloquer, onDebloque
             <div className="flex justify-between text-sm"><span className="text-muted-foreground">Commission SILGAPP</span><span className="font-semibold text-orange-600">{entry.commissionTotal.toLocaleString()} F</span></div>
             <div className="flex justify-between text-sm"><span className="text-muted-foreground">Déjà payé</span><span className="font-semibold text-green-600">{entry.montantPaye.toLocaleString()} F</span></div>
             <div className="border-t pt-2 flex justify-between text-sm font-bold">
-              <span>Reste dû à Silga</span>
+              <span>Reste dû à SILGAPP</span>
               <span className={entry.montantDu > 0 ? "text-red-600 text-base" : "text-green-600"}>{entry.montantDu.toLocaleString()} F</span>
             </div>
           </div>
@@ -111,7 +111,7 @@ function DetailPaiementModal({ entry, onClose, onPaiement, onBloquer, onDebloque
                   <p className="text-sm font-medium truncate">{c.adresse_depart} → {c.adresse_arrivee || "?"}</p>
                   <div className="flex flex-wrap gap-x-3 mt-1 text-xs text-muted-foreground">
                     {c.prix_final != null && <span> {c.prix_final.toLocaleString()} F</span>}
-                    {c.commission_silga != null && <span className="text-orange-600 font-semibold">Silga: {c.commission_silga.toLocaleString()} F</span>}
+                    {c.commission_silga != null && <span className="text-orange-600 font-semibold">SILGAPP: {c.commission_silga.toLocaleString()} F</span>}
                   </div>
                 </div>
               ))}
