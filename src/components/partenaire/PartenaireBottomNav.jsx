@@ -1,11 +1,11 @@
 import React from "react";
 import { Home, Package, ShoppingBag, MessageCircle, BarChart3, Truck, Pill } from "lucide-react";
 
-export default function PartenaireBottomNav({ tab, setTab, badgeCount = 0, etablissementType }) {
+export default function PartenaireBottomNav({ tab, setTab, badgeCount = 0, messageBadge = 0, etablissementType }) {
   const isPharmacie = etablissementType === "pharmacie";
   const items = isPharmacie ? [
     { id: "home", icon: Home, label: "Accueil" },
-    { id: "messages", icon: MessageCircle, label: "Messages" },
+    { id: "messages", icon: MessageCircle, label: "Messages", badge: messageBadge },
     { id: "livraisons", icon: Truck, label: "Livraisons", badge: badgeCount },
     { id: "statistiques", icon: BarChart3, label: "Stats" },
     { id: "infos", icon: Pill, label: "Infos" },
@@ -13,7 +13,7 @@ export default function PartenaireBottomNav({ tab, setTab, badgeCount = 0, etabl
     { id: "home", icon: Home, label: "Accueil" },
     { id: "commandes", icon: Package, label: "Commandes", badge: badgeCount },
     { id: "produits", icon: ShoppingBag, label: "Produits" },
-    { id: "messages", icon: MessageCircle, label: "Messages" },
+    { id: "messages", icon: MessageCircle, label: "Messages", badge: messageBadge },
     { id: "statistiques", icon: BarChart3, label: "Stats" },
   ];
 

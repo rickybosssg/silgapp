@@ -10,6 +10,7 @@ import MessagesPage from "@/components/chat/MessagesPage";
 import ComptabilitePartenaire from "@/components/partenaire/ComptabilitePartenaire";
 import PartenaireHome from "@/components/partenaire/PartenaireHome";
 import PartenaireBottomNav from "@/components/partenaire/PartenaireBottomNav";
+import NewMessageModal from "@/components/partenaire/NewMessageModal";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { registerPushToken } from "@/lib/notifications";
 
@@ -101,6 +102,74 @@ export default function PartenaireDashboard() {
     enabled: hasPharmacie && !!etablissement?.id,
     refetchInterval: 10000,
   });
+
+  // ── Conversations pour TOUS les types d'établissement (badge messages non lus) ──
+  const { data: allConversations = [] } = useQuery({
+    queryKey: ["conversations-partenaire-all", etablissement?.id],
+    queryFn: async () => {
+      const all = await base44.entities.Conversation.list("-last_message_date", 100);
+      return (all || []).filter(c => {
+        try {
+          const parts = JSON.parse(c.participants || "[]");
+          return parts.some(p => p.type === "partenaire" && p.id === etablissement.id);
+        } catch { return false; }
+      });
+    },
+    enabled: !!etablissement?.id,
+    refetchInterval: 8000,
+  });
+
+  // ── Tracker les messages non lus (dernier message pas du partenaire) ──
+  const [seenConvIds, setSeenConvIds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("partenaire_seen_convs") || "[]"); } catch { return []; }
+  });
+  const [newMsgModal, setNewMsgModal] = useState(null);
+
+  // Conversations non lues = dernier message pas envoyé par le partenaire
+  const unreadConversations = allConversations.filter(c => {
+    if (!c.last_message) return false;
+    return c.last_sender_name !== etablissement?.nom;
+  });
+  const unreadCount = unreadConversations.length;
+
+  // ── Détecter une nouvelle discussion et afficher le modal ──
+  useEffect(() => {
+    if (!etablissement?.id || allConversations.length === 0) return;
+    const currentIds = allConversations.map(c => c.id);
+    const newOnes = allConversations.filter(c => {
+      // Non lu ET pas encore vu
+      const isUnread = c.last_sender_name !== etablissement.nom;
+      const notSeen = !seenConvIds.includes(c.id);
+      return isUnread && notSeen;
+    });
+    if (newOnes.length > 0 && tab !== "messages") {
+      // Trouver le nom du client
+      const newest = newOnes[0];
+      let clientName = "Nouveau client";
+      try {
+        const parts = JSON.parse(newest.participants || "[]");
+        const client = parts.find(p => p.type === "client");
+        if (client?.name) clientName = client.name;
+      } catch {}
+      setNewMsgModal({ convId: newest.id, clientName });
+    }
+    // Marquer comme vues
+    const newSeen = [...new Set([...seenConvIds, ...currentIds])];
+    if (newSeen.length !== seenConvIds.length) {
+      setSeenConvIds(newSeen);
+      localStorage.setItem("partenaire_seen_convs", JSON.stringify(newSeen));
+    }
+  }, [allConversations, etablissement?.id, etablissement?.nom, tab]);
+
+  // Quand on ouvre l'onglet messages, marquer tout comme lu
+  useEffect(() => {
+    if (tab === "messages" && allConversations.length > 0) {
+      const currentIds = allConversations.map(c => c.id);
+      const newSeen = [...new Set([...seenConvIds, ...currentIds])];
+      setSeenConvIds(newSeen);
+      localStorage.setItem("partenaire_seen_convs", JSON.stringify(newSeen));
+    }
+  }, [tab]);
 
   const loading = loadingBoutique || loadingRestaurant || loadingPharmacie;
 
@@ -217,7 +286,15 @@ export default function PartenaireDashboard() {
       </div>
 
       {/* ── Bottom Nav ── */}
-      <PartenaireBottomNav tab={tab} setTab={setTab} badgeCount={pendingCount} etablissementType={etablissementType} />
+      <PartenaireBottomNav tab={tab} setTab={setTab} badgeCount={pendingCount} messageBadge={unreadCount} etablissementType={etablissementType} />
+
+      {/* ── Modal Nouvelle discussion ── */}
+      <NewMessageModal
+        show={!!newMsgModal}
+        clientName={newMsgModal?.clientName}
+        onOpen={() => { setTab("messages"); setNewMsgModal(null); }}
+        onClose={() => setNewMsgModal(null)}
+      />
     </div>
   );
 }
