@@ -16,18 +16,56 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
     queryKey: ["commandes", etablissementType, etablissement.id],
     queryFn: () => base44.entities[entityName].filter({ [idField]: etablissement.id }, "-created_date", 100),
     enabled: !isPharmacie && !!etablissement?.id,
+    refetchInterval: 10000,
+  });
+
+  // ── Pour les pharmacies : conversations & courses en temps réel ──
+  const { data: pharmaConversations = [] } = useQuery({
+    queryKey: ["conversations-pharmacie-home", etablissement?.id],
+    queryFn: async () => {
+      const all = await base44.entities.Conversation.list("-last_message_date", 100);
+      return (all || []).filter(c => {
+        try {
+          const parts = JSON.parse(c.participants || "[]");
+          return parts.some(p => p.type === "partenaire" && p.id === etablissement.id);
+        } catch { return false; }
+      });
+    },
+    enabled: isPharmacie && !!etablissement?.id,
+    refetchInterval: 10000,
+  });
+
+  const { data: pharmaCourses = [] } = useQuery({
+    queryKey: ["courses-pharmacie-home", etablissement?.id],
+    queryFn: async () => {
+      const pharma = await base44.entities.Pharmacie.get(etablissement.id);
+      const all = await base44.entities.CourseExterne.filter({ country_code: pharma.pays_code }, "-created_date", 50);
+      return (all || []).filter(c => c.expediteur_nom === etablissement.nom);
+    },
+    enabled: isPharmacie && !!etablissement?.id,
+    refetchInterval: 10000,
   });
 
   // Stats du jour
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const commandesToday = commandes.filter(c => new Date(c.created_date) >= today);
-  const revenusToday = commandesToday.filter(c => c.statut === "livree").reduce((sum, c) => sum + (c.total || 0), 0);
-  const enPreparation = commandes.filter(c => c.statut === "en_preparation").length;
-  const enLivraison = commandes.filter(c => ["livreur_assigne", "en_livraison"].includes(c.statut)).length;
-  const livreesToday = commandesToday.filter(c => c.statut === "livree").length;
-  const annuleesToday = commandesToday.filter(c => c.statut === "annulee").length;
-  const pendingCount = commandes.filter(c => !["livree", "annulee"].includes(c.statut)).length;
+
+  // Pour les pharmacies, calculer les stats depuis les courses
+  const pharmaCoursesToday = pharmaCourses.filter(c => new Date(c.created_date) >= today);
+  const pharmaActiveCourses = pharmaCourses.filter(c => !["livree", "annulee"].includes(c.statut));
+  const pharmaLivreesToday = pharmaCoursesToday.filter(c => c.statut === "livree").length;
+  const pharmaEnLivraison = pharmaCourses.filter(c => ["livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut)).length;
+  const pharmaEnRecherche = pharmaCourses.filter(c => ["nouvelle", "recherche_livreur"].includes(c.statut)).length;
+
+  const commandesToday = isPharmacie ? pharmaCoursesToday : commandes.filter(c => new Date(c.created_date) >= today);
+  const revenusToday = isPharmacie ? 0 : commandesToday.filter(c => c.statut === "livree").reduce((sum, c) => sum + (c.total || 0), 0);
+  const enPreparation = isPharmacie ? pharmaEnRecherche : commandes.filter(c => c.statut === "en_preparation").length;
+  const enLivraison = isPharmacie ? pharmaEnLivraison : commandes.filter(c => ["livreur_assigne", "en_livraison"].includes(c.statut)).length;
+  const livreesToday = isPharmacie ? pharmaLivreesToday : commandesToday.filter(c => c.statut === "livree").length;
+  const annuleesToday = isPharmacie ? 0 : commandesToday.filter(c => c.statut === "annulee").length;
+  const pendingCount = isPharmacie
+    ? pharmaActiveCourses.length
+    : commandes.filter(c => !["livree", "annulee"].includes(c.statut)).length;
 
   const handleToggleOuvert = async () => {
     setToggling(true);
@@ -90,16 +128,16 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
           {/* Main stats */}
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-3 text-center">
-              <p className="text-2xl font-black leading-none">{commandesToday.length}</p>
-              <p className="text-[10px] text-white/70 font-medium mt-1">Commandes<br/>aujourd'hui</p>
+              <p className="text-2xl font-black leading-none">{isPharmacie ? pharmaConversations.length : commandesToday.length}</p>
+              <p className="text-[10px] text-white/70 font-medium mt-1">{isPharmacie ? "Conversations\nactives" : "Commandes\naujourd'hui"}</p>
             </div>
             <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-3 text-center">
-              <p className="text-2xl font-black leading-none">{revenusToday.toLocaleString()}</p>
-              <p className="text-[10px] text-white/70 font-medium mt-1">FCFA<br/>de ventes</p>
+              <p className="text-2xl font-black leading-none">{isPharmacie ? pharmaActiveCourses.length : revenusToday.toLocaleString()}</p>
+              <p className="text-[10px] text-white/70 font-medium mt-1">{isPharmacie ? "Livraisons\nen cours" : "FCFA\n de ventes"}</p>
             </div>
             <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-3 text-center">
               <p className="text-2xl font-black leading-none">{enPreparation}</p>
-              <p className="text-[10px] text-white/70 font-medium mt-1">En<br/>préparation</p>
+              <p className="text-[10px] text-white/70 font-medium mt-1">{isPharmacie ? "En\nrecherche" : "En\npréparation"}</p>
             </div>
           </div>
         </div>
@@ -107,10 +145,10 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
 
       {/* ── Quick stats row ── */}
       <div className="grid grid-cols-4 gap-2">
-        <QuickStat icon={CheckCircle} value={livreesToday} label="Livrées" color="text-green-600" bg="bg-green-50" />
-        <QuickStat icon={Clock} value={enPreparation} label="Préparation" color="text-orange-600" bg="bg-orange-50" />
+        <QuickStat icon={CheckCircle} value={livreesToday} label={isPharmacie ? "Livrées" : "Livrées"} color="text-green-600" bg="bg-green-50" />
+        <QuickStat icon={Clock} value={enPreparation} label={isPharmacie ? "Recherche" : "Préparation"} color="text-orange-600" bg="bg-orange-50" />
         <QuickStat icon={Truck} value={enLivraison} label="En livraison" color="text-indigo-600" bg="bg-indigo-50" />
-        <QuickStat icon={X} value={annuleesToday} label="Annulées" color="text-red-600" bg="bg-red-50" />
+        <QuickStat icon={MessageCircle} value={isPharmacie ? pharmaConversations.length : annuleesToday} label={isPharmacie ? "Messages" : "Annulées"} color={isPharmacie ? "text-purple-600" : "text-red-600"} bg={isPharmacie ? "bg-purple-50" : "bg-red-50"} />
       </div>
 
       {/* ── Navigation cards grid ── */}

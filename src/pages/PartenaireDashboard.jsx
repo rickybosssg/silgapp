@@ -35,6 +35,7 @@ export default function PartenaireDashboard() {
       return list?.[0] || null;
     },
     enabled: !!user?.id,
+    refetchInterval: 15000,
   });
 
   const { data: monRestaurant, isLoading: loadingRestaurant } = useQuery({
@@ -44,6 +45,7 @@ export default function PartenaireDashboard() {
       return list?.[0] || null;
     },
     enabled: !!user?.id,
+    refetchInterval: 15000,
   });
 
   const { data: maPharmacie, isLoading: loadingPharmacie } = useQuery({
@@ -53,6 +55,7 @@ export default function PartenaireDashboard() {
       return list?.[0] || null;
     },
     enabled: !!user?.id,
+    refetchInterval: 15000,
   });
 
   const hasBoutique = !!maBoutique;
@@ -68,7 +71,35 @@ export default function PartenaireDashboard() {
   const { data: commandes = [] } = useQuery({
     queryKey: ["commandes", etablissementType, etablissement?.id],
     queryFn: () => base44.entities[cmdEntityName].filter({ [cmdIdField]: etablissement.id }, "-created_date", 100),
-    enabled: !!etablissement?.id,
+    enabled: !!etablissement?.id && !hasPharmacie,
+    refetchInterval: 10000,
+  });
+
+  // ── Pour les pharmacies : conversations & courses en temps réel ──
+  const { data: pharmaConversations = [] } = useQuery({
+    queryKey: ["conversations-pharmacie-dashboard", etablissement?.id],
+    queryFn: async () => {
+      const all = await base44.entities.Conversation.list("-last_message_date", 100);
+      return (all || []).filter(c => {
+        try {
+          const parts = JSON.parse(c.participants || "[]");
+          return parts.some(p => p.type === "partenaire" && p.id === etablissement.id);
+        } catch { return false; }
+      });
+    },
+    enabled: hasPharmacie && !!etablissement?.id,
+    refetchInterval: 10000,
+  });
+
+  const { data: pharmaCourses = [] } = useQuery({
+    queryKey: ["courses-pharmacie-dashboard", etablissement?.id],
+    queryFn: async () => {
+      const pharma = await base44.entities.Pharmacie.get(etablissement.id);
+      const all = await base44.entities.CourseExterne.filter({ country_code: pharma.pays_code }, "-created_date", 50);
+      return (all || []).filter(c => c.expediteur_nom === etablissement.nom);
+    },
+    enabled: hasPharmacie && !!etablissement?.id,
+    refetchInterval: 10000,
   });
 
   const loading = loadingBoutique || loadingRestaurant || loadingPharmacie;
@@ -133,7 +164,9 @@ export default function PartenaireDashboard() {
     );
   }
 
-  const pendingCount = commandes.filter(c => !["livree", "annulee"].includes(c.statut)).length;
+  const pendingCount = hasPharmacie
+    ? pharmaCourses.filter(c => !["livree", "annulee"].includes(c.statut)).length
+    : commandes.filter(c => !["livree", "annulee"].includes(c.statut)).length;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
