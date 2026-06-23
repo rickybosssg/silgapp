@@ -145,7 +145,7 @@ export default function PartenaireDashboard() {
       {/* ── Contenu ── */}
       <div className="max-w-lg mx-auto px-4 py-4">
         {tab === "home" && <PartenaireHome etablissement={etablissement} etablissementType={etablissementType} onNavigate={setTab} />}
-        {tab === "commandes" && <CommandesManager type={etablissementType} etablissementId={etablissement.id} />}
+        {tab === "commandes" && <CommandesManager type={etablissementType} etablissementId={etablissement.id} etablissementNom={etablissement.nom} />}
         {tab === "produits" && <ProduitsManager type={etablissementType} etablissementId={etablissement.id} />}
         {tab === "messages" && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-[70vh]">

@@ -117,6 +117,25 @@ export default function ClientExterneApp() {
     ...restaurantsCarte.map(r => ({ ...r, _type: "restaurant" })),
   ], [boutiquesCarte, restaurantsCarte]);
 
+  const { data: commandesBoutiqueClient = [] } = useQuery({
+    queryKey: ["commandes-boutique-client-active", clientProfil?.id],
+    queryFn: () => base44.entities.CommandeBoutique.filter({ client_id: clientProfil.id }, "-created_date", 50),
+    enabled: !!clientProfil?.id,
+    refetchInterval: 10000,
+  });
+
+  const { data: commandesRestaurantClient = [] } = useQuery({
+    queryKey: ["commandes-restaurant-client-active", clientProfil?.id],
+    queryFn: () => base44.entities.CommandeRestaurant.filter({ client_id: clientProfil.id }, "-created_date", 50),
+    enabled: !!clientProfil?.id,
+    refetchInterval: 10000,
+  });
+
+  const commandesActivesCount = useMemo(() => {
+    const active = new Set(["commande_envoyee", "commande_recue", "paiement_verification", "paiement_valide", "en_preparation", "prete_recuperation", "livreur_assigne", "commande_recuperee", "en_livraison"]);
+    return [...commandesBoutiqueClient, ...commandesRestaurantClient].filter(c => active.has(c.statut)).length;
+  }, [commandesBoutiqueClient, commandesRestaurantClient]);
+
   // Pull-to-refresh
   const { pulling, refreshing } = usePullToRefresh(async () => {
     await loadProfil();
@@ -956,7 +975,8 @@ export default function ClientExterneApp() {
                   {[
                     { icon: <Package className="w-5 h-5" />, label: "Courses",   color: "text-blue-600",   bg: "bg-blue-50",   action: () => navigate("/client/suivi") },
                     { icon: <Clock className="w-5 h-5" />,   label: "Historique",color: "text-purple-600", bg: "bg-purple-50", action: () => navigate("/client/suivi") },
-                    { icon: <Package className="w-5 h-5" />, label: "Commandes", color: "text-indigo-600", bg: "bg-indigo-50", action: () => navigate("/client/mes-commandes") },
+                    { icon: <Package className="w-5 h-5" />, label: "Commandes", color: "text-indigo-600", bg: "bg-indigo-50", badge: commandesActivesCount, action: () => navigate("/client/mes-commandes") },
+                    { icon: <Clock className="w-5 h-5" />, label: "Programmees", color: "text-amber-600", bg: "bg-amber-50", action: () => navigate("/client/livraisons-programmees") },
                     { icon: <span className="text-xs"></span>, label: "Support", color: "text-green-600", bg: "bg-green-50", action: () => {
                       const msg = encodeURIComponent("Bonjour SILGAPP \nJ'ai besoin d'aide sur SILGAPP.");
                       const a = document.createElement("a");
@@ -971,8 +991,13 @@ export default function ClientExterneApp() {
                       onClick={item.action}
                       className="flex flex-col items-center gap-1.5 py-3 rounded-xl hover:bg-gray-50 active:scale-95 transition-all"
                     >
-                      <div className={`w-10 h-10 rounded-xl ${item.bg} flex items-center justify-center ${item.color}`}>
+                      <div className={`relative w-10 h-10 rounded-xl ${item.bg} flex items-center justify-center ${item.color}`}>
                         {item.icon}
+                        {item.badge > 0 && (
+                          <span className="absolute -top-1 -right-1 min-w-5 h-5 rounded-full bg-red-600 text-white text-[10px] font-black flex items-center justify-center px-1">
+                            {item.badge > 9 ? "9+" : item.badge}
+                          </span>
+                        )}
                       </div>
                       <span className="text-[10px] font-semibold text-gray-600">{item.label}</span>
                     </button>

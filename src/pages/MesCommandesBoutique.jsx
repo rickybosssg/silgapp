@@ -1,33 +1,40 @@
-import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Loader2, Package, UtensilsCrossed, Store } from "lucide-react";
+import { ArrowLeft, Loader2, Package, Store, UtensilsCrossed } from "lucide-react";
+import { base44 } from "@/api/base44Client";
 
 const STATUTS = {
-  commande_envoyee: { label: "Commande envoyée", color: "bg-gray-100 text-gray-700" },
-  commande_recue: { label: "Reçue par le partenaire", color: "bg-blue-100 text-blue-700" },
-  paiement_verification: { label: "Paiement en vérification", color: "bg-amber-100 text-amber-700" },
-  paiement_valide: { label: "Paiement validé", color: "bg-green-100 text-green-700" },
-  paiement_refuse: { label: "Paiement refusé", color: "bg-red-100 text-red-700" },
-  en_preparation: { label: "En préparation", color: "bg-purple-100 text-purple-700" },
-  prete_recuperation: { label: "Prête — livreur recherché", color: "bg-indigo-100 text-indigo-700" },
-  livreur_assigne: { label: "Livreur assigné", color: "bg-blue-100 text-blue-700" },
-  commande_recuperee: { label: "Commande récupérée", color: "bg-amber-100 text-amber-700" },
+  commande_envoyee: { label: "Commande envoyee", color: "bg-gray-100 text-gray-700" },
+  commande_recue: { label: "Recue par le partenaire", color: "bg-blue-100 text-blue-700" },
+  paiement_verification: { label: "Paiement en verification", color: "bg-amber-100 text-amber-700" },
+  paiement_valide: { label: "Paiement valide", color: "bg-green-100 text-green-700" },
+  paiement_refuse: { label: "Paiement refuse", color: "bg-red-100 text-red-700" },
+  en_preparation: { label: "En preparation", color: "bg-purple-100 text-purple-700" },
+  prete_recuperation: { label: "Prete - livreur recherche", color: "bg-indigo-100 text-indigo-700" },
+  livreur_assigne: { label: "Livreur assigne", color: "bg-blue-100 text-blue-700" },
+  commande_recuperee: { label: "Commande recuperee", color: "bg-amber-100 text-amber-700" },
   en_livraison: { label: "En livraison", color: "bg-blue-100 text-blue-700" },
-  livree: { label: "Livrée", color: "bg-green-100 text-green-700" },
-  annulee: { label: "Annulée", color: "bg-red-100 text-red-700" },
+  livree: { label: "Livree", color: "bg-green-100 text-green-700" },
+  annulee: { label: "Annulee", color: "bg-red-100 text-red-700" },
 };
+
+const STATUTS_SUIVI_ACTIF = new Set([
+  "prete_recuperation",
+  "livreur_assigne",
+  "commande_recuperee",
+  "en_livraison",
+]);
 
 export default function MesCommandesBoutique() {
   const navigate = useNavigate();
   const [clientProfil, setClientProfil] = useState(null);
 
   useEffect(() => {
-    base44.auth.me().then(u => {
-      if (u?.email) {
-        base44.entities.ClientExterne.filter({ user_email: u.email })
-          .then(c => setClientProfil(c?.[0] || null))
+    base44.auth.me().then(user => {
+      if (user?.email) {
+        base44.entities.ClientExterne.filter({ user_email: user.email })
+          .then(rows => setClientProfil(rows?.[0] || null))
           .catch(() => {});
       }
     }).catch(() => {});
@@ -55,7 +62,6 @@ export default function MesCommandesBoutique() {
     );
   }
 
-  // Fusionner et trier par date
   const allCommandes = [
     ...commandesBoutique.map(c => ({ ...c, _type: "boutique", _icon: Store })),
     ...commandesRestaurant.map(c => ({ ...c, _type: "restaurant", _icon: UtensilsCrossed })),
@@ -65,7 +71,9 @@ export default function MesCommandesBoutique() {
     <div className="min-h-screen bg-gray-50">
       <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-4 sticky top-0 z-20">
         <div className="max-w-lg mx-auto flex items-center gap-3">
-          <button onClick={() => navigate("/")} className="text-white/80 hover:text-white p-1"><ArrowLeft className="w-6 h-6" /></button>
+          <button onClick={() => navigate("/")} className="text-white/80 hover:text-white p-1">
+            <ArrowLeft className="w-6 h-6" />
+          </button>
           <h1 className="text-lg font-black">Mes Commandes</h1>
         </div>
       </div>
@@ -77,42 +85,49 @@ export default function MesCommandesBoutique() {
             <p className="text-sm text-gray-500">Aucune commande pour le moment</p>
           </div>
         )}
+
         {allCommandes.map(cmd => {
           const statut = STATUTS[cmd.statut] || STATUTS.commande_envoyee;
           const Icon = cmd._icon;
-          const items = (() => { try { return JSON.parse(cmd.items || "[]"); } catch { return []; } })();
+          const items = (() => {
+            try { return JSON.parse(cmd.items || "[]"); } catch { return []; }
+          })();
+
           return (
             <div key={cmd.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-2">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${cmd._type === "restaurant" ? "bg-orange-50" : "bg-blue-50"}`}>
                     <Icon className={`w-4 h-4 ${cmd._type === "restaurant" ? "text-orange-500" : "text-blue-500"}`} />
                   </div>
-                  <div>
-                    <p className="font-bold text-gray-900 text-sm">{cmd.boutique_nom || cmd.restaurant_nom}</p>
+                  <div className="min-w-0">
+                    <p className="font-bold text-gray-900 text-sm truncate">{cmd.boutique_nom || cmd.restaurant_nom}</p>
                     <p className="text-[10px] text-gray-400">{cmd._type === "restaurant" ? "Restaurant" : "Boutique"}</p>
                   </div>
                 </div>
                 <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${statut.color}`}>{statut.label}</span>
               </div>
+
               <div className="text-xs text-gray-500">
-                {items.map((item, i) => (
-                  <div key={i} className="flex justify-between">
-                    <span>{item.nom} × {item.quantite}</span>
+                {items.map((item, index) => (
+                  <div key={index} className="flex justify-between gap-3">
+                    <span>{item.nom} x {item.quantite}</span>
                     <span>{((item.prix || 0) * (item.quantite || 1)).toLocaleString()} F</span>
                   </div>
                 ))}
               </div>
+
               <div className="flex justify-between pt-2 border-t">
                 <span className="text-xs text-gray-500">Total</span>
                 <span className="font-bold text-primary text-sm">{cmd.total?.toLocaleString()} FCFA</span>
               </div>
-              {cmd.course_id && (
+
+              {cmd.course_id && STATUTS_SUIVI_ACTIF.has(cmd.statut) && (
                 <button
                   onClick={() => navigate("/client/suivi", { state: { course_id: cmd.course_id } })}
                   className="w-full text-xs font-bold text-primary underline mt-1"
                 >
-                  Suivre la livraison →
+                  Suivre la livraison
                 </button>
               )}
             </div>

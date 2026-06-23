@@ -14,7 +14,7 @@ import {
   mergeMessageList,
 } from "@/lib/chatUtils";
 
-export default function ChatWindow({ courseId, senderType, senderId, senderName, compact = false }) {
+export default function ChatWindow({ courseId, senderType, senderId, senderName, compact = false, contextInfo = null }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -140,9 +140,17 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
     <div className="flex flex-col h-[460px] bg-slate-50 rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
       {/* Header */}
       <div className="p-3 bg-slate-950 text-white flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <MessageCircle className="w-4 h-4" />
-          <span className="text-sm font-bold">Messagerie SILGAPP</span>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <MessageCircle className="w-4 h-4 flex-shrink-0" />
+            <span className="text-sm font-bold">Messagerie SILGAPP</span>
+          </div>
+          {contextInfo && (
+            <div className="mt-1 text-[10px] leading-4 text-white/65 space-y-0.5">
+              <p className="truncate">{contextInfo.reference || "Commande"} - {contextInfo.statut || "Statut"}</p>
+              <p className="truncate">Client: {contextInfo.client || "-"} - Partenaire: {contextInfo.partenaire || "-"}</p>
+            </div>
+          )}
         </div>
         {compact && (
           <button onClick={() => setOpen(false)} className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors">
