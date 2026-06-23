@@ -4,7 +4,7 @@ import { Download, Shield, Smartphone } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { base44 } from "@/api/base44Client";
 
-const FALLBACK_APK_URL = "https://drive.google.com/file/d/1soo0sfdr0xyF8nuVbTx6aTyidvqonM1s/view?usp=sharing";
+const FALLBACK_APK_URL = "https://drive.google.com/file/d/1-v443uj-RbY68X7jMpIGvPfKOHEfFWgC/view?usp=sharing";
 
 export default function TelechargerSILGAPP() {
   const [mounted, setMounted] = useState(false);
