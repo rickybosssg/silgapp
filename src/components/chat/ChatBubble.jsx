@@ -6,19 +6,33 @@ import { Play, Pause, Mic } from "lucide-react";
 function AudioBubble({ audioUrl, isMine }) {
   const [playing, setPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
-  const audioRef = useRef(new Audio());
+  const [loading, setLoading] = useState(false);
+  const audioRef = useRef(null);
 
   const togglePlay = () => {
+    if (!audioRef.current) audioRef.current = new Audio();
     const a = audioRef.current;
     if (playing) {
       a.pause();
       setPlaying(false);
     } else {
+      setLoading(true);
       a.src = audioUrl;
-      a.onloadedmetadata = () => setDuration(Math.round(a.duration));
+      a.onloadedmetadata = () => {
+        setDuration(Math.round(a.duration || 0));
+        setLoading(false);
+      };
       a.onended = () => setPlaying(false);
-      a.play();
-      setPlaying(true);
+      a.onerror = () => {
+        setLoading(false);
+        setPlaying(false);
+      };
+      a.play()
+        .then(() => setPlaying(true))
+        .catch(() => {
+          setLoading(false);
+          setPlaying(false);
+        });
     }
   };
 

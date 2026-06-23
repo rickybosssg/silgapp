@@ -2,6 +2,25 @@ import React, { useState, useRef } from "react";
 import { Mic, Square, Send, Loader2, Play, Pause } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+// Détecte le meilleur mimeType supporté par le navigateur/WebView
+function getSupportedMimeType() {
+  if (typeof MediaRecorder === "undefined") return null;
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/ogg;codecs=opus",
+    "audio/mp4",
+    "audio/mpeg",
+    "audio/aac",
+  ];
+  for (const type of candidates) {
+    try {
+      if (MediaRecorder.isTypeSupported(type)) return type;
+    } catch (_) {}
+  }
+  return ""; // laisse le navigateur choisir
+}
+
 export default function AudioRecorder({ onSend, disabled, senderName }) {
   const [recording, setRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState(null);
@@ -9,42 +28,80 @@ export default function AudioRecorder({ onSend, disabled, senderName }) {
   const [uploading, setUploading] = useState(false);
   const [duration, setDuration] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [error, setError] = useState(null);
 
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
-  const audioRef = useRef(new Audio());
+  const streamRef = useRef(null);
+  const audioRef = useRef(null);
 
   const startRecording = async () => {
+    setError(null);
     try {
+      // Vérifier que mediaDevices est disponible (peut manquer dans WebView)
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setError("Micro non supporté sur cet appareil");
+        alert("Le microphone n'est pas supporté dans cet environnement.");
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
+      streamRef.current = stream;
+
+      const mimeType = getSupportedMimeType();
+      let recorder;
+      try {
+        recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      } catch {
+        recorder = new MediaRecorder(stream);
+      }
+
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
 
       recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
+        if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
       };
 
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        const type = recorder.mimeType || "audio/webm";
+        const blob = new Blob(chunksRef.current, { type });
         setAudioBlob(blob);
         setAudioUrl(URL.createObjectURL(blob));
+        // Libérer le micro
         stream.getTracks().forEach(t => t.stop());
-        clearInterval(timerRef.current);
+        if (timerRef.current) clearInterval(timerRef.current);
+      };
+
+      recorder.onerror = (e) => {
+        console.error("MediaRecorder error:", e);
+        setError("Erreur d'enregistrement");
+        stream.getTracks().forEach(t => t.stop());
+        if (timerRef.current) clearInterval(timerRef.current);
+        setRecording(false);
       };
 
       recorder.start();
       setRecording(true);
       setDuration(0);
       timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
-    } catch {
-      alert("Microphone non disponible. Vérifiez les permissions.");
+    } catch (err) {
+      console.error("startRecording error:", err);
+      const msg = err?.name === "NotAllowedError"
+        ? "Permission microphone refusée. Activez le micro dans les paramètres."
+        : err?.name === "NotFoundError"
+        ? "Aucun microphone trouvé."
+        : "Microphone non disponible. Vérifiez les permissions.";
+      setError(msg);
+      alert(msg);
     }
   };
 
   const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
     setRecording(false);
   };
 
@@ -53,13 +110,15 @@ export default function AudioRecorder({ onSend, disabled, senderName }) {
     setUploading(true);
     try {
       const { base44 } = await import("@/api/base44Client");
-      const file = new File([audioBlob], `audio_${Date.now()}.webm`, { type: "audio/webm" });
+      const ext = audioBlob.type.includes("mp4") ? "m4a" : audioBlob.type.includes("mpeg") ? "mp3" : "webm";
+      const file = new File([audioBlob], `audio_${Date.now()}.${ext}`, { type: audioBlob.type });
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       await onSend({ message_type: "audio", audio_url: file_url, content: "" });
       setAudioBlob(null);
       setAudioUrl(null);
       setDuration(0);
-    } catch {
+    } catch (err) {
+      console.error("Upload audio error:", err);
       alert("Erreur lors de l'envoi de l'audio");
     }
     setUploading(false);
@@ -67,19 +126,23 @@ export default function AudioRecorder({ onSend, disabled, senderName }) {
 
   const cancelRecording = () => {
     setAudioBlob(null);
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
     setAudioUrl(null);
     setDuration(0);
   };
 
   const togglePlay = () => {
+    if (!audioRef.current) audioRef.current = new Audio();
     const a = audioRef.current;
     if (playing) {
       a.pause();
+      setPlaying(false);
     } else {
       a.src = audioUrl;
-      a.play();
+      a.onended = () => setPlaying(false);
+      a.play().catch(() => setPlaying(false));
+      setPlaying(true);
     }
-    setPlaying(!playing);
   };
 
   const formatTime = (s) => {
