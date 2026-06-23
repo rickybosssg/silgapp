@@ -1,22 +1,27 @@
 package com.silgapp2.app;
 
 import android.Manifest;
+import android.app.Activity;
+import android.app.KeyguardManager;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.media.AudioAttributes;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.os.SystemClock;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.os.VibratorManager;
+import android.view.WindowManager;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
@@ -36,6 +41,7 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
     private static Runnable alertRunnable;
     private static long alertEndAtMs = 0L;
     private static Ringtone activeRingtone;
+    private static PowerManager.WakeLock wakeLock;
 
     @Override
     public void onMessageReceived(RemoteMessage remoteMessage) {
@@ -43,22 +49,32 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
         String type = data.get("type");
         String livreurId = data.get("livreur_id");
 
+        // ── Course urgente pour livreur → data-only message → toujours reçu ──
         if ("nouvelle_course".equals(type) && livreurId != null && !livreurId.isEmpty()) {
-            String title = valueOrDefault(data.get("title"), "SILGAPP");
-            String body = valueOrDefault(data.get("body"), "Nouvelle course disponible");
+            String title = valueOrDefault(data.get("title"), "🚨 Nouvelle course SILGAPP");
+            String body = valueOrDefault(data.get("body"), "Une course est disponible. Ouvrez l'app pour accepter.");
             long durationMs = parseSeconds(data.get("alert_duration_seconds"), DEFAULT_DURATION_MS / 1000L, 10L, 180L) * 1000L;
             long intervalMs = parseSeconds(data.get("alert_interval_seconds"), DEFAULT_INTERVAL_MS / 1000L, 3L, 30L) * 1000L;
 
-            showUrgentCourseNotification(title, body, data);
+            wakeUpScreen();
+            showUrgentCourseNotification(title, body, data, durationMs);
             startUrgentCourseAlert(getApplicationContext(), durationMs, intervalMs);
             return;
         }
 
+        // ── Notifications avec payload notification (clients, etc.) ──
         RemoteMessage.Notification notification = remoteMessage.getNotification();
         if (notification != null) {
             showDefaultNotification(
                 valueOrDefault(notification.getTitle(), "SILGAPP"),
                 valueOrDefault(notification.getBody(), ""),
+                data
+            );
+        } else if (data.get("title") != null) {
+            // Data-only message non-urgent → afficher notification simple
+            showDefaultNotification(
+                valueOrDefault(data.get("title"), "SILGAPP"),
+                valueOrDefault(data.get("body"), ""),
                 data
             );
         }
@@ -71,6 +87,7 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
         alertRunnable = null;
         alertEndAtMs = 0L;
         stopRingtone();
+        releaseWakeLock();
     }
 
     private static synchronized void startUrgentCourseAlert(Context context, long durationMs, long intervalMs) {
@@ -93,8 +110,38 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
         alertRunnable.run();
     }
 
-    private void showUrgentCourseNotification(String title, String body, Map<String, String> data) {
-        createChannel(CHANNEL_ID, "Courses urgentes", NotificationManager.IMPORTANCE_HIGH);
+    // ── Réveiller l'écran même si le téléphone est verrouillé ──
+    private void wakeUpScreen() {
+        try {
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (pm != null) {
+                wakeLock = pm.newWakeLock(
+                    PowerManager.SCREEN_BRIGHT_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP | PowerManager.ON_AFTER_RELEASE,
+                    "Silgapp:CourseAlert"
+                );
+                wakeLock.acquire(60_000L); // 60 secondes max
+            }
+
+            // Désactiver le keyguard temporairement (si l'app est au premier plan)
+            KeyguardManager km = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
+            if (km != null && km.isKeyguardLocked()) {
+                // Le keyguard ne peut être désactivé que par une activity au premier plan
+                // Le fullScreenIntent s'en chargera
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private static void releaseWakeLock() {
+        try {
+            if (wakeLock != null && wakeLock.isHeld()) {
+                wakeLock.release();
+            }
+        } catch (Exception ignored) {}
+        wakeLock = null;
+    }
+
+    private void showUrgentCourseNotification(String title, String body, Map<String, String> data, long durationMs) {
+        createUrgentChannel();
 
         Intent intent = new Intent(this, MainActivity.class);
         intent.setAction("OPEN_SILGAPP");
@@ -103,9 +150,11 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
             intent.putExtra(entry.getKey(), entry.getValue());
         }
 
-        PendingIntent pendingIntent = PendingIntent.getActivity(
+        int notifId = stableNotificationId(data.get("course_id"));
+
+        PendingIntent fullScreenPendingIntent = PendingIntent.getActivity(
             this,
-            stableNotificationId(data.get("course_id")),
+            notifId,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
@@ -119,17 +168,20 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setAutoCancel(true)
-            .setOngoing(false)
+            .setOngoing(false) // Permet à l'utilisateur de la rejeter
             .setOnlyAlertOnce(false)
-            .setVibrate(new long[] { 0, 300, 150, 300, 150, 500 })
-            .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
-            .setContentIntent(pendingIntent);
+            .setVibrate(new long[] { 0, 500, 200, 500, 200, 800 })
+            .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM))
+            .setContentIntent(fullScreenPendingIntent)
+            .setFullScreenIntent(fullScreenPendingIntent, true) // Affiche popup écran verrouillé
+            .setShowWhen(true)
+            .setTimeoutAfter(durationMs + 5000L); // Auto-dismiss après expiration
 
-        notifyIfAllowed(stableNotificationId(data.get("course_id")), builder);
+        notifyIfAllowed(notifId, builder);
     }
 
     private void showDefaultNotification(String title, String body, Map<String, String> data) {
-        createChannel(DEFAULT_CHANNEL_ID, "SILGAPP", NotificationManager.IMPORTANCE_HIGH);
+        createDefaultChannel();
         Intent intent = new Intent(this, MainActivity.class);
         intent.setAction("OPEN_SILGAPP");
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -160,13 +212,50 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
         NotificationManagerCompat.from(this).notify(id, builder.build());
     }
 
-    private void createChannel(String id, String name, int importance) {
+    // ── Canal dédié "SILGAPP Courses" — IMPORTANCE_HIGH ──
+    private void createUrgentChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
-        NotificationChannel channel = new NotificationChannel(id, name, importance);
+        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager == null) return;
+        NotificationChannel existing = manager.getNotificationChannel(CHANNEL_ID);
+        if (existing != null) return; // Déjà créé
+
+        NotificationChannel channel = new NotificationChannel(
+            CHANNEL_ID,
+            "SILGAPP Courses",
+            NotificationManager.IMPORTANCE_HIGH
+        );
+        channel.setDescription("Notifications de courses urgentes SILGAPP");
         channel.enableVibration(true);
         channel.enableLights(true);
+        channel.setVibrationPattern(new long[] { 0, 500, 200, 500, 200, 800 });
+        channel.setLockscreenVisibility(NotificationCompat.VISIBILITY_PUBLIC);
+        channel.setBypassDnd(true);
+        channel.setSound(
+            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
+            new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+        );
+        manager.createNotificationChannel(channel);
+    }
+
+    private void createDefaultChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
         NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        if (manager != null) manager.createNotificationChannel(channel);
+        if (manager == null) return;
+        if (manager.getNotificationChannel(DEFAULT_CHANNEL_ID) != null) return;
+
+        NotificationChannel channel = new NotificationChannel(
+            DEFAULT_CHANNEL_ID,
+            "SILGAPP",
+            NotificationManager.IMPORTANCE_HIGH
+        );
+        channel.setDescription("Notifications SILGAPP générales");
+        channel.enableVibration(true);
+        channel.enableLights(true);
+        manager.createNotificationChannel(channel);
     }
 
     private static void vibrate(Context context) {
@@ -179,7 +268,7 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
                 vibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
             }
             if (vibrator == null || !vibrator.hasVibrator()) return;
-            long[] pattern = new long[] { 0, 500, 150, 500, 150, 500 };
+            long[] pattern = new long[] { 0, 500, 200, 500, 200, 800 };
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1));
             } else {
@@ -191,9 +280,15 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
     private static void playNotificationSound(Context context) {
         try {
             stopRingtone();
-            Uri uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+            // TYPE_ALARM = sonnerie forte qui ignore le mode silencieux
+            Uri uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+            if (uri == null) uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+            if (uri == null) uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
             activeRingtone = RingtoneManager.getRingtone(context.getApplicationContext(), uri);
-            if (activeRingtone != null) activeRingtone.play();
+            if (activeRingtone != null) {
+                activeRingtone.setStreamType(android.media.AudioManager.STREAM_ALARM);
+                activeRingtone.play();
+            }
         } catch (Exception ignored) {}
     }
 

@@ -11,6 +11,7 @@ import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
 import { requestNativeAppPermissions } from "@/lib/nativePermissions";
 import { startNativeBackgroundHeartbeat } from "@/lib/nativeAndroid";
+import { ensureBatteryOptimizationExemption } from "@/lib/batteryOptimization";
 import {
   normalizeLivreurAlertConfig,
   saveLivreurAlertConfig,
@@ -258,6 +259,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     let stopNativeHeartbeat = null;
     let cancelled = false;
 
+    // ── Démarrer le Foreground Service (GPS + heartbeat en arrière-plan) ──
     startNativeBackgroundHeartbeat({
       userType: "livreur",
       intervalMs: 5000,
@@ -268,6 +270,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     }).catch((error) => {
       console.warn("[LivreurExterneGPS] native background heartbeat unavailable:", error?.message);
     });
+
+    // ── Demander l'exclusion de l'optimisation batterie (Samsung, Xiaomi, etc.) ──
+    ensureBatteryOptimizationExemption().catch(() => null);
 
     return () => {
       cancelled = true;

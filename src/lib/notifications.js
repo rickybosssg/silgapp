@@ -10,6 +10,7 @@ import {
 } from "@/lib/livreurUrgentAlert";
 
 const ANDROID_CHANNEL_ID = "silgapp_default";
+const ANDROID_URGENT_CHANNEL_ID = "silgapp_urgent_courses";
 const SilgappPush = registerPlugin("SilgappPush");
 let nativeListenersReady = false;
 let nativeRegistrationListenersReady = false;
@@ -188,6 +189,16 @@ async function ensureNativePushListeners() {
       id: ANDROID_CHANNEL_ID,
       name: "SILGAPP",
       description: "Notifications SILGAPP",
+      importance: 5,
+      visibility: 1,
+      lights: true,
+      vibration: true,
+    });
+    // ── Canal dédié "SILGAPP Courses" — IMPORTANCE_MAX pour courses urgentes ──
+    await PushNotifications.createChannel?.({
+      id: ANDROID_URGENT_CHANNEL_ID,
+      name: "SILGAPP Courses",
+      description: "Notifications de courses urgentes SILGAPP",
       importance: 5,
       visibility: 1,
       lights: true,

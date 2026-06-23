@@ -4,6 +4,7 @@ const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const APP_URL = 'https://silga-dispatch-go.base44.app';
 const ANDROID_CHANNEL_ID = 'silgapp_default';
+const ANDROID_URGENT_CHANNEL_ID = 'silgapp_urgent_courses';
 const ANDROID_CLICK_ACTION = 'OPEN_SILGAPP';
 
 function base64UrlEncode(input) {
@@ -354,8 +355,16 @@ Deno.serve(async (req) => {
       },
     };
 
+    // ── PAYLOAD DATA-ONLY pour courses urgentes livreur ──
+    // PAS de champ "notification" au top level → FCM délivre TOUJOURS à
+    // onMessageReceived() même si l'app est en arrière-plan, fermée ou écran verrouillé.
+    // Le code natif (SilgappFirebaseMessagingService) gère ensuite :
+    //   - sonnerie persistante (TYPE_ALARM)
+    //   - vibration longue
+    //   - réveil écran (WakeLock)
+    //   - notification plein écran (fullScreenIntent)
+    //   - canal IMPORTANCE_HIGH "SILGAPP Courses"
     const urgentAndroidPayload = {
-      notification: { title: titre, body: message },
       data: {
         ...dataPayload,
         title: String(titre),
@@ -365,17 +374,7 @@ Deno.serve(async (req) => {
         collapse_key: notificationTag,
         priority: 'HIGH',
         ttl: `${Math.max(60, Number(alert_duration_seconds || 60) + 30)}s`,
-        notification: {
-          tag: notificationTag,
-          channel_id: ANDROID_CHANNEL_ID,
-          sound: 'default',
-          vibrate_timings: ['0s', '0.2s', '0.1s', '0.2s', '0.1s', '0.4s'],
-          default_sound: true,
-          default_vibrate_timings: false,
-          notification_priority: 'PRIORITY_HIGH',
-          visibility: 'PUBLIC',
-          click_action: ANDROID_CLICK_ACTION,
-        },
+        // Pas de bloc "notification" → data-only message → onMessageReceived toujours appelé
       },
     };
 
