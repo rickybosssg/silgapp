@@ -35,12 +35,16 @@ Deno.serve(async (req) => {
     if (!sender_type || !sender_id) {
       return Response.json({ error: 'sender_type et sender_id sont requis' }, { status: 400 });
     }
+    const normalized_sender_type = ['partner', 'boutique', 'restaurant'].includes(sender_type)
+      ? 'partenaire'
+      : sender_type;
+    let effective_sender_id = sender_id;
 
     // ── 1. Résoudre le VRAI nom et la photo depuis le profil ──
     let realName = '';
     let photoUrl = '';
 
-    if (sender_type === 'livreur') {
+    if (normalized_sender_type === 'livreur') {
       const livreurs = await base44.asServiceRole.entities.Livreur.filter({ user_email: user.email });
       if (!livreurs || livreurs.length === 0) {
         return Response.json({ error: 'Profil livreur introuvable' }, { status: 404 });
@@ -52,7 +56,7 @@ Deno.serve(async (req) => {
       }
       realName = `${livreur.prenom || ''} ${livreur.nom || ''}`.trim() || livreur.telephone || 'Livreur';
       photoUrl = livreur.photo_url || '';
-    } else if (sender_type === 'client') {
+    } else if (normalized_sender_type === 'client') {
       const clients = await base44.asServiceRole.entities.ClientExterne.filter({ user_email: user.email });
       if (!clients || clients.length === 0) {
         return Response.json({ error: 'Profil client introuvable' }, { status: 404 });
@@ -63,13 +67,13 @@ Deno.serve(async (req) => {
       }
       realName = `${client.prenom || ''} ${client.nom || ''}`.trim() || client.telephone || 'Client';
       photoUrl = client.photo_url || client.avatar_url || '';
-    } else if (sender_type === 'admin') {
+    } else if (normalized_sender_type === 'admin') {
       if (user.email !== sender_id) {
         return Response.json({ error: 'sender_id ne correspond pas à l\'admin authentifié' }, { status: 403 });
       }
       realName = user.full_name || user.email || 'Admin';
       photoUrl = '';
-    } else if (sender_type === 'partenaire') {
+    } else if (normalized_sender_type === 'partenaire') {
       // Le partenaire est identifié par son établissement (Boutique ou Restaurant)
       // sender_id = ID de la boutique ou du restaurant
       // On vérifie que l'utilisateur authentifié est bien propriétaire de cet établissement
@@ -79,7 +83,8 @@ Deno.serve(async (req) => {
         ...(boutiques || []).map(b => ({ ...b, _kind: 'boutique' })),
         ...(restaurants || []).map(r => ({ ...r, _kind: 'restaurant' })),
       ];
-      const etab = allEtabs.find(e => e.id === sender_id);
+      const etab = allEtabs.find(e => e.id === sender_id || e.partenaire_id === user.id || e.user_email === user.email);
+      if (etab) effective_sender_id = etab.id;
       if (!etab) {
         return Response.json({ error: 'Vous n\'êtes pas propriétaire de cet établissement' }, { status: 403 });
       }
@@ -97,20 +102,20 @@ Deno.serve(async (req) => {
       }
       const c = courses[0];
       let isParticipant = false;
-      if (sender_type === 'livreur') {
-        isParticipant = c.livreur_id === sender_id;
-      } else if (sender_type === 'client') {
-        isParticipant = c.expediteur_client_id === sender_id || c.destinataire_client_id === sender_id;
-      } else if (sender_type === 'partenaire') {
+      if (normalized_sender_type === 'livreur') {
+        isParticipant = c.livreur_id === effective_sender_id;
+      } else if (normalized_sender_type === 'client') {
+        isParticipant = c.expediteur_client_id === effective_sender_id || c.destinataire_client_id === effective_sender_id;
+      } else if (normalized_sender_type === 'partenaire') {
         if (c.commande_boutique_id) {
           const cmd = await base44.asServiceRole.entities.CommandeBoutique.get(c.commande_boutique_id).catch(() => null);
-          isParticipant = cmd?.boutique_id === sender_id;
+          isParticipant = cmd?.boutique_id === effective_sender_id || cmd?.partenaire_id === user.id;
         }
         if (!isParticipant && c.commande_restaurant_id) {
           const cmd = await base44.asServiceRole.entities.CommandeRestaurant.get(c.commande_restaurant_id).catch(() => null);
-          isParticipant = cmd?.restaurant_id === sender_id;
+          isParticipant = cmd?.restaurant_id === effective_sender_id || cmd?.partenaire_id === user.id;
         }
-      } else if (sender_type === 'admin') {
+      } else if (normalized_sender_type === 'admin') {
         isParticipant = true; // L'admin peut discuter dans toutes les courses
       }
       if (!isParticipant) {
@@ -124,7 +129,10 @@ Deno.serve(async (req) => {
       const c = convs[0];
       let participants = [];
       try { participants = JSON.parse(c.participants || '[]'); } catch {}
-      const isParticipant = participants.some(p => p.type === sender_type && p.id === sender_id);
+      const isParticipant = participants.some(p => {
+        const participantType = ['partner', 'boutique', 'restaurant'].includes(p.type) ? 'partenaire' : p.type;
+        return participantType === normalized_sender_type && p.id === effective_sender_id;
+      });
       if (!isParticipant) {
         return Response.json({ error: 'Vous n\'êtes pas participant de cette conversation' }, { status: 403 });
       }
@@ -150,8 +158,8 @@ Deno.serve(async (req) => {
       const created = new Date(m.created_date || 0).getTime();
       return (
         now - created < 5000 &&
-        m.sender_type === sender_type &&
-        m.sender_id === sender_id &&
+        m.sender_type === normalized_sender_type &&
+        m.sender_id === effective_sender_id &&
         m.message_type === (message_type || 'text') &&
         (m.content || '') === (content || '') &&
         (m.audio_url || '') === (audio_url || '') &&
@@ -169,8 +177,8 @@ Deno.serve(async (req) => {
     const message = await base44.asServiceRole.entities.Message.create({
       course_id: course_id || null,
       conversation_id: conversation_id || null,
-      sender_type,
-      sender_id,
+      sender_type: normalized_sender_type,
+      sender_id: effective_sender_id,
       sender_name: realName,
       sender_photo_url: photoUrl,
       client_message_id: client_message_id || null,

@@ -179,7 +179,7 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
       </div>
 
       {/* Barre de saisie — bouton Envoyer toujours visible */}
-      <div className="p-3 bg-white border-t border-slate-200 flex items-center gap-2 safe-area-bottom shadow-[0_-8px_24px_rgba(15,23,42,0.06)]">
+      <div className="p-2.5 bg-white border-t border-slate-200 flex items-end gap-1.5 safe-area-bottom shadow-[0_-8px_24px_rgba(15,23,42,0.06)]">
         <AudioRecorder
           onSend={handleAudioSend}
           disabled={sending}
@@ -198,15 +198,15 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
           placeholder="Votre message..."
           disabled={sending}
           rows={2}
-          className="flex-1 min-h-14 max-h-28 min-w-0 resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40"
+          className="flex-1 min-h-14 max-h-32 min-w-0 resize-none rounded-2xl border border-slate-300 bg-white px-4 py-3 text-[15px] font-medium leading-5 text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40"
         />
         <Button
           onClick={handleSend}
           disabled={sending || !input.trim()}
-          className="h-11 min-w-[104px] rounded-xl bg-primary hover:bg-primary/90 shadow-md flex-shrink-0 disabled:opacity-60 gap-2 px-4 font-black text-white"
+          className="h-11 w-11 sm:w-auto sm:min-w-[92px] rounded-full sm:rounded-xl bg-primary hover:bg-primary/90 shadow-md flex-shrink-0 disabled:opacity-60 gap-2 px-0 sm:px-4 font-black text-white"
         >
           {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-          <span>Envoyer</span>
+          <span className="hidden sm:inline">Envoyer</span>
         </Button>
       </div>
     </div>

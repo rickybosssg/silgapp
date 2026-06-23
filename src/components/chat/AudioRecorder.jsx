@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { Mic, Square, Send, Loader2, Play, Pause } from "lucide-react";
+import { Mic, Square, Send, Loader2, Play, Pause, Settings, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function AudioRecorder({ onSend, disabled, senderName }) {
@@ -9,16 +9,47 @@ export default function AudioRecorder({ onSend, disabled, senderName }) {
   const [uploading, setUploading] = useState(false);
   const [duration, setDuration] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [permissionError, setPermissionError] = useState("");
 
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
   const audioRef = useRef(new Audio());
 
+  const getSupportedMimeType = () => {
+    const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/mpeg"];
+    return candidates.find((type) => window.MediaRecorder?.isTypeSupported?.(type)) || "";
+  };
+
+  const openAppSettings = () => {
+    const platform = window.Capacitor?.getPlatform?.();
+    const url = platform === "ios"
+      ? "app-settings:"
+      : "intent:#Intent;action=android.settings.APPLICATION_DETAILS_SETTINGS;data=package:com.base6a0ec08f3af5e1d1284254c1.app;end";
+    try {
+      window.open(url, "_system");
+    } catch {
+      alert("Ouvrez les parametres de l'application SILGAPP et autorisez le microphone.");
+    }
+  };
+
   const startRecording = async () => {
     try {
+      setPermissionError("");
+      if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+        throw new Error("unsupported");
+      }
+      if (navigator.permissions?.query) {
+        try {
+          const status = await navigator.permissions.query({ name: "microphone" });
+          if (status.state === "denied") throw new Error("denied");
+        } catch (err) {
+          if (err?.message === "denied") throw err;
+        }
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
+      const mimeType = getSupportedMimeType();
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
 
@@ -38,8 +69,13 @@ export default function AudioRecorder({ onSend, disabled, senderName }) {
       setRecording(true);
       setDuration(0);
       timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
-    } catch {
-      alert("Microphone non disponible. Vérifiez les permissions.");
+    } catch (err) {
+      const denied = err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError" || err?.message === "denied";
+      setPermissionError(
+        denied
+          ? "Microphone refuse. Autorisez le microphone dans les parametres de l'application."
+          : "Microphone non disponible sur cet appareil."
+      );
     }
   };
 
@@ -136,15 +172,40 @@ export default function AudioRecorder({ onSend, disabled, senderName }) {
   }
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      className="h-9 w-9 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50"
-      onClick={startRecording}
-      disabled={disabled}
-      title="Message vocal"
-    >
-      <Mic className="w-4 h-4" />
-    </Button>
+    <div className="relative flex-shrink-0">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-10 w-10 rounded-full text-gray-500 hover:text-red-500 hover:bg-red-50"
+        onClick={startRecording}
+        disabled={disabled}
+        title="Message vocal"
+      >
+        <Mic className="w-4 h-4" />
+      </Button>
+      {permissionError && (
+        <div className="absolute bottom-12 left-0 z-50 w-64 rounded-2xl border border-red-200 bg-white p-3 shadow-xl">
+          <button
+            type="button"
+            onClick={() => setPermissionError("")}
+            className="absolute right-2 top-2 rounded-full p-1 text-gray-400 hover:bg-gray-100"
+            aria-label="Fermer"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+          <p className="pr-6 text-xs font-semibold leading-relaxed text-red-700">{permissionError}</p>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={openAppSettings}
+            className="mt-2 h-8 rounded-xl text-xs font-bold"
+          >
+            <Settings className="mr-1.5 h-3.5 w-3.5" />
+            Ouvrir les parametres
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }

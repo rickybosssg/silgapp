@@ -4,11 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Upload, X, CheckCircle } from "lucide-react";
+import { Loader2, Upload, X, CheckCircle, Navigation, MapPin } from "lucide-react";
 
 export default function CheckoutModal({ type, etablissementId, etablissementNom, cart, total, clientProfil, onClose, onSuccess }) {
   const [adresse, setAdresse] = useState(clientProfil?.quartier ? clientProfil.quartier + ", " + (clientProfil.ville || "") : "");
-  const [quartier, setQuartier] = useState(clientProfil?.quartier || "");
+  const [gpsPosition, setGpsPosition] = useState(null);
+  const [locating, setLocating] = useState(false);
+  const [locationMessage, setLocationMessage] = useState("");
   const [note, setNote] = useState("");
   const [preuveUrl, setPreuveUrl] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -26,6 +28,30 @@ export default function CheckoutModal({ type, etablissementId, etablissementNom,
     setUploading(false);
   };
 
+  const useCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationMessage("GPS non disponible. Saisissez l'adresse manuellement.");
+      return;
+    }
+    setLocating(true);
+    setLocationMessage("Detection de votre position en cours...");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setGpsPosition(coords);
+        if (!adresse) setAdresse("Position GPS actuelle");
+        setLocationMessage("Position detectee avec succes.");
+        setLocating(false);
+      },
+      () => {
+        setGpsPosition(null);
+        setLocationMessage("Impossible de detecter votre position. Verifiez le GPS ou saisissez l'adresse manuellement.");
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 15000 }
+    );
+  };
+
   const handleSubmit = async () => {
     if (!adresse || !preuveUrl) return;
     setSubmitting(true);
@@ -38,9 +64,9 @@ export default function CheckoutModal({ type, etablissementId, etablissementNom,
         items,
         total,
         adresse_livraison: adresse,
-        quartier_livraison: quartier,
-        gps_lat: clientProfil?.latitude || null,
-        gps_lng: clientProfil?.longitude || null,
+        quartier_livraison: "",
+        gps_lat: gpsPosition?.lat || null,
+        gps_lng: gpsPosition?.lng || null,
         note_client: note,
         preuve_paiement_url: preuveUrl,
       });
@@ -84,8 +110,23 @@ export default function CheckoutModal({ type, etablissementId, etablissementNom,
               <span className="text-primary">{(total || 0).toLocaleString()} FCFA</span>
             </div>
           </div>
-          <div><Label className="text-xs">Adresse de livraison *</Label><Input value={adresse} onChange={e => setAdresse(e.target.value)} placeholder="Adresse complète" className="mt-1" /></div>
-          <div><Label className="text-xs">Quartier</Label><Input value={quartier} onChange={e => setQuartier(e.target.value)} placeholder="Quartier" className="mt-1" /></div>
+          <div className="space-y-2">
+            <Label className="text-xs">Adresse de livraison *</Label>
+            <Input value={adresse} onChange={e => setAdresse(e.target.value)} placeholder="Adresse complete" className="mt-1" />
+            <Button type="button" variant="outline" onClick={useCurrentLocation} disabled={locating} className="w-full h-10 rounded-xl text-xs font-bold">
+              {locating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Navigation className="w-4 h-4" />}
+              Utiliser ma position actuelle
+            </Button>
+            {locationMessage && (
+              <div className="flex items-start gap-2 rounded-xl bg-blue-50 border border-blue-100 p-2">
+                <MapPin className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                <p className="text-xs font-semibold text-blue-700">
+                  {locationMessage}
+                  {gpsPosition ? ` (${gpsPosition.lat.toFixed(5)}, ${gpsPosition.lng.toFixed(5)})` : ""}
+                </p>
+              </div>
+            )}
+          </div>
           <div><Label className="text-xs">Note (optionnel)</Label><Textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Instructions pour le livreur..." rows={2} className="mt-1" /></div>
           <div>
             <Label className="text-xs">Preuve de paiement *</Label>

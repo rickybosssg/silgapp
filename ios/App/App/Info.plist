@@ -30,6 +30,8 @@
 	<string>SILGAPP utilise votre position meme en arriere-plan pour suivre precisement les clients et les livreurs pendant une course.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>SILGAPP utilise votre position pour creer, suivre et livrer les courses avec precision.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>SILGAPP utilise le microphone pour enregistrer et envoyer des messages vocaux dans la messagerie.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

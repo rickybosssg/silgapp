@@ -46,6 +46,7 @@ const ADMIN_NOTIFS = {
 async function notifyPush(base44, payload) {
   try {
     await base44.functions.invoke('envoiNotificationPush', payload);
+    console.log(`[syncCommandeFromCourse] Notification push envoyee: ${payload.type} -> ${payload.destinataire_email}`);
   } catch (err) {
     console.error(`[syncCommandeFromCourse] Erreur notif push: ${err.message}`);
   }
@@ -83,7 +84,7 @@ Deno.serve(async (req) => {
       const clientNom = commande?.client_nom || course.client_nom || 'client';
       const titre = course.statut === 'livree' ? 'Commande livree' : info.titre;
       const message = course.statut === 'livree'
-        ? `La commande #${ref} de ${clientNom} a ete livree.`
+        ? `La commande #${ref} de ${clientNom} a ete livree avec succes au client.`
         : info.msg;
       await notifyPush(base44, {
         titre,
