@@ -1,0 +1,90 @@
+{
+  "name": "Pharmacie",
+  "type": "object",
+  "properties": {
+    "nom": {
+      "type": "string",
+      "description": "Nom de la pharmacie"
+    },
+    "logo_url": {
+      "type": "string",
+      "description": "Logo ou photo de la pharmacie"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description / informations utiles"
+    },
+    "pays_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE",
+        "GH"
+      ],
+      "description": "Code pays \u2014 isolation stricte"
+    },
+    "ville": {
+      "type": "string"
+    },
+    "quartier": {
+      "type": "string"
+    },
+    "adresse": {
+      "type": "string",
+      "description": "Adresse pr\u00e9cise de l'\u00e9tablissement (g\u00e9olocalis\u00e9e)"
+    },
+    "latitude": {
+      "type": "number",
+      "description": "Position GPS FIXE de l'\u00e9tablissement (enregistr\u00e9e manuellement)"
+    },
+    "longitude": {
+      "type": "number",
+      "description": "Position GPS FIXE de l'\u00e9tablissement (enregistr\u00e9e manuellement)"
+    },
+    "telephone": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone de la pharmacie"
+    },
+    "telephone_depot": {
+      "type": "string",
+      "description": "Num\u00e9ro Orange Money / Mobile Money pour d\u00e9p\u00f4t paiement"
+    },
+    "horaires": {
+      "type": "string",
+      "description": "Horaires d'ouverture (ex: Lun-Sam: 8h-20h)"
+    },
+    "ouvert": {
+      "type": "boolean",
+      "default": true,
+      "description": "Statut ouvert/ferm\u00e9 (manuel)"
+    },
+    "actif": {
+      "type": "boolean",
+      "default": true,
+      "description": "Pharmacie active sur la plateforme"
+    },
+    "commission_pct": {
+      "type": "number",
+      "description": "Commission configurable (fallback global si null)"
+    },
+    "partenaire_id": {
+      "type": "string",
+      "description": "User ID du partenaire propri\u00e9taire"
+    },
+    "user_email": {
+      "type": "string",
+      "description": "Email du partenaire propri\u00e9taire"
+    }
+  },
+  "required": [
+    "nom",
+    "pays_code",
+    "partenaire_id"
+  ]
+}

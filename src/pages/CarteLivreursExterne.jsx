@@ -179,12 +179,19 @@ export default function CarteLivreursExterne() {
     initialData: [],
     refetchInterval: 30000,
   });
+  const { data: pharmaciesCarte = [] } = useQuery({
+    queryKey: ["pharmacies-carte", effectiveCountry],
+    queryFn: () => base44.entities.Pharmacie.filter(partenaireFilter),
+    initialData: [],
+    refetchInterval: 30000,
+  });
 
-  // Combiner boutiques + restaurants avec _type pour différenciation visuelle
+  // Combiner boutiques + restaurants + pharmacies avec _type pour différenciation visuelle
   const partenaires = useMemo(() => [
     ...boutiquesCarte.map(b => ({ ...b, _type: "boutique" })),
     ...restaurantsCarte.map(r => ({ ...r, _type: "restaurant" })),
-  ], [boutiquesCarte, restaurantsCarte]);
+    ...pharmaciesCarte.map(p => ({ ...p, _type: "pharmacie" })),
+  ], [boutiquesCarte, restaurantsCarte, pharmaciesCarte]);
 
   // Courses en attente : créées, sans livreur assigné, non terminées/annulées
   const coursesAttenteFilter = effectiveCountry

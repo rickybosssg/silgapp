@@ -79,9 +79,11 @@ Deno.serve(async (req) => {
       // On vérifie que l'utilisateur authentifié est bien propriétaire de cet établissement
       const boutiques = await base44.asServiceRole.entities.Boutique.filter({ user_email: user.email });
       const restaurants = await base44.asServiceRole.entities.Restaurant.filter({ user_email: user.email });
+      const pharmacies = await base44.asServiceRole.entities.Pharmacie.filter({ user_email: user.email });
       const allEtabs = [
         ...(boutiques || []).map(b => ({ ...b, _kind: 'boutique' })),
         ...(restaurants || []).map(r => ({ ...r, _kind: 'restaurant' })),
+        ...(pharmacies || []).map(p => ({ ...p, _kind: 'pharmacie' })),
       ];
       const etab = allEtabs.find(e => e.id === sender_id || e.partenaire_id === user.id || e.user_email === user.email);
       if (etab) effective_sender_id = etab.id;

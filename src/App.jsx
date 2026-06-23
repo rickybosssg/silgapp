@@ -77,8 +77,11 @@ const RestaurantDetail = lazy(() => import('./pages/RestaurantDetail.jsx'));
 const PartenaireDashboard = lazy(() => import('./pages/PartenaireDashboard.jsx'));
 const GestionBoutiques = lazy(() => import('./pages/GestionBoutiques.jsx'));
 const GestionRestaurants = lazy(() => import('./pages/GestionRestaurants.jsx'));
+const GestionPharmacies = lazy(() => import('./pages/GestionPharmacies.jsx'));
 const MesCommandesBoutique = lazy(() => import('./pages/MesCommandesBoutique.jsx'));
 const LivraisonsProgrammees = lazy(() => import('./pages/LivraisonsProgrammees.jsx'));
+const PharmaciesList = lazy(() => import('./pages/PharmaciesList.jsx'));
+const PharmacieDetail = lazy(() => import('./pages/PharmacieDetail.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -259,6 +262,8 @@ function AppContent() {
           <Route path="/client/boutiques/:id" element={<BoutiqueDetail />} />
           <Route path="/client/restaurants" element={<RestaurantsList />} />
           <Route path="/client/restaurants/:id" element={<RestaurantDetail />} />
+          <Route path="/client/pharmacies" element={<PharmaciesList />} />
+          <Route path="/client/pharmacies/:id" element={<PharmacieDetail />} />
           <Route path="/client/mes-commandes" element={<MesCommandesBoutique />} />
           <Route path="/client/livraisons-programmees" element={<LivraisonsProgrammees />} />
           <Route path="/livreur/recap-course/:courseId" element={<RecapCourseLivreur />} />
@@ -364,6 +369,7 @@ function AppContent() {
           <Route path="/admin/support" element={<AnimatedRoutes><SupportAdmin /></AnimatedRoutes>} />
           <Route path="/admin/boutiques" element={<AnimatedRoutes><GestionBoutiques /></AnimatedRoutes>} />
           <Route path="/admin/restaurants" element={<AnimatedRoutes><GestionRestaurants /></AnimatedRoutes>} />
+          <Route path="/admin/pharmacies" element={<AnimatedRoutes><GestionPharmacies /></AnimatedRoutes>} />
           <Route path="/admin/commandes-partenaires" element={<AnimatedRoutes><CommandesPartenaires /></AnimatedRoutes>} />
           <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
           <Route path="/support" element={<AnimatedRoutes><SupportClient /></AnimatedRoutes>} />

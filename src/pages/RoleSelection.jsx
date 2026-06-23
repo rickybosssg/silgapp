@@ -5,10 +5,9 @@ import ClientOnboarding from "@/components/client/ClientOnboarding";
 import LivreurRegistrationForm from "@/components/auth/LivreurRegistrationForm";
 
 export default function RoleSelection({ onPartenaire }) {
-  const [step, setStep] = useState("choix"); // choix | client_form | livreur_form | client_done | livreur_done
+  const [step, setStep] = useState("choix");
   const [user, setUser] = useState(null);
 
-  // Charger les infos user au montage
   React.useEffect(() => {
     base44.auth.me().then(u => setUser(u)).catch(() => {});
   }, []);
@@ -26,13 +25,13 @@ export default function RoleSelection({ onPartenaire }) {
   const handlePartenaire = () => {
     try {
       localStorage.setItem("silgapp_preferred_role", "partenaire");
+      localStorage.setItem("silgapp_role_choice", "partenaire");
       if (user?.email) localStorage.setItem("silgapp_preferred_role_email", user.email);
     } catch (_) {}
     onPartenaire?.();
     setTimeout(() => window.location.reload(), 300);
   };
 
-  // Écran de choix
   if (step === "choix") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
@@ -46,41 +45,25 @@ export default function RoleSelection({ onPartenaire }) {
           </div>
 
           <div className="space-y-4">
-            <button
+            <RoleButton
               onClick={() => setStep("client_form")}
-              className="w-full p-6 rounded-3xl border-2 border-accent/20 bg-gradient-to-br from-accent/5 to-green-50 hover:border-accent hover:shadow-lg transition-all text-left group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center group-hover:bg-accent/20 transition-colors">
-                  <Package className="w-7 h-7 text-accent" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-black text-lg text-foreground">Client</p>
-                  <p className="text-sm text-muted-foreground">Envoyer ou recevoir des colis</p>
-                </div>
-                <ArrowRight className="w-5 h-5 text-accent opacity-0 group-hover:opacity-100 transition-all" />
-              </div>
-            </button>
+              icon={Package}
+              title="Client"
+              subtitle="Envoyer ou recevoir des colis"
+              color="accent"
+            />
 
-            <button
+            <RoleButton
               onClick={() => setStep("livreur_form")}
-              className="w-full p-6 rounded-3xl border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-red-50 hover:border-primary hover:shadow-lg transition-all text-left group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                  <Truck className="w-7 h-7 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-black text-lg text-foreground">Livreur</p>
-                  <p className="text-sm text-muted-foreground">Livrer des colis et gagner de l'argent</p>
-                </div>
-                <ArrowRight className="w-5 h-5 text-primary opacity-0 group-hover:opacity-100 transition-all" />
-              </div>
-            </button>
+              icon={Truck}
+              title="Livreur"
+              subtitle="Livrer des colis et gagner de l'argent"
+              color="primary"
+            />
 
             <button
               onClick={handlePartenaire}
-              className="w-full p-6 rounded-3xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-fuchsia-50 hover:border-purple-500 hover:shadow-lg transition-all text-left group"
+              className="w-full p-6 rounded-3xl border-2 border-purple-300/30 bg-gradient-to-br from-purple-50 to-violet-50 hover:border-purple-500 hover:shadow-lg transition-all text-left group"
             >
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-2xl bg-purple-100 flex items-center justify-center group-hover:bg-purple-200 transition-colors">
@@ -88,7 +71,7 @@ export default function RoleSelection({ onPartenaire }) {
                 </div>
                 <div className="flex-1">
                   <p className="font-black text-lg text-foreground">Partenaire</p>
-                  <p className="text-sm text-muted-foreground">Gérer une boutique ou un restaurant</p>
+                  <p className="text-sm text-muted-foreground">Boutique, Restaurant ou Pharmacie</p>
                 </div>
                 <ArrowRight className="w-5 h-5 text-purple-600 opacity-0 group-hover:opacity-100 transition-all" />
               </div>
@@ -99,13 +82,12 @@ export default function RoleSelection({ onPartenaire }) {
     );
   }
 
-  // Formulaire client
   if (step === "client_form") {
     return (
       <div className="min-h-screen bg-background p-6">
         <div className="max-w-lg mx-auto">
           <button onClick={() => setStep("choix")} className="text-sm text-muted-foreground hover:text-foreground mb-6">
-            ← Retour
+            Retour
           </button>
           <ClientOnboarding clientProfil={null} onComplete={handleClientComplete} />
         </div>
@@ -113,13 +95,12 @@ export default function RoleSelection({ onPartenaire }) {
     );
   }
 
-  // Formulaire livreur
   if (step === "livreur_form") {
     return (
       <div className="min-h-screen bg-background p-6">
         <div className="max-w-lg mx-auto">
           <button onClick={() => setStep("choix")} className="text-sm text-muted-foreground hover:text-foreground mb-6">
-            ← Retour
+            Retour
           </button>
           <LivreurRegistrationForm user={user} onComplete={handleLivreurComplete} />
         </div>
@@ -127,35 +108,62 @@ export default function RoleSelection({ onPartenaire }) {
     );
   }
 
-  // Confirmation client
   if (step === "client_done") {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-6">
-        <div className="text-center space-y-4 max-w-sm">
-          <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto">
-            <CheckCircle className="w-8 h-8 text-accent" />
-          </div>
-          <h2 className="text-lg font-bold text-foreground">Compte client créé !</h2>
-          <p className="text-sm text-muted-foreground">Redirection vers votre tableau de bord...</p>
-          <Loader2 className="w-5 h-5 animate-spin mx-auto text-accent" />
-        </div>
-      </div>
+      <DoneScreen
+        tone="accent"
+        title="Compte client cree !"
+        message="Redirection vers votre tableau de bord..."
+      />
     );
   }
 
-  // Confirmation livreur
+  return (
+    <DoneScreen
+      tone="secondary"
+      title="Demande envoyee !"
+      message="Votre demande de compte livreur a bien ete recue. Elle est en cours de verification par l'administration SILGAPP. Vous serez informe des validation de votre compte."
+      support="Support : +226 66 92 51 90"
+    />
+  );
+}
+
+function RoleButton({ onClick, icon: Icon, title, subtitle, color }) {
+  const isAccent = color === "accent";
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full p-6 rounded-3xl border-2 ${
+        isAccent
+          ? "border-accent/20 bg-gradient-to-br from-accent/5 to-green-50 hover:border-accent"
+          : "border-primary/20 bg-gradient-to-br from-primary/5 to-red-50 hover:border-primary"
+      } hover:shadow-lg transition-all text-left group`}
+    >
+      <div className="flex items-center gap-4">
+        <div className={`w-14 h-14 rounded-2xl ${isAccent ? "bg-accent/10 group-hover:bg-accent/20" : "bg-primary/10 group-hover:bg-primary/20"} flex items-center justify-center transition-colors`}>
+          <Icon className={`w-7 h-7 ${isAccent ? "text-accent" : "text-primary"}`} />
+        </div>
+        <div className="flex-1">
+          <p className="font-black text-lg text-foreground">{title}</p>
+          <p className="text-sm text-muted-foreground">{subtitle}</p>
+        </div>
+        <ArrowRight className={`w-5 h-5 ${isAccent ? "text-accent" : "text-primary"} opacity-0 group-hover:opacity-100 transition-all`} />
+      </div>
+    </button>
+  );
+}
+
+function DoneScreen({ tone, title, message, support }) {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <div className="text-center space-y-4 max-w-sm">
-        <div className="w-16 h-16 rounded-2xl bg-secondary/20 flex items-center justify-center mx-auto">
-          <CheckCircle className="w-8 h-8 text-secondary" />
+        <div className={`w-16 h-16 rounded-2xl ${tone === "accent" ? "bg-accent/10" : "bg-secondary/20"} flex items-center justify-center mx-auto`}>
+          <CheckCircle className={`w-8 h-8 ${tone === "accent" ? "text-accent" : "text-secondary"}`} />
         </div>
-        <h2 className="text-lg font-bold text-foreground">Demande envoyée !</h2>
-        <p className="text-sm text-muted-foreground">
-          Votre demande de compte livreur a bien été reçue. Elle est en cours de vérification par l'administration SILGAPP. Vous serez informé dès validation de votre compte.
-        </p>
-        <p className="text-xs text-muted-foreground"> Support : +226 66 92 51 90</p>
-        <Loader2 className="w-5 h-5 animate-spin mx-auto text-secondary" />
+        <h2 className="text-lg font-bold text-foreground">{title}</h2>
+        <p className="text-sm text-muted-foreground">{message}</p>
+        {support && <p className="text-xs text-muted-foreground">{support}</p>}
+        <Loader2 className={`w-5 h-5 animate-spin mx-auto ${tone === "accent" ? "text-accent" : "text-secondary"}`} />
       </div>
     </div>
   );

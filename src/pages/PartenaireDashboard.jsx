@@ -1,10 +1,11 @@
 import React, { useRef, useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Store, UtensilsCrossed, Loader2, LogOut, MapPin } from "lucide-react";
+import { Store, UtensilsCrossed, Loader2, LogOut, MapPin, Pill } from "lucide-react";
 import EtablissementForm from "@/components/partenaire/EtablissementForm";
 import ProduitsManager from "@/components/partenaire/ProduitsManager";
 import CommandesManager from "@/components/partenaire/CommandesManager";
+import PharmacieLivraisons from "@/components/partenaire/PharmacieLivraisons";
 import MessagesPage from "@/components/chat/MessagesPage";
 import ComptabilitePartenaire from "@/components/partenaire/ComptabilitePartenaire";
 import PartenaireHome from "@/components/partenaire/PartenaireHome";
@@ -25,6 +26,15 @@ const ACTION_STATUSES = new Set([
   "en_livraison",
 ]);
 
+const PHARMACIE_ACTIVE_STATUSES = new Set([
+  "nouvelle",
+  "recherche_livreur",
+  "livreur_en_route",
+  "arrive_prise_en_charge",
+  "colis_recupere",
+  "en_livraison",
+]);
+
 export default function PartenaireDashboard() {
   const [user, setUser] = useState(null);
   const [tab, setTab] = useState("home");
@@ -35,7 +45,6 @@ export default function PartenaireDashboard() {
   useEffect(() => {
     base44.auth.me().then(u => {
       setUser(u);
-      // ── Enregistrer le token FCM pour les notifications push partenaire ──
       if (u?.email) {
         registerPushToken(null, { ...u, user_type: "partenaire" }).catch(() => {});
       }
@@ -49,6 +58,7 @@ export default function PartenaireDashboard() {
       return list?.[0] || null;
     },
     enabled: !!user?.id,
+    refetchInterval: 15000,
   });
 
   const { data: monRestaurant, isLoading: loadingRestaurant } = useQuery({
@@ -58,42 +68,64 @@ export default function PartenaireDashboard() {
       return list?.[0] || null;
     },
     enabled: !!user?.id,
+    refetchInterval: 15000,
+  });
+
+  const { data: maPharmacie, isLoading: loadingPharmacie } = useQuery({
+    queryKey: ["ma-pharmacie", user?.id],
+    queryFn: async () => {
+      const list = await base44.entities.Pharmacie.filter({ partenaire_id: user.id });
+      return list?.[0] || null;
+    },
+    enabled: !!user?.id,
+    refetchInterval: 15000,
   });
 
   const hasBoutique = !!maBoutique;
   const hasRestaurant = !!monRestaurant;
-  const hasEtablissement = hasBoutique || hasRestaurant;
-  const etablissementType = hasBoutique ? "boutique" : hasRestaurant ? "restaurant" : null;
-  const etablissement = maBoutique || monRestaurant || null;
+  const hasPharmacie = !!maPharmacie;
+  const hasEtablissement = hasBoutique || hasRestaurant || hasPharmacie;
+  const etablissementType = hasBoutique ? "boutique" : hasRestaurant ? "restaurant" : hasPharmacie ? "pharmacie" : null;
+  const etablissement = maBoutique || monRestaurant || maPharmacie || null;
 
-  // Query commandes avant les retours conditionnels (Rules of Hooks)
   const cmdEntityName = etablissementType === "restaurant" ? "CommandeRestaurant" : "CommandeBoutique";
   const cmdIdField = etablissementType === "restaurant" ? "restaurant_id" : "boutique_id";
   const { data: commandes = [] } = useQuery({
     queryKey: ["commandes", etablissementType, etablissement?.id],
     queryFn: () => base44.entities[cmdEntityName].filter({ [cmdIdField]: etablissement.id }, "-created_date", 100),
-    enabled: !!etablissement?.id,
+    enabled: !!etablissement?.id && !hasPharmacie,
+    refetchInterval: 5000,
+  });
+
+  const { data: pharmaCourses = [] } = useQuery({
+    queryKey: ["courses-pharmacie-dashboard", etablissement?.id],
+    queryFn: async () => {
+      const pharma = await base44.entities.Pharmacie.get(etablissement.id);
+      const all = await base44.entities.CourseExterne.filter({ country_code: pharma.pays_code }, "-created_date", 50);
+      return (all || []).filter(c => c.expediteur_nom === etablissement.nom);
+    },
+    enabled: hasPharmacie && !!etablissement?.id,
     refetchInterval: 5000,
   });
 
   useEffect(() => {
-    if (!etablissement?.id) return;
+    if (!etablissement?.id || hasPharmacie) return;
     const unsub = base44.entities[cmdEntityName]?.subscribe?.((event) => {
       const row = event?.data;
       if (!row || row[cmdIdField] !== etablissement.id) return;
       queryClient.invalidateQueries({ queryKey: ["commandes", etablissementType, etablissement.id] });
     });
     return () => unsub?.();
-  }, [cmdEntityName, cmdIdField, etablissement?.id, etablissementType, queryClient]);
+  }, [cmdEntityName, cmdIdField, etablissement?.id, etablissementType, hasPharmacie, queryClient]);
 
-  const seenKey = etablissement?.id ? `silgapp_partner_commandes_seen_${etablissementType}_${etablissement.id}` : "";
+  const seenKey = etablissement?.id ? `silgapp_partner_seen_${etablissementType}_${etablissement.id}` : "";
   const seenAt = seenKey ? Number(localStorage.getItem(seenKey) || 0) : 0;
-  const pendingCount = commandes.filter(c => {
-    if (!ACTION_STATUSES.has(c.statut)) return false;
-    const changedAt = new Date(c.updated_date || c.created_date || 0).getTime();
-    return changedAt > seenAt;
-  }).length;
-  const activeCount = commandes.filter(c => ACTION_STATUSES.has(c.statut)).length;
+  const pendingCount = hasPharmacie
+    ? pharmaCourses.filter(c => PHARMACIE_ACTIVE_STATUSES.has(c.statut) && new Date(c.updated_date || c.created_date || 0).getTime() > seenAt).length
+    : commandes.filter(c => ACTION_STATUSES.has(c.statut) && new Date(c.updated_date || c.created_date || 0).getTime() > seenAt).length;
+  const activeCount = hasPharmacie
+    ? pharmaCourses.filter(c => PHARMACIE_ACTIVE_STATUSES.has(c.statut)).length
+    : commandes.filter(c => ACTION_STATUSES.has(c.statut)).length;
 
   useEffect(() => {
     if (!etablissement?.id) return;
@@ -104,21 +136,23 @@ export default function PartenaireDashboard() {
     if (activeCount > previousActiveCountRef.current) {
       playNotificationSound();
       navigator.vibrate?.([160, 80, 160]);
-      setNewOrderNotice("Nouvelle commande recue");
+      setNewOrderNotice(hasPharmacie ? "Nouvelle livraison pharmacie" : "Nouvelle commande recue");
       setTimeout(() => setNewOrderNotice(null), 5000);
     }
     previousActiveCountRef.current = activeCount;
-  }, [activeCount, etablissement?.id]);
+  }, [activeCount, etablissement?.id, hasPharmacie]);
 
   const handleSetTab = (nextTab) => {
     setTab(nextTab);
-    if (nextTab === "commandes" && seenKey) {
+    const seenTabs = hasPharmacie ? ["livraisons", "messages"] : ["commandes"];
+    if (seenTabs.includes(nextTab) && seenKey) {
       localStorage.setItem(seenKey, String(Date.now()));
       queryClient.invalidateQueries({ queryKey: ["commandes", etablissementType, etablissement?.id] });
+      queryClient.invalidateQueries({ queryKey: ["courses-pharmacie-dashboard", etablissement?.id] });
     }
   };
 
-  const loading = loadingBoutique || loadingRestaurant;
+  const loading = loadingBoutique || loadingRestaurant || loadingPharmacie;
 
   if (!user || loading) {
     return (
@@ -137,31 +171,30 @@ export default function PartenaireDashboard() {
               <Store className="w-10 h-10 text-purple-600" />
             </div>
             <h1 className="text-2xl font-black text-gray-900">Espace Partenaire</h1>
-            <p className="text-gray-500">Que souhaitez-vous créer ?</p>
+            <p className="text-gray-500">Que souhaitez-vous creer ?</p>
           </div>
-          <div className="space-y-4">
-            <button onClick={() => setTab("boutique_form")} className="w-full p-6 rounded-3xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 hover:border-blue-500 hover:shadow-lg transition-all text-left">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-blue-100 flex items-center justify-center"><Store className="w-7 h-7 text-blue-600" /></div>
-                <div><p className="font-black text-lg text-gray-900">Une Boutique</p><p className="text-sm text-gray-500">Vendre des produits</p></div>
-              </div>
-            </button>
-            <button onClick={() => setTab("restaurant_form")} className="w-full p-6 rounded-3xl border-2 border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50 hover:border-orange-500 hover:shadow-lg transition-all text-left">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-orange-100 flex items-center justify-center"><UtensilsCrossed className="w-7 h-7 text-orange-600" /></div>
-                <div><p className="font-black text-lg text-gray-900">Un Restaurant</p><p className="text-sm text-gray-500">Proposer un menu et des plats</p></div>
-              </div>
-            </button>
-          </div>
-          <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="w-full text-sm text-gray-400 underline">Se déconnecter</button>
+
+          <CreateChoice icon={Store} title="Une Boutique" text="Vendre des produits" onClick={() => setTab("boutique_form")} color="blue" />
+          <CreateChoice icon={UtensilsCrossed} title="Un Restaurant" text="Proposer un menu et des plats" onClick={() => setTab("restaurant_form")} color="orange" />
+          <CreateChoice icon={Pill} title="Une Pharmacie" text="Discuter avec clients et livrer" onClick={() => setTab("pharmacie_form")} color="gray" />
+
+          <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="w-full text-sm text-gray-400 underline">
+            Se deconnecter
+          </button>
+
           {tab === "boutique_form" && (
-            <EtablissementForm type="boutique" partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === 'admin'}
+            <EtablissementForm type="boutique" partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === "admin"}
               onSaved={() => { setTab("home"); queryClient.invalidateQueries({ queryKey: ["ma-boutique"] }); }}
               onCancel={() => setTab("home")} />
           )}
           {tab === "restaurant_form" && (
-            <EtablissementForm type="restaurant" partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === 'admin'}
+            <EtablissementForm type="restaurant" partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === "admin"}
               onSaved={() => { setTab("home"); queryClient.invalidateQueries({ queryKey: ["mon-restaurant"] }); }}
+              onCancel={() => setTab("home")} />
+          )}
+          {tab === "pharmacie_form" && (
+            <EtablissementForm type="pharmacie" partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === "admin"}
+              onSaved={() => { setTab("home"); queryClient.invalidateQueries({ queryKey: ["ma-pharmacie"] }); }}
               onCancel={() => setTab("home")} />
           )}
         </div>
@@ -171,14 +204,13 @@ export default function PartenaireDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
-      {/* ── En-tête premium ── */}
       <div className="bg-gradient-to-br from-purple-600 via-violet-600 to-indigo-600 text-white px-4 py-4 sticky top-0 z-20 shadow-lg">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center overflow-hidden flex-shrink-0">
               {etablissement.logo_url
                 ? <img src={etablissement.logo_url} alt="logo" className="w-full h-full object-cover" />
-                : (etablissementType === "boutique" ? <Store className="w-6 h-6" /> : <UtensilsCrossed className="w-6 h-6" />)}
+                : etablissementType === "boutique" ? <Store className="w-6 h-6" /> : etablissementType === "restaurant" ? <UtensilsCrossed className="w-6 h-6" /> : <Pill className="w-6 h-6" />}
             </div>
             <div className="min-w-0">
               <h1 className="text-lg font-black leading-tight truncate">{etablissement.nom}</h1>
@@ -186,19 +218,16 @@ export default function PartenaireDashboard() {
                 <MapPin className="w-3 h-3 flex-shrink-0" />
                 <span className="truncate">{etablissement.quartier || etablissement.ville || ""}</span>
                 <span className={"w-1.5 h-1.5 rounded-full flex-shrink-0 " + (etablissement.ouvert ? "bg-green-400" : "bg-red-400")} />
-                <span className="flex-shrink-0">{etablissement.ouvert ? "Ouvert" : "Fermé"}</span>
+                <span className="flex-shrink-0">{etablissement.ouvert ? "Ouvert" : "Ferme"}</span>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors">
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
+          <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors">
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
-      {/* ── Contenu ── */}
       <div className="max-w-lg mx-auto px-4 py-4">
         {newOrderNotice && (
           <div className="mb-3 rounded-2xl bg-red-50 border border-red-100 px-4 py-3 text-sm font-black text-red-700">
@@ -206,8 +235,9 @@ export default function PartenaireDashboard() {
           </div>
         )}
         {tab === "home" && <PartenaireHome etablissement={etablissement} etablissementType={etablissementType} onNavigate={handleSetTab} />}
-        {tab === "commandes" && <CommandesManager type={etablissementType} etablissementId={etablissement.id} etablissementNom={etablissement.nom} />}
-        {tab === "produits" && <ProduitsManager type={etablissementType} etablissementId={etablissement.id} />}
+        {tab === "commandes" && !hasPharmacie && <CommandesManager type={etablissementType} etablissementId={etablissement.id} etablissementNom={etablissement.nom} />}
+        {tab === "produits" && !hasPharmacie && <ProduitsManager type={etablissementType} etablissementId={etablissement.id} />}
+        {tab === "livraisons" && hasPharmacie && <PharmacieLivraisons pharmacieId={etablissement.id} pharmacieNom={etablissement.nom} onNavigate={handleSetTab} />}
         {tab === "messages" && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-[70vh]">
             <MessagesPage myType="partenaire" myId={etablissement.id} myName={etablissement.nom} />
@@ -216,13 +246,34 @@ export default function PartenaireDashboard() {
         {tab === "statistiques" && <ComptabilitePartenaire type={etablissementType} />}
         {tab === "revenus" && <ComptabilitePartenaire type={etablissementType} />}
         {tab === "infos" && (
-          <EtablissementForm type={etablissementType} existing={etablissement} partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === 'admin'}
-            onSaved={() => queryClient.invalidateQueries({ queryKey: etablissementType === "boutique" ? ["ma-boutique"] : ["mon-restaurant"] })} />
+          <EtablissementForm type={etablissementType} existing={etablissement} partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === "admin"}
+            onSaved={() => queryClient.invalidateQueries({ queryKey: hasPharmacie ? ["ma-pharmacie"] : etablissementType === "boutique" ? ["ma-boutique"] : ["mon-restaurant"] })} />
         )}
       </div>
 
-      {/* ── Bottom Nav ── */}
-      <PartenaireBottomNav tab={tab} setTab={handleSetTab} badgeCount={pendingCount} />
+      <PartenaireBottomNav tab={tab} setTab={handleSetTab} badgeCount={pendingCount} etablissementType={etablissementType} />
     </div>
+  );
+}
+
+function CreateChoice({ icon: Icon, title, text, onClick, color }) {
+  const styles = {
+    blue: "border-blue-200 from-blue-50 to-indigo-50 hover:border-blue-500 text-blue-600 bg-blue-100",
+    orange: "border-orange-200 from-orange-50 to-amber-50 hover:border-orange-500 text-orange-600 bg-orange-100",
+    gray: "border-gray-300 from-gray-50 to-slate-100 hover:border-gray-600 text-gray-700 bg-gray-200",
+  };
+  const [border, gradientA, gradientB, hover, textColor, iconBg] = styles[color].split(" ");
+  return (
+    <button onClick={onClick} className={`w-full p-6 rounded-3xl border-2 ${border} bg-gradient-to-br ${gradientA} ${gradientB} ${hover} hover:shadow-lg transition-all text-left`}>
+      <div className="flex items-center gap-4">
+        <div className={`w-14 h-14 rounded-2xl ${iconBg} flex items-center justify-center`}>
+          <Icon className={`w-7 h-7 ${textColor}`} />
+        </div>
+        <div>
+          <p className="font-black text-lg text-gray-900">{title}</p>
+          <p className="text-sm text-gray-500">{text}</p>
+        </div>
+      </div>
+    </button>
   );
 }

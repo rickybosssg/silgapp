@@ -241,9 +241,9 @@ function GeneralChatWindow({ conversationId, myType, myId, myName, onBack }) {
   );
 }
 
-export default function MessagesPage({ myType, myId, myName, onBack }) {
+export default function MessagesPage({ myType, myId, myName, onBack, initialConversationId }) {
   const [conversations, setConversations] = useState([]);
-  const [activeConvId, setActiveConvId] = useState(null);
+  const [activeConvId, setActiveConvId] = useState(initialConversationId || null);
   const [loading, setLoading] = useState(true);
   const [showNewConv, setShowNewConv] = useState(false);
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+﻿import React, { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 
 export default function ModernMap({
@@ -30,7 +30,7 @@ export default function ModernMap({
       script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
       script.onload = () => {
         if (cancelled) {
-          console.log("[ModernMap] Script Leaflet chargé après démontage — ignoré");
+          console.log("[ModernMap] Script Leaflet charge apres demontage - ignore");
           return;
         }
         initMap();
@@ -50,17 +50,17 @@ export default function ModernMap({
     };
   }, [position?.latitude, position?.longitude]);
 
-  // Mettre à jour la position du client
+  // Mettre ? jour la position du client
   useEffect(() => {
     if (!mapInstanceRef.current || !position) return;
-
+    
     const map = mapInstanceRef.current;
-
-    // Mettre à jour le marqueur client
+    
+    // Mettre ? jour le marqueur client
     if (markersRef.current[0]) {
       markersRef.current[0].setLatLng([position.latitude, position.longitude]);
     }
-
+    
     // Centrer sur la position avec animation fluide
     map.flyTo([position.latitude, position.longitude], 14, {
       duration: 1.5,
@@ -68,11 +68,11 @@ export default function ModernMap({
     });
   }, [position]);
 
-  // Map des marqueurs livreurs par id — pour mise à jour stable sans recréation
+  // Map des marqueurs livreurs par id - pour mise a jour stable sans recreation
   const livreurMarkersRef = useRef({}); // { [id]: marker }
   const partenaireMarkersRef = useRef({}); // { [id]: marker }
 
-  // Mettre à jour les marqueurs de livreurs — diff intelligent (pas de suppression totale)
+  // Mettre ? jour les marqueurs de livreurs - diff intelligent (pas de suppression totale)
   useEffect(() => {
     if (!mapInstanceRef.current || !window.L) return;
     if (!livreursProches || livreursProches.length === 0) return; // Ne jamais vider sur tableau vide
@@ -88,7 +88,7 @@ export default function ModernMap({
       }
     });
 
-    // 2. Pour chaque livreur : mettre à jour la position si existant, ou créer si nouveau
+    // 2. Pour chaque livreur : mettre a jour la position si existant, ou creer si nouveau
     livreursProches.forEach((personne) => {
       if (!personne.latitude || !personne.longitude) return;
       if (!personne.id) return;
@@ -96,7 +96,7 @@ export default function ModernMap({
       const isLivreur = !!personne.vehicule || !!personne.type_vehicule || !!personne.statut;
       const isClient = !isLivreur;
 
-      // Déjà un marqueur pour cet id → juste déplacer
+      // Deja un marqueur pour cet id -> juste deplacer
       if (livreurMarkersRef.current[personne.id]) {
         livreurMarkersRef.current[personne.id].setLatLng([personne.latitude, personne.longitude]);
         return;
@@ -139,7 +139,7 @@ export default function ModernMap({
         const dt = personne.derniere_position_date || personne.last_seen_at || personne.updated_date;
         if (!dt) return null;
         const diff = Math.round((Date.now() - new Date(dt).getTime()) / 60000);
-        if (diff < 1) return 'à l\'instant';
+        if (diff < 1) return '? l\'instant';
         if (diff < 60) return `il y a ${diff} min`;
         return `il y a ${Math.round(diff / 60)}h`;
       })();
@@ -159,7 +159,7 @@ export default function ModernMap({
     });
   }, [livreursProches]);
 
-  // ── Marqueurs partenaires (boutiques violet + restaurants rose) — position FIXE ──
+  // -- Marqueurs partenaires (boutiques violet + restaurants rose) - position FIXE --
   useEffect(() => {
     if (!mapInstanceRef.current || !window.L) return;
     if (!partenaires || partenaires.length === 0) {
@@ -182,17 +182,18 @@ export default function ModernMap({
       }
     });
 
-    // Créer / mettre à jour les marqueurs
+    // Creer / mettre a jour les marqueurs
     partenaires.forEach((partenaire) => {
       if (!partenaire.latitude || !partenaire.longitude) return;
       if (!partenaire.id) return;
 
-      // Déjà un marqueur → ne pas recréer (position fixe)
+      // Deja un marqueur -> ne pas recreer (position fixe)
       if (partenaireMarkersRef.current[partenaire.id]) return;
 
+      const isPharmacie = partenaire._type === "pharmacie";
       const isBoutique = partenaire._type === "boutique" || !partenaire._type;
-      const borderColor = isBoutique ? "#8b5cf6" : "#ec4899";
-      const emoji = isBoutique ? "" : "";
+      const borderColor = isPharmacie ? "#1e3a8a" : isBoutique ? "#8b5cf6" : "#ec4899";
+      const initial = (partenaire.nom || "?").charAt(0).toUpperCase();
 
       const markerIcon = window.L.divIcon({
         html: `
@@ -200,7 +201,7 @@ export default function ModernMap({
             <div class="partenaire-marker" style="border-color: ${borderColor}">
               ${partenaire.logo_url
                 ? `<img src="${partenaire.logo_url}" alt="${partenaire.nom}" class="partenaire-photo" />`
-                : `<div class="partenaire-avatar" style="background: ${borderColor}">${emoji}</div>`
+                : `<div class="partenaire-avatar" style="background: ${borderColor}">${initial}</div>`
               }
             </div>
           </div>
@@ -216,18 +217,18 @@ export default function ModernMap({
       }).addTo(map);
 
       const statutLabel = partenaire.ouvert === false
-        ? '<span style="color:#dc2626;font-weight:600"> Fermé</span>'
-        : '<span style="color:#16a34a;font-weight:600"> Ouvert</span>';
-      const typeLabel = isBoutique ? " Boutique" : " Restaurant";
+        ? '<span style="color:#dc2626;font-weight:600">Ferme</span>'
+        : '<span style="color:#16a34a;font-weight:600">Ouvert</span>';
+      const typeLabel = isPharmacie ? "Pharmacie" : isBoutique ? "Boutique" : "Restaurant";
 
       marker.bindPopup(`
         <div style="min-width:200px;font-family:sans-serif;padding:4px 0">
           <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#1a1a1a">${partenaire.nom || ""}</p>
           <p style="font-size:12px;margin:2px 0;color:${borderColor};font-weight:600">${typeLabel}</p>
           <p style="font-size:12px;margin:2px 0">${statutLabel}</p>
-          ${partenaire.adresse ? `<p style="font-size:12px;margin:2px 0;color:#6b7280"> ${partenaire.adresse}</p>` : ""}
-          ${partenaire.quartier ? `<p style="font-size:12px;margin:2px 0;color:#6b7280"> ${partenaire.quartier}</p>` : ""}
-          ${partenaire.telephone ? `<p style="font-size:12px;margin:2px 0;color:#444"> ${partenaire.telephone}</p>` : ""}
+          ${partenaire.adresse ? `<p style="font-size:12px;margin:2px 0;color:#6b7280">Adresse: ${partenaire.adresse}</p>` : ""}
+          ${partenaire.quartier ? `<p style="font-size:12px;margin:2px 0;color:#6b7280">Quartier: ${partenaire.quartier}</p>` : ""}
+          ${partenaire.telephone ? `<p style="font-size:12px;margin:2px 0;color:#444">Tel: ${partenaire.telephone}</p>` : ""}
         </div>
       `, { maxWidth: 260 });
 
@@ -242,13 +243,13 @@ export default function ModernMap({
   const initMap = () => {
     if (!window.L || !mapRef.current || !document.body.contains(mapRef.current)) return;
 
-    // Créer la carte avec options premium
+    // Creer la carte avec options premium
     const map = window.L.map(mapRef.current, {
       zoomControl: false,
       attributionControl: false,
       scrollWheelZoom: false,
       doubleClickZoom: false,
-      dragging: !courseActive, // Désactiver drag pendant course active
+      dragging: !courseActive, // Desactiver drag pendant course active
       keyboard: false,
     }).setView([position.latitude, position.longitude], 14);
 
@@ -259,7 +260,7 @@ export default function ModernMap({
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
     }).addTo(map);
 
-    // Contrôles de zoom stylisés
+    // Controles de zoom stylises
     const zoomControl = window.L.control.zoom({
       position: 'bottomright'
     }).addTo(map);
@@ -268,7 +269,7 @@ export default function ModernMap({
     setTimeout(() => {
       const zoomIn = document.querySelector('.leaflet-control-zoom-in');
       const zoomOut = document.querySelector('.leaflet-control-zoom-out');
-
+      
       [zoomIn, zoomOut].forEach(btn => {
         if (btn) {
           btn.style.cssText = `
@@ -287,7 +288,7 @@ export default function ModernMap({
       });
     }, 100);
 
-    // Marqueur client personnalisé (style Uber)
+    // Marqueur client personnalise (style Uber)
     const clientIcon = window.L.divIcon({
       html: `
         <div class="client-marker-wrapper">
@@ -302,19 +303,19 @@ export default function ModernMap({
       iconAnchor: [30, 30],
     });
 
-    const clientMarker = window.L.marker([position.latitude, position.longitude], {
+    const clientMarker = window.L.marker([position.latitude, position.longitude], { 
       icon: clientIcon,
       zIndexOffset: 2000
     }).addTo(map);
 
     markersRef.current = [clientMarker];
 
-    // Ajouter CSS personnalisé pour les marqueurs
+    // Ajouter CSS personnalise pour les marqueurs
     addCustomStyles();
 
     setMapLoaded(true);
     mapInstanceRef.current = map;
-
+    
     if (onMapReady) onMapReady(map);
   };
 
@@ -329,7 +330,7 @@ export default function ModernMap({
       .client-marker-container {
         pointer-events: none;
       }
-
+      
       .client-marker-wrapper {
         position: relative;
         width: 60px;
@@ -338,7 +339,7 @@ export default function ModernMap({
         align-items: center;
         justify-content: center;
       }
-
+      
       .client-marker-pulse {
         position: absolute;
         width: 60px;
@@ -347,7 +348,7 @@ export default function ModernMap({
         border-radius: 50%;
         animation: pulse-client 2s ease-out infinite;
       }
-
+      
       @keyframes pulse-client {
         0% {
           transform: scale(0.5);
@@ -358,7 +359,7 @@ export default function ModernMap({
           opacity: 0;
         }
       }
-
+      
       .client-marker {
         width: 20px;
         height: 20px;
@@ -368,7 +369,7 @@ export default function ModernMap({
         box-shadow: 0 2px 12px rgba(220, 38, 38, 0.4);
         position: relative;
       }
-
+      
       .client-marker-dot {
         width: 6px;
         height: 6px;
@@ -379,12 +380,12 @@ export default function ModernMap({
         left: 50%;
         transform: translate(-50%, -50%);
       }
-
+      
       /* Marqueurs livreurs - style Glovo */
       .livreur-marker-container {
         transition: all 0.3s ease;
       }
-
+      
       .livreur-marker-wrapper {
         position: relative;
         width: 48px;
@@ -393,7 +394,7 @@ export default function ModernMap({
         align-items: center;
         justify-content: center;
       }
-
+      
       .livreur-marker-pulse {
         position: absolute;
         width: 48px;
@@ -402,7 +403,7 @@ export default function ModernMap({
         border-radius: 50%;
         animation: pulse-livreur 2s ease-out infinite;
       }
-
+      
       @keyframes pulse-livreur {
         0% {
           transform: scale(0.5);
@@ -413,7 +414,7 @@ export default function ModernMap({
           opacity: 0;
         }
       }
-
+      
       .livreur-marker {
         width: 40px;
         height: 40px;
@@ -426,13 +427,13 @@ export default function ModernMap({
         align-items: center;
         justify-content: center;
       }
-
+      
       .livreur-photo {
         width: 100%;
         height: 100%;
         object-fit: cover;
       }
-
+      
       .livreur-avatar {
         width: 100%;
         height: 100%;
@@ -444,26 +445,26 @@ export default function ModernMap({
         font-weight: 700;
         font-size: 18px;
       }
-
+      
       /* Popup livreurs */
       .livreur-popup {
         min-width: 180px;
       }
-
+      
       .livreur-popup-header {
         display: flex;
         align-items: center;
         gap: 12px;
         margin-bottom: 8px;
       }
-
+      
       .livreur-popup-header img {
         width: 48px;
         height: 48px;
         border-radius: 50%;
         object-fit: cover;
       }
-
+      
       .livreur-popup-avatar {
         width: 48px;
         height: 48px;
@@ -476,38 +477,38 @@ export default function ModernMap({
         font-weight: 700;
         font-size: 20px;
       }
-
+      
       .livreur-popup-name {
         font-weight: 700;
         color: #1a1a1a;
         margin: 0;
         font-size: 14px;
       }
-
+      
       .livreur-popup-rating {
         font-size: 12px;
         color: #f59e0b;
         margin-top: 2px;
       }
-
+      
       .livreur-popup-vehicle {
         font-size: 12px;
         color: #666;
         margin: 0;
       }
-
+      
       /* Popup clients */
       .client-popup {
         min-width: 200px;
       }
-
+      
       .client-popup-header {
         display: flex;
         align-items: center;
         gap: 12px;
         margin-bottom: 8px;
       }
-
+      
       .client-popup-avatar {
         width: 48px;
         height: 48px;
@@ -520,27 +521,27 @@ export default function ModernMap({
         font-weight: 700;
         font-size: 20px;
       }
-
+      
       .client-popup-name {
         font-weight: 700;
         color: #1a1a1a;
         margin: 0;
         font-size: 14px;
       }
-
+      
       .client-popup-status {
         font-size: 11px;
         color: #dc2626;
         margin-top: 2px;
         font-weight: 600;
       }
-
+      
       .client-popup-phone {
         font-size: 12px;
         color: #666;
         margin: 0;
       }
-
+      
       /* Marqueurs partenaires (boutiques violet + restaurants rose) */
       .partenaire-marker-container {
         transition: all 0.3s ease;
@@ -584,39 +585,39 @@ export default function ModernMap({
         font-size: 18px;
       }
 
-      /* Contrôles de zoom */
+      /* Controles de zoom */
       .leaflet-control-zoom {
         border: none !important;
       }
-
+      
       .leaflet-control-zoom-in,
       .leaflet-control-zoom-out {
         transition: all 0.2s ease !important;
       }
-
+      
       .leaflet-control-zoom-in:hover,
       .leaflet-control-zoom-out:hover {
         background: #f5f5f5 !important;
         transform: scale(1.1);
       }
-
+      
       /* Responsive */
       @media (max-width: 640px) {
         .livreur-marker-wrapper {
           width: 40px;
           height: 40px;
         }
-
+        
         .livreur-marker {
           width: 32px;
           height: 32px;
         }
-
+        
         .client-marker-wrapper {
           width: 50px;
           height: 50px;
         }
-
+        
         .client-marker {
           width: 16px;
           height: 16px;
@@ -628,12 +629,12 @@ export default function ModernMap({
 
   return (
     <div className="relative w-full h-full" style={{ minHeight: "calc(100vh - 73px)" }}>
-      <div
-        ref={mapRef}
+      <div 
+        ref={mapRef} 
         className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-200"
         style={{ minHeight: "calc(100vh - 73px)" }}
       />
-
+      
       {/* Overlay de chargement */}
       {!mapLoaded && (
         <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
@@ -646,8 +647,8 @@ export default function ModernMap({
           </div>
         </div>
       )}
-
-      {/* Badge livreurs — même source que les marqueurs (avec GPS uniquement) */}
+      
+      {/* Badge livreurs - meme source que les marqueurs (avec GPS uniquement) */}
       {mapLoaded && (() => {
         const livreursAffiches = livreursProches.filter(p => (p.vehicule || p.type_vehicule || p.statut) && p.latitude && p.longitude);
         if (livreursAffiches.length === 0) return null;
@@ -665,7 +666,7 @@ export default function ModernMap({
         );
       })()}
 
-      {/* Badge partenaires — boutiques + restaurants à proximité */}
+      {/* Badge partenaires - boutiques + restaurants ? proximite */}
       {mapLoaded && (() => {
         const partenairesAffiches = (partenaires || []).filter(p => p.latitude && p.longitude);
         if (partenairesAffiches.length === 0) return null;

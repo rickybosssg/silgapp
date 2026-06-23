@@ -16,6 +16,7 @@ const PAYS = [
 
 export default function EtablissementForm({ type, existing, partenaireId, userEmail, onSaved, onCancel, isAdmin }) {
   const isRestaurant = type === "restaurant";
+  const isPharmacie = type === "pharmacie";
   const [form, setForm] = useState(existing || {
     nom: "", logo_url: "", description: "",
     categorie: "", specialite: "",
@@ -44,10 +45,11 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
     setSaving(true);
     try {
       const data = { ...form, partenaire_id: partenaireId, user_email: userEmail, actif: form.actif !== false };
+      const entityName = isPharmacie ? "Pharmacie" : isRestaurant ? "Restaurant" : "Boutique";
       if (existing?.id) {
-        await base44.entities[isRestaurant ? "Restaurant" : "Boutique"].update(existing.id, data);
+        await base44.entities[entityName].update(existing.id, data);
       } else {
-        await base44.entities[isRestaurant ? "Restaurant" : "Boutique"].create(data);
+        await base44.entities[entityName].create(data);
       }
       onSaved?.();
     } catch (err) {}
@@ -56,7 +58,7 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
-      <h2 className="font-bold text-gray-900 text-sm">{existing ? "Modifier" : "Créer"} {isRestaurant ? "le restaurant" : "la boutique"}</h2>
+      <h2 className="font-bold text-gray-900 text-sm">{existing ? "Modifier" : "Créer"} {isPharmacie ? "la pharmacie" : isRestaurant ? "le restaurant" : "la boutique"}</h2>
       {existing && !existing.actif && !isAdmin && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
@@ -83,7 +85,7 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
       <div><Label className="text-xs">Description</Label><Textarea value={form.description} onChange={e => set("description", e.target.value)} placeholder="Description" className="mt-1" rows={2} /></div>
       {isRestaurant ? (
         <div><Label className="text-xs">Spécialité</Label><Input value={form.specialite || ""} onChange={e => set("specialite", e.target.value)} placeholder="Ex: Africain, Fast-food" className="mt-1" /></div>
-      ) : (
+      ) : isPharmacie ? null : (
         <div><Label className="text-xs">Catégorie</Label><Input value={form.categorie || ""} onChange={e => set("categorie", e.target.value)} placeholder="Ex: Alimentation, Mode" className="mt-1" /></div>
       )}
       <div className="grid grid-cols-2 gap-3">
@@ -123,6 +125,11 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
       <div><Label className="text-xs">Horaires d'ouverture</Label><Input value={form.horaires || ""} onChange={e => set("horaires", e.target.value)} placeholder="Ex: Lun-Sam: 8h-20h" className="mt-1" /></div>
       {isRestaurant && (
         <div><Label className="text-xs">Temps de préparation (minutes)</Label><Input type="number" value={form.temps_preparation_min || 30} onChange={e => set("temps_preparation_min", parseInt(e.target.value) || 30)} className="mt-1" /></div>
+      )}
+      {isPharmacie && (
+        <div className="bg-gray-50 border border-gray-100 rounded-xl p-3">
+          <p className="text-xs text-gray-500">💊 <span className="font-semibold">Pharmacie</span> — Les clients discutent avec vous par messagerie (texte, audio, ordonnances) puis vous créez la livraison quand le paiement est confirmé.</p>
+        </div>
       )}
       <div className="flex items-center gap-4">
         <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.ouvert} onChange={e => set("ouvert", e.target.checked)} className="w-4 h-4" /> Ouvert actuellement</label>

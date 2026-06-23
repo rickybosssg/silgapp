@@ -13,7 +13,7 @@ import { useQueryClient, useQuery } from "@tanstack/react-query";
 import {
   MapPin, Navigation, MessageCircle, User, Package,
   Clock, ChevronRight, TrendingUp, Loader2, ArrowLeft, RefreshCw,
-  Store, UtensilsCrossed, Bell
+  Store, UtensilsCrossed, Bell, Pill
 } from "lucide-react";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import CourseAnnuleeRelanceDialog from "@/components/client/CourseAnnuleeRelanceDialog";
@@ -122,10 +122,19 @@ export default function ClientExterneApp() {
     staleTime: 15000,
     refetchInterval: 30000,
   });
+  const { data: pharmaciesCarte = [] } = useQuery({
+    queryKey: ["pharmacies-carte-client", clientProfil?.country_code],
+    queryFn: () => base44.entities.Pharmacie.filter(partenaireFilter),
+    initialData: [],
+    enabled: !!clientProfil?.country_code,
+    staleTime: 15000,
+    refetchInterval: 30000,
+  });
   const partenairesCarte = useMemo(() => [
     ...boutiquesCarte.map(b => ({ ...b, _type: "boutique" })),
     ...restaurantsCarte.map(r => ({ ...r, _type: "restaurant" })),
-  ], [boutiquesCarte, restaurantsCarte]);
+    ...pharmaciesCarte.map(p => ({ ...p, _type: "pharmacie" })),
+  ], [boutiquesCarte, restaurantsCarte, pharmaciesCarte]);
 
   const { data: commandesBoutiqueClient = [] } = useQuery({
     queryKey: ["commandes-boutique-client-active", clientProfil?.id],
@@ -959,6 +968,17 @@ export default function ClientExterneApp() {
                   </div>
                   <p className="font-black text-gray-900 text-xs">Restaurants</p>
                   <p className="text-[10px] text-gray-500 mt-0.5">Commander à manger</p>
+                </button>
+
+                <button
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-gray-300"
+                  onClick={() => navigate("/client/pharmacies")}
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-gray-600 to-gray-800 flex items-center justify-center shadow-lg shadow-gray-300 mb-2 group-hover:scale-105 transition-transform">
+                    <Pill className="w-5 h-5 text-white" />
+                  </div>
+                  <p className="font-black text-gray-900 text-xs">Pharmacies</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">Discuter & commander</p>
                 </button>
               </div>
 
