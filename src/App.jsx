@@ -76,6 +76,7 @@ const RestaurantDetail = lazy(() => import('./pages/RestaurantDetail.jsx'));
 const PartenaireDashboard = lazy(() => import('./pages/PartenaireDashboard.jsx'));
 const GestionBoutiques = lazy(() => import('./pages/GestionBoutiques.jsx'));
 const GestionRestaurants = lazy(() => import('./pages/GestionRestaurants.jsx'));
+const GestionPharmacies = lazy(() => import('./pages/GestionPharmacies.jsx'));
 const MesCommandesBoutique = lazy(() => import('./pages/MesCommandesBoutique.jsx'));
 const PharmaciesList = lazy(() => import('./pages/PharmaciesList.jsx'));
 const PharmacieDetail = lazy(() => import('./pages/PharmacieDetail.jsx'));
@@ -365,6 +366,7 @@ function AppContent() {
           <Route path="/admin/support" element={<AnimatedRoutes><SupportAdmin /></AnimatedRoutes>} />
           <Route path="/admin/boutiques" element={<AnimatedRoutes><GestionBoutiques /></AnimatedRoutes>} />
           <Route path="/admin/restaurants" element={<AnimatedRoutes><GestionRestaurants /></AnimatedRoutes>} />
+          <Route path="/admin/pharmacies" element={<AnimatedRoutes><GestionPharmacies /></AnimatedRoutes>} />
           <Route path="/admin/commandes-partenaires" element={<AnimatedRoutes><CommandesPartenaires /></AnimatedRoutes>} />
           <Route path="/support" element={<AnimatedRoutes><SupportClient /></AnimatedRoutes>} />
         </Route>

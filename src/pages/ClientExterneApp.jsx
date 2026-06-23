@@ -112,10 +112,19 @@ export default function ClientExterneApp() {
     staleTime: 15000,
     refetchInterval: 30000,
   });
+  const { data: pharmaciesCarte = [] } = useQuery({
+    queryKey: ["pharmacies-carte-client", clientProfil?.country_code],
+    queryFn: () => base44.entities.Pharmacie.filter(partenaireFilter),
+    initialData: [],
+    enabled: !!clientProfil?.country_code,
+    staleTime: 15000,
+    refetchInterval: 30000,
+  });
   const partenairesCarte = useMemo(() => [
     ...boutiquesCarte.map(b => ({ ...b, _type: "boutique" })),
     ...restaurantsCarte.map(r => ({ ...r, _type: "restaurant" })),
-  ], [boutiquesCarte, restaurantsCarte]);
+    ...pharmaciesCarte.map(p => ({ ...p, _type: "pharmacie" })),
+  ], [boutiquesCarte, restaurantsCarte, pharmaciesCarte]);
 
   // Pull-to-refresh
   const { pulling, refreshing } = usePullToRefresh(async () => {

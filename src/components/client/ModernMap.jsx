@@ -190,9 +190,10 @@ export default function ModernMap({
       // Déjà un marqueur → ne pas recréer (position fixe)
       if (partenaireMarkersRef.current[partenaire.id]) return;
 
+      const isPharmacie = partenaire._type === "pharmacie";
       const isBoutique = partenaire._type === "boutique" || !partenaire._type;
-      const borderColor = isBoutique ? "#8b5cf6" : "#ec4899";
-      const emoji = isBoutique ? "🏪" : "🍽️";
+      const borderColor = isPharmacie ? "#374151" : isBoutique ? "#8b5cf6" : "#ec4899";
+      const emoji = isPharmacie ? "💊" : isBoutique ? "🏪" : "🍽️";
 
       const markerIcon = window.L.divIcon({
         html: `
@@ -218,7 +219,7 @@ export default function ModernMap({
       const statutLabel = partenaire.ouvert === false
         ? '<span style="color:#dc2626;font-weight:600">🔴 Fermé</span>'
         : '<span style="color:#16a34a;font-weight:600">🟢 Ouvert</span>';
-      const typeLabel = isBoutique ? "🏪 Boutique" : "🍽️ Restaurant";
+      const typeLabel = isPharmacie ? "💊 Pharmacie" : isBoutique ? "🏪 Boutique" : "🍽️ Restaurant";
 
       marker.bindPopup(`
         <div style="min-width:200px;font-family:sans-serif;padding:4px 0">

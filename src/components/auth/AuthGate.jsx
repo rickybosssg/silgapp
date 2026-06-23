@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44, detectedToken } from "@/api/base44Client";
 import { APP_PUBLIC_URL, BASE44_APP_ID } from "@/lib/app-params";
-import { Loader2, Lock, Mail, Truck } from "lucide-react";
+import { Loader2, Lock, Mail, Truck, Store } from "lucide-react";
 import AppMaintenanceGate from "@/components/admin/AppMaintenanceGate";
 import { registerPushToken } from "@/lib/notifications";
 import { persistToken, clearPersistedToken } from "@/lib/authPersistence";
@@ -594,6 +594,20 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
   // Client → bloqué si app OFF
   if (state === "client") {
     return <AppMaintenanceGate>{children}</AppMaintenanceGate>;
+  }
+
+  // Partenaire → rendu géré par App.jsx via onPartenaire
+  if (state === "partenaire") {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-purple-100 flex items-center justify-center mx-auto">
+            <Store className="w-8 h-8 text-purple-600 animate-pulse" />
+          </div>
+          <p className="text-sm text-muted-foreground">Chargement de votre espace partenaire...</p>
+        </div>
+      </div>
+    );
   }
 
   // Livreur → rendu géré par App.jsx via onLivreur (le gate est dans LivreurApp/LivreurExterneApp)
