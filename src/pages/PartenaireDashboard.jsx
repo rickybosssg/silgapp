@@ -10,6 +10,7 @@ import MessagesPage from "@/components/chat/MessagesPage";
 import ComptabilitePartenaire from "@/components/partenaire/ComptabilitePartenaire";
 import PartenaireHome from "@/components/partenaire/PartenaireHome";
 import PartenaireBottomNav from "@/components/partenaire/PartenaireBottomNav";
+import NewMessageModal from "@/components/partenaire/NewMessageModal";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { registerPushToken } from "@/lib/notifications";
 import { playNotificationSound } from "@/hooks/useSonEtVibration";
@@ -39,6 +40,10 @@ export default function PartenaireDashboard() {
   const [user, setUser] = useState(null);
   const [tab, setTab] = useState("home");
   const [newOrderNotice, setNewOrderNotice] = useState(null);
+  const [newMsgModal, setNewMsgModal] = useState(null);
+  const [seenConvIds, setSeenConvIds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("partenaire_seen_convs") || "[]"); } catch { return []; }
+  });
   const previousActiveCountRef = useRef(null);
   const queryClient = useQueryClient();
 
@@ -108,6 +113,23 @@ export default function PartenaireDashboard() {
     refetchInterval: 5000,
   });
 
+  const { data: allConversations = [] } = useQuery({
+    queryKey: ["conversations-partenaire-all", etablissement?.id],
+    queryFn: async () => {
+      const all = await base44.entities.Conversation.list("-last_message_date", 100);
+      return (all || []).filter(c => {
+        try {
+          const parts = JSON.parse(c.participants || "[]");
+          return parts.some(p => p.type === "partenaire" && p.id === etablissement.id);
+        } catch {
+          return false;
+        }
+      });
+    },
+    enabled: !!etablissement?.id,
+    refetchInterval: 8000,
+  });
+
   useEffect(() => {
     if (!etablissement?.id || hasPharmacie) return;
     const unsub = base44.entities[cmdEntityName]?.subscribe?.((event) => {
@@ -126,6 +148,39 @@ export default function PartenaireDashboard() {
   const activeCount = hasPharmacie
     ? pharmaCourses.filter(c => PHARMACIE_ACTIVE_STATUSES.has(c.statut)).length
     : commandes.filter(c => ACTION_STATUSES.has(c.statut)).length;
+
+  const unreadConversations = allConversations.filter(c => c.last_message && c.last_sender_name !== etablissement?.nom);
+  const unreadCount = unreadConversations.length;
+
+  useEffect(() => {
+    if (!etablissement?.id || allConversations.length === 0) return;
+    const currentIds = allConversations.map(c => c.id);
+    const newOnes = allConversations.filter(c => c.last_sender_name !== etablissement.nom && !seenConvIds.includes(c.id));
+    if (newOnes.length > 0 && tab !== "messages") {
+      const newest = newOnes[0];
+      let clientName = "Nouveau client";
+      try {
+        const parts = JSON.parse(newest.participants || "[]");
+        const client = parts.find(p => p.type === "client");
+        if (client?.name) clientName = client.name;
+      } catch {}
+      setNewMsgModal({ convId: newest.id, clientName });
+    }
+    const newSeen = [...new Set([...seenConvIds, ...currentIds])];
+    if (newSeen.length !== seenConvIds.length) {
+      setSeenConvIds(newSeen);
+      localStorage.setItem("partenaire_seen_convs", JSON.stringify(newSeen));
+    }
+  }, [allConversations, etablissement?.id, etablissement?.nom, seenConvIds, tab]);
+
+  useEffect(() => {
+    if (tab === "messages" && allConversations.length > 0) {
+      const currentIds = allConversations.map(c => c.id);
+      const newSeen = [...new Set([...seenConvIds, ...currentIds])];
+      setSeenConvIds(newSeen);
+      localStorage.setItem("partenaire_seen_convs", JSON.stringify(newSeen));
+    }
+  }, [tab, allConversations, seenConvIds]);
 
   useEffect(() => {
     if (!etablissement?.id) return;
@@ -176,7 +231,7 @@ export default function PartenaireDashboard() {
 
           <CreateChoice icon={Store} title="Une Boutique" text="Vendre des produits" onClick={() => setTab("boutique_form")} color="blue" />
           <CreateChoice icon={UtensilsCrossed} title="Un Restaurant" text="Proposer un menu et des plats" onClick={() => setTab("restaurant_form")} color="orange" />
-          <CreateChoice icon={Pill} title="Une Pharmacie" text="Discuter avec clients et livrer" onClick={() => setTab("pharmacie_form")} color="gray" />
+          <CreateChoice icon={Pill} title="Une Pharmacie" text="Discuter avec clients et livrer" onClick={() => setTab("pharmacie_form")} color="blueDark" />
 
           <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="w-full text-sm text-gray-400 underline">
             Se deconnecter
@@ -251,23 +306,48 @@ export default function PartenaireDashboard() {
         )}
       </div>
 
-      <PartenaireBottomNav tab={tab} setTab={handleSetTab} badgeCount={pendingCount} etablissementType={etablissementType} />
+      <PartenaireBottomNav tab={tab} setTab={handleSetTab} badgeCount={pendingCount} messageBadge={unreadCount} etablissementType={etablissementType} />
+
+      <NewMessageModal
+        show={!!newMsgModal}
+        clientName={newMsgModal?.clientName}
+        onOpen={() => { handleSetTab("messages"); setNewMsgModal(null); }}
+        onClose={() => setNewMsgModal(null)}
+      />
     </div>
   );
 }
 
 function CreateChoice({ icon: Icon, title, text, onClick, color }) {
   const styles = {
-    blue: "border-blue-200 from-blue-50 to-indigo-50 hover:border-blue-500 text-blue-600 bg-blue-100",
-    orange: "border-orange-200 from-orange-50 to-amber-50 hover:border-orange-500 text-orange-600 bg-orange-100",
-    gray: "border-gray-300 from-gray-50 to-slate-100 hover:border-gray-600 text-gray-700 bg-gray-200",
+    blue: {
+      border: "border-blue-200",
+      gradient: "from-blue-50 to-indigo-50",
+      hover: "hover:border-blue-500",
+      iconText: "text-blue-600",
+      iconBg: "bg-blue-100",
+    },
+    orange: {
+      border: "border-orange-200",
+      gradient: "from-orange-50 to-amber-50",
+      hover: "hover:border-orange-500",
+      iconText: "text-orange-600",
+      iconBg: "bg-orange-100",
+    },
+    blueDark: {
+      border: "border-blue-900/25",
+      gradient: "from-blue-50 to-slate-100",
+      hover: "hover:border-blue-900",
+      iconText: "text-blue-900",
+      iconBg: "bg-blue-100",
+    },
   };
-  const [border, gradientA, gradientB, hover, textColor, iconBg] = styles[color].split(" ");
+  const s = styles[color] || styles.blue;
   return (
-    <button onClick={onClick} className={`w-full p-6 rounded-3xl border-2 ${border} bg-gradient-to-br ${gradientA} ${gradientB} ${hover} hover:shadow-lg transition-all text-left`}>
+    <button onClick={onClick} className={`w-full p-6 rounded-3xl border-2 ${s.border} bg-gradient-to-br ${s.gradient} ${s.hover} hover:shadow-lg transition-all text-left`}>
       <div className="flex items-center gap-4">
-        <div className={`w-14 h-14 rounded-2xl ${iconBg} flex items-center justify-center`}>
-          <Icon className={`w-7 h-7 ${textColor}`} />
+        <div className={`w-14 h-14 rounded-2xl ${s.iconBg} flex items-center justify-center`}>
+          <Icon className={`w-7 h-7 ${s.iconText}`} />
         </div>
         <div>
           <p className="font-black text-lg text-gray-900">{title}</p>

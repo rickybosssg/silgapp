@@ -4,19 +4,27 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioAttributes;
+import android.media.RingtoneManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.PowerManager;
+import android.provider.Settings;
 
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     private static final String CHANNEL_ID = "silgapp_default";
+    private static final String URGENT_CHANNEL_ID = "silgapp_courses_critical_v2";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(SilgappPushPlugin.class);
         registerPlugin(SilgappNativePlugin.class);
         createDefaultNotificationChannel();
+        createUrgentCourseChannel();
+        requestBatteryOptimizationExemption();
         super.onCreate(savedInstanceState);
         SilgappFirebaseMessagingService.stopUrgentCourseAlert();
     }
@@ -50,5 +58,52 @@ public class MainActivity extends BridgeActivity {
         if (manager != null) {
             manager.createNotificationChannel(channel);
         }
+    }
+
+    private void createUrgentCourseChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+
+        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager == null) return;
+        if (manager.getNotificationChannel(URGENT_CHANNEL_ID) != null) return;
+
+        NotificationChannel channel = new NotificationChannel(
+            URGENT_CHANNEL_ID,
+            "SILGAPP Courses",
+            NotificationManager.IMPORTANCE_MAX
+        );
+        channel.setDescription("Notifications de courses urgentes SILGAPP");
+        channel.enableVibration(true);
+        channel.enableLights(true);
+        channel.setVibrationPattern(new long[] { 0, 500, 200, 500, 200, 800 });
+        channel.setLockscreenVisibility(androidx.core.app.NotificationCompat.VISIBILITY_PUBLIC);
+        channel.setBypassDnd(true);
+        channel.setSound(
+            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
+            new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+        );
+
+        manager.createNotificationChannel(channel);
+    }
+
+    // ── Demander l'exclusion de l'optimisation batterie ──
+    // Empêche Android (Samsung, Xiaomi, Huawei, Tecno, Infinix, Oppo, Vivo) de tuer l'app
+    private void requestBatteryOptimizationExemption() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
+        try {
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (pm == null) return;
+            String packageName = getPackageName();
+            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                Intent intent = new Intent();
+                intent.setAction(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                intent.setData(Uri.parse("package:" + packageName));
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
+            }
+        } catch (Exception ignored) {}
     }
 }

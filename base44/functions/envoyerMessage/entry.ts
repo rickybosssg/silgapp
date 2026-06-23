@@ -202,6 +202,38 @@ Deno.serve(async (req) => {
       }).catch(() => {});
     }
 
+    // ── 5. Envoyer une notification push au partenaire si le message vient d'un client ──
+    if (conversation_id && sender_type === 'client') {
+      try {
+        const convs = await base44.asServiceRole.entities.Conversation.filter({ id: conversation_id });
+        if (convs && convs.length > 0) {
+          const conv = convs[0];
+          let participants = [];
+          try { participants = JSON.parse(conv.participants || '[]'); } catch {}
+          const partenaire = participants.find(p => p.type === 'partenaire');
+          if (partenaire) {
+            const [boutiques, restaurants, pharmacies] = await Promise.all([
+              base44.asServiceRole.entities.Boutique.filter({ id: partenaire.id }),
+              base44.asServiceRole.entities.Restaurant.filter({ id: partenaire.id }),
+              base44.asServiceRole.entities.Pharmacie.filter({ id: partenaire.id }),
+            ]);
+            const etab = (boutiques?.[0]) || (restaurants?.[0]) || (pharmacies?.[0]);
+            if (etab?.user_email) {
+              await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
+                titre: '💬 Nouveau message',
+                message: (content || '').slice(0, 100) || 'Nouveau message',
+                type: 'nouveau_message',
+                destinataire_email: etab.user_email,
+                user_type: 'partenaire',
+              }).catch(() => {});
+            }
+          }
+        }
+      } catch (e) {
+        console.error('[envoyerMessage] Push notification error:', e);
+      }
+    }
+
     return Response.json({
       success: true,
       message,

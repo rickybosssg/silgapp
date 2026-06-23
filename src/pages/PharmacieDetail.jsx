@@ -1,9 +1,28 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, MapPin, Clock, Phone, Loader2, MessageCircle, Info } from "lucide-react";
+import {
+  ArrowLeft,
+  Clock,
+  FileText,
+  Info,
+  Loader2,
+  MapPin,
+  MessageCircle,
+  Phone,
+  Pill,
+  ShieldCheck,
+  Truck,
+} from "lucide-react";
 import MessagesPage from "@/components/chat/MessagesPage";
+
+const serviceCards = [
+  { Icon: Pill, label: "Medicaments", desc: "Disponibilite et prix" },
+  { Icon: FileText, label: "Ordonnance", desc: "Envoyez votre prescription" },
+  { Icon: Truck, label: "Livraison", desc: "A domicile via SILGAPP" },
+  { Icon: ShieldCheck, label: "Garde", desc: "Service d'urgence" },
+];
 
 export default function PharmacieDetail() {
   const { id } = useParams();
@@ -14,12 +33,11 @@ export default function PharmacieDetail() {
   const [starting, setStarting] = useState(false);
 
   useEffect(() => {
-    base44.auth.me().then(u => {
-      if (u?.email) {
-        base44.entities.ClientExterne.filter({ user_email: u.email })
-          .then(c => setClientProfil(c?.[0] || null))
-          .catch(() => {});
-      }
+    base44.auth.me().then((user) => {
+      if (!user?.email) return;
+      base44.entities.ClientExterne.filter({ user_email: user.email })
+        .then((clients) => setClientProfil(clients?.[0] || null))
+        .catch(() => {});
     }).catch(() => {});
   }, []);
 
@@ -33,30 +51,49 @@ export default function PharmacieDetail() {
     if (!clientProfil) return;
     setStarting(true);
     try {
-      const res = await base44.functions.invoke("demarrerConversationPharmacie", { pharmacie_id: id });
-      if (res?.data?.conversation_id) {
-        setConversationId(res.data.conversation_id);
+      const response = await base44.functions.invoke("demarrerConversationPharmacie", {
+        pharmacie_id: id,
+      });
+      if (response?.data?.conversation_id) {
+        setConversationId(response.data.conversation_id);
         setShowChat(true);
       }
-    } catch (err) {
-      alert("Erreur: " + (err?.message || "échec"));
+    } catch (error) {
+      alert("Erreur: " + (error?.message || "echec du demarrage de la discussion"));
+    } finally {
+      setStarting(false);
     }
-    setStarting(false);
   };
 
-  if (isLoading || !clientProfil) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
-  if (!pharmacie) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><p className="text-gray-500">Pharmacie introuvable</p></div>;
+  if (isLoading || !clientProfil) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-700" />
+      </div>
+    );
+  }
+
+  if (!pharmacie) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <p className="text-slate-500">Pharmacie introuvable</p>
+      </div>
+    );
+  }
 
   if (showChat && conversationId) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-slate-50">
         <div className="max-w-lg mx-auto h-screen bg-white flex flex-col">
           <MessagesPage
             myType="client"
             myId={clientProfil.id}
-            myName={`${clientProfil.prenom || ''} ${clientProfil.nom || ''}`.trim() || 'Client'}
+            myName={`${clientProfil.prenom || ""} ${clientProfil.nom || ""}`.trim() || "Client"}
             initialConversationId={conversationId}
-            onBack={() => { setShowChat(false); setConversationId(null); }}
+            onBack={() => {
+              setShowChat(false);
+              setConversationId(null);
+            }}
           />
         </div>
       </div>
@@ -64,69 +101,133 @@ export default function PharmacieDetail() {
   }
 
   const isOuvert = pharmacie.ouvert && pharmacie.actif;
+  const address = [
+    pharmacie.adresse,
+    pharmacie.quartier,
+    pharmacie.ville,
+  ].filter(Boolean).join(", ");
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-8">
-      <div className="bg-gradient-to-r from-gray-700 to-gray-900 text-white px-4 py-4 sticky top-0 z-20">
-        <div className="max-w-lg mx-auto flex items-center gap-3">
-          <button onClick={() => navigate("/client/pharmacies")} className="text-white/80 hover:text-white p-1"><ArrowLeft className="w-6 h-6" /></button>
-          <div className="flex-1">
-            <h1 className="text-lg font-black">{pharmacie.nom}</h1>
-            <p className="text-white/70 text-xs">Pharmacie partenaire SILGAPP</p>
+    <div className="min-h-screen bg-slate-50 pb-10">
+      <div className="relative bg-gradient-to-br from-[#071737] via-[#0B2A5B] to-[#0F4C81] text-white px-4 pt-5 pb-20 sticky top-0 z-20 overflow-hidden">
+        <div className="absolute -top-16 -right-16 w-56 h-56 bg-cyan-400/10 rounded-full blur-2xl" />
+        <div className="absolute -bottom-20 -left-10 w-48 h-48 bg-blue-300/10 rounded-full blur-2xl" />
+
+        <div className="relative max-w-lg mx-auto">
+          <div className="flex items-center gap-3 mb-4">
+            <button
+              onClick={() => navigate("/client/pharmacies")}
+              className="text-white/75 hover:text-white p-1.5 -ml-1.5 rounded-full hover:bg-white/10 transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg font-black truncate">{pharmacie.nom}</h1>
+              <p className="text-blue-100/70 text-[11px] font-medium">Pharmacie partenaire SILGAPP</p>
+            </div>
+
+            {isOuvert ? (
+              <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-100 bg-emerald-500/25 border border-emerald-400/30 px-2.5 py-1 rounded-full backdrop-blur-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Ouvert
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-[10px] font-bold text-red-100 bg-red-500/25 border border-red-400/30 px-2.5 py-1 rounded-full backdrop-blur-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-400" /> Ferme
+              </span>
+            )}
           </div>
-          {isOuvert
-            ? <span className="text-[10px] font-bold text-green-100 bg-green-500/30 px-2 py-1 rounded-full">Ouvert</span>
-            : <span className="text-[10px] font-bold text-red-100 bg-red-500/30 px-2 py-1 rounded-full">Fermé</span>}
+
+          <div className="relative h-36 rounded-2xl overflow-hidden shadow-2xl shadow-blue-900/40 ring-1 ring-white/10">
+            <img
+              src={pharmacie.logo_url || "https://images.unsplash.com/photo-1631549916768-3c7a4d6e5e9e?w=900&q=80"}
+              alt={pharmacie.nom}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#071737]/85 via-transparent to-transparent" />
+            <div className="absolute bottom-3 left-3 flex items-center gap-2">
+              <div className="w-9 h-9 rounded-xl bg-white/15 backdrop-blur-md flex items-center justify-center ring-1 ring-white/20">
+                <Pill className="w-5 h-5 text-cyan-200" />
+              </div>
+              <div>
+                <p className="text-white text-sm font-bold leading-tight">Pharmacie en ligne</p>
+                <p className="text-blue-100/70 text-[10px]">Ordonnance, paiement et livraison</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
-        {/* Bienvenue */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
-          {pharmacie.logo_url && <img src={pharmacie.logo_url} alt={pharmacie.nom} className="w-full h-32 rounded-xl object-cover" />}
-          <h2 className="text-lg font-black text-gray-900 text-center">
-            Bienvenue sur la pharmacie en ligne {pharmacie.nom}
+      <div className="max-w-lg mx-auto px-4 -mt-14 space-y-4 relative z-10">
+        <div className="bg-white rounded-3xl shadow-xl shadow-blue-900/5 ring-1 ring-slate-100 p-5 space-y-3">
+          <h2 className="text-base font-black text-slate-900 text-center leading-snug">
+            Bienvenue sur la pharmacie en ligne <span className="text-blue-700">{pharmacie.nom}</span>
           </h2>
-          {pharmacie.description && <p className="text-sm text-gray-600 text-center">{pharmacie.description}</p>}
+          <p className="text-sm text-slate-500 text-center leading-relaxed">
+            {pharmacie.description || "Demandez un produit, envoyez une ordonnance ou une preuve de paiement directement dans la discussion."}
+          </p>
         </div>
 
-        {/* Informations utiles */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
-          <p className="text-xs font-black text-gray-600 uppercase tracking-widest flex items-center gap-1.5"><Info className="w-4 h-4" /> Informations utiles</p>
+        <div className="grid grid-cols-4 gap-2.5">
+          {serviceCards.map(({ Icon, label, desc }) => (
+            <div key={label} className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 p-2.5 text-center">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center mx-auto mb-1.5">
+                <Icon className="w-5 h-5 text-blue-700" />
+              </div>
+              <p className="text-[10px] font-bold text-slate-800 leading-tight">{label}</p>
+              <p className="text-[8px] text-slate-400 leading-tight mt-0.5">{desc}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="bg-white rounded-3xl shadow-sm ring-1 ring-slate-100 p-5 space-y-3.5">
+          <p className="text-[11px] font-black text-blue-700 uppercase tracking-[0.15em] flex items-center gap-1.5">
+            <Info className="w-3.5 h-3.5" /> Informations utiles
+          </p>
+
           {pharmacie.horaires && (
-            <div className="flex items-start gap-2 text-sm text-gray-700">
-              <Clock className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-              <div><span className="font-semibold">Horaires: </span>{pharmacie.horaires}</div>
-            </div>
+            <InfoRow icon={<Clock className="w-4 h-4 text-blue-700" />} title="Horaires" text={pharmacie.horaires} />
           )}
-          {pharmacie.adresse && (
-            <div className="flex items-start gap-2 text-sm text-gray-700">
-              <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-              <div><span className="font-semibold">Adresse: </span>{pharmacie.adresse}{pharmacie.quartier ? `, ${pharmacie.quartier}` : ""}{pharmacie.ville ? `, ${pharmacie.ville}` : ""}</div>
-            </div>
+
+          {address && (
+            <InfoRow icon={<MapPin className="w-4 h-4 text-blue-700" />} title="Adresse" text={address} />
           )}
+
           {pharmacie.telephone && (
-            <div className="flex items-start gap-2 text-sm text-gray-700">
-              <Phone className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-              <div><span className="font-semibold">Téléphone: </span>{pharmacie.telephone}</div>
-            </div>
+            <InfoRow icon={<Phone className="w-4 h-4 text-blue-700" />} title="Telephone" text={pharmacie.telephone} />
+          )}
+
+          {pharmacie.informations_utiles && (
+            <InfoRow icon={<FileText className="w-4 h-4 text-blue-700" />} title="A savoir" text={pharmacie.informations_utiles} />
           )}
         </div>
 
-        {/* Bouton discuter */}
         <button
           onClick={handleStartChat}
           disabled={starting}
-          className="w-full bg-gradient-to-r from-gray-700 to-gray-900 text-white rounded-2xl p-5 flex items-center justify-center gap-3 shadow-xl active:scale-[0.98] transition-all disabled:opacity-60"
+          className="w-full bg-gradient-to-r from-[#071737] to-[#0F4C81] text-white rounded-2xl p-4 flex items-center justify-center gap-3 shadow-xl shadow-blue-900/20 active:scale-[0.98] transition-all disabled:opacity-60 ring-1 ring-blue-400/20"
         >
           {starting ? <Loader2 className="w-5 h-5 animate-spin" /> : <MessageCircle className="w-5 h-5" />}
-          <span className="font-black text-base">💬 DISCUTER AVEC LA PHARMACIE</span>
+          <span className="font-black text-sm tracking-wide">DISCUTER AVEC LA PHARMACIE</span>
         </button>
 
-        <p className="text-xs text-gray-400 text-center px-4">
-          Demandez la disponibilité d'un médicament, envoyez une ordonnance, commandez des produits.
-          La pharmacie vous indiquera le montant et son numéro de paiement.
+        <p className="text-[11px] text-slate-400 text-center px-6 leading-relaxed">
+          Vous pouvez demander la disponibilite d'un medicament, envoyer une ordonnance, un audio ou une preuve de paiement.
         </p>
+      </div>
+    </div>
+  );
+}
+
+function InfoRow({ icon, title, text }) {
+  return (
+    <div className="flex items-start gap-3 text-sm">
+      <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+        {icon}
+      </div>
+      <div className="pt-1">
+        <span className="font-bold text-slate-800">{title}</span>
+        <p className="text-slate-500 text-[13px]">{text}</p>
       </div>
     </div>
   );

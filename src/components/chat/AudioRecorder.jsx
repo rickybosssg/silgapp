@@ -2,7 +2,25 @@ import React, { useState, useRef } from "react";
 import { Mic, Square, Send, Loader2, Play, Pause, Settings, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export default function AudioRecorder({ onSend, disabled, senderName }) {
+function getSupportedMimeType() {
+  if (typeof MediaRecorder === "undefined") return null;
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/ogg;codecs=opus",
+    "audio/mp4",
+    "audio/mpeg",
+    "audio/aac",
+  ];
+  for (const type of candidates) {
+    try {
+      if (MediaRecorder.isTypeSupported(type)) return type;
+    } catch (_) {}
+  }
+  return "";
+}
+
+export default function AudioRecorder({ onSend, disabled }) {
   const [recording, setRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
@@ -14,11 +32,14 @@ export default function AudioRecorder({ onSend, disabled, senderName }) {
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
-  const audioRef = useRef(new Audio());
+  const streamRef = useRef(null);
+  const audioRef = useRef(null);
 
-  const getSupportedMimeType = () => {
-    const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/mpeg"];
-    return candidates.find((type) => window.MediaRecorder?.isTypeSupported?.(type)) || "";
+  const cleanupStream = () => {
+    streamRef.current?.getTracks?.().forEach(track => track.stop());
+    streamRef.current = null;
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = null;
   };
 
   const openAppSettings = () => {
@@ -39,6 +60,7 @@ export default function AudioRecorder({ onSend, disabled, senderName }) {
       if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
         throw new Error("unsupported");
       }
+
       if (navigator.permissions?.query) {
         try {
           const status = await navigator.permissions.query({ name: "microphone" });
@@ -47,22 +69,37 @@ export default function AudioRecorder({ onSend, disabled, senderName }) {
           if (err?.message === "denied") throw err;
         }
       }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
       const mimeType = getSupportedMimeType();
-      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      let recorder;
+      try {
+        recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      } catch {
+        recorder = new MediaRecorder(stream);
+      }
+
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
 
       recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
+        if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
       };
 
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        const type = recorder.mimeType || "audio/webm";
+        const blob = new Blob(chunksRef.current, { type });
         setAudioBlob(blob);
         setAudioUrl(URL.createObjectURL(blob));
-        stream.getTracks().forEach(t => t.stop());
-        clearInterval(timerRef.current);
+        cleanupStream();
+      };
+
+      recorder.onerror = (e) => {
+        console.error("MediaRecorder error:", e);
+        setPermissionError("Erreur pendant l'enregistrement audio.");
+        cleanupStream();
+        setRecording(false);
       };
 
       recorder.start();
@@ -71,16 +108,22 @@ export default function AudioRecorder({ onSend, disabled, senderName }) {
       timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
     } catch (err) {
       const denied = err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError" || err?.message === "denied";
+      const notFound = err?.name === "NotFoundError";
       setPermissionError(
         denied
           ? "Microphone refuse. Autorisez le microphone dans les parametres de l'application."
-          : "Microphone non disponible sur cet appareil."
+          : notFound
+          ? "Aucun microphone trouve sur cet appareil."
+          : "Microphone non disponible. Verifiez les permissions."
       );
+      cleanupStream();
     }
   };
 
   const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
     setRecording(false);
   };
 
@@ -89,13 +132,15 @@ export default function AudioRecorder({ onSend, disabled, senderName }) {
     setUploading(true);
     try {
       const { base44 } = await import("@/api/base44Client");
-      const file = new File([audioBlob], `audio_${Date.now()}.webm`, { type: "audio/webm" });
+      const ext = audioBlob.type.includes("mp4") ? "m4a" : audioBlob.type.includes("mpeg") ? "mp3" : "webm";
+      const file = new File([audioBlob], `audio_${Date.now()}.${ext}`, { type: audioBlob.type });
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       await onSend({ message_type: "audio", audio_url: file_url, content: "" });
       setAudioBlob(null);
       setAudioUrl(null);
       setDuration(0);
-    } catch {
+    } catch (err) {
+      console.error("Upload audio error:", err);
       alert("Erreur lors de l'envoi de l'audio");
     }
     setUploading(false);
@@ -103,19 +148,23 @@ export default function AudioRecorder({ onSend, disabled, senderName }) {
 
   const cancelRecording = () => {
     setAudioBlob(null);
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
     setAudioUrl(null);
     setDuration(0);
   };
 
   const togglePlay = () => {
+    if (!audioRef.current) audioRef.current = new Audio();
     const a = audioRef.current;
     if (playing) {
       a.pause();
+      setPlaying(false);
     } else {
       a.src = audioUrl;
-      a.play();
+      a.onended = () => setPlaying(false);
+      a.play().catch(() => setPlaying(false));
+      setPlaying(true);
     }
-    setPlaying(!playing);
   };
 
   const formatTime = (s) => {
@@ -131,12 +180,7 @@ export default function AudioRecorder({ onSend, disabled, senderName }) {
           <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
           <span className="text-xs font-bold text-red-600 tabular-nums">{formatTime(duration)}</span>
         </div>
-        <Button
-          variant="destructive"
-          size="icon"
-          className="h-8 w-8 rounded-full"
-          onClick={stopRecording}
-        >
+        <Button variant="destructive" size="icon" className="h-8 w-8 rounded-full" onClick={stopRecording}>
           <Square className="w-3.5 h-3.5" />
         </Button>
       </div>
@@ -146,26 +190,16 @@ export default function AudioRecorder({ onSend, disabled, senderName }) {
   if (audioBlob) {
     return (
       <div className="flex items-center gap-2 px-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 rounded-full gap-1.5 bg-blue-50 border-blue-200"
-          onClick={togglePlay}
-        >
+        <Button variant="outline" size="sm" className="h-8 rounded-full gap-1.5 bg-blue-50 border-blue-200" onClick={togglePlay}>
           {playing ? <Pause className="w-3.5 h-3.5 text-blue-600" /> : <Play className="w-3.5 h-3.5 text-blue-600" />}
           <span className="text-xs font-bold text-blue-600 tabular-nums">{formatTime(duration)}</span>
         </Button>
-        <Button
-          size="sm"
-          className="h-8 rounded-full gap-1"
-          onClick={handleUploadAndSend}
-          disabled={uploading}
-        >
+        <Button size="sm" className="h-8 rounded-full gap-1" onClick={handleUploadAndSend} disabled={uploading}>
           {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
           Envoyer
         </Button>
         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-gray-400" onClick={cancelRecording}>
-
+          <X className="w-3.5 h-3.5" />
         </Button>
       </div>
     );
@@ -194,13 +228,7 @@ export default function AudioRecorder({ onSend, disabled, senderName }) {
             <X className="h-3.5 w-3.5" />
           </button>
           <p className="pr-6 text-xs font-semibold leading-relaxed text-red-700">{permissionError}</p>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={openAppSettings}
-            className="mt-2 h-8 rounded-xl text-xs font-bold"
-          >
+          <Button type="button" size="sm" variant="outline" onClick={openAppSettings} className="mt-2 h-8 rounded-xl text-xs font-bold">
             <Settings className="mr-1.5 h-3.5 w-3.5" />
             Ouvrir les parametres
           </Button>
