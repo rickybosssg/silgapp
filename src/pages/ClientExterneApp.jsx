@@ -13,7 +13,7 @@ import { useQueryClient, useQuery } from "@tanstack/react-query";
 import {
   MapPin, Navigation, MessageCircle, User, Package,
   Clock, ChevronRight, TrendingUp, Loader2, ArrowLeft, RefreshCw,
-  Store, UtensilsCrossed
+  Store, UtensilsCrossed, Bell
 } from "lucide-react";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import CourseAnnuleeRelanceDialog from "@/components/client/CourseAnnuleeRelanceDialog";
@@ -82,6 +82,8 @@ export default function ClientExterneApp() {
   const [notationShownFor, setNotationShownFor] = useState(null);
   const [courseAnnuleeRelance, setCourseAnnuleeRelance] = useState(null); // course annulée auto → proposer relance
   const [showMessages, setShowMessages] = useState(false);
+  const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
+  const [notificationPanelItems, setNotificationPanelItems] = useState([]);
   const [sessionId, setSessionId] = useState(() => {
     try { return localStorage.getItem("silgapp_client_session_id") || null; } catch { return null; }
   });
@@ -91,6 +93,14 @@ export default function ClientExterneApp() {
   const queryClient = useQueryClient();
   const clientProfilRef = useRef(null);
   useEffect(() => { clientProfilRef.current = clientProfil; }, [clientProfil]);
+
+  const openNotificationsPanel = async () => {
+    const unread = [...notifications];
+    setNotificationPanelItems(unread);
+    setShowNotificationsPanel(true);
+    setNotifications([]);
+    await Promise.all(unread.map(n => base44.entities.Notification.update(n.id, { lue: true }).catch(() => null)));
+  };
 
   // ── Partenaires (boutiques + restaurants) pour la carte client — filtrés par pays ──
   const partenaireFilter = clientProfil?.country_code
@@ -605,6 +615,8 @@ export default function ClientExterneApp() {
             }
           } catch (_) {}
         }
+      } else {
+        setNotifications([]);
       }
 
       await loadLivreursProches(pos);
@@ -813,7 +825,7 @@ export default function ClientExterneApp() {
             <>
 
               {/* ── NOTIFICATIONS ─────────────────── */}
-              {notifications.length > 0 && (
+              {false && notifications.length > 0 && (
                 <div className="space-y-2">
                   {notifications.map((notif) => (
                     <div key={notif.id} className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 flex items-start gap-3">
@@ -975,6 +987,7 @@ export default function ClientExterneApp() {
                   {[
                     { icon: <Package className="w-5 h-5" />, label: "Courses",   color: "text-blue-600",   bg: "bg-blue-50",   action: () => navigate("/client/suivi") },
                     { icon: <Clock className="w-5 h-5" />,   label: "Historique",color: "text-purple-600", bg: "bg-purple-50", action: () => navigate("/client/suivi") },
+                    { icon: <Bell className="w-5 h-5" />, label: "Notifications", color: "text-red-600", bg: "bg-red-50", badge: notifications.length, action: openNotificationsPanel },
                     { icon: <Package className="w-5 h-5" />, label: "Commandes", color: "text-indigo-600", bg: "bg-indigo-50", badge: commandesActivesCount, action: () => navigate("/client/mes-commandes") },
                     { icon: <Clock className="w-5 h-5" />, label: "Programmees", color: "text-amber-600", bg: "bg-amber-50", action: () => navigate("/client/livraisons-programmees") },
                     { icon: <span className="text-xs"></span>, label: "Support", color: "text-green-600", bg: "bg-green-50", action: () => {
@@ -1120,6 +1133,59 @@ export default function ClientExterneApp() {
       <PubliciteFullscreen cible="clients" userId={clientProfil?.id} userType="client" />
 
       {/* ── MESSAGES ── */}
+      {showNotificationsPanel && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center">
+          <div className="w-full max-w-lg max-h-[82vh] bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-2xl bg-red-50 flex items-center justify-center">
+                  <Bell className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <h2 className="font-black text-gray-900">Notifications</h2>
+                  <p className="text-xs text-gray-500">Alertes et suivi de vos courses</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowNotificationsPanel(false)}
+                className="w-9 h-9 rounded-xl bg-gray-100 text-gray-600 font-black"
+              >
+                x
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {notificationPanelItems.length === 0 ? (
+                <div className="py-12 text-center">
+                  <Bell className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                  <p className="text-sm font-bold text-gray-500">Aucune nouvelle notification</p>
+                </div>
+              ) : notificationPanelItems.map(notif => (
+                <div key={notif.id} className="rounded-2xl border border-amber-100 bg-amber-50 p-3.5 flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+                    <Package className="w-4 h-4 text-amber-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-amber-950 text-sm">{notif.titre}</p>
+                    <p className="text-xs text-amber-800 mt-0.5">{notif.message}</p>
+                    {notif.course_id && (
+                      <button
+                        className="mt-2 text-xs font-black text-amber-900 underline"
+                        onClick={() => {
+                          setShowNotificationsPanel(false);
+                          navigate("/client/suivi", { state: { course_id: notif.course_id } });
+                        }}
+                      >
+                        Voir la course
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {showMessages && (
         <div className="fixed inset-0 z-50 bg-white flex flex-col">
           <MessagesPage

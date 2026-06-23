@@ -138,7 +138,7 @@ function countryMismatchPayload(course, target, context) {
   };
 }
 
-async function assertNotificationCountry(base44, { course_id, livreur_id, client_id, targetEmail, type }) {
+async function assertNotificationCountry(base44, { course_id, livreur_id, client_id, targetEmail, type, user_type }) {
   if (!course_id) return { ok: true };
 
   const course = await base44.asServiceRole.entities.CourseExterne.get(course_id).catch(() => null);
@@ -180,6 +180,26 @@ async function assertNotificationCountry(base44, { course_id, livreur_id, client
     for (const livreur of livreurs || []) {
       targets.push({ entity: livreur, context: 'destinataire_email_livreur' });
     }
+  }
+
+  if (targetEmail && String(user_type || '') === 'partenaire') {
+    const [boutiques, restaurants] = await Promise.all([
+      base44.asServiceRole.entities.Boutique.filter({ user_email: targetEmail }).catch(() => []),
+      base44.asServiceRole.entities.Restaurant.filter({ user_email: targetEmail }).catch(() => []),
+    ]);
+    const partnerTargets = [
+      ...(boutiques || []).map(boutique => ({ entity: { ...boutique, country_code: boutique.pays_code }, context: 'destinataire_email_boutique' })),
+      ...(restaurants || []).map(restaurant => ({ entity: { ...restaurant, country_code: restaurant.pays_code }, context: 'destinataire_email_restaurant' })),
+    ];
+    const partnerMatches = partnerTargets.filter(target => normalizeCountryCode(target.entity?.country_code) === courseCountry);
+    if (partnerTargets.length > 0 && partnerMatches.length === 0) {
+      return {
+        ok: false,
+        status: 403,
+        payload: countryMismatchPayload(course, partnerTargets[0].entity, partnerTargets[0].context),
+      };
+    }
+    targets.push(...partnerMatches);
   }
 
   for (const target of targets) {
@@ -229,6 +249,7 @@ Deno.serve(async (req) => {
       client_id,
       targetEmail,
       type,
+      user_type,
     });
     if (!countryGuard.ok) {
       return Response.json(countryGuard.payload, { status: countryGuard.status });

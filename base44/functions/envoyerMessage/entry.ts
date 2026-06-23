@@ -101,6 +101,15 @@ Deno.serve(async (req) => {
         isParticipant = c.livreur_id === sender_id;
       } else if (sender_type === 'client') {
         isParticipant = c.expediteur_client_id === sender_id || c.destinataire_client_id === sender_id;
+      } else if (sender_type === 'partenaire') {
+        if (c.commande_boutique_id) {
+          const cmd = await base44.asServiceRole.entities.CommandeBoutique.get(c.commande_boutique_id).catch(() => null);
+          isParticipant = cmd?.boutique_id === sender_id;
+        }
+        if (!isParticipant && c.commande_restaurant_id) {
+          const cmd = await base44.asServiceRole.entities.CommandeRestaurant.get(c.commande_restaurant_id).catch(() => null);
+          isParticipant = cmd?.restaurant_id === sender_id;
+        }
       } else if (sender_type === 'admin') {
         isParticipant = true; // L'admin peut discuter dans toutes les courses
       }

@@ -76,12 +76,18 @@ Deno.serve(async (req) => {
 
     const asService = base44.asServiceRole;
 
-    async function notifyPartner(partnerEmail) {
+    async function notifyPartner(partnerEmail, commande) {
       const info = PARTNER_NOTIFS[course.statut];
       if (!info || !partnerEmail) return;
+      const ref = String(commande?.id || course.id || '').slice(-6).toUpperCase();
+      const clientNom = commande?.client_nom || course.client_nom || 'client';
+      const titre = course.statut === 'livree' ? 'Commande livree' : info.titre;
+      const message = course.statut === 'livree'
+        ? `La commande #${ref} de ${clientNom} a ete livree.`
+        : info.msg;
       await notifyPush(base44, {
-        titre: info.titre,
-        message: info.msg,
+        titre,
+        message,
         type: info.type,
         destinataire_email: partnerEmail,
         user_type: 'partenaire',
@@ -145,7 +151,7 @@ Deno.serve(async (req) => {
         if (cmd && cmd.statut !== newCommandStatut && !['livree', 'annulee'].includes(cmd.statut)) {
           await asService.entities.CommandeBoutique.update(course.commande_boutique_id, { statut: newCommandStatut });
           const boutique = cmd.boutique_id ? await asService.entities.Boutique.get(cmd.boutique_id).catch(() => null) : null;
-          await notifyPartner(boutique?.user_email || '');
+          await notifyPartner(boutique?.user_email || '', cmd);
           await notifyAdmins();
           console.log(`[syncCommandeFromCourse]  Commande boutique ${course.commande_boutique_id} → ${newCommandStatut}`);
         }
@@ -161,7 +167,7 @@ Deno.serve(async (req) => {
         if (cmd && cmd.statut !== newCommandStatut && !['livree', 'annulee'].includes(cmd.statut)) {
           await asService.entities.CommandeRestaurant.update(course.commande_restaurant_id, { statut: newCommandStatut });
           const restaurant = cmd.restaurant_id ? await asService.entities.Restaurant.get(cmd.restaurant_id).catch(() => null) : null;
-          await notifyPartner(restaurant?.user_email || '');
+          await notifyPartner(restaurant?.user_email || '', cmd);
           await notifyAdmins();
           console.log(`[syncCommandeFromCourse]  Commande restaurant ${course.commande_restaurant_id} → ${newCommandStatut}`);
         }

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Loader2, Package, Store, UtensilsCrossed } from "lucide-react";
+import { ArrowLeft, Loader2, MessageCircle, Package, Store, UtensilsCrossed } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import ChatWindow from "@/components/chat/ChatWindow";
 
 const STATUTS = {
   commande_envoyee: { label: "Commande envoyee", color: "bg-gray-100 text-gray-700" },
@@ -29,6 +30,7 @@ const STATUTS_SUIVI_ACTIF = new Set([
 export default function MesCommandesBoutique() {
   const navigate = useNavigate();
   const [clientProfil, setClientProfil] = useState(null);
+  const [chatOpenId, setChatOpenId] = useState(null);
 
   useEffect(() => {
     base44.auth.me().then(user => {
@@ -89,6 +91,7 @@ export default function MesCommandesBoutique() {
         {allCommandes.map(cmd => {
           const statut = STATUTS[cmd.statut] || STATUTS.commande_envoyee;
           const Icon = cmd._icon;
+          const isChatOpen = chatOpenId === cmd.id;
           const items = (() => {
             try { return JSON.parse(cmd.items || "[]"); } catch { return []; }
           })();
@@ -129,6 +132,34 @@ export default function MesCommandesBoutique() {
                 >
                   Suivre la livraison
                 </button>
+              )}
+
+              {cmd.course_id && clientProfil?.id && (
+                <div className="pt-2 border-t border-gray-100">
+                  <button
+                    onClick={() => setChatOpenId(isChatOpen ? null : cmd.id)}
+                    className="w-full h-10 rounded-xl border border-gray-200 text-xs font-black text-gray-700 flex items-center justify-center gap-2"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    {isChatOpen ? "Fermer la messagerie" : "Messagerie"}
+                  </button>
+                  {isChatOpen && (
+                    <div className="mt-2">
+                      <ChatWindow
+                        courseId={cmd.course_id}
+                        senderType="client"
+                        senderId={clientProfil.id}
+                        senderName={`${clientProfil.prenom || ""} ${clientProfil.nom || ""}`.trim() || "Client"}
+                        contextInfo={{
+                          reference: `Commande #${String(cmd.id || "").slice(-6)}`,
+                          client: `${clientProfil.prenom || ""} ${clientProfil.nom || ""}`.trim() || "Client",
+                          partenaire: cmd.boutique_nom || cmd.restaurant_nom || "Partenaire",
+                          statut: statut.label,
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           );

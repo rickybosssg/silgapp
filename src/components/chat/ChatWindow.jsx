@@ -197,8 +197,8 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
           onKeyDown={handleKeyDown}
           placeholder="Votre message..."
           disabled={sending}
-          rows={1}
-          className="flex-1 min-h-11 max-h-24 min-w-0 resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40"
+          rows={2}
+          className="flex-1 min-h-14 max-h-28 min-w-0 resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40"
         />
         <Button
           onClick={handleSend}

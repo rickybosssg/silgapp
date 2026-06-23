@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Store, UtensilsCrossed, Loader2, LogOut, MapPin } from "lucide-react";
@@ -11,10 +11,25 @@ import PartenaireHome from "@/components/partenaire/PartenaireHome";
 import PartenaireBottomNav from "@/components/partenaire/PartenaireBottomNav";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { registerPushToken } from "@/lib/notifications";
+import { playNotificationSound } from "@/hooks/useSonEtVibration";
+
+const ACTION_STATUSES = new Set([
+  "commande_envoyee",
+  "commande_recue",
+  "paiement_verification",
+  "paiement_valide",
+  "en_preparation",
+  "prete_recuperation",
+  "livreur_assigne",
+  "commande_recuperee",
+  "en_livraison",
+]);
 
 export default function PartenaireDashboard() {
   const [user, setUser] = useState(null);
   const [tab, setTab] = useState("home");
+  const [newOrderNotice, setNewOrderNotice] = useState(null);
+  const previousActiveCountRef = useRef(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -58,7 +73,50 @@ export default function PartenaireDashboard() {
     queryKey: ["commandes", etablissementType, etablissement?.id],
     queryFn: () => base44.entities[cmdEntityName].filter({ [cmdIdField]: etablissement.id }, "-created_date", 100),
     enabled: !!etablissement?.id,
+    refetchInterval: 5000,
   });
+
+  useEffect(() => {
+    if (!etablissement?.id) return;
+    const unsub = base44.entities[cmdEntityName]?.subscribe?.((event) => {
+      const row = event?.data;
+      if (!row || row[cmdIdField] !== etablissement.id) return;
+      queryClient.invalidateQueries({ queryKey: ["commandes", etablissementType, etablissement.id] });
+    });
+    return () => unsub?.();
+  }, [cmdEntityName, cmdIdField, etablissement?.id, etablissementType, queryClient]);
+
+  const seenKey = etablissement?.id ? `silgapp_partner_commandes_seen_${etablissementType}_${etablissement.id}` : "";
+  const seenAt = seenKey ? Number(localStorage.getItem(seenKey) || 0) : 0;
+  const pendingCount = commandes.filter(c => {
+    if (!ACTION_STATUSES.has(c.statut)) return false;
+    const changedAt = new Date(c.updated_date || c.created_date || 0).getTime();
+    return changedAt > seenAt;
+  }).length;
+  const activeCount = commandes.filter(c => ACTION_STATUSES.has(c.statut)).length;
+
+  useEffect(() => {
+    if (!etablissement?.id) return;
+    if (previousActiveCountRef.current === null) {
+      previousActiveCountRef.current = activeCount;
+      return;
+    }
+    if (activeCount > previousActiveCountRef.current) {
+      playNotificationSound();
+      navigator.vibrate?.([160, 80, 160]);
+      setNewOrderNotice("Nouvelle commande recue");
+      setTimeout(() => setNewOrderNotice(null), 5000);
+    }
+    previousActiveCountRef.current = activeCount;
+  }, [activeCount, etablissement?.id]);
+
+  const handleSetTab = (nextTab) => {
+    setTab(nextTab);
+    if (nextTab === "commandes" && seenKey) {
+      localStorage.setItem(seenKey, String(Date.now()));
+      queryClient.invalidateQueries({ queryKey: ["commandes", etablissementType, etablissement?.id] });
+    }
+  };
 
   const loading = loadingBoutique || loadingRestaurant;
 
@@ -111,8 +169,6 @@ export default function PartenaireDashboard() {
     );
   }
 
-  const pendingCount = commandes.filter(c => !["livree", "annulee"].includes(c.statut)).length;
-
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* ── En-tête premium ── */}
@@ -144,7 +200,12 @@ export default function PartenaireDashboard() {
 
       {/* ── Contenu ── */}
       <div className="max-w-lg mx-auto px-4 py-4">
-        {tab === "home" && <PartenaireHome etablissement={etablissement} etablissementType={etablissementType} onNavigate={setTab} />}
+        {newOrderNotice && (
+          <div className="mb-3 rounded-2xl bg-red-50 border border-red-100 px-4 py-3 text-sm font-black text-red-700">
+            {newOrderNotice}
+          </div>
+        )}
+        {tab === "home" && <PartenaireHome etablissement={etablissement} etablissementType={etablissementType} onNavigate={handleSetTab} />}
         {tab === "commandes" && <CommandesManager type={etablissementType} etablissementId={etablissement.id} etablissementNom={etablissement.nom} />}
         {tab === "produits" && <ProduitsManager type={etablissementType} etablissementId={etablissement.id} />}
         {tab === "messages" && (
@@ -161,7 +222,7 @@ export default function PartenaireDashboard() {
       </div>
 
       {/* ── Bottom Nav ── */}
-      <PartenaireBottomNav tab={tab} setTab={setTab} badgeCount={pendingCount} />
+      <PartenaireBottomNav tab={tab} setTab={handleSetTab} badgeCount={pendingCount} />
     </div>
   );
 }

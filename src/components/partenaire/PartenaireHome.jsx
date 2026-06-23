@@ -25,7 +25,6 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
   const enLivraison = commandes.filter(c => ["livreur_assigne", "commande_recuperee", "en_livraison"].includes(c.statut)).length;
   const livreesToday = commandesToday.filter(c => c.statut === "livree").length;
   const annuleesToday = commandesToday.filter(c => c.statut === "annulee").length;
-  const pendingCount = commandes.filter(c => !["livree", "annulee"].includes(c.statut)).length;
 
   const handleToggleOuvert = async () => {
     setToggling(true);
@@ -38,7 +37,7 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
   };
 
   const cards = [
-    { id: "commandes", icon: Package, label: "Commandes", subtitle: "Gérer les commandes", bg: "bg-blue-50", iconColor: "text-blue-600", badge: pendingCount },
+    { id: "commandes", icon: Package, label: "Commandes", subtitle: "Gérer les commandes", bg: "bg-blue-50", iconColor: "text-blue-600" },
     { id: "produits", icon: ShoppingBag, label: isRestaurant ? "Plats" : "Produits", subtitle: "Gérer le catalogue", bg: "bg-purple-50", iconColor: "text-purple-600" },
     { id: "messages", icon: MessageCircle, label: "Messages", subtitle: "Discuter avec clients", bg: "bg-green-50", iconColor: "text-green-600" },
     { id: "statistiques", icon: BarChart3, label: "Statistiques", subtitle: "Ventes & revenus", bg: "bg-amber-50", iconColor: "text-amber-600" },
@@ -120,11 +119,6 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
               onClick={() => onNavigate(card.id)}
               className="relative bg-white rounded-2xl p-4 shadow-sm border border-gray-50 hover:shadow-md hover:border-gray-100 transition-all text-left group active:scale-95"
             >
-              {card.badge > 0 && (
-                <span className="absolute top-3 right-3 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center">
-                  {card.badge}
-                </span>
-              )}
               <div className={"w-11 h-11 rounded-xl " + card.bg + " flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"}>
                 <card.icon className={"w-5 h-5 " + card.iconColor} />
               </div>

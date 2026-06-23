@@ -107,6 +107,7 @@ export default function CommandesManager({ type, etablissementId, etablissementN
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState("all");
   const [expandedId, setExpandedId] = useState(null);
+  const [chatOpenId, setChatOpenId] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
 
   const { data: commandes = [], isLoading } = useQuery({
@@ -144,19 +145,6 @@ export default function CommandesManager({ type, etablissementId, etablissementN
     (livreurs || []).filter(Boolean).forEach(l => map.set(l.id, l));
     return map;
   }, [livreurs]);
-
-  const { data: messageCounts = {} } = useQuery({
-    queryKey: ["message-counts-commandes-partenaires", courseIds.join("|")],
-    queryFn: async () => {
-      const entries = await Promise.all(courseIds.map(async (id) => {
-        const msgs = await base44.entities.Message.filter({ course_id: id }, "-created_date", 50).catch(() => []);
-        return [id, (msgs || []).filter(m => !(m.sender_type === "partenaire" && m.sender_id === etablissementId)).length];
-      }));
-      return Object.fromEntries(entries);
-    },
-    enabled: courseIds.length > 0,
-    refetchInterval: 5000,
-  });
 
   const handleAction = async (commande, action) => {
     setActionLoading(commande.id);
@@ -224,7 +212,7 @@ export default function CommandesManager({ type, etablissementId, etablissementN
           const itemCount = items.reduce((sum, it) => sum + (it.quantite || 1), 0);
           const isExpanded = expandedId === cmd.id;
           const livreur = course?.livreur_id ? livreurById.get(course.livreur_id) : null;
-          const msgCount = cmd.course_id ? Number(messageCounts[cmd.course_id] || 0) : 0;
+          const isChatOpen = chatOpenId === cmd.id;
 
           return (
             <div key={cmd.id} className={"bg-white rounded-2xl border border-gray-100 shadow-sm border-l-4 " + s.border + " overflow-hidden"}>
@@ -239,11 +227,6 @@ export default function CommandesManager({ type, etablissementId, etablissementN
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-black text-gray-900 text-sm truncate">{cmd.client_nom || "Client"}</p>
-                    {msgCount > 0 && (
-                      <span className="min-w-5 h-5 rounded-full bg-red-600 text-white text-[10px] font-black flex items-center justify-center px-1">
-                        {msgCount > 9 ? "9+" : msgCount}
-                      </span>
-                    )}
                   </div>
                   <p className="text-[11px] text-gray-500 truncate">
                     #{(cmd.id || "").slice(-6)} - {itemCount} article(s) - {(cmd.total || 0).toLocaleString()} FCFA
@@ -340,18 +323,32 @@ export default function CommandesManager({ type, etablissementId, etablissementN
                   )}
 
                   {cmd.course_id && (
-                    <ChatWindow
-                      courseId={cmd.course_id}
-                      senderType="partenaire"
-                      senderId={etablissementId}
-                      senderName={etablissementNom || (isRestaurant ? cmd.restaurant_nom : cmd.boutique_nom) || "Partenaire"}
-                      contextInfo={{
-                        reference: `Commande #${(cmd.id || "").slice(-6)}`,
-                        client: cmd.client_nom || "Client",
-                        partenaire: etablissementNom || cmd.boutique_nom || cmd.restaurant_nom || "Partenaire",
-                        statut: s.label,
-                      }}
-                    />
+                    <div className="space-y-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setChatOpenId(isChatOpen ? null : cmd.id)}
+                        className="w-full h-10 rounded-xl text-xs font-black"
+                      >
+                        <MessageCircle className="w-4 h-4 mr-2" />
+                        {isChatOpen ? "Fermer la messagerie" : "Messagerie"}
+                      </Button>
+                      {isChatOpen && (
+                        <ChatWindow
+                          courseId={cmd.course_id}
+                          senderType="partenaire"
+                          senderId={etablissementId}
+                          senderName={etablissementNom || (isRestaurant ? cmd.restaurant_nom : cmd.boutique_nom) || "Partenaire"}
+                          contextInfo={{
+                            reference: `Commande #${(cmd.id || "").slice(-6)}`,
+                            client: cmd.client_nom || "Client",
+                            partenaire: etablissementNom || cmd.boutique_nom || cmd.restaurant_nom || "Partenaire",
+                            statut: s.label,
+                          }}
+                        />
+                      )}
+                    </div>
                   )}
                 </div>
               )}
