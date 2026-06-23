@@ -24,7 +24,8 @@
       "enum": [
         "admin",
         "livreur",
-        "client"
+        "client",
+        "partenaire"
       ],
       "description": "Type d'utilisateur"
     },

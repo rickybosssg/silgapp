@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
     const payload = await req.json().catch(() => ({}));
     const { type, montant, preuve_url } = payload;
 
-    if (!type || !['boutique', 'restaurant'].includes(type)) {
+    if (!type || !['boutique', 'restaurant', 'pharmacie'].includes(type)) {
       return Response.json({ error: 'type requis' }, { status: 400 });
     }
     if (!montant || montant <= 0) {
@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
     }
 
     // Vérifier que l'utilisateur possède bien l'établissement
-    const entityName = type === 'restaurant' ? 'Restaurant' : 'Boutique';
+    const entityName = type === 'restaurant' ? 'Restaurant' : type === 'pharmacie' ? 'Pharmacie' : 'Boutique';
     const etablissements = await base44.entities[entityName].filter({ partenaire_id: user.id });
     if (!etablissements || etablissements.length === 0) {
       return Response.json({ error: 'Aucun établissement trouvé' }, { status: 404 });

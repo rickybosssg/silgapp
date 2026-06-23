@@ -16,17 +16,41 @@ Deno.serve(async (req) => {
     const payload = await req.json().catch(() => ({}));
     const { type, date_debut, date_fin } = payload;
 
-    if (!type || !['boutique', 'restaurant'].includes(type)) {
-      return Response.json({ error: 'type requis (boutique ou restaurant)' }, { status: 400 });
+    if (!type || !['boutique', 'restaurant', 'pharmacie'].includes(type)) {
+      return Response.json({ error: 'type requis (boutique, restaurant ou pharmacie)' }, { status: 400 });
     }
 
     // Vérifier que l'utilisateur possède bien un établissement de ce type
-    const entityName = type === 'restaurant' ? 'Restaurant' : 'Boutique';
+    const entityName = type === 'restaurant' ? 'Restaurant' : type === 'pharmacie' ? 'Pharmacie' : 'Boutique';
     const etablissements = await base44.entities[entityName].filter({ partenaire_id: user.id });
     if (!etablissements || etablissements.length === 0) {
       return Response.json({ error: 'Aucun établissement trouvé' }, { status: 404 });
     }
     const etablissement = etablissements[0];
+
+    // Les pharmacies n'ont pas de commandes produit (pas de catalogue) —
+    // elles créent directement des CourseExterne. Retourner des données vides.
+    if (type === 'pharmacie') {
+      const paiements = await base44.entities.PaiementPartenaire.filter({ partenaire_id: user.id }, '-created_date', 500);
+      let totalPayeConfirme = 0, totalPayeEnAttente = 0;
+      paiements.forEach(p => {
+        if (p.statut === 'confirme') totalPayeConfirme += (p.montant || 0);
+        else if (p.statut === 'en_attente') totalPayeEnAttente += (p.montant || 0);
+      });
+      return Response.json({
+        success: true,
+        etablissement: { id: etablissement.id, nom: etablissement.nom, type },
+        periode: { debut: (date_debut ? new Date(date_debut) : new Date(new Date().getFullYear(), new Date().getMonth(), 1)).toISOString(), fin: new Date().toISOString() },
+        kpis: {
+          ca_total: 0, commission_silga: 0, net_partenaire: 0,
+          nb_commandes: 0, nb_livrees: 0, nb_annulees: 0,
+          ca_precedent: 0, pct_ca: null, taux_commission_moyen: 0,
+          du_silga_restant: 0, total_paye_confirme: totalPayeConfirme, total_paye_en_attente: totalPayeEnAttente,
+        },
+        par_statut: {}, evolution: [], top_produits: [],
+        paiements: paiements.slice(0, 50),
+      });
+    }
 
     const now = new Date();
     const debut = date_debut ? new Date(date_debut) : new Date(now.getFullYear(), now.getMonth(), 1);
