@@ -148,7 +148,7 @@ async function resendEmailOtp(email) {
  * - base44Client lit localStorage au moment de createClient()
  * - detectedToken permet de savoir si un token a été trouvé
  */
-export default function AuthGate({ children, onLivreur, onClient }) {
+export default function AuthGate({ children, onLivreur, onClient, onPartenaire }) {
   const [state, setState] = useState("loading");
   const [authRetry, setAuthRetry] = useState(0);
   const [authMode, setAuthMode] = useState("login");
@@ -277,7 +277,29 @@ export default function AuthGate({ children, onLivreur, onClient }) {
         return;
       }
 
-      // 4. Aucun profil → choix du rôle (Client ou Livreur)
+      // 3.5. Vérifier si l'utilisateur est un partenaire (Boutique, Restaurant, Pharmacie)
+      const roleChoice = localStorage.getItem("silgapp_role_choice");
+      const [boutiques, restaurants, pharmacies] = await Promise.all([
+        base44.entities.Boutique.filter({ user_email: user.email }).catch(() => []),
+        base44.entities.Restaurant.filter({ user_email: user.email }).catch(() => []),
+        base44.entities.Pharmacie.filter({ user_email: user.email }).catch(() => []),
+      ]);
+      if (!mounted) return;
+
+      const hasEtablissement = (boutiques?.length > 0) || (restaurants?.length > 0) || (pharmacies?.length > 0);
+      if (hasEtablissement || roleChoice === "partenaire") {
+        registerPushToken(null, {
+          email: user.email,
+          user_email: user.email,
+          user_type: "partenaire",
+        }).catch(() => null);
+        onPartenaire?.();
+        if (!mounted) return;
+        setState("partenaire");
+        return;
+      }
+
+      // 4. Aucun profil → choix du rôle (Client, Livreur ou Partenaire)
       setState("choix_role");
     }
 

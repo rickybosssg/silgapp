@@ -77,6 +77,8 @@ const PartenaireDashboard = lazy(() => import('./pages/PartenaireDashboard.jsx')
 const GestionBoutiques = lazy(() => import('./pages/GestionBoutiques.jsx'));
 const GestionRestaurants = lazy(() => import('./pages/GestionRestaurants.jsx'));
 const MesCommandesBoutique = lazy(() => import('./pages/MesCommandesBoutique.jsx'));
+const PharmaciesList = lazy(() => import('./pages/PharmaciesList.jsx'));
+const PharmacieDetail = lazy(() => import('./pages/PharmacieDetail.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -257,6 +259,8 @@ function AppContent() {
           <Route path="/client/boutiques/:id" element={<BoutiqueDetail />} />
           <Route path="/client/restaurants" element={<RestaurantsList />} />
           <Route path="/client/restaurants/:id" element={<RestaurantDetail />} />
+          <Route path="/client/pharmacies" element={<PharmaciesList />} />
+          <Route path="/client/pharmacies/:id" element={<PharmacieDetail />} />
           <Route path="/client/mes-commandes" element={<MesCommandesBoutique />} />
           <Route path="/livreur/recap-course/:courseId" element={<RecapCourseLivreur />} />
           <Route path="*" element={<ClientExterneApp />} />

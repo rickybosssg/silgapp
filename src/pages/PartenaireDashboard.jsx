@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Store, UtensilsCrossed, Loader2, LogOut, MapPin } from "lucide-react";
+import { Store, UtensilsCrossed, Loader2, LogOut, MapPin, Pill } from "lucide-react";
 import EtablissementForm from "@/components/partenaire/EtablissementForm";
 import ProduitsManager from "@/components/partenaire/ProduitsManager";
 import CommandesManager from "@/components/partenaire/CommandesManager";
+import PharmacieLivraisons from "@/components/partenaire/PharmacieLivraisons";
 import MessagesPage from "@/components/chat/MessagesPage";
 import ComptabilitePartenaire from "@/components/partenaire/ComptabilitePartenaire";
 import PartenaireHome from "@/components/partenaire/PartenaireHome";
@@ -45,11 +46,21 @@ export default function PartenaireDashboard() {
     enabled: !!user?.id,
   });
 
+  const { data: maPharmacie, isLoading: loadingPharmacie } = useQuery({
+    queryKey: ["ma-pharmacie", user?.id],
+    queryFn: async () => {
+      const list = await base44.entities.Pharmacie.filter({ partenaire_id: user.id });
+      return list?.[0] || null;
+    },
+    enabled: !!user?.id,
+  });
+
   const hasBoutique = !!maBoutique;
   const hasRestaurant = !!monRestaurant;
-  const hasEtablissement = hasBoutique || hasRestaurant;
-  const etablissementType = hasBoutique ? "boutique" : hasRestaurant ? "restaurant" : null;
-  const etablissement = maBoutique || monRestaurant || null;
+  const hasPharmacie = !!maPharmacie;
+  const hasEtablissement = hasBoutique || hasRestaurant || hasPharmacie;
+  const etablissementType = hasBoutique ? "boutique" : hasRestaurant ? "restaurant" : hasPharmacie ? "pharmacie" : null;
+  const etablissement = maBoutique || monRestaurant || maPharmacie || null;
 
   // Query commandes avant les retours conditionnels (Rules of Hooks)
   const cmdEntityName = etablissementType === "restaurant" ? "CommandeRestaurant" : "CommandeBoutique";
@@ -60,7 +71,7 @@ export default function PartenaireDashboard() {
     enabled: !!etablissement?.id,
   });
 
-  const loading = loadingBoutique || loadingRestaurant;
+  const loading = loadingBoutique || loadingRestaurant || loadingPharmacie;
 
   if (!user || loading) {
     return (
@@ -94,6 +105,12 @@ export default function PartenaireDashboard() {
                 <div><p className="font-black text-lg text-gray-900">Un Restaurant</p><p className="text-sm text-gray-500">Proposer un menu et des plats</p></div>
               </div>
             </button>
+            <button onClick={() => setTab("pharmacie_form")} className="w-full p-6 rounded-3xl border-2 border-gray-300 bg-gradient-to-br from-gray-50 to-slate-100 hover:border-gray-600 hover:shadow-lg transition-all text-left">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-gray-200 flex items-center justify-center"><Pill className="w-7 h-7 text-gray-700" /></div>
+                <div><p className="font-black text-lg text-gray-900">Une Pharmacie</p><p className="text-sm text-gray-500">Discuter avec clients et livrer</p></div>
+              </div>
+            </button>
           </div>
           <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="w-full text-sm text-gray-400 underline">Se déconnecter</button>
           {tab === "boutique_form" && (
@@ -104,6 +121,11 @@ export default function PartenaireDashboard() {
           {tab === "restaurant_form" && (
             <EtablissementForm type="restaurant" partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === 'admin'}
               onSaved={() => { setTab("home"); queryClient.invalidateQueries({ queryKey: ["mon-restaurant"] }); }}
+              onCancel={() => setTab("home")} />
+          )}
+          {tab === "pharmacie_form" && (
+            <EtablissementForm type="pharmacie" partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === 'admin'}
+              onSaved={() => { setTab("home"); queryClient.invalidateQueries({ queryKey: ["ma-pharmacie"] }); }}
               onCancel={() => setTab("home")} />
           )}
         </div>
@@ -122,7 +144,7 @@ export default function PartenaireDashboard() {
             <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center overflow-hidden flex-shrink-0">
               {etablissement.logo_url
                 ? <img src={etablissement.logo_url} alt="logo" className="w-full h-full object-cover" />
-                : (etablissementType === "boutique" ? <Store className="w-6 h-6" /> : <UtensilsCrossed className="w-6 h-6" />)}
+                : (etablissementType === "boutique" ? <Store className="w-6 h-6" /> : etablissementType === "restaurant" ? <UtensilsCrossed className="w-6 h-6" /> : <Pill className="w-6 h-6" />)}
             </div>
             <div className="min-w-0">
               <h1 className="text-lg font-black leading-tight truncate">{etablissement.nom}</h1>
@@ -145,8 +167,9 @@ export default function PartenaireDashboard() {
       {/* ── Contenu ── */}
       <div className="max-w-lg mx-auto px-4 py-4">
         {tab === "home" && <PartenaireHome etablissement={etablissement} etablissementType={etablissementType} onNavigate={setTab} />}
-        {tab === "commandes" && <CommandesManager type={etablissementType} etablissementId={etablissement.id} />}
-        {tab === "produits" && <ProduitsManager type={etablissementType} etablissementId={etablissement.id} />}
+        {tab === "commandes" && !hasPharmacie && <CommandesManager type={etablissementType} etablissementId={etablissement.id} />}
+        {tab === "produits" && !hasPharmacie && <ProduitsManager type={etablissementType} etablissementId={etablissement.id} />}
+        {tab === "livraisons" && hasPharmacie && <PharmacieLivraisons pharmacieId={etablissement.id} pharmacieNom={etablissement.nom} onNavigate={setTab} />}
         {tab === "messages" && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-[70vh]">
             <MessagesPage myType="partenaire" myId={etablissement.id} myName={etablissement.nom} />
@@ -156,12 +179,12 @@ export default function PartenaireDashboard() {
         {tab === "revenus" && <ComptabilitePartenaire type={etablissementType} />}
         {tab === "infos" && (
           <EtablissementForm type={etablissementType} existing={etablissement} partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === 'admin'}
-            onSaved={() => queryClient.invalidateQueries({ queryKey: etablissementType === "boutique" ? ["ma-boutique"] : ["mon-restaurant"] })} />
+            onSaved={() => queryClient.invalidateQueries({ queryKey: hasPharmacie ? ["ma-pharmacie"] : etablissementType === "boutique" ? ["ma-boutique"] : ["mon-restaurant"] })} />
         )}
       </div>
 
       {/* ── Bottom Nav ── */}
-      <PartenaireBottomNav tab={tab} setTab={setTab} badgeCount={pendingCount} />
+      <PartenaireBottomNav tab={tab} setTab={setTab} badgeCount={pendingCount} etablissementType={etablissementType} />
     </div>
   );
 }

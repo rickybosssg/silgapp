@@ -1,8 +1,15 @@
 import React from "react";
-import { Home, Package, ShoppingBag, MessageCircle, BarChart3 } from "lucide-react";
+import { Home, Package, ShoppingBag, MessageCircle, BarChart3, Truck, Pill } from "lucide-react";
 
-export default function PartenaireBottomNav({ tab, setTab, badgeCount = 0 }) {
-  const items = [
+export default function PartenaireBottomNav({ tab, setTab, badgeCount = 0, etablissementType }) {
+  const isPharmacie = etablissementType === "pharmacie";
+  const items = isPharmacie ? [
+    { id: "home", icon: Home, label: "Accueil" },
+    { id: "messages", icon: MessageCircle, label: "Messages" },
+    { id: "livraisons", icon: Truck, label: "Livraisons", badge: badgeCount },
+    { id: "statistiques", icon: BarChart3, label: "Stats" },
+    { id: "infos", icon: Pill, label: "Infos" },
+  ] : [
     { id: "home", icon: Home, label: "Accueil" },
     { id: "commandes", icon: Package, label: "Commandes", badge: badgeCount },
     { id: "produits", icon: ShoppingBag, label: "Produits" },

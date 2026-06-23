@@ -235,6 +235,19 @@ function buildStyles() {
       background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
     }
 
+    /* ─── Partenaire PHARMACIE (⚫ gris foncé) ─── */
+    .dmap-partenaire-pharmacie .dmap-partenaire-ring {
+      background: rgba(55, 65, 81, 0.3);
+      animation: dmap-pulse-gris 2.5s ease-out infinite;
+    }
+    .dmap-partenaire-pharmacie .dmap-partenaire-body {
+      border-color: #374151;
+      box-shadow: 0 2px 10px rgba(55, 65, 81, 0.4);
+    }
+    .dmap-partenaire-pharmacie .dmap-partenaire-avatar-bg {
+      background: linear-gradient(135deg, #4b5563 0%, #1f2937 100%);
+    }
+
     /* ─── Structure commune partenaire ─── */
     .dmap-partenaire-wrapper {
       position: relative;
@@ -316,6 +329,10 @@ function buildStyles() {
       100% { transform: scale(1.5); opacity: 0; }
     }
     @keyframes dmap-pulse-rose {
+      0%   { transform: scale(0.5); opacity: 1; }
+      100% { transform: scale(1.5); opacity: 0; }
+    }
+    @keyframes dmap-pulse-gris {
       0%   { transform: scale(0.5); opacity: 1; }
       100% { transform: scale(1.5); opacity: 0; }
     }
@@ -553,7 +570,8 @@ function buildCoursePopup(course) {
 
 function buildPartenaireIcon(partenaire) {
   const isBoutique = partenaire._type === "boutique";
-  const cssClass = isBoutique ? "dmap-partenaire-boutique" : "dmap-partenaire-restaurant";
+  const isPharmacie = partenaire._type === "pharmacie";
+  const cssClass = isPharmacie ? "dmap-partenaire-pharmacie" : isBoutique ? "dmap-partenaire-boutique" : "dmap-partenaire-restaurant";
   const initial = (partenaire.nom || "?").charAt(0).toUpperCase();
   const photoHtml = partenaire.logo_url
     ? `<img src="${partenaire.logo_url}" alt="" class="dmap-partenaire-photo" />`
@@ -575,8 +593,9 @@ function buildPartenaireIcon(partenaire) {
 
 function buildPartenairePopup(partenaire) {
   const isBoutique = partenaire._type === "boutique";
-  const typeLabel = isBoutique ? "🏪 Boutique" : "🍽️ Restaurant";
-  const typeColor = isBoutique ? "#8b5cf6" : "#ec4899";
+  const isPharmacie = partenaire._type === "pharmacie";
+  const typeLabel = isPharmacie ? "💊 Pharmacie" : isBoutique ? "🏪 Boutique" : "🍽️ Restaurant";
+  const typeColor = isPharmacie ? "#374151" : isBoutique ? "#8b5cf6" : "#ec4899";
   const statutLabel = partenaire.ouvert === false
     ? '<span style="color:#dc2626;font-weight:600">🔴 Fermé</span>'
     : '<span style="color:#16a34a;font-weight:600">🟢 Ouvert</span>';
@@ -887,6 +906,7 @@ export default function DispatchMap({
   const nbLivreursVisibles = showLivreurs ? nbLibres + nbCourse : 0;
   const nbPartenairesBoutiques = partenaires.filter(p => p._type === "boutique" && p.latitude && p.longitude).length;
   const nbPartenairesRestaurants = partenaires.filter(p => p._type === "restaurant" && p.latitude && p.longitude).length;
+  const nbPartenairesPharmacies = partenaires.filter(p => p._type === "pharmacie" && p.latitude && p.longitude).length;
   
   // Points heatmap pour légende
   const nbPointsDemande = clients.filter(c => c.latitude && c.longitude).length + 
@@ -977,6 +997,12 @@ export default function DispatchMap({
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-pink-500 flex-shrink-0" />
                     <span className="text-pink-700 font-medium">🍽️ {nbPartenairesRestaurants} restaurant{nbPartenairesRestaurants > 1 ? "s" : ""}</span>
+                  </div>
+                )}
+                {showPartenaires && nbPartenairesPharmacies > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-gray-700 flex-shrink-0" />
+                    <span className="text-gray-700 font-medium">💊 {nbPartenairesPharmacies} pharmacie{nbPartenairesPharmacies > 1 ? "s" : ""}</span>
                   </div>
                 )}
                 {courses.length === 0 && nbLivreursVisibles === 0 && nbClientsVisibles === 0 && (

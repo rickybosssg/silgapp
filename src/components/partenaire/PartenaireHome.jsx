@@ -6,6 +6,7 @@ import { Package, ShoppingBag, MessageCircle, BarChart3, Store, Wallet, Loader2,
 
 export default function PartenaireHome({ etablissement, etablissementType, onNavigate }) {
   const isRestaurant = etablissementType === "restaurant";
+  const isPharmacie = etablissementType === "pharmacie";
   const entityName = isRestaurant ? "CommandeRestaurant" : "CommandeBoutique";
   const idField = isRestaurant ? "restaurant_id" : "boutique_id";
   const queryClient = useQueryClient();
@@ -14,6 +15,7 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
   const { data: commandes = [], isLoading } = useQuery({
     queryKey: ["commandes", etablissementType, etablissement.id],
     queryFn: () => base44.entities[entityName].filter({ [idField]: etablissement.id }, "-created_date", 100),
+    enabled: !isPharmacie && !!etablissement?.id,
   });
 
   // Stats du jour
@@ -30,14 +32,20 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
   const handleToggleOuvert = async () => {
     setToggling(true);
     try {
-      const eName = isRestaurant ? "Restaurant" : "Boutique";
+      const eName = isPharmacie ? "Pharmacie" : isRestaurant ? "Restaurant" : "Boutique";
       await base44.entities[eName].update(etablissement.id, { ouvert: !etablissement.ouvert });
-      queryClient.invalidateQueries({ queryKey: isRestaurant ? ["mon-restaurant"] : ["ma-boutique"] });
+      queryClient.invalidateQueries({ queryKey: isPharmacie ? ["ma-pharmacie"] : isRestaurant ? ["mon-restaurant"] : ["ma-boutique"] });
     } catch (err) {}
     setToggling(false);
   };
 
-  const cards = [
+  const cards = isPharmacie ? [
+    { id: "messages", icon: MessageCircle, label: "Messages", subtitle: "Discuter avec clients", bg: "bg-green-50", iconColor: "text-green-600", badge: pendingCount },
+    { id: "livraisons", icon: Truck, label: "Livraisons", subtitle: "Créer une livraison", bg: "bg-gray-100", iconColor: "text-gray-700" },
+    { id: "statistiques", icon: BarChart3, label: "Statistiques", subtitle: "Revenus & suivi", bg: "bg-amber-50", iconColor: "text-amber-600" },
+    { id: "infos", icon: Store, label: "Informations", subtitle: "Modifier la fiche", bg: "bg-pink-50", iconColor: "text-pink-600" },
+    { id: "revenus", icon: Wallet, label: "Revenus", subtitle: "Suivi des paiements", bg: "bg-teal-50", iconColor: "text-teal-600" },
+  ] : [
     { id: "commandes", icon: Package, label: "Commandes", subtitle: "Gérer les commandes", bg: "bg-blue-50", iconColor: "text-blue-600", badge: pendingCount },
     { id: "produits", icon: ShoppingBag, label: isRestaurant ? "Plats" : "Produits", subtitle: "Gérer le catalogue", bg: "bg-purple-50", iconColor: "text-purple-600" },
     { id: "messages", icon: MessageCircle, label: "Messages", subtitle: "Discuter avec clients", bg: "bg-green-50", iconColor: "text-green-600" },
