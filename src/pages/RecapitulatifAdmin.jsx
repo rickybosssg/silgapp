@@ -81,7 +81,7 @@ export default function RecapitulatifAdmin({ reseau }) {
   const queryClient = useQueryClient();
   const [period, setPeriod] = useState("today");
   const [selectedLivreur, setSelectedLivreur] = useState(null);
-  const [activeTab, setActiveTab] = useState(reseau || "interne");
+  const [activeTab, setActiveTab] = useState(reseau || "externe");
   const { user: currentUser } = useSilgappAuth();
 
   // Charger TOUS les livreurs (on filtre ensuite par type)
@@ -97,7 +97,7 @@ export default function RecapitulatifAdmin({ reseau }) {
     queryFn: () => base44.entities.Course.list("-created_date", 500),
     initialData: [],
     refetchInterval: 30000,
-    enabled: !reseau || reseau === "interne",
+    enabled: reseau === "interne",
   });
 
   // Courses externes (entité CourseExterne)
@@ -172,7 +172,7 @@ export default function RecapitulatifAdmin({ reseau }) {
   const coursesActives = activeTab === "interne" ? coursesInternes : coursesExternes;
 
   // Si reseau est forcé (prop), afficher uniquement ce réseau sans onglets
-  const showTabs = !reseau;
+  const showTabs = false;
 
   return (
     <div className="p-4 space-y-5 max-w-7xl mx-auto">
@@ -212,22 +212,7 @@ export default function RecapitulatifAdmin({ reseau }) {
       </div>
 
       {/* Cartes résumé */}
-      {!reseau ? (
-        <div className="space-y-4">
-          <ReseauInternePremiumCard
-            livreurs={livreursInternes}
-            coursesLivrees={coursesInterneLivrees}
-          />
-          <ReseauCard
-            title="SILGAPP Externe"
-            icon={Globe}
-            color="border-primary/20 bg-primary/5"
-            livreurs={livreursExternes}
-            coursesLivrees={coursesExterneLivrees}
-            isExterne={true}
-          />
-        </div>
-      ) : reseau === "interne" ? (
+      {reseau === "interne" ? (
         <ReseauInternePremiumCard
           livreurs={livreursInternes}
           coursesLivrees={coursesInterneLivrees}
@@ -278,7 +263,7 @@ export default function RecapitulatifAdmin({ reseau }) {
             {activeTab === "interne" ? <Building2 className="w-4 h-4 text-white" /> : <Globe className="w-4 h-4 text-white" />}
           </div>
           <div>
-            <p className="font-bold text-foreground">Performances — {activeTab === "interne" ? "SILGAPP Interne" : "SILGAPP Externe"}</p>
+            <p className="font-bold text-foreground">Performances - SILGAPP Externe</p>
             <p className="text-xs text-muted-foreground">{livreursActifs.length} livreur{livreursActifs.length > 1 ? "s" : ""}</p>
           </div>
         </div>
