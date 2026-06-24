@@ -10,21 +10,41 @@ export default function RoleSelection() {
 
   // Charger les infos user au montage
   React.useEffect(() => {
-    base44.auth.me().then(u => setUser(u)).catch(() => {});
+    base44.auth.me().then(u => {
+      setUser(u);
+      // Anti-double-rôle : si silgapp_role déjà défini, AuthGate doit router → reload de sécurité
+      if (u?.silgapp_role) {
+        window.location.reload();
+      }
+    }).catch(() => {});
   }, []);
 
-  const handleClientComplete = () => {
+  const handleClientComplete = async () => {
+    try {
+      await base44.auth.updateMe({ silgapp_role: "client" });
+    } catch (err) {
+      console.error("Erreur enregistrement rôle client:", err);
+    }
     setStep("client_done");
     setTimeout(() => window.location.reload(), 1500);
   };
 
-  const handleLivreurComplete = () => {
+  const handleLivreurComplete = async () => {
+    try {
+      await base44.auth.updateMe({ silgapp_role: "livreur" });
+    } catch (err) {
+      console.error("Erreur enregistrement rôle livreur:", err);
+    }
     setStep("livreur_done");
     setTimeout(() => window.location.reload(), 2000);
   };
 
-  const handlePartenaireChoice = () => {
-    localStorage.setItem("silgapp_role_choice", "partenaire");
+  const handlePartenaireChoice = async () => {
+    try {
+      await base44.auth.updateMe({ silgapp_role: "partenaire" });
+    } catch (err) {
+      console.error("Erreur enregistrement rôle partenaire:", err);
+    }
     window.location.reload();
   };
 
