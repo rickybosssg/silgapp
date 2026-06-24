@@ -235,17 +235,17 @@ function buildStyles() {
       background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
     }
 
-    /* ─── Partenaire PHARMACIE (⚫ gris foncé) ─── */
+    /* ─── Partenaire PHARMACIE (🔵 bleu foncé) ─── */
     .dmap-partenaire-pharmacie .dmap-partenaire-ring {
-      background: rgba(55, 65, 81, 0.3);
-      animation: dmap-pulse-gris 2.5s ease-out infinite;
+      background: rgba(30, 58, 138, 0.3);
+      animation: dmap-pulse-bleu-fonce 2.5s ease-out infinite;
     }
     .dmap-partenaire-pharmacie .dmap-partenaire-body {
-      border-color: #374151;
-      box-shadow: 0 2px 10px rgba(55, 65, 81, 0.4);
+      border-color: #1e3a8a;
+      box-shadow: 0 2px 10px rgba(30, 58, 138, 0.4);
     }
     .dmap-partenaire-pharmacie .dmap-partenaire-avatar-bg {
-      background: linear-gradient(135deg, #4b5563 0%, #1f2937 100%);
+      background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
     }
 
     /* ─── Structure commune partenaire ─── */
@@ -332,7 +332,7 @@ function buildStyles() {
       0%   { transform: scale(0.5); opacity: 1; }
       100% { transform: scale(1.5); opacity: 0; }
     }
-    @keyframes dmap-pulse-gris {
+    @keyframes dmap-pulse-bleu-fonce {
       0%   { transform: scale(0.5); opacity: 1; }
       100% { transform: scale(1.5); opacity: 0; }
     }
@@ -595,7 +595,7 @@ function buildPartenairePopup(partenaire) {
   const isBoutique = partenaire._type === "boutique";
   const isPharmacie = partenaire._type === "pharmacie";
   const typeLabel = isPharmacie ? "💊 Pharmacie" : isBoutique ? "🏪 Boutique" : "🍽️ Restaurant";
-  const typeColor = isPharmacie ? "#374151" : isBoutique ? "#8b5cf6" : "#ec4899";
+  const typeColor = isPharmacie ? "#1e3a8a" : isBoutique ? "#8b5cf6" : "#ec4899";
   const statutLabel = partenaire.ouvert === false
     ? '<span style="color:#dc2626;font-weight:600">🔴 Fermé</span>'
     : '<span style="color:#16a34a;font-weight:600">🟢 Ouvert</span>';
@@ -1001,8 +1001,8 @@ export default function DispatchMap({
                 )}
                 {showPartenaires && nbPartenairesPharmacies > 0 && (
                   <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-gray-700 flex-shrink-0" />
-                    <span className="text-gray-700 font-medium">💊 {nbPartenairesPharmacies} pharmacie{nbPartenairesPharmacies > 1 ? "s" : ""}</span>
+                    <span className="w-3 h-3 rounded-full bg-blue-900 flex-shrink-0" />
+                    <span className="text-blue-900 font-medium">💊 {nbPartenairesPharmacies} pharmacie{nbPartenairesPharmacies > 1 ? "s" : ""}</span>
                   </div>
                 )}
                 {courses.length === 0 && nbLivreursVisibles === 0 && nbClientsVisibles === 0 && (
