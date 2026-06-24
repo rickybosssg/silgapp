@@ -439,6 +439,14 @@
     "commande_restaurant_id": {
       "type": "string",
       "description": "ID de la CommandeRestaurant li\u00e9e (si course issue d'une commande partenaire)"
+    },
+    "pharmacie_id": {
+      "type": "string",
+      "description": "ID de la pharmacie liee (si course issue d'une pharmacie partenaire)"
+    },
+    "conversation_id": {
+      "type": "string",
+      "description": "ID de la conversation liee a la livraison pharmacie"
     }
   },
   "required": [

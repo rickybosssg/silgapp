@@ -4,24 +4,53 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
+  Baby,
+  Bandage,
   Clock,
+  CreditCard,
   FileText,
+  HeartPulse,
   Info,
   Loader2,
   MapPin,
   MessageCircle,
   Phone,
   Pill,
+  Send,
   ShieldCheck,
+  Sparkles,
+  Stethoscope,
+  Syringe,
+  Thermometer,
   Truck,
 } from "lucide-react";
 import MessagesPage from "@/components/chat/MessagesPage";
+
+const VENUS_AVATAR_URL = "https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/17cf522aa_file_0000000034b871f7bf133c0de0c9eb62.png";
 
 const serviceCards = [
   { Icon: Pill, label: "Medicaments", desc: "Disponibilite et prix" },
   { Icon: FileText, label: "Ordonnance", desc: "Envoyez votre prescription" },
   { Icon: Truck, label: "Livraison", desc: "A domicile via SILGAPP" },
   { Icon: ShieldCheck, label: "Garde", desc: "Service d'urgence" },
+];
+
+const frequentProducts = [
+  { Icon: Pill, label: "Medicaments", desc: "Disponibilite a confirmer" },
+  { Icon: HeartPulse, label: "Antalgiques", desc: "Douleurs et fievres" },
+  { Icon: Thermometer, label: "Thermometres", desc: "Controle temperature" },
+  { Icon: Bandage, label: "Pansements", desc: "Premiers soins" },
+  { Icon: Sparkles, label: "Produits de soins", desc: "Hygiene et bien-etre" },
+  { Icon: Baby, label: "Produits bebe", desc: "Soins enfant" },
+  { Icon: Stethoscope, label: "Materiel medical", desc: "Selon disponibilite" },
+  { Icon: Syringe, label: "Vitamines", desc: "Conseil pharmacie" },
+];
+
+const benefits = [
+  { Icon: FileText, text: "Envoyez votre ordonnance directement a la pharmacie." },
+  { Icon: Send, text: "Verifiez la disponibilite avant de vous deplacer." },
+  { Icon: CreditCard, text: "Payez au numero Mobile Money de la pharmacie." },
+  { Icon: Truck, text: "Demandez une livraison a domicile avec suivi SILGAPP." },
 ];
 
 export default function PharmacieDetail() {
@@ -178,6 +207,55 @@ export default function PharmacieDetail() {
               <p className="text-[8px] text-slate-400 leading-tight mt-0.5">{desc}</p>
             </div>
           ))}
+        </div>
+
+        <div className="bg-white rounded-3xl shadow-sm ring-1 ring-slate-100 p-5 space-y-4">
+          <div>
+            <p className="text-[11px] font-black text-blue-700 uppercase tracking-[0.15em]">Produits frequemment demandes</p>
+            <p className="text-xs text-slate-500 mt-1">Ces categories servent a orienter la discussion. Elles ne representent pas un stock garanti.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {frequentProducts.map(({ Icon, label, desc }) => (
+              <div key={label} className="rounded-2xl border border-slate-100 bg-slate-50/70 p-3 flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+                  <Icon className="w-5 h-5 text-blue-700" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-900 leading-tight">{label}</p>
+                  <p className="text-[11px] text-slate-500 leading-snug mt-0.5">{desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-blue-900 to-slate-950 rounded-3xl shadow-xl shadow-blue-900/10 p-5 text-white overflow-hidden relative">
+          <div className="absolute -right-10 -bottom-10 w-36 h-36 rounded-full bg-cyan-400/10 blur-2xl" />
+          <div className="relative flex gap-4">
+            <div className="w-20 h-20 rounded-2xl bg-white/10 ring-1 ring-white/15 overflow-hidden flex-shrink-0">
+              <img src={VENUS_AVATAR_URL} alt="Venus SILGAPP" className="w-full h-full object-cover" />
+            </div>
+            <div>
+              <p className="text-sm font-black">Venus vous souhaite la bienvenue.</p>
+              <p className="text-xs text-blue-100/80 leading-relaxed mt-1">
+                Envoyez votre ordonnance, verifiez la disponibilite de vos produits et faites-vous livrer rapidement avec SILGAPP.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-3xl shadow-sm ring-1 ring-slate-100 p-5 space-y-3">
+          <p className="text-[11px] font-black text-blue-700 uppercase tracking-[0.15em]">Pourquoi utiliser la pharmacie en ligne ?</p>
+          <div className="space-y-3">
+            {benefits.map(({ Icon, text }) => (
+              <div key={text} className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+                  <Icon className="w-4 h-4 text-blue-700" />
+                </div>
+                <p className="text-sm text-slate-600 leading-relaxed pt-1">{text}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="bg-white rounded-3xl shadow-sm ring-1 ring-slate-100 p-5 space-y-3.5">

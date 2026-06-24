@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Mic, Square, Send, Loader2, Play, Pause, Settings, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -35,6 +35,18 @@ export default function AudioRecorder({ onSend, disabled }) {
   const streamRef = useRef(null);
   const audioRef = useRef(null);
 
+  useEffect(() => {
+    const clearError = () => {
+      if (document.visibilityState === "visible") setPermissionError("");
+    };
+    document.addEventListener("visibilitychange", clearError);
+    window.addEventListener("focus", clearError);
+    return () => {
+      document.removeEventListener("visibilitychange", clearError);
+      window.removeEventListener("focus", clearError);
+    };
+  }, []);
+
   const cleanupStream = () => {
     streamRef.current?.getTracks?.().forEach(track => track.stop());
     streamRef.current = null;
@@ -61,15 +73,8 @@ export default function AudioRecorder({ onSend, disabled }) {
         throw new Error("unsupported");
       }
 
-      if (navigator.permissions?.query) {
-        try {
-          const status = await navigator.permissions.query({ name: "microphone" });
-          if (status.state === "denied") throw new Error("denied");
-        } catch (err) {
-          if (err?.message === "denied") throw err;
-        }
-      }
-
+      // Android WebView peut retourner un etat "denied" stale apres retour des parametres.
+      // La seule source fiable est l'appel getUserMedia lui-meme.
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       const mimeType = getSupportedMimeType();

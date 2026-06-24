@@ -13,7 +13,7 @@ import { useQueryClient, useQuery } from "@tanstack/react-query";
 import {
   MapPin, Navigation, MessageCircle, User, Package,
   Clock, ChevronRight, TrendingUp, Loader2, ArrowLeft, RefreshCw,
-  Store, UtensilsCrossed, Bell, Pill
+  Store, UtensilsCrossed, Bell, Pill, Inbox, Car
 } from "lucide-react";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import CourseAnnuleeRelanceDialog from "@/components/client/CourseAnnuleeRelanceDialog";
@@ -920,7 +920,7 @@ export default function ClientExterneApp() {
                   onClick={() => navigate("/client/course/recevoir", { state: { position, clientProfil } })}
                 >
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-lg shadow-green-200 mb-2 group-hover:scale-105 transition-transform">
-                    <span className="text-xl"></span>
+                    <Inbox className="w-5 h-5 text-white" />
                   </div>
                   <p className="font-black text-gray-900 text-xs">Recevoir</p>
                   <p className="text-[10px] text-gray-500 mt-0.5">Attendre un colis</p>
@@ -931,7 +931,7 @@ export default function ClientExterneApp() {
                   onClick={() => navigate("/client/course/deplacement", { state: { position, clientProfil } })}
                 >
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center shadow-lg shadow-sky-200 mb-2 group-hover:scale-105 transition-transform">
-                    <span className="text-xl"></span>
+                    <Car className="w-5 h-5 text-white" />
                   </div>
                   <p className="font-black text-gray-900 text-xs">Déplacement</p>
                   <p className="text-[10px] text-gray-500 mt-0.5">Transport personne</p>

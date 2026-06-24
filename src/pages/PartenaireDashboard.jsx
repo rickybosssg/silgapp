@@ -149,12 +149,15 @@ export default function PartenaireDashboard() {
     ? pharmaCourses.filter(c => PHARMACIE_ACTIVE_STATUSES.has(c.statut)).length
     : commandes.filter(c => ACTION_STATUSES.has(c.statut)).length;
 
-  const unreadConversations = allConversations.filter(c => c.last_message && c.last_sender_name !== etablissement?.nom);
+  const unreadConversations = allConversations.filter(c =>
+    c.last_message &&
+    c.last_sender_name !== etablissement?.nom &&
+    !seenConvIds.includes(c.id)
+  );
   const unreadCount = unreadConversations.length;
 
   useEffect(() => {
     if (!etablissement?.id || allConversations.length === 0) return;
-    const currentIds = allConversations.map(c => c.id);
     const newOnes = allConversations.filter(c => c.last_sender_name !== etablissement.nom && !seenConvIds.includes(c.id));
     if (newOnes.length > 0 && tab !== "messages") {
       const newest = newOnes[0];
@@ -165,11 +168,6 @@ export default function PartenaireDashboard() {
         if (client?.name) clientName = client.name;
       } catch {}
       setNewMsgModal({ convId: newest.id, clientName });
-    }
-    const newSeen = [...new Set([...seenConvIds, ...currentIds])];
-    if (newSeen.length !== seenConvIds.length) {
-      setSeenConvIds(newSeen);
-      localStorage.setItem("partenaire_seen_convs", JSON.stringify(newSeen));
     }
   }, [allConversations, etablissement?.id, etablissement?.nom, seenConvIds, tab]);
 
@@ -289,7 +287,7 @@ export default function PartenaireDashboard() {
             {newOrderNotice}
           </div>
         )}
-        {tab === "home" && <PartenaireHome etablissement={etablissement} etablissementType={etablissementType} onNavigate={handleSetTab} />}
+        {tab === "home" && <PartenaireHome etablissement={etablissement} etablissementType={etablissementType} onNavigate={handleSetTab} messageBadge={unreadCount} />}
         {tab === "commandes" && !hasPharmacie && <CommandesManager type={etablissementType} etablissementId={etablissement.id} etablissementNom={etablissement.nom} />}
         {tab === "produits" && !hasPharmacie && <ProduitsManager type={etablissementType} etablissementId={etablissement.id} />}
         {tab === "livraisons" && hasPharmacie && <PharmacieLivraisons pharmacieId={etablissement.id} pharmacieNom={etablissement.nom} onNavigate={handleSetTab} />}

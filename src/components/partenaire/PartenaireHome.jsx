@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Package, ShoppingBag, MessageCircle, BarChart3, Store, Wallet, Loader2, CheckCircle, Clock, Truck, TrendingUp } from "lucide-react";
 
-export default function PartenaireHome({ etablissement, etablissementType, onNavigate }) {
+export default function PartenaireHome({ etablissement, etablissementType, onNavigate, messageBadge = 0 }) {
   const isRestaurant = etablissementType === "restaurant";
   const isPharmacie = etablissementType === "pharmacie";
   const entityName = isRestaurant ? "CommandeRestaurant" : "CommandeBoutique";
@@ -19,53 +19,52 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
     refetchInterval: 10000,
   });
 
-  // ── Pour les pharmacies : conversations & courses en temps réel ──
   const { data: pharmaConversations = [] } = useQuery({
     queryKey: ["conversations-pharmacie-home", etablissement?.id],
     queryFn: async () => {
       const all = await base44.entities.Conversation.list("-last_message_date", 100);
-      return (all || []).filter(c => {
+      return (all || []).filter((conv) => {
         try {
-          const parts = JSON.parse(c.participants || "[]");
-          return parts.some(p => p.type === "partenaire" && p.id === etablissement.id);
-        } catch { return false; }
+          const parts = JSON.parse(conv.participants || "[]");
+          return parts.some((p) => p.type === "partenaire" && p.id === etablissement.id);
+        } catch {
+          return false;
+        }
       });
     },
     enabled: isPharmacie && !!etablissement?.id,
-    refetchInterval: 10000,
+    refetchInterval: 5000,
   });
 
   const { data: pharmaCourses = [] } = useQuery({
     queryKey: ["courses-pharmacie-home", etablissement?.id],
     queryFn: async () => {
-      const pharma = await base44.entities.Pharmacie.get(etablissement.id);
-      const all = await base44.entities.CourseExterne.filter({ country_code: pharma.pays_code }, "-created_date", 50);
-      return (all || []).filter(c => c.expediteur_nom === etablissement.nom);
+      const pharmacie = await base44.entities.Pharmacie.get(etablissement.id);
+      const all = await base44.entities.CourseExterne.filter({ country_code: pharmacie.pays_code }, "-created_date", 80);
+      return (all || []).filter((course) => course.pharmacie_id === etablissement.id || course.expediteur_nom === etablissement.nom);
     },
     enabled: isPharmacie && !!etablissement?.id,
-    refetchInterval: 10000,
+    refetchInterval: 5000,
   });
 
-  // Stats du jour
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Pour les pharmacies, calculer les stats depuis les courses
-  const pharmaCoursesToday = pharmaCourses.filter(c => new Date(c.created_date) >= today);
-  const pharmaActiveCourses = pharmaCourses.filter(c => !["livree", "annulee"].includes(c.statut));
-  const pharmaLivreesToday = pharmaCoursesToday.filter(c => c.statut === "livree").length;
-  const pharmaEnLivraison = pharmaCourses.filter(c => ["livreur_en_route", "colis_recupere", "en_livraison"].includes(c.statut)).length;
-  const pharmaEnRecherche = pharmaCourses.filter(c => ["nouvelle", "recherche_livreur"].includes(c.statut)).length;
+  const pharmaCoursesToday = pharmaCourses.filter((course) => new Date(course.created_date) >= today);
+  const pharmaActiveCourses = pharmaCourses.filter((course) => !["livree", "annulee"].includes(course.statut));
+  const pharmaLivreesToday = pharmaCoursesToday.filter((course) => course.statut === "livree").length;
+  const pharmaEnLivraison = pharmaCourses.filter((course) => ["livreur_en_route", "colis_recupere", "en_livraison"].includes(course.statut)).length;
+  const pharmaEnRecherche = pharmaCourses.filter((course) => ["nouvelle", "recherche_livreur"].includes(course.statut)).length;
 
-  const commandesToday = isPharmacie ? pharmaCoursesToday : commandes.filter(c => new Date(c.created_date) >= today);
-  const revenusToday = isPharmacie ? 0 : commandesToday.filter(c => c.statut === "livree").reduce((sum, c) => sum + (c.total || 0), 0);
-  const enPreparation = isPharmacie ? pharmaEnRecherche : commandes.filter(c => c.statut === "en_preparation").length;
-  const enLivraison = isPharmacie ? pharmaEnLivraison : commandes.filter(c => ["livreur_assigne", "en_livraison"].includes(c.statut)).length;
-  const livreesToday = isPharmacie ? pharmaLivreesToday : commandesToday.filter(c => c.statut === "livree").length;
-  const annuleesToday = isPharmacie ? 0 : commandesToday.filter(c => c.statut === "annulee").length;
+  const commandesToday = isPharmacie ? pharmaCoursesToday : commandes.filter((commande) => new Date(commande.created_date) >= today);
+  const revenusToday = isPharmacie ? 0 : commandesToday.filter((commande) => commande.statut === "livree").reduce((sum, commande) => sum + (commande.total || 0), 0);
+  const enPreparation = isPharmacie ? pharmaEnRecherche : commandes.filter((commande) => commande.statut === "en_preparation").length;
+  const enLivraison = isPharmacie ? pharmaEnLivraison : commandes.filter((commande) => ["livreur_assigne", "en_livraison"].includes(commande.statut)).length;
+  const livreesToday = isPharmacie ? pharmaLivreesToday : commandesToday.filter((commande) => commande.statut === "livree").length;
+  const annuleesToday = isPharmacie ? 0 : commandesToday.filter((commande) => commande.statut === "annulee").length;
   const pendingCount = isPharmacie
     ? pharmaActiveCourses.length
-    : commandes.filter(c => !["livree", "annulee"].includes(c.statut)).length;
+    : commandes.filter((commande) => !["livree", "annulee"].includes(commande.statut)).length;
 
   const handleToggleOuvert = async () => {
     setToggling(true);
@@ -73,32 +72,38 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
       const eName = isPharmacie ? "Pharmacie" : isRestaurant ? "Restaurant" : "Boutique";
       await base44.entities[eName].update(etablissement.id, { ouvert: !etablissement.ouvert });
       queryClient.invalidateQueries({ queryKey: isPharmacie ? ["ma-pharmacie"] : isRestaurant ? ["mon-restaurant"] : ["ma-boutique"] });
-    } catch (err) {}
-    setToggling(false);
+    } catch {
+      // La UI sera rafraichie au prochain cycle.
+    } finally {
+      setToggling(false);
+    }
   };
 
   const cards = isPharmacie ? [
-    { id: "messages", icon: MessageCircle, label: "Messages", subtitle: "Discuter avec clients", bg: "bg-green-50", iconColor: "text-green-600", badge: pendingCount },
-    { id: "livraisons", icon: Truck, label: "Livraisons", subtitle: "Créer une livraison", bg: "bg-gray-100", iconColor: "text-gray-700" },
-    { id: "statistiques", icon: BarChart3, label: "Statistiques", subtitle: "Revenus & suivi", bg: "bg-amber-50", iconColor: "text-amber-600" },
+    { id: "messages", icon: MessageCircle, label: "Messages", subtitle: "Discuter avec clients", bg: "bg-green-50", iconColor: "text-green-600", badge: messageBadge },
+    { id: "livraisons", icon: Truck, label: "Livraisons", subtitle: "Creer une livraison", bg: "bg-blue-50", iconColor: "text-blue-700", badge: pendingCount },
+    { id: "statistiques", icon: BarChart3, label: "Statistiques", subtitle: "Revenus et suivi", bg: "bg-amber-50", iconColor: "text-amber-600" },
     { id: "infos", icon: Store, label: "Informations", subtitle: "Modifier la fiche", bg: "bg-pink-50", iconColor: "text-pink-600" },
     { id: "revenus", icon: Wallet, label: "Revenus", subtitle: "Suivi des paiements", bg: "bg-teal-50", iconColor: "text-teal-600" },
   ] : [
-    { id: "commandes", icon: Package, label: "Commandes", subtitle: "Gérer les commandes", bg: "bg-blue-50", iconColor: "text-blue-600", badge: pendingCount },
-    { id: "produits", icon: ShoppingBag, label: isRestaurant ? "Plats" : "Produits", subtitle: "Gérer le catalogue", bg: "bg-purple-50", iconColor: "text-purple-600" },
-    { id: "messages", icon: MessageCircle, label: "Messages", subtitle: "Discuter avec clients", bg: "bg-green-50", iconColor: "text-green-600" },
-    { id: "statistiques", icon: BarChart3, label: "Statistiques", subtitle: "Ventes & revenus", bg: "bg-amber-50", iconColor: "text-amber-600" },
+    { id: "commandes", icon: Package, label: "Commandes", subtitle: "Gerer les commandes", bg: "bg-blue-50", iconColor: "text-blue-600", badge: pendingCount },
+    { id: "produits", icon: ShoppingBag, label: isRestaurant ? "Plats" : "Produits", subtitle: "Gerer le catalogue", bg: "bg-purple-50", iconColor: "text-purple-600" },
+    { id: "messages", icon: MessageCircle, label: "Messages", subtitle: "Discuter avec clients", bg: "bg-green-50", iconColor: "text-green-600", badge: messageBadge },
+    { id: "statistiques", icon: BarChart3, label: "Statistiques", subtitle: "Ventes et revenus", bg: "bg-amber-50", iconColor: "text-amber-600" },
     { id: "infos", icon: Store, label: "Informations", subtitle: "Modifier la fiche", bg: "bg-pink-50", iconColor: "text-pink-600" },
     { id: "revenus", icon: Wallet, label: "Revenus", subtitle: "Suivi des paiements", bg: "bg-teal-50", iconColor: "text-teal-600" },
   ];
 
   if (isLoading) {
-    return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-purple-500" /></div>;
+    return (
+      <div className="flex justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+      </div>
+    );
   }
 
   return (
     <div className="space-y-4">
-      {/* ── Hero Card — style Uber Eats / Glovo Merchant ── */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -108,7 +113,6 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
         <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-white/5 rounded-full" />
 
         <div className="relative p-5 space-y-4">
-          {/* Status toggle */}
           <div className="flex items-center justify-between">
             <button
               onClick={handleToggleOuvert}
@@ -118,51 +122,39 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
               {toggling ? <Loader2 className="w-4 h-4 animate-spin" /> : (
                 <span className={"w-2.5 h-2.5 rounded-full " + (etablissement.ouvert ? "bg-green-400" : "bg-red-400")} />
               )}
-              {etablissement.ouvert ? "Ouvert" : "Fermé"}
+              {etablissement.ouvert ? "Ouvert" : "Ferme"}
             </button>
             <span className="text-xs text-white/70 capitalize">
               {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "short" })}
             </span>
           </div>
 
-          {/* Main stats */}
           <div className="grid grid-cols-3 gap-3">
-            <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-3 text-center">
-              <p className="text-2xl font-black leading-none">{isPharmacie ? pharmaConversations.length : commandesToday.length}</p>
-              <p className="text-[10px] text-white/70 font-medium mt-1">{isPharmacie ? "Conversations\nactives" : "Commandes\naujourd'hui"}</p>
-            </div>
-            <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-3 text-center">
-              <p className="text-2xl font-black leading-none">{isPharmacie ? pharmaActiveCourses.length : revenusToday.toLocaleString()}</p>
-              <p className="text-[10px] text-white/70 font-medium mt-1">{isPharmacie ? "Livraisons\nen cours" : "FCFA\n de ventes"}</p>
-            </div>
-            <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-3 text-center">
-              <p className="text-2xl font-black leading-none">{enPreparation}</p>
-              <p className="text-[10px] text-white/70 font-medium mt-1">{isPharmacie ? "En\nrecherche" : "En\npréparation"}</p>
-            </div>
+            <HeroStat value={isPharmacie ? pharmaConversations.length : commandesToday.length} label={isPharmacie ? "Conversations actives" : "Commandes aujourd'hui"} />
+            <HeroStat value={isPharmacie ? pharmaActiveCourses.length : revenusToday.toLocaleString()} label={isPharmacie ? "Livraisons en cours" : "FCFA de ventes"} />
+            <HeroStat value={enPreparation} label={isPharmacie ? "En recherche" : "En preparation"} />
           </div>
         </div>
       </motion.div>
 
-      {/* ── Quick stats row ── */}
       <div className="grid grid-cols-4 gap-2">
-        <QuickStat icon={CheckCircle} value={livreesToday} label={isPharmacie ? "Livrées" : "Livrées"} color="text-green-600" bg="bg-green-50" />
-        <QuickStat icon={Clock} value={enPreparation} label={isPharmacie ? "Recherche" : "Préparation"} color="text-orange-600" bg="bg-orange-50" />
+        <QuickStat icon={CheckCircle} value={livreesToday} label="Livrees" color="text-green-600" bg="bg-green-50" />
+        <QuickStat icon={Clock} value={enPreparation} label={isPharmacie ? "Recherche" : "Preparation"} color="text-orange-600" bg="bg-orange-50" />
         <QuickStat icon={Truck} value={enLivraison} label="En livraison" color="text-indigo-600" bg="bg-indigo-50" />
-        <QuickStat icon={MessageCircle} value={isPharmacie ? pharmaConversations.length : annuleesToday} label={isPharmacie ? "Messages" : "Annulées"} color={isPharmacie ? "text-purple-600" : "text-red-600"} bg={isPharmacie ? "bg-purple-50" : "bg-red-50"} />
+        <QuickStat icon={MessageCircle} value={isPharmacie ? pharmaConversations.length : annuleesToday} label={isPharmacie ? "Messages" : "Annulees"} color={isPharmacie ? "text-purple-600" : "text-red-600"} bg={isPharmacie ? "bg-purple-50" : "bg-red-50"} />
       </div>
 
-      {/* ── Navigation cards grid ── */}
       <div>
         <h2 className="text-sm font-bold text-gray-700 mb-3 px-1 flex items-center gap-1.5">
           <TrendingUp className="w-4 h-4 text-purple-500" /> Gestion
         </h2>
         <div className="grid grid-cols-2 gap-3">
-          {cards.map((card, i) => (
+          {cards.map((card, index) => (
             <motion.button
               key={card.id}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
+              transition={{ delay: index * 0.05 }}
               onClick={() => onNavigate(card.id)}
               className="relative bg-white rounded-2xl p-4 shadow-sm border border-gray-50 hover:shadow-md hover:border-gray-100 transition-all text-left group active:scale-95"
             >
@@ -180,6 +172,15 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+function HeroStat({ value, label }) {
+  return (
+    <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-3 text-center">
+      <p className="text-2xl font-black leading-none">{value}</p>
+      <p className="text-[10px] text-white/70 font-medium mt-1 leading-tight">{label}</p>
     </div>
   );
 }
