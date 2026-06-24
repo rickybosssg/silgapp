@@ -264,98 +264,52 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
         return;
       }
 
-      // 2. Livreur interne ou externe (chercher par email SANS filtrer sur validation/actif)
-      // D'abord par user_email, sinon par email (cas livreurs internes sans user_email renseigné)
-      let livreurs = await base44.entities.Livreur.filter({ user_email: user.email });
-      if (!mounted) return;
+      let effectiveRole = user.silgapp_role || null;
 
-      // Fallback : chercher aussi par champ email si user_email vide
-      if (!livreurs || livreurs.length === 0) {
-        try {
-          const byEmail = await base44.entities.Livreur.filter({ email: user.email });
-          if (byEmail && byEmail.length > 0) livreurs = byEmail;
-        } catch (_) {}
-      }
-      if (!mounted) return;
-
-      if (livreurs && livreurs.length > 0) {
-        const livreur = livreurs[0];
-
-        // Corriger silencieusement le user_email manquant pour les futures connexions
-        if (!livreur.user_email) {
-          base44.entities.Livreur.update(livreur.id, { user_email: user.email }).catch(() => {});
-        }
-
-        // Compte désactivé par l'admin
-        if (livreur.actif === false) {
-          setState("livreur_bloque");
-          return;
-        }
-
-        // Compte en attente de validation
-        if (livreur.validation === "en_attente") {
-          setState("livreur_en_attente");
-          return;
-        }
-
-        // Compte refusé
-        if (livreur.validation === "refuse") {
-          setState("livreur_refuse");
-          return;
-        }
-
-        // Compte valide → router vers l'app livreur
-        // L'obligation GPS est gérée par LivreurExterneOnboarding (écran GPS obligatoire)
-        registerPushToken(livreur.id, {
-          email: user.email,
-          user_email: user.email,
-          user_type: "livreur",
-          livreur_id: livreur.id,
-        }).catch(() => null);
-        onLivreur?.(livreur);
+      if (!effectiveRole) {
+        let livreurs = await base44.entities.Livreur.filter({ user_email: user.email });
         if (!mounted) return;
-        setState("livreur");
-        return;
+        if (!livreurs || livreurs.length === 0) {
+          try {
+            const byEmail = await base44.entities.Livreur.filter({ email: user.email });
+            if (byEmail && byEmail.length > 0) livreurs = byEmail;
+          } catch (_) {}
+        }
+        if (!mounted) return;
+
+        if (livreurs && livreurs.length > 0) {
+          effectiveRole = "livreur";
+          base44.auth.updateMe({ silgapp_role: "livreur" }).catch(() => {});
+        } else {
+          const clients = await base44.entities.ClientExterne.filter({ user_email: user.email });
+          if (!mounted) return;
+          if (clients && clients.length > 0) {
+            effectiveRole = "client";
+            base44.auth.updateMe({ silgapp_role: "client" }).catch(() => {});
+          } else {
+            const [boutiques, restaurants, pharmacies] = await Promise.all([
+              base44.entities.Boutique.filter({ user_email: user.email }).catch(() => []),
+              base44.entities.Restaurant.filter({ user_email: user.email }).catch(() => []),
+              base44.entities.Pharmacie.filter({ user_email: user.email }).catch(() => []),
+            ]);
+            if (!mounted) return;
+            if ((boutiques?.length > 0) || (restaurants?.length > 0) || (pharmacies?.length > 0)) {
+              effectiveRole = "partenaire";
+              base44.auth.updateMe({ silgapp_role: "partenaire" }).catch(() => {});
+            }
+          }
+        }
       }
-
-      // 3. Vérifier si un profil client existe déjà
-      let partenairePreference = false;
-      try {
-        partenairePreference =
-          localStorage.getItem("silgapp_preferred_role") === "partenaire" &&
-          localStorage.getItem("silgapp_preferred_role_email") === user.email;
-      } catch (_) {}
-
-      const [boutiquesPartenaire, restaurantsPartenaire] = await Promise.all([
-        base44.entities.Boutique.filter({ user_email: user.email }).catch(() => []),
-        base44.entities.Restaurant.filter({ user_email: user.email }).catch(() => []),
-      ]);
-      if (!mounted) return;
-
-      if (
-        partenairePreference ||
-        (boutiquesPartenaire && boutiquesPartenaire.length > 0) ||
-        (restaurantsPartenaire && restaurantsPartenaire.length > 0)
-      ) {
-        registerPushToken(null, {
-          email: user.email,
-          user_email: user.email,
-          user_type: "partenaire",
-        }).catch(() => null);
-        onPartenaire?.();
-        setState("partenaire");
-        return;
-      }
-
-      const clients = await base44.entities.ClientExterne.filter({
-        user_email: user.email
-      });
 
       if (!mounted) return;
 
-      // Si un profil client existe → router vers dashboard client
-      if (clients && clients.length > 0) {
-        const clientProfil = clients[0];
+      if (effectiveRole === "client") {
+        let clientProfil = null;
+        try {
+          const clients = await base44.entities.ClientExterne.filter({ user_email: user.email });
+          clientProfil = clients?.[0];
+        } catch (_) {}
+        if (!mounted) return;
         registerPushToken(null, {
           email: user.email,
           user_email: user.email,
@@ -367,7 +321,52 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
         return;
       }
 
-      // 4. Aucun profil → choix du rôle (Client ou Livreur)
+      if (effectiveRole === "livreur") {
+        let livreurs = await base44.entities.Livreur.filter({ user_email: user.email });
+        if (!mounted) return;
+        if (!livreurs || livreurs.length === 0) {
+          try {
+            const byEmail = await base44.entities.Livreur.filter({ email: user.email });
+            if (byEmail && byEmail.length > 0) livreurs = byEmail;
+          } catch (_) {}
+        }
+        if (!mounted) return;
+
+        if (livreurs && livreurs.length > 0) {
+          const livreur = livreurs[0];
+          if (!livreur.user_email) {
+            base44.entities.Livreur.update(livreur.id, { user_email: user.email }).catch(() => {});
+          }
+          if (livreur.actif === false) { setState("livreur_bloque"); return; }
+          if (livreur.validation === "en_attente") { setState("livreur_en_attente"); return; }
+          if (livreur.validation === "refuse") { setState("livreur_refuse"); return; }
+          registerPushToken(livreur.id, {
+            email: user.email,
+            user_email: user.email,
+            user_type: "livreur",
+            livreur_id: livreur.id,
+          }).catch(() => null);
+          onLivreur?.(livreur);
+          if (!mounted) return;
+          setState("livreur");
+          return;
+        }
+        setState("choix_role");
+        return;
+      }
+
+      if (effectiveRole === "partenaire") {
+        registerPushToken(null, {
+          email: user.email,
+          user_email: user.email,
+          user_type: "partenaire",
+        }).catch(() => null);
+        onPartenaire?.();
+        if (!mounted) return;
+        setState("partenaire");
+        return;
+      }
+
       setState("choix_role");
     }
 

@@ -33,6 +33,15 @@
         "NE"
       ],
       "description": "Code pays ISO de l'admin pays (ex: BF, CI). Vide si admin global."
+    },
+    "silgapp_role": {
+      "type": "string",
+      "enum": [
+        "client",
+        "livreur",
+        "partenaire"
+      ],
+      "description": "R\u00f4le m\u00e9tier SILGAPP persistant en base de donn\u00e9es. D\u00e9finit le dashboard affich\u00e9 : client, livreur ou partenaire. Ind\u00e9pendant du cache/localStorage \u2014 survit \u00e0 la d\u00e9sinstallation et au changement d'appareil."
     }
   }
 }
