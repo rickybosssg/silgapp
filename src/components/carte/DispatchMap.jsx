@@ -418,6 +418,8 @@ function buildStyles() {
     }
 
     /* ─── Zoom controls ─── */
+    .leaflet-overlay-pane svg { pointer-events: auto !important; }
+    .leaflet-container .leaflet-overlay-pane { z-index: 400 !important; }
     .leaflet-control-zoom { border: none !important; }
     .leaflet-control-zoom-in,
     .leaflet-control-zoom-out {
@@ -723,6 +725,7 @@ export default function DispatchMap({
           doubleClickZoom: true,
           dragging: true,
           keyboard: false,
+          preferCanvas: true,
         }).setView([position.latitude, position.longitude], position.zoom ?? 12);
 
         window.L.tileLayer(

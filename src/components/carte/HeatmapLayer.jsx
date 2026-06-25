@@ -214,7 +214,7 @@ export default function HeatmapLayer({
         fillColor,
         color: fillColor,
         weight: 0,
-        fillOpacity: 0.65,
+        fillOpacity: 1,
       }).addTo(heatGroup);
     });
 
