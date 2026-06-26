@@ -18,6 +18,19 @@
       "type": "string",
       "description": "ID ClientExterne du propri\u00e9taire"
     },
+    "proprietaire_livreur_id": {
+      "type": "string",
+      "description": "ID Livreur du propri\u00e9taire (si livreur)"
+    },
+    "proprietaire_type": {
+      "type": "string",
+      "enum": [
+        "client",
+        "livreur"
+      ],
+      "default": "client",
+      "description": "Type de propri\u00e9taire du code"
+    },
     "client_nouveau_id": {
       "type": "string",
       "description": "ID ClientExterne du nouveau client ayant utilis\u00e9 le code"

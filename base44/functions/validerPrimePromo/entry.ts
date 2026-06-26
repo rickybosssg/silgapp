@@ -10,6 +10,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
  * - Prix final >= 1000 FCFA
  * - Course statut = "livree"
  * - Prime fixe = 100 FCFA (réduction client + prime propriétaire)
+ * - Le propriétaire peut être un client OU un livreur
  */
 Deno.serve(async (req) => {
   try {
@@ -18,11 +19,9 @@ Deno.serve(async (req) => {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    // Peut être appelé manuellement avec course_id, ou via automation avec event.entity_id
     const course_id = body.course_id || body.event?.entity_id || body.data?.id;
     if (!course_id) return Response.json({ error: 'course_id requis' }, { status: 400 });
 
-    // Récupérer la course
     const courses = await base44.asServiceRole.entities.CourseExterne.filter({ id: course_id });
     const course = courses?.[0];
     if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
@@ -40,12 +39,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Trouver le client
-    const clients = await base44.asServiceRole.entities.ClientExterne.filter({
-      user_email: course.expediteur_client_id ? undefined : undefined,
-    });
-
-    // Chercher le client par téléphone de l'expéditeur
+    // Trouver le client par téléphone
     let client = null;
     if (course.expediteur_telephone) {
       const byPhone = await base44.asServiceRole.entities.ClientExterne.filter({ 
@@ -62,7 +56,6 @@ Deno.serve(async (req) => {
 
     if (!client) return Response.json({ success: false, reason: 'Client introuvable' });
 
-    // Vérifier que le client a un code promo et que c'est sa première course
     if (!client.code_promo_utilise || !client.code_promo_id) {
       return Response.json({ success: false, reason: 'Pas de code promo associé' });
     }
@@ -87,19 +80,21 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, reason: 'Code promo inactif ou introuvable' });
     }
 
-    // Calculer la répartition avec code promo
-    // Prix final > 1000 → réduction fixe 100 FCFA (pas 10% du total)
     const PRIME_FIXE = 100;
-    const prixClientPaye = prixFinal - PRIME_FIXE;       // Client paie prix - 100
-    const montantLivreur = Math.round(prixFinal * 0.70); // Livreur 70% du prix total
-    const commissionSilga = prixFinal - montantLivreur - PRIME_FIXE; // SILGAPP = reste
+    const prixClientPaye = prixFinal - PRIME_FIXE;
+    const montantLivreur = Math.round(prixFinal * 0.70);
+    const commissionSilga = prixFinal - montantLivreur - PRIME_FIXE;
+
+    const proprietaireType = codePromo.proprietaire_type || 'client';
 
     // Créer la PrimePromo
     const prime = await base44.asServiceRole.entities.PrimePromo.create({
       code_promo_id: codePromo.id,
       code_promo_code: codePromo.code,
       proprietaire_email: codePromo.proprietaire_email || null,
-      proprietaire_client_id: codePromo.proprietaire_client_id || null,
+      proprietaire_client_id: proprietaireType === 'client' ? (codePromo.proprietaire_client_id || null) : null,
+      proprietaire_livreur_id: proprietaireType === 'livreur' ? (codePromo.proprietaire_livreur_id || null) : null,
+      proprietaire_type: proprietaireType,
       client_nouveau_id: client.id,
       client_nouveau_nom: `${client.prenom || ''} ${client.nom || ''}`.trim(),
       course_id: course.id,
@@ -128,7 +123,24 @@ Deno.serve(async (req) => {
       montant_livreur: montantLivreur,
     });
 
-    console.log(`[validerPrimePromo] Prime validée: client=${client.id}, code=${codePromo.code}, prime=${PRIME_FIXE} FCFA`);
+    // 🎯 Si le propriétaire est un livreur, réduire son montant_du_silga de 100 FCFA
+    if (proprietaireType === 'livreur' && codePromo.proprietaire_livreur_id) {
+      try {
+        const livreurs = await base44.asServiceRole.entities.Livreur.filter({ id: codePromo.proprietaire_livreur_id });
+        const livreur = livreurs?.[0];
+        if (livreur) {
+          const nouveauMontantDu = Math.max(0, (livreur.montant_du_silga || 0) - PRIME_FIXE);
+          await base44.asServiceRole.entities.Livreur.update(livreur.id, {
+            montant_du_silga: nouveauMontantDu,
+          });
+          console.log(`[validerPrimePromo] Prime livreur ${livreur.id}: montant_du_silga réduit de ${PRIME_FIXE} FCFA (nouveau: ${nouveauMontantDu})`);
+        }
+      } catch (err) {
+        console.error(`[validerPrimePromo] Erreur crédit livreur:`, err);
+      }
+    }
+
+    console.log(`[validerPrimePromo] Prime validée: client=${client.id}, code=${codePromo.code}, proprietaire=${proprietaireType}, prime=${PRIME_FIXE} FCFA`);
 
     return Response.json({
       success: true,
@@ -138,6 +150,7 @@ Deno.serve(async (req) => {
       prix_client_paie: prixClientPaye,
       montant_livreur: montantLivreur,
       commission_silga: commissionSilga,
+      proprietaire_type: proprietaireType,
     });
 
   } catch (error) {

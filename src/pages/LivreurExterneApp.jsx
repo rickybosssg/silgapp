@@ -33,6 +33,7 @@ import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
 import PricingModeSelector from "@/components/livreur/PricingModeSelector";
 import PrixManuelReponseAlert from "@/components/livreur/PrixManuelReponseAlert";
 import MessagesPage from "@/components/chat/MessagesPage";
+import OngletCodePromoLivreur from "@/components/livreur/OngletCodePromoLivreur";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -1150,10 +1151,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   // ─── Dashboard principal ──────────────────────────────────────────────────
   const TABS = [
-    { id: "courses",    label: "Courses",    emoji: "🚴" },
-    { id: "historique", label: "Historique", emoji: "📋" },
-    { id: "messages",   label: "Messages",   emoji: "💬" },
-    { id: "infos",      label: "Mon profil", emoji: "👤" },
+    { id: "courses",    label: "Courses",     emoji: "🚴" },
+    { id: "historique", label: "Historique",  emoji: "📋" },
+    { id: "messages",   label: "Messages",    emoji: "💬" },
+    { id: "promo",      label: "Code Promo",  emoji: "🎁" },
+    { id: "infos",      label: "Mon profil",  emoji: "👤" },
   ];
 
   return (
@@ -1411,6 +1413,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             myName={`${livreurProfil?.prenom || ""} ${livreurProfil?.nom || ""}`.trim() || livreurProfil?.telephone}
             onBack={() => setActiveTab("courses")}
           />
+        )}
+
+        {activeTab === "promo" && (
+          <OngletCodePromoLivreur livreurProfil={livreurProfil} />
         )}
 
         {activeTab === "infos" && livreurProfil && (

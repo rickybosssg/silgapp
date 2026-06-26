@@ -25,10 +25,43 @@ function CreateCodeModal({ onClose, onCreated }) {
   const [proprietaireEmail, setProprietaireEmail] = useState("");
   const [countryCode, setCountryCode] = useState("BF");
   const [loading, setLoading] = useState(false);
+  const [proprietaireType, setProprietaireType] = useState("client"); // "client" | "livreur"
+  const [livreurSearch, setLivreurSearch] = useState("");
+  const [livreurResults, setLivreurResults] = useState([]);
+  const [selectedLivreur, setSelectedLivreur] = useState(null);
+  const [searching, setSearching] = useState(false);
+
+  const searchLivreurs = async (query) => {
+    setLivreurSearch(query);
+    if (!query || query.length < 2) { setLivreurResults([]); return; }
+    setSearching(true);
+    try {
+      const results = await base44.entities.Livreur.list("-created_date", 20);
+      const filtered = results.filter(l => {
+        const nom = `${l.prenom || ""} ${l.nom || ""}`.toLowerCase();
+        const tel = (l.telephone || "").toLowerCase();
+        return nom.includes(query.toLowerCase()) || tel.includes(query.toLowerCase());
+      });
+      setLivreurResults(filtered);
+    } catch {}
+    setSearching(false);
+  };
+
+  const selectLivreur = (livreur) => {
+    setSelectedLivreur(livreur);
+    setProprietaireNom(`${livreur.prenom || ""} ${livreur.nom || ""}`.trim());
+    setProprietaireEmail(livreur.user_email || "");
+    setLivreurSearch("");
+    setLivreurResults([]);
+  };
 
   const handleCreate = async () => {
     if (!code.trim() || !proprietaireNom.trim() || !countryCode) {
       toast.error("Code, nom propriétaire et pays sont obligatoires");
+      return;
+    }
+    if (proprietaireType === "livreur" && !selectedLivreur) {
+      toast.error("Sélectionnez un livreur dans les résultats de recherche");
       return;
     }
     setLoading(true);
@@ -40,9 +73,9 @@ function CreateCodeModal({ onClose, onCreated }) {
       return;
     }
 
-    // Chercher si le propriétaire a un ClientExterne
+    // Chercher si le propriétaire a un ClientExterne (si type client)
     let proprietaireClientId = null;
-    if (proprietaireEmail) {
+    if (proprietaireType === "client" && proprietaireEmail) {
       try {
         const clients = await base44.entities.ClientExterne.filter({ user_email: proprietaireEmail });
         if (clients?.length > 0) proprietaireClientId = clients[0].id;
@@ -53,7 +86,9 @@ function CreateCodeModal({ onClose, onCreated }) {
       code: code.trim().toUpperCase(),
       proprietaire_nom: proprietaireNom.trim(),
       proprietaire_email: proprietaireEmail.trim() || null,
-      proprietaire_client_id: proprietaireClientId,
+      proprietaire_client_id: proprietaireType === "client" ? proprietaireClientId : null,
+      proprietaire_livreur_id: proprietaireType === "livreur" ? (selectedLivreur?.id || null) : null,
+      proprietaire_type: proprietaireType,
       country_code: countryCode,
       actif: true,
       nb_inscrits: 0,
@@ -68,13 +103,86 @@ function CreateCodeModal({ onClose, onCreated }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md p-6 space-y-4">
+      <Card className="w-full max-w-md p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <h3 className="font-bold text-lg">Nouveau code promo</h3>
           <Button variant="ghost" size="icon" onClick={onClose}><X className="w-4 h-4" /></Button>
         </div>
 
         <div className="space-y-3">
+          {/* Type de propriétaire */}
+          <div>
+            <label className="text-xs font-bold text-gray-700 mb-1 block">Type de propriétaire *</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => { setProprietaireType("client"); setSelectedLivreur(null); }}
+                className={`h-10 rounded-lg border-2 text-sm font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                  proprietaireType === "client"
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-gray-200 hover:border-primary/40 text-gray-600"
+                }`}
+              >
+                👤 Client
+              </button>
+              <button
+                type="button"
+                onClick={() => setProprietaireType("livreur")}
+                className={`h-10 rounded-lg border-2 text-sm font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                  proprietaireType === "livreur"
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-gray-200 hover:border-primary/40 text-gray-600"
+                }`}
+              >
+                🏍️ Livreur
+              </button>
+            </div>
+          </div>
+
+          {/* Recherche livreur si type = livreur */}
+          {proprietaireType === "livreur" && (
+            <div>
+              <label className="text-xs font-bold text-gray-700 mb-1 block">Rechercher un livreur *</label>
+              <Input
+                value={livreurSearch}
+                onChange={e => searchLivreurs(e.target.value)}
+                placeholder="Nom ou téléphone..."
+                disabled={!!selectedLivreur}
+              />
+              {selectedLivreur ? (
+                <div className="mt-2 flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-2.5">
+                  <div>
+                    <p className="text-sm font-bold text-green-800">{selectedLivreur.prenom} {selectedLivreur.nom}</p>
+                    <p className="text-xs text-green-600">{selectedLivreur.telephone}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedLivreur(null); setProprietaireNom(""); setProprietaireEmail(""); }}
+                    className="text-red-500 hover:text-red-700 text-xs font-semibold"
+                  >
+                    Changer
+                  </button>
+                </div>
+              ) : (
+                livreurResults.length > 0 && (
+                  <div className="mt-2 space-y-1 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-1">
+                    {livreurResults.map(l => (
+                      <button
+                        key={l.id}
+                        type="button"
+                        onClick={() => selectLivreur(l)}
+                        className="w-full text-left p-2 rounded hover:bg-gray-100 transition-colors"
+                      >
+                        <p className="text-sm font-semibold">{l.prenom} {l.nom}</p>
+                        <p className="text-xs text-gray-500">{l.telephone} · {l.country_code}</p>
+                      </button>
+                    ))}
+                  </div>
+                )
+              )}
+            </div>
+          )}
+
           <div>
             <label className="text-xs font-bold text-gray-700 mb-1 block">Code promo *</label>
             <Input
@@ -86,12 +194,14 @@ function CreateCodeModal({ onClose, onCreated }) {
           </div>
           <div>
             <label className="text-xs font-bold text-gray-700 mb-1 block">Nom du propriétaire *</label>
-            <Input value={proprietaireNom} onChange={e => setProprietaireNom(e.target.value)} placeholder="ex: Aissam" />
+            <Input value={proprietaireNom} onChange={e => setProprietaireNom(e.target.value)} placeholder="ex: Aissam" disabled={proprietaireType === "livreur" && !!selectedLivreur} />
           </div>
-          <div>
-            <label className="text-xs font-bold text-gray-700 mb-1 block">Email du propriétaire (optionnel)</label>
-            <Input value={proprietaireEmail} onChange={e => setProprietaireEmail(e.target.value)} placeholder="email@exemple.com" type="email" />
-          </div>
+          {proprietaireType === "client" && (
+            <div>
+              <label className="text-xs font-bold text-gray-700 mb-1 block">Email du propriétaire (optionnel)</label>
+              <Input value={proprietaireEmail} onChange={e => setProprietaireEmail(e.target.value)} placeholder="email@exemple.com" type="email" />
+            </div>
+          )}
           <div>
             <label className="text-xs font-bold text-gray-700 mb-1 block">Pays *</label>
             <div className="grid grid-cols-4 gap-1.5">
@@ -115,7 +225,9 @@ function CreateCodeModal({ onClose, onCreated }) {
         </div>
 
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
-          💡 Le propriétaire gagnera <strong>100 FCFA fixe</strong> à chaque première course d'un client inscrit avec son code.
+          💡 {proprietaireType === "livreur" 
+            ? "Le livreur gagnera <strong>100 FCFA fixe</strong> déduits de son dû SILGAPP à chaque première course d'un client inscrit avec son code."
+            : "Le propriétaire gagnera <strong>100 FCFA fixe</strong> à chaque première course d'un client inscrit avec son code."}
         </div>
 
         <Button onClick={handleCreate} disabled={loading} className="w-full">
