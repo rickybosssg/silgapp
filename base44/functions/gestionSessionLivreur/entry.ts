@@ -28,6 +28,29 @@ Deno.serve(async (req) => {
 
     const livreur = livreurs[0];
     const now = new Date().toISOString();
+    const currentDeviceId = device_id || 'inconnu';
+
+    // Idempotence critique: le dashboard livreur peut être remonté après une fin
+    // de course. Si c'est le même appareil, on garde la session existante pour
+    // éviter d'expirer le heartbeat natif encore actif et de forcer une reconnexion.
+    if (livreur.session_active_id && livreur.session_active_device === currentDeviceId) {
+      await base44.asServiceRole.entities.Livreur.update(livreur.id, {
+        app_active: true,
+        background_active: true,
+        last_seen_at: now,
+      });
+
+      return Response.json({
+        success: true,
+        session_id: livreur.session_active_id,
+        device_id: currentDeviceId,
+        livreur_id: livreur.id,
+        ancienne_session_remplacee: false,
+        session_reused: true,
+        tokens_desactives: 0,
+      });
+    }
+
     const sessionId = `sess_${livreur.id}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
     // Si une session existait déjà, on la remplace (nouvelle connexion)
@@ -36,7 +59,7 @@ Deno.serve(async (req) => {
     // 1. Mettre à jour le livreur avec la nouvelle session
     await base44.asServiceRole.entities.Livreur.update(livreur.id, {
       session_active_id: sessionId,
-      session_active_device: device_id || 'inconnu',
+      session_active_device: currentDeviceId,
       session_active_date: now,
       app_active: true,
       background_active: true, // App native = foreground service actif
@@ -70,7 +93,7 @@ Deno.serve(async (req) => {
     await base44.asServiceRole.entities.DeviceSession.create({
       user_email: user.email,
       user_type: 'livreur',
-      device_id: device_id || `device_${Date.now()}`,
+      device_id: currentDeviceId || `device_${Date.now()}`,
       platform: plateforme || 'android',
       session_actif: true,
       app_active: true,
@@ -80,7 +103,7 @@ Deno.serve(async (req) => {
     console.log('[gestionSessionLivreur] Nouvelle session créée', {
       livreur_id: livreur.id,
       session_id: sessionId,
-      device_id: device_id,
+      device_id: currentDeviceId,
       ancienne_session: ancienneSession || 'aucune',
       tokens_desactives: deactivatedCount,
     });
@@ -88,7 +111,7 @@ Deno.serve(async (req) => {
     return Response.json({
       success: true,
       session_id: sessionId,
-      device_id: device_id || 'inconnu',
+      device_id: currentDeviceId,
       livreur_id: livreur.id,
       ancienne_session_remplacee: !!ancienneSession,
       tokens_desactives: deactivatedCount,

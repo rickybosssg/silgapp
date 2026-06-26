@@ -18,18 +18,35 @@ import {
   mergeMessageList,
 } from "@/lib/chatUtils";
 
+const PARTNER_TYPES = ["partner", "partenaire", "boutique", "restaurant", "pharmacie"];
+const normalizeParticipantType = (type) => PARTNER_TYPES.includes(type) ? "partenaire" : type;
+const participantBelongsToMe = (participant, myType, myId) => {
+  const type = normalizeParticipantType(participant?.type);
+  if (type !== normalizeParticipantType(myType)) return false;
+  const ids = [
+    participant?.id,
+    participant?.partner_id,
+    participant?.partenaire_id,
+    participant?.boutique_id,
+    participant?.restaurant_id,
+    participant?.pharmacie_id,
+    participant?.user_id,
+  ].filter(Boolean).map(String);
+  return ids.includes(String(myId));
+};
+
 function ConversationItem({ conv, myType, myId, active, onClick }) {
   const [otherParticipant, setOtherParticipant] = useState(null);
 
   useEffect(() => {
     try {
       const parts = JSON.parse(conv.participants || "[]");
-      const other = parts.find(p => !(p.type === myType && p.id === myId));
+      const other = parts.find(p => !participantBelongsToMe(p, myType, myId));
       setOtherParticipant(other || parts[0]);
     } catch { setOtherParticipant(null); }
   }, [conv, myType, myId]);
 
-  const roleKey = otherParticipant?.type || (conv.group_type === "group" ? "group" : "client");
+  const roleKey = normalizeParticipantType(otherParticipant?.type) || (conv.group_type === "group" ? "group" : "client");
 
   return (
     <button
@@ -269,7 +286,7 @@ export default function MessagesPage({ myType, myId, myName, onBack, initialConv
       const mine = all.filter(c => {
         try {
           const parts = JSON.parse(c.participants || "[]");
-          return parts.some(p => p.type === myType && p.id === myId);
+          return parts.some(p => participantBelongsToMe(p, myType, myId));
         } catch { return false; }
       });
       setConversations(mine);

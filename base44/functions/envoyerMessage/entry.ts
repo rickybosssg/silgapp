@@ -1,5 +1,40 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
+const PARTNER_TYPES = ['partner', 'partenaire', 'boutique', 'restaurant', 'pharmacie'];
+
+function normalizeActorType(type) {
+  return PARTNER_TYPES.includes(type) ? 'partenaire' : type;
+}
+
+async function getEntityById(asService, entityName, id) {
+  if (!id) return null;
+  try {
+    const direct = await asService.entities[entityName].get(id);
+    if (direct) return direct;
+  } catch (_) {}
+  try {
+    const rows = await asService.entities[entityName].filter({ id });
+    return rows?.[0] || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function participantMatches(participant, normalizedType, effectiveId, userId) {
+  const participantType = normalizeActorType(participant?.type);
+  if (participantType !== normalizedType) return false;
+  const ids = [
+    participant?.id,
+    participant?.partner_id,
+    participant?.partenaire_id,
+    participant?.boutique_id,
+    participant?.restaurant_id,
+    participant?.pharmacie_id,
+    participant?.user_id,
+  ].filter(Boolean).map(String);
+  return ids.includes(String(effectiveId)) || (userId && ids.includes(String(userId)));
+}
+
 /**
  * Envoi sécurisé d'un message de messagerie SILGAPP.
  *
@@ -35,9 +70,7 @@ Deno.serve(async (req) => {
     if (!sender_type || !sender_id) {
       return Response.json({ error: 'sender_type et sender_id sont requis' }, { status: 400 });
     }
-    const normalized_sender_type = ['partner', 'boutique', 'restaurant'].includes(sender_type)
-      ? 'partenaire'
-      : sender_type;
+    const normalized_sender_type = normalizeActorType(sender_type);
     let effective_sender_id = sender_id;
 
     // ── 1. Résoudre le VRAI nom et la photo depuis le profil ──
@@ -74,9 +107,9 @@ Deno.serve(async (req) => {
       realName = user.full_name || user.email || 'Admin';
       photoUrl = '';
     } else if (normalized_sender_type === 'partenaire') {
-      // Le partenaire est identifié par son établissement (Boutique ou Restaurant)
-      // sender_id = ID de la boutique ou du restaurant
-      // On vérifie que l'utilisateur authentifié est bien propriétaire de cet établissement
+      // Le partenaire est identifié par son établissement (Boutique, Restaurant ou Pharmacie).
+      // sender_id = ID de l'établissement. On vérifie que l'utilisateur authentifié
+      // est bien propriétaire de cet établissement.
       const boutiques = await base44.asServiceRole.entities.Boutique.filter({ user_email: user.email });
       const restaurants = await base44.asServiceRole.entities.Restaurant.filter({ user_email: user.email });
       const pharmacies = await base44.asServiceRole.entities.Pharmacie.filter({ user_email: user.email });
@@ -85,7 +118,7 @@ Deno.serve(async (req) => {
         ...(restaurants || []).map(r => ({ ...r, _kind: 'restaurant' })),
         ...(pharmacies || []).map(p => ({ ...p, _kind: 'pharmacie' })),
       ];
-      const etab = allEtabs.find(e => e.id === sender_id || e.partenaire_id === user.id || e.user_email === user.email);
+      const etab = allEtabs.find(e => e.id === sender_id || e.partenaire_id === sender_id || e.partenaire_id === user.id);
       if (etab) effective_sender_id = etab.id;
       if (!etab) {
         return Response.json({ error: 'Vous n\'êtes pas propriétaire de cet établissement' }, { status: 403 });
@@ -110,12 +143,16 @@ Deno.serve(async (req) => {
         isParticipant = c.expediteur_client_id === effective_sender_id || c.destinataire_client_id === effective_sender_id;
       } else if (normalized_sender_type === 'partenaire') {
         if (c.commande_boutique_id) {
-          const cmd = await base44.asServiceRole.entities.CommandeBoutique.get(c.commande_boutique_id).catch(() => null);
-          isParticipant = cmd?.boutique_id === effective_sender_id || cmd?.partenaire_id === user.id;
+          const cmd = await getEntityById(base44.asServiceRole, 'CommandeBoutique', c.commande_boutique_id);
+          isParticipant = cmd?.boutique_id === effective_sender_id || cmd?.partenaire_id === user.id || cmd?.partenaire_id === sender_id;
         }
         if (!isParticipant && c.commande_restaurant_id) {
-          const cmd = await base44.asServiceRole.entities.CommandeRestaurant.get(c.commande_restaurant_id).catch(() => null);
-          isParticipant = cmd?.restaurant_id === effective_sender_id || cmd?.partenaire_id === user.id;
+          const cmd = await getEntityById(base44.asServiceRole, 'CommandeRestaurant', c.commande_restaurant_id);
+          isParticipant = cmd?.restaurant_id === effective_sender_id || cmd?.partenaire_id === user.id || cmd?.partenaire_id === sender_id;
+        }
+        if (!isParticipant && c.commande_pharmacie_id) {
+          const cmd = await getEntityById(base44.asServiceRole, 'CommandePharmacie', c.commande_pharmacie_id);
+          isParticipant = cmd?.pharmacie_id === effective_sender_id || cmd?.partenaire_id === user.id || cmd?.partenaire_id === sender_id;
         }
       } else if (normalized_sender_type === 'admin') {
         isParticipant = true; // L'admin peut discuter dans toutes les courses
@@ -131,10 +168,9 @@ Deno.serve(async (req) => {
       const c = convs[0];
       let participants = [];
       try { participants = JSON.parse(c.participants || '[]'); } catch {}
-      const isParticipant = participants.some(p => {
-        const participantType = ['partner', 'boutique', 'restaurant'].includes(p.type) ? 'partenaire' : p.type;
-        return participantType === normalized_sender_type && p.id === effective_sender_id;
-      });
+      const isParticipant = participants.some(p =>
+        participantMatches(p, normalized_sender_type, effective_sender_id, user.id)
+      );
       if (!isParticipant) {
         return Response.json({ error: 'Vous n\'êtes pas participant de cette conversation' }, { status: 403 });
       }
@@ -203,14 +239,14 @@ Deno.serve(async (req) => {
     }
 
     // ── 5. Envoyer une notification push au partenaire si le message vient d'un client ──
-    if (conversation_id && sender_type === 'client') {
+    if (conversation_id && normalized_sender_type === 'client') {
       try {
         const convs = await base44.asServiceRole.entities.Conversation.filter({ id: conversation_id });
         if (convs && convs.length > 0) {
           const conv = convs[0];
           let participants = [];
           try { participants = JSON.parse(conv.participants || '[]'); } catch {}
-          const partenaire = participants.find(p => p.type === 'partenaire');
+          const partenaire = participants.find(p => normalizeActorType(p.type) === 'partenaire');
           if (partenaire) {
             const [boutiques, restaurants, pharmacies] = await Promise.all([
               base44.asServiceRole.entities.Boutique.filter({ id: partenaire.id }),

@@ -36,6 +36,21 @@ const PHARMACIE_ACTIVE_STATUSES = new Set([
   "en_livraison",
 ]);
 
+const PARTNER_PARTICIPANT_TYPES = ["partner", "partenaire", "boutique", "restaurant", "pharmacie"];
+function isCurrentPartnerParticipant(participant, etablissementId) {
+  if (!participant || !PARTNER_PARTICIPANT_TYPES.includes(participant.type)) return false;
+  const ids = [
+    participant.id,
+    participant.partner_id,
+    participant.partenaire_id,
+    participant.boutique_id,
+    participant.restaurant_id,
+    participant.pharmacie_id,
+    participant.user_id,
+  ].filter(Boolean).map(String);
+  return ids.includes(String(etablissementId));
+}
+
 export default function PartenaireDashboard() {
   const [user, setUser] = useState(null);
   const [tab, setTab] = useState("home");
@@ -120,7 +135,7 @@ export default function PartenaireDashboard() {
       return (all || []).filter(c => {
         try {
           const parts = JSON.parse(c.participants || "[]");
-          return parts.some(p => p.type === "partenaire" && p.id === etablissement.id);
+          return parts.some(p => isCurrentPartnerParticipant(p, etablissement.id));
         } catch {
           return false;
         }
