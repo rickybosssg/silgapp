@@ -111,11 +111,14 @@ function CreateCodeModal({ onClose, onCreated }) {
     }
 
     // Chercher si le propriétaire a un ClientExterne (si type client)
+    // Insensible à la casse — l'email User est toujours en minuscules
     let proprietaireClientId = null;
     if (proprietaireType === "client" && proprietaireEmail) {
       try {
-        const clients = await base44.entities.ClientExterne.filter({ user_email: proprietaireEmail });
-        if (clients?.length > 0) proprietaireClientId = clients[0].id;
+        const allClients = await base44.entities.ClientExterne.list("-created_date", 500);
+        const emailLower = proprietaireEmail.trim().toLowerCase();
+        const found = allClients.find(c => (c.user_email || "").toLowerCase() === emailLower || (c.email || "").toLowerCase() === emailLower);
+        if (found) proprietaireClientId = found.id;
       } catch {}
     }
 
