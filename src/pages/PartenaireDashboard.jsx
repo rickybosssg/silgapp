@@ -11,6 +11,7 @@ import ComptabilitePartenaire from "@/components/partenaire/ComptabilitePartenai
 import PartenaireHome from "@/components/partenaire/PartenaireHome";
 import PartenaireBottomNav from "@/components/partenaire/PartenaireBottomNav";
 import NewMessageModal from "@/components/partenaire/NewMessageModal";
+import OngletCodePromoPartenaire from "@/components/partenaire/OngletCodePromoPartenaire";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { registerPushToken } from "@/lib/notifications";
 
@@ -277,6 +278,7 @@ export default function PartenaireDashboard() {
             <MessagesPage myType="partenaire" myId={etablissement.id} myName={etablissement.nom} />
           </div>
         )}
+        {tab === "promo" && <OngletCodePromoPartenaire partenaireId={user.id} />}
         {tab === "statistiques" && <ComptabilitePartenaire type={etablissementType} />}
         {tab === "revenus" && <ComptabilitePartenaire type={etablissementType} />}
         {tab === "infos" && (

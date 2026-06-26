@@ -94,6 +94,7 @@ Deno.serve(async (req) => {
       proprietaire_email: codePromo.proprietaire_email || null,
       proprietaire_client_id: proprietaireType === 'client' ? (codePromo.proprietaire_client_id || null) : null,
       proprietaire_livreur_id: proprietaireType === 'livreur' ? (codePromo.proprietaire_livreur_id || null) : null,
+      proprietaire_partenaire_id: proprietaireType === 'partenaire' ? (codePromo.proprietaire_partenaire_id || null) : null,
       proprietaire_type: proprietaireType,
       client_nouveau_id: client.id,
       client_nouveau_nom: `${client.prenom || ''} ${client.nom || ''}`.trim(),

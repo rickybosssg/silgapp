@@ -30,6 +30,9 @@ function CreateCodeModal({ onClose, onCreated }) {
   const [livreurResults, setLivreurResults] = useState([]);
   const [selectedLivreur, setSelectedLivreur] = useState(null);
   const [searching, setSearching] = useState(false);
+  const [partenaireSearch, setPartenaireSearch] = useState("");
+  const [partenaireResults, setPartenaireResults] = useState([]);
+  const [selectedPartenaire, setSelectedPartenaire] = useState(null);
 
   const searchLivreurs = async (query) => {
     setLivreurSearch(query);
@@ -55,6 +58,36 @@ function CreateCodeModal({ onClose, onCreated }) {
     setLivreurResults([]);
   };
 
+  const searchPartenaires = async (query) => {
+    setPartenaireSearch(query);
+    if (!query || query.length < 2) { setPartenaireResults([]); return; }
+    setSearching(true);
+    try {
+      const [boutiques, restaurants, pharmacies] = await Promise.all([
+        base44.entities.Boutique.list("-created_date", 50),
+        base44.entities.Restaurant.list("-created_date", 50),
+        base44.entities.Pharmacie.list("-created_date", 50),
+      ]);
+      const q = query.toLowerCase();
+      const match = (e, type) => (e.nom || "").toLowerCase().includes(q) || (e.quartier || "").toLowerCase().includes(q);
+      const results = [
+        ...(boutiques || []).filter(e => match(e)).map(e => ({ ...e, _type: "boutique" })),
+        ...(restaurants || []).filter(e => match(e)).map(e => ({ ...e, _type: "restaurant" })),
+        ...(pharmacies || []).filter(e => match(e)).map(e => ({ ...e, _type: "pharmacie" })),
+      ];
+      setPartenaireResults(results.slice(0, 20));
+    } catch {}
+    setSearching(false);
+  };
+
+  const selectPartenaire = (etab) => {
+    setSelectedPartenaire(etab);
+    setProprietaireNom(etab.nom || "");
+    setProprietaireEmail(etab.user_email || "");
+    setPartenaireSearch("");
+    setPartenaireResults([]);
+  };
+
   const handleCreate = async () => {
     if (!code.trim() || !proprietaireNom.trim() || !countryCode) {
       toast.error("Code, nom propriétaire et pays sont obligatoires");
@@ -62,6 +95,10 @@ function CreateCodeModal({ onClose, onCreated }) {
     }
     if (proprietaireType === "livreur" && !selectedLivreur) {
       toast.error("Sélectionnez un livreur dans les résultats de recherche");
+      return;
+    }
+    if (proprietaireType === "partenaire" && !selectedPartenaire) {
+      toast.error("Sélectionnez un établissement dans les résultats de recherche");
       return;
     }
     setLoading(true);
@@ -88,6 +125,7 @@ function CreateCodeModal({ onClose, onCreated }) {
       proprietaire_email: proprietaireEmail.trim() || null,
       proprietaire_client_id: proprietaireType === "client" ? proprietaireClientId : null,
       proprietaire_livreur_id: proprietaireType === "livreur" ? (selectedLivreur?.id || null) : null,
+      proprietaire_partenaire_id: proprietaireType === "partenaire" ? (selectedPartenaire?.partenaire_id || null) : null,
       proprietaire_type: proprietaireType,
       country_code: countryCode,
       actif: true,
@@ -113,11 +151,11 @@ function CreateCodeModal({ onClose, onCreated }) {
           {/* Type de propriétaire */}
           <div>
             <label className="text-xs font-bold text-gray-700 mb-1 block">Type de propriétaire *</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
-                onClick={() => { setProprietaireType("client"); setSelectedLivreur(null); }}
-                className={`h-10 rounded-lg border-2 text-sm font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                onClick={() => { setProprietaireType("client"); setSelectedLivreur(null); setSelectedPartenaire(null); }}
+                className={`h-10 rounded-lg border-2 text-xs font-semibold flex items-center justify-center gap-1 transition-all ${
                   proprietaireType === "client"
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-gray-200 hover:border-primary/40 text-gray-600"
@@ -127,8 +165,8 @@ function CreateCodeModal({ onClose, onCreated }) {
               </button>
               <button
                 type="button"
-                onClick={() => setProprietaireType("livreur")}
-                className={`h-10 rounded-lg border-2 text-sm font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                onClick={() => { setProprietaireType("livreur"); setSelectedPartenaire(null); }}
+                className={`h-10 rounded-lg border-2 text-xs font-semibold flex items-center justify-center gap-1 transition-all ${
                   proprietaireType === "livreur"
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-gray-200 hover:border-primary/40 text-gray-600"
@@ -136,8 +174,63 @@ function CreateCodeModal({ onClose, onCreated }) {
               >
                 🏍️ Livreur
               </button>
+              <button
+                type="button"
+                onClick={() => { setProprietaireType("partenaire"); setSelectedLivreur(null); }}
+                className={`h-10 rounded-lg border-2 text-xs font-semibold flex items-center justify-center gap-1 transition-all ${
+                  proprietaireType === "partenaire"
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-gray-200 hover:border-primary/40 text-gray-600"
+                }`}
+              >
+                🏪 Partenaire
+              </button>
             </div>
           </div>
+
+          {/* Recherche partenaire si type = partenaire */}
+          {proprietaireType === "partenaire" && (
+            <div>
+              <label className="text-xs font-bold text-gray-700 mb-1 block">Rechercher un établissement *</label>
+              <Input
+                value={partenaireSearch}
+                onChange={e => searchPartenaires(e.target.value)}
+                placeholder="Nom de boutique, restaurant ou pharmacie..."
+                disabled={!!selectedPartenaire}
+              />
+              {selectedPartenaire ? (
+                <div className="mt-2 flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-2.5">
+                  <div>
+                    <p className="text-sm font-bold text-green-800">{selectedPartenaire.nom}</p>
+                    <p className="text-xs text-green-600 capitalize">{selectedPartenaire._type} · {selectedPartenaire.quartier || selectedPartenaire.ville || ""}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedPartenaire(null); setProprietaireNom(""); setProprietaireEmail(""); }}
+                    className="text-red-500 hover:text-red-700 text-xs font-semibold"
+                  >
+                    Changer
+                  </button>
+                </div>
+              ) : (
+                partenaireResults.length > 0 && (
+                  <div className="mt-2 space-y-1 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-1">
+                    {partenaireResults.map(e => (
+                      <button
+                        key={e.id}
+                        type="button"
+                        onClick={() => selectPartenaire(e)}
+                        className="w-full text-left p-2 rounded hover:bg-gray-100 transition-colors"
+                      >
+                        <p className="text-sm font-semibold">{e.nom}</p>
+                        <p className="text-xs text-gray-500 capitalize">{e._type} · {e.quartier || e.ville || ""}</p>
+                      </button>
+                    ))}
+                  </div>
+                )
+              )}
+            </div>
+          )}
 
           {/* Recherche livreur si type = livreur */}
           {proprietaireType === "livreur" && (
@@ -225,8 +318,10 @@ function CreateCodeModal({ onClose, onCreated }) {
         </div>
 
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
-          💡 {proprietaireType === "livreur" 
+          💡 {proprietaireType === "livreur"
             ? "Le livreur gagnera <strong>100 FCFA fixe</strong> déduits de son dû SILGAPP à chaque première course d'un client inscrit avec son code."
+            : proprietaireType === "partenaire"
+            ? "Le partenaire gagnera <strong>100 FCFA fixe</strong> à chaque première course d'un client inscrit avec son code."
             : "Le propriétaire gagnera <strong>100 FCFA fixe</strong> à chaque première course d'un client inscrit avec son code."}
         </div>
 
@@ -326,7 +421,9 @@ export default function CodePromoPanel() {
                       </Badge>
                       {pays && <span className="text-sm">{pays.emoji} {pays.nom}</span>}
                     </div>
-                    <p className="text-sm font-semibold text-foreground">👤 {c.proprietaire_nom}</p>
+                    <p className="text-sm font-semibold text-foreground">
+                      {c.proprietaire_type === "livreur" ? "🏍️" : c.proprietaire_type === "partenaire" ? "🏪" : "👤"} {c.proprietaire_nom}
+                    </p>
                     {c.proprietaire_email && <p className="text-xs text-muted-foreground">{c.proprietaire_email}</p>}
                     <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1"><Users className="w-3 h-3" />{c.nb_inscrits || 0} inscrits</span>
