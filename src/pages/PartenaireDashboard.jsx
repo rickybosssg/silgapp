@@ -11,6 +11,7 @@ import ComptabilitePartenaire from "@/components/partenaire/ComptabilitePartenai
 import PartenaireHome from "@/components/partenaire/PartenaireHome";
 import PartenaireBottomNav from "@/components/partenaire/PartenaireBottomNav";
 import NewMessageModal from "@/components/partenaire/NewMessageModal";
+import OngletCodePromoPartenaire from "@/components/partenaire/OngletCodePromoPartenaire";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { registerPushToken } from "@/lib/notifications";
 import { playNotificationSound } from "@/hooks/useSonEtVibration";
@@ -222,6 +223,12 @@ export default function PartenaireDashboard() {
 
   const loading = loadingBoutique || loadingRestaurant || loadingPharmacie;
 
+  const handleLogout = () => {
+    if (!window.confirm("Voulez-vous vraiment vous déconnecter ?")) return;
+    clearPersistedToken();
+    base44.auth.logout();
+  };
+
   if (!user || loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -246,7 +253,7 @@ export default function PartenaireDashboard() {
           <CreateChoice icon={UtensilsCrossed} title="Un Restaurant" text="Proposer un menu et des plats" onClick={() => setTab("restaurant_form")} color="orange" />
           <CreateChoice icon={Pill} title="Une Pharmacie" text="Discuter avec clients et livrer" onClick={() => setTab("pharmacie_form")} color="blueDark" />
 
-          <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="w-full text-sm text-gray-400 underline">
+          <button onClick={handleLogout} className="w-full text-sm text-gray-400 underline">
             Se deconnecter
           </button>
 
@@ -290,7 +297,7 @@ export default function PartenaireDashboard() {
               </div>
             </div>
           </div>
-          <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors">
+          <button onClick={handleLogout} className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors">
             <LogOut className="w-4 h-4" />
           </button>
         </div>
@@ -311,6 +318,7 @@ export default function PartenaireDashboard() {
             <MessagesPage myType="partenaire" myId={etablissement.id} myName={etablissement.nom} />
           </div>
         )}
+        {tab === "promo" && <OngletCodePromoPartenaire partenaireId={user.id} />}
         {tab === "statistiques" && <ComptabilitePartenaire type={etablissementType} />}
         {tab === "revenus" && <ComptabilitePartenaire type={etablissementType} />}
         {tab === "infos" && (

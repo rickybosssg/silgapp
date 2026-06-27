@@ -34,6 +34,7 @@ import PricingModeSelector from "@/components/livreur/PricingModeSelector";
 import PrixManuelReponseAlert from "@/components/livreur/PrixManuelReponseAlert";
 import { normalizeCommissionPct, splitAmountByCommission } from "@/lib/commissionUtils";
 import MessagesPage from "@/components/chat/MessagesPage";
+import OngletCodePromoLivreur from "@/components/livreur/OngletCodePromoLivreur";
 
 // Haversine — utilisée aussi pour le calcul de prix
 function calculerDistance(lat1, lng1, lat2, lng2) {
@@ -1127,6 +1128,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   };
 
   const handleLogout = () => {
+    if (!window.confirm("Voulez-vous vraiment vous déconnecter ?")) return;
     if (livreurProfil?.id) {
       saveLivreur(livreurProfil.id, { app_active: false }).catch(() => null);
     }
@@ -1178,6 +1180,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     { id: "courses", label: "Courses", emoji: "" },
     { id: "historique", label: "Historique", emoji: "" },
     { id: "messages", label: "Messages", emoji: "" },
+    { id: "promo", label: "Code Promo", emoji: "" },
     { id: "infos", label: "Mon profil", emoji: "" },
   ];
 
@@ -1436,6 +1439,10 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             myName={`${livreurProfil?.prenom || ""} ${livreurProfil?.nom || ""}`.trim() || livreurProfil?.telephone}
             onBack={() => setActiveTab("courses")}
           />
+        )}
+
+        {activeTab === "promo" && (
+          <OngletCodePromoLivreur livreur={livreurProfil} />
         )}
 
         {activeTab === "infos" && livreurProfil && (

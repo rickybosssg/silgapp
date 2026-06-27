@@ -192,9 +192,13 @@ export default function VenusChat({ onClose, countryContext }) {
       }).catch(() => null); // silencieux
     } catch (err) {
       console.error("Erreur envoi message:", err);
+      const errMsg = err?.message || "";
+      const isCreditError = /credit|quota|exhaust|limit|402|429/i.test(errMsg);
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Désolée, une erreur est survenue. Veuillez réessayer." },
+        { role: "assistant", content: isCreditError
+          ? "⚠️ **Service temporairement indisponible**\n\nNotre assistant VENUS est en maintenance. Veuillez réessayer plus tard ou contacter le support au **+226 66 92 51 90**."
+          : "Désolée, une erreur est survenue. Veuillez réessayer dans un instant." },
       ]);
       setLoading(false);
     }
@@ -233,8 +237,8 @@ export default function VenusChat({ onClose, countryContext }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-lg h-[600px] flex flex-col shadow-2xl overflow-hidden rounded-2xl bg-white" style={{backgroundColor: '#ffffff'}}>
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center sm:p-4">
+      <div className="w-full max-w-lg h-[100dvh] sm:h-[600px] sm:max-h-[90dvh] flex flex-col shadow-2xl overflow-hidden rounded-t-2xl sm:rounded-2xl bg-white" style={{backgroundColor: '#ffffff'}}>
 
         {/* Header */}
         <div className="p-4 border-b flex items-center justify-between bg-gradient-to-r from-primary via-blue-600 to-red-600">
@@ -350,8 +354,8 @@ export default function VenusChat({ onClose, countryContext }) {
           )}
         </div>
 
-        {/* Input */}
-        <div className="p-4 border-t" style={{backgroundColor: '#ffffff'}}>
+        {/* Input — reste visible même quand le clavier apparaît (Correction 3) */}
+        <div className="p-3 border-t flex-shrink-0" style={{backgroundColor: '#ffffff', paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)'}}>
           <div className="flex gap-2">
             <input
               value={input}

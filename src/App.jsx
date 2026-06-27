@@ -182,21 +182,28 @@ function AdminExterneRoutes() {
 }
 
 function AppContent() {
+  // ── Forcer le mode clair en permanence — SILGAPP reste lisible même si
+  //    le téléphone est en mode sombre (Correction 4) ──
+  useEffect(() => {
+    document.documentElement.classList.remove('dark');
+    document.documentElement.classList.add('light');
+    // Empêcher toute bascule ultérieure vers le mode sombre
+    const observer = new MutationObserver(() => {
+      if (document.documentElement.classList.contains('dark')) {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.add('light');
+      }
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+  
+  // Hook for Android hardware back button
   const navigate = useNavigate();
   const location = useLocation();
   const [livreurProfil, setLivreurProfil] = useState(null);
   const [isClient, setIsClient] = useState(false);
   const [isPartenaire, setIsPartenaire] = useState(false);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const applyTheme = (event) => {
-      document.documentElement.classList.toggle("dark", event.matches);
-    };
-    applyTheme(mediaQuery);
-    mediaQuery.addEventListener("change", applyTheme);
-    return () => mediaQuery.removeEventListener("change", applyTheme);
-  }, []);
 
   useEffect(() => {
     const handleBackButton = (event) => {

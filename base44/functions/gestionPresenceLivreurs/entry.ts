@@ -1,11 +1,12 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 /**
- * BALAYAGE AUTOMATIQUE DE PRÉSENCE LIVREURS
+ * Balayage automatique de présence livreurs.
  *
  * Exécuté toutes les 5 minutes.
- * Tout livreur disponible dont le dernier heartbeat dépasse 60 minutes
- * est automatiquement passé en hors_ligne et exclu du dispatch.
+ * Ne met plus automatiquement les livreurs hors_ligne.
+ * Seul le livreur lui-même peut se mettre hors_ligne depuis son app.
+ * Cette fonction collecte uniquement des statistiques de présence.
  */
 Deno.serve(async (req) => {
   try {
@@ -13,7 +14,6 @@ Deno.serve(async (req) => {
     const now = Date.now();
     const SEUIL_HORS_LIGNE_MIN = 60;
 
-    // Récupérer tous les livreurs externes disponibles
     const livreursDisponibles = await base44.asServiceRole.entities.Livreur.filter({
       type_livreur: 'externe',
       statut: 'disponible',
@@ -21,10 +21,15 @@ Deno.serve(async (req) => {
     }, '-updated_date', 500);
 
     if (!livreursDisponibles || livreursDisponibles.length === 0) {
-      return Response.json({ success: true, verifies: 0, marques_hors_ligne: 0, message: 'Aucun livreur disponible' });
+      return Response.json({
+        success: true,
+        verifies: 0,
+        inactifs_detectes: 0,
+        message: 'Aucun livreur disponible',
+      });
     }
 
-    const passesHorsLigne = [];
+    const inactifsDetectes = [];
     const maintenant = new Date();
 
     for (const livreur of livreursDisponibles) {
@@ -37,37 +42,31 @@ Deno.serve(async (req) => {
       const ageMin = (now - hb.getTime()) / 60000;
 
       if (ageMin > SEUIL_HORS_LIGNE_MIN) {
-        try {
-          await base44.asServiceRole.entities.Livreur.update(livreur.id, { statut: 'hors_ligne' });
-          passesHorsLigne.push({
-            id: livreur.id?.slice(-8),
-            nom: `${livreur.prenom || ''} ${livreur.nom}`.trim(),
-            age_min: Math.round(ageMin),
-            country_code: livreur.country_code,
-          });
-          console.log(`[PRESENCE] ${livreur.prenom || ''} ${livreur.nom} → hors_ligne (HB: ${Math.round(ageMin)} min)`);
-        } catch (err) {
-          console.error(`[PRESENCE] Échec mise hors_ligne ${livreur.id}:`, err.message);
-        }
+        inactifsDetectes.push({
+          id: livreur.id?.slice(-8),
+          nom: `${livreur.prenom || ''} ${livreur.nom || ''}`.trim(),
+          age_min: Math.round(ageMin),
+          country_code: livreur.country_code,
+        });
       }
     }
 
-    // Résumé par pays
     const parPays = {};
-    passesHorsLigne.forEach(l => {
-      const cc = l.country_code || 'INCONNU';
+    inactifsDetectes.forEach((livreur) => {
+      const cc = livreur.country_code || 'INCONNU';
       parPays[cc] = (parPays[cc] || 0) + 1;
     });
 
-    console.log(`[PRESENCE] Balayage terminé — ${passesHorsLigne.length} livreur(s) mis hors_ligne sur ${livreursDisponibles.length} vérifiés`);
+    console.log(`[PRESENCE] Balayage terminé - ${inactifsDetectes.length} livreur(s) inactif(s) détecté(s) sur ${livreursDisponibles.length} vérifiés (aucune mise à jour automatique)`);
 
     return Response.json({
       success: true,
       verifies: livreursDisponibles.length,
-      marques_hors_ligne: passesHorsLigne.length,
-      passes_hors_ligne: passesHorsLigne,
+      inactifs_detectes: inactifsDetectes.length,
+      inactifs: inactifsDetectes,
       par_pays: parPays,
       timestamp: maintenant.toISOString(),
+      note: 'Aucune mise à jour automatique - seul le livreur peut se mettre hors_ligne',
     });
   } catch (error) {
     console.error('[PRESENCE] Erreur:', error.message);

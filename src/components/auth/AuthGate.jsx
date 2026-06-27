@@ -224,6 +224,12 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
   const [loginError, setLoginError] = useState("");
   const [loginInfo, setLoginInfo] = useState("");
 
+  const handleConfirmedLogout = () => {
+    if (!window.confirm("Voulez-vous vraiment vous déconnecter ?")) return;
+    clearPersistedToken();
+    base44.auth.logout();
+  };
+
   useEffect(() => {
     let mounted = true;
 
@@ -679,7 +685,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
           </p>
           <p className="text-xs text-muted-foreground"> Support : +226 66 92 51 90</p>
           <button
-            onClick={() => { clearPersistedToken(); base44.auth.logout(); }}
+            onClick={handleConfirmedLogout}
             className="text-xs text-primary underline"
           >
             Se déconnecter
@@ -702,7 +708,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
           </p>
           <p className="text-xs text-muted-foreground"> Support : +226 66 92 51 90</p>
           <button
-            onClick={() => { clearPersistedToken(); base44.auth.logout(); }}
+            onClick={handleConfirmedLogout}
             className="text-xs text-primary underline"
           >
             Se déconnecter
@@ -725,7 +731,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
           </p>
           <p className="text-xs text-muted-foreground"> Support : +226 66 92 51 90</p>
           <button
-            onClick={() => { clearPersistedToken(); base44.auth.logout(); }}
+            onClick={handleConfirmedLogout}
             className="text-xs text-primary underline"
           >
             Se déconnecter

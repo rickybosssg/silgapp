@@ -65,6 +65,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, re
     return () => clearTimeout(timer);
   }, [location.pathname]);
   const logout = () => {
+    if (!window.confirm("Voulez-vous vraiment vous déconnecter ?")) return;
     ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
       try { localStorage.removeItem(k); } catch(_) {}
     });

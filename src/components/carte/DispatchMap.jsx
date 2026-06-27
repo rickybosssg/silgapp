@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Loader2, Globe } from "lucide-react";
 import HeatmapLayer from "./HeatmapLayer";
 import HeatmapControls from "./HeatmapControls";
@@ -8,19 +8,19 @@ import { useZonesChaudesHalos } from "./ZonesChaudes";
 import { isLibre, GPS_DISPATCH_SEUIL_MIN } from "@/lib/dispatchRules";
 
 /**
- * DispatchMap - Carte dediee au dispatch temps reel
+ * DispatchMap — Carte dédiée au dispatch temps réel
  *
  * Code couleur Livreurs :
- *   Vert   = Livreur libre (disponible + ON + GPS present)
- *    Orange = Livreur en course (mission active + ON + GPS present)
- *   Noir   = Inactif / non dispatchable (OFF, GPS expire, non valide)
+ *  🟢 Vert   = Livreur libre (disponible + ON + GPS présent)
+ *  🟠 Orange = Livreur en course (mission active + ON + GPS présent)
+ *  ⚫ Noir   = Inactif / non dispatchable (OFF, GPS expiré, non validé)
  *
  * Code couleur Clients :
- *   Bleu   = Client actif (GPS < 5 min)
- *   Jaune  = Client recent (GPS entre 5 et 15 min)
- *   Noir   = Client inactif (GPS > 15 min ou GPS absent)
+ *  🔵 Bleu   = Client actif (GPS < 5 min)
+ *  🟡 Jaune  = Client récent (GPS entre 5 et 15 min)
+ *  ⚫ Noir   = Client inactif (GPS > 15 min ou GPS absent)
  *
- *  Rouge = Course en attente (aucun livreur assign?)
+ * 🔴 Rouge = Course en attente (aucun livreur assigné)
  *
  * Filtres :
  *  - showClients     : afficher/masquer les clients
@@ -32,16 +32,16 @@ const GPS_CLIENT_ACTIF_SEUIL_MIN = 5;
 const GPS_CLIENT_RECENT_SEUIL_MIN = 15;
 
 /**
- * NOUVELLE REGLE : Disponibilite metier uniquement
+ * NOUVELLE RÈGLE : Disponibilité métier uniquement
  * 
- *  VERT = Libre (disponible + ON + valide + GPS)
- *   ORANGE = En course (course active reelle)
- *  NOIR = Hors ligne / non dispatchable
+ * 🟢 VERT = Libre (disponible + ON + validé + GPS)
+ * 🟠 ORANGE = En course (course active réelle)
+ * ⚫ NOIR = Hors ligne / non dispatchable
  * 
- *   IMPORTANT :
+ * ⚠️ IMPORTANT :
  * - GPS ancien N'EXCLUT PAS (reste vert)
  * - Heartbeat ancien N'EXCLUT PAS (reste vert)
- * - App fermee N'EXCLUT PAS (reste vert, recevra WhatsApp)
+ * - App fermée N'EXCLUT PAS (reste vert, recevra WhatsApp)
  * 
  * Un livreur vert signifie : "Disponible pour travailler et peut recevoir une course (SILGAPP ou WhatsApp)"
  */
@@ -50,9 +50,9 @@ function isLivreurNoir(livreur, livreurIdsEnCourseReelle) {
   if (livreur.statut === "hors_ligne") return true;
   if (livreur.actif === false) return true;
   if (livreur.validation !== "valide") return true;
-  //  En course = avec course ACTIVE (peu importe le statut DB)
+  // 🎯 En course = avec course ACTIVE (peu importe le statut DB)
   if (livreurIdsEnCourseReelle?.has(livreur.id)) return false;
-  // Disponible avec GPS = vert (meme si GPS/heartbeat ancien)
+  // Disponible avec GPS = vert (même si GPS/heartbeat ancien)
   if (livreur.statut === "disponible") return false;
   return true;
 }
@@ -86,8 +86,8 @@ function getLastGPSMin(entity) {
 }
 
 /**
- * Ajoute un leger offset aleatoire pour eviter le chevauchement des marqueurs
- * Offset max: ~5 metres (0.000045 degres)
+ * Ajoute un léger offset aléatoire pour éviter le chevauchement des marqueurs
+ * Offset max: ~5 mètres (0.000045 degrés)
  */
 function addMarkerOffset(lat, lng, index) {
   const offset = (Math.sin(index * 1.5) * 0.000045);
@@ -96,7 +96,7 @@ function addMarkerOffset(lat, lng, index) {
 
 function buildStyles() {
   return `
-    /* --- Livreur LIBRE ( vert) --- */
+    /* ─── Livreur LIBRE (🟢 vert) ─── */
     .dmap-livreur-libre .dmap-ring {
       background: rgba(22, 163, 74, 0.3);
       animation: dmap-pulse-vert 2s ease-out infinite;
@@ -109,7 +109,7 @@ function buildStyles() {
       background: linear-gradient(135deg, #16a34a 0%, #059669 100%);
     }
 
-    /* --- Livreur EN COURSE (  orange) --- */
+    /* ─── Livreur EN COURSE (🟠 orange) ─── */
     .dmap-livreur-course .dmap-ring {
       background: rgba(234, 88, 12, 0.3);
       animation: dmap-pulse-orange 2s ease-out infinite;
@@ -122,7 +122,7 @@ function buildStyles() {
       background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
     }
 
-    /* --- Livreur NOIR ( hors ligne) --- */
+    /* ─── Livreur NOIR (⚫ hors ligne) ─── */
     .dmap-livreur-noir .dmap-ring {
       background: rgba(0, 0, 0, 0.3);
     }
@@ -137,7 +137,7 @@ function buildStyles() {
       opacity: 0.85;
     }
 
-    /* --- Client ACTIF ( bleu) --- */
+    /* ─── Client ACTIF (🔵 bleu) ─── */
     .dmap-client-actif .dmap-client-ring {
       background: rgba(37, 99, 235, 0.25);
       animation: dmap-pulse-bleu 2s ease-out infinite;
@@ -148,7 +148,7 @@ function buildStyles() {
       box-shadow: 0 2px 8px rgba(37, 99, 235, 0.45);
     }
 
-    /* --- Client RECENT ( jaune/orange) --- */
+    /* ─── Client RÉCENT (🟡 jaune/orange) ─── */
     .dmap-client-recent .dmap-client-ring {
       background: rgba(234, 179, 8, 0.25);
       animation: dmap-pulse-jaune 2s ease-out infinite;
@@ -159,7 +159,7 @@ function buildStyles() {
       box-shadow: 0 2px 8px rgba(234, 179, 8, 0.45);
     }
 
-    /* --- Client INACTIF ( noir) --- */
+    /* ─── Client INACTIF (⚫ noir) ─── */
     .dmap-client-inactif .dmap-client-ring {
       background: rgba(0, 0, 0, 0.3);
     }
@@ -172,7 +172,7 @@ function buildStyles() {
       opacity: 0.85;
     }
 
-    /* --- Course en attente ( rouge) --- */
+    /* ─── Course en attente (🔴 rouge) ─── */
     .dmap-course-wrapper {
       position: relative;
       width: 44px;
@@ -209,7 +209,7 @@ function buildStyles() {
       z-index: 9999 !important;
     }
 
-    /* --- Partenaire BOUTIQUE ( violet) --- */
+    /* ─── Partenaire BOUTIQUE (🟣 violet) ─── */
     .dmap-partenaire-boutique .dmap-partenaire-ring {
       background: rgba(139, 92, 246, 0.3);
       animation: dmap-pulse-violet 2.5s ease-out infinite;
@@ -222,7 +222,7 @@ function buildStyles() {
       background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
     }
 
-    /* --- Partenaire RESTAURANT ( rose) --- */
+    /* ─── Partenaire RESTAURANT (🩷 rose) ─── */
     .dmap-partenaire-restaurant .dmap-partenaire-ring {
       background: rgba(236, 72, 153, 0.3);
       animation: dmap-pulse-rose 2.5s ease-out infinite;
@@ -235,20 +235,20 @@ function buildStyles() {
       background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
     }
 
-    /* --- Partenaire PHARMACIE (bleu fonce) --- */
+    /* ─── Partenaire PHARMACIE (🔵 bleu foncé) ─── */
     .dmap-partenaire-pharmacie .dmap-partenaire-ring {
-      background: rgba(30, 58, 138, 0.28);
-      animation: dmap-pulse-pharmacie 2.5s ease-out infinite;
+      background: rgba(30, 58, 138, 0.3);
+      animation: dmap-pulse-bleu-fonce 2.5s ease-out infinite;
     }
     .dmap-partenaire-pharmacie .dmap-partenaire-body {
       border-color: #1e3a8a;
       box-shadow: 0 2px 10px rgba(30, 58, 138, 0.4);
     }
     .dmap-partenaire-pharmacie .dmap-partenaire-avatar-bg {
-      background: linear-gradient(135deg, #2563eb 0%, #1e3a8a 100%);
+      background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
     }
 
-    /* --- Structure commune partenaire --- */
+    /* ─── Structure commune partenaire ─── */
     .dmap-partenaire-wrapper {
       position: relative;
       width: 48px;
@@ -303,7 +303,7 @@ function buildStyles() {
       opacity: 0.6;
     }
 
-    /* --- Animations --- */
+    /* ─── Animations ─── */
     @keyframes dmap-pulse-vert {
       0%   { transform: scale(0.5); opacity: 1; }
       100% { transform: scale(1.6); opacity: 0; }
@@ -332,12 +332,12 @@ function buildStyles() {
       0%   { transform: scale(0.5); opacity: 1; }
       100% { transform: scale(1.5); opacity: 0; }
     }
-    @keyframes dmap-pulse-pharmacie {
+    @keyframes dmap-pulse-bleu-fonce {
       0%   { transform: scale(0.5); opacity: 1; }
       100% { transform: scale(1.5); opacity: 0; }
     }
 
-    /* --- Structure commune livreur --- */
+    /* ─── Structure commune livreur ─── */
     .dmap-livreur-wrapper {
       position: relative;
       width: 52px;
@@ -381,7 +381,7 @@ function buildStyles() {
       font-size: 16px;
     }
 
-    /* --- Structure client --- */
+    /* ─── Structure client ─── */
     .dmap-client-wrapper {
       position: relative;
       width: 44px;
@@ -405,7 +405,7 @@ function buildStyles() {
       z-index: 1;
     }
 
-    /* --- Containers Leaflet --- */
+    /* ─── Containers Leaflet ─── */
     .dmap-livreur-container,
     .dmap-client-container {
       transition: filter 0.2s ease;
@@ -417,7 +417,9 @@ function buildStyles() {
       z-index: 9999 !important;
     }
 
-    /* --- Zoom controls --- */
+    /* ─── Zoom controls ─── */
+    .leaflet-overlay-pane svg { pointer-events: auto !important; }
+    .leaflet-container .leaflet-overlay-pane { z-index: 400 !important; }
     .leaflet-control-zoom { border: none !important; }
     .leaflet-control-zoom-in,
     .leaflet-control-zoom-out {
@@ -434,7 +436,7 @@ function buildStyles() {
       transition: all 0.2s !important;
     }
 
-    /* --- Badge legende en overlay --- */
+    /* ─── Badge légende en overlay ─── */
     .dmap-overlay-badge {
       background: rgba(255,255,255,0.95);
       backdrop-filter: blur(8px);
@@ -448,7 +450,7 @@ function buildStyles() {
 
 function buildLivreurIcon(livreur, livreurIdsEnCourseReelle) {
   const estNoir = isLivreurNoir(livreur, livreurIdsEnCourseReelle);
-  //  CORRECTION : Libre = disponible + GPS < 10 min, En course = course active reelle
+  // 🎯 CORRECTION : Libre = disponible + GPS < 10 min, En course = course active réelle
   const libre = isLibre(livreur);
   const estEnCourse = livreurIdsEnCourseReelle?.has(livreur.id);
   const cssClass = estNoir ? "dmap-livreur-noir" : (estEnCourse ? "dmap-livreur-course" : "dmap-livreur-libre");
@@ -490,35 +492,35 @@ function buildClientIcon(client) {
 
 function buildLivreurPopup(livreur, livreurIdsEnCourseReelle) {
   const estNoir = isLivreurNoir(livreur, livreurIdsEnCourseReelle);
-  //  CORRECTION : Statut base sur course active reelle
+  // 🎯 CORRECTION : Statut basé sur course active réelle
   const estEnCourse = livreurIdsEnCourseReelle?.has(livreur.id);
   const libre = isLibre(livreur);
   const statutLabel = estNoir
-    ? " Hors ligne - non dispatchable"
-    : estEnCourse ? "  En course" : " Libre - disponible";
+    ? "⚫ Hors ligne — non dispatchable"
+    : estEnCourse ? "🟠 En course" : "🟢 Libre — disponible";
   const gpsMin = getLastGPSMin(livreur);
-  const gpsStr = gpsMin === null ? "?" : gpsMin < 1 ? "a l'instant" : `${gpsMin} min`;
+  const gpsStr = gpsMin === null ? "?" : gpsMin < 1 ? "à l'instant" : `${gpsMin} min`;
   const statutColor = estNoir ? "#374151" : (estEnCourse ? "#ea580c" : "#16a34a");
   
-  // Qualite GPS
+  // Qualité GPS
   let gpsQuality = "";
   if (gpsMin !== null) {
-    if (gpsMin < 2) gpsQuality = " Excellent";
-    else if (gpsMin < 5) gpsQuality = " Bon";
-    else if (gpsMin < 15) gpsQuality = " Moyen";
-    else if (gpsMin < 30) gpsQuality = " Faible";
-    else gpsQuality = " Expire";
+    if (gpsMin < 2) gpsQuality = "❤️ Excellent";
+    else if (gpsMin < 5) gpsQuality = "💚 Bon";
+    else if (gpsMin < 15) gpsQuality = "🧡 Moyen";
+    else if (gpsMin < 30) gpsQuality = "❤️‍🩹 Faible";
+    else gpsQuality = "❤️‍🔥 Expiré";
   }
   
   return `
     <div style="min-width:210px;font-family:sans-serif;padding:4px 0">
       <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#1a1a1a">${livreur.prenom || ""} ${livreur.nom || ""}</p>
       <p style="font-size:12px;margin:2px 0;color:${statutColor}">${statutLabel}</p>
-      ${livreur.telephone ? `<p style="font-size:12px;margin:2px 0;color:#444"> ${livreur.telephone}</p>` : ""}
-      <p style="font-size:12px;margin:2px 0;color:#6b7280"> GPS il y a ${gpsStr}</p>
-      ${gpsQuality ? `<p style="font-size:11px;margin:2px 0;color:#999">Qualite: ${gpsQuality}</p>` : ""}
-      ${livreur.vehicule ? `<p style="font-size:12px;margin:2px 0;color:#888"> ${livreur.vehicule}</p>` : ""}
-      ${livreur.validation !== "valide" ? `<p style="font-size:11px;margin:2px 0;color:#f59e0b">  Validation: ${livreur.validation || "en attente"}</p>` : ""}
+      ${livreur.telephone ? `<p style="font-size:12px;margin:2px 0;color:#444">📞 ${livreur.telephone}</p>` : ""}
+      <p style="font-size:12px;margin:2px 0;color:#6b7280">📍 GPS il y a ${gpsStr}</p>
+      ${gpsQuality ? `<p style="font-size:11px;margin:2px 0;color:#999">Qualité: ${gpsQuality}</p>` : ""}
+      ${livreur.vehicule ? `<p style="font-size:12px;margin:2px 0;color:#888">🏍 ${livreur.vehicule}</p>` : ""}
+      ${livreur.validation !== "valide" ? `<p style="font-size:11px;margin:2px 0;color:#f59e0b">⚠️ Validation: ${livreur.validation || "en attente"}</p>` : ""}
     </div>
   `;
 }
@@ -526,12 +528,12 @@ function buildLivreurPopup(livreur, livreurIdsEnCourseReelle) {
 function getRaisonInactif(livreur) {
   const raisons = [];
   if (livreur.statut === "hors_ligne") raisons.push("hors ligne");
-  if (livreur.validation !== "valide") raisons.push("non valide");
-  if (!livreur.actif) raisons.push("bloque");
+  if (livreur.validation !== "valide") raisons.push("non validé");
+  if (!livreur.actif) raisons.push("bloqué");
   const dt = livreur.last_seen_at || livreur.derniere_position_date;
   if (dt) {
     const min = Math.round((Date.now() - new Date(dt).getTime()) / 60000);
-    if (min > GPS_DISPATCH_SEUIL_MIN) raisons.push(`GPS expire ${min} min`);
+    if (min > GPS_DISPATCH_SEUIL_MIN) raisons.push(`GPS expiré ${min} min`);
   }
   if (!livreur.latitude || !livreur.longitude) raisons.push("pas de GPS");
   return raisons.length > 0 ? `(${raisons.join(", ")})` : "";
@@ -555,15 +557,15 @@ function buildCoursePopup(course) {
   const age = course.created_date
     ? Math.round((Date.now() - new Date(course.created_date).getTime()) / 60000)
     : null;
-  const ageStr = age === null ? "" : age < 1 ? "a l'instant" : `il y a ${age} min`;
+  const ageStr = age === null ? "" : age < 1 ? "à l'instant" : `il y a ${age} min`;
   return `
     <div style="min-width:210px;font-family:sans-serif;padding:4px 0">
-      <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#dc2626"> Course en attente</p>
-      ${course.client_nom ? `<p style="font-size:12px;margin:2px 0;color:#444"> ${course.client_nom}</p>` : ""}
-      ${course.client_telephone ? `<p style="font-size:12px;margin:2px 0;color:#444"> ${course.client_telephone}</p>` : ""}
-      ${course.adresse_depart ? `<p style="font-size:12px;margin:2px 0;color:#444"> Depart : ${course.adresse_depart}</p>` : ""}
-      ${course.adresse_arrivee ? `<p style="font-size:12px;margin:2px 0;color:#888"> Arrivee : ${course.adresse_arrivee}</p>` : ""}
-      ${ageStr ? `<p style="font-size:11px;margin:4px 0 0 0;color:#dc2626;font-weight:600"> Creee ${ageStr}</p>` : ""}
+      <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#dc2626">🔴 Course en attente</p>
+      ${course.client_nom ? `<p style="font-size:12px;margin:2px 0;color:#444">👤 ${course.client_nom}</p>` : ""}
+      ${course.client_telephone ? `<p style="font-size:12px;margin:2px 0;color:#444">📞 ${course.client_telephone}</p>` : ""}
+      ${course.adresse_depart ? `<p style="font-size:12px;margin:2px 0;color:#444">📍 Départ : ${course.adresse_depart}</p>` : ""}
+      ${course.adresse_arrivee ? `<p style="font-size:12px;margin:2px 0;color:#888">🏁 Arrivée : ${course.adresse_arrivee}</p>` : ""}
+      ${ageStr ? `<p style="font-size:11px;margin:4px 0 0 0;color:#dc2626;font-weight:600">⏱ Créée ${ageStr}</p>` : ""}
     </div>
   `;
 }
@@ -594,21 +596,21 @@ function buildPartenaireIcon(partenaire) {
 function buildPartenairePopup(partenaire) {
   const isBoutique = partenaire._type === "boutique";
   const isPharmacie = partenaire._type === "pharmacie";
-  const typeLabel = isPharmacie ? "Pharmacie" : isBoutique ? "Boutique" : "Restaurant";
+  const typeLabel = isPharmacie ? "💊 Pharmacie" : isBoutique ? "🏪 Boutique" : "🍽️ Restaurant";
   const typeColor = isPharmacie ? "#1e3a8a" : isBoutique ? "#8b5cf6" : "#ec4899";
   const statutLabel = partenaire.ouvert === false
-    ? '<span style="color:#dc2626;font-weight:600">Ferme</span>'
-    : '<span style="color:#16a34a;font-weight:600">Ouvert</span>';
+    ? '<span style="color:#dc2626;font-weight:600">🔴 Fermé</span>'
+    : '<span style="color:#16a34a;font-weight:600">🟢 Ouvert</span>';
   return `
     <div style="min-width:220px;font-family:sans-serif;padding:4px 0">
       <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#1a1a1a">${partenaire.nom || ""}</p>
       <p style="font-size:12px;margin:2px 0;color:${typeColor};font-weight:600">${typeLabel}</p>
       <p style="font-size:12px;margin:2px 0">${statutLabel}</p>
-      ${partenaire.adresse ? `<p style="font-size:12px;margin:2px 0;color:#6b7280">Adresse: ${partenaire.adresse}</p>` : ""}
-      ${partenaire.quartier ? `<p style="font-size:12px;margin:2px 0;color:#6b7280">Quartier: ${partenaire.quartier}</p>` : ""}
+      ${partenaire.adresse ? `<p style="font-size:12px;margin:2px 0;color:#6b7280">📍 ${partenaire.adresse}</p>` : ""}
+      ${partenaire.quartier ? `<p style="font-size:12px;margin:2px 0;color:#6b7280">📌 ${partenaire.quartier}</p>` : ""}
       ${partenaire.ville ? `<p style="font-size:11px;margin:2px 0;color:#9ca3af">${partenaire.ville}</p>` : ""}
-      ${partenaire.telephone ? `<p style="font-size:12px;margin:2px 0;color:#444">Tel: ${partenaire.telephone}</p>` : ""}
-      ${partenaire._commandes_en_attente > 0 ? `<p style="font-size:12px;margin:4px 0 0 0;color:#dc2626;font-weight:600">${partenaire._commandes_en_attente} commande(s) en attente</p>` : ""}
+      ${partenaire.telephone ? `<p style="font-size:12px;margin:2px 0;color:#444">📞 ${partenaire.telephone}</p>` : ""}
+      ${partenaire._commandes_en_attente > 0 ? `<p style="font-size:12px;margin:4px 0 0 0;color:#dc2626;font-weight:600">📦 ${partenaire._commandes_en_attente} commande(s) en attente</p>` : ""}
     </div>
   `;
 }
@@ -616,12 +618,12 @@ function buildPartenairePopup(partenaire) {
 function buildClientPopup(client) {
   const statut = getClientStatut(client);
   const gpsMin = getLastGPSMin(client);
-  const gpsStr = gpsMin === null ? "?" : gpsMin < 1 ? "a l'instant" : `${gpsMin} min`;
+  const gpsStr = gpsMin === null ? "?" : gpsMin < 1 ? "à l'instant" : `${gpsMin} min`;
   
   const statutLabels = {
-    actif: " Client actif - GPS recent",
-    recent: " Client recent - GPS > 5 min",
-    inactif: " Hors ligne - non dispatchable",
+    actif: "🔵 Client actif — GPS récent",
+    recent: "🟡 Client récent — GPS > 5 min",
+    inactif: "⚫ Hors ligne — non dispatchable",
   };
   
   const statutColors = {
@@ -630,24 +632,24 @@ function buildClientPopup(client) {
     inactif: "#374151",
   };
   
-  // Qualite GPS
+  // Qualité GPS
   let gpsQuality = "";
   if (gpsMin !== null) {
-    if (gpsMin < 2) gpsQuality = " Excellent";
-    else if (gpsMin < 5) gpsQuality = " Bon";
-    else if (gpsMin < 15) gpsQuality = " Moyen";
-    else if (gpsMin < 30) gpsQuality = " Faible";
-    else gpsQuality = " Expire";
+    if (gpsMin < 2) gpsQuality = "❤️ Excellent";
+    else if (gpsMin < 5) gpsQuality = "💚 Bon";
+    else if (gpsMin < 15) gpsQuality = "🧡 Moyen";
+    else if (gpsMin < 30) gpsQuality = "❤️‍🩹 Faible";
+    else gpsQuality = "❤️‍🔥 Expiré";
   }
   
   return `
     <div style="min-width:210px;font-family:sans-serif;padding:4px 0">
       <p style="font-weight:700;font-size:14px;margin:0 0 4px 0;color:#1a1a1a">${client.prenom || ""} ${client.nom || ""}</p>
       <p style="font-size:12px;margin:2px 0;color:${statutColors[statut]}">${statutLabels[statut]}</p>
-      ${client.telephone ? `<p style="font-size:12px;margin:2px 0;color:#444"> ${client.telephone}</p>` : ""}
-      <p style="font-size:12px;margin:2px 0;color:#6b7280"> GPS il y a ${gpsStr}</p>
-      ${gpsQuality ? `<p style="font-size:11px;margin:2px 0;color:#999">Qualite: ${gpsQuality}</p>` : ""}
-      ${client.quartier ? `<p style="font-size:12px;margin:2px 0;color:#888"> ${client.quartier}</p>` : ""}
+      ${client.telephone ? `<p style="font-size:12px;margin:2px 0;color:#444">📞 ${client.telephone}</p>` : ""}
+      <p style="font-size:12px;margin:2px 0;color:#6b7280">📍 GPS il y a ${gpsStr}</p>
+      ${gpsQuality ? `<p style="font-size:11px;margin:2px 0;color:#999">Qualité: ${gpsQuality}</p>` : ""}
+      ${client.quartier ? `<p style="font-size:12px;margin:2px 0;color:#888">📌 ${client.quartier}</p>` : ""}
     </div>
   `;
 }
@@ -662,13 +664,13 @@ export default function DispatchMap({
   heatmapMode = "off", // "off" | "demande" | "couverture" | "opportunite"
   countryCode = "",
   onCountryChange,
-  zonesChaudesData = [], // zones pour les halos colores
-  masquerInactifs = false, // prop controlee depuis le parent
+  zonesChaudesData = [], // zones pour les halos colorés
+  masquerInactifs = false, // prop contrôlée depuis le parent
   showClients = true, // filtre : afficher les clients
   showLivreurs = true, // filtre : afficher les livreurs
-  partenaires = [], //  partenaires (boutiques + restaurants) ? afficher
+  partenaires = [], // 🏪🍽️ partenaires (boutiques + restaurants) à afficher
   showPartenaires = true, // filtre : afficher les partenaires
-  livreurIdsEnCourseReelle = new Set(), //  IDs des livreurs avec course active reelle
+  livreurIdsEnCourseReelle = new Set(), // 🎯 IDs des livreurs avec course active réelle
 }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -691,11 +693,11 @@ export default function DispatchMap({
 
     const inject = () => {
       if (cancelled) {
-        console.log("[DispatchMap] Injection annulee - composant demonte");
+        console.log("[DispatchMap] Injection annulée — composant démonté");
         return;
       }
       if (!mapRef.current || !document.body.contains(mapRef.current)) {
-        console.warn("[DispatchMap] Container DOM indisponible ou detache - annulation injection");
+        console.warn("[DispatchMap] Container DOM indisponible ou détaché — annulation injection");
         return;
       }
       
@@ -709,7 +711,7 @@ export default function DispatchMap({
       }
 
       if (!window.L) {
-        console.error("[DispatchMap] window.L non disponible apres chargement script");
+        console.error("[DispatchMap] window.L non disponible après chargement script");
         return;
       }
 
@@ -723,6 +725,7 @@ export default function DispatchMap({
           doubleClickZoom: true,
           dragging: true,
           keyboard: false,
+          preferCanvas: true,
         }).setView([position.latitude, position.longitude], position.zoom ?? 12);
 
         window.L.tileLayer(
@@ -734,7 +737,7 @@ export default function DispatchMap({
 
         mapInstanceRef.current = map;
         setMapLoaded(true);
-        console.log("[DispatchMap] Carte initialisee avec succes");
+        console.log("[DispatchMap] Carte initialisée avec succès");
       } catch (error) {
         console.error("[DispatchMap] Erreur initialisation carte:", error);
       }
@@ -753,16 +756,16 @@ export default function DispatchMap({
       script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
       script.onload = () => {
         if (cancelled) {
-          console.log("[DispatchMap] Script Leaflet charge apres demontage - ignore");
+          console.log("[DispatchMap] Script Leaflet chargé après démontage — ignoré");
           return;
         }
-        console.log("[DispatchMap] Script Leaflet charge");
+        console.log("[DispatchMap] Script Leaflet chargé");
         inject();
       };
       script.onerror = () => console.error("[DispatchMap] Erreur chargement script Leaflet");
       document.head.appendChild(script);
     } else {
-      console.log("[DispatchMap] Leaflet deja charge");
+      console.log("[DispatchMap] Leaflet déjà chargé");
       inject();
     }
 
@@ -779,10 +782,10 @@ export default function DispatchMap({
   // Halos zones chaudes
   useZonesChaudesHalos(mapInstanceRef.current, mapLoaded, zonesChaudesData);
 
-  // Heatmap layer - gere directement par le composant HeatmapLayer
-  // Pas besoin d'effet separe, le composant HeatmapLayer gere son propre cycle de vie
+  // Heatmap layer - géré directement par le composant HeatmapLayer
+  // Pas besoin d'effet séparé, le composant HeatmapLayer gère son propre cycle de vie
 
-  // Mise a jour des marqueurs
+  // Mise à jour des marqueurs
   useEffect(() => {
     if (!mapInstanceRef.current || !mapLoaded) return;
     const map = mapInstanceRef.current;
@@ -790,7 +793,7 @@ export default function DispatchMap({
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
 
-    //  Courses en attente (toujours affichees)
+    // 🔴 Courses en attente (toujours affichées)
     let markerIndex = 0;
     courses.forEach(course => {
       const lat = course.gps_depart_lat;
@@ -804,9 +807,9 @@ export default function DispatchMap({
       markersRef.current.push(marker);
     });
 
-    //   Livreurs (filtres par showLivreurs)
+    // 🟢🟠⚫ Livreurs (filtrés par showLivreurs)
     if (showLivreurs) {
-      // Livreurs NOIRS (hors ligne) - zIndex bas
+      // Livreurs NOIRS (hors ligne) — zIndex bas
       livreurs.forEach(livreur => {
         if (!livreur.latitude || !livreur.longitude) return;
         const estNoir = isLivreurNoir(livreur, livreurIdsEnCourseReelle);
@@ -830,7 +833,7 @@ export default function DispatchMap({
         if (estNoir) return;
         const icon = buildLivreurIcon(livreur, livreurIdsEnCourseReelle);
         const [lat, lng] = addMarkerOffset(livreur.latitude, livreur.longitude, markerIndex++);
-        //  CORRECTION : zIndex base sur course active reelle
+        // 🎯 CORRECTION : zIndex basé sur course active réelle
         const estEnCourse = livreurIdsEnCourseReelle?.has(livreur.id);
         const marker = window.L.marker([lat, lng], {
           icon,
@@ -842,9 +845,9 @@ export default function DispatchMap({
       });
     }
 
-    //  Clients (filtres par showClients)
+    // 🔵🟡⚫ Clients (filtrés par showClients)
     if (showClients) {
-      // Clients INACTIFS (NOIRS) - zIndex bas
+      // Clients INACTIFS (NOIRS) — zIndex bas
       clients.forEach(client => {
         if (!client.latitude || !client.longitude) return;
         const statut = getClientStatut(client);
@@ -861,7 +864,7 @@ export default function DispatchMap({
         markersRef.current.push(marker);
       });
 
-      // Clients ACTIFS et RECENTS (BLEUS/JAUNES) - zIndex haut
+      // Clients ACTIFS et RÉCENTS (BLEUS/JAUNES) — zIndex haut
       clients.forEach(client => {
         if (!client.latitude || !client.longitude) return;
         const statut = getClientStatut(client);
@@ -878,7 +881,7 @@ export default function DispatchMap({
       });
     }
 
-    //  Partenaires (boutiques violet + restaurants rose)
+    // 🏪🍽️ Partenaires (boutiques violet + restaurants rose)
     if (showPartenaires) {
       partenaires.forEach(partenaire => {
         if (!partenaire.latitude || !partenaire.longitude) return;
@@ -895,7 +898,7 @@ export default function DispatchMap({
     }
   }, [livreurs, clients, courses, partenaires, mapLoaded, masquerInactifs, showClients, showLivreurs, showPartenaires, livreurIdsEnCourseReelle]);
 
-  //  Compteurs - utilise livreurIdsEnCourseReelle pour "en course"
+  // 🎯 Compteurs — utilise livreurIdsEnCourseReelle pour "en course"
   const nbLibres = livreurs.filter(l => isLibre(l)).length;
   const nbCourse = livreurs.filter(l => livreurIdsEnCourseReelle?.has(l.id) && !isLivreurNoir(l, livreurIdsEnCourseReelle)).length;
   const nbLivreursInactifs = livreurs.filter(l => isLivreurNoir(l, livreurIdsEnCourseReelle)).length;
@@ -908,7 +911,7 @@ export default function DispatchMap({
   const nbPartenairesRestaurants = partenaires.filter(p => p._type === "restaurant" && p.latitude && p.longitude).length;
   const nbPartenairesPharmacies = partenaires.filter(p => p._type === "pharmacie" && p.latitude && p.longitude).length;
   
-  // Points heatmap pour legende
+  // Points heatmap pour légende
   const nbPointsDemande = clients.filter(c => c.latitude && c.longitude).length + 
                           courses.filter(c => c.gps_depart_lat && c.gps_depart_lng).length;
   const nbPointsCouverture = livreurs.filter(l => 
@@ -941,7 +944,7 @@ export default function DispatchMap({
       {/* Overlay controls */}
       {mapLoaded && (
         <>
-          {/* Stats + legende (top-left) */}
+          {/* Stats + légende (top-left) */}
           <div className="absolute top-4 left-4 z-[1000] space-y-2">
             <div className="dmap-overlay-badge">
               <div className="space-y-1 text-xs font-medium">
@@ -972,59 +975,59 @@ export default function DispatchMap({
                 {showClients && nbClientsRecents > 0 && (
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-yellow-500 flex-shrink-0" />
-                    <span className="text-yellow-700">{nbClientsRecents} recent{nbClientsRecents > 1 ? "s" : ""} (5-15 min)</span>
+                    <span className="text-yellow-700">{nbClientsRecents} récent{nbClientsRecents > 1 ? "s" : ""} (5-15 min)</span>
                   </div>
                 )}
                 {!masquerInactifs && showLivreurs && nbLivreursInactifs > 0 && (
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-gray-400 flex-shrink-0" />
-                    <span className="text-gray-700 font-medium"> {nbLivreursInactifs} livreur{nbLivreursInactifs > 1 ? "s" : ""} inactif{nbLivreursInactifs > 1 ? "s" : ""}</span>
+                    <span className="text-gray-700 font-medium">⚫ {nbLivreursInactifs} livreur{nbLivreursInactifs > 1 ? "s" : ""} inactif{nbLivreursInactifs > 1 ? "s" : ""}</span>
                   </div>
                 )}
                 {!masquerInactifs && showClients && nbClientsInactifs > 0 && (
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-gray-400 flex-shrink-0" />
-                    <span className="text-gray-700 font-medium"> {nbClientsInactifs} client{nbClientsInactifs > 1 ? "s" : ""} inactif{nbClientsInactifs > 1 ? "s" : ""}</span>
+                    <span className="text-gray-700 font-medium">⚫ {nbClientsInactifs} client{nbClientsInactifs > 1 ? "s" : ""} inactif{nbClientsInactifs > 1 ? "s" : ""}</span>
                   </div>
                 )}
                 {showPartenaires && nbPartenairesBoutiques > 0 && (
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-violet-500 flex-shrink-0" />
-                    <span className="text-violet-700 font-medium"> {nbPartenairesBoutiques} boutique{nbPartenairesBoutiques > 1 ? "s" : ""}</span>
+                    <span className="text-violet-700 font-medium">🏪 {nbPartenairesBoutiques} boutique{nbPartenairesBoutiques > 1 ? "s" : ""}</span>
                   </div>
                 )}
                 {showPartenaires && nbPartenairesRestaurants > 0 && (
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-pink-500 flex-shrink-0" />
-                    <span className="text-pink-700 font-medium"> {nbPartenairesRestaurants} restaurant{nbPartenairesRestaurants > 1 ? "s" : ""}</span>
+                    <span className="text-pink-700 font-medium">🍽️ {nbPartenairesRestaurants} restaurant{nbPartenairesRestaurants > 1 ? "s" : ""}</span>
                   </div>
                 )}
                 {showPartenaires && nbPartenairesPharmacies > 0 && (
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-blue-900 flex-shrink-0" />
-                    <span className="text-blue-900 font-medium"> {nbPartenairesPharmacies} pharmacie{nbPartenairesPharmacies > 1 ? "s" : ""}</span>
+                    <span className="text-blue-900 font-medium">💊 {nbPartenairesPharmacies} pharmacie{nbPartenairesPharmacies > 1 ? "s" : ""}</span>
                   </div>
                 )}
                 {courses.length === 0 && nbLivreursVisibles === 0 && nbClientsVisibles === 0 && (
-                  <span className="text-gray-400">Aucun element visible</span>
+                  <span className="text-gray-400">Aucun élément visible</span>
                 )}
               </div>
             </div>
             
-            {/* Legende GPS qualite */}
+            {/* Légende GPS qualité */}
             <div className="dmap-overlay-badge text-xs text-slate-500 space-y-1">
-              <div className="font-semibold text-slate-700 mb-1">Qualite GPS</div>
-              <div> &lt;2 min -  2-5 min -  5-15 min</div>
-              <div> 15-30 min -  &gt;30 min</div>
-              <div className="text-gray-400"> Noir = non dispatchable</div>
+              <div className="font-semibold text-slate-700 mb-1">Qualité GPS</div>
+              <div>❤️ &lt;2 min · 💚 2-5 min · 🧡 5-15 min</div>
+              <div>❤️‍🩹 15-30 min · ❤️‍🔥 &gt;30 min</div>
+              <div className="text-gray-400">⚫ Noir = non dispatchable</div>
             </div>
           </div>
 
-          {/* Controles heatmap + legende (top-right) */}
+          {/* Contrôles heatmap + légende (top-right) */}
           <div className="absolute top-4 right-4 z-[1000] space-y-2">
             {showHeatmapHint && heatmapModeLocal === "off" && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 shadow-lg animate-in fade-in slide-in-from-top-2">
-                <p className="text-xs font-semibold text-blue-800 mb-1"> Nouveau !</p>
+                <p className="text-xs font-semibold text-blue-800 mb-1">✨ Nouveau !</p>
                 <p className="text-xs text-blue-700">Essayez les cartes thermiques pour analyser la demande et la couverture</p>
                 <button 
                   onClick={() => setShowHeatmapHint(false)}
@@ -1042,7 +1045,7 @@ export default function DispatchMap({
               courses={courses}
             />
             
-            {/* Legende contextuelle detaillee */}
+            {/* Légende contextuelle détaillée */}
             <HeatmapLegend
               mode={heatmapModeLocal}
               clients={clients}
@@ -1051,7 +1054,7 @@ export default function DispatchMap({
             />
           </div>
 
-          {/* Selecteur pays (bottom-left) */}
+          {/* Sélecteur pays (bottom-left) */}
           {onCountryChange && (
             <div className="absolute bottom-4 left-4 z-[1000]">
               <div className="dmap-overlay-badge" style={{ colorScheme: "light" }}>
@@ -1074,4 +1077,3 @@ export default function DispatchMap({
     </div>
   );
 }
-

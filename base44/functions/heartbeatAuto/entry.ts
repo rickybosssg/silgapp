@@ -104,13 +104,25 @@ Deno.serve(async (req) => {
       const livreurs = await base44.asServiceRole.entities.Livreur.filter({ user_email: user.email });
       if (livreurs && livreurs.length > 0) {
         const livreur = livreurs[0];
-        await base44.asServiceRole.entities.Livreur.update(livreur.id, {
+        const updateData = {
           latitude: latitude || livreur.latitude,
           longitude: longitude || livreur.longitude,
           last_seen_at: now,
           app_active: app_active,
           background_active: background_active,
-        });
+        };
+
+        // 🔄 Remontée automatique : si le livreur est hors_ligne (mais pas désactivé par admin
+        // ni en course), un heartbeat récent prouve qu'il est actif → repasser en disponible
+        if (livreur.statut === 'hors_ligne' && livreur.admin_hors_ligne !== true) {
+          updateData.statut = 'disponible';
+          console.log('[heartbeatAuto] 🔄 Remontée hors_ligne → disponible', {
+            livreur_id: livreur.id,
+            nom: `${livreur.prenom || ''} ${livreur.nom}`.trim(),
+          });
+        }
+
+        await base44.asServiceRole.entities.Livreur.update(livreur.id, updateData);
       }
     }
 

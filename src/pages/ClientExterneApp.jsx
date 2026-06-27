@@ -688,6 +688,7 @@ export default function ClientExterneApp() {
           </div>
           <button
             onClick={() => {
+              if (!window.confirm("Voulez-vous vraiment vous déconnecter ?")) return;
               try { localStorage.removeItem("silgapp_client_session_id"); } catch {}
               { clearPersistedToken(); base44.auth.logout(); };
               setTimeout(() => window.location.reload(), 300);

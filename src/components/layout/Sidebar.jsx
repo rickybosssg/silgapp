@@ -12,6 +12,7 @@ import { useAdminContext } from "@/hooks/useAdminContext.js";
 import { PAYS_SILGAPP } from "@/components/international/CountrySelector.jsx";
 
 const doLogout = () => {
+  if (!window.confirm("Voulez-vous vraiment vous déconnecter ?")) return;
   ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
     try { localStorage.removeItem(k); } catch(_) {}
   });
