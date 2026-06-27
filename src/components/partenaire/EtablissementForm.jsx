@@ -100,107 +100,236 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
     setSaving(false);
   };
 
+  const typeLabel = isPharmacie ? "Pharmacie" : isRestaurant ? "Restaurant" : "Boutique";
+  const typeIcon = isPharmacie ? "💊" : isRestaurant ? "🍽️" : "🏪";
+  const accentColor = isPharmacie ? "from-blue-600 to-cyan-600" : isRestaurant ? "from-orange-500 to-red-500" : "from-purple-600 to-pink-600";
+
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
-      <h2 className="font-bold text-gray-900 text-sm">{existing ? "Modifier" : "Créer"} {isPharmacie ? "la pharmacie" : isRestaurant ? "le restaurant" : "la boutique"}</h2>
-      {existing && !existing.actif && !isAdmin && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
-          <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-xs font-bold text-red-700">Établissement bloqué</p>
-            <p className="text-xs text-red-600">Votre établissement est actuellement bloqué. Veuillez contacter SILGAPP pour plus d'informations.</p>
+    <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
+      {/* ── Header premium ── */}
+      <div className={`bg-gradient-to-r ${accentColor} px-6 py-5`}>
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center text-2xl">
+            {typeIcon}
           </div>
-        </div>
-      )}
-      <div>
-        <Label className="text-xs">Logo / Photo</Label>
-        <div className="flex items-center gap-3 mt-1">
-          {form.logo_url && <img src={form.logo_url} alt="logo" className="w-16 h-16 rounded-xl object-cover" />}
-          <label className="cursor-pointer">
-            <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" disabled={uploading} />
-            <div className="px-4 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 flex items-center gap-2">
-              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-              {form.logo_url ? "Changer" : "Télécharger"}
-            </div>
-          </label>
-        </div>
-      </div>
-      <div><Label className="text-xs">Nom *</Label><Input value={form.nom} onChange={e => set("nom", e.target.value)} placeholder="Nom" className="mt-1" /></div>
-      <div><Label className="text-xs">Description</Label><Textarea value={form.description} onChange={e => set("description", e.target.value)} placeholder="Description" className="mt-1" rows={2} /></div>
-      {isRestaurant ? (
-        <div><Label className="text-xs">Spécialité</Label><Input value={form.specialite || ""} onChange={e => set("specialite", e.target.value)} placeholder="Ex: Africain, Fast-food" className="mt-1" /></div>
-      ) : isPharmacie ? null : (
-        <div><Label className="text-xs">Catégorie</Label><Input value={form.categorie || ""} onChange={e => set("categorie", e.target.value)} placeholder="Ex: Alimentation, Mode" className="mt-1" /></div>
-      )}
-      <div className="grid grid-cols-2 gap-3">
-        <div><Label className="text-xs">Pays *</Label>
-          <select value={form.pays_code} onChange={e => set("pays_code", e.target.value)} className="w-full h-10 rounded-lg border border-gray-200 px-3 text-sm mt-1">
-            {PAYS.map(p => <option key={p.code} value={p.code}>{p.nom}</option>)}
-          </select>
-        </div>
-        <div><Label className="text-xs">Ville</Label><Input value={form.ville || ""} onChange={e => set("ville", e.target.value)} placeholder="Ville" className="mt-1" /></div>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div><Label className="text-xs">Quartier</Label><Input value={form.quartier || ""} onChange={e => set("quartier", e.target.value)} placeholder="Quartier" className="mt-1" /></div>
-        <div>
-          <Label className="text-xs">Téléphone ({paysConfig.digits} chiffres)</Label>
-          <Input
-            value={form.telephone || ""}
-            onChange={e => set("telephone", e.target.value.replace(/\D/g, "").slice(0, paysConfig.digits))}
-            placeholder={`${paysConfig.emoji} ${paysConfig.digits} chiffres`}
-            inputMode="numeric"
-            className={`mt-1 ${form.telephone && !telValide ? "border-red-400" : ""}`}
-          />
-          {form.telephone && !telValide && <p className="text-[10px] text-red-500 mt-0.5">{telDigits.length}/{paysConfig.digits} chiffres</p>}
+          <div>
+            <h2 className="font-black text-white text-lg leading-tight">
+              {existing ? "Modifier" : "Créer"} {typeLabel.toLowerCase()}
+            </h2>
+            <p className="text-white/80 text-xs font-medium">Renseignez les informations de votre établissement</p>
+          </div>
         </div>
       </div>
 
-      {/* ── Localisation GPS fixe ── */}
-      <div className="border border-gray-100 rounded-xl p-3 space-y-2 bg-gray-50/50">
-        <PartenaireLocalisation
-          type={type}
-          existingLat={form.latitude}
-          existingLng={form.longitude}
-          existingAdresse={form.adresse}
-          onConfirm={(loc) => {
-            set("latitude", loc.latitude);
-            set("longitude", loc.longitude);
-            if (loc.ville) set("ville", loc.ville);
-            if (loc.quartier) set("quartier", loc.quartier);
-            if (loc.adresse) set("adresse", loc.adresse);
-          }}
-        />
-      </div>
-      <div>
-        <Label className="text-xs">Numéro Mobile Money (dépôt) *</Label>
-        <Input
-          value={form.telephone_depot || ""}
-          onChange={e => set("telephone_depot", e.target.value.replace(/\D/g, "").slice(0, paysConfig.digits))}
-          placeholder={`${paysConfig.emoji} ${paysConfig.digits} chiffres`}
-          inputMode="numeric"
-          className={`mt-1 ${form.telephone_depot && !telDepotValide ? "border-red-400" : ""}`}
-        />
-        <p className="text-[10px] text-gray-400 mt-1">Les clients verseront le paiement sur ce numéro</p>
-      </div>
-      <div><Label className="text-xs">Horaires d'ouverture</Label><Input value={form.horaires || ""} onChange={e => set("horaires", e.target.value)} placeholder="Ex: Lun-Sam: 8h-20h" className="mt-1" /></div>
-      {isRestaurant && (
-        <div><Label className="text-xs">Temps de préparation (minutes)</Label><Input type="number" value={form.temps_preparation_min || 30} onChange={e => set("temps_preparation_min", parseInt(e.target.value) || 30)} className="mt-1" /></div>
-      )}
-      {isPharmacie && (
-        <div className="bg-gray-50 border border-gray-100 rounded-xl p-3">
-          <p className="text-xs text-gray-500">💊 <span className="font-semibold">Pharmacie</span> — Les clients discutent avec vous par messagerie (texte, audio, ordonnances) puis vous créez la livraison quand le paiement est confirmé.</p>
+      <div className="p-5 sm:p-6 space-y-6">
+        {existing && !existing.actif && !isAdmin && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-bold text-red-700">Établissement bloqué</p>
+              <p className="text-xs text-red-600 mt-0.5">Votre établissement est actuellement bloqué. Veuillez contacter SILGAPP pour plus d'informations.</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Section : Identité ── */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-5 rounded-full bg-purple-500" />
+            <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Identité</h3>
+          </div>
+
+          {/* Logo upload — zone premium */}
+          <div>
+            <Label className="text-xs font-semibold text-gray-600">Logo / Photo</Label>
+            <label className="mt-2 flex flex-col items-center justify-center gap-2 cursor-pointer rounded-2xl border-2 border-dashed border-gray-200 hover:border-purple-400 hover:bg-purple-50/30 transition-all p-6 group">
+              <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" disabled={uploading} />
+              {form.logo_url ? (
+                <div className="flex items-center gap-4">
+                  <img src={form.logo_url} alt="logo" className="w-20 h-20 rounded-2xl object-cover shadow-md ring-2 ring-purple-100" />
+                  <div className="text-left">
+                    <p className="text-sm font-semibold text-gray-700">Logo chargé ✓</p>
+                    <p className="text-xs text-gray-400 group-hover:text-purple-500">Cliquez pour changer</p>
+                  </div>
+                </div>
+              ) : uploading ? (
+                <div className="flex flex-col items-center gap-2">
+                  <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+                  <p className="text-xs text-gray-500">Compression en cours...</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-14 h-14 rounded-2xl bg-purple-100 flex items-center justify-center group-hover:bg-purple-200 transition-colors">
+                    <Upload className="w-6 h-6 text-purple-500" />
+                  </div>
+                  <p className="text-sm font-semibold text-gray-600">Cliquez pour ajouter un logo</p>
+                  <p className="text-[10px] text-gray-400">JPG, PNG ou WebP — compression automatique</p>
+                </div>
+              )}
+            </label>
+          </div>
+
+          <div>
+            <Label className="text-xs font-semibold text-gray-600">Nom de l'établissement *</Label>
+            <Input value={form.nom} onChange={e => set("nom", e.target.value)} placeholder={`Ex: ${typeLabel} ${typeIcon}`} className="mt-1.5 h-12 rounded-xl text-sm font-medium" />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-gray-600">Description</Label>
+            <Textarea value={form.description} onChange={e => set("description", e.target.value)} placeholder="Décrivez votre établissement en quelques mots..." className="mt-1.5 rounded-xl text-sm" rows={3} />
+          </div>
+          {isRestaurant ? (
+            <div>
+              <Label className="text-xs font-semibold text-gray-600">Spécialité culinaire</Label>
+              <Input value={form.specialite || ""} onChange={e => set("specialite", e.target.value)} placeholder="Ex: Africain, Fast-food, Grillades" className="mt-1.5 h-12 rounded-xl text-sm" />
+            </div>
+          ) : isPharmacie ? null : (
+            <div>
+              <Label className="text-xs font-semibold text-gray-600">Catégorie</Label>
+              <Input value={form.categorie || ""} onChange={e => set("categorie", e.target.value)} placeholder="Ex: Alimentation, Mode, Électronique" className="mt-1.5 h-12 rounded-xl text-sm" />
+            </div>
+          )}
+        </section>
+
+        {/* ── Section : Localisation ── */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-5 rounded-full bg-blue-500" />
+            <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Localisation</h3>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs font-semibold text-gray-600">Pays *</Label>
+              <div className="relative mt-1.5">
+                <select value={form.pays_code} onChange={e => set("pays_code", e.target.value)} className="w-full h-12 rounded-xl border border-gray-200 bg-white px-3 pr-8 text-sm font-medium appearance-none cursor-pointer focus:ring-2 focus:ring-purple-200 focus:border-purple-400 outline-none">
+                  {PAYS.map(p => <option key={p.code} value={p.code}>{p.emoji} {p.nom}</option>)}
+                </select>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-xs">▼</span>
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs font-semibold text-gray-600">Ville</Label>
+              <Input value={form.ville || ""} onChange={e => set("ville", e.target.value)} placeholder="Ex: Ouagadougou" className="mt-1.5 h-12 rounded-xl text-sm" />
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-gray-600">Quartier</Label>
+            <Input value={form.quartier || ""} onChange={e => set("quartier", e.target.value)} placeholder="Ex: Wemtenga" className="mt-1.5 h-12 rounded-xl text-sm" />
+          </div>
+
+          {/* Localisation GPS fixe */}
+          <div className="rounded-2xl border border-blue-100 bg-blue-50/30 p-4 space-y-2">
+            <div className="flex items-center gap-2 mb-1">
+              <MapPin className="w-4 h-4 text-blue-500" />
+              <p className="text-xs font-bold text-blue-700 uppercase tracking-wide">Position GPS fixe</p>
+            </div>
+            <PartenaireLocalisation
+              type={type}
+              existingLat={form.latitude}
+              existingLng={form.longitude}
+              existingAdresse={form.adresse}
+              onConfirm={(loc) => {
+                set("latitude", loc.latitude);
+                set("longitude", loc.longitude);
+                if (loc.ville) set("ville", loc.ville);
+                if (loc.quartier) set("quartier", loc.quartier);
+                if (loc.adresse) set("adresse", loc.adresse);
+              }}
+            />
+          </div>
+        </section>
+
+        {/* ── Section : Contact & Paiement ── */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-5 rounded-full bg-green-500" />
+            <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Contact & Paiement</h3>
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-gray-600">Téléphone ({paysConfig.digits} chiffres pour {paysConfig.nom})</Label>
+            <div className="relative mt-1.5">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-mono">{paysConfig.emoji}</span>
+              <Input
+                value={form.telephone || ""}
+                onChange={e => set("telephone", e.target.value.replace(/\D/g, "").slice(0, paysConfig.digits))}
+                placeholder={`${paysConfig.digits} chiffres`}
+                inputMode="numeric"
+                className={`h-12 rounded-xl text-sm font-mono tracking-wider pl-10 ${form.telephone && !telValide ? "border-red-400 ring-2 ring-red-100" : ""}`}
+              />
+            </div>
+            {form.telephone && !telValide && <p className="text-[11px] text-red-500 mt-1 font-medium">⚠️ {telDigits.length}/{paysConfig.digits} chiffres saisis</p>}
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-gray-600">Numéro Mobile Money (dépôt) *</Label>
+            <div className="relative mt-1.5">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-mono">{paysConfig.emoji}</span>
+              <Input
+                value={form.telephone_depot || ""}
+                onChange={e => set("telephone_depot", e.target.value.replace(/\D/g, "").slice(0, paysConfig.digits))}
+                placeholder={`${paysConfig.digits} chiffres`}
+                inputMode="numeric"
+                className={`h-12 rounded-xl text-sm font-mono tracking-wider pl-10 ${form.telephone_depot && !telDepotValide ? "border-red-400 ring-2 ring-red-100" : ""}`}
+              />
+            </div>
+            <p className="text-[11px] text-gray-400 mt-1">Les clients verseront le paiement sur ce numéro</p>
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-gray-600">Horaires d'ouverture</Label>
+            <Input value={form.horaires || ""} onChange={e => set("horaires", e.target.value)} placeholder="Ex: Lun-Sam: 8h-20h" className="mt-1.5 h-12 rounded-xl text-sm" />
+          </div>
+          {isRestaurant && (
+            <div>
+              <Label className="text-xs font-semibold text-gray-600">Temps de préparation (minutes)</Label>
+              <Input type="number" value={form.temps_preparation_min || 30} onChange={e => set("temps_preparation_min", parseInt(e.target.value) || 30)} className="mt-1.5 h-12 rounded-xl text-sm" />
+            </div>
+          )}
+        </section>
+
+        {/* ── Section : Paramètres ── */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-5 rounded-full bg-gray-400" />
+            <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide">Paramètres</h3>
+          </div>
+          {isPharmacie && (
+            <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
+              <p className="text-xs text-blue-700 leading-relaxed">💊 <span className="font-bold">Mode Pharmacie</span> — Les clients discutent avec vous par messagerie (texte, audio, ordonnances) puis vous créez la livraison quand le paiement est confirmé.</p>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-4">
+            <label className="flex items-center gap-2.5 cursor-pointer">
+              <div className="relative">
+                <input type="checkbox" checked={form.ouvert} onChange={e => set("ouvert", e.target.checked)} className="sr-only peer" />
+                <div className="w-11 h-6 bg-gray-200 rounded-full peer-checked:bg-green-500 transition-colors" />
+                <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5" />
+              </div>
+              <span className="text-sm font-medium text-gray-700">Ouvert actuellement</span>
+            </label>
+            {isAdmin && (
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <div className="relative">
+                  <input type="checkbox" checked={form.actif} onChange={e => set("actif", e.target.checked)} className="sr-only peer" />
+                  <div className="w-11 h-6 bg-gray-200 rounded-full peer-checked:bg-purple-500 transition-colors" />
+                  <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5" />
+                </div>
+                <span className="text-sm font-medium text-gray-700">Actif sur la plateforme</span>
+              </label>
+            )}
+          </div>
+          {isAdmin && (
+            <div>
+              <Label className="text-xs font-semibold text-gray-600">Commission (%) — laisser vide pour défaut</Label>
+              <Input type="number" value={form.commission_pct ?? ""} onChange={e => set("commission_pct", e.target.value ? parseInt(e.target.value) : null)} placeholder="Ex: 10" className="mt-1.5 h-12 rounded-xl text-sm" />
+            </div>
+          )}
+        </section>
+
+        {/* ── Actions ── */}
+        <div className="flex gap-3 pt-2 border-t border-gray-100">
+          <Button onClick={handleSave} disabled={saving || !form.nom} className={`flex-1 h-13 py-3.5 rounded-2xl bg-gradient-to-r ${accentColor} hover:opacity-90 text-white font-bold text-sm shadow-lg`}>
+            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Enregistrer
+          </Button>
+          {onCancel && <Button variant="outline" onClick={onCancel} className="h-13 px-4 rounded-2xl border-gray-200"><X className="w-5 h-5" /></Button>}
         </div>
-      )}
-      <div className="flex items-center gap-4">
-        <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.ouvert} onChange={e => set("ouvert", e.target.checked)} className="w-4 h-4" /> Ouvert actuellement</label>
-        {isAdmin && <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.actif} onChange={e => set("actif", e.target.checked)} className="w-4 h-4" /> Actif sur la plateforme</label>}
-      </div>
-      {isAdmin && <div><Label className="text-xs">Commission (%) — laisser vide pour défaut</Label><Input type="number" value={form.commission_pct ?? ""} onChange={e => set("commission_pct", e.target.value ? parseInt(e.target.value) : null)} placeholder="Ex: 10" className="mt-1" /></div>}
-      <div className="flex gap-2 pt-2">
-        <Button onClick={handleSave} disabled={saving || !form.nom} className="flex-1 bg-purple-600 hover:bg-purple-700">
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Enregistrer
-        </Button>
-        {onCancel && <Button variant="outline" onClick={onCancel}><X className="w-4 h-4" /></Button>}
       </div>
     </div>
   );
