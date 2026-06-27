@@ -354,40 +354,58 @@ export default function LivreurExterneOnboarding({ livreurProfil, onComplete }) 
     } catch (_) {}
 
     if (gpsDeja && posDejaData && complet) {
-      // Tout ok : pas d'onboarding nécessaire
       setEtape("done");
       setTimeout(() => onCompleteRef.current(posDejaData), 0);
     } else if (!gpsDeja) {
-      setEtape("gps");
+      // ── Correction 6 : demander le GPS via la boîte native, sans écran bloquant ──
+      setEtape("requesting_gps");
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const gps = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            try { localStorage.setItem(GPS_KEY(livreurProfil.id), "true"); } catch (_) {}
+            try { localStorage.setItem(GPS_POS_KEY(livreurProfil.id), JSON.stringify(gps)); } catch (_) {}
+            setGpsData(gps);
+            if (complet) {
+              setEtape("done");
+              setTimeout(() => onCompleteRef.current(gps), 0);
+            } else {
+              setEtape("profil");
+            }
+          },
+          () => {
+            // Permission refusée — ne pas bloquer, expliquer et continuer
+            toast.error("GPS non activé — certaines fonctions seront limitées. Activez-le plus tard dans les paramètres.");
+            setGpsData(null);
+            if (complet) {
+              setEtape("done");
+              setTimeout(() => onCompleteRef.current(null), 0);
+            } else {
+              setEtape("profil");
+            }
+          },
+          { enableHighAccuracy: true, timeout: 15000 }
+        );
+      } else {
+        toast.error("GPS non disponible sur cet appareil");
+        setGpsData(null);
+        if (complet) {
+          setEtape("done");
+          setTimeout(() => onCompleteRef.current(null), 0);
+        } else {
+          setEtape("profil");
+        }
+      }
     } else if (!complet) {
-      // GPS ok mais profil incomplet
       setGpsData(posDejaData);
       setEtape("profil");
     } else {
-      // GPS ok + profil ok
       setEtape("done");
       setTimeout(() => onCompleteRef.current(posDejaData), 0);
     }
   }, [livreurProfil?.id]);
 
-  if (etape === "loading" || etape === "done") return null;
-
-  if (etape === "gps") {
-    return (
-      <EcranGPS
-        livreurId={livreurProfil?.id}
-        onGpsOk={(gps) => {
-          setGpsData(gps);
-          if (profilLivreurComplet(livreurProfil)) {
-            setEtape("done");
-            setTimeout(() => onCompleteRef.current(gps), 0);
-          } else {
-            setEtape("profil");
-          }
-        }}
-      />
-    );
-  }
+  if (etape === "loading" || etape === "done" || etape === "requesting_gps") return null;
 
   return (
     <FormulaireProfilLivreur

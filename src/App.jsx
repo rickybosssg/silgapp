@@ -108,19 +108,20 @@ function AnimatedRoutes({ children }) {
 }
 
 function AppContent() {
-  // Hook to apply system theme preference
+  // ── Forcer le mode clair en permanence — SILGAPP reste lisible même si
+  //    le téléphone est en mode sombre (Correction 4) ──
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const applyTheme = (e) => {
-      if (e.matches) {
-        document.documentElement.classList.add('dark');
-      } else {
+    document.documentElement.classList.remove('dark');
+    document.documentElement.classList.add('light');
+    // Empêcher toute bascule ultérieure vers le mode sombre
+    const observer = new MutationObserver(() => {
+      if (document.documentElement.classList.contains('dark')) {
         document.documentElement.classList.remove('dark');
+        document.documentElement.classList.add('light');
       }
-    };
-    applyTheme(mediaQuery);
-    mediaQuery.addEventListener('change', applyTheme);
-    return () => mediaQuery.removeEventListener('change', applyTheme);
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
   }, []);
   
   // Hook for Android hardware back button

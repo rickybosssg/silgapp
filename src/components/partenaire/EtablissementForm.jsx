@@ -5,14 +5,39 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Upload, Save, X, AlertTriangle, MapPin } from "lucide-react";
+import { toast } from "sonner";
 import PartenaireLocalisation from "@/components/partenaire/PartenaireLocalisation";
 
 const PAYS = [
-  { code: "BF", nom: "Burkina Faso" }, { code: "CI", nom: "Côte d'Ivoire" },
-  { code: "TG", nom: "Togo" }, { code: "BJ", nom: "Bénin" },
-  { code: "SN", nom: "Sénégal" }, { code: "ML", nom: "Mali" },
-  { code: "GN", nom: "Guinée" }, { code: "NE", nom: "Niger" }, { code: "GH", nom: "Ghana" },
+  { code: "BF", nom: "Burkina Faso", emoji: "🇧🇫", digits: 8 }, { code: "CI", nom: "Côte d'Ivoire", emoji: "🇨🇮", digits: 10 },
+  { code: "TG", nom: "Togo", emoji: "🇹🇬", digits: 8 }, { code: "BJ", nom: "Bénin", emoji: "🇧🇯", digits: 8 },
+  { code: "SN", nom: "Sénégal", emoji: "🇸🇳", digits: 9 }, { code: "ML", nom: "Mali", emoji: "🇲🇱", digits: 8 },
+  { code: "GN", nom: "Guinée", emoji: "🇬🇳", digits: 9 }, { code: "NE", nom: "Niger", emoji: "🇳🇪", digits: 8 },
+  { code: "GH", nom: "Ghana", emoji: "🇬🇭", digits: 9 },
 ];
+
+// Compression image avant upload (max 800px, JPEG 0.7) — Correction 1
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      const maxSize = 800;
+      if (width > height) { if (width > maxSize) { height = Math.round((height * maxSize) / width); width = maxSize; } }
+      else { if (height > maxSize) { width = Math.round((width * maxSize) / height); height = maxSize; } }
+      canvas.width = width; canvas.height = height;
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob((blob) => {
+        if (!blob) { reject(new Error("Compression échouée")); return; }
+        resolve(new File([blob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" }));
+      }, "image/jpeg", 0.7);
+    };
+    img.onerror = () => reject(new Error("Image illisible"));
+    img.src = URL.createObjectURL(file);
+  });
+}
 
 export default function EtablissementForm({ type, existing, partenaireId, userEmail, onSaved, onCancel, isAdmin }) {
   const isRestaurant = type === "restaurant";
@@ -32,16 +57,35 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
   const handleLogoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!file.type.startsWith("image/")) { toast?.error?.("Format non supporté"); return; }
     setUploading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const compressed = await compressImage(file);
+      const { file_url } = await base44.integrations.Core.UploadFile({ file: compressed });
       set("logo_url", file_url);
-    } catch (err) {}
+    } catch (err) {
+      console.error("Upload logo:", err);
+    }
     setUploading(false);
   };
 
+  // Validation téléphone selon le pays — Correction 5
+  const paysConfig = PAYS.find(p => p.code === form.pays_code) || PAYS[0];
+  const telDigits = (form.telephone || "").replace(/\D/g, "");
+  const telValide = !form.telephone || telDigits.length === paysConfig.digits;
+  const telDepotValide = !form.telephone_depot || (form.telephone_depot.replace(/\D/g, "").length === paysConfig.digits);
+
   const handleSave = async () => {
     if (!form.nom || !form.pays_code) return;
+    // Blocage si téléphone invalide — Correction 5
+    if (form.telephone && !telValide) {
+      toast?.error?.(`Téléphone invalide : ${paysConfig.nom} requiert ${paysConfig.digits} chiffres`);
+      return;
+    }
+    if (form.telephone_depot && !telDepotValide) {
+      toast?.error?.(`Numéro Mobile Money invalide : ${paysConfig.digits} chiffres requis pour ${paysConfig.nom}`);
+      return;
+    }
     setSaving(true);
     try {
       const data = { ...form, partenaire_id: partenaireId, user_email: userEmail, actif: form.actif !== false };
@@ -98,7 +142,17 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div><Label className="text-xs">Quartier</Label><Input value={form.quartier || ""} onChange={e => set("quartier", e.target.value)} placeholder="Quartier" className="mt-1" /></div>
-        <div><Label className="text-xs">Téléphone</Label><Input value={form.telephone || ""} onChange={e => set("telephone", e.target.value)} placeholder="Téléphone" className="mt-1" /></div>
+        <div>
+          <Label className="text-xs">Téléphone ({paysConfig.digits} chiffres)</Label>
+          <Input
+            value={form.telephone || ""}
+            onChange={e => set("telephone", e.target.value.replace(/\D/g, "").slice(0, paysConfig.digits))}
+            placeholder={`${paysConfig.emoji} ${paysConfig.digits} chiffres`}
+            inputMode="numeric"
+            className={`mt-1 ${form.telephone && !telValide ? "border-red-400" : ""}`}
+          />
+          {form.telephone && !telValide && <p className="text-[10px] text-red-500 mt-0.5">{telDigits.length}/{paysConfig.digits} chiffres</p>}
+        </div>
       </div>
 
       {/* ── Localisation GPS fixe ── */}
@@ -118,8 +172,14 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
         />
       </div>
       <div>
-        <Label className="text-xs">Numéro Orange Money (dépôt) *</Label>
-        <Input value={form.telephone_depot || ""} onChange={e => set("telephone_depot", e.target.value)} placeholder="Ex: 70 12 34 56" className="mt-1" />
+        <Label className="text-xs">Numéro Mobile Money (dépôt) *</Label>
+        <Input
+          value={form.telephone_depot || ""}
+          onChange={e => set("telephone_depot", e.target.value.replace(/\D/g, "").slice(0, paysConfig.digits))}
+          placeholder={`${paysConfig.emoji} ${paysConfig.digits} chiffres`}
+          inputMode="numeric"
+          className={`mt-1 ${form.telephone_depot && !telDepotValide ? "border-red-400" : ""}`}
+        />
         <p className="text-[10px] text-gray-400 mt-1">Les clients verseront le paiement sur ce numéro</p>
       </div>
       <div><Label className="text-xs">Horaires d'ouverture</Label><Input value={form.horaires || ""} onChange={e => set("horaires", e.target.value)} placeholder="Ex: Lun-Sam: 8h-20h" className="mt-1" /></div>
