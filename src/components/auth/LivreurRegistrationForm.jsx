@@ -20,13 +20,55 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
   const [cnibVerso, setCnibVerso] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [uploadProgress, setUploadProgress] = useState("");
 
-  const uploadFile = async (file) => {
+  // Compression image avant upload (max 800px, JPEG 0.7)
+  const compressImage = (file) => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        const maxSize = 800;
+        if (width > height) {
+          if (width > maxSize) { height = Math.round((height * maxSize) / width); width = maxSize; }
+        } else {
+          if (height > maxSize) { width = Math.round((width * maxSize) / height); height = maxSize; }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) { reject(new Error("Compression échouée")); return; }
+            resolve(new File([blob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" }));
+          },
+          "image/jpeg",
+          0.7
+        );
+      };
+      img.onerror = () => reject(new Error("Image illisible"));
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  // Upload un fichier compressé — séquentiel pour éviter la surcharge
+  const uploadFile = async (file, label) => {
     if (!file) return null;
     try {
-      const res = await base44.integrations.Core.UploadFile({ file });
-      return res?.file_url || null;
-    } catch { return null; }
+      setUploadProgress(`Compression ${label}...`);
+      const compressed = await compressImage(file);
+      setUploadProgress(`Envoi ${label}...`);
+      const res = await base44.integrations.Core.UploadFile({ file: compressed });
+      const url = res?.file_url || null;
+      if (!url) throw new Error(`Upload ${label} : URL manquante`);
+      return url;
+    } catch (err) {
+      console.error(`[Upload ${label}]`, err);
+      throw new Error(`Échec upload ${label}: ${err?.message || "erreur inconnue"}`);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -48,14 +90,11 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
 
     setLoading(true);
     try {
-      // Upload des fichiers
-      const [photoUrl, rectoUrl, versoUrl] = await Promise.all([
-        uploadFile(photoProfil),
-        uploadFile(cnibRecto),
-        uploadFile(cnibVerso),
-      ]);
-
-      if (!photoUrl) throw new Error("Échec upload photo profil");
+      // Upload SÉQUENTIEL (pas Promise.all) — évite la surcharge et les timeouts
+      const photoUrl = await uploadFile(photoProfil, "photo profil");
+      const rectoUrl = await uploadFile(cnibRecto, "CNIB recto");
+      const versoUrl = await uploadFile(cnibVerso, "CNIB verso");
+      setUploadProgress("");
 
       // Créer le profil livreur
       await base44.entities.Livreur.create({
@@ -81,6 +120,7 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
       setError(err?.message || "Erreur lors de l'envoi de la demande.");
     } finally {
       setLoading(false);
+      setUploadProgress("");
     }
   };
 
@@ -180,7 +220,12 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
         type="submit" disabled={loading}
         className="w-full h-14 rounded-2xl bg-gradient-to-r from-primary to-red-600 text-white font-bold text-base shadow-lg shadow-primary/20"
       >
-        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Envoyer ma demande"}
+        {loading ? (
+          <span className="flex flex-col items-center gap-1">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            {uploadProgress && <span className="text-xs font-normal opacity-80">{uploadProgress}</span>}
+          </span>
+        ) : "Envoyer ma demande"}
       </Button>
     </form>
   );
