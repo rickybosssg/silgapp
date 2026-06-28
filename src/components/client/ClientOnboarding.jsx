@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { requestNativeAppPermissions } from "@/lib/nativePermissions";
 import { toast } from "sonner";
-import { MapPin, User, Check, Loader2 } from "lucide-react";
+import { User, Check, Loader2 } from "lucide-react";
 import CountryCodeSelect from "@/components/ui/CountryCodeSelect";
 import { SILGAPP_COUNTRIES } from "@/lib/phoneUtils";
 
@@ -64,89 +64,7 @@ async function requestPostGpsPermissions(clientProfil) {
   });
 }
 
-// ─── GPS ──────────────────────────────────────────────────────────────────────
-function EtapeGPS({ onSuccess, clientId, clientProfil }) {
-  const [loading, setLoading] = useState(false);
-  const [quartier, setQuartier] = useState("");
-
-  const handleGPS = () => {
-    if (!navigator.geolocation) {
-      toast.error("GPS non disponible sur cet appareil");
-      return;
-    }
-    setLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const posData = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-        try { localStorage.setItem("client_gps_active", "true"); } catch (_) {}
-        try { localStorage.setItem("client_gps_position", JSON.stringify(posData)); } catch (_) {}
-
-        // Reverse geocoding pour afficher le quartier
-        const q = await reverseGeocode(posData.latitude, posData.longitude);
-        if (q) setQuartier(q);
-
-        // Sync BDD avec le quartier
-        if (clientId) {
-          try {
-            await base44.entities.ClientExterne.update(clientId, {
-              latitude: posData.latitude,
-              longitude: posData.longitude,
-              ...(q ? { quartier: q } : {}),
-            });
-          } catch (err) {
-            console.error("[GPS Onboarding] Erreur BDD:", err);
-          }
-        }
-        await requestPostGpsPermissions(clientProfil);
-        setLoading(false);
-        onSuccess(posData);
-      },
-      () => {
-        setLoading(false);
-        toast.error("Permission GPS refusée – obligatoire pour continuer");
-      },
-      { enableHighAccuracy: true, timeout: 15000 }
-    );
-  };
-
-  return (
-    <div className="fixed inset-0 bg-gradient-to-br from-primary/10 to-red-50 flex items-center justify-center p-6 z-50">
-      <div className="max-w-sm w-full bg-white rounded-3xl shadow-2xl p-7 space-y-6 text-center">
-        <div className="w-20 h-20 rounded-2xl bg-red-50 flex items-center justify-center mx-auto">
-          <MapPin className="w-10 h-10 text-primary" />
-        </div>
-        <div>
-          <p className="text-2xl font-black text-gray-900 mb-2">Activer votre GPS</p>
-          <p className="text-sm text-gray-600 leading-relaxed">
-            Le GPS est obligatoire pour créer une course et être localisé par le livreur.
-          </p>
-        </div>
-        {quartier ? (
-          <div className="bg-green-50 border border-green-200 rounded-2xl p-3 flex items-center justify-center gap-2">
-            <MapPin className="w-4 h-4 text-green-600 flex-shrink-0" />
-            <p className="text-sm font-bold text-green-800">{quartier}</p>
-          </div>
-        ) : (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3">
-            <p className="text-xs text-amber-700 font-semibold">
-               Sans GPS, vous ne pourrez pas commander une livraison.
-            </p>
-          </div>
-        )}
-        <button
-          onClick={handleGPS}
-          disabled={loading}
-          className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-95 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
-        >
-          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <MapPin className="w-5 h-5" />}
-          {loading ? "Localisation en cours..." : "Activer le GPS"}
-        </button>
-        <p className="text-xs text-gray-600">Appuyez sur "Autoriser" lorsque votre appareil vous demande</p>
-      </div>
-    </div>
-  );
-}
-
+// GPS is requested with native permissions after profile detection; it must not block onboarding.
 // ─── Profil ────────────────────────────────────────────────────────────────────
 function EtapeProfil({ clientProfil, onSuccess }) {
   const [nom, setNom] = useState(clientProfil?.nom || "");
@@ -422,37 +340,39 @@ export default function ClientOnboarding({ clientProfil, onComplete }) {
     const complet = profilClientComplet(clientProfil);
 
     if (!gpsOk) {
-      setStep("gps");
-    } else if (!complet) {
+      requestPostGpsPermissions(clientProfil).catch(() => null);
+      navigator.geolocation?.getCurrentPosition(
+        async (pos) => {
+          const posData = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+          try { localStorage.setItem("client_gps_active", "true"); } catch (_) {}
+          try { localStorage.setItem("client_gps_position", JSON.stringify(posData)); } catch (_) {}
+          try {
+            const quartier = await reverseGeocode(posData.latitude, posData.longitude);
+            if (clientProfil?.id) {
+              await base44.entities.ClientExterne.update(clientProfil.id, {
+                latitude: posData.latitude,
+                longitude: posData.longitude,
+                ...(quartier ? { quartier } : {}),
+              });
+            }
+          } catch (_) {}
+        },
+        () => toast.info("GPS non activé. Vous pourrez l'activer plus tard dans les paramètres."),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      );
+    }
+
+    if (!complet) {
       setStep("profil");
     } else {
-      // Profil complet + GPS déjà ok → terminer directement
       let savedPos = null;
       try { savedPos = JSON.parse(localStorage.getItem("client_gps_position") || "null"); } catch (_) {}
       setStep("done");
-      // setTimeout 0 pour éviter l'appel pendant le rendu
       setTimeout(() => onCompleteRef.current({ gps: savedPos, profil: clientProfil }), 0);
     }
   }, [clientProfil?.id]); // Dépend uniquement de l'ID pour éviter re-runs inutiles
 
   if (step === null || step === "done") return null;
-
-  if (step === "gps") {
-    return (
-      <EtapeGPS
-        clientId={clientProfil?.id}
-        clientProfil={clientProfil}
-        onSuccess={(posData) => {
-          if (profilClientComplet(clientProfil)) {
-            setStep("done");
-            setTimeout(() => onCompleteRef.current({ gps: posData, profil: clientProfil }), 0);
-          } else {
-            setStep("profil");
-          }
-        }}
-      />
-    );
-  }
 
   if (step === "profil") {
     return (

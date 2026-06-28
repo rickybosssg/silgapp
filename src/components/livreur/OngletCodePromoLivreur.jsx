@@ -49,7 +49,7 @@ export default function OngletCodePromoLivreur({ livreurProfil }) {
 
   const partagerWhatsApp = () => {
     const msg = encodeURIComponent(
-      `🎁 Utilise mon code promo *${monCode.code}* sur SILGAPP et bénéficie de *100 FCFA de réduction* sur ta première course !\n\n📦 Télécharge SILGAPP et inscris-toi maintenant.`
+      `Utilise mon code promo *${monCode.code}* sur SILGAPP et bénéficie de *100 FCFA de réduction* sur ta première course !\n\nTélécharge SILGAPP et inscris-toi maintenant.`
     );
     const a = document.createElement("a");
     a.href = `whatsapp://send?text=${msg}`;
@@ -105,7 +105,7 @@ export default function OngletCodePromoLivreur({ livreurProfil }) {
         </div>
 
         <p className="text-white/80 text-xs text-center mt-3">
-          🎁 Chaque ami qui fait sa 1ère course = <strong className="text-white">100 FCFA</strong> déduits de votre dû SILGAPP
+          Chaque ami qui fait sa 1ère course = <strong className="text-white">100 FCFA</strong> déduits de votre dû SILGAPP
         </p>
       </Card>
 

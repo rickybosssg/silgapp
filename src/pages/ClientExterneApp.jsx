@@ -93,6 +93,13 @@ export default function ClientExterneApp() {
   const queryClient = useQueryClient();
   const clientProfilRef = useRef(null);
   useEffect(() => { clientProfilRef.current = clientProfil; }, [clientProfil]);
+  const canShowCodePromo = aUnCodePromo && !!(clientProfil?.user_email || clientProfil?.email);
+
+  useEffect(() => {
+    if (ongletActif === "promo" && !canShowCodePromo) {
+      setOngletActif("accueil");
+    }
+  }, [canShowCodePromo, ongletActif]);
 
   const openNotificationsPanel = async () => {
     const unread = [...notifications];
@@ -809,7 +816,7 @@ export default function ClientExterneApp() {
         <div className="max-w-lg mx-auto space-y-4">
 
           {/* ── ONGLETS PROMO ─────────────────────── */}
-          {aUnCodePromo && (
+          {canShowCodePromo && (
             <div className="flex bg-white rounded-2xl p-1 gap-1 shadow-sm border border-gray-100">
               <button
                 onClick={() => setOngletActif("accueil")}
@@ -827,7 +834,7 @@ export default function ClientExterneApp() {
           )}
 
           {/* ── ONGLET CODE PROMO ─────────────────── */}
-          {ongletActif === "promo" && aUnCodePromo && (
+          {ongletActif === "promo" && canShowCodePromo && (
             <OngletCodePromo clientProfil={clientProfil} />
           )}
 

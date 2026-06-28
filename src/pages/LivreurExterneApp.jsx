@@ -178,6 +178,13 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     staleTime: 30000,
   });
   const commissionPct = normalizeCommissionPct(countryCommissionRows?.[0]?.commission_pct);
+  const livreurHasEmail = !!(livreurProfil?.user_email || livreurProfil?.email);
+
+  useEffect(() => {
+    if (activeTab === "promo" && !livreurHasEmail) {
+      setActiveTab("courses");
+    }
+  }, [activeTab, livreurHasEmail]);
 
   // Synchroniser le pricingMode depuis le profil BDD au chargement
   useEffect(() => {
@@ -1180,7 +1187,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     { id: "courses", label: "Courses", emoji: "" },
     { id: "historique", label: "Historique", emoji: "" },
     { id: "messages", label: "Messages", emoji: "" },
-    { id: "promo", label: "Code Promo", emoji: "" },
+    ...(livreurHasEmail ? [{ id: "promo", label: "Code Promo", emoji: "" }] : []),
     { id: "infos", label: "Mon profil", emoji: "" },
   ];
 
@@ -1441,7 +1448,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           />
         )}
 
-        {activeTab === "promo" && (
+        {activeTab === "promo" && livreurHasEmail && (
           <OngletCodePromoLivreur livreur={livreurProfil} />
         )}
 

@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Store, UtensilsCrossed, Loader2, LogOut, MapPin, Pill } from "lucide-react";
+import { Store, UtensilsCrossed, Loader2, LogOut, MapPin, Pill, ArrowLeft } from "lucide-react";
 import EtablissementForm from "@/components/partenaire/EtablissementForm";
 import ProduitsManager from "@/components/partenaire/ProduitsManager";
 import CommandesManager from "@/components/partenaire/CommandesManager";
@@ -222,6 +222,13 @@ export default function PartenaireDashboard() {
   };
 
   const loading = loadingBoutique || loadingRestaurant || loadingPharmacie;
+  const partenaireHasEmail = !!(user?.email || etablissement?.email || etablissement?.user_email);
+
+  useEffect(() => {
+    if (tab === "promo" && !partenaireHasEmail) {
+      setTab("home");
+    }
+  }, [partenaireHasEmail, tab]);
 
   const handleLogout = () => {
     if (!window.confirm("Voulez-vous vraiment vous déconnecter ?")) return;
@@ -241,6 +248,15 @@ export default function PartenaireDashboard() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
         <div className="w-full max-w-md space-y-6">
+          <button
+            type="button"
+            onClick={() => window.history.back()}
+            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 shadow-sm"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Retour
+          </button>
+
           <div className="text-center space-y-3">
             <div className="w-20 h-20 rounded-2xl bg-purple-100 flex items-center justify-center mx-auto">
               <Store className="w-10 h-10 text-purple-600" />
@@ -272,6 +288,35 @@ export default function PartenaireDashboard() {
               onSaved={() => { setTab("home"); queryClient.invalidateQueries({ queryKey: ["ma-pharmacie"] }); }}
               onCancel={() => setTab("home")} />
           )}
+        </div>
+      </div>
+    );
+  }
+
+  if (hasEtablissement && etablissement?.actif === false && user?.role !== "admin") {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <div className="w-full max-w-md rounded-3xl border border-amber-200 bg-white p-6 text-center shadow-xl">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100">
+            {etablissementType === "pharmacie" ? (
+              <Pill className="h-8 w-8 text-amber-700" />
+            ) : etablissementType === "restaurant" ? (
+              <UtensilsCrossed className="h-8 w-8 text-amber-700" />
+            ) : (
+              <Store className="h-8 w-8 text-amber-700" />
+            )}
+          </div>
+          <h1 className="text-2xl font-black text-gray-900">Demande envoyée</h1>
+          <p className="mt-3 text-sm leading-relaxed text-gray-600">
+            Votre demande a été envoyée pour analyse et validation. Vous pourrez accéder à SILGAPP après validation par l'administrateur.
+          </p>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="mt-6 w-full rounded-2xl bg-gray-900 px-4 py-3 text-sm font-black text-white"
+          >
+            Se déconnecter
+          </button>
         </div>
       </div>
     );
@@ -318,7 +363,7 @@ export default function PartenaireDashboard() {
             <MessagesPage myType="partenaire" myId={etablissement.id} myName={etablissement.nom} />
           </div>
         )}
-        {tab === "promo" && <OngletCodePromoPartenaire partenaireId={user.id} />}
+        {tab === "promo" && partenaireHasEmail && <OngletCodePromoPartenaire partenaireId={user.id} />}
         {tab === "statistiques" && <ComptabilitePartenaire type={etablissementType} />}
         {tab === "revenus" && <ComptabilitePartenaire type={etablissementType} />}
         {tab === "infos" && (
@@ -327,7 +372,14 @@ export default function PartenaireDashboard() {
         )}
       </div>
 
-      <PartenaireBottomNav tab={tab} setTab={handleSetTab} badgeCount={pendingCount} messageBadge={unreadCount} etablissementType={etablissementType} />
+      <PartenaireBottomNav
+        tab={tab}
+        setTab={handleSetTab}
+        badgeCount={pendingCount}
+        messageBadge={unreadCount}
+        etablissementType={etablissementType}
+        showPromo={partenaireHasEmail}
+      />
 
       <NewMessageModal
         show={!!newMsgModal}

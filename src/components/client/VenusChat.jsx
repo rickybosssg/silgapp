@@ -11,7 +11,7 @@ const buildWelcomeMessage = (countryContext) => {
   if (!countryContext || !countryContext.code) {
     return {
       role: "assistant",
-      content: "Bonjour Je suis **VENUS**, votre assistante intelligente **SILGAPP**.\n\n *Plus qu'un service, une promesse* \n\nJe suis là pour vous aider à :\n\n **Créer une course** — Expédier ou recevoir un colis\n **Suivre en temps réel** — Localisez votre livreur sur la carte\n **QR codes & PIN** — Validation de récupération et livraison\n **Prix adapté à votre pays** — Calculé automatiquement selon votre localisation\n **Support** — +226 66 92 51 90\n\n**Dans quel pays êtes-vous ? Comment puis-je vous aider ?**",
+      content: "Bonjour Je suis **VENUS**, votre assistante intelligente **SILGAPP**.\n\n *Plus qu'un service, une promesse* \n\nJe suis là pour vous aider à :\n\n **Créer une course** - Expédier ou recevoir un colis\n **Suivre en temps réel** - Localisez votre livreur sur la carte\n **QR codes & PIN** - Validation de récupération et livraison\n **Prix adapté à votre pays** - Calculé automatiquement selon votre localisation\n **Support** - +226 66 92 51 90\n\n**Dans quel pays êtes-vous ? Comment puis-je vous aider ?**",
     };
   }
 
@@ -137,7 +137,7 @@ export default function VenusChat({ onClose, countryContext }) {
 
       // Créer une nouvelle conversation avec contexte pays
       const contextMeta = countryContext?.code ? {
-        name: `Conversation VENUS — ${countryContext.nom || countryContext.code}`,
+        name: `Conversation VENUS - ${countryContext.nom || countryContext.code}`,
         description: `Assistance SILGAPP | Pays actif: ${countryContext.code} | Ville: ${countryContext.ville || "N/D"} | Devise: ${countryContext.devise || "FCFA"}`,
         country_code: countryContext.code,
         country_nom: countryContext.nom,
@@ -197,7 +197,7 @@ export default function VenusChat({ onClose, countryContext }) {
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: isCreditError
-          ? "⚠️ **Service temporairement indisponible**\n\nNotre assistant VENUS est en maintenance. Veuillez réessayer plus tard ou contacter le support au **+226 66 92 51 90**."
+          ? "Je n'arrive pas à joindre le service VENUS pour le moment. Vous pouvez réessayer ou contacter le support au **+226 66 92 51 90**."
           : "Désolée, une erreur est survenue. Veuillez réessayer dans un instant." },
       ]);
       setLoading(false);
@@ -213,7 +213,7 @@ export default function VenusChat({ onClose, countryContext }) {
     // Créer une toute nouvelle conversation
     try {
       const contextMeta = countryContext?.code ? {
-        name: `Conversation VENUS — ${countryContext.nom || countryContext.code}`,
+        name: `Conversation VENUS - ${countryContext.nom || countryContext.code}`,
         description: `Assistance SILGAPP | Pays actif: ${countryContext.code}`,
         country_code: countryContext.code,
       } : { name: "Conversation VENUS", description: "Assistance SILGAPP" };
@@ -254,7 +254,7 @@ export default function VenusChat({ onClose, countryContext }) {
                 )}
               </div>
               <p className="text-xs text-white font-semibold">
-                {initializing ? "Chargement de la mémoire..." : countryContext?.ville ? `Assistante locale — ${countryContext.ville}` : "Assistante intelligente SILGAPP"}
+                {initializing ? "Chargement de la mémoire..." : countryContext?.ville ? `Assistante locale - ${countryContext.ville}` : "Assistante intelligente SILGAPP"}
               </p>
             </div>
           </div>
@@ -354,7 +354,7 @@ export default function VenusChat({ onClose, countryContext }) {
           )}
         </div>
 
-        {/* Input — reste visible même quand le clavier apparaît (Correction 3) */}
+        {/* Input - reste visible même quand le clavier apparaît (Correction 3) */}
         <div className="p-3 border-t flex-shrink-0" style={{backgroundColor: '#ffffff', paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)'}}>
           <div className="flex gap-2">
             <input

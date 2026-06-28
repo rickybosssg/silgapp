@@ -48,7 +48,7 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
     pays_code: "BF", ville: "", quartier: "",
     telephone: "", telephone_depot: "",
     horaires: "", temps_preparation_min: 30,
-    ouvert: true, actif: true, commission_pct: null,
+    ouvert: true, actif: true, statut_validation: "en_attente", commission_pct: null,
   });
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -88,7 +88,15 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
     }
     setSaving(true);
     try {
-      const data = { ...form, partenaire_id: partenaireId, user_email: userEmail, actif: form.actif !== false };
+      const data = {
+        ...form,
+        partenaire_id: partenaireId,
+        user_email: userEmail,
+        actif: isAdmin ? form.actif !== false : !!existing?.actif,
+        statut_validation: isAdmin
+          ? (form.actif !== false ? "valide" : "refuse")
+          : (existing?.statut_validation || "en_attente"),
+      };
       const entityName = isPharmacie ? "Pharmacie" : isRestaurant ? "Restaurant" : "Boutique";
       if (existing?.id) {
         await base44.entities[entityName].update(existing.id, data);

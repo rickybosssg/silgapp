@@ -1,9 +1,9 @@
 import React from "react";
 import { Home, Package, ShoppingBag, MessageCircle, BarChart3, Truck, Pill, Gift } from "lucide-react";
 
-export default function PartenaireBottomNav({ tab, setTab, badgeCount = 0, messageBadge = 0, etablissementType }) {
+export default function PartenaireBottomNav({ tab, setTab, badgeCount = 0, messageBadge = 0, etablissementType, showPromo = true }) {
   const isPharmacie = etablissementType === "pharmacie";
-  const items = isPharmacie ? [
+  const baseItems = isPharmacie ? [
     { id: "home", icon: Home, label: "Accueil" },
     { id: "messages", icon: MessageCircle, label: "Messages", badge: messageBadge },
     { id: "livraisons", icon: Truck, label: "Livraisons", badge: badgeCount },
@@ -18,6 +18,7 @@ export default function PartenaireBottomNav({ tab, setTab, badgeCount = 0, messa
     { id: "promo", icon: Gift, label: "Promo" },
     { id: "statistiques", icon: BarChart3, label: "Stats" },
   ];
+  const items = baseItems.filter((item) => item.id !== "promo" || showPromo);
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-gray-100 safe-area-bottom shadow-[0_-2px_10px_rgba(0,0,0,0.03)]">

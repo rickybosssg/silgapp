@@ -1,14 +1,10 @@
-/**
- * SILGAPP — Utilitaires téléphone centralisés
+/*
+ * SILGAPP - utilitaires telephone centralises.
  *
- * Format normalisé interne : international sans "+" ni espaces
- * Exemples : "22670123456" (BF), "22507012345678" (CI), "22190123456" (SN)
- *
- * Ce fichier est la SOURCE UNIQUE DE VÉRITÉ pour toute logique téléphone.
- * Importer depuis ici partout dans l'application.
+ * Format normalise interne : international sans "+" ni espaces.
+ * Exemples : "22670123456" (BF), "2250701234567" (CI), "22190123456" (SN).
  */
 
-/** Tous les pays SILGAPP avec indicatif et longueur du numéro local */
 export const SILGAPP_COUNTRIES = [
   { code: "BF", dial: "226", len: 8, name: "Burkina Faso", flag: "" },
   { code: "TG", dial: "228", len: 8, name: "Togo", flag: "" },
@@ -27,9 +23,15 @@ const normalizeSearch = (value) =>
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 
+const onlyDigits = (value) => String(value || "").replace(/\D/g, "");
+
+export function getCountryConfig(countryCode = "BF") {
+  return SILGAPP_COUNTRIES.find((item) => item.code === countryCode) || SILGAPP_COUNTRIES[0];
+}
+
 export function getCountryLabel(countryCode) {
   const country = SILGAPP_COUNTRIES.find((item) => item.code === countryCode);
-  return country ? `${country.flag} ${country.name} (+${country.dial})` : "Sélectionner un pays";
+  return country ? `${country.name} (+${country.dial})` : "Sélectionner un pays";
 }
 
 export function searchCountries(query) {
@@ -40,84 +42,100 @@ export function searchCountries(query) {
   );
 }
 
-/**
- * Normalise un numéro de téléphone au format international sans "+"
- * Retourne null si le numéro ne peut pas être normalisé.
- *
- * Exemples :
- * normalizePhone("70123456") → "22670123456" (BF supposé si ambigu)
- * normalizePhone("70123456", "BF") → "22670123456"
- * normalizePhone("+22670123456") → "22670123456"
- * normalizePhone("22670123456") → "22670123456"
- * normalizePhone("070123456", "BF") → "22670123456"
- * normalizePhone("0712345678", "CI")→ "2250712345678"
- */
+export function extractLocalPhone(phone, countryCode = "BF") {
+  const country = getCountryConfig(countryCode);
+  let digits = onlyDigits(phone);
+
+  if (digits.startsWith(country.dial)) {
+    digits = digits.slice(country.dial.length);
+  }
+
+  if (digits.startsWith("0") && digits.length > country.len) {
+    digits = digits.slice(1);
+  }
+
+  return digits.slice(0, country.len);
+}
+
+export function formatLocalPhone(phone, countryCode = "BF") {
+  const country = getCountryConfig(countryCode);
+  const local = extractLocalPhone(phone, country.code);
+
+  if (country.code === "GH" && local.length > 2) {
+    return [local.slice(0, 2), local.slice(2, 5), local.slice(5, 9)].filter(Boolean).join(" ");
+  }
+
+  return local.match(/.{1,2}/g)?.join(" ") || local;
+}
+
+export function phonePlaceholder(countryCode = "BF") {
+  const country = getCountryConfig(countryCode);
+  if (country.code === "GH") return "XX XXX XXXX";
+  if (country.code === "CI") return "XX XX XX XX XX";
+  return "XX XX XX XX";
+}
+
 export function normalizePhone(phone, countryCode = null) {
   if (!phone) return null;
-  const n = String(phone).replace(/\D/g, "");
+  const n = onlyDigits(phone);
   if (!n) return null;
 
-  // 1. Déjà en format international (commence par un indicatif connu)
   for (const { dial, len } of SILGAPP_COUNTRIES) {
     if (n.startsWith(dial) && n.length === dial.length + len) {
-      return n; // déjà normalisé
+      return n;
     }
   }
 
-  // 2. Avec "+" supprimé mais indicatif présent (ex: "22670..." après strip)
-  // déjà géré ci-dessus
+  if (countryCode) {
+    const country = getCountryConfig(countryCode);
+    const local = extractLocalPhone(n, country.code);
+    if (local.length === country.len) return country.dial + local;
+  }
 
-  // 3. Format local avec 0 initial (ex: "070123456" BF → "22670123456")
   if (n.startsWith("0")) {
     const withoutZero = n.slice(1);
-    // Chercher par pays spécifié en priorité
     const countries = countryCode
-      ? [...SILGAPP_COUNTRIES.filter(c => c.code === countryCode), ...SILGAPP_COUNTRIES.filter(c => c.code !== countryCode)]
+      ? [
+          ...SILGAPP_COUNTRIES.filter((c) => c.code === countryCode),
+          ...SILGAPP_COUNTRIES.filter((c) => c.code !== countryCode),
+        ]
       : SILGAPP_COUNTRIES;
+
     for (const { dial, len } of countries) {
-      if (withoutZero.length === len) {
-        return dial + withoutZero;
-      }
+      if (withoutZero.length === len) return dial + withoutZero;
     }
   }
 
-  // 4. Format local sans 0 (ex: "70123456" BF)
   const countries = countryCode
-    ? [...SILGAPP_COUNTRIES.filter(c => c.code === countryCode), ...SILGAPP_COUNTRIES.filter(c => c.code !== countryCode)]
+    ? [
+        ...SILGAPP_COUNTRIES.filter((c) => c.code === countryCode),
+        ...SILGAPP_COUNTRIES.filter((c) => c.code !== countryCode),
+      ]
     : SILGAPP_COUNTRIES;
+
   for (const { dial, len } of countries) {
-    if (n.length === len && !n.startsWith("0")) {
-      return dial + n;
-    }
+    if (n.length === len && !n.startsWith("0")) return dial + n;
   }
 
-  // 5. Fallback : retourner tel quel (ne pas bloquer)
   return n;
 }
 
-/**
- * Retourne toutes les variantes connues d'un numéro (format local + international)
- * Utile pour les recherches en base où le format de stockage est incertain.
- * Maximum 3 variantes retournées.
- */
 export function phoneVariants(phone) {
-  // Nettoyer : supprimer espaces, tirets, parenthèses, ET le "+" initial
-  const n = (phone || "").replace(/\D/g, "");
+  const n = onlyDigits(phone);
   if (!n) return [];
   const variants = new Set([n]);
 
   for (const { dial, len } of SILGAPP_COUNTRIES) {
-    // Numéro international → ajouter version locale
     if (n.startsWith(dial) && n.length === dial.length + len) {
-      variants.add(n.slice(dial.length)); // local sans indicatif
+      variants.add(n.slice(dial.length));
       break;
     }
-    // Numéro local → ajouter version internationale
+
     if (n.length === len && !n.startsWith("0")) {
       variants.add(dial + n);
       break;
     }
-    // Numéro local avec 0 → ajouter sans 0 et avec indicatif
+
     if (n.startsWith("0") && n.length === len + 1) {
       variants.add(n.slice(1));
       variants.add(dial + n.slice(1));
@@ -128,29 +146,19 @@ export function phoneVariants(phone) {
   return [...variants];
 }
 
-/**
- * Formate un numéro pour affichage lisible (groupes de 2)
- * Ex: "22670123456" → "+226 70 12 34 56"
- * "22507012345678" → "+225 07 01 23 45 67 8"
- */
 export function formatPhoneDisplay(phone) {
-  const n = (phone || "").replace(/\D/g, "");
+  const n = onlyDigits(phone);
   if (!n) return phone || "";
 
-  for (const { dial, len } of SILGAPP_COUNTRIES) {
+  for (const { code, dial, len } of SILGAPP_COUNTRIES) {
     if (n.startsWith(dial) && n.length === dial.length + len) {
-      const local = n.slice(dial.length);
-      const groups = local.match(/.{1,2}/g) || [local];
-      return `+${dial} ${groups.join(" ")}`;
+      return `+${dial} ${formatLocalPhone(n.slice(dial.length), code)}`;
     }
   }
+
   return phone || "";
 }
 
-/**
- * Recherche un ClientExterne par numéro de téléphone en testant toutes les variantes.
- * Retourne le premier client trouvé ou null.
- */
 export async function findClientByPhone(base44, phone) {
   const variants = phoneVariants(phone);
   for (const v of variants) {

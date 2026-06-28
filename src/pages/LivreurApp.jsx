@@ -373,37 +373,8 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
     );
   }
 
-  // Écran GPS obligatoire
   if (gpsRequis && !gpsActif) {
-    return (
-      <div className="fixed inset-0 bg-gradient-to-br from-primary/10 to-red-50 flex items-center justify-center p-6">
-        <div className="max-w-sm w-full bg-white rounded-3xl shadow-2xl p-6 space-y-6 text-center">
-          <div className="w-20 h-20 rounded-2xl bg-red-50 flex items-center justify-center mx-auto">
-            <span className="text-4xl"></span>
-          </div>
-          <div>
-            <p className="text-xl font-black text-gray-900 mb-2">GPS Obligatoire</p>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              Pour des raisons de sécurité et de suivi, l'activation du GPS est requise pour accéder à votre tableau de bord.
-            </p>
-          </div>
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-            <p className="text-xs text-amber-700 font-semibold">
-               Sans GPS, vous ne pourrez pas recevoir de courses ni être visible sur la carte.
-            </p>
-          </div>
-          <button
-            className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-95 transition-all"
-            onClick={handleActiverGPS}
-          >
-            Activer le GPS
-          </button>
-          <p className="text-xs text-gray-400">
-            Appuyez sur "Autoriser" lorsque votre appareil vous demande la permission
-          </p>
-        </div>
-      </div>
-    );
+    toast.info("GPS non activé. Vous pouvez l'activer plus tard dans les paramètres.");
   }
 
   const isEnLigne = livreurProfil.statut !== "hors_ligne";

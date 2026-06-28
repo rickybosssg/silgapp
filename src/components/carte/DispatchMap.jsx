@@ -610,7 +610,7 @@ function buildPartenairePopup(partenaire) {
       ${partenaire.quartier ? `<p style="font-size:12px;margin:2px 0;color:#6b7280">📌 ${partenaire.quartier}</p>` : ""}
       ${partenaire.ville ? `<p style="font-size:11px;margin:2px 0;color:#9ca3af">${partenaire.ville}</p>` : ""}
       ${partenaire.telephone ? `<p style="font-size:12px;margin:2px 0;color:#444">📞 ${partenaire.telephone}</p>` : ""}
-      ${partenaire._commandes_en_attente > 0 ? `<p style="font-size:12px;margin:4px 0 0 0;color:#dc2626;font-weight:600">📦 ${partenaire._commandes_en_attente} commande(s) en attente</p>` : ""}
+      ${partenaire._commandes_en_attente > 0 ? `<p style="font-size:12px;margin:4px 0 0 0;color:#dc2626;font-weight:600">${partenaire._commandes_en_attente} commande(s) en attente</p>` : ""}
     </div>
   `;
 }

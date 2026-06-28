@@ -73,6 +73,12 @@
       "default": true,
       "description": "Boutique active sur la plateforme"
     },
+    "statut_validation": {
+      "type": "string",
+      "enum": ["en_attente", "valide", "refuse"],
+      "default": "en_attente",
+      "description": "Statut de validation administrateur"
+    },
     "commission_pct": {
       "type": "number",
       "description": "Commission configurable (fallback global si null)"
