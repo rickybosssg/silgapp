@@ -262,7 +262,7 @@ export default function PartenaireDashboard() {
               <Store className="w-10 h-10 text-purple-600" />
             </div>
             <h1 className="text-2xl font-black text-gray-900">Espace Partenaire</h1>
-            <p className="text-gray-500">Que souhaitez-vous creer ?</p>
+            <p className="text-gray-500">Que souhaitez-vous créer ?</p>
           </div>
 
           <CreateChoice icon={Store} title="Une Boutique" text="Vendre des produits" onClick={() => setTab("boutique_form")} color="blue" />
@@ -270,7 +270,7 @@ export default function PartenaireDashboard() {
           <CreateChoice icon={Pill} title="Une Pharmacie" text="Discuter avec clients et livrer" onClick={() => setTab("pharmacie_form")} color="blueDark" />
 
           <button onClick={handleLogout} className="w-full text-sm text-gray-400 underline">
-            Se deconnecter
+            Se déconnecter
           </button>
 
           {tab === "boutique_form" && (
@@ -322,9 +322,34 @@ export default function PartenaireDashboard() {
     );
   }
 
+  const dashboardTheme =
+    etablissementType === "pharmacie"
+      ? {
+          page: "bg-gradient-to-b from-emerald-50 via-white to-white",
+          header: "from-emerald-800 via-green-700 to-teal-600",
+          shadow: "shadow-emerald-200/70",
+          active: "text-emerald-700",
+          activeBar: "bg-emerald-600",
+        }
+      : etablissementType === "restaurant"
+        ? {
+            page: "bg-gradient-to-b from-orange-50 via-white to-white",
+            header: "from-orange-700 via-amber-600 to-rose-500",
+            shadow: "shadow-orange-200/70",
+            active: "text-orange-700",
+            activeBar: "bg-orange-600",
+          }
+        : {
+            page: "bg-gradient-to-b from-blue-50 via-white to-white",
+            header: "from-slate-900 via-blue-800 to-sky-700",
+            shadow: "shadow-blue-200/70",
+            active: "text-blue-700",
+            activeBar: "bg-blue-600",
+          };
+
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      <div className="bg-gradient-to-br from-purple-600 via-violet-600 to-indigo-600 text-white px-4 py-4 sticky top-0 z-20 shadow-lg">
+    <div className={`min-h-screen ${dashboardTheme.page} pb-20`}>
+      <div className={`bg-gradient-to-br ${dashboardTheme.header} text-white px-4 py-4 sticky top-0 z-20 shadow-lg ${dashboardTheme.shadow}`}>
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -338,7 +363,7 @@ export default function PartenaireDashboard() {
                 <MapPin className="w-3 h-3 flex-shrink-0" />
                 <span className="truncate">{etablissement.quartier || etablissement.ville || ""}</span>
                 <span className={"w-1.5 h-1.5 rounded-full flex-shrink-0 " + (etablissement.ouvert ? "bg-green-400" : "bg-red-400")} />
-                <span className="flex-shrink-0">{etablissement.ouvert ? "Ouvert" : "Ferme"}</span>
+                <span className="flex-shrink-0">{etablissement.ouvert ? "Ouvert" : "Fermé"}</span>
               </div>
             </div>
           </div>
@@ -384,6 +409,7 @@ export default function PartenaireDashboard() {
       <NewMessageModal
         show={!!newMsgModal}
         clientName={newMsgModal?.clientName}
+        etablissementType={etablissementType}
         onOpen={() => { handleSetTab("messages"); setNewMsgModal(null); }}
         onClose={() => setNewMsgModal(null)}
       />

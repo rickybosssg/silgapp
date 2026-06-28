@@ -84,21 +84,22 @@ export default function LivreurHeader({
 
   return (
     <div className={cn(
-      "rounded-3xl text-white overflow-hidden relative",
-      "shadow-2xl",
+      "rounded-3xl text-white overflow-hidden relative border",
+      "shadow-2xl shadow-blue-200/60",
       isON
-        ? "bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900"
-        : "bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800"
+        ? "bg-gradient-to-br from-slate-950 via-blue-900 to-sky-800 border-blue-300/20"
+        : "bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border-white/10"
     )}>
       {/* Halos decoratifs */}
-      {isON && <div className="absolute top-0 right-0 w-48 h-48 bg-green-500/8 rounded-full blur-3xl pointer-events-none" />}
-      {isEnCourse && <div className="absolute top-0 left-0 w-48 h-48 bg-blue-500/8 rounded-full blur-3xl pointer-events-none" />}
+      {isON && <div className="absolute top-0 right-0 w-52 h-52 bg-sky-300/15 rounded-full blur-3xl pointer-events-none" />}
+      {isON && <div className="absolute -bottom-10 -left-10 w-44 h-44 bg-emerald-300/10 rounded-full blur-3xl pointer-events-none" />}
+      {isEnCourse && <div className="absolute top-0 left-0 w-48 h-48 bg-blue-300/15 rounded-full blur-3xl pointer-events-none" />}
 
       {/* Barre de statut coloree */}
       <div className={cn(
         "h-0.5 w-full",
-        isON && isLibre ? "bg-gradient-to-r from-green-400 via-emerald-300 to-green-400" :
-        isEnCourse ? "bg-gradient-to-r from-blue-400 via-indigo-300 to-blue-400" :
+        isON && isLibre ? "bg-gradient-to-r from-emerald-300 via-sky-300 to-emerald-300" :
+        isEnCourse ? "bg-gradient-to-r from-sky-300 via-indigo-300 to-blue-300" :
         "bg-white/10"
       )} />
 
@@ -140,14 +141,14 @@ export default function LivreurHeader({
               <img
                 src={livreur.photo_url}
                 alt={nomComplet}
-                className="relative w-14 h-14 rounded-xl object-cover border-2 border-white/20 shadow-lg"
+                className="relative w-14 h-14 rounded-2xl object-cover border-2 border-white/25 shadow-lg"
               />
             ) : (
-              <div className="relative w-14 h-14 rounded-xl bg-gradient-to-br from-primary via-primary/80 to-primary/50 flex items-center justify-center border-2 border-white/15 shadow-lg">
+              <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-400 via-blue-500 to-blue-700 flex items-center justify-center border-2 border-white/20 shadow-lg">
                 <span className="text-white font-black text-xl">{prenom.charAt(0).toUpperCase()}</span>
               </div>
             )}
-            <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-slate-900 bg-green-400 shadow shadow-green-400/50" />
+            <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-slate-900 bg-emerald-400 shadow shadow-emerald-400/50" />
           </div>
 
           {/* Nom + Note + Zone */}
@@ -180,7 +181,7 @@ export default function LivreurHeader({
                   ? "bg-gradient-to-br from-red-700 to-red-800 text-white shadow-red-500/25"
                   : isON
                   ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-red-500/25"
-                  : "bg-gradient-to-br from-green-500 to-emerald-500 text-white shadow-green-500/25"
+                  : "bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-emerald-500/25"
               )}
             >
               <Power className="w-3 h-3 flex-shrink-0" />
@@ -194,7 +195,7 @@ export default function LivreurHeader({
                 "flex items-center justify-center gap-1.5 w-24 h-8 rounded-xl text-[11px] font-semibold border transition-all",
                 "active:scale-95",
                 gpsActif
-                  ? "bg-blue-500/20 text-blue-300 border-blue-400/30 shadow-sm shadow-blue-500/15"
+                  ? "bg-sky-400/20 text-sky-200 border-sky-300/30 shadow-sm shadow-sky-500/15"
                   : "bg-white/8 text-white/75 border-white/20 hover:bg-white/15"
               )}
             >
@@ -240,7 +241,7 @@ export default function LivreurHeader({
         {/* Ligne 4 : Compteurs clients + courses */}
         <div className="grid grid-cols-2 gap-2">
           {/* Clients en ligne */}
-          <div className="bg-white/6 border border-white/10 rounded-2xl px-3 py-2.5 flex items-center gap-2">
+          <div className="bg-white/10 border border-white/10 rounded-2xl px-3 py-2.5 flex items-center gap-2 backdrop-blur-sm">
             <div className="relative flex-shrink-0">
               <Users className="w-5 h-5 text-white/80" />
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-400 rounded-full border border-slate-900" style={{ animation: "pulse-live 2s ease-in-out infinite" }} />
@@ -256,7 +257,7 @@ export default function LivreurHeader({
           </div>
 
           {/* Courses en attente */}
-          <div className="bg-white/6 border border-white/10 rounded-2xl px-3 py-2.5 flex items-center gap-2">
+          <div className="bg-white/10 border border-white/10 rounded-2xl px-3 py-2.5 flex items-center gap-2 backdrop-blur-sm">
             <div className="relative flex-shrink-0">
               <Package className="w-5 h-5 text-white/80" />
               {coursesEnAttente > 0 && (

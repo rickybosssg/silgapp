@@ -45,7 +45,7 @@ export default function CheckoutModal({ type, etablissementId, etablissementNom,
       },
       () => {
         setGpsPosition(null);
-        setLocationMessage("Impossible de detecter votre position. Verifiez le GPS ou saisissez l'adresse manuellement.");
+        setLocationMessage("Impossible de détecter votre position. Vérifiez le GPS ou saisissez l'adresse manuellement.");
         setLocating(false);
       },
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 15000 }

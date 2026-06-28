@@ -119,7 +119,7 @@ export default function AudioRecorder({ onSend, disabled }) {
           ? "Microphone refuse. Autorisez le microphone dans les parametres de l'application."
           : notFound
           ? "Aucun microphone trouve sur cet appareil."
-          : "Microphone non disponible. Verifiez les permissions."
+          : "Microphone non disponible. Vérifiez les permissions."
       );
       cleanupStream();
     }

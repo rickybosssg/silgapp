@@ -9,6 +9,35 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
   const isPharmacie = etablissementType === "pharmacie";
   const entityName = isRestaurant ? "CommandeRestaurant" : "CommandeBoutique";
   const idField = isRestaurant ? "restaurant_id" : "boutique_id";
+  const theme = isPharmacie
+    ? {
+        hero: "from-emerald-700 via-green-600 to-teal-600",
+        shadow: "shadow-emerald-100",
+        accent: "text-emerald-600",
+        activeBg: "bg-emerald-600",
+        soft: "bg-emerald-50",
+        icon: "text-emerald-700",
+        label: "Espace pharmacie",
+      }
+    : isRestaurant
+      ? {
+          hero: "from-orange-600 via-amber-500 to-rose-500",
+          shadow: "shadow-orange-100",
+          accent: "text-orange-600",
+          activeBg: "bg-orange-600",
+          soft: "bg-orange-50",
+          icon: "text-orange-700",
+          label: "Espace restaurant",
+        }
+      : {
+          hero: "from-sky-700 via-blue-600 to-indigo-600",
+          shadow: "shadow-sky-100",
+          accent: "text-blue-600",
+          activeBg: "bg-blue-600",
+          soft: "bg-blue-50",
+          icon: "text-blue-700",
+          label: "Espace boutique",
+        };
   const queryClient = useQueryClient();
   const [toggling, setToggling] = useState(false);
 
@@ -81,13 +110,13 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
 
   const cards = isPharmacie ? [
     { id: "messages", icon: MessageCircle, label: "Messages", subtitle: "Discuter avec clients", bg: "bg-green-50", iconColor: "text-green-600", badge: messageBadge },
-    { id: "livraisons", icon: Truck, label: "Livraisons", subtitle: "Creer une livraison", bg: "bg-blue-50", iconColor: "text-blue-700", badge: pendingCount },
+    { id: "livraisons", icon: Truck, label: "Livraisons", subtitle: "Créer une livraison", bg: "bg-blue-50", iconColor: "text-blue-700", badge: pendingCount },
     { id: "statistiques", icon: BarChart3, label: "Statistiques", subtitle: "Revenus et suivi", bg: "bg-amber-50", iconColor: "text-amber-600" },
     { id: "infos", icon: Store, label: "Informations", subtitle: "Modifier la fiche", bg: "bg-pink-50", iconColor: "text-pink-600" },
     { id: "revenus", icon: Wallet, label: "Revenus", subtitle: "Suivi des paiements", bg: "bg-teal-50", iconColor: "text-teal-600" },
   ] : [
-    { id: "commandes", icon: Package, label: "Commandes", subtitle: "Gerer les commandes", bg: "bg-blue-50", iconColor: "text-blue-600", badge: pendingCount },
-    { id: "produits", icon: ShoppingBag, label: isRestaurant ? "Plats" : "Produits", subtitle: "Gerer le catalogue", bg: "bg-purple-50", iconColor: "text-purple-600" },
+    { id: "commandes", icon: Package, label: "Commandes", subtitle: "Gérer les commandes", bg: "bg-blue-50", iconColor: "text-blue-600", badge: pendingCount },
+    { id: "produits", icon: ShoppingBag, label: isRestaurant ? "Plats" : "Produits", subtitle: "Gérer le catalogue", bg: "bg-purple-50", iconColor: "text-purple-600" },
     { id: "messages", icon: MessageCircle, label: "Messages", subtitle: "Discuter avec clients", bg: "bg-green-50", iconColor: "text-green-600", badge: messageBadge },
     { id: "statistiques", icon: BarChart3, label: "Statistiques", subtitle: "Ventes et revenus", bg: "bg-amber-50", iconColor: "text-amber-600" },
     { id: "infos", icon: Store, label: "Informations", subtitle: "Modifier la fiche", bg: "bg-pink-50", iconColor: "text-pink-600" },
@@ -107,46 +136,57 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-purple-600 via-violet-600 to-indigo-600 text-white shadow-xl shadow-purple-200"
+        className={`relative overflow-hidden rounded-3xl bg-gradient-to-br ${theme.hero} text-white shadow-xl ${theme.shadow}`}
       >
         <div className="absolute -top-12 -right-12 w-40 h-40 bg-white/10 rounded-full" />
         <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-white/5 rounded-full" />
+        <div className="absolute inset-x-0 bottom-0 h-1 bg-white/20" />
 
         <div className="relative p-5 space-y-4">
           <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/70">{theme.label}</p>
+              <p className="text-lg font-black leading-tight mt-1">{etablissement.nom || "Etablissement"}</p>
+            </div>
             <button
               onClick={handleToggleOuvert}
               disabled={toggling}
               className="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 text-sm font-bold hover:bg-white/30 transition-colors"
             >
               {toggling ? <Loader2 className="w-4 h-4 animate-spin" /> : (
-                <span className={"w-2.5 h-2.5 rounded-full " + (etablissement.ouvert ? "bg-green-400" : "bg-red-400")} />
+                <span className={"w-2.5 h-2.5 rounded-full " + (etablissement.ouvert ? "bg-green-300" : "bg-red-300")} />
               )}
-              {etablissement.ouvert ? "Ouvert" : "Ferme"}
+              {etablissement.ouvert ? "Ouvert" : "Fermé"}
             </button>
-            <span className="text-xs text-white/70 capitalize">
-              {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "short" })}
+          </div>
+
+          <div className="flex items-center justify-between rounded-2xl bg-white/10 border border-white/10 px-4 py-3">
+            <span className="text-xs font-semibold text-white/75 capitalize">
+              {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
+            </span>
+            <span className="text-xs font-bold text-white/85">
+              {etablissement.ville || etablissement.quartier || "SILGAPP"}
             </span>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <HeroStat value={isPharmacie ? pharmaConversations.length : commandesToday.length} label={isPharmacie ? "Conversations actives" : "Commandes aujourd'hui"} />
             <HeroStat value={isPharmacie ? pharmaActiveCourses.length : revenusToday.toLocaleString()} label={isPharmacie ? "Livraisons en cours" : "FCFA de ventes"} />
-            <HeroStat value={enPreparation} label={isPharmacie ? "En recherche" : "En preparation"} />
+            <HeroStat value={enPreparation} label={isPharmacie ? "En recherche" : "En préparation"} />
           </div>
         </div>
       </motion.div>
 
       <div className="grid grid-cols-4 gap-2">
-        <QuickStat icon={CheckCircle} value={livreesToday} label="Livrees" color="text-green-600" bg="bg-green-50" />
-        <QuickStat icon={Clock} value={enPreparation} label={isPharmacie ? "Recherche" : "Preparation"} color="text-orange-600" bg="bg-orange-50" />
+        <QuickStat icon={CheckCircle} value={livreesToday} label="Livrées" color="text-green-600" bg="bg-green-50" />
+        <QuickStat icon={Clock} value={enPreparation} label={isPharmacie ? "Recherche" : "Préparation"} color="text-orange-600" bg="bg-orange-50" />
         <QuickStat icon={Truck} value={enLivraison} label="En livraison" color="text-indigo-600" bg="bg-indigo-50" />
-        <QuickStat icon={MessageCircle} value={isPharmacie ? pharmaConversations.length : annuleesToday} label={isPharmacie ? "Messages" : "Annulees"} color={isPharmacie ? "text-purple-600" : "text-red-600"} bg={isPharmacie ? "bg-purple-50" : "bg-red-50"} />
+        <QuickStat icon={MessageCircle} value={isPharmacie ? pharmaConversations.length : annuleesToday} label={isPharmacie ? "Messages" : "Annulées"} color={isPharmacie ? "text-emerald-600" : "text-red-600"} bg={isPharmacie ? "bg-emerald-50" : "bg-red-50"} />
       </div>
 
       <div>
         <h2 className="text-sm font-bold text-gray-700 mb-3 px-1 flex items-center gap-1.5">
-          <TrendingUp className="w-4 h-4 text-purple-500" /> Gestion
+          <TrendingUp className={`w-4 h-4 ${theme.accent}`} /> Gestion
         </h2>
         <div className="grid grid-cols-2 gap-3">
           {cards.map((card, index) => (

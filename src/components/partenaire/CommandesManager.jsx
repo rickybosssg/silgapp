@@ -23,17 +23,17 @@ import ChatWindow from "@/components/chat/ChatWindow";
 const STATUTS = {
   commande_envoyee: { label: "Nouvelle", color: "bg-red-50 text-red-700", border: "border-l-red-500", icon: Clock },
   commande_recue: { label: "Nouvelle", color: "bg-red-50 text-red-700", border: "border-l-red-500", icon: Clock },
-  paiement_verification: { label: "Paiement a verifier", color: "bg-red-50 text-red-700", border: "border-l-red-500", icon: Clock },
-  paiement_valide: { label: "Paiement valide", color: "bg-blue-50 text-blue-700", border: "border-l-blue-500", icon: CheckCircle },
-  paiement_refuse: { label: "Paiement refuse", color: "bg-red-50 text-red-700", border: "border-l-red-500", icon: X },
-  en_preparation: { label: "Preparation", color: "bg-blue-50 text-blue-700", border: "border-l-blue-500", icon: ChefHat },
-  prete_recuperation: { label: "Livreur recherche", color: "bg-blue-50 text-blue-700", border: "border-l-blue-500", icon: Package },
-  livreur_assigne: { label: "Livreur assigne", color: "bg-blue-50 text-blue-700", border: "border-l-blue-500", icon: Truck },
-  commande_recuperee: { label: "Recuperee", color: "bg-blue-50 text-blue-700", border: "border-l-blue-500", icon: Package },
+  paiement_verification: { label: "Paiement à vérifier", color: "bg-red-50 text-red-700", border: "border-l-red-500", icon: Clock },
+  paiement_valide: { label: "Paiement validé", color: "bg-blue-50 text-blue-700", border: "border-l-blue-500", icon: CheckCircle },
+  paiement_refuse: { label: "Paiement refusé", color: "bg-red-50 text-red-700", border: "border-l-red-500", icon: X },
+  en_preparation: { label: "Préparation", color: "bg-blue-50 text-blue-700", border: "border-l-blue-500", icon: ChefHat },
+  prete_recuperation: { label: "Livreur recherché", color: "bg-blue-50 text-blue-700", border: "border-l-blue-500", icon: Package },
+  livreur_assigne: { label: "Livreur assigné", color: "bg-blue-50 text-blue-700", border: "border-l-blue-500", icon: Truck },
+  commande_recuperee: { label: "Récupérée", color: "bg-blue-50 text-blue-700", border: "border-l-blue-500", icon: Package },
   en_livraison: { label: "En livraison", color: "bg-blue-50 text-blue-700", border: "border-l-blue-500", icon: Truck },
-  livree: { label: "Livree", color: "bg-green-50 text-green-700", border: "border-l-green-500", icon: CheckCircle },
-  terminee: { label: "Terminee", color: "bg-green-50 text-green-700", border: "border-l-green-500", icon: CheckCircle },
-  annulee: { label: "Annulee", color: "bg-gray-50 text-gray-600", border: "border-l-gray-400", icon: X },
+  livree: { label: "Livrée", color: "bg-green-50 text-green-700", border: "border-l-green-500", icon: CheckCircle },
+  terminee: { label: "Terminée", color: "bg-green-50 text-green-700", border: "border-l-green-500", icon: CheckCircle },
+  annulee: { label: "Annulée", color: "bg-gray-50 text-gray-600", border: "border-l-gray-400", icon: X },
 };
 
 const ACTIVE_DELIVERY_STATUSES = new Set(["prete_recuperation", "livreur_assigne", "commande_recuperee", "en_livraison"]);
@@ -42,7 +42,7 @@ function timeAgo(dateStr) {
   if (!dateStr) return "";
   const diff = Date.now() - new Date(dateStr).getTime();
   const min = Math.floor(diff / 60000);
-  if (min < 1) return "a l'instant";
+  if (min < 1) return "à l'instant";
   if (min < 60) return `il y a ${min} min`;
   const h = Math.floor(min / 60);
   if (h < 24) return `il y a ${h}h`;
@@ -73,7 +73,7 @@ function LivreurCompactCard({ livreur }) {
           className="w-12 h-12 rounded-2xl object-cover border border-white shadow-sm bg-white"
         />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-black text-blue-950 truncate">Livreur assigne</p>
+          <p className="text-sm font-black text-blue-950 truncate">Livreur assigné</p>
           <p className="text-sm font-bold text-gray-900 truncate">{fullName}</p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-600">
             <span className="inline-flex items-center gap-1"><MapPin className="w-3 h-3" />{livreur.quartier || livreur.ville || "Quartier non renseigne"}</span>
@@ -169,15 +169,15 @@ export default function CommandesManager({ type, etablissementId, etablissementN
     { key: "all", label: "Toutes", count: commandes.length },
     { key: "commande_envoyee", label: "Nouvelles", count: (counts.commande_envoyee || 0) + (counts.commande_recue || 0) },
     { key: "paiement_verification", label: "Paiement", count: counts.paiement_verification || 0 },
-    { key: "en_preparation", label: "Preparation", count: counts.en_preparation || 0 },
-    { key: "prete_recuperation", label: "Pretes", count: counts.prete_recuperation || 0 },
+    { key: "en_preparation", label: "Préparation", count: counts.en_preparation || 0 },
+    { key: "prete_recuperation", label: "Prêtes", count: counts.prete_recuperation || 0 },
     { key: "en_livraison", label: "Livraison", count: (counts.en_livraison || 0) + (counts.commande_recuperee || 0) + (counts.livreur_assigne || 0) },
-    { key: "livree", label: "Livrees", count: counts.livree || 0 },
+    { key: "livree", label: "Livrées", count: counts.livree || 0 },
   ].filter(f => f.count > 0 || f.key === "all");
 
   return (
     <div className="space-y-3">
-      <h2 className="font-bold text-gray-900 text-base px-1">Commandes recues</h2>
+      <h2 className="font-bold text-gray-900 text-base px-1">Commandes reçues</h2>
 
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
         {activeFilters.map(f => (
@@ -243,7 +243,7 @@ export default function CommandesManager({ type, etablissementId, etablissementN
                 <div className="px-3 pb-3 space-y-3 border-t border-gray-50">
                   <div className="grid grid-cols-2 gap-2 pt-3 text-xs">
                     <div className="rounded-xl bg-gray-50 p-2">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase">Telephone</p>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase">Téléphone</p>
                       <p className="font-bold text-gray-800">{cmd.client_telephone || "-"}</p>
                     </div>
                     <div className="rounded-xl bg-gray-50 p-2">
@@ -274,7 +274,7 @@ export default function CommandesManager({ type, etablissementId, etablissementN
 
                   {cmd.statut === "commande_envoyee" && (
                     <Button size="sm" onClick={() => handleAction(cmd, "verifier_paiement")} disabled={actionLoading === cmd.id} className="bg-red-600 hover:bg-red-700 text-xs h-9">
-                      {actionLoading === cmd.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Clock className="w-3 h-3" />} Verifier paiement
+                      {actionLoading === cmd.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Clock className="w-3 h-3" />} Vérifier paiement
                     </Button>
                   )}
                   {cmd.statut === "paiement_verification" && (
@@ -289,12 +289,12 @@ export default function CommandesManager({ type, etablissementId, etablissementN
                   )}
                   {cmd.statut === "paiement_valide" && (
                     <Button size="sm" onClick={() => handleAction(cmd, "commencer_preparation")} disabled={actionLoading === cmd.id} className="bg-blue-600 hover:bg-blue-700 text-xs h-9">
-                      {actionLoading === cmd.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <ChefHat className="w-3 h-3" />} Commencer preparation
+                      {actionLoading === cmd.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <ChefHat className="w-3 h-3" />} Commencer préparation
                     </Button>
                   )}
                   {cmd.statut === "en_preparation" && (
                     <Button size="sm" onClick={() => handleAction(cmd, "prete_recuperation")} disabled={actionLoading === cmd.id} className="bg-blue-600 hover:bg-blue-700 text-xs h-9">
-                      {actionLoading === cmd.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Rocket className="w-3 h-3" />} Prete - declencher livraison
+                      {actionLoading === cmd.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Rocket className="w-3 h-3" />} Prête - déclencher livraison
                     </Button>
                   )}
 
@@ -309,13 +309,13 @@ export default function CommandesManager({ type, etablissementId, etablissementN
                   )}
 
                   {cmd.statut === "commande_recuperee" && (
-                    <p className="text-xs text-blue-700 font-bold flex items-center gap-1 py-1"><Package className="w-3 h-3" /> Commande recuperee - livreur en route vers le client</p>
+                    <p className="text-xs text-blue-700 font-bold flex items-center gap-1 py-1"><Package className="w-3 h-3" /> Commande récupérée - livreur en route vers le client</p>
                   )}
                   {cmd.statut === "en_livraison" && (
                     <p className="text-xs text-blue-700 font-bold flex items-center gap-1 py-1"><Truck className="w-3 h-3" /> En livraison</p>
                   )}
                   {cmd.statut === "livree" && (
-                    <p className="text-xs text-green-700 font-bold flex items-center gap-1 py-1"><CheckCircle className="w-3 h-3" /> Livree</p>
+                    <p className="text-xs text-green-700 font-bold flex items-center gap-1 py-1"><CheckCircle className="w-3 h-3" /> Livrée</p>
                   )}
 
                   {!["livree", "annulee", "prete_recuperation", "livreur_assigne", "commande_recuperee", "en_livraison"].includes(cmd.statut) && (

@@ -1192,7 +1192,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-blue-50/40 to-white dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <PullToRefreshIndicator pulling={pulling} refreshing={refreshing} />
       <AlertesLivreurModal
         livreurId={livreurProfil?.id}
@@ -1248,15 +1248,15 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       )}
 
       {/* ── Navigation sticky en haut ──────────────── */}
-      <div className="sticky top-0 z-30 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-sm px-4 pt-3 pb-2 border-b border-gray-100 dark:border-gray-800">
-        <div className="max-w-lg mx-auto flex gap-1 bg-white dark:bg-gray-800 rounded-2xl p-1 shadow-sm border border-gray-100 dark:border-gray-700">
+      <div className="sticky top-0 z-30 bg-white/80 dark:bg-slate-950/85 backdrop-blur-xl px-4 pt-3 pb-2 border-b border-blue-100/70 dark:border-slate-800">
+        <div className="max-w-lg mx-auto flex gap-1 bg-white/95 dark:bg-slate-900 rounded-2xl p-1 shadow-sm border border-blue-100 dark:border-slate-700">
           {TABS.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                 activeTab === tab.id
-                  ? "bg-gradient-to-br from-slate-800 to-slate-900 text-white shadow-md"
+                  ? "bg-gradient-to-br from-blue-800 to-sky-600 text-white shadow-md shadow-blue-200"
                   : "text-gray-500 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-500"
               }`}
             >

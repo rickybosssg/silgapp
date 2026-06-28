@@ -765,7 +765,7 @@ export default function ClientExterneApp() {
   const prenom = (clientProfil?.prenom || (clientProfil?.nom || "").split(" ")[0] || "Client").trim() || "Client";
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-blue-50/30 to-white">
       <PullToRefreshIndicator pulling={pulling} refreshing={refreshing} />
 
       {/* ── COURSES ACTIVES — bannière flottante ─────── */}
@@ -870,10 +870,11 @@ export default function ClientExterneApp() {
               <PubliciteCarousel cible="clients" userId={clientProfil?.id} userType="client" />
 
               {/* ── HERO HEADER ───────────────────── */}
-              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-red-500 to-red-700 p-5 shadow-xl shadow-red-200">
+              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-blue-800 to-sky-700 p-5 shadow-xl shadow-blue-200">
                 {/* Cercles déco */}
                 <div className="absolute -top-6 -right-6 w-28 h-28 bg-white/10 rounded-full" />
-                <div className="absolute -bottom-8 -left-4 w-36 h-36 bg-white/5 rounded-full" />
+                <div className="absolute -bottom-8 -left-4 w-36 h-36 bg-sky-300/10 rounded-full" />
+                <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-sky-300 via-emerald-300 to-blue-200" />
                 <div className="relative">
                   <div className="flex items-start justify-between">
                     <div>
@@ -913,10 +914,10 @@ export default function ClientExterneApp() {
               {/* ── ACTIONS PRINCIPALES ───────────── */}
               <div className="grid grid-cols-2 gap-3">
                 <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-primary/20"
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-blue-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-blue-200"
                   onClick={() => navigate("/client/course/expedier", { state: { position, clientProfil } })}
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-red-600 flex items-center justify-center shadow-lg shadow-red-200 mb-2 group-hover:scale-105 transition-transform">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-700 to-sky-500 flex items-center justify-center shadow-lg shadow-blue-200 mb-2 group-hover:scale-105 transition-transform">
                     <Package className="w-5 h-5 text-white" />
                   </div>
                   <p className="font-black text-gray-900 text-xs">Expédier</p>
@@ -924,7 +925,7 @@ export default function ClientExterneApp() {
                 </button>
 
                 <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-green-200"
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-emerald-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-emerald-200"
                   onClick={() => navigate("/client/course/recevoir", { state: { position, clientProfil } })}
                 >
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-lg shadow-green-200 mb-2 group-hover:scale-105 transition-transform">
@@ -935,7 +936,7 @@ export default function ClientExterneApp() {
                 </button>
 
                 <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-sky-200"
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-sky-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-sky-200"
                   onClick={() => navigate("/client/course/deplacement", { state: { position, clientProfil } })}
                 >
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center shadow-lg shadow-sky-200 mb-2 group-hover:scale-105 transition-transform">
@@ -946,7 +947,7 @@ export default function ClientExterneApp() {
                 </button>
 
                 <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-purple-200"
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-violet-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-violet-200"
                   onClick={() => setShowMessages(true)}
                 >
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-lg shadow-purple-200 mb-2 group-hover:scale-105 transition-transform">
@@ -957,7 +958,7 @@ export default function ClientExterneApp() {
                 </button>
 
                 <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-blue-200"
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-blue-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-blue-200"
                   onClick={() => navigate("/client/boutiques")}
                 >
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-200 mb-2 group-hover:scale-105 transition-transform">
@@ -968,7 +969,7 @@ export default function ClientExterneApp() {
                 </button>
 
                 <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-orange-200"
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-amber-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-amber-200"
                   onClick={() => navigate("/client/restaurants")}
                 >
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg shadow-orange-200 mb-2 group-hover:scale-105 transition-transform">
@@ -979,10 +980,10 @@ export default function ClientExterneApp() {
                 </button>
 
                 <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-gray-300"
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-emerald-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-emerald-200"
                   onClick={() => navigate("/client/pharmacies")}
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-gray-600 to-gray-800 flex items-center justify-center shadow-lg shadow-gray-300 mb-2 group-hover:scale-105 transition-transform">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-700 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-200 mb-2 group-hover:scale-105 transition-transform">
                     <Pill className="w-5 h-5 text-white" />
                   </div>
                   <p className="font-black text-gray-900 text-xs">Pharmacies</p>
@@ -993,7 +994,7 @@ export default function ClientExterneApp() {
               {/* ── BOUTON CARTE ──────────────────── */}
               {position && (
                 <button
-                  className="w-full bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3 shadow-sm hover:shadow-md hover:border-primary/20 transition-all active:scale-[0.98]"
+                  className="w-full bg-white border border-blue-100 rounded-2xl p-4 flex items-center gap-3 shadow-sm hover:shadow-md hover:border-blue-200 transition-all active:scale-[0.98]"
                   onClick={() => setShowMap(true)}
                 >
                   <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
@@ -1009,7 +1010,7 @@ export default function ClientExterneApp() {
               )}
 
               {/* ── RACCOURCIS ────────────────────── */}
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              <div className="bg-white rounded-2xl border border-blue-100 shadow-sm p-4">
                 <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-3">Accès rapide</p>
                 <div className="grid grid-cols-4 gap-2">
                   {[
@@ -1048,7 +1049,7 @@ export default function ClientExterneApp() {
 
               {/* ── BANNIÈRE CODE PROMO ───────────── */}
               {clientProfil?.code_promo_utilise && !clientProfil?.premiere_course_faite && (
-                <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl p-4 shadow-lg shadow-purple-200">
+                <div className="bg-gradient-to-r from-blue-700 to-sky-500 rounded-2xl p-4 shadow-lg shadow-blue-200">
                   <div className="flex items-center gap-3">
                     <span className="text-2xl"></span>
                     <div className="flex-1">
@@ -1065,7 +1066,7 @@ export default function ClientExterneApp() {
               {/* ── SUPPORT + TARIF ───────────────── */}
               <SupportWhatsApp />
 
-              <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
+              <div className="bg-white border border-blue-100 rounded-2xl p-4 shadow-sm">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-8 h-8 rounded-xl bg-indigo-100 flex items-center justify-center">
                     <TrendingUp className="w-4 h-4 text-indigo-600" />

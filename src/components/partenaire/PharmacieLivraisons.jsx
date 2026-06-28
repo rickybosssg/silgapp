@@ -67,7 +67,7 @@ export default function PharmacieLivraisons({ pharmacieId, pharmacieNom, onNavig
       return;
     }
 
-    if (!confirm(`Creer une livraison vers ${clientPart.name || "ce client"} ?`)) return;
+    if (!confirm(`Créer une livraison vers ${clientPart.name || "ce client"} ?`)) return;
 
     setCreating(conv.id);
     try {
@@ -105,7 +105,7 @@ export default function PharmacieLivraisons({ pharmacieId, pharmacieNom, onNavig
       )}
 
       <div className="space-y-2">
-        <p className="text-xs font-bold text-gray-500 uppercase px-1">Creer une livraison depuis une conversation</p>
+        <p className="text-xs font-bold text-gray-500 uppercase px-1">Créer une livraison depuis une conversation</p>
 
         {isLoading && (
           <div className="flex justify-center py-8">

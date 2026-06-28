@@ -3,6 +3,11 @@ import { Home, Package, ShoppingBag, MessageCircle, BarChart3, Truck, Pill, Gift
 
 export default function PartenaireBottomNav({ tab, setTab, badgeCount = 0, messageBadge = 0, etablissementType, showPromo = true }) {
   const isPharmacie = etablissementType === "pharmacie";
+  const activeClasses = isPharmacie
+    ? { text: "text-emerald-700", bar: "bg-emerald-600" }
+    : etablissementType === "restaurant"
+      ? { text: "text-orange-700", bar: "bg-orange-600" }
+      : { text: "text-blue-700", bar: "bg-blue-600" };
   const baseItems = isPharmacie ? [
     { id: "home", icon: Home, label: "Accueil" },
     { id: "messages", icon: MessageCircle, label: "Messages", badge: messageBadge },
@@ -33,7 +38,7 @@ export default function PartenaireBottomNav({ tab, setTab, badgeCount = 0, messa
             >
               <div className="relative">
                 <item.icon
-                  className={"w-5 h-5 transition-colors " + (active ? "text-purple-600" : "text-gray-400")}
+                  className={"w-5 h-5 transition-colors " + (active ? activeClasses.text : "text-gray-400")}
                   strokeWidth={active ? 2.5 : 2}
                 />
                 {item.badge > 0 && (
@@ -42,10 +47,10 @@ export default function PartenaireBottomNav({ tab, setTab, badgeCount = 0, messa
                   </span>
                 )}
               </div>
-              <span className={"text-[10px] font-bold transition-colors " + (active ? "text-purple-600" : "text-gray-400")}>
+              <span className={"text-[10px] font-bold transition-colors " + (active ? activeClasses.text : "text-gray-400")}>
                 {item.label}
               </span>
-              {active && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-purple-600 rounded-full" />}
+              {active && <div className={"absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full " + activeClasses.bar} />}
             </button>
           );
         })}
