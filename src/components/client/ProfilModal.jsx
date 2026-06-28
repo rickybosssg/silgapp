@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { toast } from "sonner";
-import { User, Save, X, Check, Trash2 } from "lucide-react";
+import { User, Save, X, Check, Trash2, LogOut } from "lucide-react";
 import CountryCodeSelect from "@/components/ui/CountryCodeSelect";
 import { SILGAPP_COUNTRIES, normalizePhone } from "@/lib/phoneUtils";
 
@@ -70,6 +70,12 @@ export default function ProfilModal({ clientProfil, onClose, onSave }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleLogout = () => {
+    if (!window.confirm("Voulez-vous vraiment vous déconnecter ?")) return;
+    clearPersistedToken();
+    base44.auth.logout();
   };
 
   const telValide = telAffiche.replace(/\D/g, "").length === countryInfo.len;
@@ -165,6 +171,15 @@ export default function ProfilModal({ clientProfil, onClose, onSave }) {
             )}
           </button>
         </div>
+
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="w-full h-12 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-100 transition-colors"
+        >
+          <LogOut className="w-4 h-4" />
+          Déconnexion
+        </button>
 
         {/* Supprimer le compte */}
         {!showDeleteConfirm ? (

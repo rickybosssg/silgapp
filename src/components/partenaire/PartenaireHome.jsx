@@ -16,6 +16,7 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
         accent: "text-emerald-600",
         activeBg: "bg-emerald-600",
         soft: "bg-emerald-50",
+        softBorder: "border-emerald-100",
         icon: "text-emerald-700",
         label: "Espace pharmacie",
       }
@@ -26,6 +27,7 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
           accent: "text-orange-600",
           activeBg: "bg-orange-600",
           soft: "bg-orange-50",
+          softBorder: "border-orange-100",
           icon: "text-orange-700",
           label: "Espace restaurant",
         }
@@ -35,6 +37,7 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
           accent: "text-blue-600",
           activeBg: "bg-blue-600",
           soft: "bg-blue-50",
+          softBorder: "border-blue-100",
           icon: "text-blue-700",
           label: "Espace boutique",
         };
@@ -115,8 +118,8 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
     { id: "infos", icon: Store, label: "Informations", subtitle: "Modifier la fiche", bg: "bg-pink-50", iconColor: "text-pink-600" },
     { id: "revenus", icon: Wallet, label: "Revenus", subtitle: "Suivi des paiements", bg: "bg-teal-50", iconColor: "text-teal-600" },
   ] : [
-    { id: "commandes", icon: Package, label: "Commandes", subtitle: "Gérer les commandes", bg: "bg-blue-50", iconColor: "text-blue-600", badge: pendingCount },
-    { id: "produits", icon: ShoppingBag, label: isRestaurant ? "Plats" : "Produits", subtitle: "Gérer le catalogue", bg: "bg-purple-50", iconColor: "text-purple-600" },
+    { id: "commandes", icon: Package, label: "Commandes", subtitle: "Gérer les commandes", bg: isRestaurant ? "bg-orange-50" : "bg-blue-50", iconColor: isRestaurant ? "text-orange-700" : "text-blue-600", badge: pendingCount },
+    { id: "produits", icon: ShoppingBag, label: isRestaurant ? "Plats" : "Produits", subtitle: "Gérer le catalogue", bg: isRestaurant ? "bg-amber-50" : "bg-blue-50", iconColor: isRestaurant ? "text-amber-700" : "text-blue-700" },
     { id: "messages", icon: MessageCircle, label: "Messages", subtitle: "Discuter avec clients", bg: "bg-green-50", iconColor: "text-green-600", badge: messageBadge },
     { id: "statistiques", icon: BarChart3, label: "Statistiques", subtitle: "Ventes et revenus", bg: "bg-amber-50", iconColor: "text-amber-600" },
     { id: "infos", icon: Store, label: "Informations", subtitle: "Modifier la fiche", bg: "bg-pink-50", iconColor: "text-pink-600" },
@@ -126,7 +129,7 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+        <Loader2 className={`w-6 h-6 animate-spin ${theme.accent}`} />
       </div>
     );
   }
@@ -196,7 +199,7 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
               onClick={() => onNavigate(card.id)}
-              className="relative bg-white rounded-2xl p-4 shadow-sm border border-gray-50 hover:shadow-md hover:border-gray-100 transition-all text-left group active:scale-95"
+              className={`relative bg-white rounded-2xl p-4 shadow-sm border ${theme.softBorder} hover:shadow-md transition-all text-left group active:scale-95`}
             >
               {card.badge > 0 && (
                 <span className="absolute top-3 right-3 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center">

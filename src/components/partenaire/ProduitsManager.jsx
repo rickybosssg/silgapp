@@ -17,6 +17,21 @@ const CATEGORIES_PLAT = [
 
 export default function ProduitsManager({ type, etablissementId }) {
   const isRestaurant = type === "restaurant";
+  const theme = isRestaurant
+    ? {
+        primary: "bg-orange-600 hover:bg-orange-700",
+        soft: "bg-orange-50 hover:bg-orange-100",
+        text: "text-orange-700",
+        spinner: "text-orange-500",
+        ring: "focus:ring-orange-200 focus:border-orange-400",
+      }
+    : {
+        primary: "bg-blue-700 hover:bg-blue-800",
+        soft: "bg-blue-50 hover:bg-blue-100",
+        text: "text-blue-700",
+        spinner: "text-blue-500",
+        ring: "focus:ring-blue-200 focus:border-blue-400",
+      };
   const entityName = isRestaurant ? "PlatRestaurant" : "ProduitBoutique";
   const idField = isRestaurant ? "restaurant_id" : "boutique_id";
   const queryClient = useQueryClient();
@@ -43,7 +58,7 @@ export default function ProduitsManager({ type, etablissementId }) {
     <div className="space-y-3">
       <div className="flex items-center justify-between px-1">
         <h2 className="font-bold text-gray-900 text-base">{isRestaurant ? "Plats" : "Produits"}</h2>
-        <Button size="sm" onClick={() => { setEditing(null); setShowForm(true); }} className="bg-purple-600 hover:bg-purple-700 gap-1 rounded-xl">
+        <Button size="sm" onClick={() => { setEditing(null); setShowForm(true); }} className={`${theme.primary} gap-1 rounded-xl`}>
           <Plus className="w-4 h-4" /> Ajouter
         </Button>
       </div>
@@ -66,7 +81,7 @@ export default function ProduitsManager({ type, etablissementId }) {
         </div>
       )}
 
-      {isLoading && <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-purple-400" /></div>}
+      {isLoading && <div className="flex justify-center py-12"><Loader2 className={`w-6 h-6 animate-spin ${theme.spinner}`} /></div>}
 
       {!isLoading && items.length === 0 && (
         <div className="text-center py-12">
@@ -112,7 +127,7 @@ export default function ProduitsManager({ type, etablissementId }) {
               <p className="font-black text-primary text-sm mt-1">{(item.prix || 0).toLocaleString()} FCFA</p>
               {/* Actions */}
               <div className="flex gap-1.5 mt-2">
-                <button onClick={() => { setEditing(item); setShowForm(true); }} className="flex-1 h-8 rounded-lg bg-purple-50 flex items-center justify-center gap-1 text-[10px] font-bold text-purple-600 hover:bg-purple-100 transition-colors">
+                <button onClick={() => { setEditing(item); setShowForm(true); }} className={`flex-1 h-8 rounded-lg ${theme.soft} flex items-center justify-center gap-1 text-[10px] font-bold ${theme.text} transition-colors`}>
                   <Pencil className="w-3 h-3" /> Modifier
                 </button>
                 <button onClick={() => handleDelete(item.id)} className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center hover:bg-red-100 transition-colors">
@@ -201,7 +216,7 @@ function ProduitForm({ type, etablissementId, existing, onClose, onSaved }) {
             <div><Label className="text-xs">Catégorie</Label><Input value={form.categorie || ""} onChange={e => set("categorie", e.target.value)} placeholder="Ex: Boissons, Alimentation" className="mt-1" /></div>
           )}
           <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.disponible} onChange={e => set("disponible", e.target.checked)} className="w-4 h-4" /> Disponible</label>
-          <Button onClick={handleSave} disabled={saving || !form.nom || !form.prix} className="w-full bg-purple-600 hover:bg-purple-700">
+          <Button onClick={handleSave} disabled={saving || !form.nom || !form.prix} className={`w-full ${isRestaurant ? "bg-orange-600 hover:bg-orange-700" : "bg-blue-700 hover:bg-blue-800"}`}>
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Enregistrer
           </Button>
         </div>

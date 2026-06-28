@@ -13,7 +13,7 @@ import { useQueryClient, useQuery } from "@tanstack/react-query";
 import {
   MapPin, Navigation, MessageCircle, User, Package,
   Clock, ChevronRight, TrendingUp, Loader2, ArrowLeft, RefreshCw,
-  Store, UtensilsCrossed, Bell, Pill, Inbox, Car
+  Store, UtensilsCrossed, Bell, Pill, Inbox, Car, Headphones, ShieldCheck, Zap
 } from "lucide-react";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import CourseAnnuleeRelanceDialog from "@/components/client/CourseAnnuleeRelanceDialog";
@@ -283,7 +283,7 @@ export default function ClientExterneApp() {
   useEffect(() => {
     if (!clientProfil?.id) return;
     base44.entities.CodePromo.filter({ proprietaire_client_id: clientProfil.id })
-      .then(codes => setAUnCodePromo((codes?.length || 0) > 0))
+      .then(codes => setAUnCodePromo((codes || []).some((code) => code?.actif !== false)))
       .catch(() => {});
   }, [clientProfil?.id]);
 
@@ -1019,7 +1019,7 @@ export default function ClientExterneApp() {
                     { icon: <Bell className="w-5 h-5" />, label: "Notifications", color: "text-red-600", bg: "bg-red-50", badge: notifications.length, action: openNotificationsPanel },
                     { icon: <Package className="w-5 h-5" />, label: "Commandes", color: "text-indigo-600", bg: "bg-indigo-50", badge: commandesActivesCount, action: () => navigate("/client/mes-commandes") },
                     { icon: <Clock className="w-5 h-5" />, label: "Programmees", color: "text-amber-600", bg: "bg-amber-50", action: () => navigate("/client/livraisons-programmees") },
-                    { icon: <span className="text-xs"></span>, label: "Support", color: "text-green-600", bg: "bg-green-50", action: () => {
+                    { icon: <Headphones className="w-5 h-5" />, label: "Support", color: "text-green-600", bg: "bg-green-50", action: () => {
                       const msg = encodeURIComponent("Bonjour SILGAPP \nJ'ai besoin d'aide sur SILGAPP.");
                       const a = document.createElement("a");
                       a.href = `whatsapp://send?phone=22667572857&text=${msg}`;
@@ -1075,13 +1075,13 @@ export default function ClientExterneApp() {
                 </div>
                 <div className="space-y-2">
                   {[
-                    { icon: "", color: "bg-green-50 text-green-700",   title: "Livraison rapide",  desc: "Livreurs disponibles 24/7" },
-                    { icon: "", color: "bg-blue-50 text-blue-700",     title: "Service sécurisé",  desc: "Livreurs vérifiés et suivis" },
-                    { icon: "", color: "bg-purple-50 text-purple-700", title: "Support réactif",   desc: "Aide disponible à tout moment" },
-                    { icon: "", color: "bg-amber-50 text-amber-700",   title: "100 F/km",          desc: "Tarif transparent et calculé au km" },
+                    { icon: <Zap className="w-4 h-4" />, color: "bg-green-50 text-green-700",   title: "Livraison rapide",  desc: "Livreurs disponibles 24/7" },
+                    { icon: <ShieldCheck className="w-4 h-4" />, color: "bg-blue-50 text-blue-700", title: "Service sécurisé", desc: "Livreurs vérifiés et suivis" },
+                    { icon: <MessageCircle className="w-4 h-4" />, color: "bg-purple-50 text-purple-700", title: "Support réactif", desc: "Aide disponible à tout moment" },
+                    { icon: <TrendingUp className="w-4 h-4" />, color: "bg-amber-50 text-amber-700", title: "Tarif clair", desc: "Prix transparent et calculé au km" },
                   ].map((item, i) => (
                     <div key={i} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl ${item.color}`}>
-                      <span className="text-base">{item.icon}</span>
+                      <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/70">{item.icon}</span>
                       <div>
                         <p className="text-xs font-bold">{item.title}</p>
                         <p className="text-[10px] opacity-70">{item.desc}</p>

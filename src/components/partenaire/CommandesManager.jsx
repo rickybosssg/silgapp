@@ -102,6 +102,9 @@ function LivreurCompactCard({ livreur }) {
 
 export default function CommandesManager({ type, etablissementId, etablissementNom }) {
   const isRestaurant = type === "restaurant";
+  const theme = isRestaurant
+    ? { active: "bg-orange-600 text-white shadow-sm", spinner: "text-orange-500" }
+    : { active: "bg-blue-700 text-white shadow-sm", spinner: "text-blue-500" };
   const entityName = isRestaurant ? "CommandeRestaurant" : "CommandeBoutique";
   const idField = isRestaurant ? "restaurant_id" : "boutique_id";
   const queryClient = useQueryClient();
@@ -184,14 +187,14 @@ export default function CommandesManager({ type, etablissementId, etablissementN
           <button
             key={f.key}
             onClick={() => setFilter(f.key)}
-            className={"px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all " + (filter === f.key ? "bg-purple-600 text-white shadow-sm" : "bg-white text-gray-500 border border-gray-200")}
+            className={"px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all " + (filter === f.key ? theme.active : "bg-white text-gray-500 border border-gray-200")}
           >
             {f.label} ({f.count})
           </button>
         ))}
       </div>
 
-      {isLoading && <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-purple-400" /></div>}
+      {isLoading && <div className="flex justify-center py-12"><Loader2 className={`w-6 h-6 animate-spin ${theme.spinner}`} /></div>}
 
       {!isLoading && filtered.length === 0 && (
         <div className="text-center py-12">

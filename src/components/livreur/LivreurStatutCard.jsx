@@ -2,6 +2,7 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import BatterieFaibleButton from "./BatterieFaibleButton";
 import CoursePersonnelleButton from "./CoursePersonnelleButton";
+import { CircleCheck, PowerOff, Route } from "lucide-react";
 
 export default function LivreurStatutCard({ statut, livreur, isExterne = false }) {
   const isDisponible = statut === "disponible";
@@ -23,14 +24,14 @@ export default function LivreurStatutCard({ statut, livreur, isExterne = false }
         {/* Icône statut */}
         <div className="relative flex-shrink-0">
           <div className={cn(
-            "w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-inner",
+            "w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner",
             isDisponible && "bg-white/20",
             isEnCourse && "bg-white/20",
             isHorsLigne && "bg-gray-200",
           )}>
-            {isDisponible && ""}
-            {isEnCourse && ""}
-            {isHorsLigne && ""}
+            {isDisponible && <CircleCheck className="h-7 w-7 text-white" />}
+            {isEnCourse && <Route className="h-7 w-7 text-white" />}
+            {isHorsLigne && <PowerOff className="h-7 w-7 text-gray-500" />}
           </div>
           {/* Ping animé */}
           {(isDisponible || isEnCourse) && (

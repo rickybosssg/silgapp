@@ -160,8 +160,8 @@ export default function DashboardAdminExterne() {
       label: "Dispatch Externe",
       sub: "Vagues, timeout, nb livreurs",
       icon: Zap,
-      grad: "from-primary to-red-600",
-      shadow: "shadow-red-100",
+      grad: "from-blue-700 to-sky-600",
+      shadow: "shadow-blue-100",
     },
     {
       scroll: "zones-chaudes",
@@ -209,7 +209,7 @@ export default function DashboardAdminExterne() {
     <div className="px-4 py-4 lg:p-6 space-y-6 max-w-7xl mx-auto">
 
       {/* ── HERO HEADER ────────────────────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary via-red-600 to-rose-600 p-5 sm:p-6 shadow-xl shadow-red-200">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-950 via-blue-900 to-sky-700 p-5 sm:p-6 shadow-xl shadow-blue-200">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute -top-8 -right-8 w-40 h-40 bg-white rounded-full" />
           <div className="absolute -bottom-12 -left-6 w-56 h-56 bg-white rounded-full" />
@@ -264,7 +264,7 @@ export default function DashboardAdminExterne() {
         <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Vue d'ensemble</p>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
           {[
-            { label: "Total courses",    value: stats.coursesTotale,               grad: "from-primary to-red-600",          shadow: "shadow-red-100" },
+            { label: "Total courses",    value: stats.coursesTotale,               grad: "from-slate-800 to-blue-700",       shadow: "shadow-blue-100" },
             { label: "Aujourd'hui",      value: stats.coursesToday,                grad: "from-blue-500 to-indigo-500",       shadow: "shadow-blue-100" },
             { label: "En traitement",    value: stats.enTraitement,                grad: "from-orange-500 to-amber-500",      shadow: "shadow-orange-100" },
             { label: "Livrées",          value: stats.livrees,                     grad: "from-green-500 to-emerald-500",     shadow: "shadow-green-100" },
@@ -317,9 +317,9 @@ export default function DashboardAdminExterne() {
       </div>
 
       {/* ── CONFIG APK ────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+      <div className="bg-white rounded-2xl border border-blue-100 p-5 shadow-sm">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-red-600 flex items-center justify-center shadow-md shadow-red-100">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-slate-800 to-blue-700 flex items-center justify-center shadow-md shadow-blue-100">
             <Download className="w-4 h-4 text-white" />
           </div>
           <div>
@@ -363,9 +363,9 @@ export default function DashboardAdminExterne() {
       </div>
 
       {/* ── DISPATCH CONFIG ──────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm" id="dispatch-config">
+      <div className="bg-white rounded-2xl border border-blue-100 p-5 shadow-sm" id="dispatch-config">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-red-600 flex items-center justify-center shadow-md shadow-red-100">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-700 to-sky-600 flex items-center justify-center shadow-md shadow-blue-100">
             <Zap className="w-4 h-4 text-white" />
           </div>
           <div>

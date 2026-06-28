@@ -178,13 +178,20 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     staleTime: 30000,
   });
   const commissionPct = normalizeCommissionPct(countryCommissionRows?.[0]?.commission_pct);
-  const livreurHasEmail = !!(livreurProfil?.user_email || livreurProfil?.email);
+  const { data: livreurPromoCodes = [] } = useQuery({
+    queryKey: ["livreur-promo-eligibilite", livreurProfil?.id],
+    queryFn: () => base44.entities.CodePromo.filter({ proprietaire_livreur_id: livreurProfil.id }),
+    enabled: !!livreurProfil?.id,
+    staleTime: 30000,
+    refetchInterval: 30000,
+  });
+  const livreurHasPromoCode = (livreurPromoCodes || []).some((code) => code?.actif !== false);
 
   useEffect(() => {
-    if (activeTab === "promo" && !livreurHasEmail) {
+    if (activeTab === "promo" && !livreurHasPromoCode) {
       setActiveTab("courses");
     }
-  }, [activeTab, livreurHasEmail]);
+  }, [activeTab, livreurHasPromoCode]);
 
   // Synchroniser le pricingMode depuis le profil BDD au chargement
   useEffect(() => {
@@ -1187,7 +1194,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     { id: "courses", label: "Courses", emoji: "" },
     { id: "historique", label: "Historique", emoji: "" },
     { id: "messages", label: "Messages", emoji: "" },
-    ...(livreurHasEmail ? [{ id: "promo", label: "Code Promo", emoji: "" }] : []),
+    ...(livreurHasPromoCode ? [{ id: "promo", label: "Code Promo", emoji: "" }] : []),
     { id: "infos", label: "Mon profil", emoji: "" },
   ];
 
@@ -1448,8 +1455,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           />
         )}
 
-        {activeTab === "promo" && livreurHasEmail && (
-          <OngletCodePromoLivreur livreur={livreurProfil} />
+        {activeTab === "promo" && livreurHasPromoCode && (
+          <OngletCodePromoLivreur livreurProfil={livreurProfil} />
         )}
 
         {activeTab === "infos" && livreurProfil && (

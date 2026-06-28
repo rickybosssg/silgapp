@@ -222,13 +222,20 @@ export default function PartenaireDashboard() {
   };
 
   const loading = loadingBoutique || loadingRestaurant || loadingPharmacie;
-  const partenaireHasEmail = !!(user?.email || etablissement?.email || etablissement?.user_email);
+  const { data: partenairePromoCodes = [] } = useQuery({
+    queryKey: ["partenaire-promo-eligibilite", user?.id],
+    queryFn: () => base44.entities.CodePromo.filter({ proprietaire_partenaire_id: user.id }),
+    enabled: !!user?.id,
+    staleTime: 30000,
+    refetchInterval: 30000,
+  });
+  const partenaireHasPromoCode = (partenairePromoCodes || []).some((code) => code?.actif !== false);
 
   useEffect(() => {
-    if (tab === "promo" && !partenaireHasEmail) {
+    if (tab === "promo" && !partenaireHasPromoCode) {
       setTab("home");
     }
-  }, [partenaireHasEmail, tab]);
+  }, [partenaireHasPromoCode, tab]);
 
   const handleLogout = () => {
     if (!window.confirm("Voulez-vous vraiment vous déconnecter ?")) return;
@@ -246,30 +253,30 @@ export default function PartenaireDashboard() {
 
   if (!hasEtablissement) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-gradient-to-b from-slate-950 via-blue-950 to-slate-100 flex items-center justify-center p-6">
         <div className="w-full max-w-md space-y-6">
           <button
             type="button"
             onClick={() => window.history.back()}
-            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 shadow-sm"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold text-white shadow-sm backdrop-blur"
           >
             <ArrowLeft className="w-4 h-4" />
             Retour
           </button>
 
-          <div className="text-center space-y-3">
-            <div className="w-20 h-20 rounded-2xl bg-purple-100 flex items-center justify-center mx-auto">
-              <Store className="w-10 h-10 text-purple-600" />
+          <div className="rounded-3xl bg-white/95 border border-white/60 p-6 text-center space-y-3 shadow-2xl shadow-blue-950/20">
+            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-blue-800 to-sky-600 flex items-center justify-center mx-auto shadow-lg shadow-blue-200">
+              <Store className="w-10 h-10 text-white" />
             </div>
             <h1 className="text-2xl font-black text-gray-900">Espace Partenaire</h1>
-            <p className="text-gray-500">Que souhaitez-vous créer ?</p>
+            <p className="text-sm text-gray-500 leading-relaxed">Choisissez le type d'établissement à ouvrir dans SILGAPP.</p>
           </div>
 
           <CreateChoice icon={Store} title="Une Boutique" text="Vendre des produits" onClick={() => setTab("boutique_form")} color="blue" />
           <CreateChoice icon={UtensilsCrossed} title="Un Restaurant" text="Proposer un menu et des plats" onClick={() => setTab("restaurant_form")} color="orange" />
           <CreateChoice icon={Pill} title="Une Pharmacie" text="Discuter avec clients et livrer" onClick={() => setTab("pharmacie_form")} color="blueDark" />
 
-          <button onClick={handleLogout} className="w-full text-sm text-gray-400 underline">
+          <button onClick={handleLogout} className="w-full rounded-2xl bg-white/90 py-3 text-sm font-bold text-gray-600 shadow-sm">
             Se déconnecter
           </button>
 
@@ -388,7 +395,7 @@ export default function PartenaireDashboard() {
             <MessagesPage myType="partenaire" myId={etablissement.id} myName={etablissement.nom} />
           </div>
         )}
-        {tab === "promo" && partenaireHasEmail && <OngletCodePromoPartenaire partenaireId={user.id} />}
+        {tab === "promo" && partenaireHasPromoCode && <OngletCodePromoPartenaire partenaireId={user.id} />}
         {tab === "statistiques" && <ComptabilitePartenaire type={etablissementType} />}
         {tab === "revenus" && <ComptabilitePartenaire type={etablissementType} />}
         {tab === "infos" && (
@@ -403,7 +410,7 @@ export default function PartenaireDashboard() {
         badgeCount={pendingCount}
         messageBadge={unreadCount}
         etablissementType={etablissementType}
-        showPromo={partenaireHasEmail}
+        showPromo={partenaireHasPromoCode}
       />
 
       <NewMessageModal
@@ -421,31 +428,31 @@ function CreateChoice({ icon: Icon, title, text, onClick, color }) {
   const styles = {
     blue: {
       border: "border-blue-200",
-      gradient: "from-blue-50 to-indigo-50",
+      gradient: "from-blue-50 via-white to-sky-50",
       hover: "hover:border-blue-500",
       iconText: "text-blue-600",
       iconBg: "bg-blue-100",
     },
     orange: {
       border: "border-orange-200",
-      gradient: "from-orange-50 to-amber-50",
+      gradient: "from-orange-50 via-white to-amber-50",
       hover: "hover:border-orange-500",
       iconText: "text-orange-600",
       iconBg: "bg-orange-100",
     },
     blueDark: {
       border: "border-blue-900/25",
-      gradient: "from-blue-50 to-slate-100",
+      gradient: "from-emerald-50 via-white to-teal-50",
       hover: "hover:border-blue-900",
       iconText: "text-blue-900",
-      iconBg: "bg-blue-100",
+      iconBg: "bg-emerald-100",
     },
   };
   const s = styles[color] || styles.blue;
   return (
-    <button onClick={onClick} className={`w-full p-6 rounded-3xl border-2 ${s.border} bg-gradient-to-br ${s.gradient} ${s.hover} hover:shadow-lg transition-all text-left`}>
+    <button onClick={onClick} className={`w-full p-6 rounded-3xl border-2 ${s.border} bg-gradient-to-br ${s.gradient} ${s.hover} hover:shadow-xl transition-all text-left active:scale-[0.98]`}>
       <div className="flex items-center gap-4">
-        <div className={`w-14 h-14 rounded-2xl ${s.iconBg} flex items-center justify-center`}>
+        <div className={`w-14 h-14 rounded-2xl ${s.iconBg} flex items-center justify-center shadow-sm`}>
           <Icon className={`w-7 h-7 ${s.iconText}`} />
         </div>
         <div>
