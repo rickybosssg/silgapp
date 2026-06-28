@@ -25,6 +25,54 @@ const buildWelcomeMessage = (countryContext) => {
 
 const DEFAULT_WELCOME = buildWelcomeMessage(null);
 
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function retryVenusOperation(operation, attempts = 3) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (err) {
+      lastError = err;
+      if (attempt < attempts) {
+        await wait(450 * attempt);
+      }
+    }
+  }
+  throw lastError;
+}
+
+function buildLocalVenusReply(question, countryContext) {
+  const q = (question || "").toLowerCase();
+  const pays = countryContext?.nom || countryContext?.code || "votre pays";
+  const ville = countryContext?.ville || "votre ville";
+  const devise = countryContext?.devise || "FCFA";
+  const prixKm = countryContext?.prix_par_km || "le tarif configure par SILGAPP";
+  const minimum = countryContext?.prix_minimum || 1000;
+
+  if (/prix|tarif|cout|coût|payer|paiement|commission|minimum/.test(q)) {
+    return `Pour **${pays}**, SILGAPP applique les paramètres du pays sélectionné. Le minimum affiché est **${minimum} ${devise}** et le prix/km est **${prixKm} ${devise}** lorsque ce tarif est configuré. Les commissions et règles exactes restent pilotées depuis l'administration Pays.`;
+  }
+
+  if (/gps|position|localisation|carte|suivi|itineraire|itinéraire|livreur/.test(q)) {
+    return `Dans **${pays}**, le suivi SILGAPP utilise la position GPS pour afficher le livreur sur la carte en temps réel. Pour une meilleure précision à ${ville}, activez la localisation, gardez Internet disponible et utilisez le bouton **Utiliser ma position actuelle** quand il est proposé.`;
+  }
+
+  if (/pharmacie|ordonnance|medicament|médicament|boutique|restaurant|partenaire/.test(q)) {
+    return `Les partenaires SILGAPP de **${pays}** peuvent recevoir vos messages, photos, audios et preuves de paiement. Pour une pharmacie, ouvrez sa fiche, touchez **Discuter avec la pharmacie**, envoyez votre ordonnance ou votre demande, puis suivez la livraison si elle est créée.`;
+  }
+
+  if (/qr|pin|code|scan|scanner|recuperation|récupération|livraison/.test(q)) {
+    return `Pour sécuriser la livraison, SILGAPP utilise un **QR Code** ou un **PIN**. Le livreur valide d'abord la récupération du colis, puis valide la livraison finale uniquement avec le QR/PIN du destinataire.`;
+  }
+
+  if (/message|audio|micro|photo|discussion|chat|whatsapp/.test(q)) {
+    return `La messagerie SILGAPP permet d'échanger texte, audio et photos entre les personnes autorisées par une course ou une commande. Si le micro ne démarre pas, vérifiez la permission Micro dans les paramètres de l'application, puis revenez dans SILGAPP.`;
+  }
+
+  return `Je suis **VENUS**, l'assistante SILGAPP pour **${pays}**. Je peux vous aider sur les courses, le GPS, les QR/PIN, les partenaires, les pharmacies, les messages, les notifications et les paiements. Dites-moi simplement ce que vous voulez faire.`;
+}
+
 function getStorageKey(userEmail) {
   return `venus_conv_${userEmail || "anonymous"}`;
 }
@@ -127,7 +175,7 @@ export default function VenusChat({ onClose, countryContext }) {
             }
             subscribeToConv(existing.id);
             setInitializing(false);
-            return;
+            return existing.id;
           }
         } catch {
           // Conversation expirée ou introuvable → en créer une nouvelle
@@ -149,21 +197,24 @@ export default function VenusChat({ onClose, countryContext }) {
         livreurs_dispos: countryContext.livreursDispos,
       } : { name: "Conversation VENUS", description: "Assistance SILGAPP" };
 
-      const conversation = await base44.agents.createConversation({
+      const conversation = await retryVenusOperation(() => base44.agents.createConversation({
         agent_name: "venus",
         metadata: contextMeta,
-      });
+      }));
       setConversationId(conversation.id);
       saveConvId(email, conversation.id);
       subscribeToConv(conversation.id);
+      setInitializing(false);
+      return conversation.id;
     } catch (err) {
       console.error("Erreur init conversation VENUS:", err);
     }
     setInitializing(false);
+    return null;
   };
 
   const sendMessage = async () => {
-    if (!input.trim() || loading || !conversationId) return;
+    if (!input.trim() || loading) return;
 
     const userQuestion = input.trim();
     const userMsg = { role: "user", content: userQuestion };
@@ -173,14 +224,18 @@ export default function VenusChat({ onClose, countryContext }) {
     const msgStartTime = Date.now();
 
     try {
-      const conversation = await base44.agents.getConversation(conversationId);
-      await base44.agents.addMessage(conversation, userMsg);
+      const activeConversationId = conversationId || await initConversation();
+      if (!activeConversationId) {
+        throw new Error("venus_conversation_unavailable");
+      }
+      const conversation = await retryVenusOperation(() => base44.agents.getConversation(activeConversationId));
+      await retryVenusOperation(() => base44.agents.addMessage(conversation, userMsg));
 
       // Enregistrer l'interaction pour les rapports VENUS (fire & forget)
       const nbMessages = messages.filter(m => m.role === "user").length + 1;
       base44.functions.invoke("venusAnalytics", {
         action: "save_interaction",
-        conversation_id: conversationId,
+        conversation_id: activeConversationId,
         user_id: userEmail || "anonymous",
         user_type: "client",
         country_code: countryContext?.code || "BF",
@@ -192,13 +247,9 @@ export default function VenusChat({ onClose, countryContext }) {
       }).catch(() => null); // silencieux
     } catch (err) {
       console.error("Erreur envoi message:", err);
-      const errMsg = err?.message || "";
-      const isCreditError = /credit|quota|exhaust|limit|402|429/i.test(errMsg);
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: isCreditError
-          ? "Je n'arrive pas à joindre le service VENUS pour le moment. Vous pouvez réessayer ou contacter le support au **+226 66 92 51 90**."
-          : "Désolée, une erreur est survenue. Veuillez réessayer dans un instant." },
+        { role: "assistant", content: buildLocalVenusReply(userQuestion, countryContext) },
       ]);
       setLoading(false);
     }
@@ -217,10 +268,10 @@ export default function VenusChat({ onClose, countryContext }) {
         description: `Assistance SILGAPP | Pays actif: ${countryContext.code}`,
         country_code: countryContext.code,
       } : { name: "Conversation VENUS", description: "Assistance SILGAPP" };
-      const conversation = await base44.agents.createConversation({
+      const conversation = await retryVenusOperation(() => base44.agents.createConversation({
         agent_name: "venus",
         metadata: contextMeta,
-      });
+      }));
       setConversationId(conversation.id);
       saveConvId(userEmail, conversation.id);
       subscribeToConv(conversation.id);

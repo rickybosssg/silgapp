@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { clearPersistedToken } from "@/lib/authPersistence";
-import {
-  LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell,
+import { 
+  LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
   Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
@@ -12,7 +12,6 @@ import { useAdminContext } from "@/hooks/useAdminContext.js";
 import { PAYS_SILGAPP } from "@/components/international/CountrySelector.jsx";
 
 const doLogout = () => {
-  if (!window.confirm("Voulez-vous vraiment vous déconnecter ?")) return;
   ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
     try { localStorage.removeItem(k); } catch(_) {}
   });
@@ -49,7 +48,6 @@ export const navItems = [
   { path: "/admin/livreurs-bloques", label: "Livreurs bloqués", icon: ShieldAlert, reseauOnly: "externe" },
   { path: "/admin/anti-fraude", label: "Anti-Fraude", icon: Shield, reseauOnly: "externe" },
   { path: "/admin/support", label: "Support tickets", icon: MessageCircle, reseauOnly: "externe" },
-  { path: "/admin/messages", label: "Messages", icon: MessageCircle, reseauOnly: "externe" },
   { path: "/admin/boutiques", label: "Boutiques", icon: Store, reseauOnly: "externe" },
   { path: "/admin/restaurants", label: "Restaurants", icon: UtensilsCrossed, reseauOnly: "externe" },
   { path: "/admin/pharmacies", label: "Pharmacies", icon: Pill, reseauOnly: "externe" },
@@ -60,7 +58,7 @@ export const navItems = [
   { path: "/maintenance", label: "Maintenance", icon: Shield, reseauOnly: "externe" },
 ];
 
-export default function Sidebar({ notificationCount = 0, demandesCount = 0, reseau }) {
+export default function Sidebar({ notificationCount = 0, demandesCount = 0, partenaireDemandesCount = 0, reseau }) {
   const [collapsed, setCollapsed] = useState(false);
   const [countryOpen, setCountryOpen] = useState(false);
   const location = useLocation();
@@ -79,7 +77,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, rese
         "h-16 flex items-center border-b border-white/8 flex-shrink-0 overflow-hidden",
         collapsed ? "px-4 justify-center" : "px-5 gap-3"
       )}>
-        <img
+        <img 
           src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/2c20ad136_SILGAPPLOGO2.jpg"
           alt="SILGAPP ET"
           className="w-9 h-9 rounded-xl flex-shrink-0 ring-2 ring-white/10"
@@ -126,9 +124,14 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, rese
                       {demandesCount}
                     </Badge>
                   )}
+                  {["/admin/boutiques", "/admin/restaurants", "/admin/pharmacies"].includes(item.path) && partenaireDemandesCount > 0 && (
+                    <Badge className="bg-destructive text-white text-[10px] h-5 min-w-5 flex items-center justify-center px-1">
+                      {partenaireDemandesCount}
+                    </Badge>
+                  )}
                 </>
               )}
-              {(item.path === "/notifications" && notificationCount > 0) || (item.path === "/admin/demandes-livreurs" && demandesCount > 0) ? (
+              {(item.path === "/notifications" && notificationCount > 0) || (item.path === "/admin/demandes-livreurs" && demandesCount > 0) || (["/admin/boutiques", "/admin/restaurants", "/admin/pharmacies"].includes(item.path) && partenaireDemandesCount > 0) ? (
                 collapsed && (
                   <span className="absolute right-1 top-1 w-2 h-2 rounded-full bg-destructive" />
                 )
@@ -151,7 +154,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, rese
                 title={effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
               >
                 <span className="text-base">
-                  {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.emoji_flag || "" : ""}
+                  {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
                 </span>
               </button>
             ) : (
@@ -161,7 +164,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, rese
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-base flex-shrink-0">
-                    {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.emoji_flag || "" : ""}
+                    {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
                   </span>
                   <span className="text-xs font-semibold text-white/70 truncate">
                     {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}

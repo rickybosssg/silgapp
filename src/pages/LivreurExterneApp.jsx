@@ -185,7 +185,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     staleTime: 30000,
     refetchInterval: 30000,
   });
-  const livreurHasPromoCode = (livreurPromoCodes || []).some((code) => code?.actif !== false);
+  const livreurHasEmail = !!(livreurProfil?.user_email || livreurProfil?.email);
+  const livreurHasPromoCode = livreurHasEmail && (livreurPromoCodes || []).some((code) => code?.actif !== false);
 
   useEffect(() => {
     if (activeTab === "promo" && !livreurHasPromoCode) {

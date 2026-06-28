@@ -28,12 +28,12 @@ function restoreScrollPosition(pathname) {
   } catch (_) { return 0; }
 }
 
-export default function MobileNav({ notificationCount = 0, demandesCount = 0, reseau }) {
+export default function MobileNav({ notificationCount = 0, demandesCount = 0, partenaireDemandesCount = 0, reseau }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   useEffect(() => { base44.auth.me().then(setUser).catch(() => null); }, []);
-
+  
   // Hardware back button for Android
   useEffect(() => {
     const handleBackButton = (e) => {
@@ -45,7 +45,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, re
     document.addEventListener('backbutton', handleBackButton, false);
     return () => document.removeEventListener('backbutton', handleBackButton);
   }, [navigate, location]);
-
+  
   // Save scroll position before unmount/route change
   useEffect(() => {
     const savePosition = () => saveScrollPosition(location.pathname, window.scrollY);
@@ -55,7 +55,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, re
       window.removeEventListener('beforeunload', savePosition);
     };
   }, [location.pathname]);
-
+  
   // Restore scroll position on route change with slight delay for content render
   useEffect(() => {
     const savedY = restoreScrollPosition(location.pathname);
@@ -65,7 +65,6 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, re
     return () => clearTimeout(timer);
   }, [location.pathname]);
   const logout = () => {
-    if (!window.confirm("Voulez-vous vraiment vous déconnecter ?")) return;
     ['base44_access_token', 'access_token', 'base44_token', 'token'].forEach(k => {
       try { localStorage.removeItem(k); } catch(_) {}
     });
@@ -97,6 +96,13 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, re
             <Link to="/admin/demandes-livreurs" className="relative">
               <span className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center text-white text-[10px] font-black">
                 {demandesCount > 9 ? '9+' : demandesCount}
+              </span>
+            </Link>
+          )}
+          {partenaireDemandesCount > 0 && (
+            <Link to="/admin/boutiques" className="relative">
+              <span className="w-5 h-5 rounded-full bg-purple-500 flex items-center justify-center text-white text-[10px] font-black">
+                {partenaireDemandesCount > 9 ? '9+' : partenaireDemandesCount}
               </span>
             </Link>
           )}
@@ -146,7 +152,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, re
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-base flex-shrink-0">
-                      {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.emoji_flag || "" : ""}
+                      {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
                     </span>
                     <span className="text-sm font-medium text-foreground truncate">
                       {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
@@ -202,6 +208,11 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, re
                     {item.path === "/admin/demandes-livreurs" && demandesCount > 0 && (
                       <Badge className="bg-destructive text-destructive-foreground text-xs">
                         {demandesCount}
+                      </Badge>
+                    )}
+                    {["/admin/boutiques", "/admin/restaurants", "/admin/pharmacies"].includes(item.path) && partenaireDemandesCount > 0 && (
+                      <Badge className="bg-destructive text-destructive-foreground text-xs">
+                        {partenaireDemandesCount}
                       </Badge>
                     )}
                   </Link>
@@ -273,9 +284,9 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, re
           >
             <div className="w-10 h-6 flex items-center justify-center rounded-full relative">
               <Menu className="w-5 h-5" />
-              {(notificationCount > 0 || demandesCount > 0) && (
+              {(notificationCount > 0 || demandesCount > 0 || partenaireDemandesCount > 0) && (
                 <span className="absolute -top-1 right-0 w-3.5 h-3.5 rounded-full bg-destructive text-destructive-foreground text-[8px] font-bold flex items-center justify-center">
-                  {((notificationCount || 0) + (demandesCount || 0)) > 9 ? '9+' : (notificationCount || 0) + (demandesCount || 0)}
+                  {((notificationCount || 0) + (demandesCount || 0) + (partenaireDemandesCount || 0)) > 9 ? '9+' : (notificationCount || 0) + (demandesCount || 0) + (partenaireDemandesCount || 0)}
                 </span>
               )}
             </div>

@@ -229,7 +229,8 @@ export default function PartenaireDashboard() {
     staleTime: 30000,
     refetchInterval: 30000,
   });
-  const partenaireHasPromoCode = (partenairePromoCodes || []).some((code) => code?.actif !== false);
+  const partenaireHasEmail = !!(user?.email || etablissement?.email || etablissement?.user_email);
+  const partenaireHasPromoCode = partenaireHasEmail && (partenairePromoCodes || []).some((code) => code?.actif !== false);
 
   useEffect(() => {
     if (tab === "promo" && !partenaireHasPromoCode) {

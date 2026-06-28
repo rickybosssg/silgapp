@@ -67,6 +67,7 @@ export default function CourseExterneFormSync() {
   const [createdCourse, setCreatedCourse] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false); // verrou anti-double-clic
   const [invitationModal, setInvitationModal] = useState(null); // { telephone, nom } ou null
+  const [gpsLoading, setGpsLoading] = useState({ depart: false, arrivee: false });
 
   // Lire brouillon (données pures, sans fonctions)
   const getDraftFromStorage = () => {
@@ -169,29 +170,39 @@ export default function CourseExterneFormSync() {
     try {
       const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=fr`);
       const geo = await resp.json();
-      return geo?.address?.suburb || geo?.address?.neighbourhood || geo?.address?.quarter || geo?.address?.city_district || geo?.address?.village || "";
-    } catch (_) { return ""; }
+      const quartier = geo?.address?.suburb || geo?.address?.neighbourhood || geo?.address?.quarter || geo?.address?.city_district || geo?.address?.village || "";
+      const ville = geo?.address?.city || geo?.address?.town || geo?.address?.municipality || "";
+      return {
+        adresse: geo?.display_name || [quartier, ville].filter(Boolean).join(", ") || "Position GPS",
+        quartier,
+      };
+    } catch (_) { return { adresse: "Position GPS", quartier: "" }; }
   };
 
   // Handlers GPS
   const gpsHandlers = {
     // Récupération GPS — pour l'expéditeur (expedier) OU l'endroit où récupérer (recevoir)
     onGetGPSDepart: () => {
+      if (gpsLoading.depart) return;
+      setGpsLoading(prev => ({ ...prev, depart: true }));
       const applyDepart = async (lat, lng) => {
-        const adresse = await reverseGeocode(lat, lng);
+        const { adresse, quartier } = await reverseGeocode(lat, lng);
         setFormData((prev) => ({
           ...prev,
           gps_depart_lat: lat,
           gps_depart_lng: lng,
           recuperationGPS: true,
           adresse_depart: adresse || "Position GPS",
+          quartier_depart: quartier || prev.quartier_depart,
         }));
-        toast.success(" Position GPS récupérée avec succès !");
+        setGpsLoading(prev => ({ ...prev, depart: false }));
+        toast.success("Position détectée avec succès");
       };
 
       if (!navigator.geolocation) {
         if (savedLat && savedLng) { applyDepart(savedLat, savedLng); return; }
         toast.error("GPS non disponible sur cet appareil");
+        setGpsLoading(prev => ({ ...prev, depart: false }));
         return;
       }
       navigator.geolocation.getCurrentPosition(
@@ -202,32 +213,41 @@ export default function CourseExterneFormSync() {
           if (err.code === 1) toast.error("Permission GPS refusée. Autorisez la localisation dans les paramètres.");
           else if (err.code === 2) toast.error("Position GPS indisponible. Vérifiez votre GPS.");
           else toast.error("Délai dépassé. Réessayez en extérieur.");
+          setGpsLoading(prev => ({ ...prev, depart: false }));
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
       );
     },
     // Livraison GPS — pour "recevoir" : position actuelle du client destinataire
     onGetGPSArrivee: () => {
+      if (gpsLoading.arrivee) return;
+      setGpsLoading(prev => ({ ...prev, arrivee: true }));
       const applyArrivee = async (lat, lng) => {
-        const adresse = await reverseGeocode(lat, lng);
+        const { adresse, quartier } = await reverseGeocode(lat, lng);
         setFormData((prev) => ({
           ...prev,
           gps_arrivee_lat: lat,
           gps_arrivee_lng: lng,
           livraisonGPS: true,
           adresse_arrivee: prev.adresse_arrivee || adresse,
+          quartier_arrivee: quartier || prev.quartier_arrivee,
         }));
+        setGpsLoading(prev => ({ ...prev, arrivee: false }));
+        toast.success("Position détectée avec succès");
       };
 
       if (!navigator.geolocation) {
         if (savedLat && savedLng) { applyArrivee(savedLat, savedLng); return; }
-        toast.error("GPS non disponible"); return;
+        toast.error("GPS non disponible");
+        setGpsLoading(prev => ({ ...prev, arrivee: false }));
+        return;
       }
       navigator.geolocation.getCurrentPosition(
         (pos) => applyArrivee(pos.coords.latitude, pos.coords.longitude),
         () => {
           if (savedLat && savedLng) { applyArrivee(savedLat, savedLng); return; }
           toast.error("Impossible d'obtenir la position GPS");
+          setGpsLoading(prev => ({ ...prev, arrivee: false }));
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
       );
@@ -729,6 +749,7 @@ export default function CourseExterneFormSync() {
               totalSteps={totalSteps}
               formData={formData}
               gpsHandlers={gpsHandlers}
+              gpsLoading={gpsLoading}
               setFormData={setFormData}
               onNext={handleNext}
               onBack={handleBack}
