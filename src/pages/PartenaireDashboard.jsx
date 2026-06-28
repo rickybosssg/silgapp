@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Store, UtensilsCrossed, Loader2, LogOut, MapPin, Pill } from "lucide-react";
+import { Store, UtensilsCrossed, Loader2, LogOut, MapPin, Pill, Clock, XCircle } from "lucide-react";
 import EtablissementForm from "@/components/partenaire/EtablissementForm";
 import ProduitsManager from "@/components/partenaire/ProduitsManager";
 import CommandesManager from "@/components/partenaire/CommandesManager";
@@ -229,6 +229,39 @@ export default function PartenaireDashboard() {
               onSaved={() => { setTab("home"); queryClient.invalidateQueries({ queryKey: ["ma-pharmacie"] }); }}
               onCancel={() => setTab("home")} />
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Bloquer l'accès si l'établissement n'est pas validé ──
+  if (etablissement && etablissement.validation === "en_attente") {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <div className="text-center space-y-4 max-w-sm">
+          <div className="w-20 h-20 rounded-3xl bg-amber-100 flex items-center justify-center mx-auto">
+            <Clock className="w-10 h-10 text-amber-500" />
+          </div>
+          <h1 className="text-xl font-black text-gray-900">Compte en attente de validation</h1>
+          <p className="text-sm text-gray-500">Votre établissement est en cours de vérification par l'équipe SILGAPP. Vous recevrez une notification dès que votre compte sera validé.</p>
+          <p className="text-xs text-gray-400">📞 Support : +226 66 92 51 90</p>
+          <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="text-xs text-purple-600 underline">Se déconnecter</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (etablissement && (etablissement.validation === "refuse" || etablissement.validation === "suspendu")) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <div className="text-center space-y-4 max-w-sm">
+          <div className="w-20 h-20 rounded-3xl bg-red-100 flex items-center justify-center mx-auto">
+            <XCircle className="w-10 h-10 text-red-500" />
+          </div>
+          <h1 className="text-xl font-black text-gray-900">{etablissement.validation === "refuse" ? "Compte refusé" : "Compte suspendu"}</h1>
+          <p className="text-sm text-gray-500">{etablissement.motif_refus || "Contactez le support SILGAPP pour plus d'informations."}</p>
+          <p className="text-xs text-gray-400">📞 Support : +226 66 92 51 90</p>
+          <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="text-xs text-purple-600 underline">Se déconnecter</button>
         </div>
       </div>
     );

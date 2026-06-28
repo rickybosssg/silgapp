@@ -58,7 +58,7 @@ export const navItems = [
   { path: "/maintenance", label: "Maintenance", icon: Shield, reseauOnly: "externe" },
 ];
 
-export default function Sidebar({ notificationCount = 0, demandesCount = 0, reseau }) {
+export default function Sidebar({ notificationCount = 0, demandesCount = 0, partenaireDemandesCount = 0, reseau }) {
   const [collapsed, setCollapsed] = useState(false);
   const [countryOpen, setCountryOpen] = useState(false);
   const location = useLocation();
@@ -124,9 +124,14 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, rese
                       {demandesCount}
                     </Badge>
                   )}
+                  {["/admin/boutiques", "/admin/restaurants", "/admin/pharmacies"].includes(item.path) && partenaireDemandesCount > 0 && (
+                    <Badge className="bg-destructive text-white text-[10px] h-5 min-w-5 flex items-center justify-center px-1">
+                      {partenaireDemandesCount}
+                    </Badge>
+                  )}
                 </>
               )}
-              {(item.path === "/notifications" && notificationCount > 0) || (item.path === "/admin/demandes-livreurs" && demandesCount > 0) ? (
+              {(item.path === "/notifications" && notificationCount > 0) || (item.path === "/admin/demandes-livreurs" && demandesCount > 0) || (["/admin/boutiques", "/admin/restaurants", "/admin/pharmacies"].includes(item.path) && partenaireDemandesCount > 0) ? (
                 collapsed && (
                   <span className="absolute right-1 top-1 w-2 h-2 rounded-full bg-destructive" />
                 )

@@ -4,10 +4,12 @@ import { base44 } from "@/api/base44Client";
 import Sidebar from "./Sidebar";
 import MobileNav from "./MobileNav";
 import DemandesLivreursPopup from "@/components/admin/DemandesLivreursPopup";
+import DemandesPartenairesPopup from "@/components/admin/DemandesPartenairesPopup";
 
 export default function AppLayout({ reseau }) {
   const [notifCount, setNotifCount] = useState(0);
   const [demandesCount, setDemandesCount] = useState(0);
+  const [partenaireDemandesCount, setPartenaireDemandesCount] = useState(0);
 
   useEffect(() => {
     const fetchNotifs = async () => {
@@ -22,9 +24,20 @@ export default function AppLayout({ reseau }) {
         setDemandesCount((data || []).length);
       } catch (_) {}
     };
+    const fetchPartenaireDemandes = async () => {
+      try {
+        const [bqs, rts, phs] = await Promise.all([
+          base44.entities.Boutique.filter({ validation: "en_attente" }).catch(() => []),
+          base44.entities.Restaurant.filter({ validation: "en_attente" }).catch(() => []),
+          base44.entities.Pharmacie.filter({ validation: "en_attente" }).catch(() => []),
+        ]);
+        setPartenaireDemandesCount((bqs?.length || 0) + (rts?.length || 0) + (phs?.length || 0));
+      } catch (_) {}
+    };
     fetchNotifs();
     fetchDemandes();
-    const iv = setInterval(() => { fetchNotifs(); fetchDemandes(); }, 30000);
+    fetchPartenaireDemandes();
+    const iv = setInterval(() => { fetchNotifs(); fetchDemandes(); fetchPartenaireDemandes(); }, 30000);
     return () => clearInterval(iv);
   }, []);
 
@@ -33,9 +46,10 @@ export default function AppLayout({ reseau }) {
       {/* Desktop layout */}
       {/* Popup automatique demandes livreurs */}
       <DemandesLivreursPopup />
+      <DemandesPartenairesPopup />
 
       <div className="hidden lg:flex min-h-screen">
-        <Sidebar notificationCount={notifCount} demandesCount={demandesCount} reseau={reseau} />
+        <Sidebar notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} reseau={reseau} />
         <main className="flex-1 min-h-screen overflow-x-hidden bg-slate-50">
           <Outlet />
         </main>
@@ -43,7 +57,7 @@ export default function AppLayout({ reseau }) {
 
       {/* Mobile layout */}
       <div className="lg:hidden">
-        <MobileNav notificationCount={notifCount} demandesCount={demandesCount} reseau={reseau} />
+        <MobileNav notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} reseau={reseau} />
         <main className="pt-14 pb-16 min-h-screen bg-slate-50 safe-area-top safe-area-bottom">
           <Outlet />
         </main>

@@ -88,7 +88,19 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
     }
     setSaving(true);
     try {
-      const data = { ...form, partenaire_id: partenaireId, user_email: userEmail, actif: form.actif !== false };
+      const data = { ...form, partenaire_id: partenaireId, user_email: userEmail };
+      if (!existing?.id) {
+        // Création — en attente de validation sauf si admin
+        if (!isAdmin) {
+          data.validation = "en_attente";
+          data.actif = false;
+        } else {
+          data.validation = "valide";
+          data.actif = form.actif !== false;
+        }
+      } else {
+        data.actif = form.actif !== false;
+      }
       const entityName = isPharmacie ? "Pharmacie" : isRestaurant ? "Restaurant" : "Boutique";
       if (existing?.id) {
         await base44.entities[entityName].update(existing.id, data);

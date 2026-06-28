@@ -299,6 +299,19 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
       }
 
       if (effectiveRole === "partenaire") {
+        // Vérifier le statut de validation de l'établissement
+        const [bqs, rts, phs] = await Promise.all([
+          base44.entities.Boutique.filter({ user_email: user.email }).catch(() => []),
+          base44.entities.Restaurant.filter({ user_email: user.email }).catch(() => []),
+          base44.entities.Pharmacie.filter({ user_email: user.email }).catch(() => []),
+        ]);
+        if (!mounted) return;
+        const etab = bqs?.[0] || rts?.[0] || phs?.[0];
+        if (etab) {
+          if (etab.validation === "en_attente") { setState("partenaire_en_attente"); return; }
+          if (etab.validation === "refuse") { setState("partenaire_refuse"); return; }
+          if (etab.validation === "suspendu") { setState("partenaire_suspendu"); return; }
+        }
         registerPushToken(null, {
           email: user.email,
           user_email: user.email,
@@ -579,6 +592,58 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
           <h2 className="text-lg font-bold text-foreground">Compte désactivé</h2>
           <p className="text-sm text-muted-foreground">
             Votre compte livreur a été désactivé. Contactez le support SILGAPP.
+          </p>
+          <p className="text-xs text-muted-foreground">📞 Support : +226 66 92 51 90</p>
+          <button
+            onClick={() => { clearPersistedToken(); base44.auth.logout(); }}
+            className="text-xs text-primary underline"
+          >
+            Se déconnecter
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Partenaire en attente de validation
+  if (state === "partenaire_en_attente") {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background p-6">
+        <div className="text-center space-y-4 max-w-sm">
+          <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center mx-auto">
+            <Store className="w-8 h-8 text-amber-500" />
+          </div>
+          <h2 className="text-lg font-bold text-foreground">Compte en attente de validation</h2>
+          <p className="text-sm text-muted-foreground">
+            Votre établissement est en cours de vérification par l'équipe SILGAPP.
+            Vous serez notifié dès que votre compte sera validé.
+          </p>
+          <p className="text-xs text-muted-foreground">📞 Support : +226 66 92 51 90</p>
+          <button
+            onClick={() => { clearPersistedToken(); base44.auth.logout(); }}
+            className="text-xs text-primary underline"
+          >
+            Se déconnecter
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (state === "partenaire_refuse" || state === "partenaire_suspendu") {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background p-6">
+        <div className="text-center space-y-4 max-w-sm">
+          <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto">
+            <Store className="w-8 h-8 text-destructive" />
+          </div>
+          <h2 className="text-lg font-bold text-foreground">
+            {state === "partenaire_refuse" ? "Compte refusé" : "Compte suspendu"}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {state === "partenaire_refuse"
+              ? "Votre demande d'inscription a été refusée. Contactez le support SILGAPP pour plus d'informations."
+              : "Votre compte a été suspendu. Contactez le support SILGAPP."}
           </p>
           <p className="text-xs text-muted-foreground">📞 Support : +226 66 92 51 90</p>
           <button
