@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { X, Send, Loader2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
+import { getVenusFallbackResponse } from "@/lib/venusFallback";
 
 const VENUS_AVATAR = "https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/17cf522aa_file_0000000034b871f7bf133c0de0c9eb62.png";
 
@@ -61,6 +62,7 @@ export default function VenusChat({ onClose, countryContext }) {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const messagesEndRef = useRef(null);
   const unsubscribeRef = useRef(null);
+  const fallbackTimeoutRef = useRef(null);
 
   // Réinitialiser le message de bienvenue si le pays change
   useEffect(() => {
@@ -76,6 +78,7 @@ export default function VenusChat({ onClose, countryContext }) {
     initConversation();
     return () => {
       if (unsubscribeRef.current) unsubscribeRef.current();
+      if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current);
     };
   }, []);
 
@@ -99,6 +102,11 @@ export default function VenusChat({ onClose, countryContext }) {
       if (data.messages && data.messages.length > 0) {
         setMessages(buildMessages(data.messages));
         setLoading(false);
+        // Annuler le timeout de secours si l'agent a répondu
+        if (fallbackTimeoutRef.current) {
+          clearTimeout(fallbackTimeoutRef.current);
+          fallbackTimeoutRef.current = null;
+        }
       }
     });
   };
@@ -173,6 +181,23 @@ export default function VenusChat({ onClose, countryContext }) {
     setLoading(true);
     const msgStartTime = Date.now();
 
+    // ── Système de secours — si l'agent IA ne répond pas en 15s, utiliser le fallback local ──
+    let fallbackTriggered = false;
+    const triggerFallback = () => {
+      if (fallbackTriggered) return;
+      fallbackTriggered = true;
+      if (fallbackTimeoutRef.current) {
+        clearTimeout(fallbackTimeoutRef.current);
+        fallbackTimeoutRef.current = null;
+      }
+      const fallbackResponse = getVenusFallbackResponse(userQuestion, countryContext);
+      setMessages((prev) => [...prev, { role: "assistant", content: fallbackResponse }]);
+      setLoading(false);
+    };
+
+    // Timeout de secours (15 secondes) — couvre le cas où l'agent ne répond jamais
+    fallbackTimeoutRef.current = setTimeout(triggerFallback, 15000);
+
     try {
       const conversation = await base44.agents.getConversation(conversationId);
       await base44.agents.addMessage(conversation, userMsg);
@@ -192,16 +217,8 @@ export default function VenusChat({ onClose, countryContext }) {
         duree_secondes: Math.round((Date.now() - msgStartTime) / 1000),
       }).catch(() => null); // silencieux
     } catch (err) {
-      console.error("Erreur envoi message:", err);
-      const errMsg = err?.message || "";
-      const isCreditError = /credit|quota|exhaust|limit|402|429/i.test(errMsg);
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: isCreditError
-          ? "⚠️ **Service temporairement indisponible**\n\nNotre assistant VENUS est en maintenance. Veuillez réessayer plus tard ou contacter le support au **+226 66 92 51 90**."
-          : "Désolée, une erreur est survenue. Veuillez réessayer dans un instant." },
-      ]);
-      setLoading(false);
+      console.error("Erreur envoi message VENUS — utilisation du fallback local:", err);
+      triggerFallback();
     }
   };
 
