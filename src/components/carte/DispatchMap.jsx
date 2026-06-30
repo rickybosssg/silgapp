@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Loader2, Globe } from "lucide-react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
+import { Loader2, Globe, Locate, Maximize } from "lucide-react";
 import HeatmapLayer from "./HeatmapLayer";
 import HeatmapControls from "./HeatmapControls";
 import HeatmapLegend from "./HeatmapLegend";
@@ -675,19 +675,30 @@ export default function DispatchMap({
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
+  const initialPositionRef = useRef(position); // capture UNE SEULE fois
+  const userInteractedRef = useRef(false); // l'admin a déplacé/zoomé manuellement
   const [mapLoaded, setMapLoaded] = useState(false);
   const [heatmapModeLocal, setHeatmapModeLocal] = useState(heatmapMode);
   const [showHeatmapHint, setShowHeatmapHint] = useState(true);
 
-  // Recentrer la carte quand le pays change
-  useEffect(() => {
-    if (!mapInstanceRef.current || !position || !position.latitude || !position.longitude) return;
-    mapInstanceRef.current.setView([position.latitude, position.longitude], position.zoom ?? 12);
-  }, [position?.latitude, position?.longitude]);
+  // ── Recentrage manuel (bouton "Centrer") ──
+  const centerOnAll = useCallback(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const group = window.L.featureGroup(markersRef.current);
+    if (group.getLayers().length > 0) {
+      map.fitBounds(group.getBounds().pad(0.15), { animate: true });
+    } else if (initialPositionRef.current) {
+      const p = initialPositionRef.current;
+      map.setView([p.latitude, p.longitude], p.zoom ?? 12, { animate: true });
+    }
+    userInteractedRef.current = false;
+  }, []);
 
-  // Init carte
+  // Init carte — UNE SEULE FOIS (ne dépend plus de position)
   useEffect(() => {
-    if (!mapRef.current || !position || !position.latitude || !position.longitude) return;
+    const pos = initialPositionRef.current;
+    if (!mapRef.current || !pos || !pos.latitude || !pos.longitude) return;
 
     let cancelled = false;
 
@@ -726,7 +737,7 @@ export default function DispatchMap({
           dragging: true,
           keyboard: false,
           preferCanvas: true,
-        }).setView([position.latitude, position.longitude], position.zoom ?? 12);
+        }).setView([pos.latitude, pos.longitude], pos.zoom ?? 12);
 
         window.L.tileLayer(
           "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
@@ -734,6 +745,17 @@ export default function DispatchMap({
         ).addTo(map);
 
         window.L.control.zoom({ position: "bottomright" }).addTo(map);
+
+        // ── Détecter interaction manuelle de l'admin (drag / zoom) ──
+        // Une fois que l'admin touche la carte, on désactive tout auto-fit/auto-center
+        const onUserInteract = () => { userInteractedRef.current = true; };
+        map.on("dragstart", onUserInteract);
+        map.on("zoomstart", (e) => {
+          // Les changements de zoom programmatiques (fitBounds/setView) ne viennent pas de l'utilisateur
+          if (e.hard === false) onUserInteract();
+        });
+        map.on("mousedown", onUserInteract);
+        map.on("touchstart", onUserInteract);
 
         mapInstanceRef.current = map;
         setMapLoaded(true);
@@ -777,7 +799,8 @@ export default function DispatchMap({
       }
       markersRef.current = [];
     };
-  }, [position?.latitude, position?.longitude]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Halos zones chaudes
   useZonesChaudesHalos(mapInstanceRef.current, mapLoaded, zonesChaudesData);
@@ -1052,6 +1075,30 @@ export default function DispatchMap({
               livreurs={livreurs}
               courses={courses}
             />
+          </div>
+
+          {/* Bouton recentrer (bottom-right, au-dessus du zoom) */}
+          <div className="absolute bottom-4 right-4 z-[1000] flex flex-col gap-2">
+            <button
+              onClick={centerOnAll}
+              className="w-11 h-11 rounded-xl bg-white shadow-lg border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-slate-50 active:scale-95 transition-all"
+              title="Centrer sur tous les marqueurs"
+            >
+              <Maximize className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => {
+                const p = initialPositionRef.current;
+                if (p && mapInstanceRef.current) {
+                  mapInstanceRef.current.setView([p.latitude, p.longitude], p.zoom ?? 12, { animate: true });
+                  userInteractedRef.current = false;
+                }
+              }}
+              className="w-11 h-11 rounded-xl bg-white shadow-lg border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-slate-50 active:scale-95 transition-all"
+              title="Recentrer sur la position initiale"
+            >
+              <Locate className="w-5 h-5" />
+            </button>
           </div>
 
           {/* Sélecteur pays (bottom-left) */}
