@@ -825,10 +825,6 @@ Deno.serve(async (req) => {
         console.log(`[DISPATCH] 🚫 Livreur ${livreur_id} ajouté aux exclus définitifs — course ${course_id}`);
       }
 
-      // 🚫 Le livreur a cliqué "Refuser" / "Non, occupé" → le sortir du pool de dispatch
-      await base44.asServiceRole.entities.Livreur.update(livreur_id, { statut: 'hors_ligne' });
-      console.log(`[DISPATCH] 🚫 Livreur ${livreur_id} mis hors_ligne après refus de course`);
-
       const etaitVerrouillee = course.livreur_id === livreur_id;
       if (etaitVerrouillee) {
         // Libérer le verrou
@@ -840,12 +836,12 @@ Deno.serve(async (req) => {
           livreur_telephone: '',
         });
         const result = await lancerDispatchMulti(base44, course_id, dejaNotifies);
-        if (result.noLivreur) return Response.json({ success: true, noLivreur: true, hors_ligne: true });
-        if (result.cycleEpuise) return Response.json({ success: true, cycle_epuise: true, hors_ligne: true });
-        return Response.json({ success: true, nb_notifies: result.nb_notifies, hors_ligne: true });
+        if (result.noLivreur) return Response.json({ success: true, noLivreur: true });
+        if (result.cycleEpuise) return Response.json({ success: true, cycle_epuise: true });
+        return Response.json({ success: true, nb_notifies: result.nb_notifies });
       }
 
-      return Response.json({ success: true, exclu_definitif: true, hors_ligne: true });
+      return Response.json({ success: true, exclu_definitif: true });
     }
 
     // ─── 5. Vérifier expiration & redispatch (avec exclusions cumulées) ──
