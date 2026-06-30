@@ -750,15 +750,18 @@ export default function DispatchMap({
         // Une fois que l'admin touche la carte, on désactive tout auto-fit/auto-center
         const onUserInteract = () => { userInteractedRef.current = true; };
         map.on("dragstart", onUserInteract);
-        map.on("zoomstart", (e) => {
-          // Les changements de zoom programmatiques (fitBounds/setView) ne viennent pas de l'utilisateur
-          if (e.hard === false) onUserInteract();
-        });
+        // zoomend / moveend : fiable pour détecter zoom/pan utilisateur
+        // (zoomstart avec e.hard ne fonctionne pas — e.hard est undefined pour tout événement)
+        map.on("zoomend", onUserInteract);
+        map.on("moveend", onUserInteract);
         map.on("mousedown", onUserInteract);
         map.on("touchstart", onUserInteract);
 
         mapInstanceRef.current = map;
         setMapLoaded(true);
+
+        // Stabiliser la carte après rendu du conteneur modal
+        setTimeout(() => { if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize(); }, 200);
         console.log("[DispatchMap] Carte initialisée avec succès");
       } catch (error) {
         console.error("[DispatchMap] Erreur initialisation carte:", error);
