@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Loader2, Globe } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Loader2, Globe, Locate, Maximize } from "lucide-react";
 import HeatmapLayer from "./HeatmapLayer";
 import HeatmapControls from "./HeatmapControls";
 import HeatmapLegend from "./HeatmapLegend";
@@ -654,6 +654,38 @@ function buildClientPopup(client) {
   `;
 }
 
+function isLeafletMapUsable(map, container) {
+  return Boolean(
+    map &&
+    container &&
+    document.body.contains(container) &&
+    map._container === container &&
+    map._mapPane &&
+    map._panes?.markerPane
+  );
+}
+
+function removeMarkerSafely(marker) {
+  try {
+    marker?.remove?.();
+  } catch (error) {
+    console.warn("[DispatchMap] Marker cleanup ignore:", error?.message || error);
+  }
+}
+
+function addMarkerSafely(map, container, marker) {
+  if (!isLeafletMapUsable(map, container)) {
+    console.warn("[DispatchMap] Carte Leaflet indisponible - marqueur ignore");
+    return null;
+  }
+  try {
+    return marker.addTo(map);
+  } catch (error) {
+    console.warn("[DispatchMap] Ajout marqueur ignore:", error?.message || error);
+    return null;
+  }
+}
+
 export default function DispatchMap({
   position,
   livreurs = [],
@@ -675,19 +707,37 @@ export default function DispatchMap({
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
+  const initialPositionRef = useRef(position);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [heatmapModeLocal, setHeatmapModeLocal] = useState(heatmapMode);
   const [showHeatmapHint, setShowHeatmapHint] = useState(true);
 
   // Recentrer la carte quand le pays change
   useEffect(() => {
-    if (!mapInstanceRef.current || !position || !position.latitude || !position.longitude) return;
-    mapInstanceRef.current.setView([position.latitude, position.longitude], position.zoom ?? 12);
+    const map = mapInstanceRef.current;
+    if (!isLeafletMapUsable(map, mapRef.current) || !position || !position.latitude || !position.longitude) return;
+    map.setView([position.latitude, position.longitude], position.zoom ?? 12);
   }, [position?.latitude, position?.longitude]);
+
+  const centerOnAll = useCallback(() => {
+    const map = mapInstanceRef.current;
+    if (!isLeafletMapUsable(map, mapRef.current) || !window.L) return;
+    const layers = markersRef.current.filter(Boolean);
+    if (layers.length > 0) {
+      const group = window.L.featureGroup(layers);
+      map.fitBounds(group.getBounds().pad(0.15), { animate: true });
+      return;
+    }
+    const p = initialPositionRef.current || position;
+    if (p?.latitude && p?.longitude) {
+      map.setView([p.latitude, p.longitude], p.zoom ?? 12, { animate: true });
+    }
+  }, [position]);
 
   // Init carte
   useEffect(() => {
-    if (!mapRef.current || !position || !position.latitude || !position.longitude) return;
+    const initPosition = initialPositionRef.current || position;
+    if (!mapRef.current || !initPosition || !initPosition.latitude || !initPosition.longitude) return;
 
     let cancelled = false;
 
@@ -726,7 +776,7 @@ export default function DispatchMap({
           dragging: true,
           keyboard: false,
           preferCanvas: true,
-        }).setView([position.latitude, position.longitude], position.zoom ?? 12);
+        }).setView([initPosition.latitude, initPosition.longitude], initPosition.zoom ?? 12);
 
         window.L.tileLayer(
           "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
@@ -772,12 +822,19 @@ export default function DispatchMap({
     return () => {
       cancelled = true;
       if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
+        try {
+          mapInstanceRef.current.remove();
+        } catch (error) {
+          console.warn("[DispatchMap] Suppression carte ignoree:", error?.message || error);
+        }
         mapInstanceRef.current = null;
       }
+      markersRef.current.forEach(removeMarkerSafely);
       markersRef.current = [];
     };
-  }, [position?.latitude, position?.longitude]);
+  // Initialisation volontairement unique pour eviter les crashs Leaflet lors des refreshs.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Halos zones chaudes
   useZonesChaudesHalos(mapInstanceRef.current, mapLoaded, zonesChaudesData);
@@ -789,8 +846,10 @@ export default function DispatchMap({
   useEffect(() => {
     if (!mapInstanceRef.current || !mapLoaded) return;
     const map = mapInstanceRef.current;
+    const container = mapRef.current;
+    if (!isLeafletMapUsable(map, container)) return;
 
-    markersRef.current.forEach(m => m.remove());
+    markersRef.current.forEach(removeMarkerSafely);
     markersRef.current = [];
 
     // 🔴 Courses en attente (toujours affichées)
@@ -801,7 +860,8 @@ export default function DispatchMap({
       if (!lat || !lng) return;
       const icon = buildCourseIcon();
       const [latOff, lngOff] = addMarkerOffset(lat, lng, markerIndex++);
-      const marker = window.L.marker([latOff, lngOff], { icon, zIndexOffset: 1500 }).addTo(map);
+      const marker = addMarkerSafely(map, container, window.L.marker([latOff, lngOff], { icon, zIndexOffset: 1500 }));
+      if (!marker) return;
       marker.bindPopup(buildCoursePopup(course), { maxWidth: 260 });
       if (onMarkerClick) marker.on("click", () => onMarkerClick({ ...course, _type: "course" }));
       markersRef.current.push(marker);
@@ -817,10 +877,11 @@ export default function DispatchMap({
         if (masquerInactifs) return; // filtre visuel
         const icon = buildLivreurIcon(livreur, livreurIdsEnCourseReelle);
         const [lat, lng] = addMarkerOffset(livreur.latitude, livreur.longitude, markerIndex++);
-        const marker = window.L.marker([lat, lng], {
+        const marker = addMarkerSafely(map, container, window.L.marker([lat, lng], {
           icon,
           zIndexOffset: 100,
-        }).addTo(map);
+        }));
+        if (!marker) return;
         marker.bindPopup(buildLivreurPopup(livreur, livreurIdsEnCourseReelle), { maxWidth: 260 });
         if (onMarkerClick) marker.on("click", () => onMarkerClick(livreur));
         markersRef.current.push(marker);
@@ -835,10 +896,11 @@ export default function DispatchMap({
         const [lat, lng] = addMarkerOffset(livreur.latitude, livreur.longitude, markerIndex++);
         // 🎯 CORRECTION : zIndex basé sur course active réelle
         const estEnCourse = livreurIdsEnCourseReelle?.has(livreur.id);
-        const marker = window.L.marker([lat, lng], {
+        const marker = addMarkerSafely(map, container, window.L.marker([lat, lng], {
           icon,
           zIndexOffset: estEnCourse ? 1100 : 1200,
-        }).addTo(map);
+        }));
+        if (!marker) return;
         marker.bindPopup(buildLivreurPopup(livreur, livreurIdsEnCourseReelle), { maxWidth: 260 });
         if (onMarkerClick) marker.on("click", () => onMarkerClick(livreur));
         markersRef.current.push(marker);
@@ -855,10 +917,11 @@ export default function DispatchMap({
         if (masquerInactifs) return; // filtre visuel
         const icon = buildClientIcon(client);
         const [lat, lng] = addMarkerOffset(client.latitude, client.longitude, markerIndex++);
-        const marker = window.L.marker([lat, lng], {
+        const marker = addMarkerSafely(map, container, window.L.marker([lat, lng], {
           icon,
           zIndexOffset: 50,
-        }).addTo(map);
+        }));
+        if (!marker) return;
         marker.bindPopup(buildClientPopup(client), { maxWidth: 260 });
         if (onMarkerClick) marker.on("click", () => onMarkerClick(client));
         markersRef.current.push(marker);
@@ -871,10 +934,11 @@ export default function DispatchMap({
         if (statut === "inactif") return;
         const icon = buildClientIcon(client);
         const [lat, lng] = addMarkerOffset(client.latitude, client.longitude, markerIndex++);
-        const marker = window.L.marker([lat, lng], {
+        const marker = addMarkerSafely(map, container, window.L.marker([lat, lng], {
           icon,
           zIndexOffset: 900,
-        }).addTo(map);
+        }));
+        if (!marker) return;
         marker.bindPopup(buildClientPopup(client), { maxWidth: 260 });
         if (onMarkerClick) marker.on("click", () => onMarkerClick(client));
         markersRef.current.push(marker);
@@ -887,10 +951,11 @@ export default function DispatchMap({
         if (!partenaire.latitude || !partenaire.longitude) return;
         const icon = buildPartenaireIcon(partenaire);
         const [lat, lng] = addMarkerOffset(partenaire.latitude, partenaire.longitude, markerIndex++);
-        const marker = window.L.marker([lat, lng], {
+        const marker = addMarkerSafely(map, container, window.L.marker([lat, lng], {
           icon,
           zIndexOffset: 800,
-        }).addTo(map);
+        }));
+        if (!marker) return;
         marker.bindPopup(buildPartenairePopup(partenaire), { maxWidth: 280 });
         if (onMarkerClick) marker.on("click", () => onMarkerClick({ ...partenaire, _isPartenaire: true }));
         markersRef.current.push(marker);
@@ -1072,6 +1137,29 @@ export default function DispatchMap({
               </div>
             </div>
           )}
+
+          <div className="absolute bottom-4 right-4 z-[1000] flex flex-col gap-2">
+            <button
+              onClick={centerOnAll}
+              className="w-11 h-11 rounded-xl bg-white shadow-lg border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-slate-50 active:scale-95 transition-all"
+              title="Centrer sur tous les marqueurs"
+            >
+              <Maximize className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => {
+                const map = mapInstanceRef.current;
+                const p = initialPositionRef.current || position;
+                if (isLeafletMapUsable(map, mapRef.current) && p?.latitude && p?.longitude) {
+                  map.setView([p.latitude, p.longitude], p.zoom ?? 12, { animate: true });
+                }
+              }}
+              className="w-11 h-11 rounded-xl bg-white shadow-lg border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-slate-50 active:scale-95 transition-all"
+              title="Recentrer la carte"
+            >
+              <Locate className="w-5 h-5" />
+            </button>
+          </div>
         </>
       )}
     </div>

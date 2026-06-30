@@ -49,6 +49,19 @@ function reponseDejaPrise(reason, course, details = {}) {
   };
 }
 
+function parseIdList(value) {
+  try {
+    const parsed = JSON.parse(value || '[]');
+    return Array.isArray(parsed) ? parsed.map(id => String(id)).filter(Boolean) : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function uniqueIds(...lists) {
+  return [...new Set(lists.flat().map(id => String(id)).filter(Boolean))];
+}
+
 async function chargerConfigDispatch(base44) {
   try {
     const configs = await base44.asServiceRole.entities.AppConfig.filter({});
@@ -364,8 +377,14 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
   const config = await chargerConfigDispatch(base44);
   console.log(`[DISPATCH]  Config: ${config.nb} livreurs, ${config.timeout}s`);
 
-  // Trouver les meilleurs candidats hors exclusions (tous les déjà notifiés)
-  const resultat = await trouverLivreursCandidats(base44, course, exclusions);
+  // Exclusions propres a cette course uniquement.
+  // Un livreur qui refuse/clique "occupe" reste disponible pour les autres courses.
+  const dejaNotifies = parseIdList(course.dispatch_notified_ids);
+  const refusDefinitifsCourse = parseIdList(course.dispatch_refused_ids);
+  const exclusionsCourse = uniqueIds(exclusions, dejaNotifies, refusDefinitifsCourse);
+
+  // Trouver les meilleurs candidats hors exclusions de cette course
+  const resultat = await trouverLivreursCandidats(base44, course, exclusionsCourse);
   const { tous: candidatsTous, niveau1, niveau2, niveau3, pickupSource } = resultat;
 
   //  Charger la config vagues GPS
@@ -400,10 +419,6 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
   } else {
     candidats = candidatsTous;
   }
-
-  // Récupérer les IDs déjà notifiés précédemment
-  let dejaNotifies = [];
-  try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
 
   if (candidats.length === 0) {
     //  Heartbeat: vague 3 épuisée → cycle_epuise
@@ -443,8 +458,8 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
           livreur_id: '',
           livreur_nom: '',
         });
-        // Relancer immédiatement avec exclusions vides (nouveau cycle)
-        return await lancerDispatchMulti(base44, courseId, []);
+        // Relancer immediatement avec les refus/occupes conserves pour cette course.
+        return await lancerDispatchMulti(base44, courseId, refusDefinitifsCourse);
       } else {
         // Encore en attente des 2 minutes
         console.log(`[DISPATCH] ⏳ Cycle épuisé — attente 2 min avant nouveau cycle pour course ${courseId}`);
@@ -622,7 +637,11 @@ Deno.serve(async (req) => {
 
       let notifiedIds = [];
       try { notifiedIds = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-      const isNotified = notifiedIds.includes(livreur_id);
+      const refusedIds = parseIdList(course.dispatch_refused_ids);
+      if (refusedIds.includes(String(livreur_id))) {
+        return Response.json({ found: false, refused_for_course: true });
+      }
+      const isNotified = notifiedIds.map(id => String(id)).includes(String(livreur_id));
       if (!isNotified) return Response.json({ found: false });
 
       const expired = !!(course.timeout_expires_at && new Date(course.timeout_expires_at) < new Date());
@@ -672,7 +691,16 @@ Deno.serve(async (req) => {
 
       let notifiedIds = [];
       try { notifiedIds = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-      const isEligible = notifiedIds.includes(livreur_id) || course.livreur_id === livreur_id;
+      const refusedIds = parseIdList(course.dispatch_refused_ids);
+      if (refusedIds.includes(String(livreur_id))) {
+        return Response.json({
+          success: false,
+          accepted: false,
+          reason: 'refused_for_course',
+          error: 'Vous avez deja refuse cette course',
+        });
+      }
+      const isEligible = notifiedIds.map(id => String(id)).includes(String(livreur_id)) || String(course.livreur_id) === String(livreur_id);
       if (!isEligible) {
         return Response.json({ success: false, error: 'Vous n\'êtes pas éligible pour cette course', not_eligible: true });
       }
@@ -814,16 +842,15 @@ Deno.serve(async (req) => {
         return Response.json({ success: true, message: 'Course déjà prise par un autre' });
       }
 
-      //  Ajouter le livreur aux exclus définitifs (tous les cycles)
-      let dejaNotifies = [];
-      try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-      if (!dejaNotifies.includes(livreur_id)) {
-        dejaNotifies.push(livreur_id);
-        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
-          dispatch_notified_ids: JSON.stringify(dejaNotifies),
-        });
-        console.log(`[DISPATCH]  Livreur ${livreur_id} ajouté aux exclus définitifs — course ${course_id}`);
-      }
+      // Ajouter le livreur aux exclusions de CETTE course uniquement.
+      // Il reste disponible pour toutes les autres courses.
+      const dejaNotifies = uniqueIds(parseIdList(course.dispatch_notified_ids), [livreur_id]);
+      const refusDefinitifsCourse = uniqueIds(parseIdList(course.dispatch_refused_ids), [livreur_id]);
+      await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+        dispatch_notified_ids: JSON.stringify(dejaNotifies),
+        dispatch_refused_ids: JSON.stringify(refusDefinitifsCourse),
+      });
+      console.log(`[DISPATCH] Livreur ${livreur_id} exclu uniquement pour la course ${course_id} (raison: ${raison || 'refus'})`);
 
       const etaitVerrouillee = course.livreur_id === livreur_id;
       if (etaitVerrouillee) {
@@ -835,7 +862,7 @@ Deno.serve(async (req) => {
           livreur_nom: '',
           livreur_telephone: '',
         });
-        const result = await lancerDispatchMulti(base44, course_id, dejaNotifies);
+        const result = await lancerDispatchMulti(base44, course_id, refusDefinitifsCourse);
         if (result.noLivreur) return Response.json({ success: true, noLivreur: true });
         if (result.cycleEpuise) return Response.json({ success: true, cycle_epuise: true });
         return Response.json({ success: true, nb_notifies: result.nb_notifies });

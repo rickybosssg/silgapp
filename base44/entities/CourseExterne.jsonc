@@ -406,6 +406,10 @@
     "dispatch_notified_ids": {
       "type": "string"
     },
+    "dispatch_refused_ids": {
+      "type": "string",
+      "description": "JSON array des livreurs ayant refuse ou indique etre occupes pour cette course uniquement"
+    },
     "whatsapp_expediteur_statut": {
       "type": "string",
       "enum": [

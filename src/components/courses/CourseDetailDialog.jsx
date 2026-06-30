@@ -34,12 +34,30 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
   const statuts = reseau === "externe" ? STATUTS_EXTERNE : STATUTS_INTERNE;
   const [newStatut, setNewStatut] = React.useState(course?.statut || "");
   const [confirmAnnulation, setConfirmAnnulation] = React.useState(false);
+  const [adminIdentity, setAdminIdentity] = React.useState({ email: "", name: "Admin SILGAPP" });
   const countryMismatch = reseau === "externe" && isPays && course?.country_code && course.country_code !== adminCountryCode;
 
   React.useEffect(() => {
     setNewStatut(course?.statut || "");
     setConfirmAnnulation(false);
   }, [course]);
+
+  React.useEffect(() => {
+    if (!open || reseau !== "externe") return;
+    let cancelled = false;
+    base44.auth.me()
+      .then((user) => {
+        if (cancelled) return;
+        setAdminIdentity({
+          email: user?.email || "",
+          name: user?.full_name || user?.email || "Admin SILGAPP",
+        });
+      })
+      .catch((error) => {
+        console.warn("[CourseDetailDialog] Impossible de charger l'identite admin:", error?.message || error);
+      });
+    return () => { cancelled = true; };
+  }, [open, reseau]);
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }) => {
@@ -286,14 +304,14 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
           </div>
 
           {/* Messagerie admin */}
-          {reseau === "externe" && course.livreur_id && !["livree", "annulee"].includes(course.statut) && (
+          {reseau === "externe" && course.livreur_id && adminIdentity.email && !["livree", "annulee"].includes(course.statut) && (
             <div className="pt-2 border-t">
               <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2"> Messagerie</p>
               <ChatWindow
                 courseId={course.id}
                 senderType="admin"
-                senderId="admin"
-                senderName="Admin SILGAPP"
+                senderId={adminIdentity.email}
+                senderName={adminIdentity.name}
               />
             </div>
           )}
