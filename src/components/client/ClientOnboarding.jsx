@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { requestNativeAppPermissions } from "@/lib/nativePermissions";
 import { toast } from "sonner";
-import { User, Check, Loader2 } from "lucide-react";
+import { User, Check, Loader2, Phone, Gift, ShieldCheck, Sparkles } from "lucide-react";
 import CountryCodeSelect from "@/components/ui/CountryCodeSelect";
 import { SILGAPP_COUNTRIES } from "@/lib/phoneUtils";
 
@@ -193,34 +193,56 @@ function EtapeProfil({ clientProfil, onSuccess }) {
     }
   };
 
+  const inputClass = "w-full h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 placeholder-slate-400 shadow-sm outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
+  const labelClass = "text-[11px] font-black uppercase tracking-[0.14em] text-slate-600 mb-1.5 block";
+
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-primary/10 to-red-50 flex items-center justify-center p-6 z-50 overflow-y-auto">
-      <div className="max-w-sm w-full bg-white rounded-3xl shadow-2xl p-7 space-y-5 my-4">
-        <div className="text-center space-y-2">
-          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
-            <User className="w-8 h-8 text-primary" />
+    <div className="fixed inset-0 bg-[radial-gradient(circle_at_top,#dbeafe_0,#eef6ff_34%,#f8fafc_72%)] flex items-center justify-center p-4 z-50 overflow-y-auto">
+      <div className="max-w-md w-full my-4 overflow-hidden rounded-[2rem] bg-white shadow-2xl shadow-blue-950/15 border border-white/80">
+        <div className="relative bg-gradient-to-br from-slate-950 via-blue-900 to-sky-700 px-6 py-7 text-white">
+          <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10" />
+          <div className="absolute -left-12 bottom-0 h-28 w-28 rounded-full bg-sky-300/20" />
+          <div className="relative grid grid-cols-[64px_1fr] gap-4 [&>p]:col-start-2 [&>p]:m-0 [&>p:first-of-type]:text-2xl [&>p:first-of-type]:font-black [&>p:first-of-type]:leading-tight [&>p:first-of-type]:text-white [&>p:last-of-type]:text-sm [&>p:last-of-type]:leading-relaxed [&>p:last-of-type]:text-blue-100">
+          <div className="w-16 h-16 rounded-3xl bg-white/15 border border-white/20 flex items-center justify-center shadow-lg shadow-blue-950/20">
+            <User className="w-8 h-8 text-white" />
           </div>
-          <p className="text-xl font-black text-gray-900">Complétez vos informations</p>
-          <p className="text-xs text-gray-600">Ces informations permettent de synchroniser vos courses.</p>
+          <p className="text-2xl font-black leading-tight text-white">Complétez vos informations</p>
+          <p className="text-sm leading-relaxed text-blue-100">Ces informations permettent de synchroniser vos courses.</p>
+        </div>
         </div>
 
-        <div className="space-y-3">
+        <div className="p-5 sm:p-6 space-y-4">
+          <div className="rounded-3xl border border-blue-100 bg-blue-50/70 p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-white text-blue-700 flex items-center justify-center shadow-sm">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-sm font-black text-slate-900">Une seule fiche a remplir</p>
+                <p className="text-xs text-slate-600 leading-relaxed mt-0.5">
+                  Selectionnez votre pays, ajoutez vos coordonnees et accedez directement au tableau de bord.
+                </p>
+              </div>
+            </div>
+          </div>
           {/* Pays */}
           <div>
-            <label className="text-xs font-bold text-gray-800 mb-1 block"> Pays *</label>
-            <CountryCodeSelect
-              value={countryCode}
-              onChange={(code) => { setCountryCode(code); setTelAffiche(""); }}
-            />
+            <label className={labelClass}>Pays d'utilisation *</label>
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-1">
+              <CountryCodeSelect
+                value={countryCode}
+                onChange={(code) => { setCountryCode(code); setTelAffiche(""); }}
+              />
+            </div>
           </div>
 
           <div>
-            <label className="text-xs font-bold text-gray-800 mb-1 block">Nom *</label>
+            <label className={labelClass}>Nom *</label>
             <input
               value={nom}
               onChange={e => setNom(e.target.value)}
               placeholder="Votre nom de famille"
-              className="w-full h-12 rounded-xl border-2 border-gray-300 px-4 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+              className={inputClass}
             />
           </div>
           <div>
@@ -229,7 +251,7 @@ function EtapeProfil({ clientProfil, onSuccess }) {
               value={prenom}
               onChange={e => setPrenom(e.target.value)}
               placeholder="Votre prénom"
-              className="w-full h-12 rounded-xl border-2 border-gray-300 px-4 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+              className={inputClass}
             />
           </div>
           <div>
@@ -238,7 +260,7 @@ function EtapeProfil({ clientProfil, onSuccess }) {
               value={ville}
               onChange={e => setVille(e.target.value)}
               placeholder="Votre ville"
-              className="w-full h-12 rounded-xl border-2 border-gray-300 px-4 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+              className={inputClass}
             />
           </div>
           <div>
@@ -247,7 +269,7 @@ function EtapeProfil({ clientProfil, onSuccess }) {
               value={quartier}
               onChange={e => setQuartier(e.target.value)}
               placeholder="Votre quartier ou adresse"
-              className="w-full h-12 rounded-xl border-2 border-gray-300 px-4 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+              className={inputClass}
             />
           </div>
           <div>
@@ -255,7 +277,8 @@ function EtapeProfil({ clientProfil, onSuccess }) {
               Téléphone * {paysSelectionne ? `(${paysSelectionne.digits} chiffres)` : "(sélectionnez un pays)"}
             </label>
             <div className="flex gap-2">
-              <div className="h-12 rounded-xl border-2 border-gray-300 bg-gray-100 px-3 flex items-center text-sm font-bold text-gray-800 flex-shrink-0">
+              <div className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-3 flex items-center gap-2 text-sm font-black text-slate-800 flex-shrink-0 shadow-sm">
+                <Phone className="w-4 h-4 text-blue-600" />
                 {paysSelectionne ? `${paysSelectionne.emoji} ${paysSelectionne.indicatif}` : ""}
               </div>
               <input
@@ -264,7 +287,7 @@ function EtapeProfil({ clientProfil, onSuccess }) {
                 onChange={handleTelChange}
                 placeholder={paysSelectionne ? "0".repeat(paysSelectionne.digits).replace(/(.{2})/g, "$1 ").trim() : "—"}
                 disabled={!countryCode}
-                className="flex-1 h-12 rounded-xl border-2 border-gray-300 px-4 text-sm text-gray-900 tracking-widest font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:bg-gray-50 disabled:text-gray-500"
+                className={`${inputClass} flex-1 tracking-widest font-mono disabled:bg-slate-50 disabled:text-slate-400`}
               />
             </div>
             {telAffiche.length > 0 && (
@@ -279,8 +302,11 @@ function EtapeProfil({ clientProfil, onSuccess }) {
 
           {/* Champ code promo */}
           {!clientProfil?.code_promo_utilise && (
-            <div>
-              <label className="text-xs font-bold text-gray-800 mb-1 block"> Code promo (optionnel)</label>
+            <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
+              <label className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-600 mb-2 flex items-center gap-2">
+                <Gift className="w-4 h-4 text-blue-600" />
+                Code promo optionnel
+              </label>
               <input
                 value={codePromo}
                 onChange={e => {
@@ -292,7 +318,7 @@ function EtapeProfil({ clientProfil, onSuccess }) {
                 className={`w-full h-12 rounded-xl border px-4 text-sm font-mono font-bold tracking-widest focus:outline-none focus:ring-2 transition-all ${
                   codePromoStatut === "valide" ? "border-green-400 bg-green-50 text-green-700 focus:ring-green-200" :
                   codePromoStatut === "invalide" ? "border-red-300 bg-red-50 focus:ring-red-200" :
-                  "border-gray-200 focus:ring-primary/30 focus:border-primary"
+                  "border-slate-200 bg-white text-slate-900 focus:ring-blue-100 focus:border-blue-500"
                 }`}
               />
               {codePromoStatut === "valide" && codePromoData && (
@@ -313,7 +339,7 @@ function EtapeProfil({ clientProfil, onSuccess }) {
         <button
           onClick={handleSave}
           disabled={loading || !peutSauvegarder}
-          className="w-full h-14 rounded-2xl bg-gradient-to-b from-primary to-red-700 text-white font-black text-base shadow-lg shadow-red-200 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+          className="w-[calc(100%-2.5rem)] sm:w-[calc(100%-3rem)] mx-5 sm:mx-6 mb-6 h-14 rounded-2xl bg-gradient-to-r from-blue-700 via-sky-600 to-cyan-500 text-white font-black text-base shadow-lg shadow-blue-200 active:scale-[0.98] transition-all disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
         >
           {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
           {loading ? "Sauvegarde..." : "Valider et continuer"}

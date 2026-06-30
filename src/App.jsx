@@ -20,6 +20,7 @@ const LivreursExternes = lazy(() => import("./pages/LivreursExternes"));
 const RapportJourExterne = lazy(() => import("./pages/RapportJourExterne"));
 const Notifications = lazy(() => import("./pages/Notifications"));
 const RecapitulatifAdmin = lazy(() => import("./pages/RecapitulatifAdmin"));
+const Statistiques = lazy(() => import("./pages/Statistiques.jsx"));
 const LivreurExterneApp = lazy(() => import("./pages/LivreurExterneApp.jsx"));
 const ClientExterneApp = lazy(() => import("./pages/ClientExterneApp.jsx"));
 const RecapCourseLivreur = lazy(() => import("./pages/RecapCourseLivreur.jsx"));
@@ -145,6 +146,7 @@ function AdminExterneRoutes() {
         <Route path="/livreurs" element={<AnimatedRoutes><LivreursExternes /></AnimatedRoutes>} />
         <Route path="/rapport" element={<AnimatedRoutes><RapportJourExterne /></AnimatedRoutes>} />
         <Route path="/recapitulatif" element={<AnimatedRoutes><RecapitulatifAdmin reseau="externe" /></AnimatedRoutes>} />
+        <Route path="/admin/statistiques" element={<AnimatedRoutes><Statistiques /></AnimatedRoutes>} />
         <Route path="/admin/externe" element={<AnimatedRoutes><DashboardAdminExterne /></AnimatedRoutes>} />
         <Route path="/admin/externe/dus-livreurs" element={<AnimatedRoutes><DusLivreursExternes /></AnimatedRoutes>} />
         <Route path="/admin/externe/clients" element={<AnimatedRoutes><ClientsExternesPage /></AnimatedRoutes>} />
