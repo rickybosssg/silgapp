@@ -78,11 +78,12 @@ function CourseCreated({ course, onNewCourse, formData, onClearStorage }) {
   const navigate = useNavigate();
   const trackingUrl = buildTrackingUrl(course.tracking_token || course.id);
 
-  const expediteurPhone = formData.expediteurTelephone || formData.clientTelephone || "";
-  const destinatairePhone = formData.destinataireTelephone || "";
+  // 📞 Source prioritaire : l'entité course (DB) — fallback formData pour compat
+  const expediteurPhone = course?.expediteur_telephone || course?.client_telephone || formData?.expediteurTelephone || formData?.clientTelephone || "";
+  const destinatairePhone = course?.destinataire_telephone || formData?.destinataireTelephone || "";
 
-  const expediteurName = formData.expediteurNom || formData.clientNom || "Client";
-  const destinataireName = formData.destinataireNom || "Destinataire";
+  const expediteurName = course?.expediteur_nom || course?.client_nom || formData?.expediteurNom || formData?.clientNom || "Client";
+  const destinataireName = course?.destinataire_nom || formData?.destinataireNom || "Destinataire";
 
   const msgExpediteur = [
     `✅ *Course SILGAPP confirmée !*`,
