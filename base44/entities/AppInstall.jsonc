@@ -1,0 +1,57 @@
+{
+  "name": "AppInstall",
+  "type": "object",
+  "properties": {
+    "device_id": {
+      "type": "string",
+      "description": "Identifiant unique de l'appareil"
+    },
+    "platform": {
+      "type": "string",
+      "enum": [
+        "android",
+        "ios",
+        "web"
+      ],
+      "description": "Plateforme de l'appareil"
+    },
+    "country_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE",
+        "GH"
+      ],
+      "default": "BF",
+      "description": "Code pays"
+    },
+    "first_opened_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Premiere ouverture de l'app"
+    },
+    "last_seen_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Derniere activite"
+    },
+    "app_version": {
+      "type": "string",
+      "description": "Version de l'app"
+    },
+    "user_email": {
+      "type": "string",
+      "description": "Email utilisateur si connecte"
+    }
+  },
+  "required": [
+    "device_id",
+    "platform"
+  ]
+}

@@ -10,6 +10,7 @@ import AuthGate from './components/auth/AuthGate.jsx';
 import SelectionReseau from './pages/SelectionReseau.jsx';
 import AppMaintenanceGate from './components/admin/AppMaintenanceGate.jsx';
 import { restoreTokenFromCookie, syncTokenFromPreferences, clearPersistedToken } from '@/lib/authPersistence';
+import { trackAppInstall } from '@/lib/trackInstall';
 
 // LoadingScreen défini IMMÉDIATEMENT avant lazy loading
 const LoadingScreen = () => <SplashScreen />;
@@ -68,6 +69,7 @@ const DiagnosticPushComplet = lazy(() => import('./pages/DiagnosticPushComplet.j
 const TestDispatchLivreur = lazy(() => import('./pages/TestDispatchLivreur.jsx'));
 const CentreNotificationsPush = lazy(() => import('./pages/CentreNotificationsPush.jsx'));
 const DemoDashboard = lazy(() => import('./pages/DemoDashboard.jsx'));
+const Statistiques = lazy(() => import('./pages/Statistiques.jsx'));
 // ── Module Boutiques / Restaurants / Partenaires ──
 const BoutiquesList = lazy(() => import('./pages/BoutiquesList.jsx'));
 const BoutiqueDetail = lazy(() => import('./pages/BoutiqueDetail.jsx'));
@@ -159,12 +161,15 @@ function AppContent() {
     // Vérification toutes les 60 secondes
     const interval = setInterval(checkAndRestoreToken, 60000);
 
+    // Suivi d'installation unique par appareil
+    trackAppInstall();
+
     // Vérification immédiate quand l'app revient au premier plan
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        checkAndRestoreToken();
-      }
-    };
+      const handleVisibility = () => {
+        if (document.visibilityState === 'visible') {
+          checkAndRestoreToken();
+        }
+      };
     document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
@@ -369,6 +374,7 @@ function AppContent() {
           <Route path="/admin/restaurants" element={<AnimatedRoutes><GestionRestaurants /></AnimatedRoutes>} />
           <Route path="/admin/pharmacies" element={<AnimatedRoutes><GestionPharmacies /></AnimatedRoutes>} />
           <Route path="/admin/commandes-partenaires" element={<AnimatedRoutes><CommandesPartenaires /></AnimatedRoutes>} />
+          <Route path="/admin/statistiques" element={<AnimatedRoutes><Statistiques /></AnimatedRoutes>} />
           <Route path="/support" element={<AnimatedRoutes><SupportClient /></AnimatedRoutes>} />
         </Route>
         <Route path="*" element={<PageNotFound />} />
