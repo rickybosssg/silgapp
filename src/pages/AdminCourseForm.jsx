@@ -54,6 +54,7 @@ function buildQrUrl(token) {
 }
 
 const SILGAPP_DL = "https://silga-dispatch-go.base44.app/telecharger";
+const SILGAPP_APPLE = "https://apps.apple.com/bf/app/silgapp/id6782046749?l=fr-FR";
 
 const PAYS = [
   { code: "BF", nom: "Burkina Faso", drapeau: "🇧🇫" },
@@ -102,6 +103,8 @@ function CourseCreated({ course, onNewCourse, formData, onClearStorage }) {
     ``,
     `📲 *Téléchargez SILGAPP :*`,
     SILGAPP_DL,
+    `🍎 *Sur App Store (iPhone) :*`,
+    SILGAPP_APPLE,
     ``,
     `Merci de votre confiance ! 🏍️`,
   ].join("\n");
@@ -120,6 +123,8 @@ function CourseCreated({ course, onNewCourse, formData, onClearStorage }) {
     ``,
     `📲 *Téléchargez SILGAPP :*`,
     SILGAPP_DL,
+    `🍎 *Sur App Store (iPhone) :*`,
+    SILGAPP_APPLE,
     ``,
     `Merci de votre confiance ! 🏍️`,
   ].filter(Boolean).join("\n");
