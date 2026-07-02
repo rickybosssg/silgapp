@@ -82,6 +82,7 @@ const GestionPharmacies = lazy(() => import('./pages/GestionPharmacies.jsx'));
 const MesCommandesBoutique = lazy(() => import('./pages/MesCommandesBoutique.jsx'));
 const PharmaciesList = lazy(() => import('./pages/PharmaciesList.jsx'));
 const PharmacieDetail = lazy(() => import('./pages/PharmacieDetail.jsx'));
+const AdminMessages = lazy(() => import('./pages/AdminMessages.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -374,6 +375,7 @@ function AppContent() {
           <Route path="/admin/restaurants" element={<AnimatedRoutes><GestionRestaurants /></AnimatedRoutes>} />
           <Route path="/admin/pharmacies" element={<AnimatedRoutes><GestionPharmacies /></AnimatedRoutes>} />
           <Route path="/admin/commandes-partenaires" element={<AnimatedRoutes><CommandesPartenaires /></AnimatedRoutes>} />
+          <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
           <Route path="/admin/statistiques" element={<AnimatedRoutes><Statistiques /></AnimatedRoutes>} />
           <Route path="/support" element={<AnimatedRoutes><SupportClient /></AnimatedRoutes>} />
         </Route>
