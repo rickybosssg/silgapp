@@ -1,54 +1,60 @@
 import React from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Clock, User, ArrowRight } from "lucide-react";
+import { MapPin, Clock, User, ArrowRight, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import CourseStatusBadge from "@/components/courses/CourseStatusBadge";
 import UrgenceBadge from "@/components/courses/UrgenceBadge";
+import { cleanAddress } from "@/lib/addressUtils";
 
-// Statuts externes traduits lisiblement
+// Statuts externes traduits lisiblement — couleurs distinctes par étape
 const STATUT_EXTERNE_LABELS = {
-  nouvelle: "Nouvelle",
+  nouvelle: "🔵 Nouvelle",
   recherche_livreur: "🔍 Recherche livreur",
-  livreur_en_route: "🚴 En route",
-  colis_recupere: "📦 Colis récupéré",
-  en_livraison: "🚀 En livraison",
-  livree: "✅ Livrée",
-  annulee: "❌ Annulée",
+  livreur_en_route: "🟡 En route vers l'expéditeur",
+  colis_recupere: "🟠 Colis récupéré",
+  en_livraison: "🔵 En route vers le destinataire",
+  livree: "🟢 Livré",
+  annulee: "🔴 Annulé",
 };
 
 function CourseItemExterne({ course, onView }) {
   const expediteur = course.expediteur_nom || course.client_nom || "Client";
   const statutLabel = STATUT_EXTERNE_LABELS[course.statut] || course.statut;
   const statutColor = {
-    livreur_en_route: "bg-blue-100 text-blue-700 border-blue-200",
-    colis_recupere: "bg-amber-100 text-amber-700 border-amber-200",
-    en_livraison: "bg-purple-100 text-purple-700 border-purple-200",
-    recherche_livreur: "bg-orange-100 text-orange-700 border-orange-200",
-    nouvelle: "bg-gray-100 text-gray-600 border-gray-200",
+    livreur_en_route: "bg-yellow-100 text-yellow-800 border-yellow-300",
+    colis_recupere: "bg-orange-100 text-orange-800 border-orange-300",
+    en_livraison: "bg-blue-100 text-blue-800 border-blue-300",
+    recherche_livreur: "bg-orange-100 text-orange-800 border-orange-300",
+    nouvelle: "bg-blue-100 text-blue-700 border-blue-200",
   }[course.statut] || "bg-gray-100 text-gray-600 border-gray-200";
 
+  const addrDepart = cleanAddress(course.adresse_depart, course.gps_depart_lat, course.gps_depart_lng);
+  const addrArrivee = cleanAddress(course.adresse_arrivee, course.gps_arrivee_lat, course.gps_arrivee_lng);
+
   return (
-    <Card className="p-3 hover:shadow-sm transition-shadow border-l-4 border-l-blue-400">
+    <Card className="p-4 hover:shadow-md transition-all border-l-4 border-l-blue-400 space-y-2.5">
       <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0 space-y-1.5">
+        <div className="flex-1 min-w-0 space-y-2">
+          {/* Nom client — agrandi et en gras */}
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="font-semibold text-sm">{expediteur}</span>
+              <User className="w-4 h-4 text-muted-foreground" />
+              <span className="font-bold text-base text-gray-900">{expediteur}</span>
             </div>
-            <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${statutColor}`}>
+            <span className={`text-xs px-2.5 py-1 rounded-full border font-semibold ${statutColor}`}>
               {statutLabel}
             </span>
           </div>
 
+          {/* Adresses — nettoyées, jamais d'URL */}
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <MapPin className="w-3 h-3 text-primary flex-shrink-0" />
-            <span className="truncate">{course.adresse_depart || "—"}</span>
+            <span className="truncate">{addrDepart}</span>
             <ArrowRight className="w-3 h-3 flex-shrink-0" />
             <MapPin className="w-3 h-3 text-accent flex-shrink-0" />
-            <span className="truncate">{course.adresse_arrivee || "Destination à définir"}</span>
+            <span className="truncate">{addrArrivee || "Destination à définir"}</span>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
@@ -71,7 +77,12 @@ function CourseItemExterne({ course, onView }) {
         </div>
 
         {onView && (
-          <Button size="sm" variant="outline" className="text-xs h-7 flex-shrink-0" onClick={() => onView(course)}>
+          <Button
+            size="sm"
+            className="flex-shrink-0 h-9 px-4 rounded-xl gap-1.5 font-semibold text-xs bg-primary hover:bg-primary/90 text-white shadow-md shadow-primary/20 transition-all"
+            onClick={() => onView(course)}
+          >
+            <Eye className="w-3.5 h-3.5" />
             Détails
           </Button>
         )}
@@ -83,15 +94,17 @@ function CourseItemExterne({ course, onView }) {
 function CourseItemInterne({ course, onView }) {
   // Badge spécial pour dispatch automatique en cours
   const isDispatchAuto = course.dispatch_status === 'propose' && course.statut === 'en_attente_livreur';
+  const addrDepart = cleanAddress(course.adresse_depart);
+  const addrArrivee = cleanAddress(course.adresse_arrivee);
   
   return (
-    <Card className={`p-3 hover:shadow-sm transition-shadow ${isDispatchAuto ? 'border-l-4 border-l-amber-400 bg-amber-50/30' : ''}`}>
+    <Card className={`p-4 hover:shadow-md transition-all space-y-2.5 ${isDispatchAuto ? 'border-l-4 border-l-amber-400 bg-amber-50/30' : ''}`}>
       <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0 space-y-1.5">
+        <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="font-semibold text-sm">{course.client_nom || "Client"}</span>
+              <User className="w-4 h-4 text-muted-foreground" />
+              <span className="font-bold text-base text-gray-900">{course.client_nom || "Client"}</span>
             </div>
             {course.urgence && course.urgence !== "normale" && (
               <UrgenceBadge urgence={course.urgence} />
@@ -105,10 +118,10 @@ function CourseItemInterne({ course, onView }) {
 
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <MapPin className="w-3 h-3 text-primary flex-shrink-0" />
-            <span className="truncate">{course.adresse_depart || "—"}</span>
+            <span className="truncate">{addrDepart}</span>
             <ArrowRight className="w-3 h-3 flex-shrink-0" />
             <MapPin className="w-3 h-3 text-accent flex-shrink-0" />
-            <span className="truncate">{course.adresse_arrivee || "—"}</span>
+            <span className="truncate">{addrArrivee}</span>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
@@ -128,7 +141,12 @@ function CourseItemInterne({ course, onView }) {
           </div>
         </div>
 
-        <Button size="sm" variant="outline" className="text-xs h-7 flex-shrink-0" onClick={() => onView(course)}>
+        <Button
+          size="sm"
+          className="flex-shrink-0 h-9 px-4 rounded-xl gap-1.5 font-semibold text-xs bg-primary hover:bg-primary/90 text-white shadow-md shadow-primary/20 transition-all"
+          onClick={() => onView(course)}
+        >
+          <Eye className="w-3.5 h-3.5" />
           Détails
         </Button>
       </div>

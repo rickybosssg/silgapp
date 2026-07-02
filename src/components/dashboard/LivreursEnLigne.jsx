@@ -15,23 +15,25 @@ export default function LivreursEnLigne({ livreurs = [] }) {
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between group"
       >
-        <h2 className="font-semibold text-sm flex items-center gap-2">
+        <h2 className="font-bold text-sm flex items-center gap-2">
           <Truck className="w-4 h-4 text-primary" />
           Livreurs en ligne
-          <span className="text-xs bg-primary/10 text-primary font-semibold px-1.5 py-0.5 rounded-full">
+          <span className="text-xs bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-full">
             {livreurs.length}
           </span>
         </h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {livreurs.length > 0 && (
             <>
-              <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block" />
-                {disponibles.length} dispo
+              <span className="flex items-center gap-1.5 text-xs">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block" />
+                <span className="text-muted-foreground">Disponibles :</span>
+                <span className="font-black text-green-700">{disponibles.length}</span>
               </span>
-              <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                <span className="w-1.5 h-1.5 rounded-full bg-orange-400 inline-block" />
-                {enCourse.length} en course
+              <span className="flex items-center gap-1.5 text-xs">
+                <span className="w-2 h-2 rounded-full bg-orange-400 inline-block" />
+                <span className="text-muted-foreground">En course :</span>
+                <span className="font-black text-orange-700">{enCourse.length}</span>
               </span>
             </>
           )}
