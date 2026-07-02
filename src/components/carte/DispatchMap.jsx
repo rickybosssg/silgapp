@@ -682,18 +682,26 @@ export default function DispatchMap({
   const [showHeatmapHint, setShowHeatmapHint] = useState(true);
 
   // ── Recentrage manuel (bouton "Centrer") ──
+  // Guardé par userInteractedRef : ne s'exécute que via clic bouton (qui reset le flag)
   const centerOnAll = useCallback(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
     const group = window.L.featureGroup(markersRef.current);
     if (group.getLayers().length > 0) {
+      programmaticMoveRef.current = true;
       map.fitBounds(group.getBounds().pad(0.15), { animate: true });
     } else if (initialPositionRef.current) {
       const p = initialPositionRef.current;
+      programmaticMoveRef.current = true;
       map.setView([p.latitude, p.longitude], p.zoom ?? 12, { animate: true });
     }
     userInteractedRef.current = false;
   }, []);
+
+  // ── Auto-fit initial : UNE SEULE FOIS après que les marqueurs sont placés ──
+  // Ne s'exécute jamais si l'admin a déjà interagi avec la carte
+  const hasInitialFitRef = useRef(false);
+  const programmaticMoveRef = useRef(false); // distingue nos setView/fitBounds des actions utilisateur
 
   // Init carte — UNE SEULE FOIS (ne dépend plus de position)
   useEffect(() => {
@@ -747,11 +755,16 @@ export default function DispatchMap({
         window.L.control.zoom({ position: "bottomright" }).addTo(map);
 
         // ── Détecter interaction manuelle de l'admin (drag / zoom) ──
-        // Une fois que l'admin touche la carte, on désactive tout auto-fit/auto-center
-        const onUserInteract = () => { userInteractedRef.current = true; };
+        // On distingue les mouvements programmatiques (setView/fitBounds/invalidateSize)
+        // des vraies interactions utilisateur grâce à programmaticMoveRef.
+        const onUserInteract = () => {
+          if (programmaticMoveRef.current) {
+            programmaticMoveRef.current = false;
+            return; // ne pas marquer comme interaction utilisateur
+          }
+          userInteractedRef.current = true;
+        };
         map.on("dragstart", onUserInteract);
-        // zoomend / moveend : fiable pour détecter zoom/pan utilisateur
-        // (zoomstart avec e.hard ne fonctionne pas — e.hard est undefined pour tout événement)
         map.on("zoomend", onUserInteract);
         map.on("moveend", onUserInteract);
         map.on("mousedown", onUserInteract);
@@ -761,7 +774,13 @@ export default function DispatchMap({
         setMapLoaded(true);
 
         // Stabiliser la carte après rendu du conteneur modal
-        setTimeout(() => { if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize(); }, 200);
+        // Marquer comme mouvement programmatique pour ne pas déclencher userInteracted
+        setTimeout(() => {
+          if (mapInstanceRef.current) {
+            programmaticMoveRef.current = true;
+            mapInstanceRef.current.invalidateSize();
+          }
+        }, 200);
         console.log("[DispatchMap] Carte initialisée avec succès");
       } catch (error) {
         console.error("[DispatchMap] Erreur initialisation carte:", error);
@@ -1093,6 +1112,7 @@ export default function DispatchMap({
               onClick={() => {
                 const p = initialPositionRef.current;
                 if (p && mapInstanceRef.current) {
+                  programmaticMoveRef.current = true;
                   mapInstanceRef.current.setView([p.latitude, p.longitude], p.zoom ?? 12, { animate: true });
                   userInteractedRef.current = false;
                 }

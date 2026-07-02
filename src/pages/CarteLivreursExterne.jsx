@@ -391,16 +391,16 @@ export default function CarteLivreursExterne() {
     return 10;
   }
 
-  // Centre de la carte : pays sélectionné > premier livreur éligible > Ouagadougou (BF)
+  // Centre de la carte : pays sélectionné > Ouagadougou (BF)
+  // ⚠️ Ne PAS dépendre de livreursSurCarte[0] : le tableau est rafraîchi toutes les 5s
+  // et son ordre change → centerPosition change → la carte re-zoome.
+  // On dépend UNIQUEMENT de paysData (qui ne change qu'au changement de pays).
   const centerPosition = useMemo(() => {
     if (paysData?.latitude_centre) {
       return { latitude: paysData.latitude_centre, longitude: paysData.longitude_centre, zoom: rayonToZoom(paysData.rayon_km) };
     }
-    if (livreursSurCarte[0]?.latitude && livreursSurCarte[0]?.longitude) {
-      return { latitude: livreursSurCarte[0].latitude, longitude: livreursSurCarte[0].longitude, zoom: 13 };
-    }
     return { latitude: 12.3569, longitude: -1.5353, zoom: 12 };
-  }, [paysData, livreursSurCarte]);
+  }, [paysData]);
 
   const filtresBtns = [
     { key: "tous",      label: `Tous (${compteursLivreurs.total})` },
