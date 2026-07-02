@@ -648,6 +648,25 @@ Deno.serve(async (req) => {
         });
       }
 
+      // 🛡️ Vérification anti-courses multiples : le livreur ne peut pas accepter
+      // une nouvelle course s'il en a déjà une active en cours.
+      const STATUTS_ACTIFS = ['livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison'];
+      const coursesActivesLivreur = await base44.asServiceRole.entities.CourseExterne.filter({
+        livreur_id: livreur_id,
+      });
+      const courseActiveExistante = coursesActivesLivreur.find(c =>
+        STATUTS_ACTIFS.includes(c.statut) && c.id !== course_id
+      );
+      if (courseActiveExistante) {
+        console.warn(`[DISPATCH] 🚫 Livreur ${livreur_id} a déjà la course ${courseActiveExistante.id} active (${courseActiveExistante.statut}) — acceptation refusée`);
+        return Response.json({
+          success: false, accepted: false, reason: 'deja_en_course',
+          error: 'Vous avez déjà une course en cours. Terminez-la avant d\'en accepter une nouvelle.',
+          course_active_id: courseActiveExistante.id,
+          course_active_statut: courseActiveExistante.statut,
+        });
+      }
+
       console.log('[DISPATCH][ACCEPT_ATTEMPT]', {
         course_id, livreur_id, course_status: course.statut || '',
         dispatch_status: course.dispatch_status || '',
