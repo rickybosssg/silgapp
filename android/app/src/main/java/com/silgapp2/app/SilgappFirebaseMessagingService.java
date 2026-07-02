@@ -84,6 +84,10 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
     }
 
     public static synchronized void stopUrgentCourseAlert() {
+        stopUrgentCourseAlert(true);
+    }
+
+    private static synchronized void stopUrgentCourseAlert(boolean cancelNotification) {
         if (alertHandler != null && alertRunnable != null) {
             alertHandler.removeCallbacks(alertRunnable);
         }
@@ -91,11 +95,13 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
         alertEndAtMs = 0L;
         stopRingtone();
         releaseWakeLock();
-        cancelActiveNotification();
+        if (cancelNotification) {
+            cancelActiveNotification();
+        }
     }
 
     private static synchronized void startUrgentCourseAlert(Context context, long durationMs, long intervalMs) {
-        stopUrgentCourseAlert();
+        stopUrgentCourseAlert(false);
         alertHandler = new Handler(Looper.getMainLooper());
         alertEndAtMs = SystemClock.elapsedRealtime() + durationMs;
 

@@ -183,7 +183,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
 
             {/* Nav items */}
             <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
-              {allNavItems.filter(item => item.reseauOnly === reseau).map((item) => {
+              {allNavItems.map((item) => {
                 const isActive = location.pathname === item.path;
                 const Icon = item.icon;
                 return (
@@ -238,7 +238,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
       {/* ===== MOBILE BOTTOM TAB BAR ===== */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40 safe-area-bottom">
         <div className="flex items-stretch justify-around">
-          {allNavItems.filter(item => item.reseauOnly === reseau && bottomTabPaths.includes(item.path)).map((item) => {
+          {allNavItems.filter(item => bottomTabPaths.includes(item.path)).map((item) => {
             const isActive = location.pathname === item.path;
             const Icon = item.icon;
             return (
