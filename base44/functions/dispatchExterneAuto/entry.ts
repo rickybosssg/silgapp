@@ -844,6 +844,26 @@ Deno.serve(async (req) => {
         console.log(`[DISPATCH] 🚫 Livreur ${livreur_id} ajouté aux exclus définitifs — course ${course_id}`);
       }
 
+      // 🧹 Marquer les notifications "nouvelle_course" comme lues pour ce livreur
+      // — empêche la course de réapparaître via le fetching par notification
+      try {
+        const livreurData = await base44.asServiceRole.entities.Livreur.get(livreur_id);
+        if (livreurData?.user_email) {
+          const notifs = await base44.asServiceRole.entities.Notification.filter({
+            course_id: course_id,
+            destinataire_email: livreurData.user_email,
+            type: 'nouvelle_course',
+            lue: false,
+          });
+          for (const n of notifs) {
+            await base44.asServiceRole.entities.Notification.update(n.id, { lue: true });
+          }
+          if (notifs.length > 0) {
+            console.log(`[DISPATCH] 🧹 ${notifs.length} notification(s) marquée(s) lue(s) pour livreur ${livreur_id} — course ${course_id}`);
+          }
+        }
+      } catch (e) { console.warn('[DISPATCH] Erreur archivage notifs refus:', e.message); }
+
       const etaitVerrouillee = course.livreur_id === livreur_id;
       if (etaitVerrouillee) {
         // Libérer le verrou
