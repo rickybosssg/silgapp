@@ -1,26 +1,29 @@
 import React, { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, ArrowRight, ChevronDown, ChevronUp } from "lucide-react";
+import { MapPin, ArrowRight, ChevronDown, ChevronUp, Eye } from "lucide-react";
 import { format } from "date-fns";
 import CourseStatusBadge from "@/components/courses/CourseStatusBadge";
+import { cleanAddress } from "@/lib/addressUtils";
 
 function CourseItem({ course, onView }) {
+  const addrDepart = cleanAddress(course.adresse_depart);
+  const addrArrivee = cleanAddress(course.adresse_arrivee);
   return (
-    <div className="flex items-center justify-between gap-3 py-2 border-b last:border-0">
-      <div className="flex-1 min-w-0 space-y-1">
+    <div className="flex items-center justify-between gap-3 py-2.5 border-b last:border-0">
+      <div className="flex-1 min-w-0 space-y-1.5">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-xs">{course.client_nom || course.client_telephone}</span>
+          <span className="font-bold text-sm text-gray-900">{course.client_nom || course.client_telephone}</span>
           <CourseStatusBadge statut={course.statut} />
           {course.livreur_nom && (
             <span className="text-[10px] text-muted-foreground">→ {course.livreur_nom}</span>
           )}
         </div>
-        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
           <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
-          <span className="truncate">{course.adresse_depart}</span>
+          <span className="truncate">{addrDepart}</span>
           <ArrowRight className="w-2.5 h-2.5 flex-shrink-0" />
-          <span className="truncate">{course.adresse_arrivee}</span>
+          <span className="truncate">{addrArrivee}</span>
         </div>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
@@ -30,8 +33,13 @@ function CourseItem({ course, onView }) {
         <span className="text-[10px] text-muted-foreground">
           {format(new Date(course.heure_livraison || course.updated_date || course.created_date), "HH:mm")}
         </span>
-        <Button size="sm" variant="ghost" className="text-xs h-6 px-2" onClick={() => onView(course)}>
-          ↗
+        <Button
+          size="sm"
+          className="h-8 px-3 rounded-lg gap-1 font-semibold text-xs bg-primary hover:bg-primary/90 text-white shadow-sm transition-all"
+          onClick={() => onView(course)}
+        >
+          <Eye className="w-3 h-3" />
+          Détails
         </Button>
       </div>
     </div>

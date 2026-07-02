@@ -27,13 +27,14 @@ import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 
+import com.base6a0ec08f3af5e1d1284254c1.app.R;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
 import java.util.Map;
 
 public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
-    private static final String CHANNEL_ID = "silgapp_courses_critical_v2";
+    private static final String CHANNEL_ID = "silgapp_courses_critical_v3";
     private static final String DEFAULT_CHANNEL_ID = "silgapp_default";
     private static final long DEFAULT_DURATION_MS = 60000L;
     private static final long DEFAULT_INTERVAL_MS = 5000L;
@@ -165,7 +166,7 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
         );
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(getApplicationInfo().icon)
+            .setSmallIcon(R.drawable.ic_stat_silgapp)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
@@ -209,7 +210,7 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
         );
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, DEFAULT_CHANNEL_ID)
-            .setSmallIcon(getApplicationInfo().icon)
+            .setSmallIcon(R.drawable.ic_stat_silgapp)
             .setContentTitle(title)
             .setContentText(body)
             .setPriority(NotificationCompat.PRIORITY_HIGH)

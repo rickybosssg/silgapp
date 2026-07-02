@@ -16,7 +16,7 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     private static final String CHANNEL_ID = "silgapp_default";
-    private static final String URGENT_CHANNEL_ID = "silgapp_courses_critical_v2";
+    private static final String URGENT_CHANNEL_ID = "silgapp_courses_critical_v3";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {

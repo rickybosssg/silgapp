@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Loader2, Globe, Locate, Maximize } from "lucide-react";
 import HeatmapLayer from "./HeatmapLayer";
 import HeatmapControls from "./HeatmapControls";
@@ -610,7 +610,7 @@ function buildPartenairePopup(partenaire) {
       ${partenaire.quartier ? `<p style="font-size:12px;margin:2px 0;color:#6b7280">📌 ${partenaire.quartier}</p>` : ""}
       ${partenaire.ville ? `<p style="font-size:11px;margin:2px 0;color:#9ca3af">${partenaire.ville}</p>` : ""}
       ${partenaire.telephone ? `<p style="font-size:12px;margin:2px 0;color:#444">📞 ${partenaire.telephone}</p>` : ""}
-      ${partenaire._commandes_en_attente > 0 ? `<p style="font-size:12px;margin:4px 0 0 0;color:#dc2626;font-weight:600">${partenaire._commandes_en_attente} commande(s) en attente</p>` : ""}
+      ${partenaire._commandes_en_attente > 0 ? `<p style="font-size:12px;margin:4px 0 0 0;color:#dc2626;font-weight:600">📦 ${partenaire._commandes_en_attente} commande(s) en attente</p>` : ""}
     </div>
   `;
 }
@@ -654,38 +654,6 @@ function buildClientPopup(client) {
   `;
 }
 
-function isLeafletMapUsable(map, container) {
-  return Boolean(
-    map &&
-    container &&
-    document.body.contains(container) &&
-    map._container === container &&
-    map._mapPane &&
-    map._panes?.markerPane
-  );
-}
-
-function removeMarkerSafely(marker) {
-  try {
-    marker?.remove?.();
-  } catch (error) {
-    console.warn("[DispatchMap] Marker cleanup ignore:", error?.message || error);
-  }
-}
-
-function addMarkerSafely(map, container, marker) {
-  if (!isLeafletMapUsable(map, container)) {
-    console.warn("[DispatchMap] Carte Leaflet indisponible - marqueur ignore");
-    return null;
-  }
-  try {
-    return marker.addTo(map);
-  } catch (error) {
-    console.warn("[DispatchMap] Ajout marqueur ignore:", error?.message || error);
-    return null;
-  }
-}
-
 export default function DispatchMap({
   position,
   livreurs = [],
@@ -707,37 +675,38 @@ export default function DispatchMap({
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
-  const initialPositionRef = useRef(position);
+  const initialPositionRef = useRef(position); // capture UNE SEULE fois
+  const userInteractedRef = useRef(false); // l'admin a déplacé/zoomé manuellement
   const [mapLoaded, setMapLoaded] = useState(false);
   const [heatmapModeLocal, setHeatmapModeLocal] = useState(heatmapMode);
   const [showHeatmapHint, setShowHeatmapHint] = useState(true);
 
-  // Recentrer la carte quand le pays change
-  useEffect(() => {
-    const map = mapInstanceRef.current;
-    if (!isLeafletMapUsable(map, mapRef.current) || !position || !position.latitude || !position.longitude) return;
-    map.setView([position.latitude, position.longitude], position.zoom ?? 12);
-  }, [position?.latitude, position?.longitude]);
-
+  // ── Recentrage manuel (bouton "Centrer") ──
+  // Guardé par userInteractedRef : ne s'exécute que via clic bouton (qui reset le flag)
   const centerOnAll = useCallback(() => {
     const map = mapInstanceRef.current;
-    if (!isLeafletMapUsable(map, mapRef.current) || !window.L) return;
-    const layers = markersRef.current.filter(Boolean);
-    if (layers.length > 0) {
-      const group = window.L.featureGroup(layers);
+    if (!map) return;
+    const group = window.L.featureGroup(markersRef.current);
+    if (group.getLayers().length > 0) {
+      programmaticMoveRef.current = true;
       map.fitBounds(group.getBounds().pad(0.15), { animate: true });
-      return;
-    }
-    const p = initialPositionRef.current || position;
-    if (p?.latitude && p?.longitude) {
+    } else if (initialPositionRef.current) {
+      const p = initialPositionRef.current;
+      programmaticMoveRef.current = true;
       map.setView([p.latitude, p.longitude], p.zoom ?? 12, { animate: true });
     }
-  }, [position]);
+    userInteractedRef.current = false;
+  }, []);
 
-  // Init carte
+  // ── Auto-fit initial : UNE SEULE FOIS après que les marqueurs sont placés ──
+  // Ne s'exécute jamais si l'admin a déjà interagi avec la carte
+  const hasInitialFitRef = useRef(false);
+  const programmaticMoveRef = useRef(false); // distingue nos setView/fitBounds des actions utilisateur
+
+  // Init carte — UNE SEULE FOIS (ne dépend plus de position)
   useEffect(() => {
-    const initPosition = initialPositionRef.current || position;
-    if (!mapRef.current || !initPosition || !initPosition.latitude || !initPosition.longitude) return;
+    const pos = initialPositionRef.current;
+    if (!mapRef.current || !pos || !pos.latitude || !pos.longitude) return;
 
     let cancelled = false;
 
@@ -776,7 +745,7 @@ export default function DispatchMap({
           dragging: true,
           keyboard: false,
           preferCanvas: true,
-        }).setView([initPosition.latitude, initPosition.longitude], initPosition.zoom ?? 12);
+        }).setView([pos.latitude, pos.longitude], pos.zoom ?? 12);
 
         window.L.tileLayer(
           "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
@@ -785,8 +754,33 @@ export default function DispatchMap({
 
         window.L.control.zoom({ position: "bottomright" }).addTo(map);
 
+        // ── Détecter interaction manuelle de l'admin (drag / zoom) ──
+        // On distingue les mouvements programmatiques (setView/fitBounds/invalidateSize)
+        // des vraies interactions utilisateur grâce à programmaticMoveRef.
+        const onUserInteract = () => {
+          if (programmaticMoveRef.current) {
+            programmaticMoveRef.current = false;
+            return; // ne pas marquer comme interaction utilisateur
+          }
+          userInteractedRef.current = true;
+        };
+        map.on("dragstart", onUserInteract);
+        map.on("zoomend", onUserInteract);
+        map.on("moveend", onUserInteract);
+        map.on("mousedown", onUserInteract);
+        map.on("touchstart", onUserInteract);
+
         mapInstanceRef.current = map;
         setMapLoaded(true);
+
+        // Stabiliser la carte après rendu du conteneur modal
+        // Marquer comme mouvement programmatique pour ne pas déclencher userInteracted
+        setTimeout(() => {
+          if (mapInstanceRef.current) {
+            programmaticMoveRef.current = true;
+            mapInstanceRef.current.invalidateSize();
+          }
+        }, 200);
         console.log("[DispatchMap] Carte initialisée avec succès");
       } catch (error) {
         console.error("[DispatchMap] Erreur initialisation carte:", error);
@@ -822,17 +816,11 @@ export default function DispatchMap({
     return () => {
       cancelled = true;
       if (mapInstanceRef.current) {
-        try {
-          mapInstanceRef.current.remove();
-        } catch (error) {
-          console.warn("[DispatchMap] Suppression carte ignoree:", error?.message || error);
-        }
+        mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
       }
-      markersRef.current.forEach(removeMarkerSafely);
       markersRef.current = [];
     };
-  // Initialisation volontairement unique pour eviter les crashs Leaflet lors des refreshs.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -846,10 +834,8 @@ export default function DispatchMap({
   useEffect(() => {
     if (!mapInstanceRef.current || !mapLoaded) return;
     const map = mapInstanceRef.current;
-    const container = mapRef.current;
-    if (!isLeafletMapUsable(map, container)) return;
 
-    markersRef.current.forEach(removeMarkerSafely);
+    markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
 
     // 🔴 Courses en attente (toujours affichées)
@@ -860,8 +846,7 @@ export default function DispatchMap({
       if (!lat || !lng) return;
       const icon = buildCourseIcon();
       const [latOff, lngOff] = addMarkerOffset(lat, lng, markerIndex++);
-      const marker = addMarkerSafely(map, container, window.L.marker([latOff, lngOff], { icon, zIndexOffset: 1500 }));
-      if (!marker) return;
+      const marker = window.L.marker([latOff, lngOff], { icon, zIndexOffset: 1500 }).addTo(map);
       marker.bindPopup(buildCoursePopup(course), { maxWidth: 260 });
       if (onMarkerClick) marker.on("click", () => onMarkerClick({ ...course, _type: "course" }));
       markersRef.current.push(marker);
@@ -877,11 +862,10 @@ export default function DispatchMap({
         if (masquerInactifs) return; // filtre visuel
         const icon = buildLivreurIcon(livreur, livreurIdsEnCourseReelle);
         const [lat, lng] = addMarkerOffset(livreur.latitude, livreur.longitude, markerIndex++);
-        const marker = addMarkerSafely(map, container, window.L.marker([lat, lng], {
+        const marker = window.L.marker([lat, lng], {
           icon,
           zIndexOffset: 100,
-        }));
-        if (!marker) return;
+        }).addTo(map);
         marker.bindPopup(buildLivreurPopup(livreur, livreurIdsEnCourseReelle), { maxWidth: 260 });
         if (onMarkerClick) marker.on("click", () => onMarkerClick(livreur));
         markersRef.current.push(marker);
@@ -896,11 +880,10 @@ export default function DispatchMap({
         const [lat, lng] = addMarkerOffset(livreur.latitude, livreur.longitude, markerIndex++);
         // 🎯 CORRECTION : zIndex basé sur course active réelle
         const estEnCourse = livreurIdsEnCourseReelle?.has(livreur.id);
-        const marker = addMarkerSafely(map, container, window.L.marker([lat, lng], {
+        const marker = window.L.marker([lat, lng], {
           icon,
           zIndexOffset: estEnCourse ? 1100 : 1200,
-        }));
-        if (!marker) return;
+        }).addTo(map);
         marker.bindPopup(buildLivreurPopup(livreur, livreurIdsEnCourseReelle), { maxWidth: 260 });
         if (onMarkerClick) marker.on("click", () => onMarkerClick(livreur));
         markersRef.current.push(marker);
@@ -917,11 +900,10 @@ export default function DispatchMap({
         if (masquerInactifs) return; // filtre visuel
         const icon = buildClientIcon(client);
         const [lat, lng] = addMarkerOffset(client.latitude, client.longitude, markerIndex++);
-        const marker = addMarkerSafely(map, container, window.L.marker([lat, lng], {
+        const marker = window.L.marker([lat, lng], {
           icon,
           zIndexOffset: 50,
-        }));
-        if (!marker) return;
+        }).addTo(map);
         marker.bindPopup(buildClientPopup(client), { maxWidth: 260 });
         if (onMarkerClick) marker.on("click", () => onMarkerClick(client));
         markersRef.current.push(marker);
@@ -934,11 +916,10 @@ export default function DispatchMap({
         if (statut === "inactif") return;
         const icon = buildClientIcon(client);
         const [lat, lng] = addMarkerOffset(client.latitude, client.longitude, markerIndex++);
-        const marker = addMarkerSafely(map, container, window.L.marker([lat, lng], {
+        const marker = window.L.marker([lat, lng], {
           icon,
           zIndexOffset: 900,
-        }));
-        if (!marker) return;
+        }).addTo(map);
         marker.bindPopup(buildClientPopup(client), { maxWidth: 260 });
         if (onMarkerClick) marker.on("click", () => onMarkerClick(client));
         markersRef.current.push(marker);
@@ -951,11 +932,10 @@ export default function DispatchMap({
         if (!partenaire.latitude || !partenaire.longitude) return;
         const icon = buildPartenaireIcon(partenaire);
         const [lat, lng] = addMarkerOffset(partenaire.latitude, partenaire.longitude, markerIndex++);
-        const marker = addMarkerSafely(map, container, window.L.marker([lat, lng], {
+        const marker = window.L.marker([lat, lng], {
           icon,
           zIndexOffset: 800,
-        }));
-        if (!marker) return;
+        }).addTo(map);
         marker.bindPopup(buildPartenairePopup(partenaire), { maxWidth: 280 });
         if (onMarkerClick) marker.on("click", () => onMarkerClick({ ...partenaire, _isPartenaire: true }));
         markersRef.current.push(marker);
@@ -1119,6 +1099,31 @@ export default function DispatchMap({
             />
           </div>
 
+          {/* Bouton recentrer (bottom-right, au-dessus du zoom) */}
+          <div className="absolute bottom-4 right-4 z-[1000] flex flex-col gap-2">
+            <button
+              onClick={centerOnAll}
+              className="w-11 h-11 rounded-xl bg-white shadow-lg border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-slate-50 active:scale-95 transition-all"
+              title="Centrer sur tous les marqueurs"
+            >
+              <Maximize className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => {
+                const p = initialPositionRef.current;
+                if (p && mapInstanceRef.current) {
+                  programmaticMoveRef.current = true;
+                  mapInstanceRef.current.setView([p.latitude, p.longitude], p.zoom ?? 12, { animate: true });
+                  userInteractedRef.current = false;
+                }
+              }}
+              className="w-11 h-11 rounded-xl bg-white shadow-lg border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-slate-50 active:scale-95 transition-all"
+              title="Recentrer sur la position initiale"
+            >
+              <Locate className="w-5 h-5" />
+            </button>
+          </div>
+
           {/* Sélecteur pays (bottom-left) */}
           {onCountryChange && (
             <div className="absolute bottom-4 left-4 z-[1000]">
@@ -1137,29 +1142,6 @@ export default function DispatchMap({
               </div>
             </div>
           )}
-
-          <div className="absolute bottom-4 right-4 z-[1000] flex flex-col gap-2">
-            <button
-              onClick={centerOnAll}
-              className="w-11 h-11 rounded-xl bg-white shadow-lg border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-slate-50 active:scale-95 transition-all"
-              title="Centrer sur tous les marqueurs"
-            >
-              <Maximize className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => {
-                const map = mapInstanceRef.current;
-                const p = initialPositionRef.current || position;
-                if (isLeafletMapUsable(map, mapRef.current) && p?.latitude && p?.longitude) {
-                  map.setView([p.latitude, p.longitude], p.zoom ?? 12, { animate: true });
-                }
-              }}
-              className="w-11 h-11 rounded-xl bg-white shadow-lg border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-slate-50 active:scale-95 transition-all"
-              title="Recentrer la carte"
-            >
-              <Locate className="w-5 h-5" />
-            </button>
-          </div>
         </>
       )}
     </div>

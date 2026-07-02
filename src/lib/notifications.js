@@ -10,7 +10,7 @@ import {
 } from "@/lib/livreurUrgentAlert";
 
 const ANDROID_CHANNEL_ID = "silgapp_default";
-const ANDROID_URGENT_CHANNEL_ID = "silgapp_courses_critical_v2";
+const ANDROID_URGENT_CHANNEL_ID = "silgapp_courses_critical_v3";
 const SilgappPush = registerPlugin("SilgappPush");
 let nativeListenersReady = false;
 let nativeRegistrationListenersReady = false;
@@ -426,13 +426,24 @@ async function showNativeNotification(titre, message, options = {}) {
       lights: true,
       vibration: true,
     });
+    await LocalNotifications.createChannel?.({
+      id: ANDROID_URGENT_CHANNEL_ID,
+      name: "SILGAPP Courses",
+      description: "Notifications de courses urgentes SILGAPP",
+      importance: 5,
+      visibility: 1,
+      lights: true,
+      vibration: true,
+    });
+
+    const isUrgentCourse = String(options?.data?.type || "") === "nouvelle_course";
 
     await LocalNotifications.schedule({
       notifications: [{
         title: titre,
         body: message,
         id: Math.floor(Date.now() % 2147483647),
-        channelId: ANDROID_CHANNEL_ID,
+        channelId: isUrgentCourse ? ANDROID_URGENT_CHANNEL_ID : ANDROID_CHANNEL_ID,
         iconColor: "#dc2626",
         sound: options.sound || "default",
         vibrate: isImportant(options) ? [200, 100, 200, 100, 400] : [100],

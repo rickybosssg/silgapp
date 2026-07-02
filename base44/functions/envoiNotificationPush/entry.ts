@@ -4,7 +4,7 @@ const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const APP_URL = 'https://silga-dispatch-go.base44.app';
 const ANDROID_CHANNEL_ID = 'silgapp_default';
-const ANDROID_URGENT_CHANNEL_ID = 'silgapp_courses_critical_v2';
+const ANDROID_URGENT_CHANNEL_ID = 'silgapp_courses_critical_v3';
 const ANDROID_CLICK_ACTION = 'OPEN_SILGAPP';
 
 function base64UrlEncode(input) {

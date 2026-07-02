@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { X, Send, Loader2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
+import { getVenusFallbackResponse } from "@/lib/venusFallback";
 
 const VENUS_AVATAR = "https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/17cf522aa_file_0000000034b871f7bf133c0de0c9eb62.png";
 
@@ -11,67 +12,20 @@ const buildWelcomeMessage = (countryContext) => {
   if (!countryContext || !countryContext.code) {
     return {
       role: "assistant",
-      content: "Bonjour Je suis **VENUS**, votre assistante intelligente **SILGAPP**.\n\n *Plus qu'un service, une promesse* \n\nJe suis là pour vous aider à :\n\n **Créer une course** - Expédier ou recevoir un colis\n **Suivre en temps réel** - Localisez votre livreur sur la carte\n **QR codes & PIN** - Validation de récupération et livraison\n **Prix adapté à votre pays** - Calculé automatiquement selon votre localisation\n **Support** - +226 66 92 51 90\n\n**Dans quel pays êtes-vous ? Comment puis-je vous aider ?**",
+      content: "Bonjour 👋 Je suis **VENUS**, votre assistante intelligente **SILGAPP**.\n\n❤️ *Plus qu'un service, une promesse* ❤️\n\nJe suis là pour vous aider à :\n\n✨ **Créer une course** — Expédier ou recevoir un colis\n🚚 **Suivre en temps réel** — Localisez votre livreur sur la carte\n📱 **QR codes & PIN** — Validation de récupération et livraison\n💰 **Prix adapté à votre pays** — Calculé automatiquement selon votre localisation\n📞 **Support** — +226 66 92 51 90\n\n**Dans quel pays êtes-vous ? Comment puis-je vous aider ?**",
     };
   }
 
-  const { code, nom, ville, devise, prix_par_km, prix_minimum, indicatif, livreursDispos, pubsActives } = countryContext;
+  const { code, nom, ville, devise, prix_par_km, prix_minimum, commission_pct, indicatif, livreursDispos, pubsActives } = countryContext;
+  const gainLivreur = 100 - (commission_pct || 30);
 
   return {
     role: "assistant",
-    content: `Bonjour Je suis **VENUS**, votre assistante SILGAPP pour **${nom || code}** ${countryContext.emoji || ""}\n\n *Plus qu'un service, une promesse* \n\n **Pays actif : ${nom || code} (${code})**\n **Ville principale : ${ville || "N/D"}**\n **Indicatif : ${indicatif || "N/D"}**\n\n **Tarifs ${code} :**\n- Prix/km : **${prix_par_km || "N/D"} ${devise || "FCFA"}**\n- Minimum course : **${prix_minimum || 1000} ${devise || "FCFA"}**\n\n **Réseau actuel à ${ville || code} :**\n- Livreurs disponibles : **${livreursDispos ?? "N/D"}**${pubsActives > 0 ? `\n- Offres actives dans votre pays : **${pubsActives}**` : ""}\n\nJe réponds **uniquement** aux questions concernant **${nom || code}**. Pour un autre pays, demandez-moi de changer de contexte.\n\n**Comment puis-je vous aider aujourd'hui ?**`,
+    content: `Bonjour 👋 Je suis **VENUS**, votre assistante SILGAPP pour **${nom || code}** ${countryContext.emoji || "🌍"}\n\n❤️ *Plus qu'un service, une promesse* ❤️\n\n🌍 **Pays actif : ${nom || code} (${code})**\n📍 **Ville principale : ${ville || "N/D"}**\n📞 **Indicatif : ${indicatif || "N/D"}**\n\n💰 **Tarifs ${code} :**\n- Prix/km : **${prix_par_km || "N/D"} ${devise || "FCFA"}**\n- Minimum course : **${prix_minimum || 1000} ${devise || "FCFA"}**\n- Commission SILGAPP : **${commission_pct || 30}%** | Gain livreur : **${gainLivreur}%**\n\n🚚 **Réseau actuel à ${ville || code} :**\n- Livreurs disponibles : **${livreursDispos ?? "N/D"}**${pubsActives > 0 ? `\n- Offres actives dans votre pays : **${pubsActives}**` : ""}\n\nJe réponds **uniquement** aux questions concernant **${nom || code}**. Pour un autre pays, demandez-moi de changer de contexte.\n\n**Comment puis-je vous aider aujourd'hui ?**`,
   };
 };
 
 const DEFAULT_WELCOME = buildWelcomeMessage(null);
-
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-async function retryVenusOperation(operation, attempts = 3) {
-  let lastError;
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    try {
-      return await operation();
-    } catch (err) {
-      lastError = err;
-      if (attempt < attempts) {
-        await wait(450 * attempt);
-      }
-    }
-  }
-  throw lastError;
-}
-
-function buildLocalVenusReply(question, countryContext) {
-  const q = (question || "").toLowerCase();
-  const pays = countryContext?.nom || countryContext?.code || "votre pays";
-  const ville = countryContext?.ville || "votre ville";
-  const devise = countryContext?.devise || "FCFA";
-  const prixKm = countryContext?.prix_par_km || "le tarif configure par SILGAPP";
-  const minimum = countryContext?.prix_minimum || 1000;
-
-  if (/prix|tarif|cout|coût|payer|paiement|commission|minimum/.test(q)) {
-    return `Pour **${pays}**, SILGAPP applique les paramètres du pays sélectionné. Le minimum affiché est **${minimum} ${devise}** et le prix/km est **${prixKm} ${devise}** lorsque ce tarif est configuré. Les commissions et règles exactes restent pilotées depuis l'administration Pays.`;
-  }
-
-  if (/gps|position|localisation|carte|suivi|itineraire|itinéraire|livreur/.test(q)) {
-    return `Dans **${pays}**, le suivi SILGAPP utilise la position GPS pour afficher le livreur sur la carte en temps réel. Pour une meilleure précision à ${ville}, activez la localisation, gardez Internet disponible et utilisez le bouton **Utiliser ma position actuelle** quand il est proposé.`;
-  }
-
-  if (/pharmacie|ordonnance|medicament|médicament|boutique|restaurant|partenaire/.test(q)) {
-    return `Les partenaires SILGAPP de **${pays}** peuvent recevoir vos messages, photos, audios et preuves de paiement. Pour une pharmacie, ouvrez sa fiche, touchez **Discuter avec la pharmacie**, envoyez votre ordonnance ou votre demande, puis suivez la livraison si elle est créée.`;
-  }
-
-  if (/qr|pin|code|scan|scanner|recuperation|récupération|livraison/.test(q)) {
-    return `Pour sécuriser la livraison, SILGAPP utilise un **QR Code** ou un **PIN**. Le livreur valide d'abord la récupération du colis, puis valide la livraison finale uniquement avec le QR/PIN du destinataire.`;
-  }
-
-  if (/message|audio|micro|photo|discussion|chat|whatsapp/.test(q)) {
-    return `La messagerie SILGAPP permet d'échanger texte, audio et photos entre les personnes autorisées par une course ou une commande. Si le micro ne démarre pas, vérifiez la permission Micro dans les paramètres de l'application, puis revenez dans SILGAPP.`;
-  }
-
-  return `Je suis **VENUS**, l'assistante SILGAPP pour **${pays}**. Je peux vous aider sur les courses, le GPS, les QR/PIN, les partenaires, les pharmacies, les messages, les notifications et les paiements. Dites-moi simplement ce que vous voulez faire.`;
-}
 
 function getStorageKey(userEmail) {
   return `venus_conv_${userEmail || "anonymous"}`;
@@ -108,6 +62,7 @@ export default function VenusChat({ onClose, countryContext }) {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const messagesEndRef = useRef(null);
   const unsubscribeRef = useRef(null);
+  const fallbackTimeoutRef = useRef(null);
 
   // Réinitialiser le message de bienvenue si le pays change
   useEffect(() => {
@@ -123,6 +78,7 @@ export default function VenusChat({ onClose, countryContext }) {
     initConversation();
     return () => {
       if (unsubscribeRef.current) unsubscribeRef.current();
+      if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current);
     };
   }, []);
 
@@ -146,6 +102,11 @@ export default function VenusChat({ onClose, countryContext }) {
       if (data.messages && data.messages.length > 0) {
         setMessages(buildMessages(data.messages));
         setLoading(false);
+        // Annuler le timeout de secours si l'agent a répondu
+        if (fallbackTimeoutRef.current) {
+          clearTimeout(fallbackTimeoutRef.current);
+          fallbackTimeoutRef.current = null;
+        }
       }
     });
   };
@@ -175,7 +136,7 @@ export default function VenusChat({ onClose, countryContext }) {
             }
             subscribeToConv(existing.id);
             setInitializing(false);
-            return existing.id;
+            return;
           }
         } catch {
           // Conversation expirée ou introuvable → en créer une nouvelle
@@ -185,7 +146,7 @@ export default function VenusChat({ onClose, countryContext }) {
 
       // Créer une nouvelle conversation avec contexte pays
       const contextMeta = countryContext?.code ? {
-        name: `Conversation VENUS - ${countryContext.nom || countryContext.code}`,
+        name: `Conversation VENUS — ${countryContext.nom || countryContext.code}`,
         description: `Assistance SILGAPP | Pays actif: ${countryContext.code} | Ville: ${countryContext.ville || "N/D"} | Devise: ${countryContext.devise || "FCFA"}`,
         country_code: countryContext.code,
         country_nom: countryContext.nom,
@@ -197,24 +158,21 @@ export default function VenusChat({ onClose, countryContext }) {
         livreurs_dispos: countryContext.livreursDispos,
       } : { name: "Conversation VENUS", description: "Assistance SILGAPP" };
 
-      const conversation = await retryVenusOperation(() => base44.agents.createConversation({
+      const conversation = await base44.agents.createConversation({
         agent_name: "venus",
         metadata: contextMeta,
-      }));
+      });
       setConversationId(conversation.id);
       saveConvId(email, conversation.id);
       subscribeToConv(conversation.id);
-      setInitializing(false);
-      return conversation.id;
     } catch (err) {
       console.error("Erreur init conversation VENUS:", err);
     }
     setInitializing(false);
-    return null;
   };
 
   const sendMessage = async () => {
-    if (!input.trim() || loading) return;
+    if (!input.trim() || loading || !conversationId) return;
 
     const userQuestion = input.trim();
     const userMsg = { role: "user", content: userQuestion };
@@ -223,19 +181,32 @@ export default function VenusChat({ onClose, countryContext }) {
     setLoading(true);
     const msgStartTime = Date.now();
 
-    try {
-      const activeConversationId = conversationId || await initConversation();
-      if (!activeConversationId) {
-        throw new Error("venus_conversation_unavailable");
+    // ── Système de secours — si l'agent IA ne répond pas en 15s, utiliser le fallback local ──
+    let fallbackTriggered = false;
+    const triggerFallback = () => {
+      if (fallbackTriggered) return;
+      fallbackTriggered = true;
+      if (fallbackTimeoutRef.current) {
+        clearTimeout(fallbackTimeoutRef.current);
+        fallbackTimeoutRef.current = null;
       }
-      const conversation = await retryVenusOperation(() => base44.agents.getConversation(activeConversationId));
-      await retryVenusOperation(() => base44.agents.addMessage(conversation, userMsg));
+      const fallbackResponse = getVenusFallbackResponse(userQuestion, countryContext);
+      setMessages((prev) => [...prev, { role: "assistant", content: fallbackResponse }]);
+      setLoading(false);
+    };
+
+    // Timeout de secours (15 secondes) — couvre le cas où l'agent ne répond jamais
+    fallbackTimeoutRef.current = setTimeout(triggerFallback, 15000);
+
+    try {
+      const conversation = await base44.agents.getConversation(conversationId);
+      await base44.agents.addMessage(conversation, userMsg);
 
       // Enregistrer l'interaction pour les rapports VENUS (fire & forget)
       const nbMessages = messages.filter(m => m.role === "user").length + 1;
       base44.functions.invoke("venusAnalytics", {
         action: "save_interaction",
-        conversation_id: activeConversationId,
+        conversation_id: conversationId,
         user_id: userEmail || "anonymous",
         user_type: "client",
         country_code: countryContext?.code || "BF",
@@ -246,12 +217,8 @@ export default function VenusChat({ onClose, countryContext }) {
         duree_secondes: Math.round((Date.now() - msgStartTime) / 1000),
       }).catch(() => null); // silencieux
     } catch (err) {
-      console.error("Erreur envoi message:", err);
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: buildLocalVenusReply(userQuestion, countryContext) },
-      ]);
-      setLoading(false);
+      console.error("Erreur envoi message VENUS — utilisation du fallback local:", err);
+      triggerFallback();
     }
   };
 
@@ -264,14 +231,14 @@ export default function VenusChat({ onClose, countryContext }) {
     // Créer une toute nouvelle conversation
     try {
       const contextMeta = countryContext?.code ? {
-        name: `Conversation VENUS - ${countryContext.nom || countryContext.code}`,
+        name: `Conversation VENUS — ${countryContext.nom || countryContext.code}`,
         description: `Assistance SILGAPP | Pays actif: ${countryContext.code}`,
         country_code: countryContext.code,
       } : { name: "Conversation VENUS", description: "Assistance SILGAPP" };
-      const conversation = await retryVenusOperation(() => base44.agents.createConversation({
+      const conversation = await base44.agents.createConversation({
         agent_name: "venus",
         metadata: contextMeta,
-      }));
+      });
       setConversationId(conversation.id);
       saveConvId(userEmail, conversation.id);
       subscribeToConv(conversation.id);
@@ -300,12 +267,12 @@ export default function VenusChat({ onClose, countryContext }) {
                 <h2 className="font-black text-white text-lg leading-tight">VENUS</h2>
                 {countryContext?.code && (
                   <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full border border-white/30">
-                     {countryContext.code}
+                    🌍 {countryContext.code}
                   </span>
                 )}
               </div>
               <p className="text-xs text-white font-semibold">
-                {initializing ? "Chargement de la mémoire..." : countryContext?.ville ? `Assistante locale - ${countryContext.ville}` : "Assistante intelligente SILGAPP"}
+                {initializing ? "Chargement de la mémoire..." : countryContext?.ville ? `Assistante locale — ${countryContext.ville}` : "Assistante intelligente SILGAPP"}
               </p>
             </div>
           </div>
@@ -329,7 +296,7 @@ export default function VenusChat({ onClose, countryContext }) {
         {/* Confirmation suppression historique */}
         {showClearConfirm && (
           <div className="p-3 bg-red-50 border-b border-red-200 flex items-center gap-2">
-            <p className="text-xs text-red-700 flex-1"> Supprimer tout l'historique VENUS ?</p>
+            <p className="text-xs text-red-700 flex-1">🗑️ Supprimer tout l'historique VENUS ?</p>
             <Button size="sm" variant="destructive" className="h-7 text-xs px-2" onClick={handleClearHistory}>
               Confirmer
             </Button>
@@ -405,7 +372,7 @@ export default function VenusChat({ onClose, countryContext }) {
           )}
         </div>
 
-        {/* Input - reste visible même quand le clavier apparaît (Correction 3) */}
+        {/* Input — reste visible même quand le clavier apparaît (Correction 3) */}
         <div className="p-3 border-t flex-shrink-0" style={{backgroundColor: '#ffffff', paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)'}}>
           <div className="flex gap-2">
             <input

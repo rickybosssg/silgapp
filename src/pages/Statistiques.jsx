@@ -1,13 +1,12 @@
 import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { motion } from "framer-motion";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
   Users, Truck, Store, Pill, UtensilsCrossed, Package,
   CheckCircle2, XCircle, Wifi, WifiOff, Smartphone, Wallet,
-  TrendingUp, Globe, Activity,
+  Globe, Activity,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -19,15 +18,15 @@ import InstallationsSection from "@/components/statistiques/InstallationsSection
 import ExportButtons from "@/components/statistiques/ExportButtons";
 
 const PAYS_INFO = {
-  BF: { nom: "Burkina Faso", code: "BF", color: "#dc2626" },
-  CI: { nom: "Côte d'Ivoire", code: "CI", color: "#f59e0b" },
-  TG: { nom: "Togo", code: "TG", color: "#10b981" },
-  BJ: { nom: "Bénin", code: "BJ", color: "#3b82f6" },
-  SN: { nom: "Sénégal", code: "SN", color: "#8b5cf6" },
-  ML: { nom: "Mali", code: "ML", color: "#ec4899" },
-  GN: { nom: "Guinée", code: "GN", color: "#06b6d4" },
-  NE: { nom: "Niger", code: "NE", color: "#f97316" },
-  GH: { nom: "Ghana", code: "GH", color: "#14b8a6" },
+  BF: { nom: "Burkina Faso", emoji: "🇧🇫", color: "#dc2626" },
+  CI: { nom: "Côte d'Ivoire", emoji: "🇨🇮", color: "#f59e0b" },
+  TG: { nom: "Togo", emoji: "🇹🇬", color: "#10b981" },
+  BJ: { nom: "Bénin", emoji: "🇧🇯", color: "#3b82f6" },
+  SN: { nom: "Sénégal", emoji: "🇸🇳", color: "#8b5cf6" },
+  ML: { nom: "Mali", emoji: "🇲🇱", color: "#ec4899" },
+  GN: { nom: "Guinée", emoji: "🇬🇳", color: "#06b6d4" },
+  NE: { nom: "Niger", emoji: "🇳🇪", color: "#f97316" },
+  GH: { nom: "Ghana", emoji: "🇬🇭", color: "#14b8a6" },
 };
 
 const CHART_COLOR = "#dc2626";
@@ -94,7 +93,7 @@ export default function Statistiques() {
         code,
         value: d.clients + d.livreurs,
         color: PAYS_INFO[code].color,
-        code: PAYS_INFO[code].code,
+        emoji: PAYS_INFO[code].emoji,
         ...d,
       }))
       .filter(d => d.value > 0)
@@ -272,7 +271,7 @@ export default function Statistiques() {
                 contentStyle={tooltipStyle}
                 formatter={(v, name, props) => {
                   const d = props.payload;
-                  return [`${d.clients} clients, ${d.livreurs} livreurs`, `${d.code} ${name}`];
+                  return [`${d.clients} clients, ${d.livreurs} livreurs`, `${d.emoji} ${name}`];
                 }}
               />
             </PieChart>
@@ -303,7 +302,7 @@ export default function Statistiques() {
             <tbody>
               {countryChartData.map((d) => (
                 <tr key={d.code} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                  <td className="py-2.5 px-3 font-medium text-gray-700">{d.code} {d.name}</td>
+                  <td className="py-2.5 px-3 font-medium text-gray-700">{d.emoji} {d.name}</td>
                   <td className="text-right py-2.5 px-3 font-semibold text-gray-800">{d.clients}</td>
                   <td className="text-right py-2.5 px-3 font-semibold text-gray-800">{d.livreurs}</td>
                   <td className="text-right py-2.5 px-3 font-semibold text-gray-800">{d.courses}</td>

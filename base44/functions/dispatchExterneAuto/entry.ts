@@ -667,6 +667,25 @@ Deno.serve(async (req) => {
         });
       }
 
+      // 🛡️ Vérification anti-courses multiples : le livreur ne peut pas accepter
+      // une nouvelle course s'il en a déjà une active en cours.
+      const STATUTS_ACTIFS = ['livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison'];
+      const coursesActivesLivreur = await base44.asServiceRole.entities.CourseExterne.filter({
+        livreur_id: livreur_id,
+      });
+      const courseActiveExistante = coursesActivesLivreur.find(c =>
+        STATUTS_ACTIFS.includes(c.statut) && c.id !== course_id
+      );
+      if (courseActiveExistante) {
+        console.warn(`[DISPATCH] 🚫 Livreur ${livreur_id} a déjà la course ${courseActiveExistante.id} active (${courseActiveExistante.statut}) — acceptation refusée`);
+        return Response.json({
+          success: false, accepted: false, reason: 'deja_en_course',
+          error: 'Vous avez déjà une course en cours. Terminez-la avant d\'en accepter une nouvelle.',
+          course_active_id: courseActiveExistante.id,
+          course_active_statut: courseActiveExistante.statut,
+        });
+      }
+
       console.log('[DISPATCH][ACCEPT_ATTEMPT]', {
         course_id, livreur_id, course_status: course.statut || '',
         dispatch_status: course.dispatch_status || '',
@@ -851,6 +870,26 @@ Deno.serve(async (req) => {
         dispatch_refused_ids: JSON.stringify(refusDefinitifsCourse),
       });
       console.log(`[DISPATCH] Livreur ${livreur_id} exclu uniquement pour la course ${course_id} (raison: ${raison || 'refus'})`);
+
+      // 🧹 Marquer les notifications "nouvelle_course" comme lues pour ce livreur
+      // — empêche la course de réapparaître via le fetching par notification
+      try {
+        const livreurData = await base44.asServiceRole.entities.Livreur.get(livreur_id);
+        if (livreurData?.user_email) {
+          const notifs = await base44.asServiceRole.entities.Notification.filter({
+            course_id: course_id,
+            destinataire_email: livreurData.user_email,
+            type: 'nouvelle_course',
+            lue: false,
+          });
+          for (const n of notifs) {
+            await base44.asServiceRole.entities.Notification.update(n.id, { lue: true });
+          }
+          if (notifs.length > 0) {
+            console.log(`[DISPATCH] 🧹 ${notifs.length} notification(s) marquée(s) lue(s) pour livreur ${livreur_id} — course ${course_id}`);
+          }
+        }
+      } catch (e) { console.warn('[DISPATCH] Erreur archivage notifs refus:', e.message); }
 
       const etaitVerrouillee = course.livreur_id === livreur_id;
       if (etaitVerrouillee) {

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { requestNativeAppPermissions } from "@/lib/nativePermissions";
 import { toast } from "sonner";
-import { User, Check, Loader2, Phone, Gift, ShieldCheck, Sparkles } from "lucide-react";
+import { User, Check, Loader2, Phone, Gift, Sparkles } from "lucide-react";
 import CountryCodeSelect from "@/components/ui/CountryCodeSelect";
 import { SILGAPP_COUNTRIES } from "@/lib/phoneUtils";
 

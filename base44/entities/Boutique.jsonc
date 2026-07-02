@@ -70,8 +70,32 @@
     },
     "actif": {
       "type": "boolean",
-      "default": true,
-      "description": "Boutique active sur la plateforme"
+      "default": false,
+      "description": "Boutique active sur la plateforme (true seulement apr\u00e8s validation admin)"
+    },
+    "validation": {
+      "type": "string",
+      "enum": [
+        "en_attente",
+        "valide",
+        "refuse",
+        "suspendu"
+      ],
+      "default": "en_attente",
+      "description": "Statut de validation par l'admin"
+    },
+    "motif_refus": {
+      "type": "string",
+      "description": "Motif de refus ou suspension"
+    },
+    "valide_par": {
+      "type": "string",
+      "description": "Email admin ayant valid\u00e9/refus\u00e9"
+    },
+    "valide_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de validation"
     },
     "statut_validation": {
       "type": "string",

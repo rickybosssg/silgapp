@@ -1,46 +1,32 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import MessagesPage from "@/components/chat/MessagesPage";
 import { Loader2 } from "lucide-react";
 
 export default function AdminMessages() {
-  const [admin, setAdmin] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    let mounted = true;
     base44.auth.me()
-      .then((user) => {
-        if (!mounted) return;
-        setAdmin(user || null);
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setAdmin(null);
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
+      .then(u => setUser(u))
+      .catch(() => setUser(null));
   }, []);
 
-  if (loading) {
+  if (!user) {
     return (
-      <div className="h-full min-h-[60vh] flex items-center justify-center">
+      <div className="flex items-center justify-center h-full py-20">
         <Loader2 className="w-6 h-6 animate-spin text-primary" />
       </div>
     );
   }
 
-  const adminId = admin?.email || admin?.id || "admin";
-  const adminName = admin?.full_name || admin?.email || "Admin SILGAPP";
-
   return (
-    <div className="h-[calc(100vh-2rem)] bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-      <MessagesPage myType="admin" myId={adminId} myName={adminName} />
+    <div className="h-[calc(100vh-3.5rem)] lg:h-screen">
+      <MessagesPage
+        myType="admin"
+        myId={user.email}
+        myName={user.full_name || user.email}
+      />
     </div>
   );
 }

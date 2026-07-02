@@ -136,11 +136,31 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const prixManuelWatchedRef = useRef({}); // track les course_id déjà notifiés
 
   // Système anti-réapparition : courses écartées (refusées, expirées, déjà prises)
-  const dismissedCourseIdsRef = useRef({}); // { courseId: timestamp }
-  const DISMISS_TTL_MS = 120000; // 2 min — après ce délai, la course peut réapparaître si reproposée
+  // ⚠️ Persistance via localStorage — survit aux restarts/background de l'APK
+  const DISMISS_TTL_MS = 30 * 60 * 1000; // 30 min — couvre tous les cycles de dispatch
+  const loadDismissed = () => {
+    try {
+      const stored = localStorage.getItem("silgapp_dismissed_courses");
+      if (!stored) return {};
+      const parsed = JSON.parse(stored);
+      // Nettoyer les entrées expirées au chargement
+      const now = Date.now();
+      for (const id in parsed) {
+        if (now - parsed[id] > DISMISS_TTL_MS) delete parsed[id];
+      }
+      return parsed;
+    } catch { return {}; }
+  };
+  const saveDismissed = (obj) => {
+    try { localStorage.setItem("silgapp_dismissed_courses", JSON.stringify(obj)); } catch {}
+  };
+  const dismissedCourseIdsRef = useRef(loadDismissed());
 
   const dismissCourse = (courseId) => {
-    if (courseId) dismissedCourseIdsRef.current[courseId] = Date.now();
+    if (courseId) {
+      dismissedCourseIdsRef.current[courseId] = Date.now();
+      saveDismissed(dismissedCourseIdsRef.current);
+    }
   };
 
   const isCourseDismissed = (courseId) => {
@@ -148,6 +168,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     if (!ts) return false;
     if (Date.now() - ts > DISMISS_TTL_MS) {
       delete dismissedCourseIdsRef.current[courseId];
+      saveDismissed(dismissedCourseIdsRef.current);
       return false;
     }
     return true;

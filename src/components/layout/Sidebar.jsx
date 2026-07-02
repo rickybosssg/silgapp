@@ -21,42 +21,33 @@ const doLogout = () => {
 
 
 export const navItems = [
-  { path: "/", label: "Tableau de bord", icon: LayoutDashboard, reseauOnly: "interne" },
-  { path: "/", label: "Tableau de bord", icon: LayoutDashboard, reseauOnly: "externe" },
-  { path: "/nouvelle-course", label: "Nouvelle course", icon: Plus, reseauOnly: "interne" },
-  { path: "/admin/nouvelle-course", label: "Nouvelle course", icon: Plus, reseauOnly: "externe" },
-  { path: "/carte", label: "Carte en direct", icon: MapPin, reseauOnly: "interne" },
-  { path: "/carte", label: "Carte en direct", icon: MapPin, reseauOnly: "externe" },
-  { path: "/courses", label: "Toutes les courses", icon: Package, reseauOnly: "interne" },
-  { path: "/courses", label: "Toutes les courses", icon: Package, reseauOnly: "externe" },
-  { path: "/livreurs", label: "Livreurs", icon: Truck, reseauOnly: "interne" },
-  { path: "/livreurs", label: "Livreurs", icon: Truck, reseauOnly: "externe" },
-  { path: "/rapport", label: "Rapport du jour", icon: BarChart3, reseauOnly: "interne" },
-  { path: "/rapport", label: "Rapport du jour", icon: BarChart3, reseauOnly: "externe" },
-  { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp, reseauOnly: "interne" },
-  { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp, reseauOnly: "externe" },
-  { path: "/admin/statistiques", label: "Statistiques", icon: PieChart, reseauOnly: "externe" },
-  { path: "/admin/comptabilite", label: "Comptabilité", icon: Wallet, reseauOnly: "externe" },
-  { path: "/admin/global", label: "Admin Global", icon: Globe, reseauOnly: "externe" },
-  { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Settings, reseauOnly: "externe" },
-  { path: "/admin/externe/clients", label: "Clients externes", icon: Users, reseauOnly: "externe" },
-  { path: "/admin/publicites", label: "Publicités", icon: Megaphone, reseauOnly: "externe" },
-  { path: "/admin/venus-rapports", label: "Rapports VENUS", icon: MessageCircle, reseauOnly: "externe" },
-  { path: "/admin/centre-notifications", label: "Notifications Push", icon: Megaphone, reseauOnly: "externe" },
-  { path: "/admin/externe", label: "Config Dispatch", icon: Settings, reseauOnly: "externe" },
-  { path: "/admin/demandes-livreurs", label: "Livreurs à valider", icon: UserCheck, reseauOnly: "interne" },
-  { path: "/admin/demandes-livreurs", label: "Livreurs à valider", icon: UserCheck, reseauOnly: "externe" },
-  { path: "/admin/livreurs-bloques", label: "Livreurs bloqués", icon: ShieldAlert, reseauOnly: "externe" },
-  { path: "/admin/anti-fraude", label: "Anti-Fraude", icon: Shield, reseauOnly: "externe" },
-  { path: "/admin/support", label: "Support tickets", icon: MessageCircle, reseauOnly: "externe" },
-  { path: "/admin/boutiques", label: "Boutiques", icon: Store, reseauOnly: "externe" },
-  { path: "/admin/restaurants", label: "Restaurants", icon: UtensilsCrossed, reseauOnly: "externe" },
-  { path: "/admin/pharmacies", label: "Pharmacies", icon: Pill, reseauOnly: "externe" },
-  { path: "/admin/commandes-partenaires", label: "Commandes Partenaires", icon: Package, reseauOnly: "externe" },
-  { path: "/notifications", label: "Notifications", icon: Bell, reseauOnly: "interne" },
-  { path: "/notifications", label: "Notifications", icon: Bell, reseauOnly: "externe" },
-  { path: "/maintenance", label: "Maintenance", icon: Shield, reseauOnly: "interne" },
-  { path: "/maintenance", label: "Maintenance", icon: Shield, reseauOnly: "externe" },
+  { path: "/", label: "Tableau de bord", icon: LayoutDashboard },
+  { path: "/admin/nouvelle-course", label: "Nouvelle course", icon: Plus },
+  { path: "/carte", label: "Carte en direct", icon: MapPin },
+  { path: "/courses", label: "Toutes les courses", icon: Package },
+  { path: "/livreurs", label: "Livreurs", icon: Truck },
+  { path: "/rapport", label: "Rapport du jour", icon: BarChart3 },
+  { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp },
+  { path: "/admin/statistiques", label: "Statistiques", icon: PieChart },
+  { path: "/admin/comptabilite", label: "Comptabilité", icon: Wallet },
+  { path: "/admin/global", label: "Admin Global", icon: Globe },
+  { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Settings },
+  { path: "/admin/externe/clients", label: "Clients externes", icon: Users },
+  { path: "/admin/publicites", label: "Publicités", icon: Megaphone },
+  { path: "/admin/venus-rapports", label: "Rapports VENUS", icon: MessageCircle },
+  { path: "/admin/centre-notifications", label: "Notifications Push", icon: Megaphone },
+  { path: "/admin/externe", label: "Config Dispatch", icon: Settings },
+  { path: "/admin/demandes-livreurs", label: "Livreurs à valider", icon: UserCheck },
+  { path: "/admin/livreurs-bloques", label: "Livreurs bloqués", icon: ShieldAlert },
+  { path: "/admin/anti-fraude", label: "Anti-Fraude", icon: Shield },
+  { path: "/admin/messages", label: "Messagerie", icon: MessageCircle },
+  { path: "/admin/support", label: "Support tickets", icon: MessageCircle },
+  { path: "/admin/boutiques", label: "Boutiques", icon: Store },
+  { path: "/admin/restaurants", label: "Restaurants", icon: UtensilsCrossed },
+  { path: "/admin/pharmacies", label: "Pharmacies", icon: Pill },
+  { path: "/admin/commandes-partenaires", label: "Commandes Partenaires", icon: Package },
+  { path: "/notifications", label: "Notifications", icon: Bell },
+  { path: "/maintenance", label: "Maintenance", icon: Shield },
 ];
 
 export default function Sidebar({ notificationCount = 0, demandesCount = 0, partenaireDemandesCount = 0, reseau }) {
@@ -93,15 +84,12 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
 
       {/* Navigation */}
       <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
-        {navItems.filter(item => {
-          if (item.reseauOnly && item.reseauOnly !== reseau) return false;
-          return true;
-        }).map((item) => {
+        {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           const Icon = item.icon;
           return (
             <Link
-              key={item.path + item.reseauOnly}
+              key={item.path}
               to={item.path}
               title={collapsed ? item.label : undefined}
               className={cn(
