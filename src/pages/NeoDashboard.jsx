@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Sparkles, Play, FileText, TrendingUp, TrendingDown, Clock, Zap, CheckCircle2, BarChart3, Building2, Bell, FlaskConical, ShieldCheck, Wrench, RefreshCw } from "lucide-react";
+import { Sparkles, Play, FileText, TrendingUp, TrendingDown, Clock, Zap, CheckCircle2, BarChart3, Building2, Bell, FlaskConical, ShieldCheck, Wrench, RefreshCw, Trash2 } from "lucide-react";
 import NeoScoreGrid from "@/components/neo/NeoScoreGrid";
 import NeoRecommendationsList from "@/components/neo/NeoRecommendationsList";
 import { toast } from "sonner";
@@ -22,6 +22,8 @@ export default function NeoDashboard() {
   const [maintenanceResult, setMaintenanceResult] = useState(null);
   const [syncLoading, setSyncLoading] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
+  const [nettoyageLoading, setNettoyageLoading] = useState(false);
+  const [nettoyageResult, setNettoyageResult] = useState(null);
 
   // ─── Dernière analyse ───
   const { data: analyses = [], isLoading: loadingAnalyses } = useQuery({
@@ -126,6 +128,22 @@ export default function NeoDashboard() {
       toast.error("Erreur audit sécurité: " + (err?.message || ""));
     } finally {
       setAuditSecuLoading(false);
+    }
+  };
+
+  // ─── Nettoyer tokens inactifs ───
+  const handleNettoyageTokens = async () => {
+    setNettoyageLoading(true);
+    try {
+      const res = await base44.functions.invoke("nettoyerTokensInactifs", {});
+      if (res?.data) {
+        setNettoyageResult(res.data);
+        toast.success(res.data.resume);
+      }
+    } catch (err) {
+      toast.error("Erreur nettoyage tokens: " + (err?.message || ""));
+    } finally {
+      setNettoyageLoading(false);
     }
   };
 
@@ -479,12 +497,55 @@ export default function NeoDashboard() {
                       <p className="text-xs font-bold text-gray-900">{r.titre}</p>
                     </div>
                     <p className="text-[11px] text-gray-600">{r.detail}</p>
+                    {r.titre.includes('tokens inactifs') && (
+                      <button
+                        onClick={handleNettoyageTokens}
+                        disabled={nettoyageLoading}
+                        className="mt-2 h-8 px-3 rounded-lg bg-red-600 text-white text-xs font-bold flex items-center gap-1.5 hover:bg-red-700 disabled:opacity-50 transition-colors"
+                      >
+                        {nettoyageLoading ? (
+                          <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Nettoyage...</>
+                        ) : (
+                          <><Trash2 className="w-3.5 h-3.5" /> Nettoyer maintenant</>
+                        )}
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
             )}
           </div>
         )}
+        {/* Résultat nettoyage tokens */}
+        {nettoyageResult && (
+          <div className="rounded-2xl bg-white border border-gray-100 p-5 shadow-sm space-y-3">
+            <div className="flex items-center gap-2">
+              <Trash2 className="w-5 h-5 text-red-600" />
+              <h3 className="font-bold text-gray-900 text-sm">Nettoyage Tokens Inactifs</h3>
+              <button onClick={() => setNettoyageResult(null)} className="ml-auto text-xs text-gray-400 hover:text-gray-600">Fermer</button>
+            </div>
+            <p className="text-xs text-gray-500">{nettoyageResult.resume}</p>
+            <div className="grid grid-cols-4 gap-2">
+              <div className="rounded-lg bg-slate-50 p-2 text-center">
+                <p className="text-sm font-black text-gray-900">{nettoyageResult.tokens_total_avant}</p>
+                <p className="text-[10px] text-gray-500">Avant</p>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-2 text-center">
+                <p className="text-sm font-black text-red-600">{nettoyageResult.tokens_supprimes}</p>
+                <p className="text-[10px] text-gray-500">Supprimés</p>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-2 text-center">
+                <p className="text-sm font-black text-amber-600">{nettoyageResult.tokens_desactives}</p>
+                <p className="text-[10px] text-gray-500">Désactivés</p>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-2 text-center">
+                <p className="text-sm font-black text-emerald-600">{nettoyageResult.taux_actif_apres}%</p>
+                <p className="text-[10px] text-gray-500">Actifs</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Résultat tests automatisés */}
         {testsResult && (
           <div className="rounded-2xl bg-white border border-gray-100 p-5 shadow-sm space-y-3">
