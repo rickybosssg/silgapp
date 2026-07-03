@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Calendar, Building2, Globe } from "lucide-react";
+import { Calendar, Building2, Globe, AlertCircle } from "lucide-react";
 import { format, subDays, startOfWeek, startOfMonth, isWithinInterval } from "date-fns";
 import { fr } from "date-fns/locale";
 import LivreurPerformanceCard from "@/components/livreurs/LivreurPerformanceCard";
@@ -80,6 +80,7 @@ function ReseauCard({ title, icon: Icon, color, livreurs, coursesLivrees, isExte
 export default function RecapitulatifAdmin({ reseau }) {
   const queryClient = useQueryClient();
   const [period, setPeriod] = useState("today");
+  const [filtreEndettes, setFiltreEndettes] = useState(false);
   const [selectedLivreur, setSelectedLivreur] = useState(null);
   const [activeTab, setActiveTab] = useState(reseau || "interne");
   const { user: currentUser } = useSilgappAuth();
@@ -171,6 +172,32 @@ export default function RecapitulatifAdmin({ reseau }) {
   const livreursActifs = activeTab === "interne" ? livreursInternes : livreursExternes;
   const coursesActives = activeTab === "interne" ? coursesInternes : coursesExternes;
 
+  // ── Calcul des montants dus par livreur (sur la période sélectionnée) ──
+  const livreurMontants = useMemo(() => {
+    const map = {};
+    const coursesLivrees = activeTab === "interne" ? coursesInterneLivrees : coursesExterneLivrees;
+    for (const c of coursesLivrees) {
+      if (c.statut === "livree" && c.livreur_id) {
+        const amount = activeTab === "interne"
+          ? (c.prix_reel || c.prix || 0)
+          : (Number(c.commission_silga) || 0);
+        map[c.livreur_id] = (map[c.livreur_id] || 0) + amount;
+      }
+    }
+    return map;
+  }, [activeTab, coursesInterneLivrees, coursesExterneLivrees]);
+
+  const nbEndettes = useMemo(
+    () => livreursActifs.filter(l =>
+      (livreurMontants[l.id] || 0) > 0 && l.statut_paiement !== "paye"
+    ).length,
+    [livreursActifs, livreurMontants]
+  );
+
+  const livreursFiltres = filtreEndettes
+    ? livreursActifs.filter(l => (livreurMontants[l.id] || 0) > 0 && l.statut_paiement !== "paye")
+    : livreursActifs;
+
   // Si reseau est forcé (prop), afficher uniquement ce réseau sans onglets
   const showTabs = !reseau;
 
@@ -193,8 +220,8 @@ export default function RecapitulatifAdmin({ reseau }) {
         </div>
       </div>
 
-      {/* ── FILTRES PÉRIODE ──────────────────────────── */}
-      <div className="flex gap-2 flex-wrap">
+      {/* ── FILTRES PÉRIODE + ENDETTÉS ─────────────────── */}
+      <div className="flex gap-2 flex-wrap items-center">
         {periodFilters.map(f => (
           <button
             key={f.value}
@@ -209,6 +236,18 @@ export default function RecapitulatifAdmin({ reseau }) {
             {f.label}
           </button>
         ))}
+        <div className="w-px h-6 bg-gray-200 mx-1" />
+        <button
+          onClick={() => setFiltreEndettes(!filtreEndettes)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
+            filtreEndettes
+              ? "bg-red-600 text-white border-red-600 shadow-md"
+              : "bg-white text-red-600 border-red-200 hover:border-red-400"
+          }`}
+        >
+          <AlertCircle className="w-3.5 h-3.5" />
+          Endettés ({nbEndettes})
+        </button>
       </div>
 
       {/* Cartes résumé */}
@@ -279,7 +318,7 @@ export default function RecapitulatifAdmin({ reseau }) {
           </div>
           <div>
             <p className="font-bold text-foreground">Performances — {activeTab === "interne" ? "SILGAPP Interne" : "SILGAPP Externe"}</p>
-            <p className="text-xs text-muted-foreground">{livreursActifs.length} livreur{livreursActifs.length > 1 ? "s" : ""}</p>
+            <p className="text-xs text-muted-foreground">{livreursFiltres.length} livreur{livreursFiltres.length > 1 ? "s" : ""}{filtreEndettes ? " endetté(s)" : ""}</p>
           </div>
         </div>
         {loadingLivreurs ? (
@@ -291,11 +330,12 @@ export default function RecapitulatifAdmin({ reseau }) {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {livreursActifs.map(livreur => (
+            {livreursFiltres.map(livreur => (
               <LivreurPerformanceCard
                 key={livreur.id}
                 livreur={livreur}
                 courses={coursesActives}
+                montantDuOverride={livreurMontants[livreur.id] || 0}
                 onVoirDetails={setSelectedLivreur}
                 onValiderPaiement={handleValiderPaiement}
                 isPending={updateMutation.isPending}
