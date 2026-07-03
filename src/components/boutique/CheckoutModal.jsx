@@ -4,7 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Upload, X, CheckCircle } from "lucide-react";
+import { Loader2, Upload, X, CheckCircle, MapPin, CreditCard, Package } from "lucide-react";
+
+const STEPS = [
+  { icon: Package, label: "Récap" },
+  { icon: MapPin, label: "Livraison" },
+  { icon: CreditCard, label: "Paiement" },
+];
 
 export default function CheckoutModal({ type, etablissementId, etablissementNom, cart, total, clientProfil, onClose, onSuccess }) {
   const [adresse, setAdresse] = useState(clientProfil?.quartier ? clientProfil.quartier + ", " + (clientProfil.ville || "") : "");
@@ -14,6 +20,7 @@ export default function CheckoutModal({ type, etablissementId, etablissementNom,
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const currentStep = !preuveUrl ? (!adresse ? 0 : 1) : 2;
 
   const handlePreuveUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -67,9 +74,29 @@ export default function CheckoutModal({ type, etablissementId, etablissementNom,
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-sm max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between rounded-t-3xl">
-          <h2 className="font-bold text-gray-900">Confirmer la commande</h2>
-          <button onClick={onClose} className="p-1"><X className="w-5 h-5 text-gray-400" /></button>
+        <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 rounded-t-3xl">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="font-bold text-gray-900">Confirmer la commande</h2>
+            <button onClick={onClose} className="p-1"><X className="w-5 h-5 text-gray-400" /></button>
+          </div>
+          {/* Indicateur de progression */}
+          <div className="flex items-center gap-1">
+            {STEPS.map((step, i) => {
+              const Icon = step.icon;
+              const isActive = i === currentStep;
+              const isDone = i < currentStep;
+              return (
+                <React.Fragment key={i}>
+                  <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg transition-all ${isActive ? "bg-primary text-white" : isDone ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
+                    <Icon className="w-3 h-3" />
+                    <span className="text-[10px] font-bold">{step.label}</span>
+                    {isDone && <CheckCircle className="w-3 h-3" />}
+                  </div>
+                  {i < STEPS.length - 1 && <div className={`flex-1 h-0.5 rounded-full ${isDone ? "bg-green-400" : "bg-gray-200"}`} />}
+                </React.Fragment>
+              );
+            })}
+          </div>
         </div>
         <div className="p-4 space-y-4">
           <div className="space-y-2">

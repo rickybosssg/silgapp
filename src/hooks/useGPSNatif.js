@@ -143,6 +143,7 @@ export function useGPSNatif({ enabled = true, intervalMs = 15000, onPosition } =
         const result = await Geo.getCurrentPosition({
           enableHighAccuracy: true,
           timeout: 15000,
+          maximumAge: 0,
         });
         applyPosition(result.coords);
         return result.coords;
@@ -157,7 +158,7 @@ export function useGPSNatif({ enabled = true, intervalMs = 15000, onPosition } =
       navigator.geolocation.getCurrentPosition(
         (pos) => resolve(applyPosition(pos.coords)),
         () => { setGpsActif(false); resolve(null); },
-        { enableHighAccuracy: true, timeout: 15000 }
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
       );
     });
   }, [applyPosition]);

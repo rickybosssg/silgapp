@@ -110,6 +110,14 @@ export default function ClientSuiviCourse() {
     }
   });
 
+  // ── Subscription temps réel CourseExterne — mise à jour instantanée sans polling ──
+  useEffect(() => {
+    const unsubscribe = base44.entities.CourseExterne.subscribe((event) => {
+      queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+    });
+    return () => { try { unsubscribe(); } catch (_) {} };
+  }, [queryClient]);
+
   // Récupérer l'ID user pour filtrer correctement
   useEffect(() => {
     base44.auth.me().then(u => setUserId(u?.id)).catch(() => null);
