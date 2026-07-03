@@ -217,12 +217,18 @@ Deno.serve(async (req) => {
       user_type,
       alert_duration_seconds,
       alert_interval_seconds,
+      category,
     } = body;
     const targetEmail = String(destinataire_email || '').trim().toLowerCase();
 
     if (!titre || !message || !targetEmail) {
       return Response.json({ error: 'Missing required fields: titre, message, destinataire_email' }, { status: 400 });
     }
+
+    // Catégories critiques — toujours envoyées, non désactivables par l'utilisateur
+    const CATEGORIES_CRITIQUES = ['course', 'dispatch', 'securite', 'paiement', 'nouvelle_course', 'livreur_en_route', 'colis_recupere', 'livraison', 'annulation'];
+    const notifCategory = String(category || type || 'generic').toLowerCase();
+    const isCritique = CATEGORIES_CRITIQUES.some(c => notifCategory.includes(c));
 
     const countryGuard = await assertNotificationCountry(base44, {
       course_id,
@@ -264,6 +270,28 @@ Deno.serve(async (req) => {
       webTokens: tokens.length - nativeTokens.length,
       platforms: [...new Set(tokens.map(t => t.platform || 'unknown'))],
     });
+
+    // ── Vérifier les préférences de notification (catégories non critiques) ──
+    if (!isCritique && tokens.length > 0) {
+      const userPrefs = tokens[0]?.preferences_categories;
+      if (userPrefs) {
+        let desactivees = [];
+        try { desactivees = JSON.parse(userPrefs); } catch (_) {}
+        if (Array.isArray(desactivees) && desactivees.some(c => notifCategory.includes(c.toLowerCase()))) {
+          const skippedNotif = await base44.asServiceRole.entities.Notification.create({
+            titre, message, type: type || 'generic', course_id: course_id || '',
+            destinataire_email: targetEmail, lue: false,
+          });
+          return Response.json({
+            success: true,
+            notification_id: skippedNotif.id,
+            skipped_push: true,
+            reason: 'user_preference_opt_out',
+            category: notifCategory,
+          });
+        }
+      }
+    }
 
     // Créer la notification en BDD
     const notification = await base44.asServiceRole.entities.Notification.create({

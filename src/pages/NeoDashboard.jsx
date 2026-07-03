@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Sparkles, Play, FileText, TrendingUp, TrendingDown, Clock, Zap, CheckCircle2, BarChart3 } from "lucide-react";
+import { Sparkles, Play, FileText, TrendingUp, TrendingDown, Clock, Zap, CheckCircle2, BarChart3, Building2, Bell } from "lucide-react";
 import NeoScoreGrid from "@/components/neo/NeoScoreGrid";
 import NeoRecommendationsList from "@/components/neo/NeoRecommendationsList";
 import { toast } from "sonner";
@@ -10,6 +10,10 @@ export default function NeoDashboard() {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState("all");
   const [analysing, setAnalysing] = useState(false);
+  const [auditArchLoading, setAuditArchLoading] = useState(false);
+  const [auditNotifLoading, setAuditNotifLoading] = useState(false);
+  const [auditArchResult, setAuditArchResult] = useState(null);
+  const [auditNotifResult, setAuditNotifResult] = useState(null);
 
   // ─── Dernière analyse ───
   const { data: analyses = [], isLoading: loadingAnalyses } = useQuery({
@@ -50,6 +54,38 @@ export default function NeoDashboard() {
       toast.error("Erreur: " + (err?.message || "inconnue"));
     } finally {
       setAnalysing(false);
+    }
+  };
+
+  // ─── Audit architecture ───
+  const handleAuditArch = async () => {
+    setAuditArchLoading(true);
+    try {
+      const res = await base44.functions.invoke("auditArchitecture", {});
+      if (res?.data) {
+        setAuditArchResult(res.data);
+        toast.success("Audit architectural terminé");
+      }
+    } catch (err) {
+      toast.error("Erreur audit architecture: " + (err?.message || ""));
+    } finally {
+      setAuditArchLoading(false);
+    }
+  };
+
+  // ─── Audit notifications ───
+  const handleAuditNotif = async () => {
+    setAuditNotifLoading(true);
+    try {
+      const res = await base44.functions.invoke("auditerNotifications", { days: 7 });
+      if (res?.data) {
+        setAuditNotifResult(res.data);
+        toast.success("Audit notifications terminé");
+      }
+    } catch (err) {
+      toast.error("Erreur audit notifications: " + (err?.message || ""));
+    } finally {
+      setAuditNotifLoading(false);
     }
   };
 
@@ -217,11 +253,114 @@ export default function NeoDashboard() {
               <span className="hidden sm:inline">Rapport PDF</span>
             </button>
           </div>
+
+          {/* Boutons d'audit */}
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={handleAuditArch}
+              disabled={auditArchLoading}
+              className="flex-1 h-10 rounded-xl bg-white/5 border border-white/10 text-white/80 font-medium text-xs flex items-center justify-center gap-2 hover:bg-white/10 disabled:opacity-50 transition-all"
+            >
+              {auditArchLoading ? (
+                <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Audit en cours...</>
+              ) : (
+                <><Building2 className="w-3.5 h-3.5" /> Audit Architecture</>
+              )}
+            </button>
+            <button
+              onClick={handleAuditNotif}
+              disabled={auditNotifLoading}
+              className="flex-1 h-10 rounded-xl bg-white/5 border border-white/10 text-white/80 font-medium text-xs flex items-center justify-center gap-2 hover:bg-white/10 disabled:opacity-50 transition-all"
+            >
+              {auditNotifLoading ? (
+                <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Audit en cours...</>
+              ) : (
+                <><Bell className="w-3.5 h-3.5" /> Audit Notifications</>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* ─── CONTENU ─── */}
       <div className="max-w-4xl mx-auto px-4 py-5 pb-28 space-y-6">
+        {/* Résultat audit architecture */}
+        {auditArchResult && (
+          <div className="rounded-2xl bg-white border border-gray-100 p-5 shadow-sm space-y-3">
+            <div className="flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-slate-700" />
+              <h3 className="font-bold text-gray-900 text-sm">Audit Architectural</h3>
+              <button onClick={() => setAuditArchResult(null)} className="ml-auto text-xs text-gray-400 hover:text-gray-600">Fermer</button>
+            </div>
+            <p className="text-xs text-gray-500">{auditArchResult.resume}</p>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-lg bg-slate-50 p-2 text-center">
+                <p className="text-lg font-black text-slate-900">{auditArchResult.stats.total_fonctions}</p>
+                <p className="text-[10px] text-gray-500">Fonctions</p>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-2 text-center">
+                <p className="text-lg font-black text-slate-900">{auditArchResult.stats.total_entites}</p>
+                <p className="text-[10px] text-gray-500">Entités</p>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-2 text-center">
+                <p className="text-lg font-black text-slate-900">{auditArchResult.recommandations?.length || 0}</p>
+                <p className="text-[10px] text-gray-500">Recommandations</p>
+              </div>
+            </div>
+            {auditArchResult.recommandations?.map((r, i) => (
+              <div key={i} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={"text-[10px] font-bold px-1.5 py-0.5 rounded " + (r.priorite === 'elevee' ? 'bg-red-100 text-red-700' : r.priorite === 'moyenne' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600')}>{r.priorite}</span>
+                  <p className="text-xs font-bold text-gray-900">{r.titre}</p>
+                </div>
+                <p className="text-[11px] text-gray-600">{r.detail}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Résultat audit notifications */}
+        {auditNotifResult && (
+          <div className="rounded-2xl bg-white border border-gray-100 p-5 shadow-sm space-y-3">
+            <div className="flex items-center gap-2">
+              <Bell className="w-5 h-5 text-slate-700" />
+              <h3 className="font-bold text-gray-900 text-sm">Audit Notifications ({auditNotifResult.periode_jours}j)</h3>
+              <button onClick={() => setAuditNotifResult(null)} className="ml-auto text-xs text-gray-400 hover:text-gray-600">Fermer</button>
+            </div>
+            <p className="text-xs text-gray-500">{auditNotifResult.resume}</p>
+            <div className="grid grid-cols-4 gap-2">
+              <div className="rounded-lg bg-slate-50 p-2 text-center">
+                <p className="text-lg font-black text-slate-900">{auditNotifResult.stats_globales.notifications_total}</p>
+                <p className="text-[10px] text-gray-500">Notifs envoyées</p>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-2 text-center">
+                <p className="text-lg font-black text-green-600">{auditNotifResult.stats_globales.taux_lecture}%</p>
+                <p className="text-[10px] text-gray-500">Taux lecture</p>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-2 text-center">
+                <p className="text-lg font-black text-blue-600">{auditNotifResult.stats_globales.taux_tokens_actifs}%</p>
+                <p className="text-[10px] text-gray-500">Tokens actifs</p>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-2 text-center">
+                <p className="text-lg font-black text-red-600">{auditNotifResult.stats_globales.taux_erreurs}%</p>
+                <p className="text-[10px] text-gray-500">Taux erreurs</p>
+              </div>
+            </div>
+            {auditNotifResult.recommandations?.length > 0 && (
+              <div className="space-y-2">
+                {auditNotifResult.recommandations.map((r, i) => (
+                  <div key={i} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={"text-[10px] font-bold px-1.5 py-0.5 rounded " + (r.priorite === 'elevee' ? 'bg-red-100 text-red-700' : r.priorite === 'moyenne' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600')}>{r.priorite}</span>
+                      <p className="text-xs font-bold text-gray-900">{r.titre}</p>
+                    </div>
+                    <p className="text-[11px] text-gray-600">{r.detail}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {/* État initial */}
         {!latestAnalyse && !analysing && (
           <div className="rounded-3xl bg-white border border-gray-100 p-8 text-center shadow-sm">
