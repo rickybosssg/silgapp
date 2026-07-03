@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Sparkles, Play, FileText, TrendingUp, TrendingDown, Clock, Zap, CheckCircle2, BarChart3, Building2, Bell, FlaskConical } from "lucide-react";
+import { Sparkles, Play, FileText, TrendingUp, TrendingDown, Clock, Zap, CheckCircle2, BarChart3, Building2, Bell, FlaskConical, ShieldCheck } from "lucide-react";
 import NeoScoreGrid from "@/components/neo/NeoScoreGrid";
 import NeoRecommendationsList from "@/components/neo/NeoRecommendationsList";
 import { toast } from "sonner";
@@ -16,6 +16,8 @@ export default function NeoDashboard() {
   const [auditNotifResult, setAuditNotifResult] = useState(null);
   const [testsLoading, setTestsLoading] = useState(false);
   const [testsResult, setTestsResult] = useState(null);
+  const [auditSecuLoading, setAuditSecuLoading] = useState(false);
+  const [auditSecuResult, setAuditSecuResult] = useState(null);
 
   // ─── Dernière analyse ───
   const { data: analyses = [], isLoading: loadingAnalyses } = useQuery({
@@ -104,6 +106,22 @@ export default function NeoDashboard() {
       toast.error("Erreur tests automatisés: " + (err?.message || ""));
     } finally {
       setTestsLoading(false);
+    }
+  };
+
+  // ─── Audit sécurité ───
+  const handleAuditSecu = async () => {
+    setAuditSecuLoading(true);
+    try {
+      const res = await base44.functions.invoke("auditSecurite", {});
+      if (res?.data) {
+        setAuditSecuResult(res.data);
+        toast.success(`Audit sécurité terminé — Score: ${res.data.score_securite}/100`);
+      }
+    } catch (err) {
+      toast.error("Erreur audit sécurité: " + (err?.message || ""));
+    } finally {
+      setAuditSecuLoading(false);
     }
   };
 
@@ -310,6 +328,19 @@ export default function NeoDashboard() {
               <><FlaskConical className="w-3.5 h-3.5" /> Lancer les tests automatisés</>
             )}
           </button>
+
+          {/* Bouton audit sécurité */}
+          <button
+            onClick={handleAuditSecu}
+            disabled={auditSecuLoading}
+            className="w-full h-10 rounded-xl bg-white/5 border border-white/10 text-white/80 font-medium text-xs flex items-center justify-center gap-2 hover:bg-white/10 disabled:opacity-50 transition-all"
+          >
+            {auditSecuLoading ? (
+              <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Audit en cours...</>
+            ) : (
+              <><ShieldCheck className="w-3.5 h-3.5" /> Audit Sécurité</>
+            )}
+          </button>
         </div>
       </div>
 
@@ -415,6 +446,53 @@ export default function NeoDashboard() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Résultat audit sécurité */}
+        {auditSecuResult && (
+          <div className="rounded-2xl bg-white border border-gray-100 p-5 shadow-sm space-y-3">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-slate-700" />
+              <h3 className="font-bold text-gray-900 text-sm">Audit Sécurité</h3>
+              <span className={"ml-auto text-xs font-bold px-2 py-0.5 rounded-full " + (auditSecuResult.score_securite >= 80 ? "bg-green-100 text-green-700" : auditSecuResult.score_securite >= 50 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700")}>
+                Score: {auditSecuResult.score_securite}/100
+              </span>
+              <button onClick={() => setAuditSecuResult(null)} className="text-xs text-gray-400 hover:text-gray-600">Fermer</button>
+            </div>
+            <p className="text-xs text-gray-500">{auditSecuResult.resume}</p>
+            <div className="grid grid-cols-4 gap-2">
+              <div className="rounded-lg bg-slate-50 p-2 text-center">
+                <p className="text-sm font-black text-red-600">{auditSecuResult.stats.fraudes_non_traitees}</p>
+                <p className="text-[10px] text-gray-500">Fraudes</p>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-2 text-center">
+                <p className="text-sm font-black text-orange-600">{auditSecuResult.stats.bugs_critiques}</p>
+                <p className="text-[10px] text-gray-500">Bugs critiques</p>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-2 text-center">
+                <p className="text-sm font-black text-amber-600">{auditSecuResult.stats.partenaires_non_valides}</p>
+                <p className="text-[10px] text-gray-500">Non validés</p>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-2 text-center">
+                <p className="text-sm font-black text-blue-600">{auditSecuResult.stats.multi_sessions}</p>
+                <p className="text-[10px] text-gray-500">Multi-sessions</p>
+              </div>
+            </div>
+            {auditSecuResult.findings?.length > 0 && (
+              <div className="space-y-2">
+                {auditSecuResult.findings.map((f, i) => (
+                  <div key={i} className={"rounded-lg p-3 " + (f.priorite === 'critique' ? 'bg-red-50 border border-red-200' : f.priorite === 'elevee' ? 'bg-orange-50 border border-orange-200' : f.priorite === 'moyenne' ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50 border border-gray-200')}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={"text-[10px] font-bold px-1.5 py-0.5 rounded " + (f.priorite === 'critique' ? 'bg-red-100 text-red-700' : f.priorite === 'elevee' ? 'bg-orange-100 text-orange-700' : f.priorite === 'moyenne' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600')}>{f.priorite}</span>
+                      <p className="text-xs font-bold text-gray-900">{f.titre}</p>
+                    </div>
+                    <p className="text-[11px] text-gray-600">{f.detail}</p>
+                    <p className="text-[10px] text-blue-600 font-medium mt-1">→ {f.action}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
