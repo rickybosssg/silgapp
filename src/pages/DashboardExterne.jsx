@@ -56,10 +56,11 @@ export default function DashboardExterne() {
   const { data: courses = [] } = useQuery({
     queryKey: ["courses-externes-dashboard", effectiveCountry || "all"],
     queryFn: () => effectiveCountry
-      ? base44.entities.CourseExterne.filter({ country_code: effectiveCountry }, "-created_date")
-      : base44.entities.CourseExterne.list("-created_date", 300),
+      ? base44.entities.CourseExterne.filter({ country_code: effectiveCountry }, "-created_date", 200)
+      : base44.entities.CourseExterne.list("-created_date", 200),
     initialData: [],
-    refetchInterval: 5000,
+    refetchInterval: 15000,
+    staleTime: 10000,
   });
 
   const { data: livreurs = [] } = useQuery({
@@ -68,7 +69,8 @@ export default function DashboardExterne() {
       effectiveCountry ? { type_livreur: "externe", country_code: effectiveCountry } : { type_livreur: "externe" }
     ),
     initialData: [],
-    refetchInterval: 5000,
+    refetchInterval: 15000,
+    staleTime: 10000,
   });
 
   const { data: clients = [] } = useQuery({
@@ -77,7 +79,8 @@ export default function DashboardExterne() {
       effectiveCountry ? { actif: true, country_code: effectiveCountry } : { actif: true }
     ),
     initialData: [],
-    refetchInterval: 10000,
+    refetchInterval: 30000,
+    staleTime: 20000,
   });
 
   const coursesFiltrees = useMemo(
