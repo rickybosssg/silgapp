@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronUp, Check, X, Clock, AlertTriangle, ArrowRight, Zap, Gauge } from "lucide-react";
+import { ChevronDown, ChevronUp, Check, X, Clock, AlertTriangle, ArrowRight, Zap, Gauge, History } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const PRIORITY_CONFIG = {
@@ -131,22 +131,28 @@ function RecCard({ rec, onAction, index }) {
 }
 
 export default function NeoRecommendationsList({ recommendations, onAction, filter, onFilterChange }) {
+  const [showHistory, setShowHistory] = useState(false);
+
+  // Séparer les recommandations actives (à traiter) de l'historique (traitées)
+  const active = recommendations.filter(r => r.statut === "nouvelle" || r.statut === "lue");
+  const history = recommendations.filter(r => r.statut === "appliquee" || r.statut === "ignoree");
+
   const filters = [
-    { id: "all", label: "Toutes", count: recommendations.length },
-    { id: "nouvelle", label: "Non lues", count: recommendations.filter(r => r.statut === "nouvelle").length },
-    { id: "critique", label: "🔴 Critiques", count: recommendations.filter(r => r.priorite === "critique").length },
-    { id: "appliquee", label: "✓ Appliquées", count: recommendations.filter(r => r.statut === "appliquee").length },
+    { id: "all", label: "À traiter", count: active.length },
+    { id: "nouvelle", label: "Non lues", count: active.filter(r => r.statut === "nouvelle").length },
+    { id: "critique", label: "🔴 Critiques", count: active.filter(r => r.priorite === "critique").length },
+    { id: "elevee", label: "🟠 Élevées", count: active.filter(r => r.priorite === "elevee").length },
   ];
 
-  const filtered = recommendations.filter(r => {
+  const filtered = active.filter(r => {
     if (filter === "all") return true;
     if (filter === "nouvelle") return r.statut === "nouvelle";
-    if (filter === "appliquee") return r.statut === "appliquee";
     return r.priorite === filter;
   });
 
   return (
     <div className="space-y-3">
+      {/* Filtres — uniquement les recommandations à traiter */}
       <div className="flex gap-2 overflow-x-auto pb-1">
         {filters.map(f => (
           <button
@@ -162,15 +168,49 @@ export default function NeoRecommendationsList({ recommendations, onAction, filt
         ))}
       </div>
 
+      {/* Liste des recommandations à traiter */}
       {filtered.length === 0 ? (
         <div className="rounded-2xl bg-white border border-gray-100 p-8 text-center">
-          <p className="text-sm text-gray-400">Aucune recommandation dans cette catégorie</p>
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center mx-auto mb-3">
+            <Check className="w-6 h-6 text-emerald-500" />
+          </div>
+          <p className="text-sm font-bold text-gray-900">Tout est à jour !</p>
+          <p className="text-xs text-gray-400 mt-1">Aucune recommandation en attente de traitement.</p>
         </div>
       ) : (
         <div className="space-y-2.5">
           {filtered.map((rec, idx) => (
             <RecCard key={rec.id} rec={rec} onAction={onAction} index={idx + 1} />
           ))}
+        </div>
+      )}
+
+      {/* ── Historique des corrections ── */}
+      {history.length > 0 && (
+        <div className="mt-6">
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors"
+          >
+            <History className="w-4 h-4 text-slate-500" />
+            <span className="text-xs font-bold text-slate-600">Historique des corrections</span>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
+              {history.length}
+            </span>
+            <span className="ml-auto flex items-center gap-1">
+              <span className="text-[10px] text-emerald-600 font-bold">{history.filter(r => r.statut === "appliquee").length} ✓</span>
+              <span className="text-[10px] text-gray-400 font-bold">{history.filter(r => r.statut === "ignoree").length} ✕</span>
+            </span>
+            {showHistory ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+          </button>
+
+          {showHistory && (
+            <div className="mt-2 space-y-2">
+              {history.map((rec, idx) => (
+                <RecCard key={rec.id} rec={rec} onAction={onAction} index={idx + 1} />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

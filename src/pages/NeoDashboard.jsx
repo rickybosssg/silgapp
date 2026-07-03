@@ -15,7 +15,7 @@ import restaurantDetailCode from "@/pages/RestaurantDetail.jsx?raw";
 
 export default function NeoDashboard() {
   const queryClient = useQueryClient();
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState("all"); // "all" = à traiter (nouvelle + lue)
   const [analysing, setAnalysing] = useState(false);
   const [auditArchLoading, setAuditArchLoading] = useState(false);
   const [auditNotifLoading, setAuditNotifLoading] = useState(false);
