@@ -1,10 +1,17 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Sparkles, Play, FileText, TrendingUp, TrendingDown, Clock, Zap, CheckCircle2, BarChart3, Building2, Bell, FlaskConical, ShieldCheck, Wrench, RefreshCw, Trash2 } from "lucide-react";
+import { Sparkles, Play, FileText, TrendingUp, TrendingDown, Clock, Zap, CheckCircle2, BarChart3, Building2, Bell, FlaskConical, ShieldCheck, Wrench, RefreshCw, Trash2, Palette } from "lucide-react";
 import NeoScoreGrid from "@/components/neo/NeoScoreGrid";
 import NeoRecommendationsList from "@/components/neo/NeoRecommendationsList";
 import { toast } from "sonner";
+
+// ── Imports ?raw : code source des pages clés pour analyse design ──
+import clientAppCode from "@/pages/ClientExterneApp.jsx?raw";
+import partenaireDashCode from "@/pages/PartenaireDashboard.jsx?raw";
+import dashboardExtCode from "@/pages/DashboardExterne.jsx?raw";
+import boutiqueDetailCode from "@/pages/BoutiqueDetail.jsx?raw";
+import restaurantDetailCode from "@/pages/RestaurantDetail.jsx?raw";
 
 export default function NeoDashboard() {
   const queryClient = useQueryClient();
@@ -24,6 +31,8 @@ export default function NeoDashboard() {
   const [syncResult, setSyncResult] = useState(null);
   const [nettoyageLoading, setNettoyageLoading] = useState(false);
   const [nettoyageResult, setNettoyageResult] = useState(null);
+  const [designLoading, setDesignLoading] = useState(false);
+  const [designResult, setDesignResult] = useState(null);
 
   // ─── Dernière analyse ───
   const { data: analyses = [], isLoading: loadingAnalyses } = useQuery({
@@ -128,6 +137,32 @@ export default function NeoDashboard() {
       toast.error("Erreur audit sécurité: " + (err?.message || ""));
     } finally {
       setAuditSecuLoading(false);
+    }
+  };
+
+  // ─── Analyse design concret (avec code source réel) ───
+  const handleAnalyseDesign = async () => {
+    setDesignLoading(true);
+    try {
+      const snippets = [
+        { filename: "ClientExterneApp.jsx", content: clientAppCode },
+        { filename: "PartenaireDashboard.jsx", content: partenaireDashCode },
+        { filename: "DashboardExterne.jsx", content: dashboardExtCode },
+        { filename: "BoutiqueDetail.jsx", content: boutiqueDetailCode },
+        { filename: "RestaurantDetail.jsx", content: restaurantDetailCode },
+      ];
+      const res = await base44.functions.invoke("neoAnalyseDesign", { snippets });
+      if (res?.data?.success) {
+        setDesignResult(res.data);
+        toast.success(`${res.data.nb_recommandations} recommandation(s) design concrète(s) générée(s)`);
+        queryClient.invalidateQueries({ queryKey: ["neo-recommendations"] });
+      } else {
+        toast.error(res?.data?.error || "Erreur analyse design");
+      }
+    } catch (err) {
+      toast.error("Erreur: " + (err?.message || "inconnue"));
+    } finally {
+      setDesignLoading(false);
     }
   };
 
@@ -396,6 +431,19 @@ export default function NeoDashboard() {
             )}
           </button>
 
+          {/* Bouton analyse design concret */}
+          <button
+            onClick={handleAnalyseDesign}
+            disabled={designLoading}
+            className="w-full h-10 rounded-xl bg-gradient-to-r from-fuchsia-500/20 to-purple-500/20 border border-fuchsia-400/30 text-fuchsia-200 font-medium text-xs flex items-center justify-center gap-2 hover:from-fuchsia-500/30 hover:to-purple-500/30 disabled:opacity-50 transition-all"
+          >
+            {designLoading ? (
+              <><div className="w-3 h-3 border-2 border-fuchsia-400/30 border-t-fuchsia-400 rounded-full animate-spin" /> Analyse du code...</>
+            ) : (
+              <><Palette className="w-3.5 h-3.5" /> Analyse Design Concret (code source)</>
+            )}
+          </button>
+
           {/* Boutons maintenance & sync unifiées */}
           <div className="flex gap-2">
             <button
@@ -516,6 +564,36 @@ export default function NeoDashboard() {
             )}
           </div>
         )}
+        {/* Résultat analyse design concret */}
+        {designResult && (
+          <div className="rounded-2xl bg-white border border-gray-100 p-5 shadow-sm space-y-3">
+            <div className="flex items-center gap-2">
+              <Palette className="w-5 h-5 text-fuchsia-600" />
+              <h3 className="font-bold text-gray-900 text-sm">Analyse Design Concret</h3>
+              <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full bg-fuchsia-100 text-fuchsia-700">
+                Score: {designResult.score_design}/100
+              </span>
+              <button onClick={() => setDesignResult(null)} className="text-xs text-gray-400 hover:text-gray-600">Fermer</button>
+            </div>
+            <p className="text-xs text-gray-500">{designResult.resume}</p>
+            <p className="text-[10px] text-gray-400">Fichiers analysés: {designResult.fichiers_analyses?.join(", ")}</p>
+            <div className="space-y-2">
+              {designResult.recommandations?.map((r, i) => (
+                <div key={i} className="rounded-lg border border-fuchsia-100 bg-fuchsia-50/50 p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={"text-[10px] font-bold px-1.5 py-0.5 rounded " + (r.priorite === 'critique' ? 'bg-red-100 text-red-700' : r.priorite === 'elevee' ? 'bg-orange-100 text-orange-700' : r.priorite === 'moyenne' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600')}>{r.priorite}</span>
+                    <p className="text-xs font-bold text-gray-900">{r.titre}</p>
+                  </div>
+                  <p className="text-[10px] font-mono text-fuchsia-600 mb-1">📄 {r.fichier} → {r.section}</p>
+                  <p className="text-[11px] text-gray-600 mb-1">⚠️ {r.probleme}</p>
+                  <p className="text-[11px] text-emerald-700 font-medium">✓ {r.solution}</p>
+                  <p className="text-[10px] text-blue-600 mt-1">→ {r.benefice}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Résultat nettoyage tokens */}
         {nettoyageResult && (
           <div className="rounded-2xl bg-white border border-gray-100 p-5 shadow-sm space-y-3">
