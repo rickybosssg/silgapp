@@ -293,10 +293,44 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── Personnalisation du contenu selon le profil utilisateur (#3 #8) ──
+    let personalizedTitre = titre;
+    let personalizedMessage = message;
+    if (body.personalize !== false) {
+      // Récupérer le prénom du destinataire pour personnaliser le message
+      let userName = '';
+      if (livreur_id) {
+        const livreur = await base44.asServiceRole.entities.Livreur.get(livreur_id).catch(() => null);
+        userName = livreur?.nom || livreur?.full_name || '';
+      } else if (client_id) {
+        const client = await base44.asServiceRole.entities.ClientExterne.get(client_id).catch(() => null);
+        userName = client?.nom || client?.full_name || '';
+      }
+      if (userName) {
+        const firstName = userName.split(' ')[0];
+        // Personnaliser le titre si ce n'est pas déjà fait
+        if (!titre.includes(firstName)) {
+          personalizedTitre = `${titre} — ${firstName}`;
+        }
+        // Ajouter un suffixe contextuel selon le type de notification
+        const contextualSuffixes = {
+          nouvelle_course: 'Une nouvelle course vous attend !',
+          livreur_en_route: 'Votre livreur est en route 🏍️',
+          colis_recupere: 'Votre colis a été récupéré 📦',
+          livraison: 'Votre livraison est en cours 🚚',
+          annulation: 'Votre course a été annulée',
+        };
+        const suffix = contextualSuffixes[type] || '';
+        if (suffix && !message.includes(suffix)) {
+          personalizedMessage = `${message}\n\n${suffix}`;
+        }
+      }
+    }
+
     // Créer la notification en BDD
     const notification = await base44.asServiceRole.entities.Notification.create({
-      titre,
-      message,
+      titre: personalizedTitre,
+      message: personalizedMessage,
       type: type || 'generic',
       course_id: course_id || '',
       destinataire_email: targetEmail,
@@ -360,7 +394,7 @@ Deno.serve(async (req) => {
 
     // Payload FCM — notification visible écran verrouillé + son + vibration
     const fcmPayload = {
-      notification: { title: titre, body: message },
+      notification: { title: personalizedTitre, body: personalizedMessage },
       data: dataPayload,
       android: {
         collapse_key: notificationTag,
@@ -395,8 +429,8 @@ Deno.serve(async (req) => {
     const urgentAndroidPayload = {
       data: {
         ...dataPayload,
-        title: String(titre),
-        body: String(message),
+        title: String(personalizedTitre),
+        body: String(personalizedMessage),
       },
       android: {
         collapse_key: notificationTag,

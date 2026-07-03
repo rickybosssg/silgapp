@@ -79,8 +79,8 @@ export default function DashboardExterne() {
       effectiveCountry ? { actif: true, country_code: effectiveCountry } : { actif: true }
     ),
     initialData: [],
-    refetchInterval: 30000,
-    staleTime: 20000,
+    refetchInterval: 60000,
+    staleTime: 45000,
   });
 
   const coursesFiltrees = useMemo(
