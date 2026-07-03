@@ -100,7 +100,7 @@ export default function RestaurantDetail() {
               <p className="text-sm font-bold text-red-600">Fermé actuellement — commande impossible</p>
             </div>
           )}
-          {plats.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Aucun plat disponible</p>}
+          {plats.length === 0 && <p className="text-sm text-gray-500 text-center py-8">Aucun plat disponible</p>}
           {Object.entries(platsByCategorie).map(([cat, items]) => (
             <div key={cat} className="mb-4">
               <p className="text-xs font-bold text-gray-500 uppercase mb-2">{categorieLabels[cat] || cat}</p>
@@ -110,7 +110,7 @@ export default function RestaurantDetail() {
                   return (
                     <div key={p.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 flex items-center gap-3">
                       <div className="w-14 h-14 rounded-xl bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
-                        {p.photo_url ? <img src={p.photo_url} alt={p.nom} className="w-full h-full object-cover" /> : <UtensilsCrossed className="w-6 h-6 text-gray-300" />}
+                        {p.photo_url ? <img src={p.photo_url} alt={p.nom} className="w-full h-full object-cover" /> : <UtensilsCrossed className="w-6 h-6 text-gray-400" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-gray-900 text-sm truncate">{p.nom}</p>

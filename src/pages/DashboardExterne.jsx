@@ -251,9 +251,9 @@ export default function DashboardExterne() {
               { label: "Livrées", value: stats.livrees, color: "text-green-300" },
               { label: "Taux", value: `${taux}%`, color: "text-yellow-300" },
             ].map(item => (
-              <div key={item.label} className="text-center">
-                <p className={`text-xl sm:text-2xl font-black ${item.color}`}>{item.value}</p>
-                <p className="text-[10px] text-white/40 uppercase tracking-wide mt-0.5">{item.label}</p>
+              <div key={item.label} className="flex flex-col items-center gap-0.5">
+                <p className={`text-xl sm:text-2xl font-black leading-none ${item.color}`}>{item.value}</p>
+                <p className="text-[10px] text-white/40 uppercase tracking-wide">{item.label}</p>
               </div>
             ))}
           </div>

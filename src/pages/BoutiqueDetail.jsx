@@ -91,13 +91,13 @@ export default function BoutiqueDetail() {
             </div>
           )}
           <div className="space-y-2">
-            {produits.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Aucun produit disponible</p>}
+            {produits.length === 0 && <p className="text-sm text-gray-500 text-center py-8">Aucun produit disponible</p>}
             {produits.map(p => {
               const inCart = cart.find(i => i.id === p.id);
               return (
                 <div key={p.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 flex items-center gap-3">
                   <div className="w-14 h-14 rounded-xl bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
-                    {p.photo_url ? <img src={p.photo_url} alt={p.nom} className="w-full h-full object-cover" /> : <Package className="w-6 h-6 text-gray-300" />}
+                    {p.photo_url ? <img src={p.photo_url} alt={p.nom} className="w-full h-full object-cover" /> : <Package className="w-6 h-6 text-gray-400" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-gray-900 text-sm truncate">{p.nom}</p>
