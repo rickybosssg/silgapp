@@ -59,6 +59,25 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
     if (sendingRef.current || !courseId) return;
     sendingRef.current = true;
     setSending(true);
+
+    // Optimistic: afficher le message immédiatement (perçu instantané)
+    const tempId = "temp_" + Date.now();
+    const optimisticMsg = {
+      id: tempId,
+      course_id: courseId,
+      sender_type: senderType,
+      sender_id: senderId,
+      sender_name: senderName,
+      message_type: msgData.message_type || "text",
+      content: msgData.content || "",
+      audio_url: msgData.audio_url || null,
+      photo_url: msgData.photo_url || null,
+      created_date: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, optimisticMsg].sort((a, b) =>
+      new Date(a.created_date) - new Date(b.created_date)
+    ));
+
     try {
       const res = await base44.functions.invoke("envoyerMessage", {
         course_id: courseId,
@@ -68,16 +87,16 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
       });
       const newMsg = res?.data?.message;
       if (newMsg) {
-        // Anti-doublon : ne pas ajouter si déjà présent
-        if (!knownIdsRef.current.has(newMsg.id)) {
-          knownIdsRef.current.add(newMsg.id);
-          setMessages(prev => [...prev, newMsg].sort((a, b) =>
-            new Date(a.created_date) - new Date(b.created_date)
-          ));
-        }
+        knownIdsRef.current.add(newMsg.id);
+        setMessages(prev => {
+          const exists = prev.some(m => m.id === newMsg.id);
+          if (exists) return prev.filter(m => m.id !== tempId);
+          return prev.map(m => m.id === tempId ? newMsg : m);
+        });
       }
     } catch (err) {
       console.error("Erreur envoi message:", err);
+      setMessages(prev => prev.filter(m => m.id !== tempId));
     }
     sendingRef.current = false;
     setSending(false);

@@ -875,95 +875,82 @@ export default function ClientExterneApp() {
                 </div>
               </div>
 
-              {/* ── ACTIONS PRINCIPALES ───────────── */}
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-primary/20"
-                  onClick={() => navigate("/client/course/expedier", { state: { position, clientProfil } })}
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-red-600 flex items-center justify-center shadow-lg shadow-red-200 mb-2 group-hover:scale-105 transition-transform">
-                    <Package className="w-5 h-5 text-white" />
-                  </div>
-                  <p className="font-black text-gray-900 text-xs">Expédier</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">Envoyer un colis</p>
-                </button>
+              {/* ── SERVICES SILGAPP ─────────────── */}
+              <div>
+                <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2">Services SILGAPP</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    className="group relative overflow-hidden rounded-2xl bg-white border-t-4 border-primary border-x border-b border-gray-100 shadow-sm p-4 text-center active:scale-[0.97] transition-all hover:shadow-md"
+                    onClick={() => navigate("/client/course/expedier", { state: { position, clientProfil } })}
+                  >
+                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-primary to-red-600 flex items-center justify-center shadow-lg shadow-red-200 mx-auto mb-1.5 group-hover:scale-105 transition-transform">
+                      <Package className="w-5 h-5 text-white" />
+                    </div>
+                    <p className="font-black text-gray-900 text-xs">Expédier</p>
+                    <p className="text-[9px] text-gray-500 mt-0.5">Envoyer un colis</p>
+                  </button>
 
-                <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-green-200"
-                  onClick={() => navigate("/client/course/recevoir", { state: { position, clientProfil } })}
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-lg shadow-green-200 mb-2 group-hover:scale-105 transition-transform">
-                    <span className="text-xl">📥</span>
-                  </div>
-                  <p className="font-black text-gray-900 text-xs">Recevoir</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">Attendre un colis</p>
-                </button>
+                  <button
+                    className="group relative overflow-hidden rounded-2xl bg-white border-t-4 border-emerald-500 border-x border-b border-gray-100 shadow-sm p-4 text-center active:scale-[0.97] transition-all hover:shadow-md"
+                    onClick={() => navigate("/client/course/recevoir", { state: { position, clientProfil } })}
+                  >
+                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-lg shadow-green-200 mx-auto mb-1.5 group-hover:scale-105 transition-transform">
+                      <span className="text-xl">📥</span>
+                    </div>
+                    <p className="font-black text-gray-900 text-xs">Recevoir</p>
+                    <p className="text-[9px] text-gray-500 mt-0.5">Attendre un colis</p>
+                  </button>
 
-                <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-sky-200"
-                  onClick={() => navigate("/client/course/deplacement", { state: { position, clientProfil } })}
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center shadow-lg shadow-sky-200 mb-2 group-hover:scale-105 transition-transform">
-                    <span className="text-xl">👤</span>
-                  </div>
-                  <p className="font-black text-gray-900 text-xs">Déplacement</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">Transport personne</p>
-                </button>
+                  <button
+                    className="group relative overflow-hidden rounded-2xl bg-white border-t-4 border-sky-500 border-x border-b border-gray-100 shadow-sm p-4 text-center active:scale-[0.97] transition-all hover:shadow-md"
+                    onClick={() => navigate("/client/course/deplacement", { state: { position, clientProfil } })}
+                  >
+                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center shadow-lg shadow-sky-200 mx-auto mb-1.5 group-hover:scale-105 transition-transform">
+                      <span className="text-xl">👤</span>
+                    </div>
+                    <p className="font-black text-gray-900 text-xs">Déplacement</p>
+                    <p className="text-[9px] text-gray-500 mt-0.5">Transport personne</p>
+                  </button>
+                </div>
+              </div>
 
-                <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-purple-200"
-                  onClick={() => setShowMessages(true)}
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-lg shadow-purple-200 mb-2 group-hover:scale-105 transition-transform">
-                    <MessageCircle className="w-5 h-5 text-white" />
-                  </div>
-                  <p className="font-black text-gray-900 text-xs">Messages</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">Discuter avec clients / livreurs</p>
-                </button>
+              {/* ── NOS PARTENAIRES ──────────────── */}
+              <div>
+                <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2">Nos partenaires</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-4 text-center active:scale-[0.97] transition-all hover:shadow-md hover:border-blue-200"
+                    onClick={() => navigate("/client/boutiques")}
+                  >
+                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-200 mx-auto mb-1.5 group-hover:scale-105 transition-transform">
+                      <Store className="w-5 h-5 text-white" />
+                    </div>
+                    <p className="font-black text-gray-900 text-xs">Boutiques</p>
+                    <p className="text-[9px] text-gray-500 mt-0.5">Commander</p>
+                  </button>
 
-                <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-blue-200"
-                  onClick={() => navigate("/client/boutiques")}
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-200 mb-2 group-hover:scale-105 transition-transform">
-                    <Store className="w-5 h-5 text-white" />
-                  </div>
-                  <p className="font-black text-gray-900 text-xs">Boutiques</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">Commander en boutique</p>
-                </button>
+                  <button
+                    className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-4 text-center active:scale-[0.97] transition-all hover:shadow-md hover:border-orange-200"
+                    onClick={() => navigate("/client/restaurants")}
+                  >
+                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg shadow-orange-200 mx-auto mb-1.5 group-hover:scale-105 transition-transform">
+                      <UtensilsCrossed className="w-5 h-5 text-white" />
+                    </div>
+                    <p className="font-black text-gray-900 text-xs">Restaurants</p>
+                    <p className="text-[9px] text-gray-500 mt-0.5">À manger</p>
+                  </button>
 
-                <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-orange-200"
-                  onClick={() => navigate("/client/restaurants")}
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg shadow-orange-200 mb-2 group-hover:scale-105 transition-transform">
-                    <UtensilsCrossed className="w-5 h-5 text-white" />
-                  </div>
-                  <p className="font-black text-gray-900 text-xs">Restaurants</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">Commander à manger</p>
-                </button>
-
-                <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-gray-300"
-                  onClick={() => navigate("/client/pharmacies")}
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-gray-600 to-gray-800 flex items-center justify-center shadow-lg shadow-gray-300 mb-2 group-hover:scale-105 transition-transform">
-                    <Pill className="w-5 h-5 text-white" />
-                  </div>
-                  <p className="font-black text-gray-900 text-xs">Pharmacies</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">Discuter & commander</p>
-                </button>
-
-                <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-indigo-200"
-                  onClick={() => setShowFeedback(true)}
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-200 mb-2 group-hover:scale-105 transition-transform">
-                    <Star className="w-5 h-5 text-white" />
-                  </div>
-                  <p className="font-black text-gray-900 text-xs">Mon avis</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">Donner votre feedback</p>
-                </button>
+                  <button
+                    className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-4 text-center active:scale-[0.97] transition-all hover:shadow-md hover:border-gray-300"
+                    onClick={() => navigate("/client/pharmacies")}
+                  >
+                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-gray-600 to-gray-800 flex items-center justify-center shadow-lg shadow-gray-300 mx-auto mb-1.5 group-hover:scale-105 transition-transform">
+                      <Pill className="w-5 h-5 text-white" />
+                    </div>
+                    <p className="font-black text-gray-900 text-xs">Pharmacies</p>
+                    <p className="text-[9px] text-gray-500 mt-0.5">Discuter</p>
+                  </button>
+                </div>
               </div>
 
               {/* ── BOUTON CARTE ──────────────────── */}
@@ -984,14 +971,15 @@ export default function ClientExterneApp() {
                 </button>
               )}
 
-              {/* ── RACCOURCIS ────────────────────── */}
+              {/* ── ACCÈS RAPIDE ─────────────────── */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
                 <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-3">Accès rapide</p>
                 <div className="grid grid-cols-4 gap-2">
                   {[
-                    { icon: <Package className="w-5 h-5" />, label: "Courses",   color: "text-blue-600",   bg: "bg-blue-50",   action: () => navigate("/client/suivi") },
-                    { icon: <Clock className="w-5 h-5" />,   label: "Historique",color: "text-purple-600", bg: "bg-purple-50", action: () => navigate("/client/suivi") },
+                    { icon: <Package className="w-5 h-5" />, label: "Mes courses", color: "text-blue-600", bg: "bg-blue-50", action: () => navigate("/client/suivi") },
+                    { icon: <MessageCircle className="w-5 h-5" />, label: "Messages", color: "text-purple-600", bg: "bg-purple-50", action: () => setShowMessages(true) },
                     { icon: <Package className="w-5 h-5" />, label: "Commandes", color: "text-indigo-600", bg: "bg-indigo-50", action: () => navigate("/client/mes-commandes") },
+                    { icon: <Star className="w-5 h-5" />, label: "Mon avis", color: "text-amber-600", bg: "bg-amber-50", action: () => setShowFeedback(true) },
                     { icon: <span className="text-xs">💬</span>, label: "Support", color: "text-green-600", bg: "bg-green-50", action: () => {
                       const msg = encodeURIComponent("Bonjour SILGAPP 👋\nJ'ai besoin d'aide sur SILGAPP.");
                       const a = document.createElement("a");
@@ -999,7 +987,7 @@ export default function ClientExterneApp() {
                       a.click();
                       setTimeout(() => { if (document.hasFocus()) window.open(`https://wa.me/22667572857?text=${msg}`, "_blank"); }, 500);
                     }},
-                    { icon: <User className="w-5 h-5" />,    label: "Profil",    color: "text-orange-600", bg: "bg-orange-50", action: () => setShowProfilModal(true) },
+                    { icon: <User className="w-5 h-5" />, label: "Profil", color: "text-orange-600", bg: "bg-orange-50", action: () => setShowProfilModal(true) },
                   ].map((item, i) => (
                     <button
                       key={i}

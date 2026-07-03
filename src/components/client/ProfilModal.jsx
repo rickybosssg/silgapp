@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { toast } from "sonner";
 import { User, Save, X, Check, Trash2 } from "lucide-react";
+import NotificationPreferences from "@/components/client/NotificationPreferences";
 
 // Normalise +226XXXXXXXX
 function normaliserTel(raw) {
@@ -122,6 +123,9 @@ export default function ProfilModal({ clientProfil, onClose, onSave }) {
             )}
           </div>
         </div>
+
+        {/* Préférences de notifications */}
+        <NotificationPreferences userEmail={clientProfil?.user_email} />
 
         {/* Boutons */}
         <div className="flex gap-3">
