@@ -8,7 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 
 const VENUS_AVATAR_URL = "https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/17cf522aa_file_0000000034b871f7bf133c0de0c9eb62.png";
 
-export default function VenusFloatingButton() {
+export default function VenusFloatingButton({ forcedCountryCode = null }) {
   const [showChat, setShowChat] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -18,9 +18,9 @@ export default function VenusFloatingButton() {
   const imgRef = useRef(null);
   const buttonRef = useRef(null);
 
-  // Contexte admin (pays actif)
+  // Contexte admin (pays actif) — ignoré si forcedCountryCode est fourni (ex: partenaire)
   const { selectedCountry, isPays, countryCode } = useAdminContext();
-  const effectiveCountry = isPays ? countryCode : (selectedCountry || null);
+  const effectiveCountry = forcedCountryCode || (isPays ? countryCode : (selectedCountry || null));
 
   // Charger les données du pays actif
   const { data: countryData } = useQuery({

@@ -12,6 +12,7 @@ import PartenaireHome from "@/components/partenaire/PartenaireHome";
 import PartenaireBottomNav from "@/components/partenaire/PartenaireBottomNav";
 import NewMessageModal from "@/components/partenaire/NewMessageModal";
 import OngletCodePromoPartenaire from "@/components/partenaire/OngletCodePromoPartenaire";
+import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { registerPushToken } from "@/lib/notifications";
 
@@ -330,6 +331,9 @@ export default function PartenaireDashboard() {
         onOpen={() => { setTab("messages"); setNewMsgModal(null); }}
         onClose={() => setNewMsgModal(null)}
       />
+
+      {/* ── Assistant VENUS ── */}
+      <VenusFloatingButton forcedCountryCode={etablissement?.pays_code} />
     </div>
   );
 }
