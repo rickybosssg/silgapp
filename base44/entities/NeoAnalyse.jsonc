@@ -1,0 +1,55 @@
+{
+  "name": "NeoAnalyse",
+  "type": "object",
+  "properties": {
+    "date_analyse": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date et heure de l'analyse"
+    },
+    "score_global": {
+      "type": "number",
+      "description": "Score global SILGAPP sur 100"
+    },
+    "scores_detail": {
+      "type": "string",
+      "description": "JSON: {design, ux, performance, dispatch, notifications, gps, securite, architecture}"
+    },
+    "resume": {
+      "type": "string",
+      "description": "R\u00e9sum\u00e9 g\u00e9n\u00e9ral de l'analyse"
+    },
+    "nb_recommandations": {
+      "type": "number",
+      "default": 0
+    },
+    "nb_critique": {
+      "type": "number",
+      "default": 0
+    },
+    "nb_elevee": {
+      "type": "number",
+      "default": 0
+    },
+    "nb_moyenne": {
+      "type": "number",
+      "default": 0
+    },
+    "nb_faible": {
+      "type": "number",
+      "default": 0
+    },
+    "stats_snapshot": {
+      "type": "string",
+      "description": "JSON: statistiques de la plateforme au moment de l'analyse"
+    },
+    "lance_par": {
+      "type": "string",
+      "description": "Email admin ayant lanc\u00e9 l'analyse"
+    }
+  },
+  "required": [
+    "date_analyse",
+    "score_global"
+  ]
+}

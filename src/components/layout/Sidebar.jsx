@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
-  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill, PieChart
+  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill, PieChart, Sparkles
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
@@ -46,11 +46,12 @@ export const navItems = [
   { path: "/admin/restaurants", label: "Restaurants", icon: UtensilsCrossed },
   { path: "/admin/pharmacies", label: "Pharmacies", icon: Pill },
   { path: "/admin/commandes-partenaires", label: "Commandes Partenaires", icon: Package },
+  { path: "/admin/neo", label: "NEO – Moteur d'amélioration", icon: Sparkles },
   { path: "/notifications", label: "Notifications", icon: Bell },
   { path: "/maintenance", label: "Maintenance", icon: Shield },
 ];
 
-export default function Sidebar({ notificationCount = 0, demandesCount = 0, partenaireDemandesCount = 0, reseau }) {
+export default function Sidebar({ notificationCount = 0, demandesCount = 0, partenaireDemandesCount = 0, neoCount = 0, reseau }) {
   const [collapsed, setCollapsed] = useState(false);
   const [countryOpen, setCountryOpen] = useState(false);
   const location = useLocation();
@@ -118,9 +119,14 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
                       {partenaireDemandesCount}
                     </Badge>
                   )}
+                  {item.path === "/admin/neo" && neoCount > 0 && (
+                    <Badge className="bg-cyan-500 text-white text-[10px] h-5 min-w-5 flex items-center justify-center px-1">
+                      {neoCount}
+                    </Badge>
+                  )}
                 </>
               )}
-              {(item.path === "/notifications" && notificationCount > 0) || (item.path === "/admin/demandes-livreurs" && demandesCount > 0) || (["/admin/boutiques", "/admin/restaurants", "/admin/pharmacies"].includes(item.path) && partenaireDemandesCount > 0) ? (
+              {(item.path === "/notifications" && notificationCount > 0) || (item.path === "/admin/demandes-livreurs" && demandesCount > 0) || (["/admin/boutiques", "/admin/restaurants", "/admin/pharmacies"].includes(item.path) && partenaireDemandesCount > 0) || (item.path === "/admin/neo" && neoCount > 0) ? (
                 collapsed && (
                   <span className="absolute right-1 top-1 w-2 h-2 rounded-full bg-destructive" />
                 )

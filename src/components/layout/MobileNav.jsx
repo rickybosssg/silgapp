@@ -28,7 +28,7 @@ function restoreScrollPosition(pathname) {
   } catch (_) { return 0; }
 }
 
-export default function MobileNav({ notificationCount = 0, demandesCount = 0, partenaireDemandesCount = 0, reseau }) {
+export default function MobileNav({ notificationCount = 0, demandesCount = 0, partenaireDemandesCount = 0, neoCount = 0, reseau }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -213,6 +213,11 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
                     {["/admin/boutiques", "/admin/restaurants", "/admin/pharmacies"].includes(item.path) && partenaireDemandesCount > 0 && (
                       <Badge className="bg-destructive text-destructive-foreground text-xs">
                         {partenaireDemandesCount}
+                      </Badge>
+                    )}
+                    {item.path === "/admin/neo" && neoCount > 0 && (
+                      <Badge className="bg-cyan-500 text-white text-xs">
+                        {neoCount}
                       </Badge>
                     )}
                   </Link>
