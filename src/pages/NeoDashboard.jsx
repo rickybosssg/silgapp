@@ -218,7 +218,7 @@ export default function NeoDashboard() {
       </div>
 
       {/* ─── CONTENU ─── */}
-      <div className="max-w-4xl mx-auto px-4 py-5 space-y-6">
+      <div className="max-w-4xl mx-auto px-4 py-5 pb-28 space-y-6">
         {/* État initial */}
         {!latestAnalyse && !analysing && (
           <div className="rounded-3xl bg-white border border-gray-100 p-8 text-center shadow-sm">
