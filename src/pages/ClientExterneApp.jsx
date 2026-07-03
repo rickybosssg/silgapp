@@ -13,7 +13,7 @@ import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { 
   MapPin, Navigation, MessageCircle, User, Package, 
   Clock, ChevronRight, TrendingUp, Loader2, ArrowLeft, RefreshCw,
-  Store, UtensilsCrossed, Pill
+  Store, UtensilsCrossed, Pill, Star
 } from "lucide-react";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import CourseAnnuleeRelanceDialog from "@/components/client/CourseAnnuleeRelanceDialog";
@@ -29,6 +29,7 @@ import OngletCodePromo from "@/components/client/OngletCodePromo";
 import PubliciteCarousel from "@/components/publicite/PubliciteCarousel";
 import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
 import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
+import FeedbackModal from "@/components/client/FeedbackModal";
 
 
 function haversineDistance(lat1, lon1, lat2, lon2) {
@@ -83,6 +84,7 @@ export default function ClientExterneApp() {
   const [notationShownFor, setNotationShownFor] = useState(null);
   const [courseAnnuleeRelance, setCourseAnnuleeRelance] = useState(null); // course annulée auto → proposer relance
   const [showMessages, setShowMessages] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
   const [sessionId, setSessionId] = useState(() => {
     try { return localStorage.getItem("silgapp_client_session_id") || null; } catch { return null; }
   });
@@ -950,6 +952,17 @@ export default function ClientExterneApp() {
                   <p className="font-black text-gray-900 text-xs">Pharmacies</p>
                   <p className="text-[10px] text-gray-500 mt-0.5">Discuter & commander</p>
                 </button>
+
+                <button
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-indigo-200"
+                  onClick={() => setShowFeedback(true)}
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-200 mb-2 group-hover:scale-105 transition-transform">
+                    <Star className="w-5 h-5 text-white" />
+                  </div>
+                  <p className="font-black text-gray-900 text-xs">Mon avis</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">Donner votre feedback</p>
+                </button>
               </div>
 
               {/* ── BOUTON CARTE ──────────────────── */}
@@ -1126,6 +1139,14 @@ export default function ClientExterneApp() {
             onBack={() => setShowMessages(false)}
           />
         </div>
+      )}
+
+      {/* ── FEEDBACK ── */}
+      {showFeedback && (
+        <FeedbackModal
+          clientProfil={clientProfil}
+          onClose={() => setShowFeedback(false)}
+        />
       )}
     </div>
   );

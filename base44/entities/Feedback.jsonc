@@ -1,0 +1,89 @@
+{
+  "name": "Feedback",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email de l'utilisateur"
+    },
+    "user_type": {
+      "type": "string",
+      "enum": [
+        "client",
+        "livreur",
+        "partenaire",
+        "admin"
+      ],
+      "default": "client"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "ID du client/livreur/partenaire"
+    },
+    "user_nom": {
+      "type": "string"
+    },
+    "note": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "Note de satisfaction (1-5 \u00e9toiles)"
+    },
+    "categorie": {
+      "type": "string",
+      "enum": [
+        "experience_globale",
+        "qualite_livraison",
+        "vitesse_service",
+        "application",
+        "support",
+        "autre"
+      ],
+      "default": "experience_globale"
+    },
+    "commentaire": {
+      "type": "string",
+      "description": "Commentaire libre de l'utilisateur"
+    },
+    "country_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE",
+        "GH"
+      ]
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "nouveau",
+        "lu",
+        "traite",
+        "ignore"
+      ],
+      "default": "nouveau"
+    },
+    "reponse_admin": {
+      "type": "string",
+      "description": "R\u00e9ponse de l'administrateur au feedback"
+    },
+    "traite_par": {
+      "type": "string",
+      "description": "Email admin ayant trait\u00e9"
+    },
+    "date_traitement": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "note",
+    "user_type"
+  ]
+}

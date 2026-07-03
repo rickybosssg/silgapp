@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Send, Loader2, MessageCircle, User, Truck, Shield, UserPlus, Users, ImagePlus, Store } from "lucide-react";
@@ -241,14 +241,17 @@ export default function MessagesPage({ myType, myId, myName, onBack, initialConv
     loadConversations();
   }, [myId]);
 
-  // Subscription pour rafraîchir la liste
+  // Subscription pour rafraîchir la liste (avec debounce — anti-spam)
+  const reloadTimerRef = useRef(null);
   useEffect(() => {
     const unsub = base44.entities.Conversation.subscribe((event) => {
       if (event.type === "update" || event.type === "create") {
-        loadConversations();
+        // Debounce: attendre 2s avant de recharger pour éviter le spam
+        if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+        reloadTimerRef.current = setTimeout(() => loadConversations(), 2000);
       }
     });
-    return () => unsub?.();
+    return () => { unsub?.(); if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current); };
   }, [myId]);
 
   const loadConversations = async () => {
