@@ -48,7 +48,7 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
       }
       if (data.statut === "annulee" && reseau === "externe") {
         // Utiliser la fonction backend dédiée pour les courses externes
-        const result = await base44.functions.invoke("annulerCourseExterne", { course_id: id });
+        const result = await base44.functions.invoke("annulerCourseExterne", { course_id: id, source: "admin" });
         if (!result?.data?.success) {
           throw new Error(result?.data?.error || "Échec annulation");
         }

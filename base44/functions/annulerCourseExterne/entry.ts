@@ -85,8 +85,11 @@ Deno.serve(async (req) => {
 
     if (source === "livreur") {
       // ── ANNULATION LIVREUR : course retourne au dispatch ──────────
+      // ⚠️ Le livreur qui a annulé est EXCLU de cette course précise
+      // (ajouté dans dispatch_notified_ids) mais reste disponible pour les autres.
+      const exclusionsLivreur = livreurId ? JSON.stringify([livreurId]) : '[]';
       const resetData = {
-        statut: "nouvelle",
+        statut: "recherche_livreur",
         dispatch_status: "en_attente",
         dispatch_wave: 0,
         livreur_id: null,
@@ -96,7 +99,7 @@ Deno.serve(async (req) => {
         livreur_vehicule: null,
         livreur_note_moyenne: 0,
         livreur_nombre_avis: 0,
-        dispatch_notified_ids: null, // reset — tous les livreurs éligibles à nouveau
+        dispatch_notified_ids: exclusionsLivreur, // ⚠️ livreur annulant EXCLU de cette course
         heure_acceptation: null,
         heure_recuperation: null,
         heure_livraison: null,
@@ -204,6 +207,23 @@ Deno.serve(async (req) => {
           user_type: "client",
           course_id,
         }).catch(() => null);
+      }
+
+      // ── RELANCE IMMÉDIATE DU DISPATCH ────────────────────────────
+      // La course est en statut "recherche_livreur" + "en_attente" avec le livreur
+      // annulant dans les exclusions. On déclenche le dispatch maintenant pour
+      // trouver un nouveau livreur sans attendre le cycle programmé (5 min).
+      console.log(`[ANNULATION] 🔄 Relance dispatch immédiate pour course ${course_id} (exclu: ${livreurId})`);
+      const dispatchResult = await base44.asServiceRole.functions.invoke('dispatchExterneAuto', {
+        action: 'lancer_recherche_auto',
+        course_id,
+      }).catch((err) => {
+        console.error(`[ANNULATION] ❌ Erreur relance dispatch: ${err?.message || err}`);
+        return null;
+      });
+
+      if (dispatchResult?.data) {
+        console.log(`[ANNULATION] ✅ Dispatch relancé — ${dispatchResult.data.nb_notifies || 0} livreur(s) notifié(s)`);
       }
 
     } else {
