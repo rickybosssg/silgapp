@@ -37,6 +37,26 @@
       ],
       "description": "Niveau de priorit\u00e9"
     },
+    "effort_estime": {
+      "type": "string",
+      "enum": [
+        "rapide",
+        "moyen",
+        "long"
+      ],
+      "default": "moyen",
+      "description": "Effort de mise en \u0153uvre estim\u00e9"
+    },
+    "impact_estime": {
+      "type": "string",
+      "enum": [
+        "faible",
+        "moyen",
+        "fort"
+      ],
+      "default": "moyen",
+      "description": "Impact estim\u00e9 sur la plateforme"
+    },
     "probleme": {
       "type": "string",
       "description": "Probl\u00e8me d\u00e9tect\u00e9"

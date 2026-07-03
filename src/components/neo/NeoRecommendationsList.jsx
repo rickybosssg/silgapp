@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronUp, Check, X, Clock, AlertTriangle, ArrowRight } from "lucide-react";
+import { ChevronDown, ChevronUp, Check, X, Clock, AlertTriangle, ArrowRight, Zap, Gauge } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const PRIORITY_CONFIG = {
@@ -15,6 +15,18 @@ const CATEGORY_LABELS = {
   dispatch: "Dispatch", notifications: "Notifications", gps: "GPS",
   securite: "Sécurité", architecture: "Architecture", evolution: "Évolution",
   processus_metier: "Processus",
+};
+
+const EFFORT_CONFIG = {
+  rapide: { label: "Rapide", color: "bg-emerald-100 text-emerald-700" },
+  moyen: { label: "Moyen", color: "bg-amber-100 text-amber-700" },
+  long: { label: "Long", color: "bg-red-100 text-red-700" },
+};
+
+const IMPACT_CONFIG = {
+  faible: { label: "Impact faible", color: "bg-gray-100 text-gray-600" },
+  moyen: { label: "Impact moyen", color: "bg-blue-100 text-blue-700" },
+  fort: { label: "Impact fort", color: "bg-purple-100 text-purple-700" },
 };
 
 function RecCard({ rec, onAction, index }) {
@@ -38,6 +50,16 @@ function RecCard({ rec, onAction, index }) {
             <span className="text-[10px] font-semibold text-gray-400 uppercase">
               {CATEGORY_LABELS[rec.categorie] || rec.categorie}
             </span>
+            {rec.effort_estime && EFFORT_CONFIG[rec.effort_estime] && (
+              <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5", EFFORT_CONFIG[rec.effort_estime].color)}>
+                <Zap className="w-2.5 h-2.5" /> {EFFORT_CONFIG[rec.effort_estime].label}
+              </span>
+            )}
+            {rec.impact_estime && IMPACT_CONFIG[rec.impact_estime] && (
+              <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5", IMPACT_CONFIG[rec.impact_estime].color)}>
+                <Gauge className="w-2.5 h-2.5" /> {IMPACT_CONFIG[rec.impact_estime].label}
+              </span>
+            )}
             {rec.statut === "appliquee" && (
               <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5">
                 <Check className="w-3 h-3" /> Appliquée

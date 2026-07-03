@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Sparkles, Play, FileText, TrendingUp, TrendingDown, Clock, Zap } from "lucide-react";
+import { Sparkles, Play, FileText, TrendingUp, TrendingDown, Clock, Zap, CheckCircle2, BarChart3 } from "lucide-react";
 import NeoScoreGrid from "@/components/neo/NeoScoreGrid";
 import NeoRecommendationsList from "@/components/neo/NeoRecommendationsList";
 import { toast } from "sonner";
@@ -30,6 +30,9 @@ export default function NeoDashboard() {
   });
 
   const newCount = useMemo(() => recommendations.filter(r => r.statut === "nouvelle").length, [recommendations]);
+  const appliedCount = useMemo(() => recommendations.filter(r => r.statut === "appliquee").length, [recommendations]);
+  const ignoredCount = useMemo(() => recommendations.filter(r => r.statut === "ignoree").length, [recommendations]);
+  const resolutionRate = recommendations.length > 0 ? Math.round(appliedCount / recommendations.length * 100) : 0;
 
   // ─── Lancer une analyse ───
   const handleAnalyser = async () => {
@@ -266,6 +269,43 @@ export default function NeoDashboard() {
 
             {/* Scores */}
             <NeoScoreGrid scores={latestAnalyse.scores_detail} scoreGlobal={latestAnalyse.score_global} />
+
+            {/* Suivi des actions — taux de résolution */}
+            {recommendations.length > 0 && (
+              <div className="rounded-2xl bg-white border border-gray-100 p-4 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                  <h3 className="font-bold text-sm text-gray-900">Suivi des actions</h3>
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  <div className="text-center">
+                    <div className="text-xl font-black text-gray-900">{recommendations.length}</div>
+                    <div className="text-[9px] text-gray-400 font-semibold uppercase">Total</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xl font-black text-blue-500">{newCount}</div>
+                    <div className="text-[9px] text-gray-400 font-semibold uppercase">En attente</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xl font-black text-emerald-500">{appliedCount}</div>
+                    <div className="text-[9px] text-gray-400 font-semibold uppercase">Appliquées</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xl font-black text-gray-400">{ignoredCount}</div>
+                    <div className="text-[9px] text-gray-400 font-semibold uppercase">Ignorées</div>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase">Taux de résolution</span>
+                    <span className="text-xs font-black text-emerald-600">{resolutionRate}%</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-600 transition-all" style={{ width: `${resolutionRate}%` }} />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Évolution du score */}
             {analyses.length > 1 && (
