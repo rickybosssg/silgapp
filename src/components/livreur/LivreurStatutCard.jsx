@@ -12,10 +12,10 @@ export default function LivreurStatutCard({ statut, livreur, isExterne = false }
   return (
     <div className="space-y-3">
       <div className={cn(
-        "rounded-3xl p-4 flex items-center gap-4 transition-all duration-500 relative overflow-hidden",
-        isDisponible && "bg-gradient-to-r from-emerald-500 to-green-400 text-white shadow-lg shadow-emerald-500/30",
-        isEnCourse && "bg-gradient-to-r from-blue-600 to-indigo-500 text-white shadow-lg shadow-blue-500/30",
-        isHorsLigne && "bg-gray-100 text-gray-500 border border-gray-200",
+        "rounded-[1.75rem] p-4 flex items-center gap-4 transition-all duration-500 relative overflow-hidden border",
+        isDisponible && "bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 text-white shadow-xl shadow-emerald-500/25 border-white/20",
+        isEnCourse && "bg-gradient-to-r from-blue-800 via-indigo-700 to-sky-600 text-white shadow-xl shadow-blue-500/25 border-white/20",
+        isHorsLigne && "bg-white text-gray-500 border-slate-200 shadow-sm",
       )}>
         {/* Halo de fond décoratif */}
         {isDisponible && <div className="absolute -right-6 -top-6 w-24 h-24 bg-white/10 rounded-full blur-xl pointer-events-none" />}

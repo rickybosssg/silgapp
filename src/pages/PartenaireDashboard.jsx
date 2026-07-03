@@ -12,6 +12,7 @@ import PartenaireHome from "@/components/partenaire/PartenaireHome";
 import PartenaireBottomNav from "@/components/partenaire/PartenaireBottomNav";
 import NewMessageModal from "@/components/partenaire/NewMessageModal";
 import OngletCodePromoPartenaire from "@/components/partenaire/OngletCodePromoPartenaire";
+import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { registerPushToken } from "@/lib/notifications";
 
@@ -244,8 +245,12 @@ export default function PartenaireDashboard() {
           </div>
           <h1 className="text-xl font-black text-gray-900">Compte en attente de validation</h1>
           <p className="text-sm text-gray-500">Votre établissement est en cours de vérification par l'équipe SILGAPP. Vous recevrez une notification dès que votre compte sera validé.</p>
+          <div className="flex items-center gap-2 bg-amber-50 rounded-xl px-4 py-3 border border-amber-200">
+            <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            <p className="text-xs text-amber-700 font-medium">Validation sous 24-48h ouvrées</p>
+          </div>
           <p className="text-xs text-gray-400">📞 Support : +226 66 92 51 90</p>
-          <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="text-xs text-purple-600 underline">Se déconnecter</button>
+          <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="text-xs text-gray-500 underline underline-offset-2 hover:text-gray-700 py-2 px-4">Se déconnecter</button>
         </div>
       </div>
     );
@@ -274,7 +279,7 @@ export default function PartenaireDashboard() {
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* ── En-tête premium ── */}
-      <div className="bg-gradient-to-br from-purple-600 via-violet-600 to-indigo-600 text-white px-4 py-4 sticky top-0 z-20 shadow-lg">
+      <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white px-4 py-4 sticky top-0 z-20 shadow-lg border-b-2 border-primary">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -307,7 +312,7 @@ export default function PartenaireDashboard() {
         {tab === "produits" && !hasPharmacie && <ProduitsManager type={etablissementType} etablissementId={etablissement.id} />}
         {tab === "livraisons" && hasPharmacie && <PharmacieLivraisons pharmacieId={etablissement.id} pharmacieNom={etablissement.nom} onNavigate={setTab} />}
         {tab === "messages" && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-[70vh]">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-[calc(100dvh-180px)]">
             <MessagesPage myType="partenaire" myId={etablissement.id} myName={etablissement.nom} />
           </div>
         )}
@@ -330,6 +335,9 @@ export default function PartenaireDashboard() {
         onOpen={() => { setTab("messages"); setNewMsgModal(null); }}
         onClose={() => setNewMsgModal(null)}
       />
+
+      {/* ── Assistant VENUS ── */}
+      <VenusFloatingButton forcedCountryCode={etablissement?.pays_code} />
     </div>
   );
 }

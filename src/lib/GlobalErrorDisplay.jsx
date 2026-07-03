@@ -1,9 +1,32 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { base44 } from '@/api/base44Client';
 
 const globalErrors = [];
 let errorListeners = [];
+let lastSentErrors = new Map(); // dédoublonnage: message → timestamp
+
+// Envoyer l'erreur au backend (debounced — max 1 envoi par message toutes les 30s)
+const sendErrorToBackend = (error) => {
+  const key = error.message;
+  const now = Date.now();
+  const lastSent = lastSentErrors.get(key) || 0;
+  if (now - lastSent < 30000) return; // déjà envoyé il y a moins de 30s
+  lastSentErrors.set(key, now);
+
+  try {
+    base44.functions.invoke('loggerErreur', {
+      message: error.message,
+      type_erreur: error.type === 'unhandledrejection' ? 'promise_rejection' : 'javascript',
+      stack: error.stack,
+      fichier: error.filename,
+      ligne: error.lineno,
+      page_url: window.location.href,
+      user_agent: navigator.userAgent,
+    }).catch(() => {});
+  } catch (_) {}
+};
 
 // Global error handler
 window.addEventListener('error', (event) => {
@@ -19,6 +42,7 @@ window.addEventListener('error', (event) => {
   console.error('[GlobalError] Caught:', error);
   globalErrors.push(error);
   errorListeners.forEach(listener => listener(globalErrors));
+  sendErrorToBackend(error);
 });
 
 // Unhandled promise rejection handler
@@ -32,6 +56,7 @@ window.addEventListener('unhandledrejection', (event) => {
   console.error('[GlobalError] Unhandled rejection:', error);
   globalErrors.push(error);
   errorListeners.forEach(listener => listener(globalErrors));
+  sendErrorToBackend(error);
 });
 
 export const useGlobalErrors = () => {

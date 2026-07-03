@@ -135,15 +135,16 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`relative overflow-hidden rounded-3xl bg-gradient-to-br ${theme.hero} text-white shadow-xl ${theme.shadow}`}
+        className={`relative overflow-hidden rounded-[2rem] bg-gradient-to-br ${theme.hero} text-white shadow-2xl ${theme.shadow} ring-1 ring-white/10`}
       >
         <div className="absolute -top-12 -right-12 w-40 h-40 bg-white/10 rounded-full" />
         <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-white/5 rounded-full" />
         <div className="absolute inset-x-0 bottom-0 h-1 bg-white/20" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.16),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.10),transparent_45%)] pointer-events-none" />
 
         <div className="relative p-5 space-y-4">
           <div className="flex items-center justify-between">
@@ -154,7 +155,7 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
             <button
               onClick={handleToggleOuvert}
               disabled={toggling}
-              className="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 text-sm font-bold hover:bg-white/30 transition-colors"
+              className="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-2xl px-4 py-2.5 text-sm font-black hover:bg-white/30 transition-colors border border-white/15"
             >
               {toggling ? <Loader2 className="w-4 h-4 animate-spin" /> : (
                 <span className={"w-2.5 h-2.5 rounded-full " + (etablissement.ouvert ? "bg-green-300" : "bg-red-300")} />
@@ -172,7 +173,7 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
             </span>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-3">
             <HeroStat value={isPharmacie ? pharmaConversations.length : commandesToday.length} label={isPharmacie ? "Conversations actives" : "Commandes aujourd'hui"} />
             <HeroStat value={isPharmacie ? pharmaActiveCourses.length : revenusToday.toLocaleString()} label={isPharmacie ? "Livraisons en cours" : "FCFA de ventes"} />
             <HeroStat value={enPreparation} label={isPharmacie ? "En recherche" : "En préparation"} />
@@ -180,7 +181,7 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-4 gap-2.5">
         <QuickStat icon={CheckCircle} value={livreesToday} label="Livrées" color="text-green-600" bg="bg-green-50" />
         <QuickStat icon={Clock} value={enPreparation} label={isPharmacie ? "Recherche" : "Préparation"} color="text-orange-600" bg="bg-orange-50" />
         <QuickStat icon={Truck} value={enLivraison} label="En livraison" color="text-indigo-600" bg="bg-indigo-50" />
@@ -199,14 +200,14 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
               onClick={() => onNavigate(card.id)}
-              className={`relative bg-white rounded-2xl p-4 shadow-sm border ${theme.softBorder} hover:shadow-md transition-all text-left group active:scale-95`}
+              className={`relative bg-white rounded-3xl p-4 shadow-sm shadow-blue-100/40 border ${theme.softBorder} hover:shadow-lg hover:-translate-y-0.5 transition-all text-left group active:scale-95`}
             >
               {card.badge > 0 && (
                 <span className="absolute top-3 right-3 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center">
                   {card.badge}
                 </span>
               )}
-              <div className={"w-11 h-11 rounded-xl " + card.bg + " flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"}>
+              <div className={"w-12 h-12 rounded-2xl " + card.bg + " flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"}>
                 <card.icon className={"w-5 h-5 " + card.iconColor} />
               </div>
               <p className="font-bold text-gray-900 text-sm">{card.label}</p>

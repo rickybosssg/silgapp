@@ -5,11 +5,13 @@ import Sidebar from "./Sidebar";
 import MobileNav from "./MobileNav";
 import DemandesLivreursPopup from "@/components/admin/DemandesLivreursPopup";
 import DemandesPartenairesPopup from "@/components/admin/DemandesPartenairesPopup";
+import NeoNotificationModal from "@/components/neo/NeoNotificationModal";
 
 export default function AppLayout({ reseau }) {
   const [notifCount, setNotifCount] = useState(0);
   const [demandesCount, setDemandesCount] = useState(0);
   const [partenaireDemandesCount, setPartenaireDemandesCount] = useState(0);
+  const [neoCount, setNeoCount] = useState(0);
 
   useEffect(() => {
     const fetchNotifs = async () => {
@@ -34,10 +36,17 @@ export default function AppLayout({ reseau }) {
         setPartenaireDemandesCount((bqs?.length || 0) + (rts?.length || 0) + (phs?.length || 0));
       } catch (_) {}
     };
+    const fetchNeoCount = async () => {
+      try {
+        const data = await base44.entities.NeoRecommendation.filter({ statut: "nouvelle" });
+        setNeoCount((data || []).length);
+      } catch (_) {}
+    };
     fetchNotifs();
     fetchDemandes();
     fetchPartenaireDemandes();
-    const iv = setInterval(() => { fetchNotifs(); fetchDemandes(); fetchPartenaireDemandes(); }, 30000);
+    fetchNeoCount();
+    const iv = setInterval(() => { fetchNotifs(); fetchDemandes(); fetchPartenaireDemandes(); fetchNeoCount(); }, 30000);
     return () => clearInterval(iv);
   }, []);
 
@@ -47,9 +56,10 @@ export default function AppLayout({ reseau }) {
       {/* Popup automatique demandes livreurs */}
       <DemandesLivreursPopup />
       <DemandesPartenairesPopup />
+      <NeoNotificationModal />
 
       <div className="hidden lg:flex min-h-screen">
-        <Sidebar notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} reseau={reseau} />
+        <Sidebar notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} neoCount={neoCount} reseau={reseau} />
         <main className="flex-1 min-h-screen overflow-x-hidden bg-slate-50">
           <Outlet />
         </main>
@@ -57,7 +67,7 @@ export default function AppLayout({ reseau }) {
 
       {/* Mobile layout */}
       <div className="lg:hidden">
-        <MobileNav notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} reseau={reseau} />
+        <MobileNav notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} neoCount={neoCount} reseau={reseau} />
         <main className="pt-14 pb-16 min-h-screen bg-slate-50 safe-area-top safe-area-bottom">
           <Outlet />
         </main>

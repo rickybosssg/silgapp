@@ -1,0 +1,110 @@
+{
+  "name": "NeoRecommendation",
+  "type": "object",
+  "properties": {
+    "analyse_id": {
+      "type": "string",
+      "description": "ID de l'analyse NeoAnalyse"
+    },
+    "titre": {
+      "type": "string",
+      "description": "Titre court de la recommandation"
+    },
+    "categorie": {
+      "type": "string",
+      "enum": [
+        "bug",
+        "performance",
+        "design",
+        "ux",
+        "dispatch",
+        "notifications",
+        "gps",
+        "securite",
+        "architecture",
+        "evolution",
+        "processus_metier"
+      ],
+      "description": "Cat\u00e9gorie de la recommandation"
+    },
+    "priorite": {
+      "type": "string",
+      "enum": [
+        "critique",
+        "elevee",
+        "moyenne",
+        "faible"
+      ],
+      "description": "Niveau de priorit\u00e9"
+    },
+    "effort_estime": {
+      "type": "string",
+      "enum": [
+        "rapide",
+        "moyen",
+        "long"
+      ],
+      "default": "moyen",
+      "description": "Effort de mise en \u0153uvre estim\u00e9"
+    },
+    "impact_estime": {
+      "type": "string",
+      "enum": [
+        "faible",
+        "moyen",
+        "fort"
+      ],
+      "default": "moyen",
+      "description": "Impact estim\u00e9 sur la plateforme"
+    },
+    "probleme": {
+      "type": "string",
+      "description": "Probl\u00e8me d\u00e9tect\u00e9"
+    },
+    "raison": {
+      "type": "string",
+      "description": "Raison du probl\u00e8me"
+    },
+    "impact": {
+      "type": "string",
+      "description": "Impact sur la plateforme"
+    },
+    "solution": {
+      "type": "string",
+      "description": "Solution recommand\u00e9e"
+    },
+    "benefices": {
+      "type": "string",
+      "description": "B\u00e9n\u00e9fices attendus"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "nouvelle",
+        "lue",
+        "appliquee",
+        "ignoree"
+      ],
+      "default": "nouvelle",
+      "description": "Statut de traitement"
+    },
+    "date_creation": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "date_traitement": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "traite_par": {
+      "type": "string",
+      "description": "Email admin ayant trait\u00e9"
+    }
+  },
+  "required": [
+    "titre",
+    "categorie",
+    "priorite",
+    "probleme"
+  ]
+}

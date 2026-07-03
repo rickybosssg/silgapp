@@ -50,15 +50,9 @@ async function signJwt(clientEmail, privateKey) {
 
 function getFirebaseConfig() {
   const serviceAccountJson = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_JSON');
-  if (serviceAccountJson) {
-    const sa = JSON.parse(serviceAccountJson);
-    return { projectId: sa.project_id, clientEmail: sa.client_email, privateKey: sa.private_key };
-  }
-  return {
-    projectId: Deno.env.get('FIREBASE_PROJECT_ID'),
-    clientEmail: Deno.env.get('FIREBASE_CLIENT_EMAIL'),
-    privateKey: Deno.env.get('FIREBASE_PRIVATE_KEY'),
-  };
+  if (!serviceAccountJson) return { projectId: null, clientEmail: null, privateKey: null };
+  const sa = JSON.parse(serviceAccountJson);
+  return { projectId: sa.project_id, clientEmail: sa.client_email, privateKey: sa.private_key };
 }
 
 async function getAccessToken(clientEmail, privateKey) {
@@ -121,6 +115,23 @@ Deno.serve(async (req) => {
       filteredTokens = allTokens.filter(t => t.user_type === 'client');
     } else if (cible === 'tous_livreurs') {
       filteredTokens = allTokens.filter(t => t.user_type === 'livreur');
+    } else if (cible === 'livreurs_inactifs') {
+      // Livreurs dont le last_seen_at > 24h ou nul (inactifs long terme)
+      const tousLivreurs = await base44.asServiceRole.entities.Livreur.filter({
+        type_livreur: 'externe', actif: true, validation: 'valide',
+      });
+      const now = Date.now();
+      const inactifs = new Set();
+      for (const l of tousLivreurs) {
+        const hb = l.last_seen_at || l.derniere_position_date;
+        if (!hb) {
+          inactifs.add(l.user_email);
+        } else {
+          const ageMin = (now - new Date(hb).getTime()) / 60000;
+          if (ageMin > 1440) inactifs.add(l.user_email);
+        }
+      }
+      filteredTokens = allTokens.filter(t => t.user_type === 'livreur' && inactifs.has(t.user_email));
     }
     // tous_utilisateurs: pas de filtre user_type
 

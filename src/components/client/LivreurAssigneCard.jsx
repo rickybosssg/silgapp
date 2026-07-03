@@ -1,5 +1,5 @@
 import React from "react";
-import { Phone, MessageCircle, Star } from "lucide-react";
+import { Phone, MessageCircle, Star, MessageSquare } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
 function openWhatsApp(phone) {
@@ -115,21 +115,28 @@ export default function LivreurAssigneCard({ course }) {
 
         {/* Boutons contact */}
         {course.livreur_telephone && (
-          <div className="flex gap-2 mt-4">
+          <div className="grid grid-cols-3 gap-2 mt-4">
             <a
               href={`tel:${course.livreur_telephone}`}
-              className="flex-1 flex items-center justify-center gap-2 h-10 rounded-xl bg-blue-50 text-blue-700 font-semibold text-sm border border-blue-100 active:bg-blue-100"
+              className="flex items-center justify-center gap-1.5 h-10 rounded-xl bg-blue-50 text-blue-700 font-semibold text-xs border border-blue-100 active:bg-blue-100"
             >
               <Phone className="w-4 h-4" />
               Appeler
             </a>
             <button
               onClick={() => openWhatsApp(course.livreur_telephone)}
-              className="flex-1 flex items-center justify-center gap-2 h-10 rounded-xl bg-green-50 text-green-700 font-semibold text-sm border border-green-100 active:bg-green-100"
+              className="flex items-center justify-center gap-1.5 h-10 rounded-xl bg-green-50 text-green-700 font-semibold text-xs border border-green-100 active:bg-green-100"
             >
               <MessageCircle className="w-4 h-4" />
               WhatsApp
             </button>
+            <a
+              href="#chat-livreur"
+              className="flex items-center justify-center gap-1.5 h-10 rounded-xl bg-primary/10 text-primary font-semibold text-xs border border-primary/20 active:bg-primary/20"
+            >
+              <MessageSquare className="w-4 h-4" />
+              Chatter
+            </a>
           </div>
         )}
       </div>

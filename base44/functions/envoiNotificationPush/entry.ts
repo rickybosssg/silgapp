@@ -237,12 +237,18 @@ Deno.serve(async (req) => {
       user_type,
       alert_duration_seconds,
       alert_interval_seconds,
+      category,
     } = body;
     const targetEmail = String(destinataire_email || '').trim().toLowerCase();
 
     if (!titre || !message || !targetEmail) {
       return Response.json({ error: 'Missing required fields: titre, message, destinataire_email' }, { status: 400 });
     }
+
+    // Catégories critiques — toujours envoyées, non désactivables par l'utilisateur
+    const CATEGORIES_CRITIQUES = ['course', 'dispatch', 'securite', 'paiement', 'nouvelle_course', 'livreur_en_route', 'colis_recupere', 'livraison', 'annulation'];
+    const notifCategory = String(category || type || 'generic').toLowerCase();
+    const isCritique = CATEGORIES_CRITIQUES.some(c => notifCategory.includes(c));
 
     const countryGuard = await assertNotificationCountry(base44, {
       course_id,
@@ -286,10 +292,66 @@ Deno.serve(async (req) => {
       platforms: [...new Set(tokens.map(t => t.platform || 'unknown'))],
     });
 
+    // ── Vérifier les préférences de notification (catégories non critiques) ──
+    if (!isCritique && tokens.length > 0) {
+      const userPrefs = tokens[0]?.preferences_categories;
+      if (userPrefs) {
+        let desactivees = [];
+        try { desactivees = JSON.parse(userPrefs); } catch (_) {}
+        if (Array.isArray(desactivees) && desactivees.some(c => notifCategory.includes(c.toLowerCase()))) {
+          const skippedNotif = await base44.asServiceRole.entities.Notification.create({
+            titre, message, type: type || 'generic', course_id: course_id || '',
+            destinataire_email: targetEmail, lue: false,
+          });
+          return Response.json({
+            success: true,
+            notification_id: skippedNotif.id,
+            skipped_push: true,
+            reason: 'user_preference_opt_out',
+            category: notifCategory,
+          });
+        }
+      }
+    }
+
+    // ── Personnalisation du contenu selon le profil utilisateur (#3 #8) ──
+    let personalizedTitre = titre;
+    let personalizedMessage = message;
+    if (body.personalize !== false) {
+      // Récupérer le prénom du destinataire pour personnaliser le message
+      let userName = '';
+      if (livreur_id) {
+        const livreur = await base44.asServiceRole.entities.Livreur.get(livreur_id).catch(() => null);
+        userName = livreur?.nom || livreur?.full_name || '';
+      } else if (client_id) {
+        const client = await base44.asServiceRole.entities.ClientExterne.get(client_id).catch(() => null);
+        userName = client?.nom || client?.full_name || '';
+      }
+      if (userName) {
+        const firstName = userName.split(' ')[0];
+        // Personnaliser le titre si ce n'est pas déjà fait
+        if (!titre.includes(firstName)) {
+          personalizedTitre = `${titre} — ${firstName}`;
+        }
+        // Ajouter un suffixe contextuel selon le type de notification
+        const contextualSuffixes = {
+          nouvelle_course: 'Une nouvelle course vous attend !',
+          livreur_en_route: 'Votre livreur est en route 🏍️',
+          colis_recupere: 'Votre colis a été récupéré 📦',
+          livraison: 'Votre livraison est en cours 🚚',
+          annulation: 'Votre course a été annulée',
+        };
+        const suffix = contextualSuffixes[type] || '';
+        if (suffix && !message.includes(suffix)) {
+          personalizedMessage = `${message}\n\n${suffix}`;
+        }
+      }
+    }
+
     // Créer la notification en BDD
     const notification = await base44.asServiceRole.entities.Notification.create({
-      titre,
-      message,
+      titre: personalizedTitre,
+      message: personalizedMessage,
       type: type || 'generic',
       course_id: course_id || '',
       destinataire_email: targetEmail,
@@ -353,7 +415,7 @@ Deno.serve(async (req) => {
 
     // Payload FCM — notification visible écran verrouillé + son + vibration
     const fcmPayload = {
-      notification: { title: titre, body: message },
+      notification: { title: personalizedTitre, body: personalizedMessage },
       data: dataPayload,
       android: {
         collapse_key: notificationTag,
@@ -388,8 +450,8 @@ Deno.serve(async (req) => {
     const urgentAndroidPayload = {
       data: {
         ...dataPayload,
-        title: String(titre),
-        body: String(message),
+        title: String(personalizedTitre),
+        body: String(personalizedMessage),
       },
       android: {
         collapse_key: notificationTag,

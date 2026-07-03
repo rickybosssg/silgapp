@@ -39,14 +39,14 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
     return (
       <div className="space-y-2">
         {/* KPI row */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2.5">
           {[
             { icon: <Package className="w-4 h-4 text-blue-500" />,   bg: "bg-blue-50",   val: coursesAujourdHui,       label: "Courses",   valClass: "text-blue-800" },
             { icon: <CheckCircle className="w-4 h-4 text-green-500" />, bg: "bg-green-50", val: livreesToday.length,    label: "Livrées",   valClass: "text-green-800" },
             { icon: <AlertCircle className="w-4 h-4 text-orange-500" />, bg: "bg-orange-50", val: null, label: "Dû SILGAPP", valClass: "text-orange-700" },
           ].map((item, i) => (
-            <div key={i} className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 text-center">
-              <div className={`w-8 h-8 rounded-xl ${item.bg} flex items-center justify-center mx-auto mb-1.5`}>
+            <div key={i} className="bg-white/95 rounded-3xl p-3.5 shadow-sm shadow-blue-100/60 border border-blue-50 text-center">
+              <div className={`w-9 h-9 rounded-2xl ${item.bg} flex items-center justify-center mx-auto mb-1.5`}>
                 {item.icon}
               </div>
               {item.val !== null ? (
@@ -63,12 +63,12 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
 
         {/* Bilan financier du jour */}
         {livreesToday.length > 0 && (
-          <div className="rounded-2xl overflow-hidden shadow-sm">
-            <div className="bg-slate-800 px-4 py-2 flex items-center gap-2">
+          <div className="rounded-3xl overflow-hidden shadow-lg shadow-blue-100/60 border border-blue-50">
+            <div className="bg-gradient-to-r from-slate-950 via-blue-900 to-sky-800 px-4 py-2.5 flex items-center gap-2">
               <Banknote className="w-3.5 h-3.5 text-white/60" />
               <p className="text-[10px] font-black text-white/60 uppercase tracking-widest">Bilan du jour</p>
             </div>
-            <div className="bg-white border border-gray-100 grid grid-cols-3 divide-x divide-gray-100">
+            <div className="bg-white grid grid-cols-3 divide-x divide-blue-50">
               {[
                 { label: "Total client", val: prixTotalToday, color: "text-gray-800" },
                 { label: "Votre gain", val: gainToday,    color: "text-green-700" },

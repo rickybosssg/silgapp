@@ -84,15 +84,16 @@ export default function LivreurHeader({
 
   return (
     <div className={cn(
-      "rounded-3xl text-white overflow-hidden relative border",
-      "shadow-2xl shadow-blue-200/60",
+      "rounded-[2rem] text-white overflow-hidden relative border",
+      "shadow-2xl shadow-blue-200/70 ring-1 ring-white/10",
       isON
-        ? "bg-gradient-to-br from-slate-950 via-blue-900 to-sky-800 border-blue-300/20"
+        ? "bg-gradient-to-br from-slate-950 via-blue-900 to-cyan-700 border-blue-300/25"
         : "bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border-white/10"
     )}>
       {/* Halos decoratifs */}
-      {isON && <div className="absolute top-0 right-0 w-52 h-52 bg-sky-300/15 rounded-full blur-3xl pointer-events-none" />}
-      {isON && <div className="absolute -bottom-10 -left-10 w-44 h-44 bg-emerald-300/10 rounded-full blur-3xl pointer-events-none" />}
+      {isON && <div className="absolute top-0 right-0 w-52 h-52 bg-sky-300/20 rounded-full blur-3xl pointer-events-none" />}
+      {isON && <div className="absolute -bottom-10 -left-10 w-44 h-44 bg-emerald-300/15 rounded-full blur-3xl pointer-events-none" />}
+      {isON && <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.14),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.10),transparent_40%)] pointer-events-none" />}
       {isEnCourse && <div className="absolute top-0 left-0 w-48 h-48 bg-blue-300/15 rounded-full blur-3xl pointer-events-none" />}
 
       {/* Barre de statut coloree */}
@@ -108,7 +109,7 @@ export default function LivreurHeader({
         {/* Ligne 1 : Heure + reseau + deconnexion */}
         <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="text-2xl font-black tracking-tight tabular-nums leading-none">{heureStr}</p>
+            <p className="text-3xl font-black tracking-tight tabular-nums leading-none">{heureStr}</p>
             <p className="text-[11px] text-white/75 capitalize mt-0.5">{dateStr}</p>
           </div>
           <div className="flex items-center gap-2">
@@ -169,13 +170,13 @@ export default function LivreurHeader({
           </div>
 
           {/* Boutons action uniformises */}
-          <div className="flex flex-col gap-1.5 flex-shrink-0">
+          <div className="flex flex-col gap-2 flex-shrink-0">
             <button
               type="button"
               onClick={onToggleLigne}
               disabled={isUpdatingStatut || (!isON && isBlockedByEncours)}
               className={cn(
-                "flex items-center justify-center gap-1.5 w-24 h-8 rounded-xl font-bold text-[11px] shadow-md transition-all",
+                "flex items-center justify-center gap-1.5 w-28 h-10 rounded-2xl font-black text-[12px] shadow-lg transition-all",
                 "active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed",
                 isBlockedByEncours && !isON
                   ? "bg-gradient-to-br from-red-700 to-red-800 text-white shadow-red-500/25"
@@ -192,7 +193,7 @@ export default function LivreurHeader({
               type="button"
               onClick={onActiverGps}
               className={cn(
-                "flex items-center justify-center gap-1.5 w-24 h-8 rounded-xl text-[11px] font-semibold border transition-all",
+                "flex items-center justify-center gap-1.5 w-28 h-10 rounded-2xl text-[12px] font-bold border transition-all",
                 "active:scale-95",
                 gpsActif
                   ? "bg-sky-400/20 text-sky-200 border-sky-300/30 shadow-sm shadow-sky-500/15"

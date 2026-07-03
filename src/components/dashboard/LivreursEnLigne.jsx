@@ -7,6 +7,9 @@ export default function LivreursEnLigne({ livreurs = [] }) {
   const [open, setOpen] = useState(false);
   const disponibles = livreurs.filter(l => l.statut === "disponible");
   const enCourse = livreurs.filter(l => l.statut === "en_course");
+  const avecGPS = livreurs.filter(l => l.latitude && l.longitude);
+  const tauxDispo = livreurs.length > 0 ? Math.round((disponibles.length / livreurs.length) * 100) : 0;
+  const tauxGPS = livreurs.length > 0 ? Math.round((avecGPS.length / livreurs.length) * 100) : 0;
 
   return (
     <div className="p-4">
@@ -43,6 +46,30 @@ export default function LivreursEnLigne({ livreurs = [] }) {
           )} />
         </div>
       </button>
+
+      {/* Barre de stats disponibilité + GPS */}
+      {livreurs.length > 0 && (
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <div className="rounded-lg bg-green-50 border border-green-100 px-2.5 py-1.5">
+            <div className="flex items-center justify-between mb-0.5">
+              <span className="text-[9px] font-bold text-green-700 uppercase">Taux dispo</span>
+              <span className="text-xs font-black text-green-700">{tauxDispo}%</span>
+            </div>
+            <div className="h-1 rounded-full bg-green-100 overflow-hidden">
+              <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${tauxDispo}%` }} />
+            </div>
+          </div>
+          <div className="rounded-lg bg-blue-50 border border-blue-100 px-2.5 py-1.5">
+            <div className="flex items-center justify-between mb-0.5">
+              <span className="text-[9px] font-bold text-blue-700 uppercase">GPS actif</span>
+              <span className="text-xs font-black text-blue-700">{avecGPS.length}/{livreurs.length}</span>
+            </div>
+            <div className="h-1 rounded-full bg-blue-100 overflow-hidden">
+              <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${tauxGPS}%` }} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Contenu déployable */}
       {open && (
