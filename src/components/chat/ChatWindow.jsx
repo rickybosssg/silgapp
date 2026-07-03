@@ -146,7 +146,7 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
   }
 
   return (
-    <div className="flex flex-col h-[420px] bg-gray-50 rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
+    <div className="flex flex-col h-[calc(100vh-200px)] min-h-[320px] max-h-[600px] bg-gray-50 rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
       {/* Header */}
       <div className="p-3 bg-gradient-to-r from-primary to-primary/80 text-white flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -163,10 +163,12 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-3">
         {messages.length === 0 && (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-xs text-gray-400 text-center">
-              Aucun message. Commencez la conversation !
-            </p>
+          <div className="flex flex-col items-center justify-center h-full gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
+              <MessageCircle className="w-6 h-6 text-primary" />
+            </div>
+            <p className="text-sm font-medium text-gray-500 text-center">Démarrez la conversation</p>
+            <p className="text-xs text-gray-400 text-center">Votre message sera reçu immédiatement</p>
           </div>
         )}
         {messages.map((msg) => (
@@ -198,7 +200,7 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
           onKeyDown={handleKeyDown}
           placeholder="Votre message..."
           disabled={sending}
-          className="flex-1 h-11 min-w-0 rounded-xl border border-gray-200 px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/30"
+          className="flex-1 h-10 min-w-0 rounded-xl border border-gray-200 px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/30"
         />
         <Button
           size="icon"

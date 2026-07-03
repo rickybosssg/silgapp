@@ -56,9 +56,9 @@ export default function BoutiqueDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-4 sticky top-0 z-20">
+      <div className="bg-gradient-to-r from-primary to-red-700 text-white px-4 py-3 sticky top-0 z-20">
         <div className="max-w-lg mx-auto flex items-center gap-3">
-          <button onClick={() => navigate("/client/boutiques")} className="text-white/80 hover:text-white p-1"><ArrowLeft className="w-6 h-6" /></button>
+          <button onClick={() => navigate("/client/boutiques")} className="text-white/80 hover:text-white p-2.5 -ml-2 rounded-xl hover:bg-white/10 transition-colors"><ArrowLeft className="w-6 h-6" /></button>
           <div className="flex-1">
             <h1 className="text-lg font-black">{boutique.nom}</h1>
             <p className="text-white/70 text-xs">{boutique.categorie || boutique.description || ""}</p>
@@ -71,7 +71,7 @@ export default function BoutiqueDetail() {
 
       <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-2">
-          {boutique.logo_url && <img src={boutique.logo_url} alt={boutique.nom} className="w-full h-32 rounded-xl object-cover" />}
+          {boutique.logo_url && <img src={boutique.logo_url} alt={boutique.nom} className="w-full h-48 rounded-2xl object-cover" />}
           <div className="flex items-center gap-2 text-sm text-gray-500"><MapPin className="w-4 h-4" /> {boutique.quartier || ""} {boutique.ville ? "· " + boutique.ville : ""}</div>
           {boutique.horaires && <p className="text-xs text-gray-500">🕐 {boutique.horaires}</p>}
           {boutique.description && <p className="text-sm text-gray-600">{boutique.description}</p>}
@@ -125,7 +125,7 @@ export default function BoutiqueDetail() {
       {cartCount > 0 && isOuvert && (
         <div className="fixed bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-gray-50 via-gray-50/95 to-transparent pt-6 px-4 pb-4">
           <div className="max-w-lg mx-auto">
-            <button onClick={() => setShowCheckout(true)} className="w-full bg-primary text-white rounded-2xl p-4 flex items-center justify-between shadow-xl active:scale-[0.98] transition-all">
+            <button onClick={() => setShowCheckout(true)} className="w-full bg-primary text-white rounded-2xl p-4 flex items-center justify-between shadow-2xl shadow-primary/30 active:scale-[0.98] transition-all duration-150 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-primary">
               <div className="flex items-center gap-2"><ShoppingCart className="w-5 h-5" /><span className="font-bold">{cartCount} article{cartCount > 1 ? "s" : ""}</span></div>
               <span className="font-black text-lg">{total.toLocaleString()} FCFA</span>
             </button>

@@ -24,22 +24,22 @@ function KpiCard({ label, value, icon: Icon, color, suffix, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`group relative overflow-hidden rounded-2xl p-4 text-left transition-all duration-200 hover:scale-[1.02] hover:shadow-lg ${color} text-white`}
+      className={`group relative overflow-hidden rounded-2xl p-3 lg:p-4 text-left transition-all duration-200 hover:scale-[1.02] hover:shadow-lg ${color} text-white`}
     >
       <div className="absolute -top-4 -right-4 w-20 h-20 rounded-full bg-white/10" />
       <div className="absolute -bottom-6 -right-2 w-16 h-16 rounded-full bg-white/5" />
       <div className="relative">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-2 lg:mb-3">
           <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
             <Icon className="w-4 h-4 text-white" />
           </div>
           {onClick && <ChevronRight className="w-3.5 h-3.5 text-white/50 group-hover:text-white/80 transition-colors" />}
         </div>
-        <p className="text-2xl font-black leading-none mb-1">
+        <p className="text-xl lg:text-2xl font-black leading-none mb-1">
           {value}
           {suffix && <span className="text-xs font-normal ml-1 opacity-80">{suffix}</span>}
         </p>
-        <p className="text-[11px] font-medium opacity-70 uppercase tracking-wide">{label}</p>
+        <p className="text-xs font-medium opacity-70 uppercase tracking-wide">{label}</p>
       </div>
     </button>
   );
@@ -244,23 +244,23 @@ export default function DashboardExterne() {
           </div>
 
           {/* Mini KPIs dans le hero */}
-          <div className="relative mt-4 grid grid-cols-4 gap-3">
+          <div className="relative mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { label: "Aujourd'hui", value: stats.total, color: "text-white" },
               { label: "En cours", value: stats.enCours, color: "text-blue-300" },
               { label: "Livrées", value: stats.livrees, color: "text-green-300" },
               { label: "Taux", value: `${taux}%`, color: "text-yellow-300" },
             ].map(item => (
-              <div key={item.label} className="flex flex-col items-center gap-0.5">
+              <div key={item.label} className="flex flex-col items-center gap-0.5 border-r border-white/10 last:border-r-0 pr-3 last:pr-0">
                 <p className={`text-xl sm:text-2xl font-black leading-none ${item.color}`}>{item.value}</p>
-                <p className="text-[10px] text-white/40 uppercase tracking-wide">{item.label}</p>
+                <p className="text-xs text-white/60 uppercase tracking-wide">{item.label}</p>
               </div>
             ))}
           </div>
         </div>
 
         {/* ── KPI CARDS ───────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2 lg:gap-3">
           <KpiCard label="Clients" value={compteursClients.total} icon={Users} color="bg-gradient-to-br from-violet-500 to-purple-600" onClick={() => setStatModal({ type: "clients", data: clients })} />
           <KpiCard label="Courses" value={stats.total} icon={Package} color="bg-gradient-to-br from-blue-500 to-indigo-600" />
           <KpiCard label="En cours" value={stats.enCours} icon={Clock} color="bg-gradient-to-br from-amber-500 to-orange-500" onClick={() => setStatModal({ type: "en_traitement", data: coursesEnTraitement })} />
@@ -282,7 +282,7 @@ export default function DashboardExterne() {
 
         {/* ── ACTIVITÉ ─────────────────────────────────────── */}
         <div>
-          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">Activité en direct</p>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-1">Activité en direct</p>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 shadow-sm overflow-hidden">
               <ClientsEnLigne clients={clientsEnLigne} />
@@ -295,7 +295,7 @@ export default function DashboardExterne() {
 
         {/* ── COURSES EN COURS ────────────────────────────── */}
         <div>
-          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">Courses en cours</p>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-1">Courses en cours</p>
           <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
             <CoursesEnTraitement
               courses={filtreTypeDashboard === "tous" ? coursesEnTraitement : coursesEnTraitement.filter(c => c.type_course === filtreTypeDashboard)}
@@ -307,7 +307,7 @@ export default function DashboardExterne() {
 
         {/* ── HISTORIQUE DU JOUR ──────────────────────────── */}
         <div>
-          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">Historique du jour</p>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-1">Historique du jour</p>
           <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
             <CoursesTerminees
               courses={coursesTerminees}

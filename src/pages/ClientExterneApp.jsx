@@ -777,7 +777,7 @@ export default function ClientExterneApp() {
         </div>
       )}
 
-      <div className="px-4 pb-24" style={coursesActives.length > 0 ? { paddingTop: `${coursesActives.length * 76 + 16}px` } : { paddingTop: "16px" }}>
+      <div className={`px-4 pb-24 ${coursesActives.length > 1 ? 'pt-32' : coursesActives.length > 0 ? 'pt-20' : 'pt-4'}`}>
         <div className="max-w-lg mx-auto space-y-4">
 
           {/* ── ONGLETS PROMO ─────────────────────── */}
@@ -856,10 +856,10 @@ export default function ClientExterneApp() {
                       </div>
                     </div>
                     <button
-                      className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center hover:bg-white/30 transition-colors"
+                      className="w-11 h-11 rounded-2xl bg-white/25 backdrop-blur-sm border border-white/30 flex items-center justify-center hover:bg-white/35 transition-colors focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
                       onClick={() => setShowProfilModal(true)}
                     >
-                      <User className="w-5 h-5 text-white" />
+                      <span className="text-sm font-black text-white">{prenom.charAt(0).toUpperCase()}</span>
                     </button>
                   </div>
 
@@ -877,10 +877,10 @@ export default function ClientExterneApp() {
 
               {/* ── SERVICES SILGAPP ─────────────── */}
               <div>
-                <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2">Services SILGAPP</p>
+                <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Services SILGAPP</p>
                 <div className="grid grid-cols-3 gap-2">
                   <button
-                    className="group relative overflow-hidden rounded-2xl bg-white border-t-4 border-primary border-x border-b border-gray-100 shadow-sm p-4 text-center active:scale-[0.97] transition-all hover:shadow-md"
+                    className="group relative overflow-hidden rounded-2xl bg-white border-t-4 border-primary border-x border-b border-gray-100 shadow-sm p-4 text-center active:scale-[0.97] transition-all hover:shadow-lg focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     onClick={() => navigate("/client/course/expedier", { state: { position, clientProfil } })}
                   >
                     <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-primary to-red-600 flex items-center justify-center shadow-lg shadow-red-200 mx-auto mb-1.5 group-hover:scale-105 transition-transform">
@@ -916,7 +916,7 @@ export default function ClientExterneApp() {
 
               {/* ── NOS PARTENAIRES ──────────────── */}
               <div>
-                <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2">Nos partenaires</p>
+                <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Nos partenaires</p>
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     className="group relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-4 text-center active:scale-[0.97] transition-all hover:shadow-md hover:border-blue-200"
@@ -973,7 +973,7 @@ export default function ClientExterneApp() {
 
               {/* ── ACCÈS RAPIDE ─────────────────── */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-                <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-3">Accès rapide</p>
+                <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-3">Accès rapide</p>
                 <div className="grid grid-cols-4 gap-2">
                   {[
                     { icon: <Package className="w-5 h-5" />, label: "Mes courses", color: "text-blue-600", bg: "bg-blue-50", action: () => navigate("/client/suivi") },
@@ -1036,11 +1036,11 @@ export default function ClientExterneApp() {
                     { icon: "💬", color: "bg-purple-50 text-purple-700", title: "Support réactif",   desc: "Aide disponible à tout moment" },
                     { icon: "💰", color: "bg-amber-50 text-amber-700",   title: "100 F/km",          desc: "Tarif transparent et calculé au km" },
                   ].map((item, i) => (
-                    <div key={i} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl ${item.color}`}>
-                      <span className="text-base">{item.icon}</span>
+                    <div key={i} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg ${item.color}`}>
+                      <div className="w-7 h-7 rounded-lg bg-white/40 flex items-center justify-center text-sm flex-shrink-0">{item.icon}</div>
                       <div>
-                        <p className="text-xs font-bold">{item.title}</p>
-                        <p className="text-[10px] opacity-70">{item.desc}</p>
+                        <p className="text-sm font-bold">{item.title}</p>
+                        <p className="text-xs text-gray-600/70">{item.desc}</p>
                       </div>
                     </div>
                   ))}
