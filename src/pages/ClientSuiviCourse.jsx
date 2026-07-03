@@ -515,7 +515,8 @@ export default function ClientSuiviCourse() {
 
         {/* 💬 Messagerie client-livreur-admin */}
         {maCourse.livreur_id && !["livree", "annulee"].includes(maCourse.statut) && clientProfilId && (
-          <ChatWindow
+          <div id="chat-livreur" className="scroll-mt-20">
+            <ChatWindow
             courseId={maCourse.id}
             senderType="client"
             senderId={clientProfilId}
@@ -523,6 +524,7 @@ export default function ClientSuiviCourse() {
             clientName={maCourse.expediteur_nom || maCourse.client_nom}
             livreurName={maCourse.livreur_nom}
           />
+          </div>
         )}
 
         {/* 🗺️ Carte live du livreur */}
