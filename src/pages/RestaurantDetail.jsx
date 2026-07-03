@@ -87,10 +87,10 @@ export default function RestaurantDetail() {
           {restaurant.description && <p className="text-sm text-gray-600">{restaurant.description}</p>}
         </div>
 
-        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4">
-          <p className="text-xs font-bold text-orange-700 uppercase">Paiement Orange Money</p>
-          <p className="text-lg font-black text-orange-900 mt-1">{restaurant.telephone_depot || "—"}</p>
-          <p className="text-xs text-orange-600 mt-1">Effectuez le paiement sur ce numéro, puis téléchargez la preuve lors de la commande.</p>
+        <div className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl p-4 shadow-lg shadow-orange-500/20">
+          <p className="text-xs font-bold text-white/80 uppercase tracking-wide">Paiement Orange Money</p>
+          <p className="text-2xl font-black text-white mt-1 tracking-widest">{restaurant.telephone_depot || "—"}</p>
+          <p className="text-xs text-white/80 mt-1">Effectuez le paiement sur ce numéro, puis téléchargez la preuve lors de la commande.</p>
         </div>
 
         <div>
@@ -109,8 +109,8 @@ export default function RestaurantDetail() {
                   const inCart = cart.find(i => i.id === p.id);
                   return (
                     <div key={p.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 flex items-center gap-3">
-                      <div className="w-14 h-14 rounded-xl bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
-                        {p.photo_url ? <img src={p.photo_url} alt={p.nom} className="w-full h-full object-cover" /> : <UtensilsCrossed className="w-6 h-6 text-gray-400" />}
+                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-50 to-amber-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                        {p.photo_url ? <img src={p.photo_url} alt={p.nom} className="w-full h-full object-cover" /> : <UtensilsCrossed className="w-6 h-6 text-orange-300" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-gray-900 text-sm truncate">{p.nom}</p>
@@ -138,7 +138,7 @@ export default function RestaurantDetail() {
       </div>
 
       {cartCount > 0 && isOuvert && (
-        <div className="fixed bottom-0 left-0 right-0 z-30 p-4">
+        <div className="fixed bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-gray-50 via-gray-50/95 to-transparent pt-6 px-4 pb-4">
           <div className="max-w-lg mx-auto">
             <button onClick={() => setShowCheckout(true)} className="w-full bg-primary text-white rounded-2xl p-4 flex items-center justify-between shadow-xl active:scale-[0.98] transition-all">
               <div className="flex items-center gap-2"><ShoppingCart className="w-5 h-5" /><span className="font-bold">{cartCount} article{cartCount > 1 ? "s" : ""}</span></div>
