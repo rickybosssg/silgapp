@@ -17,7 +17,7 @@ const CATEGORY_LABELS = {
   processus_metier: "Processus",
 };
 
-function RecCard({ rec, onAction }) {
+function RecCard({ rec, onAction, index }) {
   const [expanded, setExpanded] = useState(false);
   const config = PRIORITY_CONFIG[rec.priorite] || PRIORITY_CONFIG.moyenne;
   const isTreated = rec.statut === "appliquee" || rec.statut === "ignoree";
@@ -31,6 +31,7 @@ function RecCard({ rec, onAction }) {
         <div className={cn("w-2 h-2 rounded-full mt-1.5 flex-shrink-0", config.color)} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
+            <span className="text-[11px] font-black text-gray-300 flex-shrink-0">#{index}</span>
             <span className={cn("text-[10px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full text-white", config.color)}>
               {config.label}
             </span>
@@ -145,8 +146,8 @@ export default function NeoRecommendationsList({ recommendations, onAction, filt
         </div>
       ) : (
         <div className="space-y-2.5">
-          {filtered.map(rec => (
-            <RecCard key={rec.id} rec={rec} onAction={onAction} />
+          {filtered.map((rec, idx) => (
+            <RecCard key={rec.id} rec={rec} onAction={onAction} index={idx + 1} />
           ))}
         </div>
       )}
