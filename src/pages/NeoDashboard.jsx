@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Sparkles, Play, FileText, TrendingUp, TrendingDown, Clock, Zap, CheckCircle2, BarChart3, Building2, Bell, FlaskConical, ShieldCheck } from "lucide-react";
+import { Sparkles, Play, FileText, TrendingUp, TrendingDown, Clock, Zap, CheckCircle2, BarChart3, Building2, Bell, FlaskConical, ShieldCheck, Wrench, RefreshCw } from "lucide-react";
 import NeoScoreGrid from "@/components/neo/NeoScoreGrid";
 import NeoRecommendationsList from "@/components/neo/NeoRecommendationsList";
 import { toast } from "sonner";
@@ -18,6 +18,10 @@ export default function NeoDashboard() {
   const [testsResult, setTestsResult] = useState(null);
   const [auditSecuLoading, setAuditSecuLoading] = useState(false);
   const [auditSecuResult, setAuditSecuResult] = useState(null);
+  const [maintenanceLoading, setMaintenanceLoading] = useState(false);
+  const [maintenanceResult, setMaintenanceResult] = useState(null);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
 
   // ─── Dernière analyse ───
   const { data: analyses = [], isLoading: loadingAnalyses } = useQuery({
@@ -122,6 +126,38 @@ export default function NeoDashboard() {
       toast.error("Erreur audit sécurité: " + (err?.message || ""));
     } finally {
       setAuditSecuLoading(false);
+    }
+  };
+
+  // ─── Maintenance unifiée ───
+  const handleMaintenance = async () => {
+    setMaintenanceLoading(true);
+    try {
+      const res = await base44.functions.invoke("maintenanceUnifiee", { type: "all" });
+      if (res?.data) {
+        setMaintenanceResult(res.data);
+        toast.success(res.data.resume);
+      }
+    } catch (err) {
+      toast.error("Erreur maintenance: " + (err?.message || ""));
+    } finally {
+      setMaintenanceLoading(false);
+    }
+  };
+
+  // ─── Sync unifiée ───
+  const handleSync = async () => {
+    setSyncLoading(true);
+    try {
+      const res = await base44.functions.invoke("syncUnifiee", { type: "all" });
+      if (res?.data) {
+        setSyncResult(res.data);
+        toast.success(res.data.resume);
+      }
+    } catch (err) {
+      toast.error("Erreur sync: " + (err?.message || ""));
+    } finally {
+      setSyncLoading(false);
     }
   };
 
@@ -341,6 +377,32 @@ export default function NeoDashboard() {
               <><ShieldCheck className="w-3.5 h-3.5" /> Audit Sécurité</>
             )}
           </button>
+
+          {/* Boutons maintenance & sync unifiées */}
+          <div className="flex gap-2">
+            <button
+              onClick={handleMaintenance}
+              disabled={maintenanceLoading}
+              className="flex-1 h-10 rounded-xl bg-white/5 border border-white/10 text-white/80 font-medium text-xs flex items-center justify-center gap-2 hover:bg-white/10 disabled:opacity-50 transition-all"
+            >
+              {maintenanceLoading ? (
+                <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> En cours...</>
+              ) : (
+                <><Wrench className="w-3.5 h-3.5" /> Maintenance Unifiée</>
+              )}
+            </button>
+            <button
+              onClick={handleSync}
+              disabled={syncLoading}
+              className="flex-1 h-10 rounded-xl bg-white/5 border border-white/10 text-white/80 font-medium text-xs flex items-center justify-center gap-2 hover:bg-white/10 disabled:opacity-50 transition-all"
+            >
+              {syncLoading ? (
+                <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> En cours...</>
+              ) : (
+                <><RefreshCw className="w-3.5 h-3.5" /> Sync Unifiée</>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -493,6 +555,52 @@ export default function NeoDashboard() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Résultat maintenance unifiée */}
+        {maintenanceResult && (
+          <div className="rounded-2xl bg-white border border-gray-100 p-5 shadow-sm space-y-3">
+            <div className="flex items-center gap-2">
+              <Wrench className="w-5 h-5 text-slate-700" />
+              <h3 className="font-bold text-gray-900 text-sm">Maintenance Unifiée</h3>
+              <button onClick={() => setMaintenanceResult(null)} className="ml-auto text-xs text-gray-400 hover:text-gray-600">Fermer</button>
+            </div>
+            <p className="text-xs text-gray-500">{maintenanceResult.resume}</p>
+            <div className="space-y-1.5">
+              {maintenanceResult.modules_executes?.map((m, i) => (
+                <div key={i} className={"flex items-start gap-2 rounded-lg p-2.5 text-xs " + (m.success ? "bg-green-50" : "bg-red-50")}>
+                  <span className="text-base leading-none">{m.success ? "✅" : "❌"}</span>
+                  <div className="flex-1">
+                    <p className="font-semibold text-gray-900">{m.label}</p>
+                    <p className="text-gray-500 mt-0.5">{m.detail || m.error}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Résultat sync unifiée */}
+        {syncResult && (
+          <div className="rounded-2xl bg-white border border-gray-100 p-5 shadow-sm space-y-3">
+            <div className="flex items-center gap-2">
+              <RefreshCw className="w-5 h-5 text-slate-700" />
+              <h3 className="font-bold text-gray-900 text-sm">Sync Unifiée</h3>
+              <button onClick={() => setSyncResult(null)} className="ml-auto text-xs text-gray-400 hover:text-gray-600">Fermer</button>
+            </div>
+            <p className="text-xs text-gray-500">{syncResult.resume}</p>
+            <div className="space-y-1.5">
+              {syncResult.modules_executes?.map((m, i) => (
+                <div key={i} className={"flex items-start gap-2 rounded-lg p-2.5 text-xs " + (m.success ? "bg-green-50" : "bg-red-50")}>
+                  <span className="text-base leading-none">{m.success ? "✅" : "❌"}</span>
+                  <div className="flex-1">
+                    <p className="font-semibold text-gray-900">{m.label}</p>
+                    <p className="text-gray-500 mt-0.5">{m.detail || m.error}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

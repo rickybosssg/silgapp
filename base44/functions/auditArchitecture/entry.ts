@@ -51,7 +51,8 @@ Deno.serve(async (req) => {
       'trackDownloadPublic', 'triggerSyncLivreursLocaux', 'updateLivreur', 'updateLivreurPhoto',
       'validateCourseRoles', 'validateQRCode', 'validerPaiementPartenaire', 'validerPrimePromo',
       'venusAnalytics', 'verifierConversationAutorisee', 'verifierEncoursLivreur', 'verifierFraude',
-      'verifierOptInWhatsApp', 'auditArchitecture', 'auditerNotifications'
+      'verifierOptInWhatsApp', 'auditArchitecture', 'auditerNotifications', 'auditSecurite', 'lancerTestsAutomatises',
+      'maintenanceUnifiee', 'syncUnifiee'
     ];
 
     // ── Détection de fonctions potentiellement redondantes (préfixes communs) ──
@@ -81,6 +82,10 @@ Deno.serve(async (req) => {
     // ── Recommandations architecturales automatiques ──
     const recommandations = [];
 
+    // Vérifier si les modules unifiés existent déjà
+    const hasMaintenanceUnifiee = knownFunctions.includes('maintenanceUnifiee');
+    const hasSyncUnifiee = knownFunctions.includes('syncUnifiee');
+
     if (categories.diagnostic.length > 5) {
       recommandations.push({
         priorite: 'moyenne',
@@ -92,19 +97,25 @@ Deno.serve(async (req) => {
 
     if (categories.correction.length > 5) {
       recommandations.push({
-        priorite: 'elevee',
+        priorite: hasMaintenanceUnifiee ? 'faible' : 'elevee',
         titre: 'Consolider les fonctions de correction/nettoyage',
-        detail: `${categories.correction.length} fonctions de correction et nettoyage. Risque de logique fragmentée et de maintenance difficile. Regrouper en un module de maintenance unifié.`,
+        detail: hasMaintenanceUnifiee
+          ? `Module maintenanceUnifiee créé — consolide ${categories.correction.length} fonctions. Les fonctions originales sont conservées pour rétrocompatibilité.`
+          : `${categories.correction.length} fonctions de correction et nettoyage. Risque de logique fragmentée et de maintenance difficile. Regrouper en un module de maintenance unifié.`,
         fonctions: categories.correction,
+        statut: hasMaintenanceUnifiee ? 'appliquee' : 'nouvelle',
       });
     }
 
     if (categories.sync.length > 8) {
       recommandations.push({
-        priorite: 'moyenne',
+        priorite: hasSyncUnifiee ? 'faible' : 'moyenne',
         titre: 'Unifier les fonctions de synchronisation',
-        detail: `${categories.sync.length} fonctions de sync. Envisager un pattern unifié de synchronisation avec paramètre d'entité cible.`,
+        detail: hasSyncUnifiee
+          ? `Module syncUnifiee créé — consolide ${categories.sync.length} fonctions. Les fonctions originales sont conservées pour rétrocompatibilité.`
+          : `${categories.sync.length} fonctions de sync. Envisager un pattern unifié de synchronisation avec paramètre d'entité cible.`,
         fonctions: categories.sync,
+        statut: hasSyncUnifiee ? 'appliquee' : 'nouvelle',
       });
     }
 
