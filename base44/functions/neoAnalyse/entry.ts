@@ -3,12 +3,19 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Non autorisé' }, { status: 401 });
-    if (user.role !== 'admin') return Response.json({ error: 'Accès admin requis' }, { status: 403 });
-
     const body = await req.json().catch(() => ({}));
     const action = body?.action || 'analyser';
+
+    // ── Auth : admin manuel OU exécution automatique planifiée ──
+    let user = null;
+    let lancePar = 'automatique';
+    try {
+      user = await base44.auth.me();
+    } catch (_) { /* exécution via automation — pas d'utilisateur */ }
+    if (user) {
+      if (user.role !== 'admin') return Response.json({ error: 'Accès admin requis' }, { status: 403 });
+      lancePar = user.email;
+    }
 
     // ── Récupérer les statistiques de la plateforme ──
     const [
@@ -190,7 +197,7 @@ Réponds en français.`;
       nb_moyenne: recommendations.filter(r => r.priorite === 'moyenne').length,
       nb_faible: recommendations.filter(r => r.priorite === 'faible').length,
       stats_snapshot: JSON.stringify(stats),
-      lance_par: user.email,
+      lance_par: lancePar,
     });
 
     // ── Créer les recommandations ──
