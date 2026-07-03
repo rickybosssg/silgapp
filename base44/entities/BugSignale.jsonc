@@ -1,0 +1,101 @@
+{
+  "name": "BugSignale",
+  "type": "object",
+  "properties": {
+    "type_erreur": {
+      "type": "string",
+      "enum": [
+        "javascript",
+        "promise_rejection",
+        "react_error",
+        "api_error",
+        "manuel"
+      ],
+      "description": "Type d'erreur"
+    },
+    "message": {
+      "type": "string",
+      "description": "Message d'erreur"
+    },
+    "stack": {
+      "type": "string",
+      "description": "Stack trace"
+    },
+    "fichier": {
+      "type": "string",
+      "description": "Fichier source de l'erreur"
+    },
+    "ligne": {
+      "type": "number",
+      "description": "Num\u00e9ro de ligne"
+    },
+    "user_email": {
+      "type": "string",
+      "description": "Email utilisateur si connect\u00e9"
+    },
+    "user_type": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "livreur",
+        "client",
+        "partenaire",
+        "anonyme"
+      ],
+      "default": "anonyme"
+    },
+    "page_url": {
+      "type": "string",
+      "description": "URL de la page o\u00f9 l'erreur s'est produite"
+    },
+    "user_agent": {
+      "type": "string",
+      "description": "User agent du navigateur"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "nouveau",
+        "en_cours",
+        "corrige",
+        "ignore"
+      ],
+      "default": "nouveau"
+    },
+    "priorite": {
+      "type": "string",
+      "enum": [
+        "critique",
+        "elevee",
+        "moyenne",
+        "faible"
+      ],
+      "default": "moyenne"
+    },
+    "occurrences": {
+      "type": "number",
+      "default": 1,
+      "description": "Nombre de fois que cette erreur s'est produite"
+    },
+    "derniere_occurrence": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "corrige_par": {
+      "type": "string",
+      "description": "Email admin ayant corrig\u00e9"
+    },
+    "date_correction": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "note_correction": {
+      "type": "string",
+      "description": "Note sur la correction appliqu\u00e9e"
+    }
+  },
+  "required": [
+    "message",
+    "type_erreur"
+  ]
+}

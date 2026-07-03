@@ -47,6 +47,7 @@ export const navItems = [
   { path: "/admin/pharmacies", label: "Pharmacies", icon: Pill },
   { path: "/admin/commandes-partenaires", label: "Commandes Partenaires", icon: Package },
   { path: "/admin/neo", label: "NEO – Moteur d'amélioration", icon: Sparkles },
+  { path: "/admin/bugs", label: "Suivi des bugs", icon: ShieldAlert },
   { path: "/notifications", label: "Notifications", icon: Bell },
   { path: "/maintenance", label: "Maintenance", icon: Shield },
 ];

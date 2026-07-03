@@ -18,6 +18,7 @@ import {
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import CourseAnnuleeRelanceDialog from "@/components/client/CourseAnnuleeRelanceDialog";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
+import VenusOnboardingTooltip from "@/components/client/VenusOnboardingTooltip";
 import LiveCounterBadge from "@/components/ui/LiveCounterBadge";
 import MessagesPage from "@/components/chat/MessagesPage";
 import ModernMap from "@/components/client/ModernMap";
@@ -1087,6 +1088,7 @@ export default function ClientExterneApp() {
 
 
       <VenusFloatingButton />
+      <VenusOnboardingTooltip />
 
       {/* ── COURSE ANNULÉE AUTO — proposer relance ou terminer ── */}
       {courseAnnuleeRelance && (
