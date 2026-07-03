@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Sparkles, Play, FileText, TrendingUp, TrendingDown, Clock, Zap, CheckCircle2, BarChart3, Building2, Bell } from "lucide-react";
+import { Sparkles, Play, FileText, TrendingUp, TrendingDown, Clock, Zap, CheckCircle2, BarChart3, Building2, Bell, FlaskConical } from "lucide-react";
 import NeoScoreGrid from "@/components/neo/NeoScoreGrid";
 import NeoRecommendationsList from "@/components/neo/NeoRecommendationsList";
 import { toast } from "sonner";
@@ -14,6 +14,8 @@ export default function NeoDashboard() {
   const [auditNotifLoading, setAuditNotifLoading] = useState(false);
   const [auditArchResult, setAuditArchResult] = useState(null);
   const [auditNotifResult, setAuditNotifResult] = useState(null);
+  const [testsLoading, setTestsLoading] = useState(false);
+  const [testsResult, setTestsResult] = useState(null);
 
   // ─── Dernière analyse ───
   const { data: analyses = [], isLoading: loadingAnalyses } = useQuery({
@@ -86,6 +88,22 @@ export default function NeoDashboard() {
       toast.error("Erreur audit notifications: " + (err?.message || ""));
     } finally {
       setAuditNotifLoading(false);
+    }
+  };
+
+  // ─── Lancer les tests automatisés ───
+  const handleTests = async () => {
+    setTestsLoading(true);
+    try {
+      const res = await base44.functions.invoke("lancerTestsAutomatises", {});
+      if (res?.data) {
+        setTestsResult(res.data);
+        toast.success(res.data.resume);
+      }
+    } catch (err) {
+      toast.error("Erreur tests automatisés: " + (err?.message || ""));
+    } finally {
+      setTestsLoading(false);
     }
   };
 
@@ -279,6 +297,19 @@ export default function NeoDashboard() {
               )}
             </button>
           </div>
+
+          {/* Bouton tests automatisés */}
+          <button
+            onClick={handleTests}
+            disabled={testsLoading}
+            className="w-full h-10 rounded-xl bg-white/5 border border-white/10 text-white/80 font-medium text-xs flex items-center justify-center gap-2 hover:bg-white/10 disabled:opacity-50 transition-all"
+          >
+            {testsLoading ? (
+              <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Tests en cours...</>
+            ) : (
+              <><FlaskConical className="w-3.5 h-3.5" /> Lancer les tests automatisés</>
+            )}
+          </button>
         </div>
       </div>
 
@@ -361,6 +392,32 @@ export default function NeoDashboard() {
             )}
           </div>
         )}
+        {/* Résultat tests automatisés */}
+        {testsResult && (
+          <div className="rounded-2xl bg-white border border-gray-100 p-5 shadow-sm space-y-3">
+            <div className="flex items-center gap-2">
+              <FlaskConical className="w-5 h-5 text-slate-700" />
+              <h3 className="font-bold text-gray-900 text-sm">Tests Automatisés</h3>
+              <span className={"ml-auto text-xs font-bold px-2 py-0.5 rounded-full " + (testsResult.taux_reussite >= 80 ? "bg-green-100 text-green-700" : testsResult.taux_reussite >= 50 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700")}>
+                {testsResult.taux_reussite}%
+              </span>
+              <button onClick={() => setTestsResult(null)} className="text-xs text-gray-400 hover:text-gray-600">Fermer</button>
+            </div>
+            <p className="text-xs text-gray-500">{testsResult.resume}</p>
+            <div className="space-y-1.5">
+              {testsResult.tests?.map((t, i) => (
+                <div key={i} className={"flex items-start gap-2 rounded-lg p-2.5 text-xs " + (t.statut === 'success' ? 'bg-green-50' : t.statut === 'warning' ? 'bg-amber-50' : 'bg-red-50')}>
+                  <span className="text-base leading-none">{t.statut === 'success' ? '✅' : t.statut === 'warning' ? '⚠️' : '❌'}</span>
+                  <div className="flex-1">
+                    <p className="font-semibold text-gray-900">{t.test}</p>
+                    <p className="text-gray-500 mt-0.5">{t.detail}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* État initial */}
         {!latestAnalyse && !analysing && (
           <div className="rounded-3xl bg-white border border-gray-100 p-8 text-center shadow-sm">
