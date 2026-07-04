@@ -192,7 +192,6 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
 
     //  Exclusion automatique : heartbeat > 60 min → hors_ligne immédiat
     if (heartbeatAgeMin !== null && heartbeatAgeMin > 60) {
-      base44.asServiceRole.entities.Livreur.update(l.id, { statut: 'hors_ligne' }).catch(() => {});
       nbMarquesHorsLigne++;
       return; // exclu du dispatch
     }

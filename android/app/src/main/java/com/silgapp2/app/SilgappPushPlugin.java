@@ -82,7 +82,7 @@ public class SilgappPushPlugin extends Plugin {
             intent.putExtra(Settings.EXTRA_APP_PACKAGE, getContext().getPackageName());
         } else {
             intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-            intent.setData(android.net.Uri.parse("package:" + getContext().getPackageName()));
+            intent.setData(Uri.parse("package:" + getContext().getPackageName()));
         }
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         getContext().startActivity(intent);
@@ -95,8 +95,34 @@ public class SilgappPushPlugin extends Plugin {
         call.resolve();
     }
 
-    // ── Demander l'exclusion de l'optimisation batterie ──
-    // Critique pour Samsung, Xiaomi, Huawei, Tecno, Infinix, Oppo, Vivo
+    @PluginMethod
+    public void startUrgentCourseAlert(PluginCall call) {
+        String courseId = call.getString("courseId", "");
+        if (courseId == null || courseId.trim().isEmpty()) {
+            call.reject("courseId requis pour lancer une alerte course");
+            return;
+        }
+
+        String notificationId = call.getString("notificationId", "");
+        String title = call.getString("title", "Nouvelle course SILGAPP");
+        String body = call.getString("body", "Une course est disponible. Ouvrez l'app pour accepter.");
+        long durationMs = call.getLong("durationMs", 60000L);
+        long intervalMs = call.getLong("intervalMs", 5000L);
+        boolean showNotification = call.getBoolean("showNotification", false);
+
+        SilgappFirebaseMessagingService.startUrgentCourseAlertFromPlugin(
+            getContext(),
+            title,
+            body,
+            courseId,
+            notificationId,
+            durationMs,
+            intervalMs,
+            showNotification
+        );
+        call.resolve();
+    }
+
     @PluginMethod
     public void requestIgnoreBatteryOptimizations(PluginCall call) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
@@ -139,7 +165,6 @@ public class SilgappPushPlugin extends Plugin {
         }
     }
 
-    // ── Vérifier si l'app est exclue de l'optimisation batterie ──
     @PluginMethod
     public void isIgnoringBatteryOptimizations(PluginCall call) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
@@ -156,18 +181,15 @@ public class SilgappPushPlugin extends Plugin {
         call.resolve(result);
     }
 
-    // ── Ouvrir les paramètres Autostart (Xiaomi, Oppo, Vivo, Tecno, Infinix) ──
     @PluginMethod
     public void openAutoStartSettings(PluginCall call) {
         Intent intent = new Intent();
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
-        // Xiaomi / MIUI
         intent.setClassName("com.miui.securitycenter",
             "com.miui.permcenter.autostart.AutoStartManagementActivity");
         if (tryStartActivity(intent, call)) return;
 
-        // Oppo
         intent.setClassName("com.coloros.safecenter",
             "com.coloros.safecenter.permission.startup.StartupAppListActivity");
         if (tryStartActivity(intent, call)) return;
@@ -176,39 +198,33 @@ public class SilgappPushPlugin extends Plugin {
             "com.coloros.safecenter.startupapp.StartupAppListActivity");
         if (tryStartActivity(intent, call)) return;
 
-        // Vivo
         intent.setClassName("com.vivo.permissionmanager",
             "com.vivo.permissionmanager.activity.BgStartActivityManagerActivity");
         if (tryStartActivity(intent, call)) return;
 
-        // Huawei
         intent.setClassName("com.huawei.systemmanager",
             "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity");
         if (tryStartActivity(intent, call)) return;
 
-        // Samsung
         intent.setClassName("com.samsung.android.lool",
             "com.samsung.android.sm.ui.battery.BatteryActivity");
         if (tryStartActivity(intent, call)) return;
 
-        // Tecno
         intent.setClassName("com.tecno.foundation",
             "com.tecno.foundation.activity.PermissionActivity");
         if (tryStartActivity(intent, call)) return;
 
-        // Infinix
         intent.setClassName("com.infinix.safezone",
             "com.infinix.safezone.activity.PermissionActivity");
         if (tryStartActivity(intent, call)) return;
 
-        // Fallback: paramètres généraux de l'app
         intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
         intent.setData(Uri.parse("package:" + getContext().getPackageName()));
         try {
             getContext().startActivity(intent);
             call.resolve();
         } catch (Exception error) {
-            call.reject("Impossible d'ouvrir les paramètres Autostart");
+            call.reject("Impossible d'ouvrir les parametres Autostart");
         }
     }
 

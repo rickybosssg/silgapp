@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
         const heartbeatAge = livreur.last_seen_at
           ? (Date.now() - new Date(livreur.last_seen_at).getTime()) / 60000
           : 999;
-        const nouveauStatut = heartbeatAge < 10 ? "disponible" : "hors_ligne";
+        const nouveauStatut = livreur.manual_hors_ligne === true ? "hors_ligne" : "disponible";
 
         await base44.asServiceRole.entities.Livreur.update(livreurId, { statut: nouveauStatut });
         console.log(`[syncStatutLivreur] Livreur ${livreur.prenom} ${livreur.nom} → "${nouveauStatut}" (course ${statut}, heartbeat: ${Math.round(heartbeatAge)}min)`);

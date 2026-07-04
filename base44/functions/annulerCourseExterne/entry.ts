@@ -53,13 +53,8 @@ Deno.serve(async (req) => {
     if (livreurId) {
       const livreur = await asService.entities.Livreur.get(livreurId).catch(() => null);
       if (livreur) {
-        const heartbeatAge = livreur.last_seen_at
-          ? (Date.now() - new Date(livreur.last_seen_at).getTime()) / 60000
-          : 999;
-        const nouveauStatut = heartbeatAge < 10 ? "disponible" : "hors_ligne";
-
         await asService.entities.Livreur.update(livreurId, {
-          statut: nouveauStatut,
+          statut: livreur.manual_hors_ligne === true ? "hors_ligne" : "disponible",
         });
         livreurLibere = true;
 

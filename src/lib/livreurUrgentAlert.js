@@ -106,6 +106,20 @@ function stopNativeUrgentAlert() {
   SilgappPush.stopUrgentCourseAlert?.().catch(() => null);
 }
 
+function startNativeUrgentAlert(options = {}, config = {}) {
+  if (!Capacitor.isNativePlatform()) return;
+  if (!options.courseId) return;
+  SilgappPush.startUrgentCourseAlert?.({
+    courseId: String(options.courseId),
+    notificationId: String(options.notificationId || ""),
+    title: options.title || "Nouvelle course SILGAPP",
+    body: options.body || "Une course est disponible. Ouvrez l'app pour accepter.",
+    durationMs: config.durationSeconds * 1000,
+    intervalMs: config.intervalSeconds * 1000,
+    showNotification: options.showNotification === true,
+  }).catch(() => null);
+}
+
 export function stopUrgentCourseAlert(reason = "stopped") {
   if (activeAlert?.intervalId) clearInterval(activeAlert.intervalId);
   if (activeAlert?.timeoutId) clearTimeout(activeAlert.timeoutId);
@@ -136,11 +150,28 @@ export function startUrgentCourseAlert(options = {}) {
     return activeAlert;
   }
 
-  stopUrgentCourseAlert("restart");
+  if (activeAlert) stopUrgentCourseAlert("restart");
 
   const durationMs = config.durationSeconds * 1000;
   const intervalMs = config.intervalSeconds * 1000;
   const endsAt = Date.now() + durationMs;
+
+  if (Capacitor.isNativePlatform()) {
+    activeAlert = {
+      key,
+      courseId,
+      notificationId,
+      source,
+      endsAt,
+      intervalId: null,
+      timeoutId: setTimeout(() => stopUrgentCourseAlert("timeout"), durationMs + 250),
+    };
+    startNativeUrgentAlert(options, config);
+    window.dispatchEvent(new CustomEvent("silgapp:livreur-urgent-alert-started", {
+      detail: { courseId, notificationId, source, native: true, ...config },
+    }));
+    return activeAlert;
+  }
 
   const tick = () => {
     if (Date.now() >= endsAt) {

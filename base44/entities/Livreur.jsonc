@@ -96,6 +96,11 @@
       "type": "boolean",
       "default": false
     },
+    "manual_hors_ligne": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si le livreur s'est mis hors ligne manuellement \u2014 la remont\u00e9e auto ne s'applique pas"
+    },
     "admin_statut_log": {
       "type": "string"
     },

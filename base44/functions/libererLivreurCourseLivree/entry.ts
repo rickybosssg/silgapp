@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
         ? (Date.now() - new Date(livreur.last_seen_at).getTime()) / 60000
         : 999;
       // Heartbeat récent (< 10 min) → disponible, sinon → hors_ligne
-      const nouveauStatut = heartbeatAge < 10 ? 'disponible' : 'hors_ligne';
+      const nouveauStatut = livreur.manual_hors_ligne === true ? 'hors_ligne' : 'disponible';
 
       await base44.entities.Livreur.update(course.livreur_id, { statut: nouveauStatut });
 

@@ -4,8 +4,6 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
-import android.media.AudioAttributes;
-import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -16,7 +14,7 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     private static final String CHANNEL_ID = "silgapp_default";
-    private static final String URGENT_CHANNEL_ID = "silgapp_courses_critical_v3";
+    private static final String URGENT_CHANNEL_ID = "silgapp_courses_official_v2";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -73,24 +71,15 @@ public class MainActivity extends BridgeActivity {
             NotificationManager.IMPORTANCE_MAX
         );
         channel.setDescription("Notifications de courses urgentes SILGAPP");
-        channel.enableVibration(true);
+        channel.enableVibration(false);
         channel.enableLights(true);
-        channel.setVibrationPattern(new long[] { 0, 500, 200, 500, 200, 800 });
         channel.setLockscreenVisibility(androidx.core.app.NotificationCompat.VISIBILITY_PUBLIC);
         channel.setBypassDnd(true);
-        channel.setSound(
-            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
-            new AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ALARM)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build()
-        );
+        channel.setSound(null, null);
 
         manager.createNotificationChannel(channel);
     }
 
-    // ── Demander l'exclusion de l'optimisation batterie ──
-    // Empêche Android (Samsung, Xiaomi, Huawei, Tecno, Infinix, Oppo, Vivo) de tuer l'app
     private void requestBatteryOptimizationExemption() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
         try {

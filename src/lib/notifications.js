@@ -10,7 +10,7 @@ import {
 } from "@/lib/livreurUrgentAlert";
 
 const ANDROID_CHANNEL_ID = "silgapp_default";
-const ANDROID_URGENT_CHANNEL_ID = "silgapp_courses_critical_v3";
+const ANDROID_URGENT_CHANNEL_ID = "silgapp_courses_official_v2";
 const SilgappPush = registerPlugin("SilgappPush");
 let nativeListenersReady = false;
 let nativeRegistrationListenersReady = false;
@@ -81,6 +81,8 @@ function maybeStartLivreurCourseAlert(data = {}, source = "push") {
   startUrgentCourseAlert({
     courseId: data.course_id || "",
     notificationId: data.notification_id || "",
+    title: data.title || data.titre || "Nouvelle course SILGAPP",
+    body: data.body || data.message || "Une course est disponible. Ouvrez l'app pour accepter.",
     source,
     ...config,
   });
@@ -218,6 +220,9 @@ async function ensureNativePushListeners() {
         return;
       }
       maybeStartLivreurCourseAlert(data, "push-received");
+      if (Capacitor.isNativePlatform() && isLivreurNewCourseNotification(data)) {
+        return;
+      }
       showLocalNotification(title, body, { data });
     });
     await PushNotifications.addListener("pushNotificationActionPerformed", (event) => {

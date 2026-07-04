@@ -281,7 +281,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   const { syncHeartbeat } = useHeartbeat({
     user_type: "livreur",
     position: livreurProfil?.latitude && livreurProfil?.longitude ? { latitude: livreurProfil.latitude, longitude: livreurProfil.longitude } : null,
-    enabled: onboardingTermine && gpsActif && livreurProfil?.statut !== "hors_ligne" && !sessionExpired,
+    enabled: onboardingTermine && gpsActif && !sessionExpired,
     debugLabel: "LivreurExterneGPS",
     session_id: sessionId,
     onSessionExpired: handleSessionExpired,
@@ -804,7 +804,14 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       toast.error("Votre plafond d'encours SILGAPP a été atteint. Veuillez effectuer votre dépôt auprès de SILGAPP afin de réactiver votre compte.");
       return;
     }
-    statutMutation.mutate(estHorsLigne ? "disponible" : "hors_ligne");
+    // Marquer manual_hors_ligne pour empêcher la remontée automatique
+    saveLivreur(livreurProfil.id, {
+      statut: estHorsLigne ? "disponible" : "hors_ligne",
+      manual_hors_ligne: !estHorsLigne,
+    }).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+      toast.success(estHorsLigne ? "Vous êtes en ligne" : "Vous êtes hors ligne");
+    }).catch((err) => toast.error("Erreur : " + (err?.message || "inconnue")));
   };
 
   // ─── GPS ──────────────────────────────────────────────────────────────────
