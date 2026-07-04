@@ -112,9 +112,11 @@ Deno.serve(async (req) => {
           background_active: background_active,
         };
 
-        // 🔄 Remontée automatique : si le livreur est hors_ligne (mais pas désactivé par admin
-        // ni en course), un heartbeat récent prouve qu'il est actif → repasser en disponible
-        if (livreur.statut === 'hors_ligne' && livreur.admin_hors_ligne !== true) {
+        // 🔄 Remontée automatique : si le livreur est hors_ligne (mais pas désactivé par admin,
+        // ni mis hors ligne manuellement, ni en course), un heartbeat récent prouve qu'il est
+        // actif → repasser en disponible. Le livreur reste en ligne tant qu'il ne se met pas
+        // hors ligne lui-même manuellement.
+        if (livreur.statut === 'hors_ligne' && livreur.admin_hors_ligne !== true && livreur.manual_hors_ligne !== true) {
           updateData.statut = 'disponible';
           console.log('[heartbeatAuto] 🔄 Remontée hors_ligne → disponible', {
             livreur_id: livreur.id,
