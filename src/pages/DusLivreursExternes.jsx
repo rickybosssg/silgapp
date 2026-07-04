@@ -21,8 +21,8 @@ function statutFinancier(montantDu, montantPaye) {
 
 // ── 3 filtres simples au lieu de 7 ──
 const FILTRES = [
-  { id: "impayes", label: "Non payés" },
-  { id: "partiels", label: "Partiels" },
+  { id: "arecouvrer", label: "À recouvrer" },
+  { id: "ajour", label: "À jour" },
   { id: "tous", label: "Tous" },
 ];
 
@@ -249,8 +249,8 @@ export default function DusLivreursExternes() {
       }
     });
     let result = Object.values(map);
-    if (filtre === "impayes") result = result.filter(r => r.montantDu > 0 && r.montantPaye === 0);
-    if (filtre === "partiels") result = result.filter(r => r.montantDu > 0 && r.montantPaye > 0);
+    if (filtre === "arecouvrer") result = result.filter(r => r.montantDu > 0);
+    if (filtre === "ajour") result = result.filter(r => r.montantDu <= 0);
     return result.sort((a, b) => b.montantDu - a.montantDu);
   }, [courses, livreurs, filtre]);
 
