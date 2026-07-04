@@ -263,6 +263,25 @@ export default function DusLivreursExternes() {
       map[c.livreur_id].commissionTotal += (c.commission_silga ?? 0);
       if (c.statut_paiement_livreur === "paye") map[c.livreur_id].montantPaye += (c.commission_silga ?? 0);
     });
+    // ── Ajouter les livreurs qui ont un solde dû > 0 mais aucune course dans la période ──
+    livreurs.forEach(l => {
+      if (map[l.id]) return;
+      const du = l.montant_du_silga ?? 0;
+      if (du > 0) {
+        map[l.id] = {
+          id: l.id,
+          nom: l.nom || "Inconnu",
+          prenom: l.prenom || "",
+          telephone: l.telephone || "",
+          livreurInfo: l,
+          courses: [],
+          montantTotal: 0,
+          commissionTotal: 0,
+          montantPaye: 0,
+          montantDu: du,
+        };
+      }
+    });
     Object.values(map).forEach(entry => {
       const info = entry.livreurInfo;
       if (info?.montant_du_silga != null) {
