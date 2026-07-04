@@ -259,8 +259,7 @@ export default function DusLivreursExternes() {
       if (c.statut_paiement_livreur === "paye") map[c.livreur_id].montantPaye += (c.commission_silga ?? 0);
     });
     Object.values(map).forEach(entry => {
-      const info = entry.livreurInfo;
-      entry.montantDu = info?.montant_du_silga ?? Math.max(0, entry.commissionTotal - entry.montantPaye);
+      entry.montantDu = Math.max(0, entry.commissionTotal - entry.montantPaye);
     });
     let result = Object.values(map);
     if (filtre === "impayes") result = result.filter(r => r.montantDu > 0 && r.montantPaye === 0);
