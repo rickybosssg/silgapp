@@ -185,7 +185,7 @@ function FraisCard({ frais, onPayer, onBloquer, payerLoading, bloquerLoading }) 
 export default function DusLivreursExternes() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("livreurs");
-  const [filtre, setFiltre] = useState("impayes");
+  const [filtre, setFiltre] = useState("arecouvrer");
   const [detailEntry, setDetailEntry] = useState(null);
   const [search, setSearch] = useState("");
   const { isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
@@ -241,10 +241,12 @@ export default function DusLivreursExternes() {
     });
     Object.values(map).forEach(entry => {
       const info = entry.livreurInfo;
-      if (info?.montant_du_silga != null) {
-        entry.montantDu = info.montant_du_silga;
-        entry.montantPaye = Math.max(0, entry.commissionTotal - info.montant_du_silga);
+      if (info) {
+        // montant_du_silga est la source de vérité — 0 signifie 0
+        entry.montantDu = info.montant_du_silga ?? 0;
+        entry.montantPaye = Math.max(0, entry.commissionTotal - entry.montantDu);
       } else {
+        // Pas d'info livreur — calcul de secours basé sur les courses
         entry.montantDu = Math.max(0, entry.commissionTotal - entry.montantPaye);
       }
     });
