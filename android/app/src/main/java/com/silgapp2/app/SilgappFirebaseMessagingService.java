@@ -33,7 +33,7 @@ import com.google.firebase.messaging.RemoteMessage;
 import java.util.Map;
 
 public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
-    private static final String CHANNEL_ID = "silgapp_urgent_courses";
+    private static final String CHANNEL_ID = "silgapp_urgent_courses_v2";
     private static final String DEFAULT_CHANNEL_ID = "silgapp_default";
     private static final long DEFAULT_DURATION_MS = 60000L;
     private static final long DEFAULT_INTERVAL_MS = 5000L;
@@ -110,6 +110,18 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
         alertRunnable.run();
     }
 
+    // ── Sonnerie personnalisée SILGAPP (fichier res/raw/silgapp_alert) ──
+    private static Uri getCustomSoundUri(Context context) {
+        int resId = context.getResources().getIdentifier("silgapp_alert", "raw", context.getPackageName());
+        if (resId != 0) {
+            return Uri.parse("android.resource://" + context.getPackageName() + "/" + resId);
+        }
+        // Fallback : sonnerie système par défaut
+        Uri uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+        if (uri == null) uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+        return uri;
+    }
+
     // ── Réveiller l'écran même si le téléphone est verrouillé ──
     private void wakeUpScreen() {
         try {
@@ -171,7 +183,7 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
             .setOngoing(false) // Permet à l'utilisateur de la rejeter
             .setOnlyAlertOnce(false)
             .setVibrate(new long[] { 0, 500, 200, 500, 200, 800 })
-            .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM))
+            .setSound(getCustomSoundUri(this))
             .setContentIntent(fullScreenPendingIntent)
             .setFullScreenIntent(fullScreenPendingIntent, true) // Affiche popup écran verrouillé
             .setShowWhen(true)
@@ -232,7 +244,7 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
         channel.setLockscreenVisibility(NotificationCompat.VISIBILITY_PUBLIC);
         channel.setBypassDnd(true);
         channel.setSound(
-            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
+            getCustomSoundUri(this),
             new AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_ALARM)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -280,9 +292,8 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
     private static void playNotificationSound(Context context) {
         try {
             stopRingtone();
-            // TYPE_ALARM = sonnerie forte qui ignore le mode silencieux
-            Uri uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
-            if (uri == null) uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+            // Sonnerie personnalisée SILGAPP (fallback alarme système)
+            Uri uri = getCustomSoundUri(context);
             if (uri == null) uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
             activeRingtone = RingtoneManager.getRingtone(context.getApplicationContext(), uri);
             if (activeRingtone != null) {
