@@ -16,12 +16,12 @@ import { useAdminContext } from "@/hooks/useAdminContext.js";
 function statutFinancier(montantDu, montantPaye) {
   if (montantDu <= 0) return { label: "À jour", color: "bg-green-100 text-green-700", dot: "bg-green-500" };
   if (montantPaye > 0) return { label: "Partiel", color: "bg-amber-100 text-amber-700", dot: "bg-amber-500" };
-  return { label: "Impayé", color: "bg-red-100 text-red-700", dot: "bg-red-500" };
+  return { label: "Non payé", color: "bg-red-100 text-red-700", dot: "bg-red-500" };
 }
 
 // ── 3 filtres simples au lieu de 7 ──
 const FILTRES = [
-  { id: "impayes", label: "Impayés" },
+  { id: "impayes", label: "Non payés" },
   { id: "partiels", label: "Partiels" },
   { id: "tous", label: "Tous" },
 ];
