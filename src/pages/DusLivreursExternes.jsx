@@ -264,7 +264,13 @@ export default function DusLivreursExternes() {
       if (c.statut_paiement_livreur === "paye") map[c.livreur_id].montantPaye += (c.commission_silga ?? 0);
     });
     Object.values(map).forEach(entry => {
-      entry.montantDu = Math.max(0, entry.commissionTotal - entry.montantPaye);
+      const info = entry.livreurInfo;
+      if (info?.montant_du_silga != null) {
+        entry.montantDu = info.montant_du_silga;
+        entry.montantPaye = Math.max(0, entry.commissionTotal - info.montant_du_silga);
+      } else {
+        entry.montantDu = Math.max(0, entry.commissionTotal - entry.montantPaye);
+      }
     });
     let result = Object.values(map);
     if (filtre === "impayes") result = result.filter(r => r.montantDu > 0 && r.montantPaye === 0);
@@ -290,36 +296,57 @@ export default function DusLivreursExternes() {
   // ── Mutations livreurs ──────────────────────────────────────────────────────
   const paiementMutation = useMutation({
     mutationFn: async ({ entry, montant }) => {
-      const nouveauSolde = Math.max(0, (entry.montantDu ?? entry.livreurInfo?.montant_du_silga ?? 0) - montant);
+      const nouveauSolde = Math.max(0, (entry.montantDu ?? 0) - montant);
       const impayees = nouveauSolde === 0 ? entry.courses.filter(c => c.statut_paiement_livreur !== "paye").map(c => c.id) : [];
-      await base44.functions.invoke("updateLivreur", {
+      const res = await base44.functions.invoke("updateLivreur", {
         id: entry.id,
         data: { montant_du_silga: nouveauSolde },
         mark_courses_paid: impayees,
       });
+      if (res?.data && res.data.success === false) throw new Error(res.data.error || "Échec du paiement");
       return { nouveauSolde, montant, entry };
     },
     onMutate: async ({ entry, montant }) => {
+      const nouveauSolde = Math.max(0, (entry.montantDu ?? 0) - montant);
       await queryClient.cancelQueries({ queryKey: ["courses-externes-livrees"] });
+      await queryClient.cancelQueries({ queryKey: ["livreurs-externes-all"] });
       const prevCourses = queryClient.getQueryData(["courses-externes-livrees", effectiveCountry]);
-      queryClient.setQueryData(["courses-externes-livrees", effectiveCountry], (old) =>
-        (old || []).map(c =>
-          entry.courses.some(ec => ec.id === c.id)
-            ? { ...c, statut_paiement_livreur: "paye" }
-            : c
-        )
+      const prevLivreurs = queryClient.getQueryData(["livreurs-externes-all", effectiveCountry]);
+      // Update livreur's montant_du_silga optimistically
+      queryClient.setQueryData(["livreurs-externes-all", effectiveCountry], (old) =>
+        (old || []).map(l => l.id === entry.id ? { ...l, montant_du_silga: nouveauSolde } : l)
       );
-      return { prevCourses };
+      // Mark courses as paid if full payment
+      if (nouveauSolde === 0) {
+        queryClient.setQueryData(["courses-externes-livrees", effectiveCountry], (old) =>
+          (old || []).map(c =>
+            entry.courses.some(ec => ec.id === c.id)
+              ? { ...c, statut_paiement_livreur: "paye" }
+              : c
+          )
+        );
+      }
+      return { prevCourses, prevLivreurs };
     },
-    onSuccess: ({ nouveauSolde, montant }) => {
+    onSuccess: ({ nouveauSolde, montant, entry }) => {
       queryClient.invalidateQueries({ queryKey: ["courses-externes-livrees"] });
       queryClient.invalidateQueries({ queryKey: ["livreurs-externes-all"] });
-      setDetailEntry(null);
+      if (detailEntry?.id === entry.id) {
+        setDetailEntry({
+          ...detailEntry,
+          montantDu: nouveauSolde,
+          montantPaye: detailEntry.commissionTotal - nouveauSolde,
+          courses: nouveauSolde === 0
+            ? detailEntry.courses.map(c => ({ ...c, statut_paiement_livreur: "paye" }))
+            : detailEntry.courses,
+        });
+      }
       toast.success(`Paiement de ${montant.toLocaleString()} F enregistré ! Reste : ${nouveauSolde.toLocaleString()} F`);
     },
     onError: (err, _vars, ctx) => {
       if (ctx?.prevCourses) queryClient.setQueryData(["courses-externes-livrees", effectiveCountry], ctx.prevCourses);
-      toast.error("Erreur : " + err.message);
+      if (ctx?.prevLivreurs) queryClient.setQueryData(["livreurs-externes-all", effectiveCountry], ctx.prevLivreurs);
+      toast.error("Erreur : " + (err.message || "Échec du paiement"));
     },
   });
 
