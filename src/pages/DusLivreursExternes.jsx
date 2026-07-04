@@ -286,9 +286,7 @@ export default function DusLivreursExternes() {
   // ── Mutations livreurs ──────────────────────────────────────────────────────
   const paiementMutation = useMutation({
     mutationFn: async ({ entry, montant }) => {
-      const info = entry.livreurInfo;
-      if (!info) throw new Error("Livreur introuvable");
-      const nouveauSolde = Math.max(0, (info.montant_du_silga || 0) - montant);
+      const nouveauSolde = Math.max(0, (entry.montantDu ?? entry.livreurInfo?.montant_du_silga ?? 0) - montant);
       if (nouveauSolde === 0) {
         const impayees = entry.courses.filter(c => c.statut_paiement_livreur !== "paye");
         await Promise.all(impayees.map(c => base44.entities.CourseExterne.update(c.id, { statut_paiement_livreur: "paye" })));
