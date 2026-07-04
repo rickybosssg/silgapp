@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
     } = payload;
     let final_sender_id = raw_sender_id;
 
-    if (!sender_type || !sender_id) {
+    if (!sender_type || !final_sender_id) {
       return Response.json({ error: 'sender_type et sender_id sont requis' }, { status: 400 });
     }
 
@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
       }
       const livreur = livreurs[0];
       // Sécurité : le sender_id doit correspondre au livreur authentifié
-      if (livreur.id !== sender_id) {
+      if (livreur.id !== final_sender_id) {
         return Response.json({ error: 'sender_id ne correspond pas au livreur authentifié' }, { status: 403 });
       }
       realName = `${livreur.prenom || ''} ${livreur.nom || ''}`.trim() || livreur.telephone || 'Livreur';
@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
         return Response.json({ error: 'Profil client introuvable' }, { status: 404 });
       }
       const client = clients[0];
-      if (client.id !== sender_id) {
+      if (client.id !== final_sender_id) {
         return Response.json({ error: 'sender_id ne correspond pas au client authentifié' }, { status: 403 });
       }
       realName = `${client.prenom || ''} ${client.nom || ''}`.trim() || client.telephone || 'Client';
@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
         ...(restaurants || []).map(r => ({ ...r, _kind: 'restaurant' })),
         ...(pharmacies || []).map(p => ({ ...p, _kind: 'pharmacie' })),
       ];
-      const etab = allEtabs.find(e => e.id === sender_id);
+      const etab = allEtabs.find(e => e.id === final_sender_id);
       if (!etab) {
         return Response.json({ error: 'Vous n\'êtes pas propriétaire de cet établissement' }, { status: 403 });
       }
@@ -99,9 +99,9 @@ Deno.serve(async (req) => {
       const c = courses[0];
       let isParticipant = false;
       if (sender_type === 'livreur') {
-        isParticipant = c.livreur_id === sender_id;
+        isParticipant = c.livreur_id === final_sender_id;
       } else if (sender_type === 'client') {
-        isParticipant = c.expediteur_client_id === sender_id || c.destinataire_client_id === sender_id;
+        isParticipant = c.expediteur_client_id === final_sender_id || c.destinataire_client_id === final_sender_id;
       } else if (sender_type === 'admin') {
         isParticipant = true; // L'admin peut discuter dans toutes les courses
       }
@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
       const c = convs[0];
       let participants = [];
       try { participants = JSON.parse(c.participants || '[]'); } catch {}
-      const isParticipant = participants.some(p => p.type === sender_type && p.id === sender_id);
+      const isParticipant = participants.some(p => p.type === sender_type && p.id === final_sender_id);
       if (!isParticipant) {
         return Response.json({ error: 'Vous n\'êtes pas participant de cette conversation' }, { status: 403 });
       }
@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
       course_id: course_id || null,
       conversation_id: conversation_id || null,
       sender_type,
-      sender_id,
+      sender_id: final_sender_id,
       sender_name: realName,
       sender_photo_url: photoUrl,
       message_type: message_type || 'text',
