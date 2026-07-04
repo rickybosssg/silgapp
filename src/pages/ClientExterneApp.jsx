@@ -28,9 +28,6 @@ import OngletCodePromo from "@/components/client/OngletCodePromo";
 import PubliciteCarousel from "@/components/publicite/PubliciteCarousel";
 import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
 import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
-import FeedbackModal from "@/components/client/FeedbackModal";
-import ClientDashboardGuide from "@/components/client/ClientDashboardGuide";
-import CoursesProgrammeesModal from "@/components/client/CoursesProgrammeesModal";
 import FraisAnnulationBannerClient from "@/components/client/FraisAnnulationBannerClient";
 
 

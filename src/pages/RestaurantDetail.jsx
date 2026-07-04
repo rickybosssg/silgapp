@@ -2,8 +2,9 @@ import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, UtensilsCrossed, MapPin, Plus, Minus, ShoppingCart, Loader2, Clock } from "lucide-react";
+import { ArrowLeft, UtensilsCrossed, MapPin, Plus, Minus, ShoppingCart, Loader2, Clock, X, Camera } from "lucide-react";
 import CheckoutModal from "@/components/boutique/CheckoutModal";
+import MediaGallery from "@/components/media/MediaGallery";
 
 export default function RestaurantDetail() {
   const { id } = useParams();
@@ -11,6 +12,7 @@ export default function RestaurantDetail() {
   const [clientProfil, setClientProfil] = useState(null);
   const [cart, setCart] = useState([]);
   const [showCheckout, setShowCheckout] = useState(false);
+  const [galleryProduct, setGalleryProduct] = useState(null);
 
   useEffect(() => {
     base44.auth.me().then(u => {
@@ -113,13 +115,23 @@ export default function RestaurantDetail() {
                   const inCart = cart.find(i => i.id === p.id);
                   return (
                     <div key={p.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 flex items-center gap-3">
-                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-50 to-amber-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setGalleryProduct(p)}
+                        className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-50 to-amber-100 flex items-center justify-center overflow-hidden flex-shrink-0 active:scale-95 transition-transform"
+                      >
                         {p.photo_url ? <img src={p.photo_url} alt={p.nom} className="w-full h-full object-cover" /> : <UtensilsCrossed className="w-6 h-6 text-orange-300" />}
-                      </div>
+                      </button>
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-gray-900 text-sm truncate">{p.nom}</p>
                         <p className="text-xs text-gray-500 truncate">{p.description}</p>
                         <p className="font-bold text-primary text-sm mt-0.5">{(p.prix || 0).toLocaleString()} FCFA</p>
+                        {(p.photos_urls || p.video_url) && (
+                          <p className="text-[10px] text-orange-500 font-medium mt-0.5 flex items-center gap-1">
+                            <Camera className="w-3 h-3" />
+                            Voir les médias
+                          </p>
+                        )}
                       </div>
                       {isOuvert && (
                         inCart ? (
@@ -155,6 +167,22 @@ export default function RestaurantDetail() {
       {showCheckout && (
         <CheckoutModal type="restaurant" etablissementId={restaurant.id} etablissementNom={restaurant.nom} cart={cart} total={total} clientProfil={clientProfil}
           onClose={() => setShowCheckout(false)} onSuccess={() => navigate("/client/restaurants")} />
+      )}
+
+      {galleryProduct && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-end sm:items-center justify-center" onClick={() => setGalleryProduct(null)}>
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-sm max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900 text-sm truncate">{galleryProduct.nom}</h3>
+              <button onClick={() => setGalleryProduct(null)} className="p-1"><X className="w-5 h-5 text-gray-400" /></button>
+            </div>
+            <div className="p-4 space-y-3">
+              <MediaGallery item={galleryProduct} className="h-48" />
+              {galleryProduct.description && <p className="text-sm text-gray-600">{galleryProduct.description}</p>}
+              <p className="font-bold text-primary">{(galleryProduct.prix || 0).toLocaleString()} FCFA</p>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

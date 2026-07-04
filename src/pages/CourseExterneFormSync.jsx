@@ -157,7 +157,7 @@ export default function CourseExterneFormSync() {
         livraisonGPS: prev.type_course === "recevoir" && !!clientGpsLat ? true : prev.livraisonGPS,
       }));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, []); //  Exécuté UNE fois au mount uniquement
 
   // Sauvegarder l'étape dans localStorage

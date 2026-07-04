@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronUp, Check, X, Clock, AlertTriangle, ArrowRight, Zap, Gauge, History } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { ChevronDown, ChevronUp, Check, X, Zap, Gauge, History } from "lucide-react";
 
 const PRIORITY_CONFIG = {
   critique: { label: "Critique", color: "bg-red-500", text: "text-red-600", border: "border-red-200", bg: "bg-red-50" },

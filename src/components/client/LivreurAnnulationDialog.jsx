@@ -35,7 +35,7 @@ export default function LivreurAnnulationDialog({ course, motifLabel, onFermer }
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <Package className="w-4 h-4 text-blue-600 flex-shrink-0" />
             <span className="font-medium truncate">
-              {course?.adresse_depart || "Point de depart"} -> {course?.adresse_arrivee || "Destination"}
+              {course?.adresse_depart || "Point de depart"}{" - "}{course?.adresse_arrivee || "Destination"}
             </span>
           </div>
         </div>

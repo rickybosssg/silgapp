@@ -821,7 +821,7 @@ export default function DispatchMap({
       }
       markersRef.current = [];
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, []);
 
   // Halos zones chaudes

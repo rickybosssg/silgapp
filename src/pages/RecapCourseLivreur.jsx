@@ -107,7 +107,7 @@ export default function RecapCourseLivreur() {
     } else {
       chargerCourse({ silent: true, retries: 1 });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [courseId]);
 
   useEffect(() => {
