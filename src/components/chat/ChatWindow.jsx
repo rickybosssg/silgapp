@@ -146,7 +146,7 @@ export default function ChatWindow({ courseId, senderType, senderId, senderName,
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-200px)] min-h-[320px] max-h-[600px] bg-gray-50 rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
+    <div className="flex flex-col h-[360px] min-h-[280px] max-h-[60vh] bg-gray-50 rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
       {/* Header */}
       <div className="p-3 bg-gradient-to-r from-primary to-primary/80 text-white flex items-center justify-between">
         <div className="flex items-center gap-2">
