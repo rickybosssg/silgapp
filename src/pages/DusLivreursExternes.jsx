@@ -58,7 +58,7 @@ function DetailPaiementModal({ entry, livreurInfo, onClose, onPaiement, onBloque
   const isBloque = livreurInfo?.actif === false;
 
   const handleValiderPaiement = () => {
-    const montant = Number(montantSaisi);
+    const montant = Number(montantSaisi) || entry.montantDu;
     if (!montant || montant <= 0) { toast.error("Entrez un montant valide"); return; }
     if (montant > entry.montantDu) { toast.error(`Le montant dépasse le dû (${entry.montantDu.toLocaleString()} F)`); return; }
     onPaiement(entry, montant);
@@ -96,7 +96,7 @@ function DetailPaiementModal({ entry, livreurInfo, onClose, onPaiement, onBloque
                 <input type="number" placeholder={`Max : ${entry.montantDu.toLocaleString()} F`} value={montantSaisi}
                   onChange={e => setMontantSaisi(e.target.value)}
                   className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
-                <Button className="gap-1.5 bg-green-600 hover:bg-green-700 shrink-0" onClick={handleValiderPaiement} disabled={isPending || !montantSaisi}>
+                <Button className="gap-1.5 bg-green-600 hover:bg-green-700 shrink-0" onClick={handleValiderPaiement} disabled={isPending}>
                   <CheckCircle2 className="w-4 h-4" />Valider
                 </Button>
               </div>
