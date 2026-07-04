@@ -13,7 +13,16 @@
       "type": "string"
     },
     "photo_url": {
-      "type": "string"
+      "type": "string",
+      "description": "Photo principale (r\u00e9trocompatibilit\u00e9)"
+    },
+    "photos_urls": {
+      "type": "string",
+      "description": "JSON: tableau des URLs des photos (galerie)"
+    },
+    "video_url": {
+      "type": "string",
+      "description": "URL de la courte vid\u00e9o du plat"
     },
     "prix": {
       "type": "number"

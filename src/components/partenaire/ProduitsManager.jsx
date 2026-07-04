@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Upload, Plus, Pencil, Trash2, X, Package, UtensilsCrossed } from "lucide-react";
+import { Loader2, Upload, Plus, Pencil, Trash2, X, Package, UtensilsCrossed, Camera } from "lucide-react";
+import MediaUploader from "@/components/media/MediaUploader";
+import { parsePhotos } from "@/components/media/MediaGallery";
 
 const CATEGORIES_PLAT = [
   { value: "entree", label: "Entrée" },
@@ -82,7 +84,7 @@ export default function ProduitsManager({ type, etablissementId }) {
       <div className="grid grid-cols-2 gap-3">
         {items.map(item => (
           <div key={item.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden group">
-            {/* Photo */}
+            {/* Photo principale + badge multi-médias */}
             <div className="relative w-full aspect-square bg-gray-50 overflow-hidden">
               {item.photo_url ? (
                 <img src={item.photo_url} alt={item.nom} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
@@ -90,6 +92,12 @@ export default function ProduitsManager({ type, etablissementId }) {
                 <div className="w-full h-full flex items-center justify-center">
                   {isRestaurant ? <UtensilsCrossed className="w-8 h-8 text-gray-200" /> : <Package className="w-8 h-8 text-gray-200" />}
                 </div>
+              )}
+              {/* Badge galerie si plusieurs médias */}
+              {(parsePhotos(item).length > 1 || item.video_url) && (
+                <span className="absolute bottom-2 left-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-black/60 text-white backdrop-blur-sm flex items-center gap-0.5">
+                  <Camera className="w-2.5 h-2.5" /> {parsePhotos(item).length}{item.video_url ? " + 🎬" : ""}
+                </span>
               )}
               {/* Badge dispo */}
               <button
@@ -137,27 +145,30 @@ function ProduitForm({ type, etablissementId, existing, onClose, onSaved }) {
   const isRestaurant = type === "restaurant";
   const entityName = isRestaurant ? "PlatRestaurant" : "ProduitBoutique";
   const idField = isRestaurant ? "restaurant_id" : "boutique_id";
-  const [form, setForm] = useState(existing || { nom: "", description: "", photo_url: "", prix: 0, categorie: isRestaurant ? "plat" : "", disponible: true, actif: true });
-  const [uploading, setUploading] = useState(false);
+  const initialPhotos = existing ? parsePhotos(existing) : [];
+  const [form, setForm] = useState(existing || { nom: "", description: "", photo_url: "", photos_urls: "", video_url: "", prix: 0, categorie: isRestaurant ? "plat" : "", disponible: true, actif: true });
+  const [photos, setPhotos] = useState(initialPhotos);
+  const [videoUrl, setVideoUrl] = useState(existing?.video_url || "");
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const handlePhoto = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      set("photo_url", file_url);
-    } catch (err) {}
-    setUploading(false);
+  const handleMediaChange = ({ photos: newPhotos, video_url }) => {
+    setPhotos(newPhotos);
+    setVideoUrl(video_url);
   };
 
   const handleSave = async () => {
     if (!form.nom || !form.prix) return;
     setSaving(true);
     try {
-      const data = { ...form, [idField]: etablissementId, prix: Number(form.prix) };
+      const data = {
+        ...form,
+        [idField]: etablissementId,
+        prix: Number(form.prix),
+        photo_url: photos[0] || "", // première photo = photo principale (rétrocompatibilité panier/liste)
+        photos_urls: photos.length > 0 ? JSON.stringify(photos) : "",
+        video_url: videoUrl || "",
+      };
       if (existing?.id) {
         await base44.entities[entityName].update(existing.id, data);
       } else {
@@ -176,16 +187,11 @@ function ProduitForm({ type, etablissementId, existing, onClose, onSaved }) {
           <button onClick={onClose} className="p-1"><X className="w-5 h-5 text-gray-400" /></button>
         </div>
         <div className="p-4 space-y-3">
+          {/* Galerie médias — multi-photos + vidéo */}
           <div>
-            <Label className="text-xs">Photo</Label>
-            <div className="flex items-center gap-3 mt-1">
-              {form.photo_url && <img src={form.photo_url} alt="photo" className="w-16 h-16 rounded-xl object-cover" />}
-              <label className="cursor-pointer">
-                <input type="file" accept="image/*" onChange={handlePhoto} className="hidden" disabled={uploading} />
-                <div className="px-4 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 flex items-center gap-2">
-                  {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} {form.photo_url ? "Changer" : "Télécharger"}
-                </div>
-              </label>
+            <Label className="text-xs">Photos & Vidéo</Label>
+            <div className="mt-1">
+              <MediaUploader photos={photos} videoUrl={videoUrl} onChange={handleMediaChange} />
             </div>
           </div>
           <div><Label className="text-xs">Nom *</Label><Input value={form.nom} onChange={e => set("nom", e.target.value)} placeholder="Nom" className="mt-1" /></div>
