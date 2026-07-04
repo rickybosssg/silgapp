@@ -754,17 +754,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     [livreesToday, countryCommissionPct]
   );
 
-  const montantDüSilga = useMemo(() =>
-    livreesToday.reduce((sum, c) => {
-      // ⚠️ CORRECTION PRIX MANUEL : Utiliser commission_silga si déjà calculée,
-      // sinon recalculer en respectant le mode de prix
-      if (c.commission_silga > 0) return sum + c.commission_silga;
-      const isPrixManuel = c.pricing_mode === "manual" && c.manual_price_status === "accepted" && Number(c.manual_price) > 0;
-      const prixBase = isPrixManuel ? Number(c.manual_price) : (c.prix_final || 0);
-      return sum + Math.round(prixBase * (countryCommissionPct / 100));
-    }, 0),
-    [livreesToday, countryCommissionPct]
-  );
+  // montant_du_silga est la source de vérité (incrémenté à chaque livraison,
+  // remis à 0 quand l'admin enregistre un paiement) — cohérent avec le tableau admin
+  const montantDüSilga = livreurProfil?.montant_du_silga ?? 0;
 
   // ─── isEnLigne ────────────────────────────────────────────────────────────
   const isEnLigne = livreurProfil ? livreurProfil.statut !== "hors_ligne" : false;
