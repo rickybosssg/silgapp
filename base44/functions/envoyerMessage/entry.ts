@@ -24,12 +24,13 @@ Deno.serve(async (req) => {
       course_id,
       conversation_id,
       sender_type,
-      sender_id,
+      sender_id: raw_sender_id,
       message_type,
       content,
       audio_url,
       photo_url,
     } = payload;
+    let final_sender_id = raw_sender_id;
 
     if (!sender_type || !sender_id) {
       return Response.json({ error: 'sender_type et sender_id sont requis' }, { status: 400 });
@@ -63,9 +64,8 @@ Deno.serve(async (req) => {
       realName = `${client.prenom || ''} ${client.nom || ''}`.trim() || client.telephone || 'Client';
       photoUrl = '';
     } else if (sender_type === 'admin') {
-      if (user.email !== sender_id) {
-        return Response.json({ error: 'sender_id ne correspond pas à l\'admin authentifié' }, { status: 403 });
-      }
+      // L'admin est déjà authentifié — utiliser user.email comme sender_id
+      final_sender_id = user.email;
       realName = user.full_name || user.email || 'Admin';
       photoUrl = '';
     } else if (sender_type === 'partenaire') {

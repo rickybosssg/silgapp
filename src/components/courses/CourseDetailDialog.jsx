@@ -34,7 +34,12 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
   const statuts = reseau === "externe" ? STATUTS_EXTERNE : STATUTS_INTERNE;
   const [newStatut, setNewStatut] = React.useState(course?.statut || "");
   const [confirmAnnulation, setConfirmAnnulation] = React.useState(false);
+  const [adminEmail, setAdminEmail] = React.useState("");
   const countryMismatch = reseau === "externe" && isPays && course?.country_code && course.country_code !== adminCountryCode;
+
+  React.useEffect(() => {
+    base44.auth.me().then(u => setAdminEmail(u?.email || "")).catch(() => {});
+  }, []);
 
   React.useEffect(() => {
     setNewStatut(course?.statut || "");
@@ -292,7 +297,7 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
               <ChatWindow
                 courseId={course.id}
                 senderType="admin"
-                senderId="admin"
+                senderId={adminEmail || "admin"}
                 senderName="Admin SILGAPP"
               />
             </div>
