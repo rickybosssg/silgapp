@@ -249,12 +249,14 @@ export default function DusLivreursExternes() {
       }
     });
     let result = Object.values(map);
+    const totalDuGlobal = result.reduce((s, r) => s + r.montantDu, 0);
     if (filtre === "arecouvrer") result = result.filter(r => r.montantDu > 0);
     if (filtre === "ajour") result = result.filter(r => r.montantDu <= 0);
-    return result.sort((a, b) => b.montantDu - a.montantDu);
+    return { list: result.sort((a, b) => b.montantDu - a.montantDu), totalDuGlobal };
   }, [courses, livreurs, filtre]);
 
-  const totalDu = recapLivreurs.reduce((s, r) => s + r.montantDu, 0);
+  const recapList = recapLivreurs.list;
+  const totalDu = recapLivreurs.totalDuGlobal;
 
   // ── Frais ──
   const fraisFiltres = frais.filter(f => {
@@ -369,14 +371,14 @@ export default function DusLivreursExternes() {
           </div>
 
           {/* Liste — cartes épurées */}
-          {recapLivreurs.length === 0 ? (
+          {recapList.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
               <AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-30" />
               <p className="text-sm">Aucun livreur dans ce filtre</p>
             </div>
           ) : (
             <div className="space-y-2">
-              {recapLivreurs.map(entry => {
+              {recapList.map(entry => {
                 const sf = statutFinancier(entry.montantDu, entry.montantPaye);
                 const isBloque = entry.livreurInfo?.actif === false;
                 return (
