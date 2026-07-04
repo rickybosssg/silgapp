@@ -153,7 +153,7 @@ Deno.serve(async (req) => {
         }
 
         // ── 5. Courses coincées (statuts intermédiaires bloqués) ────────
-        const seuils = { acceptee: 30, livreur_en_route: 60, colis_recupere: 120, en_livraison: 120, pris_en_charge: 120 };
+        const seuils = { acceptee: 30, livreur_en_route: 120, colis_recupere: 120, en_livraison: 120, pris_en_charge: 120 };
         for (const course of coursesActives) {
             const seuil = seuils[course.statut];
             if (!seuil) continue;
