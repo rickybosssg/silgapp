@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import CourseAnnuleeRelanceDialog from "@/components/client/CourseAnnuleeRelanceDialog";
+import LivreurAnnulationDialog from "@/components/client/LivreurAnnulationDialog";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import VenusOnboardingTooltip from "@/components/client/VenusOnboardingTooltip";
 import LiveCounterBadge from "@/components/ui/LiveCounterBadge";
@@ -85,6 +86,7 @@ export default function ClientExterneApp() {
   const [courseANoter, setCourseANoter] = useState(null);
   const [notationShownFor, setNotationShownFor] = useState(null);
   const [courseAnnuleeRelance, setCourseAnnuleeRelance] = useState(null); // course annulée auto → proposer relance
+  const [livreurAnnulation, setLivreurAnnulation] = useState(null); // livreur a annulé → modal recherche nouveau livreur
   const [showMessages, setShowMessages] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [showProgrammees, setShowProgrammees] = useState(false);
@@ -601,6 +603,24 @@ export default function ClientExterneApp() {
             }
           } catch (_) {}
         }
+
+        // ── Détecter l'annulation par le livreur (course_refusee) ───────────
+        // Le livreur a annulé → la course est remise en dispatch automatiquement.
+        // On affiche un modal informatif au client.
+        const notifRefusee = userNotifications.find(n => n.type === 'course_refusee' && n.course_id);
+        if (notifRefusee && !livreurAnnulation) {
+          try {
+            const coursesRefusees = await base44.entities.CourseExterne.filter({ id: notifRefusee.course_id });
+            const c = coursesRefusees?.[0];
+            if (c && c.statut === 'recherche_livreur') {
+              // Extraire le motif depuis le message de la notification
+              const motifMatch = notifRefusee.message?.match(/Motif:\s*(.+?)\.\s*Nous/i);
+              const motifLabel = motifMatch ? motifMatch[1] : null;
+              setLivreurAnnulation({ course: c, motifLabel });
+              base44.entities.Notification.update(notifRefusee.id, { lue: true }).catch(() => null);
+            }
+          } catch (_) {}
+        }
       }
 
       await loadLivreursProches(pos);
@@ -1107,6 +1127,15 @@ export default function ClientExterneApp() {
             });
           }}
           onTerminer={() => setCourseAnnuleeRelance(null)}
+        />
+      )}
+
+      {/* ── LIVREUR A ANNULÉ — modal informatif (recherche auto nouveau livreur) ── */}
+      {livreurAnnulation && (
+        <LivreurAnnulationDialog
+          course={livreurAnnulation.course}
+          motifLabel={livreurAnnulation.motifLabel}
+          onFermer={() => setLivreurAnnulation(null)}
         />
       )}
 
