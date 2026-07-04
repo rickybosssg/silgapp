@@ -7,38 +7,40 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
-export default function LivreurPerformanceCard({ livreur, courses, onVoirDetails, onValiderPaiement, isPending }) {
+export default function LivreurPerformanceCard({ livreur, courses, onVoirDetails, onValiderPaiement, isPending, montantDuOverride }) {
   const today = new Date().toDateString();
-
+  
   // Calculs pour aujourd'hui
   const coursesLivrees = courses.filter(c =>
     c.livreur_id === livreur.id &&
     c.statut === "livree" &&
     new Date(c.heure_livraison || c.updated_date).toDateString() === today
   );
-
+  
   const coursesAnnulees = courses.filter(c =>
     c.livreur_id === livreur.id &&
     c.statut === "annulee" &&
     new Date(c.updated_date).toDateString() === today
   );
-
+  
   const coursesEnCours = courses.filter(c =>
     c.livreur_id === livreur.id &&
     ["acceptee", "colis_recupere", "en_livraison"].includes(c.statut)
   );
-
+  
   const totalEncaisse = coursesLivrees.reduce((sum, c) => sum + (c.prix_reel || 0), 0);
-  const montantDu = totalEncaisse; // 100% à SILGAPP
+  // Utiliser le montant calculé sur la période sélectionnée (passé par le parent)
+  // Fallback sur le montant du jour si non fourni
+  const montantDu = montantDuOverride !== undefined ? montantDuOverride : totalEncaisse;
   const isPaye = livreur.statut_paiement === "paye";
-
+  
   const nomComplet = `${livreur.prenom || ""} ${livreur.nom}`.trim();
-
+  
   // Dernière position
   const lastPosition = livreur.latitude && livreur.longitude
     ? `${livreur.latitude.toFixed(4)}, ${livreur.longitude.toFixed(4)}`
     : "N/A";
-
+  
   const lastActivity = livreur.derniere_position_date
     ? format(new Date(livreur.derniere_position_date), "HH:mm", { locale: fr })
     : "N/A";
@@ -106,17 +108,17 @@ export default function LivreurPerformanceCard({ livreur, courses, onVoirDetails
       {/* Montant dû et paiement */}
       <div className={cn(
         "rounded-lg p-3 border",
-        isPaye ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-200"
+        isPaye ? "bg-green-50 border-green-200" : montantDu > 0 ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-200"
       )}>
         <div className="flex items-center justify-between text-xs mb-2">
           <span className="text-muted-foreground">Montant dû à SILGAPP</span>
           {isPaye ? (
-            <Badge className="bg-green-500 text-white text-[10px]"> Payé</Badge>
-          ) : totalEncaisse > 0 ? (
-            <Badge className="bg-amber-500 text-white text-[10px]">Non payé</Badge>
+            <Badge className="bg-green-500 text-white text-[10px]">✅ Payé</Badge>
+          ) : montantDu > 0 ? (
+            <Badge className="bg-red-500 text-white text-[10px]">⚠️ Non payé</Badge>
           ) : null}
         </div>
-        <p className={cn("font-bold text-sm", isPaye ? "text-green-700" : "text-blue-700")}>
+        <p className={cn("font-bold text-sm", isPaye ? "text-green-700" : montantDu > 0 ? "text-red-700" : "text-gray-500")}>
           {montantDu.toLocaleString()} FCFA
         </p>
         {isPaye && livreur.heure_paiement && (
@@ -145,10 +147,10 @@ export default function LivreurPerformanceCard({ livreur, courses, onVoirDetails
         >
           <Eye className="w-3.5 h-3.5" /> Voir détails
         </Button>
-        {!isPaye && totalEncaisse > 0 && (
+        {!isPaye && montantDu > 0 && (
           <Button
             size="sm"
-            className="flex-1 h-8 text-xs gap-1 bg-blue-600 hover:bg-blue-700 text-white"
+            className="flex-1 h-8 text-xs gap-1 bg-green-600 hover:bg-green-700 text-white shadow-sm"
             onClick={() => onValiderPaiement(livreur, montantDu)}
             disabled={isPending}
           >

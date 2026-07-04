@@ -26,7 +26,7 @@ const STATUTS_EXTERNE = [
   "colis_recupere", "passager_embarque", "en_livraison", "livree", "annulee"
 ];
 
-const TYPE_LABELS = { expedier: " Expédition", recevoir: " Réception", deplacement: " Déplacement" };
+const TYPE_LABELS = { expedier: "📦 Expédition", recevoir: "📥 Réception", deplacement: "👤 Déplacement" };
 
 export default function CourseDetailDialog({ course, open, onClose, reseau = "interne" }) {
   const queryClient = useQueryClient();
@@ -34,30 +34,17 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
   const statuts = reseau === "externe" ? STATUTS_EXTERNE : STATUTS_INTERNE;
   const [newStatut, setNewStatut] = React.useState(course?.statut || "");
   const [confirmAnnulation, setConfirmAnnulation] = React.useState(false);
-  const [adminIdentity, setAdminIdentity] = React.useState({ email: "", name: "Admin SILGAPP" });
+  const [adminEmail, setAdminEmail] = React.useState("");
   const countryMismatch = reseau === "externe" && isPays && course?.country_code && course.country_code !== adminCountryCode;
+
+  React.useEffect(() => {
+    base44.auth.me().then(u => setAdminEmail(u?.email || "")).catch(() => {});
+  }, []);
 
   React.useEffect(() => {
     setNewStatut(course?.statut || "");
     setConfirmAnnulation(false);
   }, [course]);
-
-  React.useEffect(() => {
-    if (!open || reseau !== "externe") return;
-    let cancelled = false;
-    base44.auth.me()
-      .then((user) => {
-        if (cancelled) return;
-        setAdminIdentity({
-          email: user?.email || "",
-          name: user?.full_name || user?.email || "Admin SILGAPP",
-        });
-      })
-      .catch((error) => {
-        console.warn("[CourseDetailDialog] Impossible de charger l'identite admin:", error?.message || error);
-      });
-    return () => { cancelled = true; };
-  }, [open, reseau]);
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }) => {
@@ -143,7 +130,7 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
             {course.urgence && <UrgenceBadge urgence={course.urgence} />}
             {course.prix && <span className="text-sm font-bold">{course.prix.toLocaleString()} FCFA</span>}
             {course.delivery_confirmed_by === 'pin_secours' && (
-              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold"> PIN secours</span>
+              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">🔑 PIN secours</span>
             )}
           </div>
 
@@ -210,7 +197,7 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
                 <Navigation className="w-4 h-4 text-blue-600" />
                 <p className="text-xs font-bold text-blue-700 uppercase">Suivi GPS</p>
               </div>
-
+              
               {course.distance_km && (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -294,8 +281,8 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
                 ))}
               </SelectContent>
             </Select>
-            <Button
-              onClick={handleStatusUpdate}
+            <Button 
+              onClick={handleStatusUpdate} 
               disabled={newStatut === course.statut || updateMutation.isPending}
               size="sm"
             >
@@ -303,15 +290,15 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
             </Button>
           </div>
 
-          {/* Messagerie admin */}
-          {reseau === "externe" && course.livreur_id && adminIdentity.email && !["livree", "annulee"].includes(course.statut) && (
+          {/* 💬 Messagerie admin */}
+          {reseau === "externe" && course.livreur_id && !["livree", "annulee"].includes(course.statut) && (
             <div className="pt-2 border-t">
-              <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2"> Messagerie</p>
+              <p className="text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">💬 Messagerie</p>
               <ChatWindow
                 courseId={course.id}
                 senderType="admin"
-                senderId={adminIdentity.email}
-                senderName={adminIdentity.name}
+                senderId={adminEmail || "admin"}
+                senderName="Admin SILGAPP"
               />
             </div>
           )}

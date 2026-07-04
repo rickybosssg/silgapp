@@ -9,7 +9,10 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.AssetFileDescriptor;
 import android.media.AudioAttributes;
+import android.media.AudioManager;
+import android.media.MediaPlayer;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
@@ -34,7 +37,7 @@ import com.google.firebase.messaging.RemoteMessage;
 import java.util.Map;
 
 public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
-    private static final String CHANNEL_ID = "silgapp_courses_critical_v3";
+    private static final String CHANNEL_ID = "silgapp_courses_official_v1";
     private static final String DEFAULT_CHANNEL_ID = "silgapp_default";
     private static final long DEFAULT_DURATION_MS = 60000L;
     private static final long DEFAULT_INTERVAL_MS = 5000L;
@@ -42,6 +45,7 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
     private static Runnable alertRunnable;
     private static long alertEndAtMs = 0L;
     private static Ringtone activeRingtone;
+    private static MediaPlayer activeMediaPlayer;
     private static PowerManager.WakeLock wakeLock;
     private static Context activeAlertContext;
     private static int activeNotificationId = -1;
@@ -183,7 +187,7 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
             .setOngoing(true)
             .setOnlyAlertOnce(false)
             .setVibrate(new long[] { 0, 500, 200, 500, 200, 800 })
-            .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM))
+            .setSound(getCustomSoundUri(this))
             .setContentIntent(fullScreenPendingIntent)
             .setFullScreenIntent(fullScreenPendingIntent, true) // Affiche popup écran verrouillé
             .setShowWhen(true)
@@ -254,7 +258,7 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
         channel.setLockscreenVisibility(NotificationCompat.VISIBILITY_PUBLIC);
         channel.setBypassDnd(true);
         channel.setSound(
-            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
+            getCustomSoundUri(this),
             new AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_ALARM)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -302,13 +306,36 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
     private static void playNotificationSound(Context context) {
         try {
             stopRingtone();
-            // TYPE_ALARM = sonnerie forte qui ignore le mode silencieux
+            AssetFileDescriptor afd = context.getResources().openRawResourceFd(R.raw.silgapp_alert);
+            if (afd != null) {
+                MediaPlayer player = new MediaPlayer();
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    player.setAudioAttributes(new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build());
+                } else {
+                    player.setAudioStreamType(AudioManager.STREAM_ALARM);
+                }
+                player.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
+                afd.close();
+                player.setLooping(true);
+                player.prepare();
+                player.start();
+                activeMediaPlayer = player;
+                return;
+            }
+        } catch (Exception ignored) {
+            stopRingtone();
+        }
+
+        try {
             Uri uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
             if (uri == null) uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
             if (uri == null) uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
             activeRingtone = RingtoneManager.getRingtone(context.getApplicationContext(), uri);
             if (activeRingtone != null) {
-                activeRingtone.setStreamType(android.media.AudioManager.STREAM_ALARM);
+                activeRingtone.setStreamType(AudioManager.STREAM_ALARM);
                 activeRingtone.play();
             }
         } catch (Exception ignored) {}
@@ -316,11 +343,27 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
 
     private static void stopRingtone() {
         try {
+            if (activeMediaPlayer != null) {
+                if (activeMediaPlayer.isPlaying()) activeMediaPlayer.stop();
+                activeMediaPlayer.release();
+            }
+        } catch (Exception ignored) {}
+        activeMediaPlayer = null;
+
+        try {
             if (activeRingtone != null && activeRingtone.isPlaying()) {
                 activeRingtone.stop();
             }
         } catch (Exception ignored) {}
         activeRingtone = null;
+    }
+
+    private static Uri getCustomSoundUri(Context context) {
+        try {
+            return Uri.parse("android.resource://" + context.getPackageName() + "/" + R.raw.silgapp_alert);
+        } catch (Exception ignored) {
+            return RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+        }
     }
 
     private static long parseSeconds(String value, long fallback, long min, long max) {
