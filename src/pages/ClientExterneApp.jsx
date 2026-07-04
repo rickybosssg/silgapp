@@ -33,6 +33,7 @@ import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgress
 import FeedbackModal from "@/components/client/FeedbackModal";
 import ClientDashboardGuide from "@/components/client/ClientDashboardGuide";
 import CoursesProgrammeesModal from "@/components/client/CoursesProgrammeesModal";
+import FraisAnnulationBannerClient from "@/components/client/FraisAnnulationBannerClient";
 
 
 function haversineDistance(lat1, lon1, lat2, lon2) {
@@ -250,6 +251,16 @@ export default function ClientExterneApp() {
     const iv = setInterval(checkCourseNotation, 60000); // ⚡ 10s → 60s
     return () => clearInterval(iv);
   }, [clientProfil?.id, notationShownFor]);
+
+  // Frais d'annulation impayés pour ce client
+  const { data: fraisAnnulationImpayes = [] } = useQuery({
+    queryKey: ["frais-annulation-client-dashboard", clientProfil?.id],
+    queryFn: () => clientProfil?.id
+      ? base44.entities.FraisAnnulation.filter({ client_id: clientProfil.id, statut_paiement: "impaye" })
+      : [],
+    enabled: !!clientProfil?.id,
+    refetchInterval: 30000,
+  });
 
   // Vérifier si ce client possède un code promo ambassadeur
   useEffect(() => {
@@ -852,6 +863,9 @@ export default function ClientExterneApp() {
                   ))}
                 </div>
               )}
+
+              {/* ── FRAIS D'ANNULATION IMPAYÉS ──── */}
+              <FraisAnnulationBannerClient fraisImpayes={fraisAnnulationImpayes} />
 
               {/* ── PUBLICITÉS CARROUSEL ──────────── */}
               <PubliciteCarousel cible="clients" userId={clientProfil?.id} userType="client" />
