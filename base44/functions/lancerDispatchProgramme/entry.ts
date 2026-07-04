@@ -20,15 +20,11 @@ Deno.serve(async (req) => {
     const resultats = [];
     for (const course of aLancer) {
       try {
-        // Passer en recherche_livreur et lancer le dispatch
+        // Passer en recherche_livreur — l'automation entity sur CourseExterne
+        // déclenchera dispatchExterneAuto automatiquement (action lancer_recherche_auto)
         await base44.asServiceRole.entities.CourseExterne.update(course.id, {
           statut: "recherche_livreur",
           dispatch_status: "en_attente",
-        });
-        
-        await base44.asServiceRole.functions.invoke("dispatchExterneAuto", {
-          action: "lancer_recherche_auto",
-          course_id: course.id,
         });
         
         resultats.push({ id: course.id, success: true });

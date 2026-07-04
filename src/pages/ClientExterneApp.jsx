@@ -13,7 +13,7 @@ import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { 
   MapPin, Navigation, MessageCircle, User, Package, 
   Clock, ChevronRight, TrendingUp, Loader2, ArrowLeft, RefreshCw,
-  Store, UtensilsCrossed, Pill, Star
+  Store, UtensilsCrossed, Pill, Star, Calendar
 } from "lucide-react";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import CourseAnnuleeRelanceDialog from "@/components/client/CourseAnnuleeRelanceDialog";
@@ -31,6 +31,7 @@ import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
 import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
 import FeedbackModal from "@/components/client/FeedbackModal";
 import ClientDashboardGuide from "@/components/client/ClientDashboardGuide";
+import CoursesProgrammeesModal from "@/components/client/CoursesProgrammeesModal";
 
 
 function haversineDistance(lat1, lon1, lat2, lon2) {
@@ -86,6 +87,7 @@ export default function ClientExterneApp() {
   const [courseAnnuleeRelance, setCourseAnnuleeRelance] = useState(null); // course annulée auto → proposer relance
   const [showMessages, setShowMessages] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [showProgrammees, setShowProgrammees] = useState(false);
   const [sessionId, setSessionId] = useState(() => {
     try { return localStorage.getItem("silgapp_client_session_id") || null; } catch { return null; }
   });
@@ -979,6 +981,7 @@ export default function ClientExterneApp() {
                     { icon: <Package className="w-5 h-5" />, label: "Mes courses", color: "text-blue-600", bg: "bg-blue-50", action: () => navigate("/client/suivi") },
                     { icon: <MessageCircle className="w-5 h-5" />, label: "Messages", color: "text-purple-600", bg: "bg-purple-50", action: () => setShowMessages(true) },
                     { icon: <Package className="w-5 h-5" />, label: "Commandes", color: "text-indigo-600", bg: "bg-indigo-50", action: () => navigate("/client/mes-commandes") },
+                    { icon: <Calendar className="w-5 h-5" />, label: "Programmées", color: "text-orange-600", bg: "bg-orange-50", action: () => setShowProgrammees(true) },
                     { icon: <Star className="w-5 h-5" />, label: "Mon avis", color: "text-amber-600", bg: "bg-amber-50", action: () => setShowFeedback(true) },
                     { icon: <span className="text-xs">💬</span>, label: "Support", color: "text-green-600", bg: "bg-green-50", action: () => {
                       const msg = encodeURIComponent("Bonjour SILGAPP 👋\nJ'ai besoin d'aide sur SILGAPP.");
@@ -1136,6 +1139,14 @@ export default function ClientExterneApp() {
         <FeedbackModal
           clientProfil={clientProfil}
           onClose={() => setShowFeedback(false)}
+        />
+      )}
+
+      {/* ── COURSES PROGRAMMÉES ── */}
+      {showProgrammees && (
+        <CoursesProgrammeesModal
+          clientProfil={clientProfil}
+          onClose={() => setShowProgrammees(false)}
         />
       )}
     </div>
