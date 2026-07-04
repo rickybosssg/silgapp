@@ -297,7 +297,19 @@ export default function DusLivreursExternes() {
         data: { montant_du_silga: nouveauSolde },
         mark_courses_paid: impayees,
       });
-      return { nouveauSolde, montant };
+      return { nouveauSolde, montant, entry };
+    },
+    onMutate: async ({ entry, montant }) => {
+      await queryClient.cancelQueries({ queryKey: ["courses-externes-livrees"] });
+      const prevCourses = queryClient.getQueryData(["courses-externes-livrees", effectiveCountry]);
+      queryClient.setQueryData(["courses-externes-livrees", effectiveCountry], (old) =>
+        (old || []).map(c =>
+          entry.courses.some(ec => ec.id === c.id)
+            ? { ...c, statut_paiement_livreur: "paye" }
+            : c
+        )
+      );
+      return { prevCourses };
     },
     onSuccess: ({ nouveauSolde, montant }) => {
       queryClient.invalidateQueries({ queryKey: ["courses-externes-livrees"] });
@@ -305,7 +317,10 @@ export default function DusLivreursExternes() {
       setDetailEntry(null);
       toast.success(`Paiement de ${montant.toLocaleString()} F enregistré ! Reste : ${nouveauSolde.toLocaleString()} F`);
     },
-    onError: (err) => toast.error("Erreur : " + err.message),
+    onError: (err, _vars, ctx) => {
+      if (ctx?.prevCourses) queryClient.setQueryData(["courses-externes-livrees", effectiveCountry], ctx.prevCourses);
+      toast.error("Erreur : " + err.message);
+    },
   });
 
   const blockMutation = useMutation({
