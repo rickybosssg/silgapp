@@ -139,11 +139,11 @@ async function scanLivreursBlockes(base44, bugs, corrections, recommandations) {
         detail: `Livreur ${l.prenom || ""} ${l.nom} marqué "disponible" mais inactif depuis +4h`,
         auto_fixable: true
       });
-      await base44.asServiceRole.entities.Livreur.update(l.id, { statut: "hors_ligne", app_active: false }).catch(() => null);
+      await base44.asServiceRole.entities.Livreur.update(l.id, { app_active: false }).catch(() => null);
       corrections.push({
-        type: "livreur_mis_hors_ligne",
+        type: "livreur_app_inactive",
         id: l.id,
-        detail: `Livreur ${l.prenom || ""} ${l.nom} basculé "hors_ligne" (inactif depuis +4h)`
+        detail: `Livreur ${l.prenom || ""} ${l.nom} marqué app_active=false (inactif depuis +4h) — statut préservé`
       });
     }
   }
