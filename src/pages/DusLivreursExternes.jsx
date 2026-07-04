@@ -56,6 +56,8 @@ function DetailPaiementModal({ entry, livreurInfo, onClose, onPaiement, onBloque
   const [montantSaisi, setMontantSaisi] = useState("");
   const sf = statutFinancier(entry.montantDu, entry.montantPaye);
   const isBloque = livreurInfo?.actif === false;
+  const montantSaisiNum = Number(montantSaisi) || 0;
+  const resteApresPaiement = Math.max(0, entry.montantDu - montantSaisiNum);
 
   const handleValiderPaiement = () => {
     const montant = Number(montantSaisi) || entry.montantDu;
@@ -86,7 +88,10 @@ function DetailPaiementModal({ entry, livreurInfo, onClose, onPaiement, onBloque
             <div className="flex justify-between text-sm"><span className="text-muted-foreground">Déjà payé</span><span className="font-semibold text-green-600">{entry.montantPaye.toLocaleString()} FCFA</span></div>
             <div className="border-t pt-2 flex justify-between text-sm font-bold">
               <span>Reste dû à SILGAPP</span>
-              <span className={entry.montantDu > 0 ? "text-red-600 text-base" : "text-green-600"}>{entry.montantDu.toLocaleString()} FCFA</span>
+              <span className={resteApresPaiement > 0 ? "text-red-600 text-base" : "text-green-600"}>
+                {resteApresPaiement.toLocaleString()} FCFA
+                {montantSaisiNum > 0 && <span className="text-xs font-normal text-muted-foreground ml-1 line-through">{entry.montantDu.toLocaleString()}</span>}
+              </span>
             </div>
           </div>
           {entry.montantDu > 0 && (
