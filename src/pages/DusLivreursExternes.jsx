@@ -287,11 +287,12 @@ export default function DusLivreursExternes() {
   const paiementMutation = useMutation({
     mutationFn: async ({ entry, montant }) => {
       const nouveauSolde = Math.max(0, (entry.montantDu ?? entry.livreurInfo?.montant_du_silga ?? 0) - montant);
-      if (nouveauSolde === 0) {
-        const impayees = entry.courses.filter(c => c.statut_paiement_livreur !== "paye");
-        await Promise.all(impayees.map(c => base44.entities.CourseExterne.update(c.id, { statut_paiement_livreur: "paye" })));
-      }
-      await base44.functions.invoke("updateLivreur", { id: entry.id, data: { montant_du_silga: nouveauSolde } });
+      const impayees = nouveauSolde === 0 ? entry.courses.filter(c => c.statut_paiement_livreur !== "paye").map(c => c.id) : [];
+      await base44.functions.invoke("updateLivreur", {
+        id: entry.id,
+        data: { montant_du_silga: nouveauSolde },
+        mark_courses_paid: impayees,
+      });
       return { nouveauSolde, montant };
     },
     onSuccess: ({ nouveauSolde, montant }) => {
