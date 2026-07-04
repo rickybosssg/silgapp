@@ -26,6 +26,7 @@ export const navItems = [
   { path: "/carte", label: "Carte en direct", icon: MapPin },
   { path: "/courses", label: "Toutes les courses", icon: Package },
   { path: "/livreurs", label: "Livreurs", icon: Truck },
+  { path: "/admin/externe/dus-livreurs", label: "Dûs Livreurs", icon: Wallet },
   { path: "/rapport", label: "Rapport du jour", icon: BarChart3 },
   { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp },
   { path: "/admin/statistiques", label: "Statistiques", icon: PieChart },
