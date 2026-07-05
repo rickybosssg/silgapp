@@ -105,31 +105,46 @@ export default function ProposedLivreursList({ course }) {
 
       {/* ── Compte à rebours + statut dispatch ── */}
       {isSearching && (
-        <div className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg ${
-          isExpired ? "bg-orange-100 border border-orange-200" : "bg-white border border-blue-100"
+        <div className={`rounded-lg p-2.5 ${
+          isExpired ? "bg-orange-50 border-2 border-orange-300" : "bg-white border-2 border-blue-200"
         }`}>
-          <div className="flex items-center gap-1.5">
-            {isExpired ? (
-              <RefreshCw className="w-3.5 h-3.5 text-orange-500 animate-spin" />
-            ) : (
-              <Timer className="w-3.5 h-3.5 text-blue-500" />
-            )}
-            <span className={`text-[11px] font-bold ${isExpired ? "text-orange-600" : "text-blue-600"}`}>
-              {isExpired
-                ? "Relance imminente…"
-                : `Prochaine relance dans ${Math.floor(remainingSec / 60)}:${String(remainingSec % 60).padStart(2, "0")}`}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              {isExpired ? (
+                <RefreshCw className="w-4 h-4 text-orange-500 animate-spin" />
+              ) : (
+                <Timer className="w-4 h-4 text-blue-500" />
+              )}
+              <span className={`text-xs font-bold ${isExpired ? "text-orange-600" : "text-blue-600"}`}>
+                {isExpired ? "Timeout dépassé — relance en cours" : "Prochaine relance dans"}
+              </span>
+            </div>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+              isExpired ? "bg-orange-200 text-orange-700" : "bg-blue-100 text-blue-700"
+            }`}>
+              {dispatchLabel}
             </span>
           </div>
-          <span className={`text-[10px] font-semibold ${dispatchColor}`}>
-            {dispatchLabel}
-          </span>
+          {!isExpired && remainingSec !== null && (
+            <div className="mt-1.5 flex items-center gap-2">
+              <div className="flex-1 h-2 bg-blue-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-blue-500 rounded-full transition-all duration-1000"
+                  style={{ width: `${Math.min(100, (remainingSec / 60) * 100)}%` }}
+                />
+              </div>
+              <span className="text-base font-black text-blue-600 tabular-nums">
+                {Math.floor(remainingSec / 60)}:{String(remainingSec % 60).padStart(2, "0")}
+              </span>
+            </div>
+          )}
         </div>
       )}
       {isCycleEpuise && (
-        <div className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-red-50 border border-red-200">
-          <RefreshCw className="w-3.5 h-3.5 text-red-500 animate-spin" />
-          <span className="text-[11px] font-bold text-red-600">
-            Tous les livreurs sollicités — nouveau cycle dans un instant…
+        <div className="flex items-center gap-1.5 px-2.5 py-2.5 rounded-lg bg-red-50 border-2 border-red-300">
+          <RefreshCw className="w-4 h-4 text-red-500 animate-spin" />
+          <span className="text-xs font-bold text-red-600">
+            Tous les livreurs sollicités — nouveau cycle imminent…
           </span>
         </div>
       )}
@@ -168,12 +183,12 @@ export default function ProposedLivreursList({ course }) {
                 </div>
               </div>
               {isAccepted ? (
-                <span className="flex items-center gap-0.5 text-[10px] font-bold text-green-600 shrink-0">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
+                <span className="flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-200 px-2 py-1 rounded-full shrink-0">
+                  <CheckCircle2 className="w-3 h-3" />
                   Accepté
                 </span>
               ) : (
-                <span className="flex items-center gap-0.5 text-[10px] font-medium text-gray-400 shrink-0">
+                <span className="flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded-full shrink-0">
                   <Clock className="w-3 h-3" />
                   En attente
                 </span>
