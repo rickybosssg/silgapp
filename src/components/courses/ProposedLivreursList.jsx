@@ -125,16 +125,16 @@ export default function ProposedLivreursList({ course }) {
               {dispatchLabel}
             </span>
           </div>
-          {!isExpired && remainingSec !== null && (
+          {remainingSec !== null && (
             <div className="mt-1.5 flex items-center gap-2">
-              <div className="flex-1 h-2 bg-blue-100 rounded-full overflow-hidden">
+              <div className={`flex-1 h-2 rounded-full overflow-hidden ${isExpired ? "bg-orange-100" : "bg-blue-100"}`}>
                 <div
-                  className="h-full bg-blue-500 rounded-full transition-all duration-1000"
-                  style={{ width: `${Math.min(100, (remainingSec / 60) * 100)}%` }}
+                  className={`h-full rounded-full transition-all duration-1000 ${isExpired ? "bg-orange-500" : "bg-blue-500"}`}
+                  style={{ width: isExpired ? "100%" : `${Math.min(100, (remainingSec / 60) * 100)}%` }}
                 />
               </div>
-              <span className="text-base font-black text-blue-600 tabular-nums">
-                {Math.floor(remainingSec / 60)}:{String(remainingSec % 60).padStart(2, "0")}
+              <span className={`text-base font-black tabular-nums ${isExpired ? "text-orange-600" : "text-blue-600"}`}>
+                {isExpired ? "00:00" : `${Math.floor(remainingSec / 60)}:${String(remainingSec % 60).padStart(2, "0")}`}
               </span>
             </div>
           )}
