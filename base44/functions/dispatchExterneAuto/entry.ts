@@ -1039,6 +1039,30 @@ Deno.serve(async (req) => {
         }
       }
 
+      // 🚨 Détection des courses bloquées > 10 min (dispatch en panne)
+      const stuckCourses = courses.filter(c => {
+        if (c.dispatch_status !== 'propose') return false;
+        if (!c.timeout_expires_at) return false;
+        const expiredTime = new Date(c.timeout_expires_at);
+        return expiredTime < now && (now.getTime() - expiredTime.getTime()) > 10 * 60 * 1000;
+      });
+      for (const course of stuckCourses) {
+        try {
+          const existingAlerts = await base44.asServiceRole.entities.Notification.filter({
+            course_id: course.id, type: 'alerte_critique_dispatch', lue: false,
+          });
+          if (existingAlerts.length === 0) {
+            const stuckMin = Math.round((now.getTime() - new Date(course.timeout_expires_at).getTime()) / 60000);
+            await base44.asServiceRole.entities.Notification.create({
+              titre: '🚨 Course bloquée — dispatch en panne ?',
+              message: `Course ${course.adresse_depart || '?'} → ${course.adresse_arrivee || '?'} — bloquée depuis ${stuckMin} min sans relance automatique. Le moteur de dispatch semble ne pas fonctionner.`,
+              type: 'alerte_critique_dispatch', course_id: course.id, lue: false,
+            });
+            console.error(`[DISPATCH] 🚨 ALERTE ADMIN: Course ${course.id} bloquée depuis ${stuckMin} min — dispatch en panne`);
+          }
+        } catch (e) { console.error('[DISPATCH] Erreur création alerte bloquée:', e.message); }
+      }
+
       return Response.json({ success: true, traitees: resultats.length, resultats: resultats.slice(0, 20) });
     }
 
@@ -1239,6 +1263,14 @@ Deno.serve(async (req) => {
     return Response.json({ error: 'Action inconnue' }, { status: 400 });
   } catch (error) {
     console.error('[DISPATCH] Erreur fatale:', error);
+    try {
+      const base44 = createClientFromRequest(req);
+      await base44.asServiceRole.entities.Notification.create({
+        titre: '🚨 Erreur fatale — dispatch automatique',
+        message: `Le moteur de dispatch a crashé: ${error.message}. Les courses ne sont plus relancées automatiquement. Intervention requise.`,
+        type: 'alerte_critique_dispatch', lue: false,
+      });
+    } catch (_) {}
     return Response.json({ error: error.message }, { status: 500 });
   }
 });

@@ -7,6 +7,7 @@ import DemandesLivreursPopup from "@/components/admin/DemandesLivreursPopup";
 import DemandesPartenairesPopup from "@/components/admin/DemandesPartenairesPopup";
 import NeoNotificationModal from "@/components/neo/NeoNotificationModal";
 import PaiementRecuModal from "@/components/admin/PaiementRecuModal";
+import SystemAlertModal from "@/components/admin/SystemAlertModal";
 
 export default function AppLayout({ reseau }) {
   const [notifCount, setNotifCount] = useState(0);
@@ -67,6 +68,7 @@ export default function AppLayout({ reseau }) {
       <DemandesPartenairesPopup />
       <NeoNotificationModal />
       <PaiementRecuModal />
+      <SystemAlertModal />
 
       <div className="hidden lg:flex min-h-screen">
         <Sidebar notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} neoCount={neoCount} paiementCount={paiementCount} reseau={reseau} />
