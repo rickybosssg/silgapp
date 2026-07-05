@@ -514,9 +514,16 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
     console.log(`[DISPATCH] 🧹 Notifications vague précédente archivées pour course ${courseId} (vague ${wave})`);
   }
 
-  // Notifier tous les livreurs sélectionnés en parallèle
-  const notifPromises = selection.map(l => notifierLivreur(base44, courseId, course, l, timeoutSec));
-  await Promise.allSettled(notifPromises);
+  // Notifier tous les livreurs sélectionnés SÉQUENTIELLEMENT (évite rate limit)
+  for (const l of selection) {
+    try {
+      await notifierLivreur(base44, courseId, course, l, timeoutSec);
+    } catch (err) {
+      console.error(`[DISPATCH] ❌ Erreur notif livreur ${l.id}:`, err.message);
+    }
+    // Petit délai entre chaque notification pour éviter le rate limit API
+    await new Promise(r => setTimeout(r, 200));
+  }
 
   console.log(`[DISPATCH] ✅ ${selection.length} livreur(s) notifiés (total cumulé: ${totalNotifies}) pour course ${courseId}, timeout: ${timeoutSec}s`);
   return {
@@ -967,7 +974,13 @@ Deno.serve(async (req) => {
       const now = new Date();
       const resultats = [];
 
-      for (const course of courses) {
+      const MAX_COURSES_PER_TICK = 8; // Limite anti-rate-limit
+      const coursesToProcess = courses.slice(0, MAX_COURSES_PER_TICK);
+      if (courses.length > MAX_COURSES_PER_TICK) {
+        console.log(`[DISPATCH] ⚡ ${courses.length} courses à traiter — limitation à ${MAX_COURSES_PER_TICK}/tick pour éviter rate limit`);
+      }
+
+      for (const course of coursesToProcess) {
         try {
           // 🔄 cycle_epuise : après 2 min d'attente → reset et retour N1
           if (course.dispatch_status === 'cycle_epuise') {
@@ -1037,6 +1050,8 @@ Deno.serve(async (req) => {
           console.error(`[DISPATCH] ❌ Erreur sur course ${course.id}:`, err.message);
           resultats.push({ course_id: course.id, error: err.message });
         }
+        // Délai entre chaque course pour éviter le rate limit API
+        await new Promise(r => setTimeout(r, 300));
       }
 
       // 🚨 Détection des courses bloquées > 10 min (dispatch en panne)
