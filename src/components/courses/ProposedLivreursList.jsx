@@ -85,11 +85,11 @@ export default function ProposedLivreursList({ course }) {
   // Construire le libellé du statut dispatch
   let dispatchLabel = "";
   let dispatchColor = "text-gray-500";
-  if (dispatchStatus === "propose") { dispatchLabel = "En cours de proposition"; dispatchColor = "text-blue-600"; }
-  else if (dispatchStatus === "en_attente") { dispatchLabel = "En attente de livreur"; dispatchColor = "text-amber-600"; }
-  else if (dispatchStatus === "redispatch") { dispatchLabel = "Relance en cours"; dispatchColor = "text-orange-600"; }
-  else if (dispatchStatus === "cycle_epuise") { dispatchLabel = "Cycle épuisé — reset imminent"; dispatchColor = "text-red-600"; }
-  else if (dispatchStatus === "accepte") { dispatchLabel = "Accepté"; dispatchColor = "text-green-600"; }
+  if (dispatchStatus === "propose") { dispatchLabel = "Livreurs notifiés"; dispatchColor = "text-blue-600"; }
+  else if (dispatchStatus === "en_attente") { dispatchLabel = "Pas de livreur dispo"; dispatchColor = "text-amber-600"; }
+  else if (dispatchStatus === "redispatch") { dispatchLabel = "Re-recherche en cours"; dispatchColor = "text-orange-600"; }
+  else if (dispatchStatus === "cycle_epuise") { dispatchLabel = "Tous sollicités"; dispatchColor = "text-red-600"; }
+  else if (dispatchStatus === "accepte") { dispatchLabel = "Course acceptée"; dispatchColor = "text-green-600"; }
 
   return (
     <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 space-y-2">
