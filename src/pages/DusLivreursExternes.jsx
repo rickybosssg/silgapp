@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
 import {
-  ArrowLeft, X, Phone, Search, CheckCircle2, Ban, Unlock, Wallet, AlertCircle
+  ArrowLeft, X, Phone, Search, CheckCircle2, Ban, Unlock, Wallet, AlertCircle, Store, UtensilsCrossed
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -74,17 +74,28 @@ function DetailModal({ entry, livreurInfo, onClose, onPaiement, onBloquer, onDeb
             )}
           </div>
 
-          {/* Résumé simple */}
-          <div className="grid grid-cols-2 gap-2 text-center">
-            <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-xs text-gray-500">Commission total</p>
-              <p className="font-bold text-gray-800">{entry.commissionTotal.toLocaleString()} F</p>
+          {/* Résumé simple — livreur uniquement */}
+          {(!entry.entityType || entry.entityType === 'livreur') && (
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <div className="bg-gray-50 rounded-xl p-3">
+                <p className="text-xs text-gray-500">Commission total</p>
+                <p className="font-bold text-gray-800">{entry.commissionTotal.toLocaleString()} F</p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3">
+                <p className="text-xs text-gray-500">Déjà payé</p>
+                <p className="font-bold text-green-600">{entry.montantPaye.toLocaleString()} F</p>
+              </div>
             </div>
-            <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-xs text-gray-500">Déjà payé</p>
-              <p className="font-bold text-green-600">{entry.montantPaye.toLocaleString()} F</p>
+          )}
+
+          {/* Infos établissement — boutique/restaurant */}
+          {entry.entityType && entry.entityType !== 'livreur' && livreurInfo && (
+            <div className="bg-gray-50 rounded-xl p-3 space-y-1">
+              {livreurInfo.quartier && <p className="text-xs text-gray-600">📍 {livreurInfo.quartier}{livreurInfo.ville ? `, ${livreurInfo.ville}` : ""}</p>}
+              {livreurInfo.adresse && <p className="text-xs text-gray-500">{livreurInfo.adresse}</p>}
+              {livreurInfo.commission_pct != null && <p className="text-xs text-gray-500">Commission : {livreurInfo.commission_pct}%</p>}
             </div>
-          </div>
+          )}
 
           {/* Dernier paiement */}
           {livreurInfo?.dernier_paiement_date && (
@@ -127,12 +138,14 @@ function DetailModal({ entry, livreurInfo, onClose, onPaiement, onBloquer, onDeb
           )}
         </div>
 
-        {/* Action bloquer/débloquer */}
-        <div className="p-4 border-t">
-          {isBloque
-            ? <Button className="w-full bg-green-600 hover:bg-green-700" onClick={onDebloquer}><Unlock className="w-4 h-4 mr-2" />Débloquer</Button>
-            : <Button variant="destructive" className="w-full" onClick={onBloquer}><Ban className="w-4 h-4 mr-2" />Bloquer</Button>}
-        </div>
+        {/* Action bloquer/débloquer — livreur uniquement */}
+        {(!entry.entityType || entry.entityType === 'livreur') && (
+          <div className="p-4 border-t">
+            {isBloque
+              ? <Button className="w-full bg-green-600 hover:bg-green-700" onClick={onDebloquer}><Unlock className="w-4 h-4 mr-2" />Débloquer</Button>
+              : <Button variant="destructive" className="w-full" onClick={onBloquer}><Ban className="w-4 h-4 mr-2" />Bloquer</Button>}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -216,6 +229,23 @@ export default function DusLivreursExternes() {
     refetchInterval: 15000,
   });
 
+  const boutiquesFilter = effectiveCountry ? { pays_code: effectiveCountry } : {};
+  const restaurantsFilter = effectiveCountry ? { pays_code: effectiveCountry } : {};
+
+  const { data: boutiques = [] } = useQuery({
+    queryKey: ["boutiques-dettes", effectiveCountry],
+    queryFn: () => base44.entities.Boutique.filter(boutiquesFilter, "-created_date", 200),
+    initialData: [],
+    refetchInterval: 15000,
+  });
+
+  const { data: restaurants = [] } = useQuery({
+    queryKey: ["restaurants-dettes", effectiveCountry],
+    queryFn: () => base44.entities.Restaurant.filter(restaurantsFilter, "-created_date", 200),
+    initialData: [],
+    refetchInterval: 15000,
+  });
+
   const { data: frais = [], isLoading: fraisLoading } = useQuery({
     queryKey: ["frais-annulation", effectiveCountry],
     queryFn: () => fraisFilter
@@ -263,6 +293,34 @@ export default function DusLivreursExternes() {
     if (filtre === "ajour") result = result.filter(r => r.montantDu <= 0);
     return { list: result.sort((a, b) => b.montantDu - a.montantDu), totalDuGlobal };
   }, [courses, livreurs, filtre]);
+
+  // ── Recap Boutiques ──
+  const recapBoutiques = useMemo(() => {
+    const list = boutiques.map(b => ({
+      id: b.id, nom: b.nom || "Inconnu", prenom: "", telephone: b.telephone || "",
+      livreurInfo: b, entityType: 'boutique', courses: [],
+      montantTotal: 0, commissionTotal: 0, montantPaye: 0, montantDu: b.montant_du_silga || 0,
+    }));
+    const totalDuGlobal = list.reduce((s, r) => s + r.montantDu, 0);
+    let result = list;
+    if (filtre === "arecouvrer") result = list.filter(r => r.montantDu > 0);
+    if (filtre === "ajour") result = list.filter(r => r.montantDu <= 0);
+    return { list: result.sort((a, b) => b.montantDu - a.montantDu), totalDuGlobal };
+  }, [boutiques, filtre]);
+
+  // ── Recap Restaurants ──
+  const recapRestaurants = useMemo(() => {
+    const list = restaurants.map(r => ({
+      id: r.id, nom: r.nom || "Inconnu", prenom: "", telephone: r.telephone || "",
+      livreurInfo: r, entityType: 'restaurant', courses: [],
+      montantTotal: 0, commissionTotal: 0, montantPaye: 0, montantDu: r.montant_du_silga || 0,
+    }));
+    const totalDuGlobal = list.reduce((s, r) => s + r.montantDu, 0);
+    let result = list;
+    if (filtre === "arecouvrer") result = list.filter(r => r.montantDu > 0);
+    if (filtre === "ajour") result = list.filter(r => r.montantDu <= 0);
+    return { list: result.sort((a, b) => b.montantDu - a.montantDu), totalDuGlobal };
+  }, [restaurants, filtre]);
 
   const recapList = recapLivreurs.list;
   const totalDu = recapLivreurs.totalDuGlobal;
@@ -321,6 +379,36 @@ export default function DusLivreursExternes() {
     onError: () => toast.error("Erreur"),
   });
 
+  // ── Paiement boutique/restaurant (mise à jour directe) ──
+  const etablissementPaiementMutation = useMutation({
+    mutationFn: async ({ entry, montant }) => {
+      const nouveauSolde = Math.max(0, (entry.montantDu ?? 0) - montant);
+      const entityName = entry.entityType === 'boutique' ? 'Boutique' : 'Restaurant';
+      await base44.entities[entityName].update(entry.id, { montant_du_silga: nouveauSolde });
+      return { nouveauSolde, montant, entry };
+    },
+    onMutate: async ({ entry, montant }) => {
+      const nouveauSolde = Math.max(0, (entry.montantDu ?? 0) - montant);
+      const qKey = entry.entityType === 'boutique' ? ["boutiques-dettes", effectiveCountry] : ["restaurants-dettes", effectiveCountry];
+      await queryClient.cancelQueries({ queryKey: qKey });
+      const prev = queryClient.getQueryData(qKey);
+      queryClient.setQueryData(qKey, (old) =>
+        (old || []).map(e => e.id === entry.id ? { ...e, montant_du_silga: nouveauSolde } : e));
+      return { prev, qKey };
+    },
+    onSuccess: ({ nouveauSolde, montant, entry }) => {
+      queryClient.invalidateQueries({ queryKey: entry.entityType === 'boutique' ? ["boutiques-dettes"] : ["restaurants-dettes"] });
+      if (detailEntry?.id === entry.id) {
+        setDetailEntry({ ...detailEntry, montantDu: nouveauSolde });
+      }
+      toast.success(`Paiement de ${montant.toLocaleString()} F enregistré`);
+    },
+    onError: (err, _v, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(ctx.qKey, ctx.prev);
+      toast.error("Erreur : " + (err.message || "Échec"));
+    },
+  });
+
   const marquerPayeMutation = useMutation({
     mutationFn: (id) => base44.entities.FraisAnnulation.update(id, { statut_paiement: "paye", paye_at: new Date().toISOString() }),
     onSuccess: () => { queryClient.invalidateQueries(["frais-annulation"]); toast.success("Marqué payé"); },
@@ -345,14 +433,22 @@ export default function DusLivreursExternes() {
       </div>
 
       {/* Onglets */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 overflow-x-auto scrollbar-hide">
         <button onClick={() => setActiveTab("livreurs")}
-          className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition ${activeTab === "livreurs" ? "bg-primary text-white" : "bg-white text-gray-600 border border-gray-200"}`}>
+          className={`flex-1 min-w-[78px] py-2.5 rounded-xl text-sm font-semibold transition whitespace-nowrap ${activeTab === "livreurs" ? "bg-primary text-white" : "bg-white text-gray-600 border border-gray-200"}`}>
           💼 Livreurs
         </button>
+        <button onClick={() => setActiveTab("boutiques")}
+          className={`flex-1 min-w-[78px] py-2.5 rounded-xl text-sm font-semibold transition whitespace-nowrap ${activeTab === "boutiques" ? "bg-primary text-white" : "bg-white text-gray-600 border border-gray-200"}`}>
+          🏪 Boutiques
+        </button>
+        <button onClick={() => setActiveTab("restaurants")}
+          className={`flex-1 min-w-[78px] py-2.5 rounded-xl text-sm font-semibold transition whitespace-nowrap ${activeTab === "restaurants" ? "bg-primary text-white" : "bg-white text-gray-600 border border-gray-200"}`}>
+          🍽️ Restaurants
+        </button>
         <button onClick={() => setActiveTab("frais")}
-          className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition relative ${activeTab === "frais" ? "bg-primary text-white" : "bg-white text-gray-600 border border-gray-200"}`}>
-          🚫 Frais annulation
+          className={`flex-1 min-w-[78px] py-2.5 rounded-xl text-sm font-semibold transition relative whitespace-nowrap ${activeTab === "frais" ? "bg-primary text-white" : "bg-white text-gray-600 border border-gray-200"}`}>
+          🚫 Frais
           {nbImpayeFrais > 0 && <span className="absolute -top-1 -right-1 w-5 h-5 bg-orange-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{nbImpayeFrais}</span>}
         </button>
       </div>
@@ -430,6 +526,144 @@ export default function DusLivreursExternes() {
         </>
       )}
 
+      {/* ── Onglet Boutiques ── */}
+      {activeTab === "boutiques" && (
+        <>
+          <div className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-4 text-white flex items-center justify-between">
+            <div>
+              <p className="text-xs opacity-80">Total dû par les boutiques</p>
+              <p className="text-3xl font-black">{recapBoutiques.totalDuGlobal.toLocaleString()} <span className="text-sm font-normal">F</span></p>
+            </div>
+            <Store className="w-10 h-10 opacity-50" />
+          </div>
+
+          <div className="flex gap-2">
+            {FILTRES.map(f => (
+              <button key={f.id} onClick={() => setFiltre(f.id)}
+                className={`flex-1 py-2 rounded-lg text-xs font-semibold transition ${filtre === f.id ? "bg-primary text-white" : "bg-white text-gray-600 border border-gray-200"}`}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {recapBoutiques.list.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">Aucune boutique dans ce filtre</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {recapBoutiques.list.map(entry => {
+                const sf = statutFinancier(entry.montantDu, entry.montantPaye);
+                return (
+                  <div key={entry.id} className="bg-white rounded-2xl border border-gray-100 p-3.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
+                          <Store className="w-4 h-4 text-amber-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-foreground text-sm truncate">{entry.nom}</p>
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${sf.dot}`} />
+                          </div>
+                          {entry.telephone && <p className="text-xs text-gray-400">{entry.telephone}</p>}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-lg font-black text-foreground">{entry.montantDu.toLocaleString()}<span className="text-xs font-normal text-gray-400 ml-0.5">F</span></p>
+                        <p className="text-[10px] text-gray-400">{sf.label}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-3">
+                      <Button variant="outline" size="sm" className="flex-1 h-8 text-xs rounded-lg" onClick={() => setDetailEntry(entry)}>
+                        Détails
+                      </Button>
+                      {entry.montantDu > 0 && (
+                        <Button size="sm" className="flex-1 h-8 text-xs bg-green-600 hover:bg-green-700 rounded-lg"
+                          disabled={etablissementPaiementMutation.isPending}
+                          onClick={() => etablissementPaiementMutation.mutate({ entry, montant: entry.montantDu })}>
+                          <CheckCircle2 className="w-3.5 h-3.5 mr-1" />Encaisser
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Onglet Restaurants ── */}
+      {activeTab === "restaurants" && (
+        <>
+          <div className="bg-gradient-to-br from-red-500 to-rose-500 rounded-2xl p-4 text-white flex items-center justify-between">
+            <div>
+              <p className="text-xs opacity-80">Total dû par les restaurants</p>
+              <p className="text-3xl font-black">{recapRestaurants.totalDuGlobal.toLocaleString()} <span className="text-sm font-normal">F</span></p>
+            </div>
+            <UtensilsCrossed className="w-10 h-10 opacity-50" />
+          </div>
+
+          <div className="flex gap-2">
+            {FILTRES.map(f => (
+              <button key={f.id} onClick={() => setFiltre(f.id)}
+                className={`flex-1 py-2 rounded-lg text-xs font-semibold transition ${filtre === f.id ? "bg-primary text-white" : "bg-white text-gray-600 border border-gray-200"}`}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {recapRestaurants.list.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">Aucun restaurant dans ce filtre</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {recapRestaurants.list.map(entry => {
+                const sf = statutFinancier(entry.montantDu, entry.montantPaye);
+                return (
+                  <div key={entry.id} className="bg-white rounded-2xl border border-gray-100 p-3.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="w-9 h-9 rounded-full bg-red-50 flex items-center justify-center shrink-0">
+                          <UtensilsCrossed className="w-4 h-4 text-red-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-foreground text-sm truncate">{entry.nom}</p>
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${sf.dot}`} />
+                          </div>
+                          {entry.telephone && <p className="text-xs text-gray-400">{entry.telephone}</p>}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-lg font-black text-foreground">{entry.montantDu.toLocaleString()}<span className="text-xs font-normal text-gray-400 ml-0.5">F</span></p>
+                        <p className="text-[10px] text-gray-400">{sf.label}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-3">
+                      <Button variant="outline" size="sm" className="flex-1 h-8 text-xs rounded-lg" onClick={() => setDetailEntry(entry)}>
+                        Détails
+                      </Button>
+                      {entry.montantDu > 0 && (
+                        <Button size="sm" className="flex-1 h-8 text-xs bg-green-600 hover:bg-green-700 rounded-lg"
+                          disabled={etablissementPaiementMutation.isPending}
+                          onClick={() => etablissementPaiementMutation.mutate({ entry, montant: entry.montantDu })}>
+                          <CheckCircle2 className="w-3.5 h-3.5 mr-1" />Encaisser
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
       {/* ── Onglet Frais ── */}
       {activeTab === "frais" && (
         <>
@@ -473,10 +707,16 @@ export default function DusLivreursExternes() {
           entry={detailEntry}
           livreurInfo={detailEntry.livreurInfo}
           onClose={() => setDetailEntry(null)}
-          onPaiement={(entry, montant) => paiementMutation.mutate({ entry, montant })}
+          onPaiement={(entry, montant) => {
+            if (entry.entityType === 'boutique' || entry.entityType === 'restaurant') {
+              etablissementPaiementMutation.mutate({ entry, montant });
+            } else {
+              paiementMutation.mutate({ entry, montant });
+            }
+          }}
           onBloquer={() => blockMutation.mutate({ id: detailEntry.id, actif: false })}
           onDebloquer={() => blockMutation.mutate({ id: detailEntry.id, actif: true })}
-          isPending={paiementMutation.isPending}
+          isPending={paiementMutation.isPending || etablissementPaiementMutation.isPending}
         />
       )}
     </div>
