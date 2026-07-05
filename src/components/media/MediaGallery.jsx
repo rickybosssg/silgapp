@@ -55,7 +55,9 @@ export default function MediaGallery({ item, className = "" }) {
             <img src={m.url} alt={item?.nom || ""} className="w-full h-full object-cover" loading="lazy" />
           )}
         </button>
-        <MediaLightbox media={media} initialIndex={0} onClose={() => setLightboxIndex(null)} />
+        {lightboxIndex !== null && (
+          <MediaLightbox media={media} initialIndex={lightboxIndex} onClose={() => setLightboxIndex(null)} />
+        )}
       </>
     );
   }

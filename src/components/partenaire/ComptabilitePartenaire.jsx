@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, Wallet, Package, Minus, BarChart3, CreditCard, Clock, CheckCircle, XCircle } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, Package, Minus, BarChart3, CreditCard, Clock, CheckCircle, XCircle, Eye } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -43,7 +43,7 @@ const PAIEMENT_STATUT = {
   refuse: { label: "Refusé", color: "text-red-500", bg: "bg-red-50", icon: XCircle },
 };
 
-export default function ComptabilitePartenaire({ type }) {
+export default function ComptabilitePartenaire({ type, etablissement }) {
   const [periodPreset, setPeriodPreset] = useState("month");
   const [showPaiementModal, setShowPaiementModal] = useState(false);
   const queryClient = useQueryClient();
@@ -70,6 +70,8 @@ export default function ComptabilitePartenaire({ type }) {
   });
 
   const kpis = compta?.kpis || {};
+  const visitesTotal = Number(etablissement?.nb_visites) || 0;
+  const derniereVisiteAt = etablissement?.derniere_visite_at;
   const evolution = compta?.evolution || [];
   const topProduits = compta?.top_produits || [];
   const parStatut = compta?.par_statut || {};
@@ -155,7 +157,20 @@ export default function ComptabilitePartenaire({ type }) {
           </CardContent>
         </Card>
       </div>
-
+        <Card className="border-0 shadow-sm bg-blue-50/60">
+          <CardContent className="p-4">
+            <p className="text-[10px] text-blue-600 font-medium uppercase tracking-wider flex items-center gap-1">
+              <Eye className="w-3 h-3" /> Visites fiche
+            </p>
+            <div className="flex items-baseline gap-1 mt-1">
+              <p className="text-lg font-black text-blue-700">{visitesTotal.toLocaleString("fr-FR")}</p>
+              <span className="text-xs text-gray-400">visites</span>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1">
+              {derniereVisiteAt ? `Derniere visite: ${format(new Date(derniereVisiteAt), "dd MMM yyyy", { locale: fr })}` : "Aucune visite enregistree"}
+            </p>
+          </CardContent>
+        </Card>
       {/* Bouton Payer SILGAPP */}
       <button
         onClick={() => setShowPaiementModal(true)}

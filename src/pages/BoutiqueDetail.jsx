@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, MapPin, Plus, Minus, ShoppingCart, Loader2, Package, Clock, X, Camera } from "lucide-react";
+import { ArrowLeft, MapPin, Plus, Minus, ShoppingCart, Loader2, Package, Clock, X, Camera, Play } from "lucide-react";
 import CheckoutModal from "@/components/boutique/CheckoutModal";
-import MediaGallery from "@/components/media/MediaGallery";
+import MediaGallery, { getMediaList } from "@/components/media/MediaGallery";
 
 export default function BoutiqueDetail() {
   const { id } = useParams();
@@ -13,6 +13,7 @@ export default function BoutiqueDetail() {
   const [cart, setCart] = useState([]);
   const [showCheckout, setShowCheckout] = useState(false);
   const [galleryProduct, setGalleryProduct] = useState(null);
+  const visitTrackedRef = useRef(false);
 
   useEffect(() => {
     base44.auth.me().then(u => {
@@ -35,6 +36,23 @@ export default function BoutiqueDetail() {
     queryFn: () => base44.entities.ProduitBoutique.filter({ boutique_id: id, disponible: true, actif: true }, "-created_date", 200),
     enabled: !!id,
   });
+
+  useEffect(() => {
+    if (!boutique?.id || visitTrackedRef.current) return;
+    const key = `silgapp_visit_boutique_${boutique.id}`;
+    const today = new Date().toISOString().slice(0, 10);
+    if (sessionStorage.getItem(key) === today) return;
+
+    visitTrackedRef.current = true;
+    sessionStorage.setItem(key, today);
+    base44.entities.Boutique.update(boutique.id, {
+      nb_visites: (Number(boutique.nb_visites) || 0) + 1,
+      derniere_visite_at: new Date().toISOString(),
+    }).catch(() => {
+      visitTrackedRef.current = false;
+      sessionStorage.removeItem(key);
+    });
+  }, [boutique?.id]);
 
   const addToCart = (p) => {
     setCart(prev => {
@@ -100,35 +118,55 @@ export default function BoutiqueDetail() {
             {produits.length === 0 && <p className="text-sm text-gray-500 text-center py-8">Aucun produit disponible</p>}
             {produits.map(p => {
               const inCart = cart.find(i => i.id === p.id);
+              const mediaList = getMediaList(p);
+              const firstMedia = mediaList[0];
+              const hasRichMedia = mediaList.length > 1 || firstMedia?.type === "video";
               return (
-                <div key={p.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 flex items-center gap-3">
+                <div key={p.id} className="bg-white rounded-3xl border border-gray-100 shadow-md shadow-gray-200/60 p-3 flex items-stretch gap-3">
                   <button
                     type="button"
                     onClick={() => setGalleryProduct(p)}
-                    className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center overflow-hidden flex-shrink-0 active:scale-95 transition-transform"
+                    className="relative w-32 min-h-32 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center overflow-hidden flex-shrink-0 active:scale-95 transition-transform"
                   >
-                    {p.photo_url ? <img src={p.photo_url} alt={p.nom} className="w-full h-full object-cover" /> : <Package className="w-6 h-6 text-blue-300" />}
+                    {firstMedia?.type === "image" ? (
+                      <img src={firstMedia.url} alt={p.nom} className="w-full h-full object-cover" />
+                    ) : firstMedia?.type === "video" ? (
+                      <>
+                        <video src={firstMedia.url} className="w-full h-full object-cover" preload="metadata" muted playsInline />
+                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                          <Play className="w-8 h-8 text-white fill-white" />
+                        </div>
+                      </>
+                    ) : (
+                      <Package className="w-10 h-10 text-blue-300" />
+                    )}
+                    {hasRichMedia && (
+                      <span className="absolute left-2 bottom-2 rounded-full bg-black/65 px-2 py-1 text-[10px] font-bold text-white">
+                        {mediaList.length} médias
+                      </span>
+                    )}
                   </button>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-gray-900 text-sm truncate">{p.nom}</p>
-                    <p className="text-xs text-gray-500 truncate">{p.description}</p>
-                    <p className="font-bold text-primary text-sm mt-0.5">{(p.prix || 0).toLocaleString()} FCFA</p>
-                    {(p.photos_urls || p.video_url) && (
-                      <p className="text-[10px] text-blue-500 font-medium mt-0.5 flex items-center gap-1">
+                  <div className="flex-1 min-w-0 py-1 flex flex-col">
+                    <p className="font-black text-gray-950 text-base leading-snug line-clamp-2">{p.nom}</p>
+                    {p.description && <p className="text-xs text-gray-500 line-clamp-2 mt-1">{p.description}</p>}
+                    <p className="font-black text-primary text-lg mt-2">{(p.prix || 0).toLocaleString()} FCFA</p>
+                    {hasRichMedia && (
+                      <p className="text-[11px] text-blue-600 font-bold mt-1 flex items-center gap-1">
                         <Camera className="w-3 h-3" />
-                        Voir les médias
+                        Voir la galerie
                       </p>
                     )}
+                    <div className="mt-auto pt-2 text-[10px] font-semibold text-gray-400">Touchez la photo pour agrandir</div>
                   </div>
                   {isOuvert && (
                     inCart ? (
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex flex-col items-center justify-center gap-2 flex-shrink-0">
                         <button onClick={() => updateQty(p.id, -1)} className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center"><Minus className="w-4 h-4" /></button>
                         <span className="font-bold text-sm w-6 text-center">{inCart.quantite}</span>
                         <button onClick={() => updateQty(p.id, 1)} className="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center"><Plus className="w-4 h-4" /></button>
                       </div>
                     ) : (
-                      <button onClick={() => addToCart(p)} className="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center flex-shrink-0"><Plus className="w-4 h-4" /></button>
+                      <button onClick={() => addToCart(p)} className="w-12 h-12 self-center rounded-2xl bg-red-600 text-white flex items-center justify-center flex-shrink-0 shadow-lg shadow-red-500/25 active:scale-95 transition-transform"><Plus className="w-6 h-6" /></button>
                     )
                   )}
                 </div>

@@ -317,8 +317,8 @@ export default function PartenaireDashboard() {
           </div>
         )}
         {tab === "promo" && <OngletCodePromoPartenaire partenaireId={user.id} />}
-        {tab === "statistiques" && <ComptabilitePartenaire type={etablissementType} />}
-        {tab === "revenus" && <ComptabilitePartenaire type={etablissementType} />}
+        {tab === "statistiques" && <ComptabilitePartenaire type={etablissementType} etablissement={etablissement} />}
+        {tab === "revenus" && <ComptabilitePartenaire type={etablissementType} etablissement={etablissement} />}
         {tab === "infos" && (
           <EtablissementForm type={etablissementType} existing={etablissement} partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === 'admin'}
             onSaved={() => queryClient.invalidateQueries({ queryKey: hasPharmacie ? ["ma-pharmacie"] : etablissementType === "boutique" ? ["ma-boutique"] : ["mon-restaurant"] })} />

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Package, ShoppingBag, MessageCircle, BarChart3, Store, Wallet, Loader2, CheckCircle, Clock, Truck, TrendingUp } from "lucide-react";
+import { Package, ShoppingBag, MessageCircle, BarChart3, Store, Wallet, Loader2, CheckCircle, Clock, Truck, TrendingUp, Eye } from "lucide-react";
 
 export default function PartenaireHome({ etablissement, etablissementType, onNavigate, messageBadge = 0 }) {
   const isRestaurant = etablissementType === "restaurant";
@@ -97,6 +97,7 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
   const pendingCount = isPharmacie
     ? pharmaActiveCourses.length
     : commandes.filter((commande) => !["livree", "annulee"].includes(commande.statut)).length;
+  const visitesTotal = Number(etablissement?.nb_visites) || 0;
 
   const handleToggleOuvert = async () => {
     setToggling(true);
@@ -121,7 +122,7 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
     { id: "commandes", icon: Package, label: "Commandes", subtitle: "Gérer les commandes", bg: isRestaurant ? "bg-orange-50" : "bg-blue-50", iconColor: isRestaurant ? "text-orange-700" : "text-blue-600", badge: pendingCount },
     { id: "produits", icon: ShoppingBag, label: isRestaurant ? "Plats" : "Produits", subtitle: "Gérer le catalogue", bg: isRestaurant ? "bg-amber-50" : "bg-blue-50", iconColor: isRestaurant ? "text-amber-700" : "text-blue-700" },
     { id: "messages", icon: MessageCircle, label: "Messages", subtitle: "Discuter avec clients", bg: "bg-green-50", iconColor: "text-green-600", badge: messageBadge },
-    { id: "statistiques", icon: BarChart3, label: "Statistiques", subtitle: "Ventes et revenus", bg: "bg-amber-50", iconColor: "text-amber-600" },
+    { id: "statistiques", icon: BarChart3, label: "Statistiques", subtitle: "Ventes, revenus et visites", bg: "bg-amber-50", iconColor: "text-amber-600" },
     { id: "infos", icon: Store, label: "Informations", subtitle: "Modifier la fiche", bg: "bg-pink-50", iconColor: "text-pink-600" },
     { id: "revenus", icon: Wallet, label: "Revenus", subtitle: "Suivi des paiements", bg: "bg-teal-50", iconColor: "text-teal-600" },
   ];
@@ -185,7 +186,7 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
         <QuickStat icon={CheckCircle} value={livreesToday} label="Livrées" color="text-green-600" bg="bg-green-50" />
         <QuickStat icon={Clock} value={enPreparation} label={isPharmacie ? "Recherche" : "Préparation"} color="text-orange-600" bg="bg-orange-50" />
         <QuickStat icon={Truck} value={enLivraison} label="En livraison" color="text-indigo-600" bg="bg-indigo-50" />
-        <QuickStat icon={MessageCircle} value={isPharmacie ? pharmaConversations.length : annuleesToday} label={isPharmacie ? "Messages" : "Annulées"} color={isPharmacie ? "text-emerald-600" : "text-red-600"} bg={isPharmacie ? "bg-emerald-50" : "bg-red-50"} />
+        <QuickStat icon={isPharmacie ? MessageCircle : Eye} value={isPharmacie ? pharmaConversations.length : visitesTotal} label={isPharmacie ? "Messages" : "Visites"} color={isPharmacie ? "text-emerald-600" : "text-blue-600"} bg={isPharmacie ? "bg-emerald-50" : "bg-blue-50"} />
       </div>
 
       <div>

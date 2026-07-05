@@ -107,6 +107,16 @@
       "type": "number",
       "description": "Commission configurable (fallback global si null)"
     },
+    "nb_visites": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de visites de la fiche boutique cote client"
+    },
+    "derniere_visite_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Derniere visite de la fiche boutique"
+    },
     "partenaire_id": {
       "type": "string",
       "description": "User ID du partenaire propri\u00e9taire"
