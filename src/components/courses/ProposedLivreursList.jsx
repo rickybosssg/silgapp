@@ -1,37 +1,35 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Users, Phone, MapPin, Clock, CheckCircle2, XCircle, Timer, RefreshCw } from "lucide-react";
+import { Users, Phone, MapPin, Clock, CheckCircle2, XCircle, Timer, RefreshCw, Radio, Search, Zap } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+
+function fmtSec(sec) {
+  if (sec <= 0) return "00:00";
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
 
 export default function ProposedLivreursList({ course }) {
   const [livreurs, setLivreurs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [remainingSec, setRemainingSec] = useState(null);
-  const [isExpired, setIsExpired] = useState(false);
+  const [now, setNow] = useState(Date.now());
 
-  // ── Compte à rebours avant prochaine relance ──
+  // ── Tick toutes les secondes pour tous les compteurs ──
   useEffect(() => {
-    if (!course?.timeout_expires_at) {
-      setRemainingSec(null);
-      setIsExpired(false);
-      return;
-    }
-    const update = () => {
-      const expires = new Date(course.timeout_expires_at);
-      const diff = Math.round((expires.getTime() - Date.now()) / 1000);
-      if (diff > 0) {
-        setRemainingSec(diff);
-        setIsExpired(false);
-      } else {
-        setRemainingSec(0);
-        setIsExpired(true);
-      }
-    };
-    update();
-    const iv = setInterval(update, 1000);
+    const iv = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(iv);
-  }, [course?.timeout_expires_at]);
+  }, []);
+
+  // ── Temps écoulé depuis notification (heure_sollicitation) ──
+  const sollicitationTs = course?.heure_sollicitation ? new Date(course.heure_sollicitation).getTime() : null;
+  const elapsedSinceNotif = sollicitationTs ? Math.max(0, Math.floor((now - sollicitationTs) / 1000)) : null;
+
+  // ── Temps restant avant expiration du timeout ──
+  const expiresTs = course?.timeout_expires_at ? new Date(course.timeout_expires_at).getTime() : null;
+  const remainingSec = expiresTs ? Math.max(0, Math.floor((expiresTs - now) / 1000)) : null;
+  const isExpired = expiresTs ? now >= expiresTs : false;
 
   useEffect(() => {
     let mounted = true;
@@ -103,41 +101,82 @@ export default function ProposedLivreursList({ course }) {
         </span>
       </div>
 
-      {/* ── Compte à rebours + statut dispatch ── */}
+      {/* ── Timeline dispatch : toutes les actions avec leur timing ── */}
       {isSearching && (
-        <div className={`rounded-lg p-2.5 ${
-          isExpired ? "bg-orange-50 border-2 border-orange-300" : "bg-white border-2 border-blue-200"
-        }`}>
+        <div className="rounded-lg p-3 bg-white border-2 border-blue-200 space-y-2.5">
+          {/* En-tête : vague + statut */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5">
-              {isExpired ? (
-                <RefreshCw className="w-4 h-4 text-orange-500 animate-spin" />
-              ) : (
-                <Timer className="w-4 h-4 text-blue-500" />
-              )}
-              <span className={`text-xs font-bold ${isExpired ? "text-orange-600" : "text-blue-600"}`}>
-                {isExpired ? "Timeout dépassé — relance en cours" : "Prochaine relance dans"}
+              <Radio className="w-4 h-4 text-blue-500 animate-pulse" />
+              <span className="text-xs font-bold text-blue-600">
+                Vague #{course?.dispatch_wave || 0}
               </span>
             </div>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-              isExpired ? "bg-orange-200 text-orange-700" : "bg-blue-100 text-blue-700"
-            }`}>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
               {dispatchLabel}
             </span>
           </div>
-          {remainingSec !== null && (
-            <div className="mt-1.5 flex items-center gap-2">
-              <div className={`flex-1 h-2 rounded-full overflow-hidden ${isExpired ? "bg-orange-100" : "bg-blue-100"}`}>
-                <div
-                  className={`h-full rounded-full transition-all duration-1000 ${isExpired ? "bg-orange-500" : "bg-blue-500"}`}
-                  style={{ width: isExpired ? "100%" : `${Math.min(100, (remainingSec / 60) * 100)}%` }}
-                />
+
+          {/* Action 1 : Notification envoyée — temps écoulé */}
+          {elapsedSinceNotif !== null && (
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
               </div>
-              <span className={`text-base font-black tabular-nums ${isExpired ? "text-orange-600" : "text-blue-600"}`}>
-                {isExpired ? "00:00" : `${Math.floor(remainingSec / 60)}:${String(remainingSec % 60).padStart(2, "0")}`}
-              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-semibold text-gray-700">Livreurs notifiés</p>
+                <p className="text-[10px] text-gray-400">il y a {fmtSec(elapsedSinceNotif)}</p>
+              </div>
+              <span className="text-xs font-bold text-green-600 tabular-nums">{fmtSec(elapsedSinceNotif)}</span>
             </div>
           )}
+
+          {/* Action 2 : Attente réponse — compte à rebours */}
+          {remainingSec !== null && !isExpired && (
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                <Timer className="w-3.5 h-3.5 text-blue-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-semibold text-gray-700">Attente de réponse</p>
+                <p className="text-[10px] text-gray-400">expire dans {fmtSec(remainingSec)}</p>
+                <div className="mt-1 h-1.5 bg-blue-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, (remainingSec / 60) * 100)}%` }} />
+                </div>
+              </div>
+              <span className="text-lg font-black text-blue-600 tabular-nums">{fmtSec(remainingSec)}</span>
+            </div>
+          )}
+
+          {/* Action 3 : Timeout expiré — relance imminente */}
+          {isExpired && (
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+                <RefreshCw className="w-3.5 h-3.5 text-orange-600 animate-spin" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-semibold text-orange-600">Timeout dépassé</p>
+                <p className="text-[10px] text-orange-400">relance de la vague suivante…</p>
+              </div>
+              <span className="text-lg font-black text-orange-600 tabular-nums">00:00</span>
+            </div>
+          )}
+
+          {/* Action 4 : Prochaine vague prévue */}
+          <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
+            <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+              <Search className="w-3.5 h-3.5 text-gray-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-semibold text-gray-600">Prochaine action</p>
+              <p className="text-[10px] text-gray-400">
+                {isExpired
+                  ? `Vague #${(course?.dispatch_wave || 0) + 1} — recherche de nouveaux livreurs`
+                  : `Vague #${(course?.dispatch_wave || 0) + 1} après expiration`}
+              </p>
+            </div>
+            <Zap className="w-3.5 h-3.5 text-amber-500" />
+          </div>
         </div>
       )}
       {isCycleEpuise && (
