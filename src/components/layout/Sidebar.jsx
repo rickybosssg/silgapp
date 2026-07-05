@@ -26,7 +26,8 @@ export const navItems = [
   { path: "/carte", label: "Carte en direct", icon: MapPin },
   { path: "/courses", label: "Toutes les courses", icon: Package },
   { path: "/livreurs", label: "Livreurs", icon: Truck },
-  { path: "/admin/externe/dus-livreurs", label: "Dûs Livreurs", icon: Wallet },
+  { path: "/admin/externe/dus-livreurs", label: "Dû Utilisateur", icon: Wallet },
+  { path: "/admin/paiements", label: "Paiements", icon: Wallet },
   { path: "/rapport", label: "Rapport du jour", icon: BarChart3 },
   { path: "/recapitulatif", label: "Récapitulatif", icon: TrendingUp },
   { path: "/admin/statistiques", label: "Statistiques", icon: PieChart },
@@ -53,7 +54,7 @@ export const navItems = [
   { path: "/maintenance", label: "Maintenance", icon: Shield },
 ];
 
-export default function Sidebar({ notificationCount = 0, demandesCount = 0, partenaireDemandesCount = 0, neoCount = 0, reseau }) {
+export default function Sidebar({ notificationCount = 0, demandesCount = 0, partenaireDemandesCount = 0, neoCount = 0, paiementCount = 0, reseau }) {
   const [collapsed, setCollapsed] = useState(false);
   const [countryOpen, setCountryOpen] = useState(false);
   const location = useLocation();
@@ -125,6 +126,9 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
                     <Badge className="bg-cyan-500 text-white text-[10px] h-5 min-w-5 flex items-center justify-center px-1">
                       {neoCount}
                     </Badge>
+                  )}
+                  {item.path === "/admin/paiements" && paiementCount > 0 && (
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
                   )}
                 </>
               )}

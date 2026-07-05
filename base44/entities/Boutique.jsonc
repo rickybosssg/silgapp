@@ -101,6 +101,11 @@
       "type": "number",
       "description": "Commission configurable (fallback global si null)"
     },
+    "montant_du_silga": {
+      "type": "number",
+      "default": 0,
+      "description": "Montant d\u00fb \u00e0 SILGAPP (commissions)"
+    },
     "partenaire_id": {
       "type": "string",
       "description": "User ID du partenaire propri\u00e9taire"

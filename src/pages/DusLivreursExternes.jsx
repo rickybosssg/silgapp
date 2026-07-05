@@ -339,8 +339,8 @@ export default function DusLivreursExternes() {
           <Button variant="ghost" size="sm" className="gap-1.5"><ArrowLeft className="w-4 h-4" /></Button>
         </Link>
         <div>
-          <h1 className="text-lg font-bold text-foreground">Comptabilité</h1>
-          <p className="text-xs text-gray-500">Livreurs & frais d'annulation</p>
+          <h1 className="text-lg font-bold text-foreground">Dû Utilisateur</h1>
+          <p className="text-xs text-gray-500">Livreurs, clients, boutiques & restaurants</p>
         </div>
       </div>
 

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { clearPersistedToken } from "@/lib/authPersistence";
-import { AlertTriangle, Check, Truck, X } from "lucide-react";
+import { AlertTriangle, Check, Truck, X, Wallet, ChevronRight } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
@@ -1357,6 +1358,23 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               montantDüSilga={montantDüSilga}
               isExterne={true}
             />
+
+            {montantDüSilga > 0 && (
+              <Link to="/payer-silgapp">
+                <div className="bg-white rounded-2xl border border-orange-200 p-3.5 flex items-center justify-between shadow-sm active:scale-[0.98] transition">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center">
+                      <Wallet className="w-5 h-5 text-orange-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-gray-900">Payer SILGAPP</p>
+                      <p className="text-xs text-gray-400">Envoyer une preuve de dépôt</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-300" />
+                </div>
+              </Link>
+            )}
 
             <LivreurStatutCard statut={livreurProfil.statut} livreur={livreurProfil} isExterne={true} />
 
