@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { TrendingUp, Package, CheckCircle, AlertCircle, Banknote } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 
-export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantDüSilga, isExterne = false }) {
+export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantDuSilga, isExterne = false }) {
   const today = new Date().toDateString();
   const livreesToday = mesCourses.filter(c =>
     c.statut === "livree" && new Date(c.heure_livraison || c.updated_date).toDateString() === today
@@ -53,7 +53,7 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
                 <p className={`text-2xl font-black ${item.valClass}`}>{item.val}</p>
               ) : (
                 <p className={`text-xs font-black ${item.valClass} leading-tight`}>
-                  {montantDüSilga > 0 ? `${montantDüSilga.toLocaleString()}` : "0"}<span className="text-[9px] ml-0.5">F</span>
+                  {montantDuSilga > 0 ? `${montantDuSilga.toLocaleString()}` : "0"}<span className="text-[9px] ml-0.5">F</span>
                 </p>
               )}
               <p className="text-[10px] text-gray-400 font-medium mt-0.5">{item.label}</p>

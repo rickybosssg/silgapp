@@ -201,6 +201,11 @@
       "type": "number",
       "default": 0
     },
+    "dernier_paiement_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date du dernier r\u00e8glement enregistr\u00e9 par l'admin"
+    },
     "encours": {
       "type": "number",
       "default": 0

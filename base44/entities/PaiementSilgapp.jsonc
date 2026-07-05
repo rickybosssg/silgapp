@@ -1,0 +1,104 @@
+{
+  "name": "PaiementSilgapp",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email de l utilisateur"
+    },
+    "user_type": {
+      "type": "string",
+      "enum": [
+        "client",
+        "livreur",
+        "boutique",
+        "restaurant"
+      ],
+      "description": "Type d utilisateur"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "ID de l entite (livreur_id, client_id, boutique_id, restaurant_id)"
+    },
+    "user_nom": {
+      "type": "string"
+    },
+    "user_telephone": {
+      "type": "string"
+    },
+    "type_dette": {
+      "type": "string",
+      "enum": [
+        "commission_livreur",
+        "frais_annulation_client",
+        "commission_boutique",
+        "commission_restaurant"
+      ],
+      "description": "Type de dette envers SILGAPP"
+    },
+    "montant_du": {
+      "type": "number",
+      "description": "Montant du au moment de l envoi"
+    },
+    "montant_paye": {
+      "type": "number",
+      "description": "Montant declare paye par l utilisateur"
+    },
+    "numero_depot": {
+      "type": "string",
+      "default": "+226 66 92 51 90",
+      "description": "Numero utilise pour le depot"
+    },
+    "preuve_url": {
+      "type": "string",
+      "description": "Photo de la preuve de depot"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "en_attente",
+        "traite",
+        "refuse"
+      ],
+      "default": "en_attente"
+    },
+    "traite_par": {
+      "type": "string",
+      "description": "Email admin ayant traite"
+    },
+    "traite_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "date_envoi": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "motif_refus": {
+      "type": "string"
+    },
+    "country_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE",
+        "GH"
+      ]
+    }
+  },
+  "required": [
+    "user_email",
+    "user_type",
+    "user_id",
+    "user_nom",
+    "montant_paye",
+    "preuve_url",
+    "statut"
+  ]
+}

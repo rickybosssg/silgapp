@@ -10,6 +10,10 @@ Deno.serve(async (req) => {
         base44.asServiceRole.entities.CourseExterne.update(cid, { statut_paiement_livreur: "paye" })
       ));
     }
+    // Si le montant_du_silga est modifié, enregistrer automatiquement la date de paiement
+    if (data.montant_du_silga !== undefined) {
+      data.dernier_paiement_date = new Date().toISOString();
+    }
     const updated = await base44.asServiceRole.entities.Livreur.update(id, data);
     return Response.json({ success: true, livreur: updated });
   } catch (error) {

@@ -117,6 +117,11 @@
       "format": "date-time",
       "description": "Derniere visite de la fiche boutique"
     },
+    "montant_du_silga": {
+      "type": "number",
+      "default": 0,
+      "description": "Montant d\u00fb \u00e0 SILGAPP (commissions)"
+    },
     "partenaire_id": {
       "type": "string",
       "description": "User ID du partenaire propri\u00e9taire"

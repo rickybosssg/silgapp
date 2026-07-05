@@ -85,6 +85,8 @@ const PharmacieDetail = lazy(() => import('./pages/PharmacieDetail.jsx'));
 const AdminMessages = lazy(() => import('./pages/AdminMessages.jsx'));
 const NeoDashboard = lazy(() => import('./pages/NeoDashboard.jsx'));
 const BugsTracking = lazy(() => import('./pages/BugsTracking.jsx'));
+const PayerSilgapp = lazy(() => import('./pages/PayerSilgapp.jsx'));
+const PaiementsAdmin = lazy(() => import('./pages/PaiementsAdmin.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -225,7 +227,10 @@ function AppContent() {
   if (isPartenaire) {
     return (
       <Suspense fallback={<LoadingScreen />}>
-        <PartenaireDashboard />
+        <Routes>
+          <Route path="/payer-silgapp" element={<PayerSilgapp />} />
+          <Route path="*" element={<PartenaireDashboard />} />
+        </Routes>
       </Suspense>
     );
   }
@@ -239,6 +244,7 @@ function AppContent() {
           <AppMaintenanceGate>
             <Routes>
               <Route path="/livreur/recap-course/:courseId" element={<RecapCourseLivreur />} />
+              <Route path="/payer-silgapp" element={<PayerSilgapp />} />
               <Route path="*" element={<LivreurExterneApp livreurProfil={livreurProfil} />} />
             </Routes>
           </AppMaintenanceGate>
@@ -249,7 +255,10 @@ function AppContent() {
     return (
       <Suspense fallback={<LoadingScreen />}>
         <AppMaintenanceGate>
-          <LivreurApp livreurProfil={livreurProfil} />
+          <Routes>
+            <Route path="/payer-silgapp" element={<PayerSilgapp />} />
+            <Route path="*" element={<LivreurApp livreurProfil={livreurProfil} />} />
+          </Routes>
         </AppMaintenanceGate>
       </Suspense>
     );
@@ -261,6 +270,7 @@ function AppContent() {
       <Suspense fallback={<LoadingScreen />}>
         <Routes>
           <Route path="/" element={<ClientExterneApp />} />
+          <Route path="/payer-silgapp" element={<PayerSilgapp />} />
           <Route path="/client/course/expedier" element={<CourseExterneFormSync />} />
           <Route path="/client/course/recevoir" element={<CourseExterneFormSync />} />
           <Route path="/client/course/deplacement" element={<CourseExterneFormSync />} />
@@ -377,6 +387,7 @@ function AppContent() {
           <Route path="/admin/restaurants" element={<AnimatedRoutes><GestionRestaurants /></AnimatedRoutes>} />
           <Route path="/admin/pharmacies" element={<AnimatedRoutes><GestionPharmacies /></AnimatedRoutes>} />
           <Route path="/admin/commandes-partenaires" element={<AnimatedRoutes><CommandesPartenaires /></AnimatedRoutes>} />
+          <Route path="/admin/paiements" element={<AnimatedRoutes><PaiementsAdmin /></AnimatedRoutes>} />
           <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
           <Route path="/admin/neo" element={<AnimatedRoutes><NeoDashboard /></AnimatedRoutes>} />
           <Route path="/admin/bugs" element={<AnimatedRoutes><BugsTracking /></AnimatedRoutes>} />

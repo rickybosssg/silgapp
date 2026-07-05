@@ -2,7 +2,22 @@ import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Package, ShoppingBag, MessageCircle, BarChart3, Store, Wallet, Loader2, CheckCircle, Clock, Truck, TrendingUp, Eye } from "lucide-react";
+import {
+  Package,
+  ShoppingBag,
+  MessageCircle,
+  BarChart3,
+  Store,
+  Wallet,
+  Loader2,
+  CheckCircle,
+  Clock,
+  Truck,
+  TrendingUp,
+  Eye,
+  ChevronRight,
+} from "lucide-react";
+import { Link } from "react-router-dom";
 
 export default function PartenaireHome({ etablissement, etablissementType, onNavigate, messageBadge = 0 }) {
   const isRestaurant = etablissementType === "restaurant";
@@ -14,10 +29,7 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
         hero: "from-emerald-700 via-green-600 to-teal-600",
         shadow: "shadow-emerald-100",
         accent: "text-emerald-600",
-        activeBg: "bg-emerald-600",
-        soft: "bg-emerald-50",
         softBorder: "border-emerald-100",
-        icon: "text-emerald-700",
         label: "Espace pharmacie",
       }
     : isRestaurant
@@ -25,20 +37,14 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
           hero: "from-orange-600 via-amber-500 to-rose-500",
           shadow: "shadow-orange-100",
           accent: "text-orange-600",
-          activeBg: "bg-orange-600",
-          soft: "bg-orange-50",
           softBorder: "border-orange-100",
-          icon: "text-orange-700",
           label: "Espace restaurant",
         }
       : {
           hero: "from-sky-700 via-blue-600 to-indigo-600",
           shadow: "shadow-sky-100",
           accent: "text-blue-600",
-          activeBg: "bg-blue-600",
-          soft: "bg-blue-50",
           softBorder: "border-blue-100",
-          icon: "text-blue-700",
           label: "Espace boutique",
         };
   const queryClient = useQueryClient();
@@ -93,11 +99,11 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
   const enPreparation = isPharmacie ? pharmaEnRecherche : commandes.filter((commande) => commande.statut === "en_preparation").length;
   const enLivraison = isPharmacie ? pharmaEnLivraison : commandes.filter((commande) => ["livreur_assigne", "en_livraison"].includes(commande.statut)).length;
   const livreesToday = isPharmacie ? pharmaLivreesToday : commandesToday.filter((commande) => commande.statut === "livree").length;
-  const annuleesToday = isPharmacie ? 0 : commandesToday.filter((commande) => commande.statut === "annulee").length;
   const pendingCount = isPharmacie
     ? pharmaActiveCourses.length
     : commandes.filter((commande) => !["livree", "annulee"].includes(commande.statut)).length;
   const visitesTotal = Number(etablissement?.nb_visites) || 0;
+  const montantDuSilga = Number(etablissement?.montant_du_silga) || 0;
 
   const handleToggleOuvert = async () => {
     setToggling(true);
@@ -105,8 +111,6 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
       const eName = isPharmacie ? "Pharmacie" : isRestaurant ? "Restaurant" : "Boutique";
       await base44.entities[eName].update(etablissement.id, { ouvert: !etablissement.ouvert });
       queryClient.invalidateQueries({ queryKey: isPharmacie ? ["ma-pharmacie"] : isRestaurant ? ["mon-restaurant"] : ["ma-boutique"] });
-    } catch {
-      // La UI sera rafraichie au prochain cycle.
     } finally {
       setToggling(false);
     }
@@ -174,7 +178,7 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
             </span>
           </div>
 
-        <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <HeroStat value={isPharmacie ? pharmaConversations.length : commandesToday.length} label={isPharmacie ? "Conversations actives" : "Commandes aujourd'hui"} />
             <HeroStat value={isPharmacie ? pharmaActiveCourses.length : revenusToday.toLocaleString()} label={isPharmacie ? "Livraisons en cours" : "FCFA de ventes"} />
             <HeroStat value={enPreparation} label={isPharmacie ? "En recherche" : "En préparation"} />
@@ -188,6 +192,23 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
         <QuickStat icon={Truck} value={enLivraison} label="En livraison" color="text-indigo-600" bg="bg-indigo-50" />
         <QuickStat icon={isPharmacie ? MessageCircle : Eye} value={isPharmacie ? pharmaConversations.length : visitesTotal} label={isPharmacie ? "Messages" : "Visites"} color={isPharmacie ? "text-emerald-600" : "text-blue-600"} bg={isPharmacie ? "bg-emerald-50" : "bg-blue-50"} />
       </div>
+
+      {!isPharmacie && montantDuSilga > 0 && (
+        <Link to="/payer-silgapp">
+          <div className="bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl p-4 text-white flex items-center justify-between shadow-lg shadow-orange-200 active:scale-[0.98] transition">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                <Wallet className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="font-black text-sm">Payer SILGAPP</p>
+                <p className="text-xs text-white/80">Commission due : {montantDuSilga.toLocaleString()} FCFA</p>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-white/70" />
+          </div>
+        </Link>
+      )}
 
       <div>
         <h2 className="text-sm font-bold text-gray-700 mb-3 px-1 flex items-center gap-1.5">

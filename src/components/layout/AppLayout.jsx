@@ -6,12 +6,14 @@ import MobileNav from "./MobileNav";
 import DemandesLivreursPopup from "@/components/admin/DemandesLivreursPopup";
 import DemandesPartenairesPopup from "@/components/admin/DemandesPartenairesPopup";
 import NeoNotificationModal from "@/components/neo/NeoNotificationModal";
+import PaiementRecuModal from "@/components/admin/PaiementRecuModal";
 
 export default function AppLayout({ reseau }) {
   const [notifCount, setNotifCount] = useState(0);
   const [demandesCount, setDemandesCount] = useState(0);
   const [partenaireDemandesCount, setPartenaireDemandesCount] = useState(0);
   const [neoCount, setNeoCount] = useState(0);
+  const [paiementCount, setPaiementCount] = useState(0);
 
   useEffect(() => {
     const fetchNotifs = async () => {
@@ -45,8 +47,15 @@ export default function AppLayout({ reseau }) {
     fetchNotifs();
     fetchDemandes();
     fetchPartenaireDemandes();
+    const fetchPaiements = async () => {
+      try {
+        const data = await base44.entities.PaiementSilgapp.filter({ statut: "en_attente" });
+        setPaiementCount((data || []).length);
+      } catch (_) {}
+    };
     fetchNeoCount();
-    const iv = setInterval(() => { fetchNotifs(); fetchDemandes(); fetchPartenaireDemandes(); fetchNeoCount(); }, 30000);
+    fetchPaiements();
+    const iv = setInterval(() => { fetchNotifs(); fetchDemandes(); fetchPartenaireDemandes(); fetchNeoCount(); fetchPaiements(); }, 30000);
     return () => clearInterval(iv);
   }, []);
 
@@ -57,9 +66,10 @@ export default function AppLayout({ reseau }) {
       <DemandesLivreursPopup />
       <DemandesPartenairesPopup />
       <NeoNotificationModal />
+      <PaiementRecuModal />
 
       <div className="hidden lg:flex min-h-screen">
-        <Sidebar notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} neoCount={neoCount} reseau={reseau} />
+        <Sidebar notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} neoCount={neoCount} paiementCount={paiementCount} reseau={reseau} />
         <main className="flex-1 min-h-screen overflow-x-hidden bg-slate-50">
           <Outlet />
         </main>
