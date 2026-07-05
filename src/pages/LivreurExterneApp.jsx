@@ -1404,22 +1404,26 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               isExterne={true}
             />
 
-            {montantDuSilga > 0 && (
-              <Link to="/payer-silgapp">
-                <div className="bg-white rounded-2xl border border-orange-200 p-3.5 flex items-center justify-between shadow-sm active:scale-[0.98] transition">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center">
-                      <Wallet className="w-5 h-5 text-orange-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-gray-900">Payer SILGAPP</p>
-                      <p className="text-xs text-gray-400">Envoyer une preuve de dépôt</p>
-                    </div>
+            <Link to="/payer-silgapp">
+              <div className={`rounded-2xl border p-3.5 flex items-center justify-between shadow-sm active:scale-[0.98] transition ${
+                montantDuSilga > 0 ? "bg-orange-50 border-orange-200" : "bg-white border-blue-100"
+              }`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                    montantDuSilga > 0 ? "bg-orange-100" : "bg-blue-50"
+                  }`}>
+                    <Wallet className={`w-5 h-5 ${montantDuSilga > 0 ? "text-orange-600" : "text-blue-700"}`} />
                   </div>
-                  <ChevronRight className="w-4 h-4 text-gray-300" />
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">Payer SILGAPP</p>
+                    <p className="text-xs text-gray-500">
+                      {montantDuSilga > 0 ? `Du : ${montantDuSilga.toLocaleString()} FCFA` : "Aucun du pour le moment"}
+                    </p>
+                  </div>
                 </div>
-              </Link>
-            )}
+                <ChevronRight className="w-4 h-4 text-gray-300" />
+              </div>
+            </Link>
 
             <LivreurStatutCard statut={livreurProfil.statut} livreur={livreurProfil} isExterne={true} />
 

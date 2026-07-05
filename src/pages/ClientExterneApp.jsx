@@ -12,7 +12,7 @@ import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import {
   MapPin, Navigation, MessageCircle, User, Package,
-  Clock, ChevronRight, TrendingUp, Loader2, ArrowLeft, RefreshCw,
+  Clock, ChevronRight, TrendingUp, Loader2, ArrowLeft, RefreshCw, Wallet,
   Store, UtensilsCrossed, Bell, Pill, Inbox, Car, Headphones, ShieldCheck, Zap
 } from "lucide-react";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
@@ -972,6 +972,17 @@ export default function ClientExterneApp() {
                 </button>
 
                 <button
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-cyan-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-cyan-200"
+                  onClick={() => navigate("/payer-silgapp")}
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-600 to-blue-700 flex items-center justify-center shadow-lg shadow-cyan-200 mb-2 group-hover:scale-105 transition-transform">
+                    <Wallet className="w-5 h-5 text-white" />
+                  </div>
+                  <p className="font-black text-gray-900 text-xs">Payer SILGAPP</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">Regler vos frais</p>
+                </button>
+
+                <button
                   className="group relative overflow-hidden rounded-2xl bg-white border border-blue-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-blue-200"
                   onClick={() => navigate("/client/boutiques")}
                 >
@@ -1033,6 +1044,7 @@ export default function ClientExterneApp() {
                     { icon: <Bell className="w-5 h-5" />, label: "Notifications", color: "text-red-600", bg: "bg-red-50", badge: notifications.length, action: openNotificationsPanel },
                     { icon: <Package className="w-5 h-5" />, label: "Commandes", color: "text-indigo-600", bg: "bg-indigo-50", badge: commandesActivesCount, action: () => navigate("/client/mes-commandes") },
                     { icon: <Clock className="w-5 h-5" />, label: "Programmees", color: "text-amber-600", bg: "bg-amber-50", action: () => navigate("/client/livraisons-programmees") },
+                    { icon: <Wallet className="w-5 h-5" />, label: "Paiement", color: "text-cyan-700", bg: "bg-cyan-50", action: () => navigate("/payer-silgapp") },
                     { icon: <Headphones className="w-5 h-5" />, label: "Support", color: "text-green-600", bg: "bg-green-50", action: () => {
                       const msg = encodeURIComponent("Bonjour SILGAPP \nJ'ai besoin d'aide sur SILGAPP.");
                       const a = document.createElement("a");

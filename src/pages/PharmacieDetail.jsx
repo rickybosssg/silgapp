@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
@@ -60,6 +60,7 @@ export default function PharmacieDetail() {
   const [showChat, setShowChat] = useState(false);
   const [conversationId, setConversationId] = useState(null);
   const [starting, setStarting] = useState(false);
+  const visitTrackedRef = useRef(false);
 
   useEffect(() => {
     base44.auth.me().then((user) => {
@@ -75,6 +76,23 @@ export default function PharmacieDetail() {
     queryFn: () => base44.entities.Pharmacie.get(id),
     enabled: !!id,
   });
+
+  useEffect(() => {
+    if (!pharmacie?.id || visitTrackedRef.current) return;
+    const key = `silgapp_visit_pharmacie_${pharmacie.id}`;
+    const today = new Date().toISOString().slice(0, 10);
+    if (sessionStorage.getItem(key) === today) return;
+
+    visitTrackedRef.current = true;
+    sessionStorage.setItem(key, today);
+    base44.entities.Pharmacie.update(pharmacie.id, {
+      nb_visites: (Number(pharmacie.nb_visites) || 0) + 1,
+      derniere_visite_at: new Date().toISOString(),
+    }).catch(() => {
+      visitTrackedRef.current = false;
+      sessionStorage.removeItem(key);
+    });
+  }, [pharmacie?.id]);
 
   const handleStartChat = async () => {
     if (!clientProfil) return;

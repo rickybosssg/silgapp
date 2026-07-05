@@ -167,6 +167,8 @@ export default function ComptabilitePartenaire({ type, etablissement }) {
               <span className="text-xs text-gray-400">visites</span>
             </div>
             <p className="text-[10px] text-gray-400 mt-1">
+              Nombre total de visites client sur votre fiche.
+              <br />
               {derniereVisiteAt ? `Derniere visite: ${format(new Date(derniereVisiteAt), "dd MMM yyyy", { locale: fr })}` : "Aucune visite enregistree"}
             </p>
           </CardContent>

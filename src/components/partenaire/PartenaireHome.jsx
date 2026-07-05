@@ -193,19 +193,27 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
         <QuickStat icon={isPharmacie ? MessageCircle : Eye} value={isPharmacie ? pharmaConversations.length : visitesTotal} label={isPharmacie ? "Messages" : "Visites"} color={isPharmacie ? "text-emerald-600" : "text-blue-600"} bg={isPharmacie ? "bg-emerald-50" : "bg-blue-50"} />
       </div>
 
-      {!isPharmacie && montantDuSilga > 0 && (
+      {!isPharmacie && (
         <Link to="/payer-silgapp">
-          <div className="bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl p-4 text-white flex items-center justify-between shadow-lg shadow-orange-200 active:scale-[0.98] transition">
+          <div className={`rounded-2xl p-4 flex items-center justify-between shadow-lg active:scale-[0.98] transition ${
+            montantDuSilga > 0
+              ? "bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-orange-200"
+              : "bg-white text-slate-900 border border-blue-100 shadow-blue-100/50"
+          }`}>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                <Wallet className="w-5 h-5" />
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                montantDuSilga > 0 ? "bg-white/20" : "bg-blue-50"
+              }`}>
+                <Wallet className={`w-5 h-5 ${montantDuSilga > 0 ? "" : "text-blue-700"}`} />
               </div>
               <div>
                 <p className="font-black text-sm">Payer SILGAPP</p>
-                <p className="text-xs text-white/80">Commission due : {montantDuSilga.toLocaleString()} FCFA</p>
+                <p className={`text-xs ${montantDuSilga > 0 ? "text-white/80" : "text-slate-500"}`}>
+                  {montantDuSilga > 0 ? `Commission due : ${montantDuSilga.toLocaleString()} FCFA` : "Aucun du pour le moment"}
+                </p>
               </div>
             </div>
-            <ChevronRight className="w-5 h-5 text-white/70" />
+            <ChevronRight className={`w-5 h-5 ${montantDuSilga > 0 ? "text-white/70" : "text-slate-300"}`} />
           </div>
         </Link>
       )}
