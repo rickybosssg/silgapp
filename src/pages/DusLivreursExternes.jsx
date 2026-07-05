@@ -86,6 +86,13 @@ function DetailModal({ entry, livreurInfo, onClose, onPaiement, onBloquer, onDeb
             </div>
           </div>
 
+          {/* Dernier paiement */}
+          {livreurInfo?.dernier_paiement_date && (
+            <div className="text-center text-xs text-gray-400">
+              Dernier règlement : {format(new Date(livreurInfo.dernier_paiement_date), "dd MMM yyyy 'à' HH:mm", { locale: fr })}
+            </div>
+          )}
+
           {/* Paiement */}
           {entry.montantDu > 0 && (
             <div className="border-t pt-4">
