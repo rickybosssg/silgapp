@@ -10,6 +10,7 @@ import { fr } from "date-fns/locale";
 import CourseStatusBadge from "./CourseStatusBadge";
 import UrgenceBadge from "./UrgenceBadge";
 import MultiColisAdminView from "./MultiColisAdminView";
+import ProposedLivreursList from "./ProposedLivreursList";
 import ChatWindow from "@/components/chat/ChatWindow";
 import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -266,6 +267,9 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
               {course.notes}
             </div>
           )}
+
+          {/* Livreurs proposés (dispatch externe) */}
+          {reseau === "externe" && <ProposedLivreursList course={course} />}
 
           {/* Update status */}
           <div className="flex items-center gap-2 pt-2 border-t">
