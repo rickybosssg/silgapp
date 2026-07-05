@@ -1,5 +1,6 @@
 import React from "react";
-import { CreditCard } from "lucide-react";
+import { CreditCard, Wallet } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export default function FraisAnnulationBannerClient({ fraisImpayes = [] }) {
   if (fraisImpayes.length === 0) return null;
@@ -19,14 +20,22 @@ export default function FraisAnnulationBannerClient({ fraisImpayes = [] }) {
           {fraisImpayes.length} annulation{fraisImpayes.length > 1 ? "s" : ""} après acceptation livreur. 
           Réglez vos frais auprès de SILGAPP pour éviter le blocage de votre compte.
         </p>
-        <a
-          href="https://wa.me/22667572857"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 mt-2 text-xs font-bold text-red-800 bg-red-100 px-3 py-1.5 rounded-xl"
-        >
-          💬 Contacter SILGAPP pour régulariser
-        </a>
+        <div className="flex gap-2 mt-2">
+          <Link
+            to="/payer-silgapp"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-red-600 px-3 py-1.5 rounded-xl"
+          >
+            <Wallet className="w-3.5 h-3.5" /> Payer SILGAPP
+          </Link>
+          <a
+            href="https://wa.me/22667572857"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-red-800 bg-red-100 px-3 py-1.5 rounded-xl"
+          >
+            💬 Contacter SILGAPP
+          </a>
+        </div>
       </div>
     </div>
   );

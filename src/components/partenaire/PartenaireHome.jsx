@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Package, ShoppingBag, MessageCircle, BarChart3, Store, Wallet, Loader2, CheckCircle, Clock, Truck, X, TrendingUp } from "lucide-react";
+import { Package, ShoppingBag, MessageCircle, BarChart3, Store, Wallet, Loader2, CheckCircle, Clock, Truck, X, TrendingUp, ChevronRight } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export default function PartenaireHome({ etablissement, etablissementType, onNavigate }) {
   const isRestaurant = etablissementType === "restaurant";
@@ -150,6 +151,24 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
         <QuickStat icon={Truck} value={enLivraison} label="En livraison" color="text-indigo-600" bg="bg-indigo-50" />
         <QuickStat icon={MessageCircle} value={isPharmacie ? pharmaConversations.length : annuleesToday} label={isPharmacie ? "Messages" : "Annulées"} color={isPharmacie ? "text-purple-600" : "text-red-600"} bg={isPharmacie ? "bg-purple-50" : "bg-red-50"} />
       </div>
+
+      {/* ── Payer SILGAPP — boutique/restaurant uniquement ── */}
+      {!isPharmacie && (etablissement?.montant_du_silga || 0) > 0 && (
+        <Link to="/payer-silgapp">
+          <div className="bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl p-4 text-white flex items-center justify-between shadow-lg shadow-orange-200 active:scale-[0.98] transition">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                <Wallet className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="font-black text-sm">Payer SILGAPP</p>
+                <p className="text-xs text-white/80">Commission due : {(etablissement.montant_du_silga || 0).toLocaleString()} FCFA</p>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-white/70" />
+          </div>
+        </Link>
+      )}
 
       {/* ── Navigation cards grid ── */}
       <div>
