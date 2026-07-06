@@ -39,7 +39,7 @@ function normalizePosition(position) {
 export async function getNativeCurrentPosition(options = {}) {
   const opts = {
     enableHighAccuracy: true,
-    timeout: 10000,
+    timeout: 15000,
     maximumAge: 2000,
     ...options,
   };
@@ -50,15 +50,43 @@ export async function getNativeCurrentPosition(options = {}) {
     });
     const granted = permission?.location === "granted" || permission?.coarseLocation === "granted";
     if (!granted) throw new Error("Permission GPS refusee");
-    const position = await Geolocation.getCurrentPosition(opts);
-    return normalizePosition(position);
+
+    // 1ère tentative : haute précision
+    try {
+      const position = await Geolocation.getCurrentPosition(opts);
+      return normalizePosition(position);
+    } catch (err) {
+      // 2e tentative : précision réduite (réseau/wifi) — plus rapide et fiable en intérieur
+      try {
+        const position = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 30000,
+        });
+        return normalizePosition(position);
+      } catch (err2) {
+        throw err;
+      }
+    }
   }
 
   if (!navigator.geolocation) throw new Error("GPS non disponible");
   return new Promise((resolve, reject) => {
+    // 1ère tentative : haute précision
     navigator.geolocation.getCurrentPosition(
       (position) => resolve(normalizePosition(position)),
-      reject,
+      (err) => {
+        if (err.code === 1) { reject(new Error("permission_denied")); return; }
+        // 2e tentative : précision réduite
+        navigator.geolocation.getCurrentPosition(
+          (position) => resolve(normalizePosition(position)),
+          (err2) => {
+            if (err2.code === 1) { reject(new Error("permission_denied")); return; }
+            reject(new Error("timeout"));
+          },
+          { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+        );
+      },
       opts
     );
   });
