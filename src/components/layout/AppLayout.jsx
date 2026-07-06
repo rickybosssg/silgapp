@@ -8,8 +8,20 @@ import DemandesPartenairesPopup from "@/components/admin/DemandesPartenairesPopu
 import NeoNotificationModal from "@/components/neo/NeoNotificationModal";
 import PaiementRecuModal from "@/components/admin/PaiementRecuModal";
 import SystemAlertModal from "@/components/admin/SystemAlertModal";
+import CourseWindowStack from "@/components/admin/CourseWindowStack";
+import { AdminCourseWindowsProvider, useAdminCourseWindows } from "@/context/AdminCourseWindowsContext";
 
 export default function AppLayout({ reseau }) {
+  return (
+    <AdminCourseWindowsProvider>
+      <AppLayoutInner reseau={reseau} />
+    </AdminCourseWindowsProvider>
+  );
+}
+
+function AppLayoutInner({ reseau }) {
+  const { windows } = useAdminCourseWindows();
+  const hasWindows = windows.length > 0;
   const [notifCount, setNotifCount] = useState(0);
   const [demandesCount, setDemandesCount] = useState(0);
   const [partenaireDemandesCount, setPartenaireDemandesCount] = useState(0);
@@ -69,10 +81,11 @@ export default function AppLayout({ reseau }) {
       <NeoNotificationModal />
       <PaiementRecuModal />
       <SystemAlertModal />
+      <CourseWindowStack />
 
       <div className="hidden lg:flex min-h-screen">
         <Sidebar notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} neoCount={neoCount} paiementCount={paiementCount} reseau={reseau} />
-        <main className="flex-1 min-h-screen overflow-x-hidden bg-slate-50">
+        <main className={`flex-1 min-h-screen overflow-x-hidden bg-slate-50 transition-all ${hasWindows ? "lg:mr-96" : ""}`}>
           <Outlet />
         </main>
       </div>

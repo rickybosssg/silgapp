@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, MapPin, Send, Loader2, Sparkles, MessageCircle, CheckCircle2, Copy, ExternalLink } from "lucide-react";
+import { ArrowLeft, MapPin, Send, Loader2, Sparkles } from "lucide-react";
 import { useAdminContext } from "@/hooks/useAdminContext";
+import { useAdminCourseWindows } from "@/context/AdminCourseWindowsContext";
 import QuartierSelect from "@/components/client/QuartierSelect";
 
 function generarQRData() {
@@ -74,262 +75,13 @@ const TYPE_OPTIONS = [
   { key: "deplacement", label: "Déplacement", icon: "👤", desc: "Transport personne" },
 ];
 
-// ── Success view after course creation ──
-function CourseCreated({ course, onNewCourse, formData, onClearStorage }) {
-  const navigate = useNavigate();
-  const trackingUrl = buildTrackingUrl(course.tracking_token || course.id);
-
-  // 📞 Source prioritaire : l'entité course (DB) — fallback formData pour compat
-  const expediteurPhone = course?.expediteur_telephone || course?.client_telephone || formData?.expediteurTelephone || formData?.clientTelephone || "";
-  const destinatairePhone = course?.destinataire_telephone || formData?.destinataireTelephone || "";
-
-  const expediteurName = course?.expediteur_nom || course?.client_nom || formData?.expediteurNom || formData?.clientNom || "Client";
-  const destinataireName = course?.destinataire_nom || formData?.destinataireNom || "Destinataire";
-
-  const msgExpediteur = [
-    `✅ *Course SILGAPP confirmée !*`,
-    ``,
-    `Votre course a été créée avec succès.`,
-    ``,
-    `📦 *Destinataire :* ${destinataireName || "—"}`,
-    `📍 *Adresse de livraison :* ${course.adresse_arrivee || "—"}`,
-    `#️⃣ *N° de course :* ${course.id?.slice(-8) || course.id}`,
-    ``,
-    `🔐 *PIN de récupération :* *${course.pickup_code_4_digits}*`,
-    `📱 *QR Code récupération :* ${buildQrUrl(course.pickup_qr_token)}`,
-    ``,
-    `🔗 *Suivez votre course en temps réel :*`,
-    trackingUrl,
-    ``,
-    `📲 *Téléchargez SILGAPP :*`,
-    SILGAPP_DL,
-    `🍎 *Sur App Store (iPhone) :*`,
-    SILGAPP_APPLE,
-    ``,
-    `Merci de votre confiance ! 🏍️`,
-  ].join("\n");
-
-  const msgDestinataire = [
-    `📦 *Un colis vous est destiné !*`,
-    ``,
-    `${expediteurName ? `👤 *Expéditeur :* ${expediteurName}` : ""}`,
-    `#️⃣ *N° de course :* ${course.id?.slice(-8) || course.id}`,
-    ``,
-    `🔐 *PIN de livraison :* *${course.delivery_code_4_digits}*`,
-    `📱 *QR Code livraison :* ${buildQrUrl(course.delivery_qr_token)}`,
-    ``,
-    `🔗 *Suivez votre colis en temps réel :*`,
-    trackingUrl,
-    ``,
-    `📲 *Téléchargez SILGAPP :*`,
-    SILGAPP_DL,
-    `🍎 *Sur App Store (iPhone) :*`,
-    SILGAPP_APPLE,
-    ``,
-    `Merci de votre confiance ! 🏍️`,
-  ].filter(Boolean).join("\n");
-
-  const copyTracking = () => {
-    navigator.clipboard.writeText(trackingUrl);
-    toast.success("Lien de suivi copié !");
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100/50">
-      <div className="max-w-xl mx-auto px-4 py-6 space-y-5">
-
-        {/* Header succès */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-700 via-emerald-800 to-emerald-950 p-5 shadow-xl shadow-emerald-200">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-white/10 to-transparent rounded-bl-full" />
-          <div className="relative flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-              <CheckCircle2 className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-lg font-black text-white">Course créée !</h1>
-              <p className="text-xs text-white/60">Envoyez les informations aux contacts</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Récapitulatif course */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Récapitulatif</p>
-
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-[10px] text-gray-400 mb-0.5">Type</p>
-              <p className="font-bold text-gray-800">
-                {TYPE_OPTIONS.find(t => t.key === course.type_course)?.icon} {TYPE_OPTIONS.find(t => t.key === course.type_course)?.label || course.type_course}
-              </p>
-            </div>
-            <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-[10px] text-gray-400 mb-0.5">Statut</p>
-              <p className="font-bold text-orange-600">Recherche livreur</p>
-            </div>
-            <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-[10px] text-gray-400 mb-0.5">Départ</p>
-              <p className="font-medium text-gray-700 text-xs">{course.adresse_depart || "—"}</p>
-            </div>
-            <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-[10px] text-gray-400 mb-0.5">Arrivée</p>
-              <p className="font-medium text-gray-700 text-xs">{course.adresse_arrivee || "—"}</p>
-            </div>
-            <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-[10px] text-gray-400 mb-0.5">Code PIN livraison</p>
-              <p className="font-black text-lg text-primary tracking-widest">{course.delivery_code_4_digits}</p>
-            </div>
-            <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-[10px] text-gray-400 mb-0.5">Code PIN récupération</p>
-              <p className="font-black text-lg text-primary tracking-widest">{course.pickup_code_4_digits}</p>
-            </div>
-          </div>
-
-          {/* Lien de suivi */}
-          <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 flex items-center gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="text-[10px] text-blue-500 mb-0.5">Lien de suivi</p>
-              <p className="text-xs text-blue-700 truncate">{trackingUrl}</p>
-            </div>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={copyTracking}
-              className="h-8 w-8 p-0 rounded-lg text-blue-600 hover:bg-blue-100 flex-shrink-0"
-            >
-              <Copy className="w-3.5 h-3.5" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Boutons WhatsApp */}
-        <div className="space-y-3">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">Envoyer par WhatsApp</p>
-
-          {/* Bouton Expéditeur */}
-          {expediteurPhone ? (
-            <a
-              href={waLink(expediteurPhone, msgExpediteur, course.country_code)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block"
-            >
-              <div className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 hover:shadow-md hover:border-emerald-300 transition-all group">
-                <div className="w-12 h-12 rounded-xl bg-green-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-green-200">
-                  <MessageCircle className="w-6 h-6 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-sm text-gray-800">Envoyer à l'expéditeur</p>
-                  <p className="text-[11px] text-gray-500">{expediteurName} — {expediteurPhone}</p>
-                </div>
-                <ExternalLink className="w-4 h-4 text-green-500 group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
-              </div>
-            </a>
-          ) : (
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50 border border-gray-200 opacity-50">
-              <div className="w-12 h-12 rounded-xl bg-gray-300 flex items-center justify-center flex-shrink-0">
-                <MessageCircle className="w-6 h-6 text-gray-400" />
-              </div>
-              <div className="flex-1">
-                <p className="font-bold text-sm text-gray-400">Envoyer à l'expéditeur</p>
-                <p className="text-[11px] text-gray-400">Aucun numéro renseigné</p>
-              </div>
-            </div>
-          )}
-
-          {/* Bouton Destinataire */}
-          {destinatairePhone ? (
-            <a
-              href={waLink(destinatairePhone, msgDestinataire, course.country_code)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block"
-            >
-              <div className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 hover:shadow-md hover:border-blue-300 transition-all group">
-                <div className="w-12 h-12 rounded-xl bg-blue-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-blue-200">
-                  <MessageCircle className="w-6 h-6 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-sm text-gray-800">Envoyer au destinataire</p>
-                  <p className="text-[11px] text-gray-500">{destinataireName} — {destinatairePhone}</p>
-                </div>
-                <ExternalLink className="w-4 h-4 text-blue-500 group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
-              </div>
-            </a>
-          ) : (
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50 border border-gray-200 opacity-50">
-              <div className="w-12 h-12 rounded-xl bg-gray-300 flex items-center justify-center flex-shrink-0">
-                <MessageCircle className="w-6 h-6 text-gray-400" />
-              </div>
-              <div className="flex-1">
-                <p className="font-bold text-sm text-gray-400">Envoyer au destinataire</p>
-                <p className="text-[11px] text-gray-400">Aucun numéro renseigné</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Actions */}
-        <div className="space-y-2">
-          <Button
-            onClick={onNewCourse}
-            className="w-full h-14 rounded-2xl gap-2 font-bold text-base bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 shadow-lg shadow-slate-200"
-          >
-            <Sparkles className="w-5 h-5" />
-            Créer une autre course
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => { onClearStorage(); navigate("/admin/externe"); }}
-            className="w-full h-12 rounded-2xl font-medium text-sm border-gray-200 text-gray-600"
-          >
-            Retour au tableau de bord
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Main form component ──
 export default function AdminCourseForm() {
   const navigate = useNavigate();
   const { countryCode: adminCountryCode } = useAdminContext();
-  const STORAGE_KEY = "silga_last_admin_course";
+  const { addWindow } = useAdminCourseWindows();
 
   const [submitting, setSubmitting] = useState(false);
-  const [createdCourse, setCreatedCourse] = useState(null);
-  const [createdFormData, setCreatedFormData] = useState(null);
-  const [restoringCourse, setRestoringCourse] = useState(false);
-
-  // Restaurer la dernière course créée si l'admin revient sur la page
-  useEffect(() => {
-    const restore = async () => {
-      try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (!stored) return;
-        const { courseId, formData } = JSON.parse(stored);
-        if (!courseId) return;
-
-        setRestoringCourse(true);
-        try {
-          const course = await base44.entities.CourseExterne.get(courseId);
-          if (course && course.id && course.statut !== "annulee" && course.statut !== "livree") {
-            setCreatedCourse(course);
-            setCreatedFormData(formData);
-          } else {
-            // Course introuvable ou terminée → nettoyer
-            localStorage.removeItem(STORAGE_KEY);
-          }
-        } catch {
-          localStorage.removeItem(STORAGE_KEY);
-        }
-      } finally {
-        setRestoringCourse(false);
-      }
-    };
-    restore();
-  }, []);
 
   const [typeCourse, setTypeCourse] = useState("expedier");
   const [adresseDepart, setAdresseDepart] = useState("");
@@ -350,33 +102,21 @@ export default function AdminCourseForm() {
 
   const selectedPays = PAYS.find(p => p.code === countryCode);
 
-  // ── Restoring state ──
-  if (restoringCourse) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100/50 flex items-center justify-center">
-        <div className="text-center space-y-3">
-          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
-          <p className="text-sm text-gray-500">Restauration de la dernière course...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Success state ──
-  if (createdCourse) {
-    return (
-      <CourseCreated
-        course={createdCourse}
-        formData={createdFormData}
-        onNewCourse={() => {
-          setCreatedCourse(null);
-          setCreatedFormData(null);
-          localStorage.removeItem(STORAGE_KEY);
-        }}
-        onClearStorage={() => localStorage.removeItem(STORAGE_KEY)}
-      />
-    );
-  }
+  const resetForm = () => {
+    setAdresseDepart("");
+    setAdresseArrivee("");
+    setQuartierDepart("");
+    setQuartierArrivee("");
+    setClientNom("");
+    setClientPrenom("");
+    setClientTelephone("");
+    setExpediteurNom("");
+    setExpediteurTelephone("");
+    setDestinataireNom("");
+    setDestinataireTelephone("");
+    setNotes("");
+    setTypeColis("petit_colis");
+  };
 
   const handleSubmit = async () => {
     setSubmitting(true);
@@ -427,11 +167,12 @@ export default function AdminCourseForm() {
 
       const course = await base44.entities.CourseExterne.create(courseData);
 
-      toast.success("Course créée avec succès !");
-      setCreatedCourse(course);
-      setCreatedFormData(formData);
-      // Persister pour que l'admin retrouve cette page après navigation
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ courseId: course.id, formData }));
+      // 📦 Pousser la course dans la pile de fenêtres persistantes
+      addWindow(course, formData);
+      toast.success("Course créée ! Fenêtre ajoutée à droite →");
+
+      // Réinitialiser le formulaire pour permettre la création d'une autre course
+      resetForm();
     } catch (err) {
       toast.error("Erreur création: " + (err?.message || "inconnue"));
     } finally {
