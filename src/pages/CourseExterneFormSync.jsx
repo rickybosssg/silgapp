@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -12,7 +12,7 @@ import LivreurRechercheAnimation from "@/components/client/LivreurRechercheAnima
 import InvitationWhatsAppModal from "@/components/client/InvitationWhatsAppModal";
 import { normalizePhone, phoneVariants } from "@/lib/phoneUtils";
 
-// Génère les IDs de colis : A, B, C...
+// GÃ©nÃ¨re les IDs de colis : A, B, C...
 const COLIS_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
 
 function createColisDefaults(nb) {
@@ -56,11 +56,11 @@ export default function CourseExterneFormSync() {
   const typeCourse = location.pathname.includes("expedier") ? "expedier" : location.pathname.includes("deplacement") ? "deplacement" : "recevoir";
   const position = location.state?.position || JSON.parse(localStorage.getItem("client_gps_position") || "null");
   const clientProfil = location.state?.clientProfil;
-  // Coords sauvegardées en DB — utilisées comme fallback si getCurrentPosition timeout
+  // Coords sauvegardÃ©es en DB â€” utilisÃ©es comme fallback si getCurrentPosition timeout
   const savedLat = clientProfil?.latitude || position?.latitude || null;
   const savedLng = clientProfil?.longitude || position?.longitude || null;
 
-  // Restaurer l'étape depuis localStorage si disponible
+  // Restaurer l'Ã©tape depuis localStorage si disponible
   const savedStep = parseInt(localStorage.getItem(STEP_KEY) || "0", 10);
   const [currentStep, setCurrentStep] = useState(isNaN(savedStep) ? 0 : savedStep);
   const [courseCreated, setCourseCreated] = useState(false);
@@ -69,7 +69,7 @@ export default function CourseExterneFormSync() {
   const [invitationModal, setInvitationModal] = useState(null); // { telephone, nom } ou null
   const [gpsLoading, setGpsLoading] = useState({ depart: false, arrivee: false });
 
-  // Lire brouillon (données pures, sans fonctions)
+  // Lire brouillon (donnÃ©es pures, sans fonctions)
   const getDraftFromStorage = () => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -85,7 +85,7 @@ export default function CourseExterneFormSync() {
 
   const draft = getDraftFromStorage();
 
-  // Pour "recevoir" : pré-remplir la destination avec la position GPS du client
+  // Pour "recevoir" : prÃ©-remplir la destination avec la position GPS du client
   const clientGpsLat = position?.latitude || null;
   const clientGpsLng = position?.longitude || null;
   const clientAdresse = clientProfil?.quartier || "";
@@ -107,14 +107,14 @@ export default function CourseExterneFormSync() {
     notes: "",
     date_souhaitee: "",
     mode_immediat: true,
-    // Pour "recevoir" : départ = chez l'expéditeur (à saisir), arrivée = position client (auto)
+    // Pour "recevoir" : dÃ©part = chez l'expÃ©diteur (Ã  saisir), arrivÃ©e = position client (auto)
     gps_depart_lat: null,
     gps_depart_lng: null,
     gps_arrivee_lat: typeCourse === "recevoir" ? clientGpsLat : null,
     gps_arrivee_lng: typeCourse === "recevoir" ? clientGpsLng : null,
     recuperationGPS: false,
     livraisonGPS: typeCourse === "recevoir" && !!clientGpsLat,
-    // Champs GPS expéditeur (pour "recevoir") - IMPORTANT : persister entre étapes
+    // Champs GPS expÃ©diteur (pour "recevoir") - IMPORTANT : persister entre Ã©tapes
     expediteur_gps_available: false,
     expediteur_gps_lat: null,
     expediteur_gps_lng: null,
@@ -122,7 +122,7 @@ export default function CourseExterneFormSync() {
 
   const [formData, setFormData] = useState(initialData);
 
-  // ── État multi-colis ─────────────────────────────────────────────────────
+  // â”€â”€ Ã‰tat multi-colis â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [colis, setColis] = useState(() => createColisDefaults(1));
 
   // Sync: quand nb_colis change, adapter le tableau de colis
@@ -135,7 +135,7 @@ export default function CourseExterneFormSync() {
         const extra = createColisDefaults(nb).slice(prev.length);
         return [...prev, ...extra];
       }
-      // Réduire
+      // RÃ©duire
       return prev.slice(0, nb);
     });
   }, [formData.nb_colis]);
@@ -144,7 +144,7 @@ export default function CourseExterneFormSync() {
     setColis(prev => prev.map((c, i) => i === index ? { ...c, [field]: value } : c));
   };
 
-  // Pré-remplir depuis profil si pas de brouillon — UNE SEULE FOIS au mount
+  // PrÃ©-remplir depuis profil si pas de brouillon â€” UNE SEULE FOIS au mount
   useEffect(() => {
     if (clientProfil && !draft) {
       setFormData((prev) => ({
@@ -158,9 +158,9 @@ export default function CourseExterneFormSync() {
       }));
     }
 
-  }, []); //  Exécuté UNE fois au mount uniquement
+  }, []); //  ExÃ©cutÃ© UNE fois au mount uniquement
 
-  // Sauvegarder l'étape dans localStorage
+  // Sauvegarder l'Ã©tape dans localStorage
   useEffect(() => {
     localStorage.setItem(STEP_KEY, String(currentStep));
   }, [currentStep]);
@@ -179,13 +179,61 @@ export default function CourseExterneFormSync() {
     } catch (_) { return { adresse: "Position GPS", quartier: "" }; }
   };
 
-  // Handlers GPS
+  const getGPSPosition = async () => {
+    if (!navigator.geolocation) {
+      throw new Error("no_geolocation");
+    }
+
+    const getPosition = (options) => new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, options);
+    });
+
+    try {
+      return await getPosition({
+        enableHighAccuracy: true,
+        timeout: 12000,
+        maximumAge: 15000,
+      });
+    } catch (firstError) {
+      if (firstError?.code === 1) {
+        throw firstError;
+      }
+      return getPosition({
+        enableHighAccuracy: false,
+        timeout: 10000,
+        maximumAge: 60000,
+      });
+    }
+  };
+
   const gpsHandlers = {
-    // Récupération GPS — pour l'expéditeur (expedier) OU l'endroit où récupérer (recevoir)
-    onGetGPSDepart: () => {
+    onGetGPSDepart: async () => {
       if (gpsLoading.depart) return;
       setGpsLoading(prev => ({ ...prev, depart: true }));
-      const applyDepart = async (lat, lng) => {
+
+      try {
+        let lat;
+        let lng;
+        try {
+          const pos = await getGPSPosition();
+          lat = pos.coords.latitude;
+          lng = pos.coords.longitude;
+        } catch (gpsError) {
+          if (savedLat && savedLng) {
+            lat = savedLat;
+            lng = savedLng;
+          } else {
+            if (gpsError?.code === 1) {
+              toast.error("Permission GPS refusee. Autorisez la localisation dans les parametres.");
+            } else if (gpsError?.code === 2) {
+              toast.error("Position GPS indisponible. Verifiez le GPS ou saisissez l'adresse manuellement.");
+            } else {
+              toast.error("Impossible de detecter votre position. Saisissez l'adresse manuellement.");
+            }
+            return;
+          }
+        }
+
         const { adresse, quartier } = await reverseGeocode(lat, lng);
         setFormData((prev) => ({
           ...prev,
@@ -195,34 +243,36 @@ export default function CourseExterneFormSync() {
           adresse_depart: adresse || "Position GPS",
           quartier_depart: quartier || prev.quartier_depart,
         }));
+        toast.success("Position detectee avec succes");
+      } finally {
         setGpsLoading(prev => ({ ...prev, depart: false }));
-        toast.success("Position détectée avec succès");
-      };
-
-      if (!navigator.geolocation) {
-        if (savedLat && savedLng) { applyDepart(savedLat, savedLng); return; }
-        toast.error("GPS non disponible sur cet appareil");
-        setGpsLoading(prev => ({ ...prev, depart: false }));
-        return;
       }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => applyDepart(pos.coords.latitude, pos.coords.longitude),
-        (err) => {
-          // Fallback sur la dernière position connue sauvegardée en DB
-          if (savedLat && savedLng) { applyDepart(savedLat, savedLng); return; }
-          if (err.code === 1) toast.error("Permission GPS refusée. Autorisez la localisation dans les paramètres.");
-          else if (err.code === 2) toast.error("Position GPS indisponible. Vérifiez votre GPS.");
-          else toast.error("Délai dépassé. Réessayez en extérieur.");
-          setGpsLoading(prev => ({ ...prev, depart: false }));
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
-      );
     },
-    // Livraison GPS — pour "recevoir" : position actuelle du client destinataire
-    onGetGPSArrivee: () => {
+    onGetGPSArrivee: async () => {
       if (gpsLoading.arrivee) return;
       setGpsLoading(prev => ({ ...prev, arrivee: true }));
-      const applyArrivee = async (lat, lng) => {
+
+      try {
+        let lat;
+        let lng;
+        try {
+          const pos = await getGPSPosition();
+          lat = pos.coords.latitude;
+          lng = pos.coords.longitude;
+        } catch (gpsError) {
+          if (savedLat && savedLng) {
+            lat = savedLat;
+            lng = savedLng;
+          } else {
+            if (gpsError?.code === 1) {
+              toast.error("Permission GPS refusee. Autorisez la localisation dans les parametres.");
+            } else {
+              toast.error("Impossible de detecter votre position. Verifiez le GPS ou saisissez l'adresse manuellement.");
+            }
+            return;
+          }
+        }
+
         const { adresse, quartier } = await reverseGeocode(lat, lng);
         setFormData((prev) => ({
           ...prev,
@@ -232,34 +282,18 @@ export default function CourseExterneFormSync() {
           adresse_arrivee: prev.adresse_arrivee || adresse,
           quartier_arrivee: quartier || prev.quartier_arrivee,
         }));
+        toast.success("Position detectee avec succes");
+      } finally {
         setGpsLoading(prev => ({ ...prev, arrivee: false }));
-        toast.success("Position détectée avec succès");
-      };
-
-      if (!navigator.geolocation) {
-        if (savedLat && savedLng) { applyArrivee(savedLat, savedLng); return; }
-        toast.error("GPS non disponible");
-        setGpsLoading(prev => ({ ...prev, arrivee: false }));
-        return;
       }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => applyArrivee(pos.coords.latitude, pos.coords.longitude),
-        () => {
-          if (savedLat && savedLng) { applyArrivee(savedLat, savedLng); return; }
-          toast.error("Impossible d'obtenir la position GPS");
-          setGpsLoading(prev => ({ ...prev, arrivee: false }));
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
-      );
     },
   };
-
   const queryClient = useQueryClient();
   const createMutation = useMutation({
     mutationFn: async (data) => {
       let finalData = { ...data };
 
-      // ─── OPTIMISTIC UI: Créer un brouillon temporaire pour affichage immédiat ──
+      // â”€â”€â”€ OPTIMISTIC UI: CrÃ©er un brouillon temporaire pour affichage immÃ©diat â”€â”€
       const tempId = `temp_${Date.now()}`;
       const tempCourse = {
         ...data,
@@ -270,8 +304,8 @@ export default function CourseExterneFormSync() {
       };
       queryClient.setQueryData(['courses-externes-client'], (old) => [...(old || []), tempCourse]);
 
-      // ─── ANTI-DOUBLON RENFORCÉ ────────────────────────────────────────────
-      // Critères larges : même client + même type, créée < 3 min (peu importe l'adresse)
+      // â”€â”€â”€ ANTI-DOUBLON RENFORCÃ‰ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // CritÃ¨res larges : mÃªme client + mÃªme type, crÃ©Ã©e < 3 min (peu importe l'adresse)
       const now = Date.now();
       try {
         const coursesRecentes = await base44.entities.CourseExterne.filter(
@@ -287,14 +321,14 @@ export default function CourseExterneFormSync() {
           const secs = Math.round((now - new Date(doublon.created_date).getTime()) / 1000);
           // Retirer le brouillon temporaire en cas d'erreur
           queryClient.setQueryData(['courses-externes-client'], (old) => (old || []).filter(c => c.id !== tempId));
-          throw new Error(`Course déjà créée il y a ${secs}s. Patientez avant de réessayer.`);
+          throw new Error(`Course dÃ©jÃ  crÃ©Ã©e il y a ${secs}s. Patientez avant de rÃ©essayer.`);
         }
       } catch (err) {
-        if (err.message?.includes('Course déjà créée')) throw err;
-        // Ignorer les autres erreurs réseau (ne pas bloquer la création)
+        if (err.message?.includes('Course dÃ©jÃ  crÃ©Ã©e')) throw err;
+        // Ignorer les autres erreurs rÃ©seau (ne pas bloquer la crÃ©ation)
       }
 
-      // Lookup destinataire (pour "expedier") — lie si inscrit
+      // Lookup destinataire (pour "expedier") â€” lie si inscrit
       if (!finalData.destinataire_client_id && finalData.destinataire_telephone) {
         try {
           const variants = phoneVariants(finalData.destinataire_telephone);
@@ -309,7 +343,7 @@ export default function CourseExterneFormSync() {
         } catch (_) {}
       }
 
-      // Lookup expéditeur (pour "recevoir") — lie si inscrit dans la base clients
+      // Lookup expÃ©diteur (pour "recevoir") â€” lie si inscrit dans la base clients
       if (finalData.type_course === "recevoir" && !finalData.expediteur_client_id && finalData.expediteur_telephone) {
         try {
           const variants = phoneVariants(finalData.expediteur_telephone);
@@ -323,8 +357,8 @@ export default function CourseExterneFormSync() {
           }
         } catch (_) {}
       }
-      // Génération QR/codes dès la création
-      // Pour "recevoir" : pickup = chez l'expéditeur, delivery = chez le destinataire
+      // GÃ©nÃ©ration QR/codes dÃ¨s la crÃ©ation
+      // Pour "recevoir" : pickup = chez l'expÃ©diteur, delivery = chez le destinataire
       if (!finalData.is_multi_colis) {
         const pickupQrToken = crypto.randomUUID().replace(/-/g, "");
         const deliveryQrToken = crypto.randomUUID().replace(/-/g, "");
@@ -340,7 +374,7 @@ export default function CourseExterneFormSync() {
 
       const course = await base44.entities.CourseExterne.create(finalData);
 
-      // ── Créer les sous-colis si mode multi-colis ──────────────────────────
+      // â”€â”€ CrÃ©er les sous-colis si mode multi-colis â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (finalData.is_multi_colis && finalData._colisData?.length > 1) {
         const colisPromises = finalData._colisData.map((c) => {
           return base44.entities.ColisExterne.create({
@@ -367,13 +401,13 @@ export default function CourseExterneFormSync() {
         await Promise.all(colisPromises);
       }
 
-      // Notifier toujours (la fonction vérifie en interne)
+      // Notifier toujours (la fonction vÃ©rifie en interne)
       try {
         await base44.functions.invoke("notifyClientSync", { course_id: course.id });
       } catch (err) {
         console.error("Erreur notification:", err);
       }
-      // Ne pas lancer le dispatch pour les courses programmées
+      // Ne pas lancer le dispatch pour les courses programmÃ©es
       if (!formData.date_souhaitee) {
         try {
           await base44.functions.invoke("dispatchExterneAuto", {
@@ -391,12 +425,20 @@ export default function CourseExterneFormSync() {
       queryClient.setQueryData(['courses-externes-client'], (old) =>
         (old || []).filter(c => c.id !== `temp_${Date.now()}`).concat(response)
       );
-      toast.success("Course créée ! Recherche d'un livreur en cours...");
-      setCreatedCourse(response);
       setIsSubmitting(false);
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(STEP_KEY);
-      // Sauvegarde contacts en base de données (sauf déplacement)
+      queryClient.invalidateQueries({ queryKey: ['courses-externes-client'] });
+
+      if (formData.date_souhaitee || response?.statut === "programmee") {
+        toast.success("Course programmee creee");
+        navigate("/client", { replace: true });
+        return;
+      }
+
+      toast.success("Course creee ! Recherche d'un livreur en cours...");
+      setCreatedCourse(response);
+      // Sauvegarde contacts en base de donnÃ©es (sauf dÃ©placement)
       const cid = clientProfil?.id;
       const ctel = clientProfil?.telephone;
       if (formData.type_course === "expedier") {
@@ -424,12 +466,12 @@ export default function CourseExterneFormSync() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // ─── Verrou anti-double-soumission (double-clic, re-render) ─────────────
+    // â”€â”€â”€ Verrou anti-double-soumission (double-clic, re-render) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (isSubmitting || createMutation.isPending) return;
     setIsSubmitting(true);
 
-    //  country_code DOIT être déclaré AVANT toute utilisation dans normalizePhone()
-    // ─── Validation des champs obligatoires ───────────────────────────────────
+    //  country_code DOIT Ãªtre dÃ©clarÃ© AVANT toute utilisation dans normalizePhone()
+    // â”€â”€â”€ Validation des champs obligatoires â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const isExpedie = formData.type_course === "expedier";
     const isRecevoir = formData.type_course === "recevoir";
     const isDeplacementValid = formData.type_course === "deplacement";
@@ -437,13 +479,13 @@ export default function CourseExterneFormSync() {
 
     if (!formData.type_course) missingFields.push("type de course");
     if (isExpedie) {
-      if (!formData.destinataire_telephone) missingFields.push("téléphone du destinataire");
+      if (!formData.destinataire_telephone) missingFields.push("tÃ©lÃ©phone du destinataire");
     }
     if (isRecevoir) {
-      if (!formData.expediteur_telephone) missingFields.push("téléphone de l'expéditeur");
+      if (!formData.expediteur_telephone) missingFields.push("tÃ©lÃ©phone de l'expÃ©diteur");
     }
     if (isDeplacementValid) {
-      if (!formData.passager_telephone) missingFields.push("téléphone du passager");
+      if (!formData.passager_telephone) missingFields.push("tÃ©lÃ©phone du passager");
     }
     if (!isDeplacementValid && !formData.type_colis) missingFields.push("type de colis");
 
@@ -454,13 +496,13 @@ export default function CourseExterneFormSync() {
       return;
     }
 
-    // Récupérer l'utilisateur connecté
+    // RÃ©cupÃ©rer l'utilisateur connectÃ©
     let user;
     try {
       user = await base44.auth.me();
     } catch (err) {
       console.error("[CourseForm] Erreur auth:", err);
-      toast.error("Session expirée ou problème de connexion. Rafraîchissez la page.");
+      toast.error("Session expirÃ©e ou problÃ¨me de connexion. RafraÃ®chissez la page.");
       setIsSubmitting(false);
       return;
     }
@@ -526,7 +568,7 @@ export default function CourseExterneFormSync() {
       expediteurTel,
     });
 
-    // Calcul prix — sécurisé : uniquement si les 4 coordonnées GPS sont valides
+    // Calcul prix â€” sÃ©curisÃ© : uniquement si les 4 coordonnÃ©es GPS sont valides
     let prixEstime = 0;
     if (
       formData.gps_depart_lat && formData.gps_depart_lng &&
@@ -536,7 +578,7 @@ export default function CourseExterneFormSync() {
         formData.gps_depart_lat, formData.gps_depart_lng,
         formData.gps_arrivee_lat, formData.gps_arrivee_lng
       );
-      // Règle : prix minimum SILGAPP = 1 000 F CFA
+      // RÃ¨gle : prix minimum SILGAPP = 1 000 F CFA
       prixEstime = Math.max(Math.round(distance * 100), 1000);
     }
 
@@ -551,9 +593,9 @@ export default function CourseExterneFormSync() {
     const gpsArriveLng = isRecevoir
       ? (formData.gps_arrivee_lng || clientGpsLng)
       : (formData.gps_arrivee_lng || null);
-    const destInconnue = false; // supprimé — les adresses sont simplement optionnelles
+    const destInconnue = false; // supprimÃ© â€” les adresses sont simplement optionnelles
 
-    // Validation des rôles — ne bloque PAS si le destinataire est hors SILGAPP
+    // Validation des rÃ´les â€” ne bloque PAS si le destinataire est hors SILGAPP
     const isDeplacement = formData.type_course === "deplacement";
     if (!isDeplacement) {
       try {
@@ -564,8 +606,8 @@ export default function CourseExterneFormSync() {
           created_by_id: user?.id
         });
         if (validationRes.data?.valid === false) {
-          const errMsg = validationRes.data.errors?.[0] || "Incohérence détectée dans les rôles";
-          console.warn("[CourseForm] Validation rôles échouée :", errMsg);
+          const errMsg = validationRes.data.errors?.[0] || "IncohÃ©rence dÃ©tectÃ©e dans les rÃ´les";
+          console.warn("[CourseForm] Validation rÃ´les Ã©chouÃ©e :", errMsg);
           toast.error(errMsg);
           setIsSubmitting(false);
           return;
@@ -578,9 +620,9 @@ export default function CourseExterneFormSync() {
     const nbColis = isDeplacement ? 1 : (formData.nb_colis || 1);
     const isMulti = isExpedie && nbColis > 1;
 
-    // Pour multi-colis : résumé des destinataires
+    // Pour multi-colis : rÃ©sumÃ© des destinataires
     const adresseArriveeFinale = isMulti
-      ? "Tournée multi-colis"
+      ? "TournÃ©e multi-colis"
       : isDeplacement ? (formData.adresse_arrivee || "") : adresseArrivee;
     const destinataireNomFinal = isMulti
       ? `${nbColis} destinataires`
@@ -596,7 +638,7 @@ export default function CourseExterneFormSync() {
       client_nom: formData.client_nom,
       client_telephone: formData.client_telephone,
       type_course: formData.type_course,
-      expediteur_nom: expediteurNom || "Expéditeur",
+      expediteur_nom: expediteurNom || "ExpÃ©diteur",
       expediteur_telephone: expediteurTel,
       expediteur_phone_normalized: expediteurPhoneNormalized,
       expediteur_client_id: expediteurClientId,
@@ -606,7 +648,7 @@ export default function CourseExterneFormSync() {
       destinataire_client_id: isMulti ? null : destinataireClientId,
       recipient_has_app: false,
       expediteur_has_app: false,
-      adresse_depart: isDeplacement ? (formData.adresse_depart || (formData.recuperationGPS ? "Position GPS" : "À définir")) : (formData.adresse_depart || (formData.recuperationGPS ? "Position GPS" : "À définir")),
+      adresse_depart: isDeplacement ? (formData.adresse_depart || (formData.recuperationGPS ? "Position GPS" : "Ã€ dÃ©finir")) : (formData.adresse_depart || (formData.recuperationGPS ? "Position GPS" : "Ã€ dÃ©finir")),
       adresse_arrivee: adresseArriveeFinale,
       quartier_depart: formData.quartier_depart || null,
       quartier_arrivee: formData.quartier_arrivee || null,
@@ -621,7 +663,7 @@ export default function CourseExterneFormSync() {
       statut: formData.date_souhaitee ? "programmee" : "recherche_livreur",
       dispatch_status: "en_attente",
       date_souhaitee: formData.date_souhaitee || null,
-      // Champs déplacement
+      // Champs dÃ©placement
       passager_nom: isDeplacement ? (formData.passager_nom || "") : "",
       passager_telephone: isDeplacement ? (formData.passager_telephone || "") : "",
       nb_passagers: isDeplacement ? (formData.nb_passagers || 1) : 1,
@@ -630,7 +672,7 @@ export default function CourseExterneFormSync() {
       nb_colis: nbColis,
       nb_colis_livres: 0,
       nb_colis_annules: 0,
-      // Données internes pour création des sous-colis (non persistées sur la course)
+      // DonnÃ©es internes pour crÃ©ation des sous-colis (non persistÃ©es sur la course)
       _colisData: isMulti ? colis : null,
     });
   };
@@ -648,7 +690,7 @@ export default function CourseExterneFormSync() {
     return <LivreurRechercheAnimation course={createdCourse} />;
   }
 
-  // Modal invitation WhatsApp — affiché après création réussie si contact hors SILGAPP
+  // Modal invitation WhatsApp â€” affichÃ© aprÃ¨s crÃ©ation rÃ©ussie si contact hors SILGAPP
   if (invitationModal && createdCourse) {
     return (
       <>
@@ -664,7 +706,7 @@ export default function CourseExterneFormSync() {
     );
   }
 
-  // ── Blocage client pour frais d'annulation impayés ────────────────────────
+  // â”€â”€ Blocage client pour frais d'annulation impayÃ©s â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (clientProfil?.bloque_frais_annulation) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-50 p-6">
@@ -673,9 +715,9 @@ export default function CourseExterneFormSync() {
             <span className="text-4xl"></span>
           </div>
           <div>
-            <h2 className="text-xl font-black text-gray-900">Compte bloqué</h2>
+            <h2 className="text-xl font-black text-gray-900">Compte bloquÃ©</h2>
             <p className="text-sm text-gray-600 mt-3 leading-relaxed">
-              Votre compte est temporairement bloqué pour frais d'annulation impayés. Veuillez contacter SILGAPP.
+              Votre compte est temporairement bloquÃ© pour frais d'annulation impayÃ©s. Veuillez contacter SILGAPP.
             </p>
           </div>
           <a
@@ -708,7 +750,7 @@ export default function CourseExterneFormSync() {
           </Button>
           <div className="flex-1">
             <h1 className="text-xl font-bold text-foreground">
-              {formData.type_course === "expedier" ? "Expédier un colis" : formData.type_course === "deplacement" ? "Déplacement" : "Recevoir un colis"}
+              {formData.type_course === "expedier" ? "ExpÃ©dier un colis" : formData.type_course === "deplacement" ? "DÃ©placement" : "Recevoir un colis"}
             </h1>
           </div>
           <div className="flex items-center gap-2">
@@ -731,7 +773,7 @@ export default function CourseExterneFormSync() {
 
         {!formData.mode_immediat && (
           <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-2xl">
-            <p className="text-xs font-bold text-amber-700 mb-2"> Date et heure souhaitées</p>
+            <p className="text-xs font-bold text-amber-700 mb-2"> Date et heure souhaitÃ©es</p>
             <input
               type="datetime-local"
               value={formData.date_souhaitee ? formData.date_souhaitee.slice(0, 16) : ""}

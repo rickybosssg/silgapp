@@ -135,7 +135,7 @@ export function useGPSNatif({ enabled = true, intervalMs = 15000, onPosition } =
     return true;
   }, []);
 
-  // Obtenir la position une fois
+  // Obtenir la position une fois — avec retry automatique (haute précision → précision réduite)
   const actualiserPosition = useCallback(async () => {
     const Geo = await getGeoPlugin();
     if (Geo) {
@@ -148,16 +148,34 @@ export function useGPSNatif({ enabled = true, intervalMs = 15000, onPosition } =
         applyPosition(result.coords);
         return result.coords;
       } catch (err) {
-        console.warn("[GPS Natif] Erreur Capacitor:", err.message);
-        setGpsActif(false);
-        return null;
+        // 2e tentative : précision réduite (réseau/wifi)
+        try {
+          const result = await Geo.getCurrentPosition({
+            enableHighAccuracy: false,
+            timeout: 10000,
+            maximumAge: 30000,
+          });
+          applyPosition(result.coords);
+          return result.coords;
+        } catch (err2) {
+          console.warn("[GPS Natif] Erreur Capacitor:", err2.message);
+          setGpsActif(false);
+          return null;
+        }
       }
     }
-    // Fallback web
+    // Fallback web — avec retry
     return new Promise((resolve) => {
       navigator.geolocation.getCurrentPosition(
         (pos) => resolve(applyPosition(pos.coords)),
-        () => { setGpsActif(false); resolve(null); },
+        () => {
+          // 2e tentative web : précision réduite
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve(applyPosition(pos.coords)),
+            () => { setGpsActif(false); resolve(null); },
+            { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+          );
+        },
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
       );
     });

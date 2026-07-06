@@ -1,40 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
-const PARTNER_TYPES = ['partner', 'partenaire', 'boutique', 'restaurant', 'pharmacie'];
-
-function normalizeActorType(type) {
-  return PARTNER_TYPES.includes(type) ? 'partenaire' : type;
-}
-
-async function getEntityById(asService, entityName, id) {
-  if (!id) return null;
-  try {
-    const direct = await asService.entities[entityName].get(id);
-    if (direct) return direct;
-  } catch (_) {}
-  try {
-    const rows = await asService.entities[entityName].filter({ id });
-    return rows?.[0] || null;
-  } catch (_) {
-    return null;
-  }
-}
-
-function participantMatches(participant, normalizedType, effectiveId, userId) {
-  const participantType = normalizeActorType(participant?.type);
-  if (participantType !== normalizedType) return false;
-  const ids = [
-    participant?.id,
-    participant?.partner_id,
-    participant?.partenaire_id,
-    participant?.boutique_id,
-    participant?.restaurant_id,
-    participant?.pharmacie_id,
-    participant?.user_id,
-  ].filter(Boolean).map(String);
-  return ids.includes(String(effectiveId)) || (userId && ids.includes(String(userId)));
-}
-
 /**
  * Envoi sécurisé d'un message de messagerie SILGAPP.
  *
@@ -59,57 +24,54 @@ Deno.serve(async (req) => {
       course_id,
       conversation_id,
       sender_type,
-      sender_id,
+      sender_id: raw_sender_id,
       message_type,
       content,
       audio_url,
       photo_url,
-      client_message_id,
     } = payload;
+    let final_sender_id = raw_sender_id;
 
-    if (!sender_type || !sender_id) {
+    if (!sender_type || !final_sender_id) {
       return Response.json({ error: 'sender_type et sender_id sont requis' }, { status: 400 });
     }
-    const normalized_sender_type = normalizeActorType(sender_type);
-    let effective_sender_id = sender_id;
 
     // ── 1. Résoudre le VRAI nom et la photo depuis le profil ──
     let realName = '';
     let photoUrl = '';
 
-    if (normalized_sender_type === 'livreur') {
+    if (sender_type === 'livreur') {
       const livreurs = await base44.asServiceRole.entities.Livreur.filter({ user_email: user.email });
       if (!livreurs || livreurs.length === 0) {
         return Response.json({ error: 'Profil livreur introuvable' }, { status: 404 });
       }
       const livreur = livreurs[0];
       // Sécurité : le sender_id doit correspondre au livreur authentifié
-      if (livreur.id !== sender_id) {
+      if (livreur.id !== final_sender_id) {
         return Response.json({ error: 'sender_id ne correspond pas au livreur authentifié' }, { status: 403 });
       }
       realName = `${livreur.prenom || ''} ${livreur.nom || ''}`.trim() || livreur.telephone || 'Livreur';
       photoUrl = livreur.photo_url || '';
-    } else if (normalized_sender_type === 'client') {
+    } else if (sender_type === 'client') {
       const clients = await base44.asServiceRole.entities.ClientExterne.filter({ user_email: user.email });
       if (!clients || clients.length === 0) {
         return Response.json({ error: 'Profil client introuvable' }, { status: 404 });
       }
       const client = clients[0];
-      if (client.id !== sender_id) {
+      if (client.id !== final_sender_id) {
         return Response.json({ error: 'sender_id ne correspond pas au client authentifié' }, { status: 403 });
       }
       realName = `${client.prenom || ''} ${client.nom || ''}`.trim() || client.telephone || 'Client';
-      photoUrl = client.photo_url || client.avatar_url || '';
-    } else if (normalized_sender_type === 'admin') {
-      if (user.email !== sender_id) {
-        return Response.json({ error: 'sender_id ne correspond pas à l\'admin authentifié' }, { status: 403 });
-      }
+      photoUrl = '';
+    } else if (sender_type === 'admin') {
+      // L'admin est déjà authentifié — utiliser user.email comme sender_id
+      final_sender_id = user.email;
       realName = user.full_name || user.email || 'Admin';
       photoUrl = '';
-    } else if (normalized_sender_type === 'partenaire') {
-      // Le partenaire est identifié par son établissement (Boutique, Restaurant ou Pharmacie).
-      // sender_id = ID de l'établissement. On vérifie que l'utilisateur authentifié
-      // est bien propriétaire de cet établissement.
+    } else if (sender_type === 'partenaire') {
+      // Le partenaire est identifié par son établissement (Boutique ou Restaurant)
+      // sender_id = ID de la boutique ou du restaurant
+      // On vérifie que l'utilisateur authentifié est bien propriétaire de cet établissement
       const boutiques = await base44.asServiceRole.entities.Boutique.filter({ user_email: user.email });
       const restaurants = await base44.asServiceRole.entities.Restaurant.filter({ user_email: user.email });
       const pharmacies = await base44.asServiceRole.entities.Pharmacie.filter({ user_email: user.email });
@@ -118,8 +80,7 @@ Deno.serve(async (req) => {
         ...(restaurants || []).map(r => ({ ...r, _kind: 'restaurant' })),
         ...(pharmacies || []).map(p => ({ ...p, _kind: 'pharmacie' })),
       ];
-      const etab = allEtabs.find(e => e.id === sender_id || e.partenaire_id === sender_id || e.partenaire_id === user.id);
-      if (etab) effective_sender_id = etab.id;
+      const etab = allEtabs.find(e => e.id === final_sender_id);
       if (!etab) {
         return Response.json({ error: 'Vous n\'êtes pas propriétaire de cet établissement' }, { status: 403 });
       }
@@ -137,24 +98,11 @@ Deno.serve(async (req) => {
       }
       const c = courses[0];
       let isParticipant = false;
-      if (normalized_sender_type === 'livreur') {
-        isParticipant = c.livreur_id === effective_sender_id;
-      } else if (normalized_sender_type === 'client') {
-        isParticipant = c.expediteur_client_id === effective_sender_id || c.destinataire_client_id === effective_sender_id;
-      } else if (normalized_sender_type === 'partenaire') {
-        if (c.commande_boutique_id) {
-          const cmd = await getEntityById(base44.asServiceRole, 'CommandeBoutique', c.commande_boutique_id);
-          isParticipant = cmd?.boutique_id === effective_sender_id || cmd?.partenaire_id === user.id || cmd?.partenaire_id === sender_id;
-        }
-        if (!isParticipant && c.commande_restaurant_id) {
-          const cmd = await getEntityById(base44.asServiceRole, 'CommandeRestaurant', c.commande_restaurant_id);
-          isParticipant = cmd?.restaurant_id === effective_sender_id || cmd?.partenaire_id === user.id || cmd?.partenaire_id === sender_id;
-        }
-        if (!isParticipant && c.commande_pharmacie_id) {
-          const cmd = await getEntityById(base44.asServiceRole, 'CommandePharmacie', c.commande_pharmacie_id);
-          isParticipant = cmd?.pharmacie_id === effective_sender_id || cmd?.partenaire_id === user.id || cmd?.partenaire_id === sender_id;
-        }
-      } else if (normalized_sender_type === 'admin') {
+      if (sender_type === 'livreur') {
+        isParticipant = c.livreur_id === final_sender_id;
+      } else if (sender_type === 'client') {
+        isParticipant = c.expediteur_client_id === final_sender_id || c.destinataire_client_id === final_sender_id;
+      } else if (sender_type === 'admin') {
         isParticipant = true; // L'admin peut discuter dans toutes les courses
       }
       if (!isParticipant) {
@@ -168,58 +116,20 @@ Deno.serve(async (req) => {
       const c = convs[0];
       let participants = [];
       try { participants = JSON.parse(c.participants || '[]'); } catch {}
-      const isParticipant = participants.some(p =>
-        participantMatches(p, normalized_sender_type, effective_sender_id, user.id)
-      );
+      const isParticipant = participants.some(p => p.type === sender_type && p.id === final_sender_id);
       if (!isParticipant) {
         return Response.json({ error: 'Vous n\'êtes pas participant de cette conversation' }, { status: 403 });
       }
     }
 
     // ── 3. Créer le message avec les VRAIES informations ──
-    if (client_message_id) {
-      const existing = await base44.asServiceRole.entities.Message.filter({ client_message_id });
-      if (existing && existing.length > 0) {
-        return Response.json({
-          success: true,
-          duplicate: true,
-          message: existing[0],
-        });
-      }
-    }
-
-    const recentScope = course_id
-      ? await base44.asServiceRole.entities.Message.filter({ course_id }, '-created_date', 20)
-      : await base44.asServiceRole.entities.Message.filter({ conversation_id }, '-created_date', 20);
-    const now = Date.now();
-    const duplicateRecent = (recentScope || []).find((m) => {
-      const created = new Date(m.created_date || 0).getTime();
-      return (
-        now - created < 5000 &&
-        m.sender_type === normalized_sender_type &&
-        m.sender_id === effective_sender_id &&
-        m.message_type === (message_type || 'text') &&
-        (m.content || '') === (content || '') &&
-        (m.audio_url || '') === (audio_url || '') &&
-        (m.photo_url || '') === (photo_url || '')
-      );
-    });
-    if (duplicateRecent) {
-      return Response.json({
-        success: true,
-        duplicate: true,
-        message: duplicateRecent,
-      });
-    }
-
     const message = await base44.asServiceRole.entities.Message.create({
       course_id: course_id || null,
       conversation_id: conversation_id || null,
-      sender_type: normalized_sender_type,
-      sender_id: effective_sender_id,
+      sender_type,
+      sender_id: final_sender_id,
       sender_name: realName,
       sender_photo_url: photoUrl,
-      client_message_id: client_message_id || null,
       message_type: message_type || 'text',
       content: content || '',
       audio_url: audio_url || null,
@@ -230,7 +140,7 @@ Deno.serve(async (req) => {
     if (conversation_id) {
       const lastMsgPreview =
         message_type === 'text' ? (content || '').slice(0, 80) :
-        message_type === 'audio' ? 'Message vocal' : 'Photo';
+        message_type === 'audio' ? '🎤 Message vocal' : '📷 Photo';
       await base44.asServiceRole.entities.Conversation.update(conversation_id, {
         last_message: lastMsgPreview,
         last_message_date: message.created_date,
@@ -238,36 +148,112 @@ Deno.serve(async (req) => {
       }).catch(() => {});
     }
 
-    // ── 5. Envoyer une notification push au partenaire si le message vient d'un client ──
-    if (conversation_id && normalized_sender_type === 'client') {
-      try {
+    // ── 5. Envoyer une notification push à TOUS les destinataires du message ──
+    // Préparer le texte de prévisualisation selon le type de message
+    const msgPreview =
+      message_type === 'text' ? (content || '').slice(0, 100) :
+      message_type === 'audio' ? '🎤 Message vocal' :
+      message_type === 'photo' ? '📷 Photo' : 'Nouveau message';
+
+    const pushTitle = `💬 Nouveau message de ${realName}`;
+    const recipients = new Set(); // emails des destinataires (déduit pour éviter les doublons)
+
+    try {
+      // ── 5a. Messages dans une COURSE → notifier l'autre partie ──
+      if (course_id) {
+        const courses = await base44.asServiceRole.entities.CourseExterne.filter({ id: course_id });
+        if (courses && courses.length > 0) {
+          const c = courses[0];
+
+          // Résoudre l'email du livreur
+          if (sender_type !== 'livreur' && c.livreur_id) {
+            const livreur = await base44.asServiceRole.entities.Livreur.get(c.livreur_id).catch(() => null);
+            if (livreur?.user_email) recipients.add(JSON.stringify({ email: livreur.user_email, user_type: 'livreur', livreur_id: livreur.id }));
+          }
+
+          // Résoudre l'email du client (expéditeur ou destinataire)
+          if (sender_type !== 'client') {
+            const clientId = c.expediteur_client_id || c.destinataire_client_id;
+            if (clientId) {
+              const client = await base44.asServiceRole.entities.ClientExterne.get(clientId).catch(() => null);
+              if (client?.user_email) recipients.add(JSON.stringify({ email: client.user_email, user_type: 'client' }));
+            }
+          }
+
+          // L'admin reçoit une notif si le message vient du livreur ou du client
+          if (sender_type !== 'admin') {
+            const admins = await base44.asServiceRole.entities.User.filter({ role: 'admin' });
+            for (const a of admins || []) {
+              if (a.email) recipients.add(JSON.stringify({ email: a.email, user_type: 'admin' }));
+            }
+          }
+        }
+      }
+
+      // ── 5b. Messages dans une CONVERSATION → notifier tous les autres participants ──
+      if (conversation_id) {
         const convs = await base44.asServiceRole.entities.Conversation.filter({ id: conversation_id });
         if (convs && convs.length > 0) {
           const conv = convs[0];
           let participants = [];
           try { participants = JSON.parse(conv.participants || '[]'); } catch {}
-          const partenaire = participants.find(p => normalizeActorType(p.type) === 'partenaire');
-          if (partenaire) {
-            const [boutiques, restaurants, pharmacies] = await Promise.all([
-              base44.asServiceRole.entities.Boutique.filter({ id: partenaire.id }),
-              base44.asServiceRole.entities.Restaurant.filter({ id: partenaire.id }),
-              base44.asServiceRole.entities.Pharmacie.filter({ id: partenaire.id }),
-            ]);
-            const etab = (boutiques?.[0]) || (restaurants?.[0]) || (pharmacies?.[0]);
-            if (etab?.user_email) {
-              await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
-                titre: '💬 Nouveau message',
-                message: (content || '').slice(0, 100) || 'Nouveau message',
-                type: 'nouveau_message',
-                destinataire_email: etab.user_email,
-                user_type: 'partenaire',
-              }).catch(() => {});
+
+          for (const p of participants) {
+            // Ne pas notifier l'expéditeur
+            if (p.type === sender_type && p.id === final_sender_id) continue;
+
+            if (p.type === 'partenaire') {
+              // Résoudre l'email du partenaire via Boutique / Restaurant / Pharmacie
+              const [boutiques, restaurants, pharmacies] = await Promise.all([
+                base44.asServiceRole.entities.Boutique.filter({ id: p.id }),
+                base44.asServiceRole.entities.Restaurant.filter({ id: p.id }),
+                base44.asServiceRole.entities.Pharmacie.filter({ id: p.id }),
+              ]);
+              const etab = (boutiques?.[0]) || (restaurants?.[0]) || (pharmacies?.[0]);
+              if (etab?.user_email) {
+                recipients.add(JSON.stringify({ email: etab.user_email, user_type: 'partenaire' }));
+              }
+            } else if (p.type === 'client') {
+              const client = await base44.asServiceRole.entities.ClientExterne.get(p.id).catch(() => null);
+              if (client?.user_email) recipients.add(JSON.stringify({ email: client.user_email, user_type: 'client' }));
+            } else if (p.type === 'livreur') {
+              const livreur = await base44.asServiceRole.entities.Livreur.get(p.id).catch(() => null);
+              if (livreur?.user_email) {
+                recipients.add(JSON.stringify({ email: livreur.user_email, user_type: 'livreur', livreur_id: livreur.id }));
+              }
+            } else if (p.type === 'admin') {
+              if (p.id && p.id.includes('@')) {
+                recipients.add(JSON.stringify({ email: p.id, user_type: 'admin' }));
+              } else {
+                // Si pas d'email direct, notifier tous les admins
+                const admins = await base44.asServiceRole.entities.User.filter({ role: 'admin' });
+                for (const a of admins || []) {
+                  if (a.email) recipients.add(JSON.stringify({ email: a.email, user_type: 'admin' }));
+                }
+              }
             }
           }
         }
-      } catch (e) {
-        console.error('[envoyerMessage] Push notification error:', e);
       }
+
+      // ── 5c. Envoyer le push à chaque destinataire unique ──
+      for (const recipientStr of recipients) {
+        try {
+          const r = JSON.parse(recipientStr);
+          await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
+            titre: pushTitle,
+            message: msgPreview,
+            type: 'nouveau_message',
+            destinataire_email: r.email,
+            user_type: r.user_type,
+            livreur_id: r.livreur_id || undefined,
+            course_id: course_id || undefined,
+            conversation_id: conversation_id || undefined,
+          }).catch(() => {});
+        } catch (_) {}
+      }
+    } catch (e) {
+      console.error('[envoyerMessage] Push notification error:', e);
     }
 
     return Response.json({
