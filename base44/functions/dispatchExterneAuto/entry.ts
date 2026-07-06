@@ -821,11 +821,23 @@ Deno.serve(async (req) => {
           clientEmail = dest?.[0]?.user_email || null;
         }
         if (clientEmail) {
+          const prixMessage = `${livreur.prenom || ''} ${livreur.nom} propose cette course à ${Number(manual_price).toLocaleString()} ${course.devise || 'FCFA'}. Acceptez-vous ?`;
           await base44.asServiceRole.entities.Notification.create({
             titre: '💰 Prix proposé par le livreur',
-            message: `${livreur.prenom || ''} ${livreur.nom} propose cette course à ${Number(manual_price).toLocaleString()} FCFA. Acceptez-vous ?`,
+            message: prixMessage,
             type: 'generic', course_id: course_id, destinataire_email: clientEmail, lue: false,
           });
+          // 📤 Push notification — le client n'est pas forcément dans l'app
+          try {
+            await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
+              destinataire_email: clientEmail,
+              titre: '💰 Prix proposé par le livreur',
+              message: prixMessage,
+              type: 'prix_manuel_propose',
+              course_id: course_id,
+              user_type: 'client',
+            });
+          } catch (e) { console.error('[DISPATCH] ❌ Push client prix manuel:', e.message); }
         }
       } catch (e) { console.warn('[DISPATCH] Erreur notif client prix manuel:', e.message); }
 
