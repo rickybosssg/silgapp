@@ -120,13 +120,9 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
 
   if (!tousLivreurs || tousLivreurs.length === 0) return [];
 
-  // Livreurs déjà en course active (même pays)
-  const coursesActives = await base44.asServiceRole.entities.CourseExterne.filter({ country_code: course.country_code });
-  const livreurIdsEnCourse = new Set(
-    coursesActives
-      .filter(c => ['livreur_en_route', 'colis_recupere', 'en_livraison'].includes(c.statut) && c.livreur_id)
-      .map(c => c.livreur_id)
-  );
+  // 🛡️ Le filtre statut: 'disponible' ci-dessus exclut déjà les livreurs en_course.
+  // Pas besoin de télécharger toutes les courses du pays (causait le rate limit).
+  const livreurIdsEnCourse = new Set();
 
   const exclusionSet = new Set(exclusions);
   const now = Date.now();
@@ -450,8 +446,9 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
           livreur_id: '',
           livreur_nom: '',
         });
-        // Relancer immédiatement avec exclusions vides (nouveau cycle)
-        return await lancerDispatchMulti(base44, courseId, []);
+        // 🛡️ Ne pas relancer récursivement — le prochain tick du scheduler s'en chargera.
+        // L'appel récursif doubling la charge API et cause le rate limit.
+        return { cycleReset: true };
       } else {
         // Encore en attente des 2 minutes
         console.log(`[DISPATCH] ⏳ Cycle épuisé — attente 2 min avant nouveau cycle pour course ${courseId}`);
@@ -974,11 +971,15 @@ Deno.serve(async (req) => {
       const now = new Date();
       const resultats = [];
 
-      const MAX_COURSES_PER_TICK = 8; // Limite anti-rate-limit
+      const MAX_COURSES_PER_TICK = 4; // Limite anti-rate-limit stricte
       const coursesToProcess = courses.slice(0, MAX_COURSES_PER_TICK);
       if (courses.length > MAX_COURSES_PER_TICK) {
         console.log(`[DISPATCH] ⚡ ${courses.length} courses à traiter — limitation à ${MAX_COURSES_PER_TICK}/tick pour éviter rate limit`);
       }
+
+      // 📦 Cache config — charger UNE SEULE FOIS par tick au lieu de par course
+      const cachedDispatchConfig = await chargerConfigDispatch(base44);
+      const cachedGpsConfig = await chargerConfigVaguesGPS(base44);
 
       for (const course of coursesToProcess) {
         try {
@@ -1019,11 +1020,10 @@ Deno.serve(async (req) => {
 
           const currentWave = course.dispatch_wave || 0;
           if (currentWave > 0) {
-            // Détecter le type de vagues
+            // Détecter le type de vagues (utiliser le cache du tick)
             const hasGPS = !!(course.gps_depart_lat && course.gps_depart_lng);
-            const gpsCfg = hasGPS ? await chargerConfigVaguesGPS(base44) : null;
-            const isGPSWave = hasGPS && gpsCfg?.gps_waves_enabled;
-            const maxWave = isGPSWave ? gpsCfg.waves.length : 3;
+            const isGPSWave = hasGPS && cachedGpsConfig.gps_waves_enabled;
+            const maxWave = isGPSWave ? cachedGpsConfig.waves.length : 3;
 
             const nextWave = currentWave + 1;
             if (nextWave > maxWave) {
