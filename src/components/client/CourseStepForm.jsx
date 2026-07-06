@@ -96,6 +96,7 @@ export default function CourseStepForm({
   onColisChange,
   savedLat,
   savedLng,
+  gpsLoading,
 }) {
   const activeCountry = countryCode || "BF";
   const phonePlaceholder = getPhonePlaceholder(activeCountry);
@@ -419,10 +420,12 @@ export default function CourseStepForm({
                 </div>
               ) : (
                 <>
-                  <button type="button" onClick={gpsHandlers?.onGetGPSDepart} className="w-full rounded-3xl bg-gradient-to-r from-primary to-red-600 text-white font-bold text-base shadow-xl shadow-primary/30 active:scale-[0.98] transition-all overflow-hidden">
+                  <button type="button" onClick={gpsHandlers?.onGetGPSDepart} disabled={gpsLoading} className="w-full rounded-3xl bg-gradient-to-r from-primary to-red-600 text-white font-bold text-base shadow-xl shadow-primary/30 active:scale-[0.98] transition-all overflow-hidden disabled:opacity-70">
                     <div className="flex flex-col items-center justify-center gap-1 py-5 px-4">
-                      <div className="flex items-center gap-2 text-lg font-black"><Navigation className="w-6 h-6" />Utiliser ma position actuelle</div>
-                      <p className="text-xs text-red-100 font-normal">📍 Détection automatique de votre position</p>
+                      <div className="flex items-center gap-2 text-lg font-black">
+                        {gpsLoading ? <><Loader2 className="w-6 h-6 animate-spin" />Localisation en cours...</> : <><Navigation className="w-6 h-6" />Utiliser ma position actuelle</>}
+                      </div>
+                      <p className="text-xs text-red-100 font-normal">{gpsLoading ? "⏳ Obtention du signal GPS..." : "📍 Détection automatique de votre position"}</p>
                     </div>
                   </button>
                   <div className="flex items-center gap-3"><div className="flex-1 h-px bg-gray-200" /><span className="text-xs text-gray-400 font-medium">ou saisir manuellement</span><div className="flex-1 h-px bg-gray-200" /></div>
@@ -604,10 +607,12 @@ export default function CourseStepForm({
                 placeholder="Quartier, rue, point de repère... (optionnel)"
                 autoFocus
               />
-              <button type="button" onClick={gpsHandlers?.onGetGPSArrivee} className="w-full rounded-3xl bg-gradient-to-r from-sky-500 to-blue-600 text-white font-bold text-base shadow-xl shadow-sky-200 active:scale-[0.98] transition-all overflow-hidden">
+              <button type="button" onClick={gpsHandlers?.onGetGPSArrivee} disabled={gpsLoading} className="w-full rounded-3xl bg-gradient-to-r from-sky-500 to-blue-600 text-white font-bold text-base shadow-xl shadow-sky-200 active:scale-[0.98] transition-all overflow-hidden disabled:opacity-70">
                 <div className="flex flex-col items-center justify-center gap-1 py-4 px-4">
-                  <div className="flex items-center gap-2 text-base font-black"><Navigation className="w-5 h-5" />Utiliser ma position actuelle</div>
-                  <p className="text-xs text-blue-100 font-normal">📍 Définir la destination avec le GPS</p>
+                  <div className="flex items-center gap-2 text-base font-black">
+                    {gpsLoading ? <><Loader2 className="w-5 h-5 animate-spin" />Localisation en cours...</> : <><Navigation className="w-5 h-5" />Utiliser ma position actuelle</>}
+                  </div>
+                  <p className="text-xs text-blue-100 font-normal">{gpsLoading ? "⏳ Obtention du signal GPS..." : "📍 Définir la destination avec le GPS"}</p>
                 </div>
               </button>
             </div>

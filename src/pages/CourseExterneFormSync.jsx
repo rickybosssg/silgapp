@@ -67,6 +67,7 @@ export default function CourseExterneFormSync() {
   const [createdCourse, setCreatedCourse] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false); // verrou anti-double-clic
   const [invitationModal, setInvitationModal] = useState(null); // { telephone, nom } ou null
+  const [gpsLoading, setGpsLoading] = useState(false); // loading GPS pour feedback UI
 
   // Lire brouillon (données pures, sans fonctions)
   const getDraftFromStorage = () => {
@@ -173,10 +174,40 @@ export default function CourseExterneFormSync() {
     } catch (_) { return ""; }
   };
 
+  // Obtention GPS robuste — retry automatique avec précision réduite si haute précision échoue
+  const getGPSPosition = () => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("no_geolocation"));
+        return;
+      }
+
+      // 1ère tentative : haute précision, timeout 15s
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+        (err) => {
+          if (err.code === 1) { reject(new Error("permission_denied")); return; }
+          // 2e tentative : précision réduite (réseau), timeout 10s
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+            (err2) => {
+              if (err2.code === 1) { reject(new Error("permission_denied")); return; }
+              reject(new Error("timeout"));
+            },
+            { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+          );
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      );
+    });
+  };
+
   // Handlers GPS
   const gpsHandlers = {
     // Récupération GPS — pour l'expéditeur (expedier) OU l'endroit où récupérer (recevoir)
-    onGetGPSDepart: () => {
+    onGetGPSDepart: async () => {
+      if (gpsLoading) return;
+      setGpsLoading(true);
       const applyDepart = async (lat, lng) => {
         const adresse = await reverseGeocode(lat, lng);
         setFormData((prev) => ({
@@ -189,25 +220,26 @@ export default function CourseExterneFormSync() {
         toast.success("📍 Position GPS récupérée avec succès !");
       };
 
-      if (!navigator.geolocation) {
-        if (savedLat && savedLng) { applyDepart(savedLat, savedLng); return; }
-        toast.error("GPS non disponible sur cet appareil");
-        return;
+      try {
+        const pos = await getGPSPosition();
+        await applyDepart(pos.latitude, pos.longitude);
+      } catch (err) {
+        if (savedLat && savedLng) {
+          await applyDepart(savedLat, savedLng);
+          toast.info("📍 Position GPS récente utilisée (signal faible)");
+        } else if (err.message === "permission_denied") {
+          toast.error("Permission GPS refusée. Autorisez la localisation dans les paramètres Android.");
+        } else {
+          toast.error("GPS indisponible. Activez le GPS ou saisissez l'adresse manuellement.");
+        }
+      } finally {
+        setGpsLoading(false);
       }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => applyDepart(pos.coords.latitude, pos.coords.longitude),
-        (err) => {
-          // Fallback sur la dernière position connue sauvegardée en DB
-          if (savedLat && savedLng) { applyDepart(savedLat, savedLng); return; }
-          if (err.code === 1) toast.error("Permission GPS refusée. Autorisez la localisation dans les paramètres.");
-          else if (err.code === 2) toast.error("Position GPS indisponible. Vérifiez votre GPS.");
-          else toast.error("Délai dépassé. Réessayez en extérieur.");
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
-      );
     },
     // Livraison GPS — pour "recevoir" : position actuelle du client destinataire
-    onGetGPSArrivee: () => {
+    onGetGPSArrivee: async () => {
+      if (gpsLoading) return;
+      setGpsLoading(true);
       const applyArrivee = async (lat, lng) => {
         const adresse = await reverseGeocode(lat, lng);
         setFormData((prev) => ({
@@ -219,18 +251,22 @@ export default function CourseExterneFormSync() {
         }));
       };
 
-      if (!navigator.geolocation) {
-        if (savedLat && savedLng) { applyArrivee(savedLat, savedLng); return; }
-        toast.error("GPS non disponible"); return;
+      try {
+        const pos = await getGPSPosition();
+        await applyArrivee(pos.latitude, pos.longitude);
+        toast.success("📍 Position GPS récupérée avec succès !");
+      } catch (err) {
+        if (savedLat && savedLng) {
+          await applyArrivee(savedLat, savedLng);
+          toast.info("📍 Position GPS récente utilisée (signal faible)");
+        } else if (err.message === "permission_denied") {
+          toast.error("Permission GPS refusée. Autorisez la localisation dans les paramètres Android.");
+        } else {
+          toast.error("GPS indisponible. Activez le GPS ou saisissez l'adresse manuellement.");
+        }
+      } finally {
+        setGpsLoading(false);
       }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => applyArrivee(pos.coords.latitude, pos.coords.longitude),
-        () => {
-          if (savedLat && savedLng) { applyArrivee(savedLat, savedLng); return; }
-          toast.error("Impossible d'obtenir la position GPS");
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
-      );
     },
   };
 
@@ -740,6 +776,7 @@ export default function CourseExterneFormSync() {
               onColisChange={handleColisChange}
               savedLat={savedLat}
               savedLng={savedLng}
+              gpsLoading={gpsLoading}
             />
           </form>
         </Card>
