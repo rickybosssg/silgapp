@@ -1280,11 +1280,18 @@ Deno.serve(async (req) => {
     console.error('[DISPATCH] Erreur fatale:', error);
     try {
       const base44 = createClientFromRequest(req);
-      await base44.asServiceRole.entities.Notification.create({
-        titre: '🚨 Erreur fatale — dispatch automatique',
-        message: `Le moteur de dispatch a crashé: ${error.message}. Les courses ne sont plus relancées automatiquement. Intervention requise.`,
+      // 🛡️ Anti-spam : ne créer une alerte que si aucune alerte récente (< 5 min) n'existe
+      const recentAlerts = await base44.asServiceRole.entities.Notification.filter({
         type: 'alerte_critique_dispatch', lue: false,
-      });
+      }, '-created_date', 1);
+      const hasRecent = recentAlerts?.[0] && (Date.now() - new Date(recentAlerts[0].created_date).getTime()) < 5 * 60 * 1000;
+      if (!hasRecent) {
+        await base44.asServiceRole.entities.Notification.create({
+          titre: '🚨 Erreur fatale — dispatch automatique',
+          message: `Le moteur de dispatch a crashé: ${error.message}. Les courses ne sont plus relancées automatiquement. Intervention requise.`,
+          type: 'alerte_critique_dispatch', lue: false,
+        });
+      }
     } catch (_) {}
     return Response.json({ error: error.message }, { status: 500 });
   }
