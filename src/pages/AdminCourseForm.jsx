@@ -54,7 +54,7 @@ function buildQrUrl(token) {
   return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(token)}`;
 }
 
-const SILGAPP_DL = "https://silga-dispatch-go.base44.app/telecharger";
+const SILGAPP_PLAYSTORE = "https://play.google.com/store/apps/details?id=com.base6a0ec08f3af5e1d1284254c1.app";
 const SILGAPP_APPLE = "https://apps.apple.com/bf/app/silgapp/id6782046749?l=fr-FR";
 
 const PAYS = [

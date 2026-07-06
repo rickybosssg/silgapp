@@ -58,7 +58,9 @@ Deno.serve(async (req) => {
           `📲 *Suivez votre livreur en temps reel :*`,
           `${trackingLink}`,
           ``,
-          `📲 *Telechargez SILGAPP* : https://silgapp.com/telecharger`,
+          `📲 *Telechargez SILGAPP :*`,
+          `🤖 Play Store : https://play.google.com/store/apps/details?id=com.base6a0ec08f3af5e1d1284254c1.app`,
+          `🍎 App Store : https://apps.apple.com/bf/app/silgapp/id6782046749?l=fr-FR`,
         ].join('\n');
       } else {
         message = [
@@ -75,7 +77,9 @@ Deno.serve(async (req) => {
           ``,
           `Montrez ce code au livreur lors de la recuperation.`,
           ``,
-          `📲 *Telechargez SILGAPP* pour suivre votre course : https://silgapp.com/telecharger`,
+          `📲 *Telechargez SILGAPP :*`,
+          `🤖 Play Store : https://play.google.com/store/apps/details?id=com.base6a0ec08f3af5e1d1284254c1.app`,
+          `🍎 App Store : https://apps.apple.com/bf/app/silgapp/id6782046749?l=fr-FR`,
         ].join('\n');
       }
     } else {
@@ -98,7 +102,9 @@ Deno.serve(async (req) => {
         ``,
         `Montrez ce code au livreur a la livraison.`,
         ``,
-        `📲 *Telechargez SILGAPP* : https://silgapp.com/telecharger`,
+        `📲 *Telechargez SILGAPP :*`,
+        `🤖 Play Store : https://play.google.com/store/apps/details?id=com.base6a0ec08f3af5e1d1284254c1.app`,
+        `🍎 App Store : https://apps.apple.com/bf/app/silgapp/id6782046749?l=fr-FR`,
       ].join('\n');
     }
 

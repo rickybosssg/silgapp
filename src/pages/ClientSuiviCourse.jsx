@@ -47,7 +47,8 @@ function buildWhatsAppMessage(course) {
   const trackingUrl = course.tracking_token
     ? `${window.location.origin}/suivi-public/${course.tracking_token}`
     : `${window.location.origin}/suivi-public/${course.id}`;
-  const SILGAPP_DL = "https://silga-dispatch-go.base44.app/telecharger";
+  const SILGAPP_PLAYSTORE = "https://play.google.com/store/apps/details?id=com.base6a0ec08f3af5e1d1284254c1.app";
+  const SILGAPP_APPLE = "https://apps.apple.com/bf/app/silgapp/id6782046749?l=fr-FR";
   const expediteurName = course.expediteur_nom || course.client_nom || "Expéditeur";
   const numeroCourse = course.id?.slice(-8) || course.id;
   const pinLivraison = course.delivery_code_4_digits || "";
@@ -67,7 +68,8 @@ function buildWhatsAppMessage(course) {
     trackingUrl,
     ``,
     `📲 *Téléchargez SILGAPP :*`,
-    SILGAPP_DL,
+    `🤖 *Play Store :* ${SILGAPP_PLAYSTORE}`,
+    `🍎 *App Store :* ${SILGAPP_APPLE}`,
     ``,
     `Merci de votre confiance.`,
   ].join("\n");
