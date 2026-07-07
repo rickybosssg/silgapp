@@ -235,23 +235,10 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
 async function notifierLivreur(base44, courseId, course, livreur, timeoutSec) {
   if (!livreur.user_email) return;
 
-  // 🛡️ ANTI-DOUBLON PERMANENT — une seule notification par course par livreur
-  const existantes = await base44.asServiceRole.entities.Notification.filter({
-    course_id: courseId,
-    destinataire_email: livreur.user_email,
-    type: 'nouvelle_course',
-  });
-  if (existantes.length > 0) {
-    console.log(`[DISPATCH] 🛡️ Anti-doublon permanent — ${existantes.length} notif(s) existante(s) pour course ${courseId} / livreur ${livreur.user_email}`);
-    // Si une notif non-lue existe, pas besoin d'en créer une nouvelle
-    const nonLue = existantes.find(n => !n.lue);
-    if (nonLue) {
-      console.log(`[DISPATCH] 🛡️ Notif non-lue déjà existante (id=${nonLue.id}) — skip`);
-      return;
-    }
-    // Si toutes sont lues, on peut en créer une nouvelle (re-dispatch après reset)
-    console.log(`[DISPATCH] 📤 Toutes les notifs sont lues — nouvelle notif autorisée`);
-  }
+  // 🛡️ ANTI-DOUBLON — vérifié via dispatch_notified_ids sur la course (déjà chargée)
+  // Plus besoin de requêter la BDD à chaque livreur — dispatch_notified_ids garantit
+  // qu'un livreur déjà notifié ne le sera pas deux fois dans le même cycle.
+  // Le reset de cycle vide dispatch_notified_ids, permettant une re-notification.
 
   const distanceSafe = livreur.distance ? Number(livreur.distance).toFixed(1) : '?';
   const titre = '🚨 Nouvelle course disponible !';
@@ -329,7 +316,7 @@ async function notifierLivreur(base44, courseId, course, livreur, timeoutSec) {
  * - Si 0 candidat restant et déjà eu des notifs → cycle_epuise (attente 2 min puis reset)
  * - Si 0 candidat et jamais eu de notif → en_attente
  */
-async function lancerDispatchMulti(base44, courseId, exclusions = []) {
+async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConfig = null) {
   const course = await base44.asServiceRole.entities.CourseExterne.get(courseId);
   if (!course) return { erreur: 'Course introuvable' };
 
@@ -364,15 +351,15 @@ async function lancerDispatchMulti(base44, courseId, exclusions = []) {
     }
   }
 
-  const config = await chargerConfigDispatch(base44);
+  const config = cachedConfig?.dispatch || await chargerConfigDispatch(base44);
   console.log(`[DISPATCH] ⚙️ Config: ${config.nb} livreurs, ${config.timeout}s`);
 
   // Trouver les meilleurs candidats hors exclusions (tous les déjà notifiés)
   const resultat = await trouverLivreursCandidats(base44, course, exclusions);
   const { tous: candidatsTous, niveau1, niveau2, niveau3, pickupSource } = resultat;
 
-  // 🧠 Charger la config vagues GPS
-  const gpsConfig = await chargerConfigVaguesGPS(base44);
+  // 🧠 Charger la config vagues GPS (utiliser le cache si disponible)
+  const gpsConfig = cachedConfig?.gps || await chargerConfigVaguesGPS(base44);
   const useGPSWaves = pickupSource === 'gps' && gpsConfig.gps_waves_enabled;
 
   // 📍 Mode vagues GPS (distance + heartbeat N1/N2/N3) — courses AVEC GPS
@@ -990,8 +977,10 @@ Deno.serve(async (req) => {
       }
 
       // 📦 Cache config — charger UNE SEULE FOIS par tick au lieu de par course
-      const cachedDispatchConfig = await chargerConfigDispatch(base44);
-      const cachedGpsConfig = await chargerConfigVaguesGPS(base44);
+      const cachedConfig = {
+        dispatch: await chargerConfigDispatch(base44),
+        gps: await chargerConfigVaguesGPS(base44),
+      };
 
       for (const course of coursesToProcess) {
         try {
@@ -1011,7 +1000,7 @@ Deno.serve(async (req) => {
                 livreur_id: '',
                 livreur_nom: '',
               });
-              const result = await lancerDispatchMulti(base44, course.id, []);
+              const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
               resultats.push({ course_id: course.id, wave: 'reset→N1', ...result });
             }
             continue;
@@ -1021,7 +1010,7 @@ Deno.serve(async (req) => {
           if (['en_attente', 'redispatch'].includes(course.dispatch_status)) {
             let dejaNotifies = [];
             try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-            const result = await lancerDispatchMulti(base44, course.id, dejaNotifies);
+            const result = await lancerDispatchMulti(base44, course.id, dejaNotifies, cachedConfig);
             resultats.push({ course_id: course.id, wave: 'retry', ...result });
             continue;
           }
@@ -1034,8 +1023,8 @@ Deno.serve(async (req) => {
           if (currentWave > 0) {
             // Détecter le type de vagues (utiliser le cache du tick)
             const hasGPS = !!(course.gps_depart_lat && course.gps_depart_lng);
-            const isGPSWave = hasGPS && cachedGpsConfig.gps_waves_enabled;
-            const maxWave = isGPSWave ? cachedGpsConfig.waves.length : 3;
+            const isGPSWave = hasGPS && cachedConfig.gps.gps_waves_enabled;
+            const maxWave = isGPSWave ? cachedConfig.gps.waves.length : 3;
 
             const nextWave = currentWave + 1;
             if (nextWave > maxWave) {
@@ -1056,7 +1045,7 @@ Deno.serve(async (req) => {
 
           let dejaNotifies = [];
           try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-          const result = await lancerDispatchMulti(base44, course.id, dejaNotifies);
+          const result = await lancerDispatchMulti(base44, course.id, dejaNotifies, cachedConfig);
           resultats.push({ course_id: course.id, wave: `${currentWave}→${currentWave + 1}`, ...result });
         } catch (err) {
           console.error(`[DISPATCH] ❌ Erreur sur course ${course.id}:`, err.message);
@@ -1104,21 +1093,36 @@ Deno.serve(async (req) => {
         ['en_attente', 'redispatch', 'cycle_epuise'].includes(c.dispatch_status)
       );
 
+      // 🛡️ Limite stricte anti-rate-limit (same as avancer_vagues_expirees)
+      const MAX_COURSES_PER_TICK = 4;
+      const coursesToProcess = aRetenter.slice(0, MAX_COURSES_PER_TICK);
+      if (aRetenter.length > MAX_COURSES_PER_TICK) {
+        console.log(`[DISPATCH] ⚡ ${aRetenter.length} courses à retenter — limitation à ${MAX_COURSES_PER_TICK}/tick`);
+      }
+
+      // 📦 Cache config — charger UNE SEULE FOIS par tick
+      const cachedConfig = {
+        dispatch: await chargerConfigDispatch(base44),
+        gps: await chargerConfigVaguesGPS(base44),
+      };
+
       const resultats = [];
-      for (const course of aRetenter) {
+      for (const course of coursesToProcess) {
         try {
           let dejaNotifies = [];
           try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
 
           // Si cycle_epuise, on laisse lancerDispatchMulti gérer le reset après 2 min
-          const result = await lancerDispatchMulti(base44, course.id, dejaNotifies);
+          const result = await lancerDispatchMulti(base44, course.id, dejaNotifies, cachedConfig);
           resultats.push({ course_id: course.id, ...result });
         } catch (err) {
           console.error(`[DISPATCH] ❌ Erreur retry course ${course.id}:`, err.message);
           resultats.push({ course_id: course.id, error: err.message });
         }
+        // Délai entre chaque course pour éviter le rate limit API
+        await new Promise(r => setTimeout(r, 300));
       }
-      return Response.json({ success: true, retried: aRetenter.length, resultats });
+      return Response.json({ success: true, retried: coursesToProcess.length, total: aRetenter.length, resultats });
     }
 
     // ─── 7. Valider le prix manuel côté client ────────────────────────────
@@ -1289,18 +1293,24 @@ Deno.serve(async (req) => {
 
     return Response.json({ error: 'Action inconnue' }, { status: 400 });
   } catch (error) {
-    console.error('[DISPATCH] Erreur fatale:', error);
+    const isRateLimit = error.message?.toLowerCase?.().includes('rate limit') || error.message?.toLowerCase?.().includes('rate_limit');
+    console.error(`[DISPATCH] Erreur fatale${isRateLimit ? ' (RATE LIMIT)' : ''}:`, error.message);
     try {
       const base44 = createClientFromRequest(req);
-      // 🛡️ Anti-spam : ne créer une alerte que si aucune alerte récente (< 5 min) n'existe
+      // 🛡️ Anti-spam : ne créer une alerte que si aucune alerte récente (< 30 min) n'existe
+      // Délai augmenté à 30 min pour les rate limits (transitoires) vs 5 min pour les autres erreurs
+      const alertWindow = isRateLimit ? 30 * 60 * 1000 : 5 * 60 * 1000;
       const recentAlerts = await base44.asServiceRole.entities.Notification.filter({
         type: 'alerte_critique_dispatch', lue: false,
       }, '-created_date', 1);
-      const hasRecent = recentAlerts?.[0] && (Date.now() - new Date(recentAlerts[0].created_date).getTime()) < 5 * 60 * 1000;
+      const hasRecent = recentAlerts?.[0] && (Date.now() - new Date(recentAlerts[0].created_date).getTime()) < alertWindow;
       if (!hasRecent) {
+        const msg = isRateLimit
+          ? `Le moteur de dispatch a atteint la limite d'appels API (rate limit). Cela est transitoire — le prochain tick reprendra automatiquement. Si le problème persiste, contactez le support.`
+          : `Le moteur de dispatch a crashé: ${error.message}. Les courses ne sont plus relancées automatiquement. Intervention requise.`;
         await base44.asServiceRole.entities.Notification.create({
-          titre: '🚨 Erreur fatale — dispatch automatique',
-          message: `Le moteur de dispatch a crashé: ${error.message}. Les courses ne sont plus relancées automatiquement. Intervention requise.`,
+          titre: isRateLimit ? '⚠️ Surcharge API temporaire — dispatch' : '🚨 Erreur fatale — dispatch automatique',
+          message: msg,
           type: 'alerte_critique_dispatch', lue: false,
         });
       }
