@@ -173,11 +173,12 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
       if (!isNaN(hb.getTime())) heartbeatAgeMin = (now - hb.getTime()) / 60000;
     }
 
-    // 🚫 Exclusion automatique : heartbeat > 60 min → hors_ligne immédiat
+    // 🚫 Exclusion automatique : heartbeat > 60 min → exclu du dispatch SANS modifier le statut
+    // Le statut du livreur est contrôlé exclusivement par lui-même (toggle manuel).
+    // On l'exclut juste des candidats pour ce cycle — il réapparaîtra s'il rouvre l'app.
     if (heartbeatAgeMin !== null && heartbeatAgeMin > 60) {
-      base44.asServiceRole.entities.Livreur.update(l.id, { statut: 'hors_ligne' }).catch(() => {});
       nbMarquesHorsLigne++;
-      return; // exclu du dispatch
+      return; // exclu du dispatch, statut préservé
     }
 
     // distance = null quand ni GPS ni quartier → pas de calcul fictif
@@ -226,7 +227,7 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
 
   const tous = [...niveau1, ...niveau2, ...niveau3];
   if (nbMarquesHorsLigne > 0) {
-    console.log(`[DISPATCH] 🚫 ${nbMarquesHorsLigne} livreur(s) marqué(s) hors_ligne (HB > 60 min)`);
+    console.log(`[DISPATCH] 🚫 ${nbMarquesHorsLigne} livreur(s) exclu(s) du dispatch (HB > 60 min) — statut préservé`);
   }
   console.log(`[DISPATCH] 📊 ${tous.length} candidats (exclus: ${exclusions.length}, hors_ligne: ${nbMarquesHorsLigne}) — N1:${niveau1.length} N2:${niveau2.length} N3:${niveau3.length} — pickup: ${pickupSource}${pickupSource === 'quartier' ? ` (${course.quartier_depart})` : ''}`);
   return { tous, niveau1, niveau2, niveau3, pickupSource };

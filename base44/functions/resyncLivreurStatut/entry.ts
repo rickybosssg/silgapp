@@ -27,12 +27,10 @@ Deno.serve(async (req) => {
       const courseActive = (courses || []).find(c => STATUTS_ACTIFS.includes(c.statut));
 
       if (!courseActive && livreur.statut === "en_course") {
-        const heartbeatAge = livreur.last_seen_at
-          ? (Date.now() - new Date(livreur.last_seen_at).getTime()) / 60000
-          : 999;
-        const nouveauStatut = heartbeatAge < 10 ? "disponible" : "hors_ligne";
-        await base44.asServiceRole.entities.Livreur.update(livreur.id, { statut: nouveauStatut });
-        return Response.json({ success: true, action: "resync", livreur_id, nouveau_statut: nouveauStatut });
+        // 🔄 Toujours remettre "disponible" — le statut hors_ligne est contrôlé
+        // exclusivement par le livreur lui-même (toggle manuel).
+        await base44.asServiceRole.entities.Livreur.update(livreur.id, { statut: "disponible" });
+        return Response.json({ success: true, action: "resync", livreur_id, nouveau_statut: "disponible" });
       }
 
       return Response.json({ success: true, action: "aucune_action", statut_actuel: livreur.statut, course_active: courseActive?.id || null });
@@ -53,15 +51,12 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, resynchronises: 0, message: "Tous les statuts sont corrects." });
     }
 
-    // Appliquer la logique heartbeat : app active → disponible, sinon → hors_ligne
+    // 🔄 Remettre "disponible" — le statut hors_ligne est contrôlé exclusivement
+    // par le livreur lui-même (toggle manuel), jamais par le système.
     await Promise.all(
       aResynchroniser.map(l => {
-        const heartbeatAge = l.last_seen_at
-          ? (Date.now() - new Date(l.last_seen_at).getTime()) / 60000
-          : 999;
-        const nouveauStatut = heartbeatAge < 10 ? "disponible" : "hors_ligne";
-        console.log(`[resyncLivreurStatut] ${l.prenom} ${l.nom} → "${nouveauStatut}" (heartbeat: ${Math.round(heartbeatAge)}min)`);
-        return base44.asServiceRole.entities.Livreur.update(l.id, { statut: nouveauStatut });
+        console.log(`[resyncLivreurStatut] ${l.prenom} ${l.nom} → "disponible" (était en_course sans course active)`);
+        return base44.asServiceRole.entities.Livreur.update(l.id, { statut: "disponible" });
       })
     );
 
