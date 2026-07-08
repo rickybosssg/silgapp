@@ -910,10 +910,14 @@ Deno.serve(async (req) => {
         console.log(`[DISPATCH] ⏰ Verrou expiré course ${course_id} — redispatch`);
 
         await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+          statut: 'recherche_livreur',
           dispatch_status: 'redispatch',
           livreur_id: '',
           livreur_nom: '',
           livreur_telephone: '',
+          heure_acceptation: null,
+          accepted_by_livreur_id: '',
+          accepted_at: null,
         });
 
         // Passer TOUS les déjà notifiés comme exclusions

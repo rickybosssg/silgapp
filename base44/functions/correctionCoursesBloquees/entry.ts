@@ -210,7 +210,29 @@ Deno.serve(async (req) => {
             taggedCount++;
         }
 
-        // ── 8. Rapport Maintenance ──────────────────────────────────────
+        // ── 8. Filet de sécurité : statut "livreur_en_route" sans livreur ──
+        // Bug possible : refus/expiration qui vide livreur_id sans remettre statut
+        const coursesIncoherentes = coursesActives.filter(c =>
+            c.statut === "livreur_en_route" && !c.livreur_id
+        );
+        for (const course of coursesIncoherentes) {
+            await asService.entities.CourseExterne.update(course.id, {
+                statut: "recherche_livreur",
+                dispatch_status: "redispatch",
+                heure_acceptation: null,
+                accepted_by_livreur_id: "",
+                accepted_at: null,
+                notes: (course.notes || "") + " | [AUTO] Statut livreur_en_route sans livreur — corrigé",
+            });
+            corrections.push({
+                type: "statut_en_route_sans_livreur",
+                course_id: course.id,
+                dispatch_status: course.dispatch_status,
+                remarque_livreur: course.remarque_livreur,
+            });
+        }
+
+        // ── 9. Rapport Maintenance ──────────────────────────────────────
         if (corrections.length > 0) {
             await asService.entities.RapportMaintenance.create({
                 type: "audit_quotidien",
