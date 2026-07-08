@@ -877,13 +877,17 @@ Deno.serve(async (req) => {
 
       const etaitVerrouillee = course.livreur_id === livreur_id;
       if (etaitVerrouillee) {
-        // Libérer le verrou
+        // Libérer le verrou + remettre le statut en recherche (sinon reste bloqué à livreur_en_route)
         await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+          statut: 'recherche_livreur',
           dispatch_status: 'redispatch',
           remarque_livreur: raison || 'Refusé',
           livreur_id: '',
           livreur_nom: '',
           livreur_telephone: '',
+          heure_acceptation: null,
+          accepted_by_livreur_id: '',
+          accepted_at: null,
         });
         const result = await lancerDispatchMulti(base44, course_id, dejaNotifies);
         if (result.noLivreur) return Response.json({ success: true, noLivreur: true });
