@@ -27,6 +27,7 @@ function AppLayoutInner({ reseau }) {
   const [partenaireDemandesCount, setPartenaireDemandesCount] = useState(0);
   const [neoCount, setNeoCount] = useState(0);
   const [paiementCount, setPaiementCount] = useState(0);
+  const [messageCount, setMessageCount] = useState(0);
 
   useEffect(() => {
     const fetchNotifs = async () => {
@@ -68,8 +69,34 @@ function AppLayoutInner({ reseau }) {
     };
     fetchNeoCount();
     fetchPaiements();
-    const iv = setInterval(() => { fetchNotifs(); fetchDemandes(); fetchPartenaireDemandes(); fetchNeoCount(); fetchPaiements(); }, 30000);
-    return () => clearInterval(iv);
+    const fetchMessages = async () => {
+      try {
+        const user = await base44.auth.me();
+        if (!user) return;
+        const all = await base44.entities.Conversation.list("-last_message_date", 100);
+        const mine = (all || []).filter(c => {
+          try {
+            const parts = JSON.parse(c.participants || "[]");
+            return parts.some(p => p.type === "admin");
+          } catch { return false; }
+        });
+        const unread = mine.filter(c => {
+          if (c.last_sender_type === "admin") return false;
+          if (!c.last_message_date) return false;
+          if (!c.admin_last_read_date) return true;
+          return new Date(c.last_message_date) > new Date(c.admin_last_read_date);
+        });
+        setMessageCount(unread.length);
+      } catch (_) {}
+    };
+    fetchMessages();
+    // Subscription temps réel sur les conversations et messages
+    const unsubConv = base44.entities.Conversation.subscribe(() => { fetchMessages(); });
+    const unsubMsg = base44.entities.Message.subscribe((event) => {
+      if (event.type === "create") fetchMessages();
+    });
+    const iv = setInterval(() => { fetchNotifs(); fetchDemandes(); fetchPartenaireDemandes(); fetchNeoCount(); fetchPaiements(); fetchMessages(); }, 30000);
+    return () => { clearInterval(iv); unsubConv?.(); unsubMsg?.(); };
   }, []);
 
   return (
@@ -84,7 +111,7 @@ function AppLayoutInner({ reseau }) {
       <CourseWindowStack />
 
       <div className="hidden lg:flex min-h-screen">
-        <Sidebar notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} neoCount={neoCount} paiementCount={paiementCount} reseau={reseau} />
+        <Sidebar notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} neoCount={neoCount} paiementCount={paiementCount} messageCount={messageCount} reseau={reseau} />
         <main className={`flex-1 min-h-screen overflow-x-hidden bg-slate-50 transition-all ${hasWindows ? "lg:mr-96" : ""}`}>
           <Outlet />
         </main>

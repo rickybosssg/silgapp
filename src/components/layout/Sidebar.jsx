@@ -54,7 +54,7 @@ export const navItems = [
   { path: "/maintenance", label: "Maintenance", icon: Shield },
 ];
 
-export default function Sidebar({ notificationCount = 0, demandesCount = 0, partenaireDemandesCount = 0, neoCount = 0, paiementCount = 0, reseau }) {
+export default function Sidebar({ notificationCount = 0, demandesCount = 0, partenaireDemandesCount = 0, neoCount = 0, paiementCount = 0, messageCount = 0, reseau }) {
   const [collapsed, setCollapsed] = useState(false);
   const [countryOpen, setCountryOpen] = useState(false);
   const location = useLocation();
@@ -130,9 +130,12 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
                   {item.path === "/admin/paiements" && paiementCount > 0 && (
                     <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
                   )}
+                  {item.path === "/admin/messages" && messageCount > 0 && (
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                  )}
                 </>
               )}
-              {(item.path === "/notifications" && notificationCount > 0) || (item.path === "/admin/demandes-livreurs" && demandesCount > 0) || (["/admin/boutiques", "/admin/restaurants", "/admin/pharmacies"].includes(item.path) && partenaireDemandesCount > 0) || (item.path === "/admin/neo" && neoCount > 0) ? (
+              {(item.path === "/notifications" && notificationCount > 0) || (item.path === "/admin/demandes-livreurs" && demandesCount > 0) || (["/admin/boutiques", "/admin/restaurants", "/admin/pharmacies"].includes(item.path) && partenaireDemandesCount > 0) || (item.path === "/admin/neo" && neoCount > 0) || (item.path === "/admin/messages" && messageCount > 0) ? (
                 collapsed && (
                   <span className="absolute right-1 top-1 w-2 h-2 rounded-full bg-destructive" />
                 )
