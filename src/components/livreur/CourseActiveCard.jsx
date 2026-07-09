@@ -12,6 +12,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import QRScannerModal from "./QRScannerModal";
 import NavigationGPS from "./NavigationGPS";
 import ChatWindow from "@/components/chat/ChatWindow";
+import AnnulationExplicationChat from "./AnnulationExplicationChat";
 
 // Haversine
 function haversine(lat1, lon1, lat2, lon2) {
@@ -143,6 +144,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const [showAnnulerCourse, setShowAnnulerCourse] = useState(false);
   const [motifAnnulationLivreur, setMotifAnnulationLivreur] = useState("");
   const [motifAnnulationDetail, setMotifAnnulationDetail] = useState("");
+  // 💬 Messagerie d'explication après annulation
+  const [showAnnulationChat, setShowAnnulationChat] = useState(false);
   // 🎯 Commission dynamique du pays (fetch auto)
   const [countryCommissionPct, setCountryCommissionPct] = useState(30);
   useEffect(() => {
@@ -334,6 +337,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           : "Course annulée");
         // Libérer le livreur localement
         onColisLivre({ ...course, statut: "annulee" }, null);
+        // 💬 Ouvrir la messagerie d'explication vers l'admin
+        setShowAnnulationChat(true);
       } else {
         toast.error(res?.data?.error || "Erreur lors de l'annulation");
         setOptimisticStatut(null);
@@ -343,8 +348,6 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       setOptimisticStatut(null);
     }
 
-    setMotifAnnulationLivreur("");
-    setMotifAnnulationDetail("");
     queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
     queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
   };
@@ -473,6 +476,22 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             </div>
           </div>
         </div>
+      )}
+
+      {/* 💬 Messagerie d'explication après annulation */}
+      {showAnnulationChat && (
+        <AnnulationExplicationChat
+          course={course}
+          livreurId={livreurId}
+          livreurNom={livreurNom}
+          motif={motifAnnulationLivreur}
+          motifDetail={motifAnnulationLivreur === "autre" ? motifAnnulationDetail : ""}
+          onClose={() => {
+            setShowAnnulationChat(false);
+            setMotifAnnulationLivreur("");
+            setMotifAnnulationDetail("");
+          }}
+        />
       )}
 
       {/* Modal mise en pause */}
