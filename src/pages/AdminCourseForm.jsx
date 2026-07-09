@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, MapPin, Send, Loader2, Sparkles } from "lucide-react";
+import { ArrowLeft, MapPin, Send, Loader2, Sparkles, Navigation, Check } from "lucide-react";
 import { useAdminContext } from "@/hooks/useAdminContext";
 import { useAdminCourseWindows } from "@/context/AdminCourseWindowsContext";
 import QuartierSelect from "@/components/client/QuartierSelect";
+import MapPickerModal from "@/components/admin/MapPickerModal";
 
 function generarQRData() {
   const pickupQrToken = crypto.randomUUID().replace(/-/g, "");
@@ -99,6 +100,9 @@ export default function AdminCourseForm() {
   const [notes, setNotes] = useState("");
   const [quartierDepart, setQuartierDepart] = useState("");
   const [quartierArrivee, setQuartierArrivee] = useState("");
+  const [gpsDepart, setGpsDepart] = useState(null);
+  const [gpsArrivee, setGpsArrivee] = useState(null);
+  const [mapModal, setMapModal] = useState(null); // null | 'depart' | 'arrivee'
 
   const selectedPays = PAYS.find(p => p.code === countryCode);
 
@@ -107,6 +111,8 @@ export default function AdminCourseForm() {
     setAdresseArrivee("");
     setQuartierDepart("");
     setQuartierArrivee("");
+    setGpsDepart(null);
+    setGpsArrivee(null);
     setClientNom("");
     setClientPrenom("");
     setClientTelephone("");
@@ -142,6 +148,10 @@ export default function AdminCourseForm() {
         adresse_arrivee: adresseArrivee.trim() || "—",
         quartier_depart: quartierDepart || null,
         quartier_arrivee: quartierArrivee || null,
+        gps_depart_lat: gpsDepart?.lat || null,
+        gps_depart_lng: gpsDepart?.lng || null,
+        gps_arrivee_lat: gpsArrivee?.lat || null,
+        gps_arrivee_lng: gpsArrivee?.lng || null,
         client_nom: clientNom.trim() || "Client",
         client_telephone: clientTelephone.trim() || "",
         expediteur_nom: expediteurNom.trim() || null,
@@ -258,15 +268,30 @@ export default function AdminCourseForm() {
           </div>
 
           <div>
-            <p className="text-xs font-semibold text-gray-500 mb-1.5">Point de départ</p>
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-xs font-semibold text-gray-500">Point de départ</p>
+              {gpsDepart && (
+                <span className="flex items-center gap-1 text-[10px] font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                  <Check className="w-3 h-3" /> GPS défini
+                </span>
+              )}
+            </div>
             <div className="relative">
               <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
               <Input
                 value={adresseDepart}
                 onChange={e => setAdresseDepart(e.target.value)}
                 placeholder="Ex: Ouaga 2000, face à la mairie"
-                className="rounded-xl h-12 pl-10 bg-gray-50 border-gray-200 text-sm"
+                className="rounded-xl h-12 pl-10 pr-28 bg-gray-50 border-gray-200 text-sm"
               />
+              <button
+                type="button"
+                onClick={() => setMapModal('depart')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary text-[11px] font-semibold hover:bg-primary/20 transition-colors"
+              >
+                <Navigation className="w-3.5 h-3.5" />
+                Localiser
+              </button>
             </div>
           </div>
 
@@ -279,15 +304,30 @@ export default function AdminCourseForm() {
           />
 
           <div>
-            <p className="text-xs font-semibold text-gray-500 mb-1.5">Point d'arrivée</p>
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-xs font-semibold text-gray-500">Point d'arrivée</p>
+              {gpsArrivee && (
+                <span className="flex items-center gap-1 text-[10px] font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                  <Check className="w-3 h-3" /> GPS défini
+                </span>
+              )}
+            </div>
             <div className="relative">
               <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
               <Input
                 value={adresseArrivee}
                 onChange={e => setAdresseArrivee(e.target.value)}
                 placeholder="Ex: Gounghin, derrière le marché"
-                className="rounded-xl h-12 pl-10 bg-gray-50 border-gray-200 text-sm"
+                className="rounded-xl h-12 pl-10 pr-28 bg-gray-50 border-gray-200 text-sm"
               />
+              <button
+                type="button"
+                onClick={() => setMapModal('arrivee')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary text-[11px] font-semibold hover:bg-primary/20 transition-colors"
+              >
+                <Navigation className="w-3.5 h-3.5" />
+                Localiser
+              </button>
             </div>
           </div>
 
@@ -425,6 +465,26 @@ export default function AdminCourseForm() {
           La course sera automatiquement proposée aux livreurs disponibles
         </p>
       </div>
+
+      {/* Modals de sélection GPS */}
+      <MapPickerModal
+        open={mapModal === 'depart'}
+        onClose={() => setMapModal(null)}
+        countryCode={countryCode}
+        initialLat={gpsDepart?.lat}
+        initialLng={gpsDepart?.lng}
+        label="Localiser le point de départ"
+        onSelect={(lat, lng) => setGpsDepart({ lat, lng })}
+      />
+      <MapPickerModal
+        open={mapModal === 'arrivee'}
+        onClose={() => setMapModal(null)}
+        countryCode={countryCode}
+        initialLat={gpsArrivee?.lat}
+        initialLng={gpsArrivee?.lng}
+        label="Localiser le point d'arrivée"
+        onSelect={(lat, lng) => setGpsArrivee({ lat, lng })}
+      />
     </div>
   );
 }
