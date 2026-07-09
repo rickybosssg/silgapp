@@ -250,32 +250,42 @@ async function notifierLivreur(base44, courseId, course, livreur, timeoutSec) {
   const appOrBgActive = (livreur.app_active === true || livreur.background_active === true);
   const appActive = heartbeatAgeMin !== null && heartbeatAgeMin < 5 && appOrBgActive;
 
-  try {
-    await base44.asServiceRole.entities.Notification.create({
-      titre, message, type: 'nouvelle_course',
-      course_id: courseId, destinataire_email: livreur.user_email, lue: false,
-    });
-  } catch (err) { console.error('[DISPATCH] ❌ Notif BDD:', err.message); }
+  // ⚡ FIRE-AND-FORGET — les notifications sont envoyées en arrière-plan sans bloquer
+  // le moteur de dispatch. Chaque appel (BDD + FCM + WhatsApp) peut prendre 2-5s ;
+  // en les rendant non-bloquants, le dispatch reste sous 120s même avec 4 courses × 7 livreurs.
+  const livreurEmail = livreur.user_email;
+  const livreurId = livreur.id;
+  const livreurTel = livreur.telephone;
+  const livreurCountry = livreur.country_code;
 
-  try {
-    await base44.functions.invoke('envoiNotificationPush', {
-      destinataire_email: livreur.user_email, livreur_id: livreur.id,
-      titre, message, type: 'nouvelle_course', course_id: courseId,
-    });
-  } catch (err) { console.error('[DISPATCH] ❌ Push Firebase:', err.message); }
+  // Notification BDD — non-bloquante
+  base44.asServiceRole.entities.Notification.create({
+    titre, message, type: 'nouvelle_course',
+    course_id: courseId, destinataire_email: livreurEmail, lue: false,
+  }).catch(err => console.error('[DISPATCH] ❌ Notif BDD:', err.message));
 
-  if (!appActive && livreur.telephone) {
-    try {
-      const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-      const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-      const fromRaw = Deno.env.get('TWILIO_WHATSAPP_FROM') || '';
-      if (accountSid && authToken && fromRaw) {
+  // Push FCM — non-bloquant
+  base44.functions.invoke('envoiNotificationPush', {
+    destinataire_email: livreurEmail, livreur_id: livreurId,
+    titre, message, type: 'nouvelle_course', course_id: courseId,
+  }).catch(err => console.error('[DISPATCH] ❌ Push Firebase:', err.message));
+
+  if (!appActive && livreurTel) {
+    // ⚡ WhatsApp — non-bloquant (fetch Twilio + BDD en arrière-plan)
+    const waOptIn = livreur.whatsapp_opt_in;
+    const waOptInDate = livreur.whatsapp_opt_in_date;
+    const waPromise = (async () => {
+      try {
+        const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
+        const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+        const fromRaw = Deno.env.get('TWILIO_WHATSAPP_FROM') || '';
+        if (!accountSid || !authToken || !fromRaw) return;
         const INDICATIFS = { BF: '+226', CI: '+225', TG: '+228', BJ: '+229', SN: '+221', ML: '+223', GN: '+224', NE: '+227', GH: '+233' };
-        const indicatif = INDICATIFS[livreur.country_code] || '+226';
-        let tel = livreur.telephone.replace(/\s+/g, '').replace(/[^\d+]/g, '');
+        const indicatif = INDICATIFS[livreurCountry] || '+226';
+        let tel = livreurTel.replace(/\s+/g, '').replace(/[^\d+]/g, '');
         if (!tel.startsWith('+')) tel = indicatif + tel;
 
-        if (livreur.whatsapp_opt_in !== false || livreur.whatsapp_opt_in_date) {
+        if (waOptIn !== false || waOptInDate) {
           const fromNumber = fromRaw.startsWith('whatsapp:') ? fromRaw : `whatsapp:${fromRaw}`;
           const formData = new URLSearchParams();
           formData.append('From', fromNumber);
@@ -291,19 +301,20 @@ async function notifierLivreur(base44, courseId, course, livreur, timeoutSec) {
           const data = await resp.json();
           if (resp.ok && data.sid) {
             await base44.asServiceRole.entities.WhatsAppAlerte.create({
-              livreur_id: livreur.id, livreur_telephone: tel,
+              livreur_id: livreurId, livreur_telephone: tel,
               notification_id: courseId, statut: 'sent',
               twilio_sid: data.sid, heure_envoi: new Date().toISOString(), canal: 'whatsapp',
             });
           } else if (data.code === 63015) {
-            await base44.asServiceRole.entities.Livreur.update(livreur.id, {
+            await base44.asServiceRole.entities.Livreur.update(livreurId, {
               whatsapp_opt_in: false, whatsapp_derniere_erreur: '63015',
               whatsapp_derniere_erreur_date: new Date().toISOString(),
             });
           }
         }
-      }
-    } catch (err) { console.error('[DISPATCH] ❌ WhatsApp:', err.message); }
+      } catch (err) { console.error('[DISPATCH] ❌ WhatsApp:', err.message); }
+    })();
+    waPromise.catch(() => {});
   }
 
   console.log(`[DISPATCH] 📤 Notifié: ${livreur.nom} (${distanceSafe}km, HB: ${heartbeatAgeMin?.toFixed(1) || '?'}min)`);
@@ -499,15 +510,14 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
     console.log(`[DISPATCH] 🧹 Notifications vague précédente archivées pour course ${courseId} (vague ${wave})`);
   }
 
-  // Notifier tous les livreurs sélectionnés SÉQUENTIELLEMENT (évite rate limit)
+  // ⚡ Notifications fire-and-forget — notifierLivreur ne bloque plus (tous les appels
+  // BDD/FCM/WhatsApp sont non-awaités). La boucle complète prend <100ms même pour 7 livreurs.
   for (const l of selection) {
     try {
-      await notifierLivreur(base44, courseId, course, l, timeoutSec);
+      notifierLivreur(base44, courseId, course, l, timeoutSec);
     } catch (err) {
       console.error(`[DISPATCH] ❌ Erreur notif livreur ${l.id}:`, err.message);
     }
-    // Petit délai entre chaque notification pour éviter le rate limit API
-    await new Promise(r => setTimeout(r, 200));
   }
 
   console.log(`[DISPATCH] ✅ ${selection.length} livreur(s) notifiés (total cumulé: ${totalNotifies}) pour course ${courseId}, timeout: ${timeoutSec}s`);
@@ -1060,8 +1070,8 @@ Deno.serve(async (req) => {
           console.error(`[DISPATCH] ❌ Erreur sur course ${course.id}:`, err.message);
           resultats.push({ course_id: course.id, error: err.message });
         }
-        // Délai entre chaque course pour éviter le rate limit API
-        await new Promise(r => setTimeout(r, 300));
+        // Délai minimal entre courses (les notifications sont fire-and-forget)
+        await new Promise(r => setTimeout(r, 100));
       }
 
       // 🚨 Détection des courses bloquées > 10 min (dispatch en panne)
@@ -1128,8 +1138,8 @@ Deno.serve(async (req) => {
           console.error(`[DISPATCH] ❌ Erreur retry course ${course.id}:`, err.message);
           resultats.push({ course_id: course.id, error: err.message });
         }
-        // Délai entre chaque course pour éviter le rate limit API
-        await new Promise(r => setTimeout(r, 300));
+        // Délai minimal entre courses (les notifications sont fire-and-forget)
+        await new Promise(r => setTimeout(r, 100));
       }
       return Response.json({ success: true, retried: coursesToProcess.length, total: aRetenter.length, resultats });
     }
