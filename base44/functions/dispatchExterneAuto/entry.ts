@@ -1,5 +1,9 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
+// ── Cache module-level avec TTL pour les configs (évite de recharger à chaque tick) ──
+const CONFIG_CACHE = { dispatch: null, gps: null, expires: 0 };
+const CONFIG_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 function generateToken() {
   return crypto.randomUUID().replace(/-/g, '');
 }
@@ -50,13 +54,17 @@ function reponseDejaPrise(reason, course, details = {}) {
 }
 
 async function chargerConfigDispatch(base44) {
+  if (CONFIG_CACHE.dispatch && Date.now() < CONFIG_CACHE.expires) return CONFIG_CACHE.dispatch;
   try {
     const configs = await base44.asServiceRole.entities.AppConfig.filter({});
     const nbConfig = configs.find(c => c.cle === 'DISPATCH_NB_LIVREURS');
     const timeoutConfig = configs.find(c => c.cle === 'DISPATCH_TIMEOUT_SEC');
     const nb = nbConfig ? (nbConfig.valeur === 'tous' ? 999 : parseInt(nbConfig.valeur, 10) || 3) : 3;
     const timeout = timeoutConfig ? (parseInt(timeoutConfig.valeur, 10) || 60) : 60;
-    return { nb, timeout };
+    const result = { nb, timeout };
+    CONFIG_CACHE.dispatch = result;
+    CONFIG_CACHE.expires = Date.now() + CONFIG_TTL_MS;
+    return result;
   } catch (err) {
     console.warn('[DISPATCH] ⚠️ Impossible de charger config dispatch, valeurs par défaut utilisées:', err.message);
     return { nb: 3, timeout: 120 };
@@ -64,6 +72,7 @@ async function chargerConfigDispatch(base44) {
 }
 
 async function chargerConfigVaguesGPS(base44) {
+  if (CONFIG_CACHE.gps && Date.now() < CONFIG_CACHE.expires) return CONFIG_CACHE.gps;
   try {
     const configs = await base44.asServiceRole.entities.DispatchWaveConfig.filter({});
     const cfg = configs[0];
@@ -78,7 +87,7 @@ async function chargerConfigVaguesGPS(base44) {
       };
     }
     const waves = JSON.parse(cfg.waves_json || '[]');
-    return {
+    const result = {
       gps_waves_enabled: cfg.gps_waves_enabled !== false,
       waves: waves.length > 0 ? waves : [
         { size: 3, timeout_sec: 60 },
@@ -86,6 +95,9 @@ async function chargerConfigVaguesGPS(base44) {
         { size: 999, timeout_sec: 60 },
       ],
     };
+    CONFIG_CACHE.gps = result;
+    CONFIG_CACHE.expires = Date.now() + CONFIG_TTL_MS;
+    return result;
   } catch (err) {
     console.warn('[DISPATCH] ⚠️ Impossible de charger config vagues GPS, défaut utilisé:', err.message);
     return {
@@ -116,7 +128,7 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
     statut: 'disponible',
     country_code: course.country_code,
     bloque_encours: false,
-  });
+  }, '-last_seen_at', 50);
 
   if (!tousLivreurs || tousLivreurs.length === 0) return [];
 
@@ -532,12 +544,10 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
 
 async function supprimerNotificationsCourse(base44, courseId) {
   try {
-    const notifs = await base44.asServiceRole.entities.Notification.filter({ course_id: courseId, type: 'nouvelle_course' });
-    const nonLues = notifs.filter(n => !n.lue);
-    for (const n of nonLues) {
-      await base44.asServiceRole.entities.Notification.update(n.id, { lue: true });
-    }
-    if (nonLues.length > 0) console.log(`[DISPATCH] 🧹 ${nonLues.length} notification(s) archivée(s)`);
+    await base44.asServiceRole.entities.Notification.updateMany(
+      { course_id: courseId, type: 'nouvelle_course', lue: false },
+      { $set: { lue: true } }
+    );
   } catch (err) { console.warn('[DISPATCH] ⚠️ Erreur archivage:', err.message); }
 }
 
@@ -865,23 +875,14 @@ Deno.serve(async (req) => {
         console.log(`[DISPATCH] 🚫 Livreur ${livreur_id} ajouté aux exclus définitifs — course ${course_id}`);
       }
 
-      // 🧹 Marquer les notifications "nouvelle_course" comme lues pour ce livreur
-      // — empêche la course de réapparaître via le fetching par notification
+      // 🧹 Marquer les notifications "nouvelle_course" comme lues pour ce livreur (bulk)
       try {
         const livreurData = await base44.asServiceRole.entities.Livreur.get(livreur_id);
         if (livreurData?.user_email) {
-          const notifs = await base44.asServiceRole.entities.Notification.filter({
-            course_id: course_id,
-            destinataire_email: livreurData.user_email,
-            type: 'nouvelle_course',
-            lue: false,
-          });
-          for (const n of notifs) {
-            await base44.asServiceRole.entities.Notification.update(n.id, { lue: true });
-          }
-          if (notifs.length > 0) {
-            console.log(`[DISPATCH] 🧹 ${notifs.length} notification(s) marquée(s) lue(s) pour livreur ${livreur_id} — course ${course_id}`);
-          }
+          await base44.asServiceRole.entities.Notification.updateMany(
+            { course_id: course_id, destinataire_email: livreurData.user_email, type: 'nouvelle_course', lue: false },
+            { $set: { lue: true } }
+          );
         }
       } catch (e) { console.warn('[DISPATCH] Erreur archivage notifs refus:', e.message); }
 
@@ -985,7 +986,7 @@ Deno.serve(async (req) => {
       const filter = { statut: 'recherche_livreur' };
       if (filterCountry) filter.country_code = filterCountry;
 
-      const courses = await base44.asServiceRole.entities.CourseExterne.filter(filter);
+      const courses = await base44.asServiceRole.entities.CourseExterne.filter(filter, '-created_date', 10);
       const now = new Date();
       const resultats = [];
 
@@ -995,7 +996,7 @@ Deno.serve(async (req) => {
         console.log(`[DISPATCH] ⚡ ${courses.length} courses à traiter — limitation à ${MAX_COURSES_PER_TICK}/tick pour éviter rate limit`);
       }
 
-      // 📦 Cache config — charger UNE SEULE FOIS par tick au lieu de par course
+      // 📦 Cache config — déjà mis en cache au niveau module (TTL 5 min), ne fait qu'une seule requête
       const cachedConfig = {
         dispatch: await chargerConfigDispatch(base44),
         gps: await chargerConfigVaguesGPS(base44),
@@ -1107,19 +1108,18 @@ Deno.serve(async (req) => {
       const filter = { statut: 'recherche_livreur' };
       if (filterCountry) filter.country_code = filterCountry;
 
-      const courses = await base44.asServiceRole.entities.CourseExterne.filter(filter);
+      const courses = await base44.asServiceRole.entities.CourseExterne.filter(filter, '-created_date', 10);
       const aRetenter = courses.filter(c =>
         ['en_attente', 'redispatch', 'cycle_epuise'].includes(c.dispatch_status)
       );
 
-      // 🛡️ Limite stricte anti-rate-limit (same as avancer_vagues_expirees)
       const MAX_COURSES_PER_TICK = 4;
       const coursesToProcess = aRetenter.slice(0, MAX_COURSES_PER_TICK);
       if (aRetenter.length > MAX_COURSES_PER_TICK) {
         console.log(`[DISPATCH] ⚡ ${aRetenter.length} courses à retenter — limitation à ${MAX_COURSES_PER_TICK}/tick`);
       }
 
-      // 📦 Cache config — charger UNE SEULE FOIS par tick
+      // 📦 Cache config — déjà mis en cache au niveau module (TTL 5 min)
       const cachedConfig = {
         dispatch: await chargerConfigDispatch(base44),
         gps: await chargerConfigVaguesGPS(base44),
