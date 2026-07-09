@@ -9,14 +9,14 @@ const statusConfig = {
   en_route_recuperation: { label: "🟡 En route vers l'expéditeur", className: "bg-yellow-400 text-black border-yellow-500" },
   recherche_livreur: { label: "🔍 Recherche livreur", className: "bg-red-500 text-white font-bold border-red-600" },
   livreur_en_route: { label: "🟡 En route vers l'expéditeur", className: "bg-yellow-400 text-black border-yellow-500" },
-  arrive_prise_en_charge: { label: "🟡 Arrivé chez l'expéditeur", className: "bg-cyan-100 text-cyan-700 border-cyan-200" },
+  arrive_prise_en_charge: { label: "🟡 Arrivé chez l'expéditeur", className: "bg-cyan-500 text-white border-cyan-600" },
   colis_recupere: { label: "🟢 Colis récupéré", className: "bg-green-500 text-black border-green-600" },
-  passager_embarque: { label: "🟠 Passager embarqué", className: "bg-teal-100 text-teal-700 border-teal-200" },
-  pris_en_charge: { label: "🟠 Pris en charge", className: "bg-cyan-100 text-cyan-700 border-cyan-200" },
+  passager_embarque: { label: "🟠 Passager embarqué", className: "bg-teal-500 text-white border-teal-600" },
+  pris_en_charge: { label: "🟠 Pris en charge", className: "bg-cyan-500 text-white border-cyan-600" },
   en_livraison: { label: "🟡 En route vers le destinataire", className: "bg-yellow-400 text-black border-yellow-500" },
-  arrivee: { label: "🟢 Arrivé à destination", className: "bg-amber-100 text-amber-700 border-amber-200" },
-  livree: { label: "🟢 Livré", className: "bg-green-100 text-green-700 border-green-200" },
-  annulee: { label: "🔴 Annulé", className: "bg-red-100 text-red-700 border-red-200" },
+  arrivee: { label: "🟢 Arrivé à destination", className: "bg-green-500 text-black border-green-600" },
+  livree: { label: "🟢 Livré", className: "bg-green-600 text-white border-green-700" },
+  annulee: { label: "🔴 Annulé", className: "bg-red-600 text-white font-bold border-red-700" },
 };
 
 export default function CourseStatusBadge({ statut, dispatchStatus }) {
