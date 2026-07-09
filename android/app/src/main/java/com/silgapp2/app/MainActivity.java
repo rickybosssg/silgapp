@@ -24,6 +24,7 @@ public class MainActivity extends BridgeActivity {
         createUrgentCourseChannel();
         requestBatteryOptimizationExemption();
         super.onCreate(savedInstanceState);
+        SilgappPushPlugin.handleNotificationIntent(getIntent(), "launch");
         SilgappFirebaseMessagingService.stopUrgentCourseAlert();
     }
 
@@ -31,6 +32,7 @@ public class MainActivity extends BridgeActivity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
+        SilgappPushPlugin.handleNotificationIntent(intent, "new_intent");
         SilgappFirebaseMessagingService.stopUrgentCourseAlert();
     }
 

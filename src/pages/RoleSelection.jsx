@@ -11,7 +11,11 @@ export default function RoleSelection({ onPartenaire }) {
   React.useEffect(() => {
     base44.auth.me().then(u => {
       setUser(u);
-      if (u?.silgapp_role) {
+      let forceRoleSelection = false;
+      try {
+        forceRoleSelection = localStorage.getItem("silgapp_force_role_selection") === "true";
+      } catch (_) {}
+      if (u?.silgapp_role && !forceRoleSelection) {
         window.location.reload();
       }
     }).catch(() => {});
@@ -20,6 +24,7 @@ export default function RoleSelection({ onPartenaire }) {
   const handleClientComplete = async () => {
     try {
       await base44.auth.updateMe({ silgapp_role: "client" });
+      localStorage.removeItem("silgapp_force_role_selection");
     } catch (err) {
       console.error("Erreur enregistrement role client:", err);
     }
@@ -30,6 +35,7 @@ export default function RoleSelection({ onPartenaire }) {
   const handleLivreurComplete = async () => {
     try {
       await base44.auth.updateMe({ silgapp_role: "livreur" });
+      localStorage.removeItem("silgapp_force_role_selection");
     } catch (err) {
       console.error("Erreur enregistrement role livreur:", err);
     }
@@ -40,6 +46,7 @@ export default function RoleSelection({ onPartenaire }) {
   const handlePartenaire = async () => {
     try {
       await base44.auth.updateMe({ silgapp_role: "partenaire" });
+      localStorage.removeItem("silgapp_force_role_selection");
     } catch (err) {
       console.error("Erreur enregistrement role partenaire:", err);
     }

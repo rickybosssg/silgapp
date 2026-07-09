@@ -270,6 +270,15 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
         return;
       }
 
+      let forceRoleSelection = false;
+      try {
+        forceRoleSelection = localStorage.getItem("silgapp_force_role_selection") === "true";
+      } catch (_) {}
+      if (forceRoleSelection) {
+        setState("choix_role");
+        return;
+      }
+
       let effectiveRole = user.silgapp_role || null;
 
       if (!effectiveRole) {

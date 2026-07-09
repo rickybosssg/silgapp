@@ -145,6 +145,7 @@ Deno.serve(async (req) => {
         last_message: lastMsgPreview,
         last_message_date: message.created_date,
         last_sender_name: realName,
+        last_sender_type: sender_type,
       }).catch(() => {});
     }
 

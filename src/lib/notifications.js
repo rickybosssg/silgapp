@@ -19,6 +19,7 @@ let lastNativeToken = null;
 let lastNativeTokenPlatform = null;
 let lastNativeRegistrationError = null;
 const recentNativeNotifications = new Map();
+const recentOpenedNotifications = new Map();
 
 function getNotificationDedupeKey(data = {}) {
   return String(
@@ -37,6 +38,18 @@ function shouldSkipDuplicateNotification(data = {}, ttlMs = 120000) {
   recentNativeNotifications.set(key, now);
   for (const [entryKey, at] of recentNativeNotifications) {
     if (now - at > ttlMs) recentNativeNotifications.delete(entryKey);
+  }
+  return now - previous < ttlMs;
+}
+
+function shouldSkipDuplicateOpened(data = {}, ttlMs = 10000) {
+  const key = getNotificationDedupeKey(data);
+  if (!key) return false;
+  const now = Date.now();
+  const previous = recentOpenedNotifications.get(key) || 0;
+  recentOpenedNotifications.set(key, now);
+  for (const [entryKey, at] of recentOpenedNotifications) {
+    if (now - at > ttlMs) recentOpenedNotifications.delete(entryKey);
   }
   return now - previous < ttlMs;
 }
@@ -64,6 +77,10 @@ function savePushDebug(event, details = {}) {
 }
 
 function dispatchNotificationOpened(data = {}, source = "push") {
+  if (shouldSkipDuplicateOpened(data)) {
+    savePushDebug("duplicate-open-skipped", { source, data });
+    return;
+  }
   stopUrgentCourseAlert("notification-opened");
   const detail = { ...(data || {}), source };
   try {
@@ -185,6 +202,35 @@ async function ensureNativePushListeners() {
   if (!PushNotifications) return;
 
   nativeListenersReady = true;
+
+  try {
+    await SilgappPush.addListener?.("nativeNotificationOpened", (event) => {
+      const data = event?.data || event || {};
+      savePushDebug("notification-click", {
+        source: "native-intent",
+        data,
+      });
+      window.focus?.();
+      dispatchNotificationOpened(data, data?.source || "native-intent");
+    });
+  } catch (error) {
+    console.warn("[Notifications] native intent listener failed:", error?.message);
+  }
+
+  try {
+    const launchResult = await withNativeTimeout(
+      SilgappPush.getLaunchNotificationData(),
+      2500,
+      "SilgappPush.getLaunchNotificationData"
+    );
+    const launchData = launchResult?.data || null;
+    if (launchResult?.hasData && launchData) {
+      savePushDebug("notification-launch-data", { data: launchData });
+      dispatchNotificationOpened(launchData, launchData?.source || "native-launch");
+    }
+  } catch (error) {
+    console.warn("[Notifications] launch notification data unavailable:", error?.message);
+  }
 
   try {
     await PushNotifications.createChannel?.({

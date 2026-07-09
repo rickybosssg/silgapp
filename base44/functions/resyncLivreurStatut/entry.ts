@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-// Statuts de course consideres comme actifs.
+// Statuts de course considérés comme "active"
 const STATUTS_ACTIFS = ["livreur_en_route", "colis_recupere", "en_livraison", "recherche_livreur"];
 
 Deno.serve(async (req) => {
@@ -8,13 +8,14 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user || user.role !== 'admin') {
-      return Response.json({ error: 'Acces reserve aux admins' }, { status: 403 });
+      return Response.json({ error: 'Accès réservé aux admins' }, { status: 403 });
     }
 
     const body = await req.json().catch(() => ({}));
     const { livreur_id } = body;
 
     if (livreur_id) {
+      // Resync un livreur spécifique
       const [livreurs, courses] = await Promise.all([
         base44.asServiceRole.entities.Livreur.filter({ id: livreur_id }),
         base44.asServiceRole.entities.CourseExterne.filter({ livreur_id }),
@@ -26,19 +27,16 @@ Deno.serve(async (req) => {
       const courseActive = (courses || []).find(c => STATUTS_ACTIFS.includes(c.statut));
 
       if (!courseActive && livreur.statut === "en_course") {
-        const nouveauStatut = livreur.manual_hors_ligne === true ? "hors_ligne" : "disponible";
-        await base44.asServiceRole.entities.Livreur.update(livreur.id, { statut: nouveauStatut });
-        return Response.json({ success: true, action: "resync", livreur_id, nouveau_statut: nouveauStatut });
+        // 🔄 Toujours remettre "disponible" — le statut hors_ligne est contrôlé
+        // exclusivement par le livreur lui-même (toggle manuel).
+        await base44.asServiceRole.entities.Livreur.update(livreur.id, { statut: "disponible" });
+        return Response.json({ success: true, action: "resync", livreur_id, nouveau_statut: "disponible" });
       }
 
-      return Response.json({
-        success: true,
-        action: "aucune_action",
-        statut_actuel: livreur.statut,
-        course_active: courseActive?.id || null,
-      });
+      return Response.json({ success: true, action: "aucune_action", statut_actuel: livreur.statut, course_active: courseActive?.id || null });
     }
 
+    // Resync global : tous les livreurs externes en_course sans course active
     const [tousLivreurs, toutesCoursesActives] = await Promise.all([
       base44.asServiceRole.entities.Livreur.filter({ reseau: "externe", statut: "en_course" }),
       base44.asServiceRole.entities.CourseExterne.filter({}, "-created_date", 200),
@@ -46,17 +44,19 @@ Deno.serve(async (req) => {
 
     const coursesActives = (toutesCoursesActives || []).filter(c => STATUTS_ACTIFS.includes(c.statut));
     const livreurIdsAvecCourse = new Set(coursesActives.map(c => c.livreur_id).filter(Boolean));
+
     const aResynchroniser = (tousLivreurs || []).filter(l => !livreurIdsAvecCourse.has(l.id));
 
     if (aResynchroniser.length === 0) {
       return Response.json({ success: true, resynchronises: 0, message: "Tous les statuts sont corrects." });
     }
 
+    // 🔄 Remettre "disponible" — le statut hors_ligne est contrôlé exclusivement
+    // par le livreur lui-même (toggle manuel), jamais par le système.
     await Promise.all(
       aResynchroniser.map(l => {
-        const nouveauStatut = l.manual_hors_ligne === true ? "hors_ligne" : "disponible";
-        console.log(`[resyncLivreurStatut] ${l.prenom || ""} ${l.nom || ""} -> "${nouveauStatut}"`);
-        return base44.asServiceRole.entities.Livreur.update(l.id, { statut: nouveauStatut });
+        console.log(`[resyncLivreurStatut] ${l.prenom} ${l.nom} → "disponible" (était en_course sans course active)`);
+        return base44.asServiceRole.entities.Livreur.update(l.id, { statut: "disponible" });
       })
     );
 
@@ -65,6 +65,7 @@ Deno.serve(async (req) => {
       resynchronises: aResynchroniser.length,
       livreurs: aResynchroniser.map(l => ({ id: l.id, nom: l.nom, prenom: l.prenom })),
     });
+
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }

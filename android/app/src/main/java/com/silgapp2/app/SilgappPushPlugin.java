@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.PowerManager;
 import android.provider.Settings;
 
@@ -17,11 +18,90 @@ import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 import com.google.firebase.messaging.FirebaseMessaging;
 
+import java.util.Iterator;
+
 @CapacitorPlugin(
     name = "SilgappPush",
     permissions = @Permission(strings = { Manifest.permission.POST_NOTIFICATIONS }, alias = "notifications")
 )
 public class SilgappPushPlugin extends Plugin {
+    private static SilgappPushPlugin activeInstance;
+    private static JSObject pendingNotificationData;
+
+    @Override
+    public void load() {
+        activeInstance = this;
+        JSObject pending = getPendingNotificationData(false);
+        if (pending != null) {
+            notifyListeners("nativeNotificationOpened", pending, true);
+        }
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        if (activeInstance == this) {
+            activeInstance = null;
+        }
+        super.handleOnDestroy();
+    }
+
+    public static void handleNotificationIntent(Intent intent, String source) {
+        JSObject data = extractNotificationData(intent, source);
+        if (data == null) return;
+
+        synchronized (SilgappPushPlugin.class) {
+            pendingNotificationData = data;
+        }
+
+        SilgappFirebaseMessagingService.stopUrgentCourseAlert();
+
+        SilgappPushPlugin plugin = activeInstance;
+        if (plugin != null) {
+            plugin.notifyListeners("nativeNotificationOpened", data, true);
+        }
+    }
+
+    private static JSObject extractNotificationData(Intent intent, String source) {
+        if (intent == null) return null;
+        Bundle extras = intent.getExtras();
+        if (extras == null || extras.isEmpty()) return null;
+
+        JSObject data = new JSObject();
+        for (String key : extras.keySet()) {
+            Object value = extras.get(key);
+            if (value != null) {
+                data.put(key, String.valueOf(value));
+            }
+        }
+
+        boolean hasNotificationPayload =
+            data.has("course_id") ||
+            data.has("notification_id") ||
+            data.has("conversation_id") ||
+            data.has("type");
+
+        if (!hasNotificationPayload) return null;
+
+        data.put("source", source);
+        data.put("native_intent", true);
+        return data;
+    }
+
+    private static synchronized JSObject getPendingNotificationData(boolean consume) {
+        if (pendingNotificationData == null) return null;
+        JSObject copy = new JSObject();
+        try {
+            Iterator<String> keys = pendingNotificationData.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                copy.put(key, pendingNotificationData.get(key));
+            }
+        } catch (Exception ignored) {}
+        if (consume) {
+            pendingNotificationData = null;
+        }
+        return copy;
+    }
 
     @PluginMethod
     public void checkNotificationPermission(PluginCall call) {
@@ -72,6 +152,17 @@ public class SilgappPushPlugin extends Plugin {
             result.put("platform", "android");
             call.resolve(result);
         });
+    }
+
+    @PluginMethod
+    public void getLaunchNotificationData(PluginCall call) {
+        JSObject data = getPendingNotificationData(true);
+        JSObject result = new JSObject();
+        result.put("hasData", data != null);
+        if (data != null) {
+            result.put("data", data);
+        }
+        call.resolve(result);
     }
 
     @PluginMethod

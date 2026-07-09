@@ -297,6 +297,16 @@ export default function MessagesPage({ myType, myId, myName, onBack, initialConv
     setLoading(false);
   };
 
+  // Marquer la conversation comme lue côté admin à l'ouverture
+  const markConversationRead = async (convId) => {
+    if (myType !== "admin") return;
+    try {
+      await base44.entities.Conversation.update(convId, {
+        admin_last_read_date: new Date().toISOString(),
+      });
+    } catch (_) {}
+  };
+
   if (activeConvId) {
     return (
       <GeneralChatWindow
@@ -363,7 +373,7 @@ export default function MessagesPage({ myType, myId, myName, onBack, initialConv
             myType={myType}
             myId={myId}
             active={conv.id === activeConvId}
-            onClick={(c) => setActiveConvId(c.id)}
+            onClick={(c) => { setActiveConvId(c.id); markConversationRead(c.id); }}
           />
         ))}
       </div>

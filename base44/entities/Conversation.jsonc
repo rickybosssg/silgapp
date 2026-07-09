@@ -19,6 +19,21 @@
       "type": "string",
       "description": "Nom du dernier exp\u00e9diteur"
     },
+    "last_sender_type": {
+      "type": "string",
+      "enum": [
+        "client",
+        "livreur",
+        "admin",
+        "partenaire"
+      ],
+      "description": "Type du dernier exp\u00e9diteur \u2014 utilis\u00e9 pour le suivi de lecture admin"
+    },
+    "admin_last_read_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de la derni\u00e8re fois que l'admin a ouvert cette conversation"
+    },
     "title": {
       "type": "string",
       "description": "Titre de la conversation (optionnel, auto-g\u00e9n\u00e9r\u00e9 si absent)"

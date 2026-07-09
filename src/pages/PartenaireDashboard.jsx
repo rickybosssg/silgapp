@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Store, UtensilsCrossed, Loader2, LogOut, MapPin, Pill, Clock, XCircle } from "lucide-react";
+import { Store, UtensilsCrossed, Loader2, LogOut, MapPin, Pill, Clock, XCircle, ArrowLeft } from "lucide-react";
 import EtablissementForm from "@/components/partenaire/EtablissementForm";
 import ProduitsManager from "@/components/partenaire/ProduitsManager";
 import CommandesManager from "@/components/partenaire/CommandesManager";
@@ -175,6 +175,13 @@ export default function PartenaireDashboard() {
 
   const loading = loadingBoutique || loadingRestaurant || loadingPharmacie;
 
+  const handleRetourChoixRole = () => {
+    try {
+      localStorage.setItem("silgapp_force_role_selection", "true");
+    } catch (_) {}
+    window.location.reload();
+  };
+
   if (!user || loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -187,6 +194,14 @@ export default function PartenaireDashboard() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
         <div className="w-full max-w-md space-y-6">
+          <button
+            type="button"
+            onClick={handleRetourChoixRole}
+            className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-all"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Retour au choix du compte
+          </button>
           <div className="text-center space-y-3">
             <div className="w-20 h-20 rounded-2xl bg-purple-100 flex items-center justify-center mx-auto">
               <Store className="w-10 h-10 text-purple-600" />

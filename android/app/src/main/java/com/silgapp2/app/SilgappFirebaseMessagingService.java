@@ -241,6 +241,9 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
         Intent intent = new Intent(this, MainActivity.class);
         intent.setAction("OPEN_SILGAPP");
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        for (Map.Entry<String, String> entry : data.entrySet()) {
+            intent.putExtra(entry.getKey(), entry.getValue());
+        }
 
         PendingIntent pendingIntent = PendingIntent.getActivity(
             this,
