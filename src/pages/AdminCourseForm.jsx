@@ -191,68 +191,90 @@ export default function AdminCourseForm() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100/50">
+    <div className="min-h-screen bg-gradient-to-br from-rose-50 via-orange-50/40 to-amber-50/30">
       <div className="max-w-xl mx-auto px-4 py-6 space-y-6">
 
         {/* Header Premium */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 p-5 shadow-xl shadow-slate-200">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-primary/20 to-transparent rounded-bl-full" />
-          <div className="absolute bottom-0 left-1/2 w-40 h-20 bg-gradient-to-t from-emerald-500/10 to-transparent rounded-t-full" />
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-rose-600 via-red-600 to-orange-600 p-5 shadow-xl shadow-red-200/60">
+          <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-bl from-amber-300/30 to-transparent rounded-bl-full" />
+          <div className="absolute bottom-0 left-1/2 w-44 h-24 bg-gradient-to-t from-yellow-400/15 to-transparent rounded-t-full" />
           <div className="relative flex items-center gap-4">
             <Link to="/admin/externe">
-              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10">
+              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 backdrop-blur-sm">
                 <ArrowLeft className="w-4 h-4 text-white" />
               </Button>
             </Link>
             <div>
               <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-amber-400" />
+                <Sparkles className="w-5 h-5 text-amber-300" />
                 <h1 className="text-xl font-black text-white">Nouvelle course</h1>
               </div>
-              <p className="text-xs text-white/50">Création manuelle administrateur</p>
+              <p className="text-xs text-white/70">Création manuelle administrateur</p>
             </div>
           </div>
         </div>
 
         {/* Type de course */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-3xl border border-rose-100 shadow-md shadow-rose-50 overflow-hidden">
           <div className="px-5 pt-5 pb-1">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Type de course</p>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-1 h-4 bg-gradient-to-b from-rose-500 to-orange-500 rounded-full" />
+              <p className="text-xs font-bold text-rose-400 uppercase tracking-widest">Type de course</p>
+            </div>
           </div>
           <div className="px-5 pb-5">
             <div className="grid grid-cols-3 gap-2.5">
-              {TYPE_OPTIONS.map(t => (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => setTypeCourse(t.key)}
-                  className={`flex flex-col items-center gap-1.5 p-4 rounded-xl border-2 transition-all duration-200 ${
-                    typeCourse === t.key
-                      ? "border-primary bg-primary/5 shadow-md shadow-primary/10 scale-[1.02]"
-                      : "border-gray-100 hover:border-gray-200 hover:bg-gray-50"
-                  }`}
-                >
-                  <span className="text-2xl">{t.icon}</span>
-                  <span className={`text-xs font-bold ${typeCourse === t.key ? "text-primary" : "text-gray-700"}`}>
-                    {t.label}
-                  </span>
-                  <span className={`text-[10px] ${typeCourse === t.key ? "text-primary/60" : "text-gray-400"}`}>
-                    {t.desc}
-                  </span>
-                </button>
-              ))}
+              {TYPE_OPTIONS.map(t => {
+                const gradients = {
+                  expedier: "from-rose-500 to-red-500",
+                  recevoir: "from-amber-500 to-orange-500",
+                  deplacement: "from-violet-500 to-purple-500",
+                };
+                const bgs = {
+                  expedier: "from-rose-50 to-red-50",
+                  recevoir: "from-amber-50 to-orange-50",
+                  deplacement: "from-violet-50 to-purple-50",
+                };
+                const isActive = typeCourse === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => setTypeCourse(t.key)}
+                    className={`flex flex-col items-center gap-1.5 p-4 rounded-2xl border-2 transition-all duration-200 ${
+                      isActive
+                        ? `border-transparent bg-gradient-to-br ${bgs[t.key]} shadow-lg shadow-rose-100 scale-[1.03]`
+                        : "border-gray-100 hover:border-gray-200 hover:bg-gray-50"
+                    }`}
+                  >
+                    <span className={`text-2xl transition-transform duration-200 ${isActive ? "scale-110" : ""}`}>{t.icon}</span>
+                    <span className={`text-xs font-bold ${isActive ? "text-gray-900" : "text-gray-700"}`}>
+                      {t.label}
+                    </span>
+                    <span className={`text-[10px] ${isActive ? "text-gray-500" : "text-gray-400"}`}>
+                      {t.desc}
+                    </span>
+                    {isActive && (
+                      <div className={`mt-0.5 w-6 h-1 rounded-full bg-gradient-to-r ${gradients[t.key]}`} />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
 
         {/* Détails */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Détails</p>
+        <div className="bg-white rounded-3xl border border-orange-100 shadow-md shadow-orange-50/50 p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-4 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
+            <p className="text-xs font-bold text-orange-500 uppercase tracking-widest">Détails</p>
+          </div>
 
           <div>
-            <p className="text-xs font-semibold text-gray-500 mb-1.5">Pays</p>
+            <p className="text-xs font-semibold text-gray-600 mb-1.5">Pays</p>
             <Select value={countryCode} onValueChange={setCountryCode}>
-              <SelectTrigger className="rounded-xl h-12 bg-gray-50 border-gray-200 text-sm">
+              <SelectTrigger className="rounded-xl h-12 bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-200/50 text-sm focus:ring-blue-300">
                 <SelectValue>
                   {selectedPays ? `${selectedPays.drapeau}  ${selectedPays.nom}` : "Choisir un pays"}
                 </SelectValue>
@@ -269,25 +291,27 @@ export default function AdminCourseForm() {
 
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <p className="text-xs font-semibold text-gray-500">Point de départ</p>
+              <p className="text-xs font-semibold text-gray-600 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" /> Point de départ
+              </p>
               {gpsDepart && (
-                <span className="flex items-center gap-1 text-[10px] font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                <span className="flex items-center gap-1 text-[10px] font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
                   <Check className="w-3 h-3" /> GPS défini
                 </span>
               )}
             </div>
             <div className="relative">
-              <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+              <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500" />
               <Input
                 value={adresseDepart}
                 onChange={e => setAdresseDepart(e.target.value)}
                 placeholder="Ex: Ouaga 2000, face à la mairie"
-                className="rounded-xl h-12 pl-10 pr-28 bg-gray-50 border-gray-200 text-sm"
+                className="rounded-xl h-12 pl-10 pr-28 bg-emerald-50/40 border-emerald-100 text-sm focus:ring-emerald-300 focus:border-emerald-300"
               />
               <button
                 type="button"
                 onClick={() => setMapModal('depart')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary text-[11px] font-semibold hover:bg-primary/20 transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500 text-white text-[11px] font-semibold hover:bg-emerald-600 transition-colors shadow-sm shadow-emerald-200"
               >
                 <Navigation className="w-3.5 h-3.5" />
                 Localiser
@@ -305,25 +329,27 @@ export default function AdminCourseForm() {
 
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <p className="text-xs font-semibold text-gray-500">Point d'arrivée</p>
+              <p className="text-xs font-semibold text-gray-600 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-rose-500" /> Point d'arrivée
+              </p>
               {gpsArrivee && (
-                <span className="flex items-center gap-1 text-[10px] font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                <span className="flex items-center gap-1 text-[10px] font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
                   <Check className="w-3 h-3" /> GPS défini
                 </span>
               )}
             </div>
             <div className="relative">
-              <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+              <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-500" />
               <Input
                 value={adresseArrivee}
                 onChange={e => setAdresseArrivee(e.target.value)}
                 placeholder="Ex: Gounghin, derrière le marché"
-                className="rounded-xl h-12 pl-10 pr-28 bg-gray-50 border-gray-200 text-sm"
+                className="rounded-xl h-12 pl-10 pr-28 bg-rose-50/40 border-rose-100 text-sm focus:ring-rose-300 focus:border-rose-300"
               />
               <button
                 type="button"
                 onClick={() => setMapModal('arrivee')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary text-[11px] font-semibold hover:bg-primary/20 transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-500 text-white text-[11px] font-semibold hover:bg-rose-600 transition-colors shadow-sm shadow-rose-200"
               >
                 <Navigation className="w-3.5 h-3.5" />
                 Localiser
@@ -341,9 +367,9 @@ export default function AdminCourseForm() {
 
           {typeCourse !== "deplacement" && (
             <div>
-              <p className="text-xs font-semibold text-gray-500 mb-1.5">Type de colis</p>
+              <p className="text-xs font-semibold text-gray-600 mb-1.5">Type de colis</p>
               <Select value={typeColis} onValueChange={setTypeColis}>
-                <SelectTrigger className="rounded-xl h-12 bg-gray-50 border-gray-200 text-sm">
+                <SelectTrigger className="rounded-xl h-12 bg-gradient-to-r from-violet-50 to-purple-50 border-violet-200/50 text-sm focus:ring-violet-300">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -360,29 +386,30 @@ export default function AdminCourseForm() {
         </div>
 
         {/* Contacts */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+        <div className="bg-white rounded-3xl border border-sky-100 shadow-md shadow-sky-50/50 p-5 space-y-4">
           <div className="flex items-center gap-2">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Contacts</p>
-            <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">Optionnel</span>
+            <div className="w-1 h-4 bg-gradient-to-b from-sky-500 to-blue-500 rounded-full" />
+            <p className="text-xs font-bold text-sky-500 uppercase tracking-widest">Contacts</p>
+            <span className="text-[10px] bg-sky-100 text-sky-600 px-2 py-0.5 rounded-full font-medium">Optionnel</span>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <p className="text-[10px] text-gray-400 mb-1">Nom du client</p>
+              <p className="text-[10px] text-gray-500 mb-1 font-medium">Nom du client</p>
               <Input
                 value={clientNom}
                 onChange={e => setClientNom(e.target.value)}
                 placeholder="Nom"
-                className="rounded-xl h-11 bg-gray-50 border-gray-200 text-sm"
+                className="rounded-xl h-11 bg-sky-50/40 border-sky-100 text-sm focus:ring-sky-300 focus:border-sky-300"
               />
             </div>
             <div>
-              <p className="text-[10px] text-gray-400 mb-1">Téléphone client</p>
+              <p className="text-[10px] text-gray-500 mb-1 font-medium">Téléphone client</p>
               <Input
                 value={clientTelephone}
                 onChange={e => setClientTelephone(e.target.value)}
                 placeholder="+226 XXXXXXXX"
-                className="rounded-xl h-11 bg-gray-50 border-gray-200 text-sm"
+                className="rounded-xl h-11 bg-sky-50/40 border-sky-100 text-sm focus:ring-sky-300 focus:border-sky-300"
               />
             </div>
           </div>
@@ -390,54 +417,54 @@ export default function AdminCourseForm() {
           {typeCourse === "recevoir" ? (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <p className="text-[10px] text-gray-400 mb-1">Expéditeur</p>
+                <p className="text-[10px] text-gray-500 mb-1 font-medium">Expéditeur</p>
                 <Input
                   value={expediteurNom}
                   onChange={e => setExpediteurNom(e.target.value)}
                   placeholder="Nom expéditeur"
-                  className="rounded-xl h-11 bg-gray-50 border-gray-200 text-sm"
+                  className="rounded-xl h-11 bg-amber-50/40 border-amber-100 text-sm focus:ring-amber-300 focus:border-amber-300"
                 />
               </div>
               <div>
-                <p className="text-[10px] text-gray-400 mb-1">Tél. expéditeur</p>
+                <p className="text-[10px] text-gray-500 mb-1 font-medium">Tél. expéditeur</p>
                 <Input
                   value={expediteurTelephone}
                   onChange={e => setExpediteurTelephone(e.target.value)}
                   placeholder="+226 XXXXXXXX"
-                  className="rounded-xl h-11 bg-gray-50 border-gray-200 text-sm"
+                  className="rounded-xl h-11 bg-amber-50/40 border-amber-100 text-sm focus:ring-amber-300 focus:border-amber-300"
                 />
               </div>
             </div>
           ) : typeCourse === "expedier" ? (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <p className="text-[10px] text-gray-400 mb-1">Destinataire</p>
+                <p className="text-[10px] text-gray-500 mb-1 font-medium">Destinataire</p>
                 <Input
                   value={destinataireNom}
                   onChange={e => setDestinataireNom(e.target.value)}
                   placeholder="Nom destinataire"
-                  className="rounded-xl h-11 bg-gray-50 border-gray-200 text-sm"
+                  className="rounded-xl h-11 bg-teal-50/40 border-teal-100 text-sm focus:ring-teal-300 focus:border-teal-300"
                 />
               </div>
               <div>
-                <p className="text-[10px] text-gray-400 mb-1">Tél. destinataire</p>
+                <p className="text-[10px] text-gray-500 mb-1 font-medium">Tél. destinataire</p>
                 <Input
                   value={destinataireTelephone}
                   onChange={e => setDestinataireTelephone(e.target.value)}
                   placeholder="+226 XXXXXXXX"
-                  className="rounded-xl h-11 bg-gray-50 border-gray-200 text-sm"
+                  className="rounded-xl h-11 bg-teal-50/40 border-teal-100 text-sm focus:ring-teal-300 focus:border-teal-300"
                 />
               </div>
             </div>
           ) : null}
 
           <div>
-            <p className="text-[10px] text-gray-400 mb-1">Notes</p>
+            <p className="text-[10px] text-gray-500 mb-1 font-medium">Notes</p>
             <Input
               value={notes}
               onChange={e => setNotes(e.target.value)}
               placeholder="Instructions particulières..."
-              className="rounded-xl h-11 bg-gray-50 border-gray-200 text-sm"
+              className="rounded-xl h-11 bg-gray-50/60 border-gray-200 text-sm"
             />
           </div>
         </div>
@@ -446,7 +473,7 @@ export default function AdminCourseForm() {
         <Button
           onClick={handleSubmit}
           disabled={submitting}
-          className="w-full h-14 rounded-2xl gap-2.5 font-bold text-base bg-gradient-to-r from-primary via-red-600 to-rose-600 hover:from-primary/90 hover:to-rose-600/90 shadow-lg shadow-red-200 transition-all active:scale-[0.98]"
+          className="w-full h-14 rounded-2xl gap-2.5 font-bold text-base bg-gradient-to-r from-rose-600 via-red-600 to-orange-500 hover:from-rose-600/90 hover:to-orange-500/90 shadow-xl shadow-red-200/60 transition-all active:scale-[0.98] border border-white/10"
         >
           {submitting ? (
             <>
@@ -461,7 +488,8 @@ export default function AdminCourseForm() {
           )}
         </Button>
 
-        <p className="text-center text-[11px] text-gray-400 pb-6">
+        <p className="text-center text-[11px] text-gray-400 pb-6 flex items-center justify-center gap-1.5">
+          <Sparkles className="w-3 h-3 text-amber-400" />
           La course sera automatiquement proposée aux livreurs disponibles
         </p>
       </div>
