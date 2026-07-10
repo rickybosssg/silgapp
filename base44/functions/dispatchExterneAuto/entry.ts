@@ -353,7 +353,9 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
   // ayant annulé ou déjà été notifié ne soit JAMAIS re-sollicité pour cette course.
   let dejaNotifiesFusion = [];
   try { dejaNotifiesFusion = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-  exclusions = [...new Set([...exclusions, ...dejaNotifiesFusion])];
+  let dejaRefuses = [];
+  try { dejaRefuses = JSON.parse(course.dispatch_refused_ids || '[]'); } catch {}
+  exclusions = [...new Set([...exclusions, ...dejaNotifiesFusion, ...dejaRefuses])];
 
   // Si un livreur détient le verrou actif → attendre
   if (course.dispatch_status === 'propose' && course.livreur_id && course.timeout_expires_at) {
@@ -439,35 +441,17 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
       return { cycleEpuise: true };
     }
     if (dejaNotifies.length > 0) {
-      // Tous les livreurs ont été sollicités → cycle épuisé
-      // On vérifie si les 2 minutes d'attente sont écoulées (depuis la dernière sollicitation)
-      const derniereSollicitation = course.heure_sollicitation ? new Date(course.heure_sollicitation) : null;
-      const maintenant = new Date();
-      const attenteEcoulee = derniereSollicitation
-        ? (maintenant.getTime() - derniereSollicitation.getTime()) >= 2 * 60 * 1000
-        : true;
-
-      if (attenteEcoulee) {
-        // Nouveau cycle : vider la liste des notifiés, recalculer les disponibilités
-        console.log(`[DISPATCH] 🔄 Nouveau cycle — réinitialisation des notifiés pour course ${courseId}`);
-        await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-          dispatch_status: 'en_attente',
-          dispatch_notified_ids: '[]',
-          dispatch_wave: 0,
-          livreur_id: '',
-          livreur_nom: '',
-        });
-        // 🛡️ Ne pas relancer récursivement — le prochain tick du scheduler s'en chargera.
-        // L'appel récursif doubling la charge API et cause le rate limit.
-        return { cycleReset: true };
-      } else {
-        // Encore en attente des 2 minutes
-        console.log(`[DISPATCH] ⏳ Cycle épuisé — attente 2 min avant nouveau cycle pour course ${courseId}`);
-        await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-          dispatch_status: 'cycle_epuise',
-        });
-        return { cycleEpuise: true };
-      }
+      // Nouveau cycle immédiat : vider la liste des notifiés, recalculer les disponibilités
+      // Les livreurs qui n'ont pas explicitement refusé restent éligibles (dispatch_refused_ids survit au reset)
+      console.log(`[DISPATCH] 🔄 Nouveau cycle — réinitialisation immédiate des notifiés pour course ${courseId}`);
+      await base44.asServiceRole.entities.CourseExterne.update(courseId, {
+        dispatch_status: 'en_attente',
+        dispatch_notified_ids: '[]',
+        dispatch_wave: 0,
+        livreur_id: '',
+        livreur_nom: '',
+      });
+      return { cycleReset: true };
     } else {
       // Aucun livreur dispo du tout
       await base44.asServiceRole.entities.CourseExterne.update(courseId, {
@@ -869,15 +853,15 @@ Deno.serve(async (req) => {
         return Response.json({ success: true, message: 'Course déjà prise par un autre' });
       }
 
-      // 🚫 Ajouter le livreur aux exclus définitifs (tous les cycles)
-      let dejaNotifies = [];
-      try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-      if (!dejaNotifies.includes(livreur_id)) {
-        dejaNotifies.push(livreur_id);
+      // 🚫 Ajouter le livreur aux refusés définitifs (exclusion permanente, survit au reset de cycle)
+      let dejaRefuses = [];
+      try { dejaRefuses = JSON.parse(course.dispatch_refused_ids || '[]'); } catch {}
+      if (!dejaRefuses.includes(livreur_id)) {
+        dejaRefuses.push(livreur_id);
         await base44.asServiceRole.entities.CourseExterne.update(course_id, {
-          dispatch_notified_ids: JSON.stringify(dejaNotifies),
+          dispatch_refused_ids: JSON.stringify(dejaRefuses),
         });
-        console.log(`[DISPATCH] 🚫 Livreur ${livreur_id} ajouté aux exclus définitifs — course ${course_id}`);
+        console.log(`[DISPATCH] 🚫 Livreur ${livreur_id} ajouté aux refusés définitifs — course ${course_id}`);
       }
 
       // 🧹 Marquer les notifications "nouvelle_course" comme lues pour ce livreur (bulk)
@@ -905,7 +889,7 @@ Deno.serve(async (req) => {
           accepted_by_livreur_id: '',
           accepted_at: null,
         });
-        const result = await lancerDispatchMulti(base44, course_id, dejaNotifies);
+        const result = await lancerDispatchMulti(base44, course_id, []);
         if (result.noLivreur) return Response.json({ success: true, noLivreur: true });
         if (result.cycleEpuise) return Response.json({ success: true, cycle_epuise: true });
         return Response.json({ success: true, nb_notifies: result.nb_notifies });
@@ -936,10 +920,7 @@ Deno.serve(async (req) => {
           accepted_at: null,
         });
 
-        // Passer TOUS les déjà notifiés comme exclusions
-        let dejaNotifies = [];
-        try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-        const result = await lancerDispatchMulti(base44, course_id, dejaNotifies);
+        const result = await lancerDispatchMulti(base44, course_id, []);
         return Response.json({ expired: true, redispatched: !result.noLivreur, nb_restants: result.total_notifies });
       }
 
@@ -976,9 +957,7 @@ Deno.serve(async (req) => {
           await base44.asServiceRole.entities.CourseExterne.update(course_id, { dispatch_status: 'redispatch' });
         }
 
-        let dejaNotifies = [];
-        try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-        const result = await lancerDispatchMulti(base44, course_id, dejaNotifies);
+        const result = await lancerDispatchMulti(base44, course_id, []);
         return Response.json({ expired: true, redispatched: !result.noLivreur });
       }
 
@@ -1011,31 +990,22 @@ Deno.serve(async (req) => {
         try {
           // 🔄 cycle_epuise : après 2 min d'attente → reset et retour N1
           if (course.dispatch_status === 'cycle_epuise') {
-            const derniereSollicitation = course.heure_sollicitation ? new Date(course.heure_sollicitation) : null;
-            const deuxMinutesPassees = derniereSollicitation
-              ? (now.getTime() - derniereSollicitation.getTime()) >= 2 * 60 * 1000
-              : true;
-
-            if (deuxMinutesPassees) {
-              console.log(`[DISPATCH] 🔄 Cycle épuisé → reset N1 pour course ${course.id}`);
-              await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-                dispatch_status: 'en_attente',
-                dispatch_notified_ids: '[]',
-                dispatch_wave: 0,
-                livreur_id: '',
-                livreur_nom: '',
-              });
-              const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
-              resultats.push({ course_id: course.id, wave: 'reset→N1', ...result });
-            }
+            console.log(`[DISPATCH] 🔄 Cycle épuisé → reset immédiat pour course ${course.id}`);
+            await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+              dispatch_status: 'en_attente',
+              dispatch_notified_ids: '[]',
+              dispatch_wave: 0,
+              livreur_id: '',
+              livreur_nom: '',
+            });
+            const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
+            resultats.push({ course_id: course.id, wave: 'reset→N1', ...result });
             continue;
           }
 
           // 📌 Courses en attente / redispatch (hors vagues) → relancer
           if (['en_attente', 'redispatch'].includes(course.dispatch_status)) {
-            let dejaNotifies = [];
-            try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-            const result = await lancerDispatchMulti(base44, course.id, dejaNotifies, cachedConfig);
+            const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
             resultats.push({ course_id: course.id, wave: 'retry', ...result });
             continue;
           }
@@ -1068,9 +1038,7 @@ Deno.serve(async (req) => {
             });
           }
 
-          let dejaNotifies = [];
-          try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-          const result = await lancerDispatchMulti(base44, course.id, dejaNotifies, cachedConfig);
+          const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
           resultats.push({ course_id: course.id, wave: `${currentWave}→${currentWave + 1}`, ...result });
         } catch (err) {
           console.error(`[DISPATCH] ❌ Erreur sur course ${course.id}:`, err.message);
@@ -1133,11 +1101,7 @@ Deno.serve(async (req) => {
       const resultats = [];
       for (const course of coursesToProcess) {
         try {
-          let dejaNotifies = [];
-          try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-
-          // Si cycle_epuise, on laisse lancerDispatchMulti gérer le reset après 2 min
-          const result = await lancerDispatchMulti(base44, course.id, dejaNotifies, cachedConfig);
+          const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
           resultats.push({ course_id: course.id, ...result });
         } catch (err) {
           console.error(`[DISPATCH] ❌ Erreur retry course ${course.id}:`, err.message);
@@ -1215,9 +1179,7 @@ Deno.serve(async (req) => {
         }
 
         // Redispatch sans exclure (le refus était côté client, pas livreur)
-        let dejaNotifies = [];
-        try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-        const result = await lancerDispatchMulti(base44, course_id, dejaNotifies);
+        const result = await lancerDispatchMulti(base44, course_id, []);
         return Response.json({ success: true, accepted: false, redispatched: !result.noLivreur });
       }
     }
