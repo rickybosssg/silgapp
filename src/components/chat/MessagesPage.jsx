@@ -282,17 +282,26 @@ export default function MessagesPage({ myType, myId, myName, onBack, initialConv
       });
       setConversations(mine);
 
-      // Admin : marquer toutes les conversations comme lues dès l'ouverture de la liste
+      // Admin : marquer toutes les conversations comme lues et mettre à jour l'état local
       if (myType === "admin") {
         const now = new Date().toISOString();
-        const unread = mine.filter(c => {
-          if (c.last_sender_type === "admin") return false;
-          if (!c.last_message_date) return false;
-          if (!c.admin_last_read_date) return true;
-          return new Date(c.last_message_date) > new Date(c.admin_last_read_date);
-        });
-        for (const c of unread) {
-          base44.entities.Conversation.update(c.id, { admin_last_read_date: now }).catch(() => {});
+        const unreadIds = new Set();
+        for (const c of mine) {
+          if (c.last_sender_type === "admin") continue;
+          if (!c.last_message_date) continue;
+          if (!c.admin_last_read_date || new Date(c.last_message_date) > new Date(c.admin_last_read_date)) {
+            unreadIds.add(c.id);
+          }
+        }
+        if (unreadIds.size > 0) {
+          for (const c of mine) {
+            if (unreadIds.has(c.id)) {
+              base44.entities.Conversation.update(c.id, { admin_last_read_date: now }).catch(() => {});
+            }
+          }
+          // Mettre à jour l'état local immédiatement pour enlever le point rouge
+          const updated = mine.map(c => unreadIds.has(c.id) ? { ...c, admin_last_read_date: now } : c);
+          setConversations(updated);
         }
       }
     } catch {}
