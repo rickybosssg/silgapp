@@ -8,15 +8,33 @@ const COUNTRY_DIAL_CODE = {
   BF: "226", CI: "225", TG: "228", BJ: "229", SN: "221",
   ML: "223", GN: "224", NE: "227", GH: "233",
 };
+const COUNTRY_LOCAL_LEN = {
+  BF: 8, CI: 10, TG: 8, BJ: 8, SN: 9,
+  ML: 8, GN: 9, NE: 8, GH: 9,
+};
 
 function cleanPhone(phone, countryCode) {
   let digits = (phone || "").replace(/\D/g, "");
   if (!digits) return "";
   const dial = COUNTRY_DIAL_CODE[countryCode] || "226";
-  if (digits.startsWith(dial) && digits.length >= dial.length + 6) return digits;
+  const localLen = COUNTRY_LOCAL_LEN[countryCode] || 8;
+
+  // Déjà au format international
+  if (digits.startsWith(dial) && digits.length === dial.length + localLen) return digits;
+
+  // Numéro avec préfixe trunk "0" : longueur = localLen + 1 (ex: "075653330" BF)
+  if (digits.startsWith("0") && digits.length === localLen + 1) {
+    return dial + digits.slice(1);
+  }
+
+  // Numéro local sans préfixe trunk : longueur == localLen (le 0 fait partie du numéro)
+  if (digits.length === localLen) {
+    return dial + digits;
+  }
+
+  // Fallback : retirer le 0 initial si présent et préfixer l'indicatif
   if (digits.startsWith("0")) digits = digits.slice(1);
-  if (digits.length <= 9) return dial + digits;
-  return digits;
+  return dial + digits;
 }
 
 function waLink(phone, message, countryCode) {

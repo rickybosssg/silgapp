@@ -14,6 +14,15 @@ import NavigationGPS from "./NavigationGPS";
 import ChatWindow from "@/components/chat/ChatWindow";
 import AnnulationExplicationChat from "./AnnulationExplicationChat";
 
+const COUNTRY_DIAL_CODE = {
+  BF: "226", CI: "225", TG: "228", BJ: "229", SN: "221",
+  ML: "223", GN: "224", NE: "227", GH: "233",
+};
+const COUNTRY_LOCAL_LEN = {
+  BF: 8, CI: 10, TG: 8, BJ: 8, SN: 9,
+  ML: 8, GN: 9, NE: 8, GH: 9,
+};
+
 // Haversine
 function haversine(lat1, lon1, lat2, lon2) {
   if (!lat1 || !lon1 || !lat2 || !lon2) return null;
@@ -655,6 +664,17 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
               const handleWhatsApp = () => {
                 let num = (contactTel || "").replace(/\D/g, "");
+                const dial = COUNTRY_DIAL_CODE[course.country_code] || "226";
+                const localLen = COUNTRY_LOCAL_LEN[course.country_code] || 8;
+                if (num.startsWith(dial) && num.length === dial.length + localLen) {
+                  // déjà international
+                } else if (num.startsWith("0") && num.length === localLen + 1) {
+                  num = dial + num.slice(1);
+                } else if (num.length === localLen) {
+                  num = dial + num;
+                } else if (num.startsWith("0")) {
+                  num = dial + num.slice(1);
+                }
                 const msg = encodeURIComponent(
                   "Bonjour, je suis votre chauffeur SILGAPP. Je suis en route pour vous prendre en charge."
                 );
@@ -702,7 +722,18 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               // Normalisation multi-pays : si le numéro a déjà un indicatif international (10+ chiffres), ok
               // Sinon on laisse le numéro tel quel — wa.me gère les numéros locaux avec indicatif
               let num = (contactTel || "").replace(/\D/g, "");
-              // Rien à faire si déjà un numéro international (≥10 chiffres)
+              const dial = COUNTRY_DIAL_CODE[course.country_code] || "226";
+              const localLen = COUNTRY_LOCAL_LEN[course.country_code] || 8;
+              // Normaliser vers le format international pour wa.me
+              if (num.startsWith(dial) && num.length === dial.length + localLen) {
+                // déjà international
+              } else if (num.startsWith("0") && num.length === localLen + 1) {
+                num = dial + num.slice(1); // retirer le 0 trunk
+              } else if (num.length === localLen) {
+                num = dial + num; // numéro local, le 0 fait partie du numéro
+              } else if (num.startsWith("0")) {
+                num = dial + num.slice(1); // fallback: retirer le 0
+              }
               const msg = encodeURIComponent(
                 colisRecupere
                   ? "Bonjour, je suis votre livreur SILGAPP. Je suis en route pour vous livrer votre colis."
