@@ -160,6 +160,20 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const effectiveStatut = optimisticStatut || course.statut;
   const isDeplacement = course.type_course === "deplacement";
 
+  // 🔄 Auto-transition : colis_recupere → en_livraison après 10 secondes
+  useEffect(() => {
+    if (effectiveStatut !== "colis_recupere" || isDeplacement) return;
+    const timer = setTimeout(() => {
+      setOptimisticStatut("en_livraison");
+      queryClient.setQueryData(['mes-courses-externes'], (old) =>
+        (old || []).map(c => c.id === course.id ? { ...c, statut: "en_livraison" } : c)
+      );
+      const entity = isExterne ? base44.entities.CourseExterne : base44.entities.Course;
+      entity.update(course.id, { statut: "en_livraison" }).catch(() => null);
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [effectiveStatut, course.id, isDeplacement, isExterne]);
+
   const navigateToRecap = (courseData = {}) => {
     const courseId = courseData?.id || course.id;
     const recapCourse = {

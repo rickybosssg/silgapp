@@ -13,7 +13,7 @@ const statusConfig = {
   colis_recupere: { label: "🟢 Colis récupéré", className: "bg-green-500 text-black border-green-600" },
   passager_embarque: { label: "🟠 Passager embarqué", className: "bg-teal-500 text-white border-teal-600" },
   pris_en_charge: { label: "🟠 Pris en charge", className: "bg-cyan-500 text-white border-cyan-600" },
-  en_livraison: { label: "🟡 En route vers le destinataire", className: "bg-yellow-400 text-black border-yellow-500" },
+  en_livraison: { label: "🌸 En route vers le destinataire", className: "bg-pink-400 text-black border-pink-500" },
   arrivee: { label: "🟢 Arrivé à destination", className: "bg-green-500 text-black border-green-600" },
   livree: { label: "🟢 Livré", className: "bg-green-600 text-white border-green-700" },
   annulee: { label: "🔴 Annulé", className: "bg-red-600 text-white font-bold border-red-700" },
