@@ -281,6 +281,20 @@ export default function MessagesPage({ myType, myId, myName, onBack, initialConv
         } catch { return false; }
       });
       setConversations(mine);
+
+      // Admin : marquer toutes les conversations comme lues dès l'ouverture de la liste
+      if (myType === "admin") {
+        const now = new Date().toISOString();
+        const unread = mine.filter(c => {
+          if (c.last_sender_type === "admin") return false;
+          if (!c.last_message_date) return false;
+          if (!c.admin_last_read_date) return true;
+          return new Date(c.last_message_date) > new Date(c.admin_last_read_date);
+        });
+        for (const c of unread) {
+          base44.entities.Conversation.update(c.id, { admin_last_read_date: now }).catch(() => {});
+        }
+      }
     } catch {}
     setLoading(false);
   };
