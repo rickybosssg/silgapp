@@ -566,6 +566,11 @@ Deno.serve(async (req) => {
       course_id = body.event.entity_id;
     }
 
+    // Déclenchement depuis automation scheduled (tick) — sans action = avancer les vagues
+    if (!action) {
+      action = 'avancer_vagues_expirees';
+    }
+
     // ─── 1. Lancer la recherche automatique (multi-livreurs) ──────────────
     if (action === 'lancer_recherche_auto') {
       if (!course_id) return Response.json({ error: 'course_id requis' }, { status: 400 });
