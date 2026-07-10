@@ -33,6 +33,29 @@ Deno.serve(async (req) => {
 
     console.log(`[syncStatutLivreur] event=${event?.type} statut=${statut} livreur_id=${livreurId?.slice(-8) || 'NONE'}`);
 
+    // 🔄 Auto-transition : colis_recupere → en_livraison après 10 secondes
+    // Déclenché côté serveur pour que TOUS les tableaux de bord (admin, client) se mettent à jour
+    // même si l'app livreur n'est pas ouverte.
+    if (statut === "colis_recupere" && livreurId && old_data?.statut !== "colis_recupere") {
+      const entityName = event?.entity_name || "CourseExterne";
+      console.log(`[syncStatutLivreur] 🔄 Auto-transition programmée: colis_recupere → en_livraison dans 10s (course ${course.id}, entity: ${entityName})`);
+      setTimeout(async () => {
+        try {
+          const entity = base44.asServiceRole.entities[entityName];
+          if (!entity) return;
+          const current = await entity.get(course.id);
+          if (current && current.statut === "colis_recupere") {
+            await entity.update(course.id, { statut: "en_livraison" });
+            console.log(`[syncStatutLivreur] ✅ Auto-transition: colis_recupere → en_livraison (course ${course.id})`);
+          } else {
+            console.log(`[syncStatutLivreur] ⏭️ Auto-transition annulée — statut actuel: ${current?.statut || 'introuvable'}`);
+          }
+        } catch (err) {
+          console.error(`[syncStatutLivreur] ❌ Auto-transition error:`, err.message);
+        }
+      }, 10000);
+    }
+
     // Cas 1 : Course passée à un statut terminal (annulée ou livrée)
     if (STATUTS_TERMINAUX.includes(statut) && livreurId) {
       // 🏛️ ADMIN_MANUEL sans prix_final : ne PAS libérer le livreur
