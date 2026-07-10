@@ -23,6 +23,17 @@ function ConversationItem({ conv, myType, myId, active, onClick }) {
 
   const roleKey = otherParticipant?.type || (conv.group_type === "group" ? "group" : "client");
 
+  // Détermine si la conversation est non lue
+  const isUnread = useMemo(() => {
+    if (!conv.last_message_date) return false;
+    if (conv.last_sender_type === myType) return false; // dernier message = moi → lu
+    if (myType === "admin") {
+      if (!conv.admin_last_read_date) return true;
+      return new Date(conv.last_message_date) > new Date(conv.admin_last_read_date);
+    }
+    return false;
+  }, [conv.last_message_date, conv.last_sender_type, conv.admin_last_read_date, myType]);
+
   return (
     <button
       onClick={() => onClick(conv)}
@@ -46,16 +57,21 @@ function ConversationItem({ conv, myType, myId, active, onClick }) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-bold text-gray-900 truncate">
+          <p className={cn("text-sm truncate", isUnread ? "font-black text-gray-900" : "font-bold text-gray-900")}>
             {conv.title || otherParticipant?.name || "Discussion"}
           </p>
-          {conv.last_message_date && (
-            <span className="text-[10px] text-gray-400 flex-shrink-0 ml-2">
-              {format(new Date(conv.last_message_date), "HH:mm", { locale: fr })}
-            </span>
-          )}
+          <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+            {isUnread && (
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0 animate-pulse" />
+            )}
+            {conv.last_message_date && (
+              <span className="text-[10px] text-gray-400">
+                {format(new Date(conv.last_message_date), "HH:mm", { locale: fr })}
+              </span>
+            )}
+          </div>
         </div>
-        <p className="text-xs text-gray-500 truncate mt-0.5">
+        <p className={cn("text-xs truncate mt-0.5", isUnread ? "font-semibold text-gray-700" : "text-gray-500")}>
           {conv.last_sender_name ? (
             <><span className="font-medium">{conv.last_sender_name}</span>: </>
           ) : null}
