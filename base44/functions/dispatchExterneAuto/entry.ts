@@ -151,7 +151,6 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
   // 🕐 0-15 min = N1 (priorité max), 15-30 min = N2 (réduite), 30-60 min = N3 (faible)
   // 🚫 > 60 min = exclusion automatique + mise hors ligne
   const niveau1 = [], niveau2 = [], niveau3 = [];
-  let nbMarquesHorsLigne = 0;
 
   // 🧠 Résoudre les coordonnées de pickup : GPS > quartier > fallback large
   let pickupLat = course.gps_depart_lat;
@@ -185,13 +184,10 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
       if (!isNaN(hb.getTime())) heartbeatAgeMin = (now - hb.getTime()) / 60000;
     }
 
-    // 🚫 Exclusion automatique : heartbeat > 60 min → exclu du dispatch SANS modifier le statut
-    // Le statut du livreur est contrôlé exclusivement par lui-même (toggle manuel).
-    // On l'exclut juste des candidats pour ce cycle — il réapparaîtra s'il rouvre l'app.
-    if (heartbeatAgeMin !== null && heartbeatAgeMin > 60) {
-      nbMarquesHorsLigne++;
-      return; // exclu du dispatch, statut préservé
-    }
+    // 📡 Aucune exclusion heartbeat : un livreur disponible reste éligible au dispatch
+    // même si son téléphone est éteint depuis plus d'1h. Il sera notifié par push
+    // (et WhatsApp si opt-in) — en ouvrant SILGAPP il pourra accepter la course.
+    // La priorisation se fait par niveaux : N1 (0-15min), N2 (15-30min), N3 (>30min).
 
     // distance = null quand ni GPS ni quartier → pas de calcul fictif
     let distance = null;
@@ -202,7 +198,7 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
     const enriched = { ...l, distance, heartbeatAgeMin };
 
     if (heartbeatAgeMin === null || heartbeatAgeMin >= 30) {
-      niveau3.push(enriched); // N3 : 30-60 min ou inconnu → priorité faible
+      niveau3.push(enriched); // N3 : > 30 min ou inconnu → priorité faible (mais reste notifié)
     } else if (heartbeatAgeMin >= 15) {
       niveau2.push(enriched); // N2 : 15-30 min → priorité réduite
     } else {
@@ -238,10 +234,7 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
   }));
 
   const tous = [...niveau1, ...niveau2, ...niveau3];
-  if (nbMarquesHorsLigne > 0) {
-    console.log(`[DISPATCH] 🚫 ${nbMarquesHorsLigne} livreur(s) exclu(s) du dispatch (HB > 60 min) — statut préservé`);
-  }
-  console.log(`[DISPATCH] 📊 ${tous.length} candidats (exclus: ${exclusions.length}, hors_ligne: ${nbMarquesHorsLigne}) — N1:${niveau1.length} N2:${niveau2.length} N3:${niveau3.length} — pickup: ${pickupSource}${pickupSource === 'quartier' ? ` (${course.quartier_depart})` : ''}`);
+  console.log(`[DISPATCH] 📊 ${tous.length} candidats (exclus: ${exclusions.length}) — N1:${niveau1.length} N2:${niveau2.length} N3:${niveau3.length} — pickup: ${pickupSource}${pickupSource === 'quartier' ? ` (${course.quartier_depart})` : ''}`);
   return { tous, niveau1, niveau2, niveau3, pickupSource };
 }
 
