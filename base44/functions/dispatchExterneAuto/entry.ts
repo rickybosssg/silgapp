@@ -1065,6 +1065,35 @@ Deno.serve(async (req) => {
         } catch (e) { console.error('[DISPATCH] Erreur création alerte bloquée:', e.message); }
       }
 
+      // ⚠️ Détection des courses sans aucun livreur disponible (> 5 min de recherche)
+      try {
+        const coursesSansLivreur = await base44.asServiceRole.entities.CourseExterne.filter(
+          { statut: 'recherche_livreur', dispatch_status: 'en_attente' },
+          '-created_date', 10
+        );
+        for (const course of coursesSansLivreur) {
+          const updatedTime = new Date(course.updated_date);
+          if (now.getTime() - updatedTime.getTime() < 5 * 60 * 1000) continue;
+
+          let notifiedIds = [];
+          try { notifiedIds = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
+          if (notifiedIds.length > 0) continue;
+
+          const existingAlerts = await base44.asServiceRole.entities.Notification.filter({
+            course_id: course.id, type: 'alerte_aucun_livreur', lue: false,
+          });
+          if (existingAlerts.length === 0) {
+            const searchMin = Math.round((now.getTime() - updatedTime.getTime()) / 60000);
+            await base44.asServiceRole.entities.Notification.create({
+              titre: '⚠️ Aucun livreur disponible',
+              message: `Course ${course.client_nom || '?'} — ${course.adresse_depart || '?'} → ${course.adresse_arrivee || '?'} — en recherche depuis ${searchMin} min sans aucun livreur trouvé. Les livreurs sont peut-être tous hors ligne ou trop loin.`,
+              type: 'alerte_aucun_livreur', course_id: course.id, lue: false,
+            });
+            console.warn(`[DISPATCH] ⚠️ ALERTE ADMIN: Course ${course.id} sans livreur depuis ${searchMin} min`);
+          }
+        }
+      } catch (e) { console.error('[DISPATCH] Erreur détection sans livreur:', e.message); }
+
       return Response.json({ success: true, traitees: resultats.length, resultats: resultats.slice(0, 20) });
     }
 
