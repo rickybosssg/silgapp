@@ -95,6 +95,32 @@ public class SilgappPushPlugin extends Plugin {
         call.resolve();
     }
 
+    // ── Pont notification tap → JS (affichage du modal course) ──
+    // Stocke les données de l'Intent quand l'app s'ouvre depuis une notification.
+    // JS récupère via checkPendingNotification() au démarrage (cold start).
+    private static JSObject pendingNotificationData = null;
+
+    public static void setPendingNotificationData(JSObject data) {
+        pendingNotificationData = data;
+    }
+
+    // Warm start : l'app tourne déjà, on émet l'événement directement au WebView
+    public void emitNotificationTapped(JSObject data) {
+        notifyListeners("silgapp:notification-tapped", data);
+    }
+
+    @PluginMethod
+    public void checkPendingNotification(PluginCall call) {
+        if (pendingNotificationData != null) {
+            call.resolve(pendingNotificationData);
+            pendingNotificationData = null;
+        } else {
+            JSObject empty = new JSObject();
+            empty.put("hasPending", false);
+            call.resolve(empty);
+        }
+    }
+
     // ── Demander l'exclusion de l'optimisation batterie ──
     // Critique pour Samsung, Xiaomi, Huawei, Tecno, Infinix, Oppo, Vivo
     @PluginMethod

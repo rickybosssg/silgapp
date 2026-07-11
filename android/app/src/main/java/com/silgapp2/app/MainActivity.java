@@ -11,6 +11,7 @@ import android.os.PowerManager;
 import android.provider.Settings;
 
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.JSObject;
 
 public class MainActivity extends BridgeActivity {
     private static final String CHANNEL_ID = "silgapp_default";
@@ -25,6 +26,7 @@ public class MainActivity extends BridgeActivity {
         requestBatteryOptimizationExemption();
         super.onCreate(savedInstanceState);
         SilgappFirebaseMessagingService.stopUrgentCourseAlert();
+        handleNotificationIntent(getIntent());
     }
 
     @Override
@@ -32,6 +34,33 @@ public class MainActivity extends BridgeActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         SilgappFirebaseMessagingService.stopUrgentCourseAlert();
+        handleNotificationIntent(intent);
+    }
+
+    // ── Extraire les données de la notification depuis l'Intent ──
+    // et les transmettre au plugin → JS pour afficher le modal course.
+    private void handleNotificationIntent(Intent intent) {
+        if (intent == null || !"OPEN_SILGAPP".equals(intent.getAction())) return;
+        Bundle extras = intent.getExtras();
+        if (extras == null) return;
+
+        JSObject data = new JSObject();
+        for (String key : extras.keySet()) {
+            Object value = extras.get(key);
+            if (value != null) {
+                data.put(key, value.toString());
+            }
+        }
+        data.put("hasPending", true);
+        SilgappPushPlugin.setPendingNotificationData(data);
+
+        // Warm start : l'app tourne déjà, émettre l'événement directement
+        try {
+            SilgappPushPlugin plugin = (SilgappPushPlugin) getBridge().getPlugin("SilgappPush").getInstance();
+            if (plugin != null) {
+                plugin.emitNotificationTapped(data);
+            }
+        } catch (Exception ignored) {}
     }
 
     @Override
