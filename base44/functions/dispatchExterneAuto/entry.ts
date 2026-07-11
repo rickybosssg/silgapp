@@ -962,12 +962,16 @@ Deno.serve(async (req) => {
       const filter = { statut: 'recherche_livreur' };
       if (filterCountry) filter.country_code = filterCountry;
 
-      const courses = await base44.asServiceRole.entities.CourseExterne.filter(filter, '-created_date', 10);
+      const courses = await base44.asServiceRole.entities.CourseExterne.filter(filter, '-created_date', 20);
       const now = new Date();
       const resultats = [];
 
       const MAX_COURSES_PER_TICK = 4; // Limite anti-rate-limit stricte
-      const coursesToProcess = courses.slice(0, MAX_COURSES_PER_TICK);
+      // Prioriser les courses VRAIMENT bloquées (en_attente/redispatch/cycle_epuise)
+      // avant celles en "propose" qui attendent juste leur timeout
+      const stuck = courses.filter(c => ['en_attente', 'redispatch', 'cycle_epuise'].includes(c.dispatch_status));
+      const waiting = courses.filter(c => !['en_attente', 'redispatch', 'cycle_epuise'].includes(c.dispatch_status));
+      const coursesToProcess = [...stuck, ...waiting].slice(0, MAX_COURSES_PER_TICK);
       if (courses.length > MAX_COURSES_PER_TICK) {
         console.log(`[DISPATCH] ⚡ ${courses.length} courses à traiter — limitation à ${MAX_COURSES_PER_TICK}/tick pour éviter rate limit`);
       }
