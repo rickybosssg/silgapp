@@ -468,8 +468,10 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
     waveLabel = `GPS vague ${wave}/${gpsConfig.waves.length}`;
   } else {
     selection = config.nb >= 999 ? candidats : candidats.slice(0, config.nb);
-    timeoutSec = config.timeout;
-    waveLabel = modeVaguesHeartbeat ? `heartbeat N${wave}` : 'direct';
+    // ⚡ Mode direct admin sans GPS → timeout 120s (re-notification de tous les livreurs à chaque cycle)
+    const isAdminNoGps = course.source === 'admin' && pickupSource !== 'gps';
+    timeoutSec = isAdminNoGps ? 120 : config.timeout;
+    waveLabel = modeVaguesHeartbeat ? `heartbeat N${wave}` : (isAdminNoGps ? 'direct admin 120s' : 'direct');
   }
   console.log(`[DISPATCH] 🎯 ${waveLabel} — ${selection.length}/${candidats.length} livreurs pour course ${courseId}`);
 
@@ -1055,6 +1057,16 @@ Deno.serve(async (req) => {
               dispatch_status: 'redispatch',
               dispatch_wave: nextWave,
             });
+          } else {
+            // ⚡ Mode direct (wave=0) — admin sans GPS : reset notifiés pour re-notifier tout le monde
+            const isAdminNoGps = course.source === 'admin' && !course.gps_depart_lat && !course.gps_depart_lng;
+            if (isAdminNoGps) {
+              console.log(`[DISPATCH] ⚡ Admin sans GPS — reset notifiés + redispatch course ${course.id}`);
+              await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+                dispatch_status: 'redispatch',
+                dispatch_notified_ids: '[]',
+              });
+            }
           }
 
           const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
