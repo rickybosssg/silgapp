@@ -9,7 +9,7 @@ import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 
-import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
+import { registerPushToken, subscribeToNotifications, consumePendingNotificationData } from "@/lib/notifications";
 import { requestNativeAppPermissions } from "@/lib/nativePermissions";
 import { startNativeBackgroundHeartbeat } from "@/lib/nativeAndroid";
 import { ensureBatteryOptimizationExemption } from "@/lib/batteryOptimization";
@@ -378,6 +378,8 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       toast.info("Course proposee", { description: "Ouverture de la course en attente..." });
     };
     window.addEventListener("silgapp:notification-opened", handleNotificationOpened);
+    // Cold start : vérifier si l'app a été ouverte depuis une notification
+    consumePendingNotificationData();
     return () => window.removeEventListener("silgapp:notification-opened", handleNotificationOpened);
   }, [queryClient, livreurId]);
 
@@ -442,7 +444,11 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
     };
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") refreshCourses();
+      if (document.visibilityState === "visible") {
+        refreshCourses();
+        // Warm start : vérifier si l'app revient d'une notification tapée
+        consumePendingNotificationData();
+      }
     };
     window.addEventListener("focus", refreshCourses);
     document.addEventListener("visibilitychange", handleVisibility);

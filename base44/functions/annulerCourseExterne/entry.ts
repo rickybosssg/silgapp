@@ -88,9 +88,8 @@ Deno.serve(async (req) => {
         dispatch_status: "en_attente",
         dispatch_wave: 0,
         livreur_id: null,
-        livreur_nom: null,
+        // ⚠️ On GARDE livreur_nom et livreur_telephone pour tracer qui a annulé
         livreur_photo_url: null,
-        livreur_telephone: null,
         livreur_vehicule: null,
         livreur_note_moyenne: 0,
         livreur_nombre_avis: 0,
@@ -208,18 +207,16 @@ Deno.serve(async (req) => {
       // La course est en statut "recherche_livreur" + "en_attente" avec le livreur
       // annulant dans les exclusions. On déclenche le dispatch maintenant pour
       // trouver un nouveau livreur sans attendre le cycle programmé (5 min).
-      console.log(`[ANNULATION] 🔄 Relance dispatch immédiate pour course ${course_id} (exclu: ${livreurId})`);
-      const dispatchResult = await base44.asServiceRole.functions.invoke('dispatchExterneAuto', {
+      // ⚡ Fire-and-forget — ne pas attendre le dispatch (évite le timeout 120s en cascade)
+      console.log(`[ANNULATION] 🔄 Relance dispatch (non-bloquant) pour course ${course_id} (exclu: ${livreurId})`);
+      base44.asServiceRole.functions.invoke('dispatchExterneAuto', {
         action: 'lancer_recherche_auto',
         course_id,
+      }).then((res) => {
+        console.log(`[ANNULATION] ✅ Dispatch relancé — ${res?.data?.nb_notifies || 0} livreur(s) notifié(s)`);
       }).catch((err) => {
         console.error(`[ANNULATION] ❌ Erreur relance dispatch: ${err?.message || err}`);
-        return null;
       });
-
-      if (dispatchResult?.data) {
-        console.log(`[ANNULATION] ✅ Dispatch relancé — ${dispatchResult.data.nb_notifies || 0} livreur(s) notifié(s)`);
-      }
 
     } else {
       // ── ANNULATION ADMIN : course définitivement annulée ──────────

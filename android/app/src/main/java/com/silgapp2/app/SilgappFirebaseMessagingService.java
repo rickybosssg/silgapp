@@ -29,6 +29,7 @@ import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 
 import com.base6a0ec08f3af5e1d1284254c1.app.R;
+import com.getcapacitor.JSObject;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
@@ -70,6 +71,21 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
             wakeUpScreen();
             showUrgentCourseNotification(this, title, body, data, durationMs);
             startUrgentCourseAlert(this, durationMs, intervalMs, alertKey);
+
+            SilgappPushPlugin plugin = SilgappPushPlugin.getActiveInstance();
+            if (plugin != null) {
+                JSObject eventData = new JSObject();
+                for (Map.Entry<String, String> entry : data.entrySet()) {
+                    eventData.put(entry.getKey(), entry.getValue());
+                }
+                eventData.put("source", "firebase_foreground");
+                eventData.put("native_intent", false);
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    try {
+                        plugin.emitNotificationTapped(eventData);
+                    } catch (Exception ignored) {}
+                });
+            }
             return;
         }
 

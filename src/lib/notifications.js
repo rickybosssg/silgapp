@@ -256,6 +256,18 @@ async function ensureNativePushListeners() {
     console.warn("[Notifications] Channel creation skipped:", error?.message);
   }
 
+  // ── Pont natif : notification tapée → ouvre le modal course ──
+  try {
+    await SilgappPush.addListener("silgapp:notification-tapped", (data) => {
+      savePushDebug("native-notification-tapped", { data });
+      if (data?.type) {
+        dispatchNotificationOpened(data, "native-tapped");
+      }
+    });
+  } catch (err) {
+    console.warn("[Notifications] silgapp:notification-tapped listener failed:", err?.message);
+  }
+
   try {
     await PushNotifications.addListener("pushNotificationReceived", (notification) => {
       const title = notification.title || notification.notification?.title || "SILGAPP";
@@ -794,6 +806,30 @@ export async function openNativeNotificationSettings() {
   if (!env.isNative || env.os !== "android") return false;
   await SilgappPush.openNotificationSettings();
   return true;
+}
+
+// ── Récupérer les données de notification en attente (cold start) ──
+// Appelé au démarrage de l'app livreur pour vérifier si l'app a été
+// ouverte depuis une notification tapée.
+export async function consumePendingNotificationData() {
+  const env = detectEnvironment();
+  if (!env.isNative || env.os !== "android") return null;
+
+  try {
+    const result = await withNativeTimeout(
+      SilgappPush.checkPendingNotification(),
+      3000,
+      "SilgappPush.checkPendingNotification"
+    );
+    savePushDebug("pending-notification-check", { hasPending: result?.hasPending });
+    if (result?.hasPending && result.type) {
+      dispatchNotificationOpened(result, "native-pending");
+      return result;
+    }
+  } catch (err) {
+    savePushDebug("pending-notification-check-error", { error: err?.message || String(err) });
+  }
+  return null;
 }
 
 export function subscribeToNotifications(onNotification, userEmail, options = {}) {

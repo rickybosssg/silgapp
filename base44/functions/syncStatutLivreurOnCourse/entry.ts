@@ -33,6 +33,27 @@ Deno.serve(async (req) => {
 
     console.log(`[syncStatutLivreur] event=${event?.type} statut=${statut} livreur_id=${livreurId?.slice(-8) || 'NONE'}`);
 
+    // 🔄 Auto-transition : colis_recupere → en_livraison après 10 secondes
+    // Doit être traité EN PREMIER, avant Cas 1/Cas 2, car colis_recupere ∈ STATUTS_ACTIFS_LIVREUR
+    // et Cas 2 fait un return early qui rendrait ce code inaccessible.
+    const shouldAutoTransition = statut === "colis_recupere" && livreurId && old_data?.statut !== "colis_recupere";
+    if (shouldAutoTransition) {
+      console.log(`[syncStatutLivreur] ⏳ Attente 10s avant transition en_livraison (course ${course.id})`);
+      await new Promise(resolve => setTimeout(resolve, 10000));
+      try {
+        const current = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+        if (current && current.statut === "colis_recupere") {
+          await base44.asServiceRole.entities.CourseExterne.update(course.id, { statut: "en_livraison" });
+          console.log(`[syncStatutLivreur] ✅ Auto-transition: colis_recupere → en_livraison (course ${course.id})`);
+          return Response.json({ success: true, action: "auto_transition_en_livraison", course_id: course.id });
+        } else {
+          console.log(`[syncStatutLivreur] ⏭️ Auto-transition annulée — statut actuel: ${current?.statut || 'introuvable'}`);
+        }
+      } catch (err) {
+        console.error(`[syncStatutLivreur] ❌ Auto-transition error:`, err.message);
+      }
+    }
+
     // Cas 1 : Course passée à un statut terminal (annulée ou livrée)
     if (STATUTS_TERMINAUX.includes(statut) && livreurId) {
       // ADMIN_MANUEL sans prix_final : ne PAS libérer le livreur
@@ -108,6 +129,24 @@ Deno.serve(async (req) => {
         return Response.json({ success: true, action: "livreur_en_course", livreur_id: livreurId });
       }
       return Response.json({ success: true, skipped: "already_en_course" });
+    }
+
+    // 🔄 Auto-transition : colis_recupere → en_livraison après 10 secondes (await réel)
+    if (shouldAutoTransition) {
+      console.log(`[syncStatutLivreur] ⏳ Attente 10s avant transition en_livraison (course ${course.id})`);
+      await new Promise(resolve => setTimeout(resolve, 10000));
+      try {
+        const current = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+        if (current && current.statut === "colis_recupere") {
+          await base44.asServiceRole.entities.CourseExterne.update(course.id, { statut: "en_livraison" });
+          console.log(`[syncStatutLivreur] ✅ Auto-transition: colis_recupere → en_livraison (course ${course.id})`);
+          return Response.json({ success: true, action: "auto_transition_en_livraison", course_id: course.id });
+        } else {
+          console.log(`[syncStatutLivreur] ⏭️ Auto-transition annulée — statut actuel: ${current?.statut || 'introuvable'}`);
+        }
+      } catch (err) {
+        console.error(`[syncStatutLivreur] ❌ Auto-transition error:`, err.message);
+      }
     }
 
     return Response.json({ success: true, skipped: "no_action_needed", statut });

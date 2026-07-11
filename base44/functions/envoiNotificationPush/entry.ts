@@ -433,6 +433,22 @@ Deno.serve(async (req) => {
           click_action: ANDROID_CLICK_ACTION,
         },
       },
+      apns: {
+        payload: {
+          aps: {
+            alert: { title: personalizedTitre, body: personalizedMessage },
+            sound: 'default',
+            badge: 1,
+            'content-available': 1,
+            'mutable-content': 1,
+          },
+          ...dataPayload,
+        },
+        headers: {
+          'apns-priority': '10',
+          'apns-collapse-id': notificationTag,
+        },
+      },
       webpush: {
         fcm_options: { link: APP_URL },
       },
@@ -447,6 +463,7 @@ Deno.serve(async (req) => {
     //   - réveil écran (WakeLock)
     //   - notification plein écran (fullScreenIntent)
     //   - canal IMPORTANCE_HIGH "SILGAPP Courses"
+    // ── PAYLOAD DATA-ONLY pour courses urgentes livreur (Android) ──
     const urgentAndroidPayload = {
       data: {
         ...dataPayload,
@@ -461,11 +478,44 @@ Deno.serve(async (req) => {
       },
     };
 
+    // ── PAYLOAD iOS pour courses urgentes livreur ──
+    // iOS ne supporte pas les data-only messages en arrière-plan.
+    // On utilise un payload "notification + data" avec APNs haute priorité.
+    const urgentIosPayload = {
+      notification: { title: personalizedTitre, body: personalizedMessage },
+      data: {
+        ...dataPayload,
+        title: String(personalizedTitre),
+        body: String(personalizedMessage),
+      },
+      apns: {
+        payload: {
+          aps: {
+            alert: { title: personalizedTitre, body: personalizedMessage },
+            sound: 'default',
+            badge: 1,
+            'content-available': 1,
+            'mutable-content': 1,
+            interruptionLevel: 'time-sensitive',
+          },
+          ...dataPayload,
+        },
+        headers: {
+          'apns-priority': '10',
+          'apns-collapse-id': notificationTag,
+        },
+      },
+    };
+
     const sendResults = await Promise.all(pushableTokens.map(async (item) => {
       const platform = String(item.platform || '').toLowerCase();
-      const payload = isUrgentLivreurCourse && platform.includes('android')
+      const isIOS = platform.includes('ios');
+      const isAndroid = platform.includes('android');
+      const payload = isUrgentLivreurCourse && isAndroid
         ? urgentAndroidPayload
-        : fcmPayload;
+        : isUrgentLivreurCourse && isIOS
+          ? urgentIosPayload
+          : fcmPayload;
       const response = await sendFcmMessage(projectId, accessToken, item.token, payload);
       const nowIso = new Date().toISOString();
 

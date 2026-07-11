@@ -1,6 +1,7 @@
 package com.silgapp2.app;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
@@ -30,6 +31,7 @@ public class SilgappPushPlugin extends Plugin {
 
     @Override
     public void load() {
+        super.load();
         activeInstance = this;
         JSObject pending = getPendingNotificationData(false);
         if (pending != null) {
@@ -43,6 +45,10 @@ public class SilgappPushPlugin extends Plugin {
             activeInstance = null;
         }
         super.handleOnDestroy();
+    }
+
+    public static SilgappPushPlugin getActiveInstance() {
+        return activeInstance;
     }
 
     public static void handleNotificationIntent(Intent intent, String source) {
@@ -101,6 +107,11 @@ public class SilgappPushPlugin extends Plugin {
             pendingNotificationData = null;
         }
         return copy;
+    }
+
+    public void emitNotificationTapped(JSObject data) {
+        notifyListeners("nativeNotificationOpened", data, true);
+        notifyListeners("silgapp:notification-tapped", data, true);
     }
 
     @PluginMethod
@@ -166,6 +177,19 @@ public class SilgappPushPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void checkPendingNotification(PluginCall call) {
+        JSObject data = getPendingNotificationData(true);
+        if (data != null) {
+            data.put("hasPending", true);
+            call.resolve(data);
+        } else {
+            JSObject empty = new JSObject();
+            empty.put("hasPending", false);
+            call.resolve(empty);
+        }
+    }
+
+    @PluginMethod
     public void openNotificationSettings(PluginCall call) {
         Intent intent;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -225,7 +249,7 @@ public class SilgappPushPlugin extends Plugin {
         }
 
         try {
-            PowerManager pm = (PowerManager) getContext().getSystemService(getContext().POWER_SERVICE);
+            PowerManager pm = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
             String packageName = getContext().getPackageName();
             boolean alreadyIgnoring = pm != null && pm.isIgnoringBatteryOptimizations(packageName);
 
@@ -265,7 +289,7 @@ public class SilgappPushPlugin extends Plugin {
             return;
         }
 
-        PowerManager pm = (PowerManager) getContext().getSystemService(getContext().POWER_SERVICE);
+        PowerManager pm = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
         boolean ignoring = pm != null && pm.isIgnoringBatteryOptimizations(getContext().getPackageName());
         JSObject result = new JSObject();
         result.put("ignoring", ignoring);
@@ -277,36 +301,28 @@ public class SilgappPushPlugin extends Plugin {
         Intent intent = new Intent();
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
-        intent.setClassName("com.miui.securitycenter",
-            "com.miui.permcenter.autostart.AutoStartManagementActivity");
+        intent.setClassName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity");
         if (tryStartActivity(intent, call)) return;
 
-        intent.setClassName("com.coloros.safecenter",
-            "com.coloros.safecenter.permission.startup.StartupAppListActivity");
+        intent.setClassName("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity");
         if (tryStartActivity(intent, call)) return;
 
-        intent.setClassName("com.coloros.safecenter",
-            "com.coloros.safecenter.startupapp.StartupAppListActivity");
+        intent.setClassName("com.coloros.safecenter", "com.coloros.safecenter.startupapp.StartupAppListActivity");
         if (tryStartActivity(intent, call)) return;
 
-        intent.setClassName("com.vivo.permissionmanager",
-            "com.vivo.permissionmanager.activity.BgStartActivityManagerActivity");
+        intent.setClassName("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartActivityManagerActivity");
         if (tryStartActivity(intent, call)) return;
 
-        intent.setClassName("com.huawei.systemmanager",
-            "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity");
+        intent.setClassName("com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity");
         if (tryStartActivity(intent, call)) return;
 
-        intent.setClassName("com.samsung.android.lool",
-            "com.samsung.android.sm.ui.battery.BatteryActivity");
+        intent.setClassName("com.samsung.android.lool", "com.samsung.android.sm.ui.battery.BatteryActivity");
         if (tryStartActivity(intent, call)) return;
 
-        intent.setClassName("com.tecno.foundation",
-            "com.tecno.foundation.activity.PermissionActivity");
+        intent.setClassName("com.tecno.foundation", "com.tecno.foundation.activity.PermissionActivity");
         if (tryStartActivity(intent, call)) return;
 
-        intent.setClassName("com.infinix.safezone",
-            "com.infinix.safezone.activity.PermissionActivity");
+        intent.setClassName("com.infinix.safezone", "com.infinix.safezone.activity.PermissionActivity");
         if (tryStartActivity(intent, call)) return;
 
         intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);

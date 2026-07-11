@@ -13,6 +13,16 @@ import QRScannerModal from "./QRScannerModal";
 import NavigationGPS from "./NavigationGPS";
 import { normalizeCommissionPct, resolveStoredOrDynamicSplit, splitAmountByCommission } from "@/lib/commissionUtils";
 import ChatWindow from "@/components/chat/ChatWindow";
+import AnnulationExplicationChat from "./AnnulationExplicationChat";
+
+const COUNTRY_DIAL_CODE = {
+  BF: "226", CI: "225", TG: "228", BJ: "229", SN: "221",
+  ML: "223", GN: "224", NE: "227", GH: "233",
+};
+const COUNTRY_LOCAL_LEN = {
+  BF: 8, CI: 10, TG: 8, BJ: 8, SN: 9,
+  ML: 8, GN: 9, NE: 8, GH: 9,
+};
 
 // Haversine
 function haversine(lat1, lon1, lat2, lon2) {
@@ -144,6 +154,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const [showAnnulerCourse, setShowAnnulerCourse] = useState(false);
   const [motifAnnulationLivreur, setMotifAnnulationLivreur] = useState("");
   const [motifAnnulationDetail, setMotifAnnulationDetail] = useState("");
+  // Messagerie d'explication apres annulation
+  const [showAnnulationChat, setShowAnnulationChat] = useState(false);
 
   const effectiveStatut = optimisticStatut || course.statut;
   const isDeplacement = course.type_course === "deplacement";
@@ -164,6 +176,20 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     }
     return split;
   };
+
+  // 🔄 Auto-transition : colis_recupere → en_livraison après 10 secondes
+  useEffect(() => {
+    if (effectiveStatut !== "colis_recupere" || isDeplacement) return;
+    const timer = setTimeout(() => {
+      setOptimisticStatut("en_livraison");
+      queryClient.setQueryData(['mes-courses-externes'], (old) =>
+        (old || []).map(c => c.id === course.id ? { ...c, statut: "en_livraison" } : c)
+      );
+      const entity = isExterne ? base44.entities.CourseExterne : base44.entities.Course;
+      entity.update(course.id, { statut: "en_livraison" }).catch(() => null);
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [effectiveStatut, course.id, isDeplacement, isExterne]);
 
   const navigateToRecap = (courseData = {}) => {
     const courseId = courseData?.id || course.id;
@@ -347,6 +373,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           : "Course annulée");
         // Libérer le livreur localement
         onColisLivre({ ...course, statut: "annulee" }, null);
+        // 💬 Ouvrir la messagerie d'explication vers l'admin
+        setShowAnnulationChat(true);
       } else {
         toast.error(res?.data?.error || "Erreur lors de l'annulation");
         setOptimisticStatut(null);
@@ -356,8 +384,6 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       setOptimisticStatut(null);
     }
 
-    setMotifAnnulationLivreur("");
-    setMotifAnnulationDetail("");
     queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
     queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
   };
@@ -486,6 +512,22 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             </div>
           </div>
         </div>
+      )}
+
+      {/* 💬 Messagerie d'explication après annulation */}
+      {showAnnulationChat && (
+        <AnnulationExplicationChat
+          course={course}
+          livreurId={livreurId}
+          livreurNom={livreurNom}
+          motif={motifAnnulationLivreur}
+          motifDetail={motifAnnulationLivreur === "autre" ? motifAnnulationDetail : ""}
+          onClose={() => {
+            setShowAnnulationChat(false);
+            setMotifAnnulationLivreur("");
+            setMotifAnnulationDetail("");
+          }}
+        />
       )}
 
       {/* Modal mise en pause */}
@@ -635,6 +677,17 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
               const handleWhatsApp = () => {
                 let num = (contactTel || "").replace(/\D/g, "");
+                const dial = COUNTRY_DIAL_CODE[course.country_code] || "226";
+                const localLen = COUNTRY_LOCAL_LEN[course.country_code] || 8;
+                if (num.startsWith(dial) && num.length === dial.length + localLen) {
+                  // déjà international
+                } else if (num.startsWith("0") && num.length === localLen + 1) {
+                  num = dial + num.slice(1);
+                } else if (num.length === localLen) {
+                  num = dial + num;
+                } else if (num.startsWith("0")) {
+                  num = dial + num.slice(1);
+                }
                 const msg = encodeURIComponent(
                   "Bonjour, je suis votre chauffeur SILGAPP. Je suis en route pour vous prendre en charge."
                 );
@@ -682,7 +735,18 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               // Normalisation multi-pays : si le numéro a déjà un indicatif international (10+ chiffres), ok
               // Sinon on laisse le numéro tel quel — wa.me gère les numéros locaux avec indicatif
               let num = (contactTel || "").replace(/\D/g, "");
-              // Rien à faire si déjà un numéro international (≥10 chiffres)
+              const dial = COUNTRY_DIAL_CODE[course.country_code] || "226";
+              const localLen = COUNTRY_LOCAL_LEN[course.country_code] || 8;
+              // Normaliser vers le format international pour wa.me
+              if (num.startsWith(dial) && num.length === dial.length + localLen) {
+                // déjà international
+              } else if (num.startsWith("0") && num.length === localLen + 1) {
+                num = dial + num.slice(1); // retirer le 0 trunk
+              } else if (num.length === localLen) {
+                num = dial + num; // numéro local, le 0 fait partie du numéro
+              } else if (num.startsWith("0")) {
+                num = dial + num.slice(1); // fallback: retirer le 0
+              }
               const msg = encodeURIComponent(
                 colisRecupere
                   ? "Bonjour, je suis votre livreur SILGAPP. Je suis en route pour vous livrer votre colis."

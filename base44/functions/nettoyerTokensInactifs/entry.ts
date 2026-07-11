@@ -9,9 +9,21 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Non autorisé' }, { status: 401 });
-    if (user.role !== 'admin') return Response.json({ error: 'Accès admin requis' }, { status: 403 });
+
+    // ── Mode automation planifiée : pas d'utilisateur connecté ──
+    // Quand appelé par un cron, on exécute directement en service role.
+    let lanceur = 'automation';
+    try {
+      const user = await base44.auth.me();
+      if (user) {
+        if (user.role !== 'admin') {
+          return Response.json({ error: 'Accès admin requis' }, { status: 403 });
+        }
+        lanceur = user.email;
+      }
+    } catch (_) {
+      // Pas d'utilisateur — exécution automatique (scheduled automation)
+    }
 
     const tokens = await base44.asServiceRole.entities.NotificationToken.list('-created_date', 500);
     const now = Date.now();
@@ -118,7 +130,7 @@ Deno.serve(async (req) => {
       })),
       resume: `${supprimes} token(s) mort(s) supprimé(s), ${desactives} token(s) désactivé(s). Taux actifs: ${tauxActifApres}% (${actifsApres}/${totalApres}).`,
       date_nettoyage: new Date().toISOString(),
-      lance_par: user.email,
+      lance_par: lanceur,
     });
   } catch (error) {
     console.error('[nettoyerTokensInactifs] Erreur:', error);

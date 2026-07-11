@@ -1,5 +1,9 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
+// ── Cache module-level avec TTL pour les configs (évite de recharger à chaque tick) ──
+const CONFIG_CACHE = { dispatch: null, gps: null, expires: 0 };
+const CONFIG_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 function generateToken() {
   return crypto.randomUUID().replace(/-/g, '');
 }
@@ -50,13 +54,17 @@ function reponseDejaPrise(reason, course, details = {}) {
 }
 
 async function chargerConfigDispatch(base44) {
+  if (CONFIG_CACHE.dispatch && Date.now() < CONFIG_CACHE.expires) return CONFIG_CACHE.dispatch;
   try {
     const configs = await base44.asServiceRole.entities.AppConfig.filter({});
     const nbConfig = configs.find(c => c.cle === 'DISPATCH_NB_LIVREURS');
     const timeoutConfig = configs.find(c => c.cle === 'DISPATCH_TIMEOUT_SEC');
     const nb = nbConfig ? (nbConfig.valeur === 'tous' ? 999 : parseInt(nbConfig.valeur, 10) || 3) : 3;
     const timeout = timeoutConfig ? (parseInt(timeoutConfig.valeur, 10) || 60) : 60;
-    return { nb, timeout };
+    const result = { nb, timeout };
+    CONFIG_CACHE.dispatch = result;
+    CONFIG_CACHE.expires = Date.now() + CONFIG_TTL_MS;
+    return result;
   } catch (err) {
     console.warn('[DISPATCH] ⚠️ Impossible de charger config dispatch, valeurs par défaut utilisées:', err.message);
     return { nb: 3, timeout: 120 };
@@ -64,6 +72,7 @@ async function chargerConfigDispatch(base44) {
 }
 
 async function chargerConfigVaguesGPS(base44) {
+  if (CONFIG_CACHE.gps && Date.now() < CONFIG_CACHE.expires) return CONFIG_CACHE.gps;
   try {
     const configs = await base44.asServiceRole.entities.DispatchWaveConfig.filter({});
     const cfg = configs[0];
@@ -78,7 +87,7 @@ async function chargerConfigVaguesGPS(base44) {
       };
     }
     const waves = JSON.parse(cfg.waves_json || '[]');
-    return {
+    const result = {
       gps_waves_enabled: cfg.gps_waves_enabled !== false,
       waves: waves.length > 0 ? waves : [
         { size: 3, timeout_sec: 60 },
@@ -86,6 +95,9 @@ async function chargerConfigVaguesGPS(base44) {
         { size: 999, timeout_sec: 60 },
       ],
     };
+    CONFIG_CACHE.gps = result;
+    CONFIG_CACHE.expires = Date.now() + CONFIG_TTL_MS;
+    return result;
   } catch (err) {
     console.warn('[DISPATCH] ⚠️ Impossible de charger config vagues GPS, défaut utilisé:', err.message);
     return {
@@ -116,7 +128,7 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
     statut: 'disponible',
     country_code: course.country_code,
     bloque_encours: false,
-  });
+  }, '-last_seen_at', 50);
 
   if (!tousLivreurs || tousLivreurs.length === 0) return [];
 
@@ -139,7 +151,6 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
   // 🕐 0-15 min = N1 (priorité max), 15-30 min = N2 (réduite), 30-60 min = N3 (faible)
   // 🚫 > 60 min = exclusion automatique + mise hors ligne
   const niveau1 = [], niveau2 = [], niveau3 = [];
-  let nbMarquesHorsLigne = 0;
 
   // 🧠 Résoudre les coordonnées de pickup : GPS > quartier > fallback large
   let pickupLat = course.gps_depart_lat;
@@ -173,13 +184,10 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
       if (!isNaN(hb.getTime())) heartbeatAgeMin = (now - hb.getTime()) / 60000;
     }
 
-    // 🚫 Exclusion automatique : heartbeat > 60 min → exclu du dispatch SANS modifier le statut
-    // Le statut du livreur est contrôlé exclusivement par lui-même (toggle manuel).
-    // On l'exclut juste des candidats pour ce cycle — il réapparaîtra s'il rouvre l'app.
-    if (heartbeatAgeMin !== null && heartbeatAgeMin > 60) {
-      nbMarquesHorsLigne++;
-      return; // exclu du dispatch, statut préservé
-    }
+    // 📡 Aucune exclusion heartbeat : un livreur disponible reste éligible au dispatch
+    // même si son téléphone est éteint depuis plus d'1h. Il sera notifié par push
+    // (et WhatsApp si opt-in) — en ouvrant SILGAPP il pourra accepter la course.
+    // La priorisation se fait par niveaux : N1 (0-15min), N2 (15-30min), N3 (>30min).
 
     // distance = null quand ni GPS ni quartier → pas de calcul fictif
     let distance = null;
@@ -190,7 +198,7 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
     const enriched = { ...l, distance, heartbeatAgeMin };
 
     if (heartbeatAgeMin === null || heartbeatAgeMin >= 30) {
-      niveau3.push(enriched); // N3 : 30-60 min ou inconnu → priorité faible
+      niveau3.push(enriched); // N3 : > 30 min ou inconnu → priorité faible (mais reste notifié)
     } else if (heartbeatAgeMin >= 15) {
       niveau2.push(enriched); // N2 : 15-30 min → priorité réduite
     } else {
@@ -226,10 +234,7 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
   }));
 
   const tous = [...niveau1, ...niveau2, ...niveau3];
-  if (nbMarquesHorsLigne > 0) {
-    console.log(`[DISPATCH] 🚫 ${nbMarquesHorsLigne} livreur(s) exclu(s) du dispatch (HB > 60 min) — statut préservé`);
-  }
-  console.log(`[DISPATCH] 📊 ${tous.length} candidats (exclus: ${exclusions.length}, hors_ligne: ${nbMarquesHorsLigne}) — N1:${niveau1.length} N2:${niveau2.length} N3:${niveau3.length} — pickup: ${pickupSource}${pickupSource === 'quartier' ? ` (${course.quartier_depart})` : ''}`);
+  console.log(`[DISPATCH] 📊 ${tous.length} candidats (exclus: ${exclusions.length}) — N1:${niveau1.length} N2:${niveau2.length} N3:${niveau3.length} — pickup: ${pickupSource}${pickupSource === 'quartier' ? ` (${course.quartier_depart})` : ''}`);
   return { tous, niveau1, niveau2, niveau3, pickupSource };
 }
 
@@ -341,7 +346,9 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
   // ayant annulé ou déjà été notifié ne soit JAMAIS re-sollicité pour cette course.
   let dejaNotifiesFusion = [];
   try { dejaNotifiesFusion = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-  exclusions = [...new Set([...exclusions, ...dejaNotifiesFusion])];
+  let dejaRefuses = [];
+  try { dejaRefuses = JSON.parse(course.dispatch_refused_ids || '[]'); } catch {}
+  exclusions = [...new Set([...exclusions, ...dejaNotifiesFusion, ...dejaRefuses])];
 
   // Si un livreur détient le verrou actif → attendre
   if (course.dispatch_status === 'propose' && course.livreur_id && course.timeout_expires_at) {
@@ -427,35 +434,17 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
       return { cycleEpuise: true };
     }
     if (dejaNotifies.length > 0) {
-      // Tous les livreurs ont été sollicités → cycle épuisé
-      // On vérifie si les 2 minutes d'attente sont écoulées (depuis la dernière sollicitation)
-      const derniereSollicitation = course.heure_sollicitation ? new Date(course.heure_sollicitation) : null;
-      const maintenant = new Date();
-      const attenteEcoulee = derniereSollicitation
-        ? (maintenant.getTime() - derniereSollicitation.getTime()) >= 2 * 60 * 1000
-        : true;
-
-      if (attenteEcoulee) {
-        // Nouveau cycle : vider la liste des notifiés, recalculer les disponibilités
-        console.log(`[DISPATCH] 🔄 Nouveau cycle — réinitialisation des notifiés pour course ${courseId}`);
-        await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-          dispatch_status: 'en_attente',
-          dispatch_notified_ids: '[]',
-          dispatch_wave: 0,
-          livreur_id: '',
-          livreur_nom: '',
-        });
-        // 🛡️ Ne pas relancer récursivement — le prochain tick du scheduler s'en chargera.
-        // L'appel récursif doubling la charge API et cause le rate limit.
-        return { cycleReset: true };
-      } else {
-        // Encore en attente des 2 minutes
-        console.log(`[DISPATCH] ⏳ Cycle épuisé — attente 2 min avant nouveau cycle pour course ${courseId}`);
-        await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-          dispatch_status: 'cycle_epuise',
-        });
-        return { cycleEpuise: true };
-      }
+      // Nouveau cycle immédiat : vider la liste des notifiés, recalculer les disponibilités
+      // Les livreurs qui n'ont pas explicitement refusé restent éligibles (dispatch_refused_ids survit au reset)
+      console.log(`[DISPATCH] 🔄 Nouveau cycle — réinitialisation immédiate des notifiés pour course ${courseId}`);
+      await base44.asServiceRole.entities.CourseExterne.update(courseId, {
+        dispatch_status: 'en_attente',
+        dispatch_notified_ids: '[]',
+        dispatch_wave: 0,
+        livreur_id: '',
+        livreur_nom: '',
+      });
+      return { cycleReset: true };
     } else {
       // Aucun livreur dispo du tout
       await base44.asServiceRole.entities.CourseExterne.update(courseId, {
@@ -479,8 +468,10 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
     waveLabel = `GPS vague ${wave}/${gpsConfig.waves.length}`;
   } else {
     selection = config.nb >= 999 ? candidats : candidats.slice(0, config.nb);
-    timeoutSec = config.timeout;
-    waveLabel = modeVaguesHeartbeat ? `heartbeat N${wave}` : 'direct';
+    // ⚡ Mode direct admin sans GPS → timeout 120s (re-notification de tous les livreurs à chaque cycle)
+    const isAdminNoGps = course.source === 'admin' && pickupSource !== 'gps';
+    timeoutSec = isAdminNoGps ? 120 : config.timeout;
+    waveLabel = modeVaguesHeartbeat ? `heartbeat N${wave}` : (isAdminNoGps ? 'direct admin 120s' : 'direct');
   }
   console.log(`[DISPATCH] 🎯 ${waveLabel} — ${selection.length}/${candidats.length} livreurs pour course ${courseId}`);
 
@@ -496,8 +487,7 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
     dispatch_status: 'propose',
     dispatch_wave: wave, // 0 = mode normal, 1/2/3 = vague en cours
     livreur_id: '',
-    livreur_nom: '',
-    livreur_telephone: '',
+    // ⚠️ On ne vide pas livreur_nom/livreur_telephone pour préserver la trace du dernier livreur
     heure_sollicitation: new Date().toISOString(),
     timeout_expires_at: timeoutAt,
     dispatch_notified_ids: JSON.stringify(tousNotifies),
@@ -532,12 +522,10 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
 
 async function supprimerNotificationsCourse(base44, courseId) {
   try {
-    const notifs = await base44.asServiceRole.entities.Notification.filter({ course_id: courseId, type: 'nouvelle_course' });
-    const nonLues = notifs.filter(n => !n.lue);
-    for (const n of nonLues) {
-      await base44.asServiceRole.entities.Notification.update(n.id, { lue: true });
-    }
-    if (nonLues.length > 0) console.log(`[DISPATCH] 🧹 ${nonLues.length} notification(s) archivée(s)`);
+    await base44.asServiceRole.entities.Notification.updateMany(
+      { course_id: courseId, type: 'nouvelle_course', lue: false },
+      { $set: { lue: true } }
+    );
   } catch (err) { console.warn('[DISPATCH] ⚠️ Erreur archivage:', err.message); }
 }
 
@@ -554,6 +542,11 @@ Deno.serve(async (req) => {
     if (!action && body.event?.entity_id) {
       action = 'lancer_recherche_auto';
       course_id = body.event.entity_id;
+    }
+
+    // Déclenchement depuis automation scheduled (tick) — sans action = avancer les vagues
+    if (!action) {
+      action = 'avancer_vagues_expirees';
     }
 
     // ─── 1. Lancer la recherche automatique (multi-livreurs) ──────────────
@@ -854,34 +847,25 @@ Deno.serve(async (req) => {
         return Response.json({ success: true, message: 'Course déjà prise par un autre' });
       }
 
-      // 🚫 Ajouter le livreur aux exclus définitifs (tous les cycles)
-      let dejaNotifies = [];
-      try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-      if (!dejaNotifies.includes(livreur_id)) {
-        dejaNotifies.push(livreur_id);
+      // 🚫 Ajouter le livreur aux refusés définitifs (exclusion permanente, survit au reset de cycle)
+      let dejaRefuses = [];
+      try { dejaRefuses = JSON.parse(course.dispatch_refused_ids || '[]'); } catch {}
+      if (!dejaRefuses.includes(livreur_id)) {
+        dejaRefuses.push(livreur_id);
         await base44.asServiceRole.entities.CourseExterne.update(course_id, {
-          dispatch_notified_ids: JSON.stringify(dejaNotifies),
+          dispatch_refused_ids: JSON.stringify(dejaRefuses),
         });
-        console.log(`[DISPATCH] 🚫 Livreur ${livreur_id} ajouté aux exclus définitifs — course ${course_id}`);
+        console.log(`[DISPATCH] 🚫 Livreur ${livreur_id} ajouté aux refusés définitifs — course ${course_id}`);
       }
 
-      // 🧹 Marquer les notifications "nouvelle_course" comme lues pour ce livreur
-      // — empêche la course de réapparaître via le fetching par notification
+      // 🧹 Marquer les notifications "nouvelle_course" comme lues pour ce livreur (bulk)
       try {
         const livreurData = await base44.asServiceRole.entities.Livreur.get(livreur_id);
         if (livreurData?.user_email) {
-          const notifs = await base44.asServiceRole.entities.Notification.filter({
-            course_id: course_id,
-            destinataire_email: livreurData.user_email,
-            type: 'nouvelle_course',
-            lue: false,
-          });
-          for (const n of notifs) {
-            await base44.asServiceRole.entities.Notification.update(n.id, { lue: true });
-          }
-          if (notifs.length > 0) {
-            console.log(`[DISPATCH] 🧹 ${notifs.length} notification(s) marquée(s) lue(s) pour livreur ${livreur_id} — course ${course_id}`);
-          }
+          await base44.asServiceRole.entities.Notification.updateMany(
+            { course_id: course_id, destinataire_email: livreurData.user_email, type: 'nouvelle_course', lue: false },
+            { $set: { lue: true } }
+          );
         }
       } catch (e) { console.warn('[DISPATCH] Erreur archivage notifs refus:', e.message); }
 
@@ -899,7 +883,7 @@ Deno.serve(async (req) => {
           accepted_by_livreur_id: '',
           accepted_at: null,
         });
-        const result = await lancerDispatchMulti(base44, course_id, dejaNotifies);
+        const result = await lancerDispatchMulti(base44, course_id, []);
         if (result.noLivreur) return Response.json({ success: true, noLivreur: true });
         if (result.cycleEpuise) return Response.json({ success: true, cycle_epuise: true });
         return Response.json({ success: true, nb_notifies: result.nb_notifies });
@@ -930,10 +914,7 @@ Deno.serve(async (req) => {
           accepted_at: null,
         });
 
-        // Passer TOUS les déjà notifiés comme exclusions
-        let dejaNotifies = [];
-        try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-        const result = await lancerDispatchMulti(base44, course_id, dejaNotifies);
+        const result = await lancerDispatchMulti(base44, course_id, []);
         return Response.json({ expired: true, redispatched: !result.noLivreur, nb_restants: result.total_notifies });
       }
 
@@ -970,9 +951,7 @@ Deno.serve(async (req) => {
           await base44.asServiceRole.entities.CourseExterne.update(course_id, { dispatch_status: 'redispatch' });
         }
 
-        let dejaNotifies = [];
-        try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-        const result = await lancerDispatchMulti(base44, course_id, dejaNotifies);
+        const result = await lancerDispatchMulti(base44, course_id, []);
         return Response.json({ expired: true, redispatched: !result.noLivreur });
       }
 
@@ -985,17 +964,21 @@ Deno.serve(async (req) => {
       const filter = { statut: 'recherche_livreur' };
       if (filterCountry) filter.country_code = filterCountry;
 
-      const courses = await base44.asServiceRole.entities.CourseExterne.filter(filter);
+      const courses = await base44.asServiceRole.entities.CourseExterne.filter(filter, '-created_date', 20);
       const now = new Date();
       const resultats = [];
 
       const MAX_COURSES_PER_TICK = 4; // Limite anti-rate-limit stricte
-      const coursesToProcess = courses.slice(0, MAX_COURSES_PER_TICK);
+      // Prioriser les courses VRAIMENT bloquées (en_attente/redispatch/cycle_epuise)
+      // avant celles en "propose" qui attendent juste leur timeout
+      const stuck = courses.filter(c => ['en_attente', 'redispatch', 'cycle_epuise'].includes(c.dispatch_status));
+      const waiting = courses.filter(c => !['en_attente', 'redispatch', 'cycle_epuise'].includes(c.dispatch_status));
+      const coursesToProcess = [...stuck, ...waiting].slice(0, MAX_COURSES_PER_TICK);
       if (courses.length > MAX_COURSES_PER_TICK) {
         console.log(`[DISPATCH] ⚡ ${courses.length} courses à traiter — limitation à ${MAX_COURSES_PER_TICK}/tick pour éviter rate limit`);
       }
 
-      // 📦 Cache config — charger UNE SEULE FOIS par tick au lieu de par course
+      // 📦 Cache config — déjà mis en cache au niveau module (TTL 5 min), ne fait qu'une seule requête
       const cachedConfig = {
         dispatch: await chargerConfigDispatch(base44),
         gps: await chargerConfigVaguesGPS(base44),
@@ -1005,38 +988,52 @@ Deno.serve(async (req) => {
         try {
           // 🔄 cycle_epuise : après 2 min d'attente → reset et retour N1
           if (course.dispatch_status === 'cycle_epuise') {
-            const derniereSollicitation = course.heure_sollicitation ? new Date(course.heure_sollicitation) : null;
-            const deuxMinutesPassees = derniereSollicitation
-              ? (now.getTime() - derniereSollicitation.getTime()) >= 2 * 60 * 1000
-              : true;
-
-            if (deuxMinutesPassees) {
-              console.log(`[DISPATCH] 🔄 Cycle épuisé → reset N1 pour course ${course.id}`);
-              await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-                dispatch_status: 'en_attente',
-                dispatch_notified_ids: '[]',
-                dispatch_wave: 0,
-                livreur_id: '',
-                livreur_nom: '',
-              });
-              const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
-              resultats.push({ course_id: course.id, wave: 'reset→N1', ...result });
-            }
+            console.log(`[DISPATCH] 🔄 Cycle épuisé → reset immédiat pour course ${course.id}`);
+            await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+              dispatch_status: 'en_attente',
+              dispatch_notified_ids: '[]',
+              dispatch_wave: 0,
+              livreur_id: '',
+              livreur_nom: '',
+            });
+            const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
+            resultats.push({ course_id: course.id, wave: 'reset→N1', ...result });
             continue;
           }
 
           // 📌 Courses en attente / redispatch (hors vagues) → relancer
           if (['en_attente', 'redispatch'].includes(course.dispatch_status)) {
-            let dejaNotifies = [];
-            try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-            const result = await lancerDispatchMulti(base44, course.id, dejaNotifies, cachedConfig);
+            const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
             resultats.push({ course_id: course.id, wave: 'retry', ...result });
             continue;
           }
 
           // 🌊/📍 Vagues expirées (propose sans verrou, mode vagues heartbeat ou GPS)
           const expired = !!(course.timeout_expires_at && new Date(course.timeout_expires_at) < now);
-          if (!expired || course.dispatch_status !== 'propose' || course.livreur_id) continue;
+          if (!expired || course.dispatch_status !== 'propose') continue;
+
+          // ⏰ Verrou expiré AVEC livreur_id (prix manuel sans réponse client, ou acceptation expirée)
+          if (course.livreur_id) {
+            console.log(`[DISPATCH] ⏰ Verrou expiré (livreur ${course.livreur_id}) course ${course.id} — libération + redispatch`);
+            await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+              statut: 'recherche_livreur',
+              dispatch_status: 'redispatch',
+              livreur_id: '',
+              livreur_nom: '',
+              livreur_telephone: '',
+              heure_acceptation: null,
+              accepted_by_livreur_id: '',
+              accepted_at: null,
+              pricing_mode: 'automatic',
+              manual_price: null,
+              manual_price_status: null,
+              proposed_by_livreur_id: '',
+              timeout_expires_at: null,
+            });
+            const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
+            resultats.push({ course_id: course.id, wave: 'expired_lock_redispatch', ...result });
+            continue;
+          }
 
           const currentWave = course.dispatch_wave || 0;
           if (currentWave > 0) {
@@ -1060,11 +1057,19 @@ Deno.serve(async (req) => {
               dispatch_status: 'redispatch',
               dispatch_wave: nextWave,
             });
+          } else {
+            // ⚡ Mode direct (wave=0) — admin sans GPS : reset notifiés pour re-notifier tout le monde
+            const isAdminNoGps = course.source === 'admin' && !course.gps_depart_lat && !course.gps_depart_lng;
+            if (isAdminNoGps) {
+              console.log(`[DISPATCH] ⚡ Admin sans GPS — reset notifiés + redispatch course ${course.id}`);
+              await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+                dispatch_status: 'redispatch',
+                dispatch_notified_ids: '[]',
+              });
+            }
           }
 
-          let dejaNotifies = [];
-          try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-          const result = await lancerDispatchMulti(base44, course.id, dejaNotifies, cachedConfig);
+          const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
           resultats.push({ course_id: course.id, wave: `${currentWave}→${currentWave + 1}`, ...result });
         } catch (err) {
           console.error(`[DISPATCH] ❌ Erreur sur course ${course.id}:`, err.message);
@@ -1098,6 +1103,35 @@ Deno.serve(async (req) => {
         } catch (e) { console.error('[DISPATCH] Erreur création alerte bloquée:', e.message); }
       }
 
+      // ⚠️ Détection des courses sans aucun livreur disponible (> 5 min de recherche)
+      try {
+        const coursesSansLivreur = await base44.asServiceRole.entities.CourseExterne.filter(
+          { statut: 'recherche_livreur', dispatch_status: 'en_attente' },
+          '-created_date', 10
+        );
+        for (const course of coursesSansLivreur) {
+          const updatedTime = new Date(course.updated_date);
+          if (now.getTime() - updatedTime.getTime() < 5 * 60 * 1000) continue;
+
+          let notifiedIds = [];
+          try { notifiedIds = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
+          if (notifiedIds.length > 0) continue;
+
+          const existingAlerts = await base44.asServiceRole.entities.Notification.filter({
+            course_id: course.id, type: 'alerte_aucun_livreur', lue: false,
+          });
+          if (existingAlerts.length === 0) {
+            const searchMin = Math.round((now.getTime() - updatedTime.getTime()) / 60000);
+            await base44.asServiceRole.entities.Notification.create({
+              titre: '⚠️ Aucun livreur disponible',
+              message: `Course ${course.client_nom || '?'} — ${course.adresse_depart || '?'} → ${course.adresse_arrivee || '?'} — en recherche depuis ${searchMin} min sans aucun livreur trouvé. Les livreurs sont peut-être tous hors ligne ou trop loin.`,
+              type: 'alerte_aucun_livreur', course_id: course.id, lue: false,
+            });
+            console.warn(`[DISPATCH] ⚠️ ALERTE ADMIN: Course ${course.id} sans livreur depuis ${searchMin} min`);
+          }
+        }
+      } catch (e) { console.error('[DISPATCH] Erreur détection sans livreur:', e.message); }
+
       return Response.json({ success: true, traitees: resultats.length, resultats: resultats.slice(0, 20) });
     }
 
@@ -1107,19 +1141,18 @@ Deno.serve(async (req) => {
       const filter = { statut: 'recherche_livreur' };
       if (filterCountry) filter.country_code = filterCountry;
 
-      const courses = await base44.asServiceRole.entities.CourseExterne.filter(filter);
+      const courses = await base44.asServiceRole.entities.CourseExterne.filter(filter, '-created_date', 10);
       const aRetenter = courses.filter(c =>
         ['en_attente', 'redispatch', 'cycle_epuise'].includes(c.dispatch_status)
       );
 
-      // 🛡️ Limite stricte anti-rate-limit (same as avancer_vagues_expirees)
       const MAX_COURSES_PER_TICK = 4;
       const coursesToProcess = aRetenter.slice(0, MAX_COURSES_PER_TICK);
       if (aRetenter.length > MAX_COURSES_PER_TICK) {
         console.log(`[DISPATCH] ⚡ ${aRetenter.length} courses à retenter — limitation à ${MAX_COURSES_PER_TICK}/tick`);
       }
 
-      // 📦 Cache config — charger UNE SEULE FOIS par tick
+      // 📦 Cache config — déjà mis en cache au niveau module (TTL 5 min)
       const cachedConfig = {
         dispatch: await chargerConfigDispatch(base44),
         gps: await chargerConfigVaguesGPS(base44),
@@ -1128,11 +1161,7 @@ Deno.serve(async (req) => {
       const resultats = [];
       for (const course of coursesToProcess) {
         try {
-          let dejaNotifies = [];
-          try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-
-          // Si cycle_epuise, on laisse lancerDispatchMulti gérer le reset après 2 min
-          const result = await lancerDispatchMulti(base44, course.id, dejaNotifies, cachedConfig);
+          const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
           resultats.push({ course_id: course.id, ...result });
         } catch (err) {
           console.error(`[DISPATCH] ❌ Erreur retry course ${course.id}:`, err.message);
@@ -1210,9 +1239,7 @@ Deno.serve(async (req) => {
         }
 
         // Redispatch sans exclure (le refus était côté client, pas livreur)
-        let dejaNotifies = [];
-        try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-        const result = await lancerDispatchMulti(base44, course_id, dejaNotifies);
+        const result = await lancerDispatchMulti(base44, course_id, []);
         return Response.json({ success: true, accepted: false, redispatched: !result.noLivreur });
       }
     }
