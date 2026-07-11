@@ -23,6 +23,27 @@ import com.google.firebase.messaging.FirebaseMessaging;
 )
 public class SilgappPushPlugin extends Plugin {
 
+    // ── Référence statique pour le service FCM ──
+    // Permet au SilgappFirebaseMessagingService d'émettre des événements
+    // vers le WebView quand l'app est au premier plan (driver dans le dashboard).
+    private static SilgappPushPlugin activeInstance = null;
+
+    @Override
+    public void load() {
+        super.load();
+        activeInstance = this;
+    }
+
+    @Override
+    public void handleOnDestroy() {
+        activeInstance = null;
+        super.handleOnDestroy();
+    }
+
+    public static SilgappPushPlugin getActiveInstance() {
+        return activeInstance;
+    }
+
     @PluginMethod
     public void checkNotificationPermission(PluginCall call) {
         JSObject result = new JSObject();

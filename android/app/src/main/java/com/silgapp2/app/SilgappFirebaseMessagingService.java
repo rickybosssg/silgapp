@@ -27,6 +27,7 @@ import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 
+import com.getcapacitor.JSObject;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
@@ -59,6 +60,22 @@ public class SilgappFirebaseMessagingService extends FirebaseMessagingService {
             wakeUpScreen();
             showUrgentCourseNotification(title, body, data, durationMs);
             startUrgentCourseAlert(getApplicationContext(), durationMs, intervalMs);
+
+            // ── Pont foreground : transmettre les données au WebView ──
+            // Si le plugin est vivant (app au premier plan), émettre l'événement
+            // pour que le JS affiche immédiatement le modal de la course.
+            SilgappPushPlugin plugin = SilgappPushPlugin.getActiveInstance();
+            if (plugin != null) {
+                JSObject eventData = new JSObject();
+                for (Map.Entry<String, String> entry : data.entrySet()) {
+                    eventData.put(entry.getKey(), entry.getValue());
+                }
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    try {
+                        plugin.emitNotificationTapped(eventData);
+                    } catch (Exception ignored) {}
+                });
+            }
             return;
         }
 
