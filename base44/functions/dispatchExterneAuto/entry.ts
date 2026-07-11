@@ -1004,7 +1004,30 @@ Deno.serve(async (req) => {
 
           // 🌊/📍 Vagues expirées (propose sans verrou, mode vagues heartbeat ou GPS)
           const expired = !!(course.timeout_expires_at && new Date(course.timeout_expires_at) < now);
-          if (!expired || course.dispatch_status !== 'propose' || course.livreur_id) continue;
+          if (!expired || course.dispatch_status !== 'propose') continue;
+
+          // ⏰ Verrou expiré AVEC livreur_id (prix manuel sans réponse client, ou acceptation expirée)
+          if (course.livreur_id) {
+            console.log(`[DISPATCH] ⏰ Verrou expiré (livreur ${course.livreur_id}) course ${course.id} — libération + redispatch`);
+            await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+              statut: 'recherche_livreur',
+              dispatch_status: 'redispatch',
+              livreur_id: '',
+              livreur_nom: '',
+              livreur_telephone: '',
+              heure_acceptation: null,
+              accepted_by_livreur_id: '',
+              accepted_at: null,
+              pricing_mode: 'automatic',
+              manual_price: null,
+              manual_price_status: null,
+              proposed_by_livreur_id: '',
+              timeout_expires_at: null,
+            });
+            const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
+            resultats.push({ course_id: course.id, wave: 'expired_lock_redispatch', ...result });
+            continue;
+          }
 
           const currentWave = course.dispatch_wave || 0;
           if (currentWave > 0) {
