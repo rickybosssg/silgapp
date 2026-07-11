@@ -34,13 +34,24 @@ Deno.serve(async (req) => {
     console.log(`[syncStatutLivreur] event=${event?.type} statut=${statut} livreur_id=${livreurId?.slice(-8) || 'NONE'}`);
 
     // 🔄 Auto-transition : colis_recupere → en_livraison après 10 secondes
-    // Déclenché côté serveur pour que TOUS les tableaux de bord (admin, client) se mettent à jour
-    // même si l'app livreur n'est pas ouverte.
-    // ⚠️ On AWAIT le délai (pas de setTimeout fire-and-forget) — sinon Deno Deploy
-    // termine l'isolate avant que le timer ne se déclenche.
+    // Doit être traité EN PREMIER, avant Cas 1/Cas 2, car colis_recupere ∈ STATUTS_ACTIFS_LIVREUR
+    // et Cas 2 fait un return early qui rendrait ce code inaccessible.
     const shouldAutoTransition = statut === "colis_recupere" && livreurId && old_data?.statut !== "colis_recupere";
     if (shouldAutoTransition) {
-      console.log(`[syncStatutLivreur] 🔄 Auto-transition programmée: colis_recupere → en_livraison dans 10s (course ${course.id})`);
+      console.log(`[syncStatutLivreur] ⏳ Attente 10s avant transition en_livraison (course ${course.id})`);
+      await new Promise(resolve => setTimeout(resolve, 10000));
+      try {
+        const current = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+        if (current && current.statut === "colis_recupere") {
+          await base44.asServiceRole.entities.CourseExterne.update(course.id, { statut: "en_livraison" });
+          console.log(`[syncStatutLivreur] ✅ Auto-transition: colis_recupere → en_livraison (course ${course.id})`);
+          return Response.json({ success: true, action: "auto_transition_en_livraison", course_id: course.id });
+        } else {
+          console.log(`[syncStatutLivreur] ⏭️ Auto-transition annulée — statut actuel: ${current?.statut || 'introuvable'}`);
+        }
+      } catch (err) {
+        console.error(`[syncStatutLivreur] ❌ Auto-transition error:`, err.message);
+      }
     }
 
     // Cas 1 : Course passée à un statut terminal (annulée ou livrée)
