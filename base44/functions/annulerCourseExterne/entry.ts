@@ -93,9 +93,8 @@ Deno.serve(async (req) => {
         dispatch_status: "en_attente",
         dispatch_wave: 0,
         livreur_id: null,
-        livreur_nom: null,
+        // ⚠️ On GARDE livreur_nom et livreur_telephone pour tracer qui a annulé
         livreur_photo_url: null,
-        livreur_telephone: null,
         livreur_vehicule: null,
         livreur_note_moyenne: 0,
         livreur_nombre_avis: 0,

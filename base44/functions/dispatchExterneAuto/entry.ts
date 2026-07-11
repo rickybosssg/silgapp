@@ -485,8 +485,7 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
     dispatch_status: 'propose',
     dispatch_wave: wave, // 0 = mode normal, 1/2/3 = vague en cours
     livreur_id: '',
-    livreur_nom: '',
-    livreur_telephone: '',
+    // ⚠️ On ne vide pas livreur_nom/livreur_telephone pour préserver la trace du dernier livreur
     heure_sollicitation: new Date().toISOString(),
     timeout_expires_at: timeoutAt,
     dispatch_notified_ids: JSON.stringify(tousNotifies),
