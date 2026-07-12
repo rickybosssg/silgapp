@@ -22,12 +22,12 @@ function cleanPhone(phone, countryCode) {
   // Déjà au format international
   if (digits.startsWith(dial) && digits.length === dial.length + localLen) return digits;
 
-  // Numéro avec préfixe trunk "0" : longueur = localLen + 1 (ex: "075653330" BF)
+  // Numéro avec préfixe trunk "0" : longueur = localLen + 1 (ex: "075653330" BF → 9 chiffres)
   if (digits.startsWith("0") && digits.length === localLen + 1) {
     return dial + digits.slice(1);
   }
 
-  // Numéro local sans préfixe trunk : longueur == localLen (le 0 fait partie du numéro)
+  // Numéro local : longueur == localLen (le 0 fait partie du numéro, ex: "07670733" BF → 8 chiffres)
   if (digits.length === localLen) {
     return dial + digits;
   }
@@ -116,40 +116,39 @@ export default function CourseWindowCard({ courseId, formData, onClose }) {
   const isTerminal = course.statut === "livree" || course.statut === "annulee";
 
   const msgExpediteur = [
-    `✅ *Course SILGAPP confirmée !*`,
+    `✅ *SILGAPP — Course confirmée*`,
     ``,
-    `📦 *Destinataire :* ${destinataireName || "—"}`,
-    `📍 *Adresse de livraison :* ${course.adresse_arrivee || "—"}`,
-    `#️⃣ *N° de course :* ${course.id?.slice(-8) || course.id}`,
+    `📦 Destinataire : ${destinataireName || "—"}`,
+    `📍 Livraison : ${course.adresse_arrivee || "—"}`,
+    `🔖 Réf : ${course.id?.slice(-8) || course.id}`,
     ``,
-    `🔐 *PIN de récupération :* *${course.pickup_code_4_digits}*`,
-    `📱 *QR Code récupération :* ${buildQrUrl(course.pickup_qr_token)}`,
+    `🔑 *Code de récupération : ${course.pickup_code_4_digits}*`,
+    `👉 Donnez ce code au livreur lors de la prise en charge.`,
     ``,
-    `🔗 *Suivez votre course :*`,
-    trackingUrl,
+    `📍 *Suivi en temps réel :*`,
+    `${trackingUrl}`,
     ``,
-    `📲 *Téléchargez SILGAPP :*`,
-    `🤖 *Play Store :* ${SILGAPP_PLAYSTORE}`,
-    `🍎 *App Store :* ${SILGAPP_APPLE}`,
+    `📲 *Téléchargez l'app SILGAPP :*`,
+    `Android → ${SILGAPP_PLAYSTORE}`,
+    `iOS → ${SILGAPP_APPLE}`,
     ``,
-    `Merci ! 🏍️`,
+    `Merci de votre confiance ! 🏍️`,
   ].join("\n");
 
   const msgDestinataire = [
-    `📦 *Un colis vous est destiné !*`,
+    `📦 *SILGAPP — Colis en route vers vous*`,
     ``,
-    `${expediteurName ? `👤 *Expéditeur :* ${expediteurName}` : ""}`,
-    `#️⃣ *N° de course :* ${course.id?.slice(-8) || course.id}`,
+    `${expediteurName ? `👤 Expéditeur : ${expediteurName}\n` : ""}🔖 Réf : ${course.id?.slice(-8) || course.id}`,
     ``,
-    `🔐 *PIN de livraison :* *${course.delivery_code_4_digits}*`,
-    `📱 *QR Code livraison :* ${buildQrUrl(course.delivery_qr_token)}`,
+    `🔑 *Code de livraison : ${course.delivery_code_4_digits}*`,
+    `👉 Présentez ce code au livreur à la réception.`,
     ``,
-    `🔗 *Suivez votre colis :*`,
-    trackingUrl,
+    `📍 *Suivez votre colis :*`,
+    `${trackingUrl}`,
     ``,
-    `📲 *Téléchargez SILGAPP :*`,
-    `🤖 *Play Store :* ${SILGAPP_PLAYSTORE}`,
-    `🍎 *App Store :* ${SILGAPP_APPLE}`,
+    `📲 *Téléchargez l'app SILGAPP :*`,
+    `Android → ${SILGAPP_PLAYSTORE}`,
+    `iOS → ${SILGAPP_APPLE}`,
     ``,
     `Merci ! 🏍️`,
   ].filter(Boolean).join("\n");

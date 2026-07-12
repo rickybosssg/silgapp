@@ -4,7 +4,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Phone, User, Package, Clock, Truck, ArrowDown, Navigation, XCircle, KeyRound, Copy } from "lucide-react";
+import { MapPin, Phone, User, Package, Clock, Truck, ArrowDown, Navigation, XCircle, KeyRound, Copy, RotateCcw } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import CourseStatusBadge from "./CourseStatusBadge";
@@ -36,6 +36,7 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
   const [newStatut, setNewStatut] = React.useState(course?.statut || "");
   const [confirmAnnulation, setConfirmAnnulation] = React.useState(false);
   const [adminEmail, setAdminEmail] = React.useState("");
+  const [reattributing, setReattributing] = React.useState(false);
   const countryMismatch = reseau === "externe" && isPays && course?.country_code && course.country_code !== adminCountryCode;
 
   React.useEffect(() => {
@@ -100,6 +101,47 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
       </Dialog>
     );
   }
+
+  const handleReattribuer = async () => {
+    setReattributing(true);
+    try {
+      let livreurId = course.livreur_id;
+      // Si livreur_id manquant, rechercher par nom
+      if (!livreurId && course.livreur_nom) {
+        const parts = course.livreur_nom.trim().split(/\s+/);
+        const nom = parts.pop() || "";
+        const prenom = parts.join(" ");
+        const filters = [];
+        if (prenom) filters.push({ prenom, nom });
+        filters.push({ nom: course.livreur_nom });
+        let found = null;
+        for (const f of filters) {
+          found = await base44.entities.Livreur.filter(f).catch(() => []);
+          if (found?.length > 0) { found = found[0]; break; }
+        }
+        if (found?.id) livreurId = found.id;
+      }
+      if (!livreurId) {
+        toast.error("Impossible de retrouver ce livreur en base");
+        setReattributing(false);
+        return;
+      }
+      await base44.entities.CourseExterne.update(course.id, {
+        statut: "recherche_livreur",
+        dispatch_status: "accepte",
+        livreur_id: livreurId,
+        heure_acceptation: new Date().toISOString(),
+        notes: (course.notes || "") + "\n[Réattribué au même livreur par admin]",
+      });
+      toast.success("Course réattribuée à " + (course.livreur_nom || "ce livreur"));
+      queryClient.invalidateQueries();
+      onClose();
+    } catch (error) {
+      toast.error("Erreur : " + (error?.message || "réattribution impossible"));
+    } finally {
+      setReattributing(false);
+    }
+  };
 
   const handleStatusUpdate = () => {
     const updateData = { statut: newStatut };
@@ -171,6 +213,25 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
             <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-3">
               <Truck className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-medium">{course.livreur_nom}</span>
+            </div>
+          )}
+
+          {/* Réattribuer au même livreur (course annulée) — placé ici pour être visible immédiatement */}
+          {reseau === "externe" && course.statut === "annulee" && (course.livreur_id || course.livreur_nom) && (
+            <div className="bg-blue-50 border-2 border-blue-300 rounded-xl p-3 space-y-2">
+              <p className="text-xs font-bold text-blue-700 flex items-center gap-1.5">
+                <RotateCcw className="w-3.5 h-3.5" />
+                Réattribuer cette course au même livreur
+              </p>
+              <Button
+                variant="outline"
+                className="w-full border-blue-400 text-blue-700 hover:bg-blue-100 font-bold"
+                disabled={updateMutation.isPending || reattributing}
+                onClick={handleReattribuer}
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Réattribuer à {course.livreur_nom}
+              </Button>
             </div>
           )}
 
