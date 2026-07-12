@@ -36,6 +36,7 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
   const [newStatut, setNewStatut] = React.useState(course?.statut || "");
   const [confirmAnnulation, setConfirmAnnulation] = React.useState(false);
   const [adminEmail, setAdminEmail] = React.useState("");
+  const [reattributing, setReattributing] = React.useState(false);
   const countryMismatch = reseau === "externe" && isPays && course?.country_code && course.country_code !== adminCountryCode;
 
   React.useEffect(() => {
@@ -102,10 +103,33 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
   }
 
   const handleReattribuer = async () => {
+    setReattributing(true);
     try {
+      let livreurId = course.livreur_id;
+      // Si livreur_id manquant, rechercher par nom
+      if (!livreurId && course.livreur_nom) {
+        const parts = course.livreur_nom.trim().split(/\s+/);
+        const nom = parts.pop() || "";
+        const prenom = parts.join(" ");
+        const filters = [];
+        if (prenom) filters.push({ prenom, nom });
+        filters.push({ nom: course.livreur_nom });
+        let found = null;
+        for (const f of filters) {
+          found = await base44.entities.Livreur.filter(f).catch(() => []);
+          if (found?.length > 0) { found = found[0]; break; }
+        }
+        if (found?.id) livreurId = found.id;
+      }
+      if (!livreurId) {
+        toast.error("Impossible de retrouver ce livreur en base");
+        setReattributing(false);
+        return;
+      }
       await base44.entities.CourseExterne.update(course.id, {
         statut: "recherche_livreur",
         dispatch_status: "accepte",
+        livreur_id: livreurId,
         heure_acceptation: new Date().toISOString(),
         notes: (course.notes || "") + "\n[Réattribué au même livreur par admin]",
       });
@@ -114,6 +138,8 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
       onClose();
     } catch (error) {
       toast.error("Erreur : " + (error?.message || "réattribution impossible"));
+    } finally {
+      setReattributing(false);
     }
   };
 
@@ -352,12 +378,12 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
           )}
 
           {/* Réattribuer au même livreur (course annulée) */}
-          {reseau === "externe" && course.statut === "annulee" && course.livreur_id && (
+          {reseau === "externe" && course.statut === "annulee" && (course.livreur_id || course.livreur_nom) && (
             <div className="pt-2">
               <Button
                 variant="outline"
                 className="w-full border-blue-300 text-blue-700 hover:bg-blue-50"
-                disabled={updateMutation.isPending}
+                disabled={updateMutation.isPending || reattributing}
                 onClick={handleReattribuer}
               >
                 <RotateCcw className="w-4 h-4 mr-2" />
