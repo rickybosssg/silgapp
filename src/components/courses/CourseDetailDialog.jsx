@@ -4,7 +4,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Phone, User, Package, Clock, Truck, ArrowDown, Navigation, XCircle, KeyRound, Copy } from "lucide-react";
+import { MapPin, Phone, User, Package, Clock, Truck, ArrowDown, Navigation, XCircle, KeyRound, Copy, RotateCcw } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import CourseStatusBadge from "./CourseStatusBadge";
@@ -100,6 +100,22 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
       </Dialog>
     );
   }
+
+  const handleReattribuer = async () => {
+    try {
+      await base44.entities.CourseExterne.update(course.id, {
+        statut: "recherche_livreur",
+        dispatch_status: "accepte",
+        heure_acceptation: new Date().toISOString(),
+        notes: (course.notes || "") + "\n[Réattribué au même livreur par admin]",
+      });
+      toast.success("Course réattribuée à " + (course.livreur_nom || "ce livreur"));
+      queryClient.invalidateQueries();
+      onClose();
+    } catch (error) {
+      toast.error("Erreur : " + (error?.message || "réattribution impossible"));
+    }
+  };
 
   const handleStatusUpdate = () => {
     const updateData = { statut: newStatut };
@@ -332,6 +348,21 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
                 senderId={adminEmail || "admin"}
                 senderName="Admin SILGAPP"
               />
+            </div>
+          )}
+
+          {/* Réattribuer au même livreur (course annulée) */}
+          {reseau === "externe" && course.statut === "annulee" && course.livreur_id && (
+            <div className="pt-2">
+              <Button
+                variant="outline"
+                className="w-full border-blue-300 text-blue-700 hover:bg-blue-50"
+                disabled={updateMutation.isPending}
+                onClick={handleReattribuer}
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Réattribuer à {course.livreur_nom}
+              </Button>
             </div>
           )}
 
