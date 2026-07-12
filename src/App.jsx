@@ -11,6 +11,7 @@ import SelectionReseau from './pages/SelectionReseau.jsx';
 import AppMaintenanceGate from './components/admin/AppMaintenanceGate.jsx';
 import { restoreTokenFromCookie, syncTokenFromPreferences, clearPersistedToken } from '@/lib/authPersistence';
 import { trackAppInstall } from '@/lib/trackInstall';
+import IOSAppStoreBanner from './components/IOSAppStoreBanner.jsx';
 
 // LoadingScreen défini IMMÉDIATEMENT avant lazy loading
 const LoadingScreen = () => <SplashScreen />;
@@ -425,6 +426,7 @@ function AppWithProviders() {
   return (
     <QueryClientProvider client={queryClientInstance}>
       <App />
+      <IOSAppStoreBanner />
     </QueryClientProvider>
   );
 }
