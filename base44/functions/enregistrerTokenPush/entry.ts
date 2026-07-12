@@ -57,13 +57,18 @@ Deno.serve(async (req) => {
     if (existingTokens.length > 0) {
       await base44.asServiceRole.entities.NotificationToken.update(existingTokens[0].id, payload);
       if (!String(token).startsWith('web_')) {
+        const currentCreatedMs = new Date(existingTokens[0].created_date || Date.now()).getTime();
         const sameUserTokens = await base44.asServiceRole.entities.NotificationToken.filter({
           user_email: normalizedEmail,
           user_type: resolvedUserType,
           actif: true,
         });
         await Promise.all((sameUserTokens || [])
-          .filter(item => item.id !== existingTokens[0].id && !String(item.token || '').startsWith('web_'))
+          .filter(item =>
+            item.id !== existingTokens[0].id &&
+            !String(item.token || '').startsWith('web_') &&
+            new Date(item.created_date || 0).getTime() < currentCreatedMs
+          )
           .map(item => base44.asServiceRole.entities.NotificationToken.update(item.id, { actif: false })));
       }
       console.log('[enregistrerTokenPush] Token updated', {
@@ -77,13 +82,18 @@ Deno.serve(async (req) => {
 
     const created = await base44.asServiceRole.entities.NotificationToken.create(payload);
     if (!String(token).startsWith('web_')) {
+      const currentCreatedMs = new Date(created.created_date || Date.now()).getTime();
       const sameUserTokens = await base44.asServiceRole.entities.NotificationToken.filter({
         user_email: normalizedEmail,
         user_type: resolvedUserType,
         actif: true,
       });
       await Promise.all((sameUserTokens || [])
-        .filter(item => item.id !== created.id && !String(item.token || '').startsWith('web_'))
+        .filter(item =>
+          item.id !== created.id &&
+          !String(item.token || '').startsWith('web_') &&
+          new Date(item.created_date || 0).getTime() < currentCreatedMs
+        )
         .map(item => base44.asServiceRole.entities.NotificationToken.update(item.id, { actif: false })));
     }
     console.log('[enregistrerTokenPush] Token created', {
