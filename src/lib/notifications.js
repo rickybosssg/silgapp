@@ -490,8 +490,21 @@ async function cleanupDuplicateNativeTokens({ token, userEmail, userType }) {
       actif: true,
     });
 
+    // Find the current token's record to get its created_date
+    const currentToken = (tokens || []).find((item) => item.token === token);
+    const currentCreatedMs = currentToken
+      ? new Date(currentToken.created_date || Date.now()).getTime()
+      : Date.now();
+
+    // Only deactivate tokens that are OLDER than the current one
+    // This prevents race conditions where two simultaneous registrations
+    // deactivate each other
     await Promise.all((tokens || [])
-      .filter((item) => item.token !== token && !String(item.token || "").startsWith("web_"))
+      .filter((item) =>
+        item.token !== token &&
+        !String(item.token || "").startsWith("web_") &&
+        new Date(item.created_date || 0).getTime() < currentCreatedMs
+      )
       .map((item) => base44.entities.NotificationToken.update(item.id, { actif: false })));
   } catch (error) {
     savePushDebug("token-cleanup-skipped", { error: error?.message || String(error) });
