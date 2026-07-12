@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.38';
 
 const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -420,6 +420,7 @@ Deno.serve(async (req) => {
             badge: 1,
             'content-available': 1,
             'mutable-content': 1,
+            'interruption-level': 'time-sensitive',
           },
           ...dataPayload,
         },
@@ -475,7 +476,7 @@ Deno.serve(async (req) => {
             badge: 1,
             'content-available': 1,
             'mutable-content': 1,
-            interruptionLevel: 'time-sensitive',
+            'interruption-level': 'time-sensitive',
           },
           ...dataPayload,
         },
