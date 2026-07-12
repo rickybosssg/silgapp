@@ -22,18 +22,11 @@ function cleanPhone(phone, countryCode) {
   // Déjà au format international
   if (digits.startsWith(dial) && digits.length === dial.length + localLen) return digits;
 
-  // Numéro avec préfixe trunk "0" : longueur = localLen + 1 (ex: "075653330" BF)
-  if (digits.startsWith("0") && digits.length === localLen + 1) {
-    return dial + digits.slice(1);
-  }
+  // ── E.164 : toujours retirer le 0 initial (préfixe trunk) ──
+  // wa.me n'accepte JAMAIS de "0" après l'indicatif pays.
+  // Cela couvre tous les cas : "075653330" (9 chiffres), "07670733" (8 chiffres), etc.
+  while (digits.startsWith("0")) digits = digits.slice(1);
 
-  // Numéro local sans préfixe trunk : longueur == localLen (le 0 fait partie du numéro)
-  if (digits.length === localLen) {
-    return dial + digits;
-  }
-
-  // Fallback : retirer le 0 initial si présent et préfixer l'indicatif
-  if (digits.startsWith("0")) digits = digits.slice(1);
   return dial + digits;
 }
 
