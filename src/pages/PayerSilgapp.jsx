@@ -237,7 +237,7 @@ export default function PayerSilgapp({ userType: forcedType }) {
                       <p className="text-xs text-gray-400">Cliquer pour ajouter une photo</p>
                     </>
                   )}
-                  <input type="file" accept="image/*" capture="environment" className="hidden"
+                  <input type="file" accept="image/*" className="hidden"
                     onChange={e => handleUpload(e.target.files?.[0])} disabled={uploading} />
                 </label>
               )}
