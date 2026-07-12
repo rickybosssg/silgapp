@@ -216,6 +216,25 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
             </div>
           )}
 
+          {/* Réattribuer au même livreur (course annulée) — placé ici pour être visible immédiatement */}
+          {reseau === "externe" && course.statut === "annulee" && (course.livreur_id || course.livreur_nom) && (
+            <div className="bg-blue-50 border-2 border-blue-300 rounded-xl p-3 space-y-2">
+              <p className="text-xs font-bold text-blue-700 flex items-center gap-1.5">
+                <RotateCcw className="w-3.5 h-3.5" />
+                Réattribuer cette course au même livreur
+              </p>
+              <Button
+                variant="outline"
+                className="w-full border-blue-400 text-blue-700 hover:bg-blue-100 font-bold"
+                disabled={updateMutation.isPending || reattributing}
+                onClick={handleReattribuer}
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Réattribuer à {course.livreur_nom}
+              </Button>
+            </div>
+          )}
+
           {/* Timestamps */}
           <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
             <div className="flex items-center gap-1">
@@ -374,21 +393,6 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
                 senderId={adminEmail || "admin"}
                 senderName="Admin SILGAPP"
               />
-            </div>
-          )}
-
-          {/* Réattribuer au même livreur (course annulée) */}
-          {reseau === "externe" && course.statut === "annulee" && (course.livreur_id || course.livreur_nom) && (
-            <div className="pt-2">
-              <Button
-                variant="outline"
-                className="w-full border-blue-300 text-blue-700 hover:bg-blue-50"
-                disabled={updateMutation.isPending || reattributing}
-                onClick={handleReattribuer}
-              >
-                <RotateCcw className="w-4 h-4 mr-2" />
-                Réattribuer à {course.livreur_nom}
-              </Button>
             </div>
           )}
 
