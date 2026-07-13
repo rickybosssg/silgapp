@@ -236,7 +236,7 @@ export default function ProposedLivreursList({ course }) {
                   Accepté
                 </span>
               ) : (
-                <span className="flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded-full shrink-0">
+                <span className="flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-100 px-2 py-1 rounded-full shrink-0">
                   <Clock className="w-3 h-3" />
                   Notifié
                 </span>
