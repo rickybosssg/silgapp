@@ -111,46 +111,46 @@ export default function CourseWindowCard({ courseId, formData, onClose }) {
   const expediteurPhone = course.expediteur_telephone || course.client_telephone || formData?.expediteurTelephone || formData?.clientTelephone || "";
   const destinatairePhone = course.destinataire_telephone || formData?.destinataireTelephone || "";
   const expediteurName = course.expediteur_nom || course.client_nom || formData?.expediteurNom || formData?.clientNom || "Client";
-  const destinataireName = course.destinataire_nom || formData?.destinataireNom || "Destinataire";
+  const destinataireName = course.destinataire_nom || formData?.destinataireNom || "";
   const statutInfo = STATUT_LABELS[course.statut] || { label: course.statut, color: "text-gray-600 bg-gray-100" };
   const isTerminal = course.statut === "livree" || course.statut === "annulee";
 
   const msgExpediteur = [
-    `✅ *SILGAPP — Course confirmée*`,
+    `*SILGAPP — Course confirmee*`,
     ``,
-    `📦 Destinataire : ${destinataireName || "—"}`,
-    `📍 Livraison : ${course.adresse_arrivee || "—"}`,
-    `🔖 Réf : ${course.id?.slice(-8) || course.id}`,
+    `Destinataire : ${destinataireName || "—"}`,
+    `Livraison : ${course.adresse_arrivee || "—"}`,
+    `Ref : ${course.id?.slice(-8) || course.id}`,
     ``,
-    `🔑 *Code de récupération : ${course.pickup_code_4_digits}*`,
-    `👉 Donnez ce code au livreur lors de la prise en charge.`,
+    `*Code de recuperation : ${course.pickup_code_4_digits}*`,
+    `Donnez ce code au livreur lors de la prise en charge.`,
     ``,
-    `📍 *Suivi en temps réel :*`,
+    `*Suivi en temps reel :*`,
     `${trackingUrl}`,
     ``,
-    `📲 *Téléchargez l'app SILGAPP :*`,
-    `Android → ${SILGAPP_PLAYSTORE}`,
-    `iOS → ${SILGAPP_APPLE}`,
+    `*Telechargez l'app SILGAPP :*`,
+    `Android : ${SILGAPP_PLAYSTORE}`,
+    `iOS : ${SILGAPP_APPLE}`,
     ``,
-    `Merci de votre confiance ! 🏍️`,
+    `Merci de votre confiance !`,
   ].join("\n");
 
   const msgDestinataire = [
-    `📦 *SILGAPP — Colis en route vers vous*`,
+    `*SILGAPP — Colis en route vers vous*`,
     ``,
-    `${expediteurName ? `👤 Expéditeur : ${expediteurName}\n` : ""}🔖 Réf : ${course.id?.slice(-8) || course.id}`,
+    `${expediteurName ? `Expediteur : ${expediteurName}\n` : ""}Ref : ${course.id?.slice(-8) || course.id}`,
     ``,
-    `🔑 *Code de livraison : ${course.delivery_code_4_digits}*`,
-    `👉 Présentez ce code au livreur à la réception.`,
+    `*Code de livraison : ${course.delivery_code_4_digits}*`,
+    `Presentez ce code au livreur a la reception.`,
     ``,
-    `📍 *Suivez votre colis :*`,
+    `*Suivez votre colis :*`,
     `${trackingUrl}`,
     ``,
-    `📲 *Téléchargez l'app SILGAPP :*`,
-    `Android → ${SILGAPP_PLAYSTORE}`,
-    `iOS → ${SILGAPP_APPLE}`,
+    `*Telechargez l'app SILGAPP :*`,
+    `Android : ${SILGAPP_PLAYSTORE}`,
+    `iOS : ${SILGAPP_APPLE}`,
     ``,
-    `Merci ! 🏍️`,
+    `Merci !`,
   ].filter(Boolean).join("\n");
 
   const copyTracking = () => {
