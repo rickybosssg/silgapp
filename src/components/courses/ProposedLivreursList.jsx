@@ -36,6 +36,15 @@ export default function ProposedLivreursList({ course }) {
     ? Math.max(1, Math.round((expiresTs - sollicitationTs) / 1000))
     : 120;
 
+  // ── Estimation du prochain tick du moteur de dispatch (toutes les 5 min = 300s) ──
+  // Le tick est indépendant du timeout : il tourne sur son propre intervalle.
+  // On estime le reste jusqu'au prochain tick depuis updated_date de la course.
+  const DISPATCH_TICK_SEC = 300;
+  const updatedTs = course?.updated_date ? new Date(course.updated_date).getTime() : null;
+  const nextTickIn = updatedTs
+    ? Math.max(0, DISPATCH_TICK_SEC - (Math.floor((now - updatedTs) / 1000) % DISPATCH_TICK_SEC))
+    : null;
+
   useEffect(() => {
     let mounted = true;
     const fetchLivreurs = async () => {
@@ -169,21 +178,23 @@ export default function ProposedLivreursList({ course }) {
             </div>
           )}
 
-          {/* Action 4 : Prochaine vague prévue */}
-          <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
-            <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-              <Search className="w-3.5 h-3.5 text-gray-500" />
+          {/* Action 4 : Prochain tick de relance dispatch */}
+          {nextTickIn !== null && (
+            <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
+              <div className="w-6 h-6 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
+                <Zap className="w-3.5 h-3.5 text-amber-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-semibold text-gray-600">Prochain tick de relance</p>
+                <p className="text-[10px] text-gray-400">
+                  {isExpired
+                    ? `Vague #${(course?.dispatch_wave || 0) + 1} lancée au prochain tick`
+                    : `Moteur dispatch — vérification auto`}
+                </p>
+              </div>
+              <span className="text-sm font-bold text-amber-600 tabular-nums">~{fmtSec(nextTickIn)}</span>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-semibold text-gray-600">Prochaine action</p>
-              <p className="text-[10px] text-gray-400">
-                {isExpired
-                  ? `Vague #${(course?.dispatch_wave || 0) + 1} — recherche de nouveaux livreurs`
-                  : `Vague #${(course?.dispatch_wave || 0) + 1} après expiration`}
-              </p>
-            </div>
-            <Zap className="w-3.5 h-3.5 text-amber-500" />
-          </div>
+          )}
         </div>
       )}
       {isCycleEpuise && (
