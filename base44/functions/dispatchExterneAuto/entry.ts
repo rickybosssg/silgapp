@@ -440,6 +440,7 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
       await base44.asServiceRole.entities.CourseExterne.update(courseId, {
         dispatch_status: 'en_attente',
         dispatch_notified_ids: '[]',
+        dispatch_wave_notified_ids: '[]',
         dispatch_wave: 0,
         livreur_id: '',
         livreur_nom: '',
@@ -993,6 +994,7 @@ Deno.serve(async (req) => {
             await base44.asServiceRole.entities.CourseExterne.update(course.id, {
               dispatch_status: 'en_attente',
               dispatch_notified_ids: '[]',
+              dispatch_wave_notified_ids: '[]',
               dispatch_wave: 0,
               livreur_id: '',
               livreur_nom: '',

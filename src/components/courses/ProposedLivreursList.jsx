@@ -39,20 +39,13 @@ export default function ProposedLivreursList({ course }) {
   useEffect(() => {
     let mounted = true;
     const fetchLivreurs = async () => {
-      // ── Priorité : dispatch_wave_notified_ids (livreurs de la vague EN COURS)
-      //    Fallback : dispatch_notified_ids (tous les livreurs notifiés — anciennes données)
+      // ── Afficher UNIQUEMENT les livreurs de la vague en cours
+      //    (dispatch_wave_notified_ids est réinitialisé à chaque nouvelle vague par le backend)
       let notifiedIds = [];
       try {
         notifiedIds = JSON.parse(course.dispatch_wave_notified_ids || "[]");
       } catch {
         notifiedIds = [];
-      }
-      if (notifiedIds.length === 0) {
-        try {
-          notifiedIds = JSON.parse(course.dispatch_notified_ids || "[]");
-        } catch {
-          notifiedIds = [];
-        }
       }
       if (notifiedIds.length === 0) {
         if (mounted) { setLivreurs([]); setLoading(false); }
@@ -71,7 +64,7 @@ export default function ProposedLivreursList({ course }) {
     };
     fetchLivreurs();
     return () => { mounted = false; };
-  }, [course?.id, course?.dispatch_wave_notified_ids, course?.dispatch_notified_ids]);
+  }, [course?.id, course?.dispatch_wave_notified_ids]);
 
   if (loading) {
     return (
