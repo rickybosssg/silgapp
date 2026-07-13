@@ -127,13 +127,15 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
         return;
       }
       await base44.entities.CourseExterne.update(course.id, {
-        statut: "recherche_livreur",
+        statut: "livreur_en_route",
         dispatch_status: "accepte",
         livreur_id: livreurId,
         heure_acceptation: new Date().toISOString(),
         notes: (course.notes || "") + "\n[Réattribué au même livreur par admin]",
       });
-      toast.success("Course réattribuée à " + (course.livreur_nom || "ce livreur"));
+      // Remettre le livreur en course
+      await base44.entities.Livreur.update(livreurId, { statut: "en_course" });
+      toast.success("Course réattribuée à " + (course.livreur_nom || "ce livreur") + " — statut: En route");
       queryClient.invalidateQueries();
       onClose();
     } catch (error) {
