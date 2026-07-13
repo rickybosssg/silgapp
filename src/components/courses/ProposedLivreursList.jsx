@@ -31,6 +31,11 @@ export default function ProposedLivreursList({ course }) {
   const remainingSec = expiresTs ? Math.max(0, Math.floor((expiresTs - now) / 1000)) : null;
   const isExpired = expiresTs ? now >= expiresTs : false;
 
+  // ── Durée totale du timeout pour la barre de progression (dynamique selon heure_sollicitation) ──
+  const totalTimeoutSec = (sollicitationTs && expiresTs)
+    ? Math.max(1, Math.round((expiresTs - sollicitationTs) / 1000))
+    : 120;
+
   useEffect(() => {
     let mounted = true;
     const fetchLivreurs = async () => {
@@ -150,7 +155,7 @@ export default function ProposedLivreursList({ course }) {
                 <p className="text-[11px] font-semibold text-gray-700">Attente de réponse</p>
                 <p className="text-[10px] text-gray-400">expire dans {fmtSec(remainingSec)}</p>
                 <div className="mt-1 h-1.5 bg-blue-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, (remainingSec / 60) * 100)}%` }} />
+                  <div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, (remainingSec / totalTimeoutSec) * 100)}%` }} />
                 </div>
               </div>
               <span className="text-lg font-black text-blue-600 tabular-nums">{fmtSec(remainingSec)}</span>
