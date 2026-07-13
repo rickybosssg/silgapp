@@ -116,7 +116,7 @@ export default function CourseWindowCard({ courseId, formData, onClose }) {
   const isTerminal = course.statut === "livree" || course.statut === "annulee";
 
   const msgExpediteur = [
-    `*SILGAPP — Course confirmee*`,
+    `*COURSE SILGAPP*`,
     ``,
     `Destinataire : ${destinataireName || "—"}`,
     `Livraison : ${course.adresse_arrivee || "—"}`,
