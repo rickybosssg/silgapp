@@ -406,6 +406,10 @@
     "dispatch_notified_ids": {
       "type": "string"
     },
+    "dispatch_wave_notified_ids": {
+      "type": "string",
+      "description": "JSON: IDs des livreurs notifi\u00e9s pour la vague EN COURS uniquement (r\u00e9initialis\u00e9 \u00e0 chaque nouvelle vague)"
+    },
     "dispatch_refused_ids": {
       "type": "string",
       "description": "JSON: IDs des livreurs ayant explicitement refuse la course (exclusion permanente, survit au reset de cycle)"

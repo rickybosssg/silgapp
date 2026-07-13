@@ -491,6 +491,7 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
     heure_sollicitation: new Date().toISOString(),
     timeout_expires_at: timeoutAt,
     dispatch_notified_ids: JSON.stringify(tousNotifies),
+    dispatch_wave_notified_ids: JSON.stringify(nouveauxNotifiedIds),
   });
 
   // 🧹 Nettoyer les notifications de la vague précédente avant la nouvelle vague
