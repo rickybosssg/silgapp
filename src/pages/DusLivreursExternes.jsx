@@ -271,7 +271,7 @@ export default function DusLivreursExternes() {
     // Livreurs avec solde dû > 0 même sans course dans la période
     livreurs.forEach(l => {
       if (map[l.id]) return;
-      const du = l.montant_du_silga ?? 0;
+      const du = l.encours ?? 0;
       if (du > 0) {
         map[l.id] = { id: l.id, nom: l.nom || "Inconnu", prenom: l.prenom || "", telephone: l.telephone || "", livreurInfo: l, courses: [], montantTotal: 0, commissionTotal: 0, montantPaye: 0, montantDu: du };
       }
@@ -279,8 +279,8 @@ export default function DusLivreursExternes() {
     Object.values(map).forEach(entry => {
       const info = entry.livreurInfo;
       if (info) {
-        // montant_du_silga est la source de vérité — 0 signifie 0
-        entry.montantDu = info.montant_du_silga ?? 0;
+        // encours est la source de vérité (commissions accumulées non réglées)
+        entry.montantDu = info.encours ?? 0;
         entry.montantPaye = Math.max(0, entry.commissionTotal - entry.montantDu);
       } else {
         // Pas d'info livreur — calcul de secours basé sur les courses
@@ -339,7 +339,7 @@ export default function DusLivreursExternes() {
     mutationFn: async ({ entry, montant }) => {
       const nouveauSolde = Math.max(0, (entry.montantDu ?? 0) - montant);
       const impayees = nouveauSolde === 0 ? entry.courses.filter(c => c.statut_paiement_livreur !== "paye").map(c => c.id) : [];
-      const res = await base44.functions.invoke("updateLivreur", { id: entry.id, data: { montant_du_silga: nouveauSolde }, mark_courses_paid: impayees });
+      const res = await base44.functions.invoke("updateLivreur", { id: entry.id, data: { encours: nouveauSolde, montant_du_silga: nouveauSolde }, mark_courses_paid: impayees });
       if (res?.data && res.data.success === false) throw new Error(res.data.error || "Échec");
       return { nouveauSolde, montant, entry };
     },
@@ -350,7 +350,7 @@ export default function DusLivreursExternes() {
       const prevCourses = queryClient.getQueryData(["courses-externes-livrees", effectiveCountry]);
       const prevLivreurs = queryClient.getQueryData(["livreurs-externes-all", effectiveCountry]);
       queryClient.setQueryData(["livreurs-externes-all", effectiveCountry], (old) =>
-        (old || []).map(l => l.id === entry.id ? { ...l, montant_du_silga: nouveauSolde } : l));
+        (old || []).map(l => l.id === entry.id ? { ...l, encours: nouveauSolde, montant_du_silga: nouveauSolde } : l));
       if (nouveauSolde === 0) {
         queryClient.setQueryData(["courses-externes-livrees", effectiveCountry], (old) =>
           (old || []).map(c => entry.courses.some(ec => ec.id === c.id) ? { ...c, statut_paiement_livreur: "paye" } : c));
