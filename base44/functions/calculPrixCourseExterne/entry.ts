@@ -95,8 +95,8 @@ Deno.serve(async (req) => {
     const prixBrut = distanceReelle * tarif.prix_par_km;
     const prixFinal = Math.max(Math.round(prixBrut), tarif.prix_minimum, PRIX_MINIMUM_GLOBAL);
 
-    // Commission Silga et montant livreur
-    const commissionRate = (tarif.commission_pct || 30) / 100;
+    // Commission Silga et montant livreur — 20% appliqués à TOUS les livreurs
+    const commissionRate = (tarif.commission_pct || 20) / 100;
     const commissionSilga = Math.round(prixFinal * commissionRate);
     const montantLivreur = prixFinal - commissionSilga;
 
@@ -110,13 +110,15 @@ Deno.serve(async (req) => {
       heure_livraison: new Date().toISOString(),
     });
 
-    // Mettre à jour le montant dû par le livreur à Silga
+    // Accumuler la commission dans l'encours du livreur (source de vérité unique)
+    // + garder montant_du_silga synchronisé pour rétrocompatibilité
     if (course.livreur_id) {
       const livreur = await base44.asServiceRole.entities.Livreur.get(course.livreur_id);
       if (livreur) {
-        const nouveauMontantDu = (livreur.montant_du_silga || 0) + commissionSilga;
+        const nouvelEncours = (livreur.encours || 0) + commissionSilga;
         await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
-          montant_du_silga: nouveauMontantDu,
+          encours: nouvelEncours,
+          montant_du_silga: nouvelEncours,
           statut_paiement: 'non_paye',
         });
       }

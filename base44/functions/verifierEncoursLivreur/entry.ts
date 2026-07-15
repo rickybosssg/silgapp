@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, error: 'Livreur introuvable' }, { status: 404 });
     }
 
-    // Si déjà bloqué, ne rien faire (pas accumuler)
+    // Si déjà bloqué, ne rien faire
     if (livreur.bloque_encours) {
       return Response.json({ success: true, skipped: true, reason: 'deja_bloque' });
     }
@@ -70,34 +70,19 @@ Deno.serve(async (req) => {
     const seuil = countries?.[0]?.seuil_encours_max || 5000;
     const devise = countries?.[0]?.devise || 'FCFA';
 
-    // Calculer la commission de cette course
-    let commission = 0;
-    if (course.commission_silga && course.commission_silga > 0) {
-      commission = course.commission_silga;
-    } else if (course.prix_final && course.prix_final > 0) {
-      const pct = countries?.[0]?.commission_pct ?? 20;
-      commission = Math.round(course.prix_final * (pct / 100));
-    }
-
-    if (commission <= 0) {
-      return Response.json({ success: true, skipped: true, reason: 'commission_nulle' });
-    }
-
-    // Accumuler l'encours
-    const encoursAvant = livreur.encours || 0;
-    const nouvelEncours = encoursAvant + commission;
+    // L'encours a déjà été accumulé par calculPrixCourseExterne — on lit la valeur courante
+    const nouvelEncours = livreur.encours || 0;
 
     // Pourcentage du seuil atteint
     const pourcentage = Math.round((nouvelEncours / seuil) * 100);
 
-    console.log(`[ENCOURS] Livreur ${livreurId} (${livreur.nom}): ${encoursAvant} → ${nouvelEncours} (${pourcentage}% du seuil ${seuil} ${devise})`);
+    console.log(`[ENCOURS] Livreur ${livreurId} (${livreur.nom}): ${nouvelEncours} (${pourcentage}% du seuil ${seuil} ${devise})`);
 
     const now = new Date().toISOString();
 
     // ── BLOCAGE : ≥ 100% du seuil ──
     if (nouvelEncours >= seuil) {
       await base44.asServiceRole.entities.Livreur.update(livreurId, {
-        encours: nouvelEncours,
         bloque_encours: true,
         encours_bloque_at: now,
         statut: 'hors_ligne',
@@ -112,7 +97,7 @@ Deno.serve(async (req) => {
         livreur_nom: `${livreur.prenom || ''} ${livreur.nom || ''}`.trim(),
         livreur_telephone: livreur.telephone || '',
         pays_code: countryCode,
-        encours_avant: encoursAvant,
+        encours_avant: nouvelEncours,
         encours_apres: nouvelEncours,
         seuil_applicable: seuil,
         pourcentage_atteint: pourcentage,
@@ -190,11 +175,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Mettre à jour l'encours
-    await base44.asServiceRole.entities.Livreur.update(livreurId, {
-      encours: nouvelEncours,
-    });
-
+    // L'encours est déjà à jour (mis à jour par calculPrixCourseExterne)
     return Response.json({
       success: true,
       bloque: false,
