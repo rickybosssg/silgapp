@@ -8,9 +8,10 @@ import { toast } from "sonner";
 import {
   ArrowLeft, Users, UserCheck, UserX, Phone, Mail, MapPin,
   Ban, CheckCircle2, RefreshCw, Bike, Car, Truck,
-  XCircle, Banknote, Star, Wifi, WifiOff, Power, PowerOff
+  XCircle, Banknote, Star, Wifi, WifiOff, Power, PowerOff, Send
 } from "lucide-react";
 import CreateLivreurDialog from "@/components/livreurs/CreateLivreurDialog";
+import EmailLivreursModal from "@/components/livreurs/EmailLivreursModal";
 import NotationLivreurPanel from "@/components/admin/NotationLivreurPanel";
 import LivreurPhotoUploader from "@/components/livreur/LivreurPhotoUploader";
 import AdminStatutLivreurPanel from "@/components/livreurs/AdminStatutLivreurPanel";
@@ -325,6 +326,7 @@ export default function LivreursExternes() {
   const queryClient = useQueryClient();
   const [selectedLivreur, setSelectedLivreur] = useState(null);
   const [filterStatut, setFilterStatut] = useState("tous");
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
   const { isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
   const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
 
@@ -482,9 +484,26 @@ export default function LivreursExternes() {
             <RefreshCw className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Resync tous</span>
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
+            onClick={() => setEmailModalOpen(true)}
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Email tous</span>
+          </Button>
           <CreateLivreurDialog reseau="externe" countryCode={effectiveCountry} />
         </div>
       </div>
+
+      {/* Modal envoi email groupé */}
+      {emailModalOpen && (
+        <EmailLivreursModal
+          onClose={() => setEmailModalOpen(false)}
+          countryCode={effectiveCountry}
+        />
+      )}
 
       {/* Statistiques — harmonisées avec la carte dispatch */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
