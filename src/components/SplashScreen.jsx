@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from "react";
 
 export default function SplashScreen() {
   // CRITICAL FIX: Use useMemo to ensure stars are generated AFTER React initialization

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo } from "react";
+import { createContext, useContext, useMemo } from "react";
 import { getLanguageForCountry, t as translate } from "@/lib/i18n";
 
 const I18nContext = createContext({ lang: "fr", t: (s) => s, countryCode: null });

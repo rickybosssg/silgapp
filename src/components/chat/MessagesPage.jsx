@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Send, Loader2, MessageCircle, User, Truck, Shield, UserPlus, Users, ImagePlus, Store } from "lucide-react";
@@ -24,7 +24,7 @@ function ConversationItem({ conv, myType, myId, active, onClick }) {
   const roleKey = otherParticipant?.type || (conv.group_type === "group" ? "group" : "client");
 
   // Détermine si la conversation est non lue
-  const isUnread = React.useMemo(() => {
+  const isUnread = useMemo(() => {
     if (!conv.last_message_date) return false;
     if (conv.last_sender_type === myType) return false; // dernier message = moi → lu
     if (myType === "admin") {

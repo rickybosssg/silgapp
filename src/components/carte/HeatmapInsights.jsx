@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { TrendingUp, Users, Target, AlertTriangle, CheckCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
