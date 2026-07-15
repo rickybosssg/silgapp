@@ -74,8 +74,17 @@ Deno.serve(async (req) => {
         }
       } else if (paiement.user_type === 'client') {
         const frais = await base44.asServiceRole.entities.FraisAnnulation.filter({ client_id: paiement.user_id, statut_paiement: 'non_paye' });
+        let reste = paiement.montant_paye;
         for (const f of (frais || [])) {
-          await base44.asServiceRole.entities.FraisAnnulation.update(f.id, { statut_paiement: 'paye', paye_at: new Date().toISOString() });
+          if (reste <= 0) break;
+          const m = f.montant || 0;
+          if (m <= reste) {
+            await base44.asServiceRole.entities.FraisAnnulation.update(f.id, { statut_paiement: 'paye', paye_at: new Date().toISOString() });
+            reste -= m;
+          } else {
+            await base44.asServiceRole.entities.FraisAnnulation.update(f.id, { montant: m - reste });
+            reste = 0;
+          }
         }
       } else if (paiement.user_type === 'boutique') {
         const boutiques = await base44.asServiceRole.entities.Boutique.filter({ id: paiement.user_id });
