@@ -52,7 +52,15 @@ function isLivreurNoir(livreur, livreurIdsEnCourseReelle) {
   if (livreur.validation !== "valide") return true;
   // 🎯 En course = avec course ACTIVE (peu importe le statut DB)
   if (livreurIdsEnCourseReelle?.has(livreur.id)) return false;
-  // Disponible avec GPS = vert (même si GPS/heartbeat ancien)
+  // GPS expiré (> 1 heure) → masqué de la carte
+  const gpsDt = livreur.derniere_position_date || livreur.last_seen_at;
+  if (gpsDt) {
+    const minutes = (Date.now() - new Date(gpsDt).getTime()) / 60000;
+    if (minutes > 60) return true;
+  } else {
+    return true; // pas de date GPS → masqué
+  }
+  // Disponible avec GPS récent = vert
   if (livreur.statut === "disponible") return false;
   return true;
 }
