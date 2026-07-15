@@ -494,6 +494,14 @@ export default function CourseExterneFormSync() {
       console.warn("[CourseForm] Impossible de relire le profil client, fallback local:", err.message);
     }
 
+    // ── Vérifier si le client est bloqué pour frais d'annulation impayés ──
+    if (clientFromDB?.bloque_frais_annulation) {
+      toast.error("Votre compte est bloqué : frais d'annulation impayés supérieurs à 2 000 FCFA. Veuillez régulariser votre situation.");
+      navigate("/payer-silgapp");
+      setIsSubmitting(false);
+      return;
+    }
+
     const courseCountryCode = clientFromDB?.country_code || clientProfil?.country_code || "";
     if (!courseCountryCode) {
       console.error("[CourseForm] country_code manquant sur clientFromDB:", clientFromDB);

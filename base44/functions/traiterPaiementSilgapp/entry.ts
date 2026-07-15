@@ -86,6 +86,12 @@ Deno.serve(async (req) => {
             reste = 0;
           }
         }
+        // Débloquer le client si le reste à payer est sous le seuil de 2000 FCFA
+        const remainingFrais = await base44.asServiceRole.entities.FraisAnnulation.filter({ client_id: paiement.user_id, statut_paiement: 'non_paye' });
+        const totalRemaining = (remainingFrais || []).reduce((s, f) => s + (f.montant || 0), 0);
+        if (totalRemaining < 2000) {
+          await base44.asServiceRole.entities.ClientExterne.update(paiement.user_id, { bloque_frais_annulation: false });
+        }
       } else if (paiement.user_type === 'boutique') {
         const boutiques = await base44.asServiceRole.entities.Boutique.filter({ id: paiement.user_id });
         if (boutiques?.[0]) {

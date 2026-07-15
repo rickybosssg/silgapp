@@ -147,6 +147,14 @@ export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, 
           raison: "Annulation après acceptation livreur",
           date_annulation: new Date().toISOString(),
         });
+
+        // Vérifier si le client dépasse le seuil de blocage (2000 FCFA)
+        const allFrais = await base44.entities.FraisAnnulation.filter({ client_id: clientId, statut_paiement: "impaye" });
+        const totalImpaye = (allFrais || []).reduce((s, f) => s + (f.montant || 0), 0);
+        if (totalImpaye >= 2000) {
+          await base44.entities.ClientExterne.update(clientId, { bloque_frais_annulation: true });
+          toast.error(`Compte bloqué : ${totalImpaye.toLocaleString()} FCFA de frais impayés. Régularisez via Payer SILGAPP.`);
+        }
       }
 
       // 3. Notifier le livreur
