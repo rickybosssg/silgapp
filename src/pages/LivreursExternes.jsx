@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import {
   ArrowLeft, Users, UserCheck, UserX, Phone, Mail, MapPin,
   Ban, CheckCircle2, RefreshCw, Bike, Car, Truck,
-  XCircle, Banknote, Star, Wifi, WifiOff, Power, PowerOff, Send
+  XCircle, Banknote, Star, Wifi, WifiOff, Power, PowerOff, Send, Search
 } from "lucide-react";
 import CreateLivreurDialog from "@/components/livreurs/CreateLivreurDialog";
 import EmailLivreursModal from "@/components/livreurs/EmailLivreursModal";
@@ -327,6 +327,7 @@ export default function LivreursExternes() {
   const [selectedLivreur, setSelectedLivreur] = useState(null);
   const [filterStatut, setFilterStatut] = useState("tous");
   const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const { isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
   const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
 
@@ -374,6 +375,18 @@ export default function LivreursExternes() {
     if (filterStatut === "en_attente")  return livreurs.filter(l => l.validation === "en_attente");
     return livreurs;
   }, [livreurs, filterStatut]);
+
+  const livreursRecherches = useMemo(() => {
+    if (!searchQuery.trim()) return livreursFiltres;
+    const q = searchQuery.trim().toLowerCase();
+    return livreursFiltres.filter(l => {
+      const nomComplet = `${l.prenom || ""} ${l.nom || ""}`.trim().toLowerCase();
+      const tel = (l.telephone || "").toLowerCase();
+      const quartier = (l.quartier || "").toLowerCase();
+      const code = (l.code_identification || "").toLowerCase();
+      return nomComplet.includes(q) || tel.includes(q) || quartier.includes(q) || code.includes(q);
+    });
+  }, [livreursFiltres, searchQuery]);
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.functions.invoke("updateLivreur", { id, data }),
@@ -505,6 +518,26 @@ export default function LivreursExternes() {
         />
       )}
 
+      {/* Barre de recherche */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Rechercher par nom, téléphone, quartier ou code..."
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          >
+            <XCircle className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
       {/* Statistiques — harmonisées avec la carte dispatch */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {[
@@ -537,17 +570,17 @@ export default function LivreursExternes() {
       </div>
 
       {/* Liste */}
-      {livreursFiltres.length === 0 ? (
+      {livreursRecherches.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
             <Users className="w-7 h-7 opacity-30" />
           </div>
           <p className="font-semibold">Aucun livreur</p>
-          <p className="text-xs mt-1 opacity-60">Modifiez le filtre ou ajoutez un livreur.</p>
+          <p className="text-xs mt-1 opacity-60">{searchQuery ? "Aucun résultat pour votre recherche." : "Modifiez le filtre ou ajoutez un livreur."}</p>
         </div>
       ) : (
         <div className="space-y-2">
-          {livreursFiltres.map(livreur => {
+          {livreursRecherches.map(livreur => {
             const nomComplet = `${livreur.prenom || ""} ${livreur.nom}`.trim();
             const vb = validationBadge(livreur.validation);
             const isBloque = livreur.actif === false;
