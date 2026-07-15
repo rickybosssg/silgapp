@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
     if (course.commission_silga && course.commission_silga > 0) {
       commission = course.commission_silga;
     } else if (course.prix_final && course.prix_final > 0) {
-      const pct = countries?.[0]?.commission_pct || 30;
+      const pct = countries?.[0]?.commission_pct ?? 20;
       commission = Math.round(course.prix_final * (pct / 100));
     }
 

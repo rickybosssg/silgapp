@@ -2,15 +2,15 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 // Tarifs par pays (fallback si pas de config en DB)
 const TARIFS_PAYS = {
-  BF: { prix_par_km: 100, prix_minimum: 500,  commission_pct: 30, devise: "FCFA" },
-  CI: { prix_par_km: 120, prix_minimum: 600,  commission_pct: 30, devise: "FCFA" },
-  TG: { prix_par_km: 100, prix_minimum: 500,  commission_pct: 30, devise: "FCFA" },
-  BJ: { prix_par_km: 100, prix_minimum: 500,  commission_pct: 30, devise: "FCFA" },
-  SN: { prix_par_km: 150, prix_minimum: 750,  commission_pct: 30, devise: "FCFA" },
-  ML: { prix_par_km: 100, prix_minimum: 500,  commission_pct: 30, devise: "FCFA" },
-  GN: { prix_par_km: 800, prix_minimum: 4000, commission_pct: 30, devise: "GNF"  },
-  NE: { prix_par_km: 100, prix_minimum: 500,  commission_pct: 30, devise: "FCFA" },
-  GH: { prix_par_km: 2,   prix_minimum: 10,   commission_pct: 30, devise: "GHS"  },
+  BF: { prix_par_km: 100, prix_minimum: 500,  commission_pct: 20, devise: "FCFA" },
+  CI: { prix_par_km: 120, prix_minimum: 600,  commission_pct: 20, devise: "FCFA" },
+  TG: { prix_par_km: 100, prix_minimum: 500,  commission_pct: 20, devise: "FCFA" },
+  BJ: { prix_par_km: 100, prix_minimum: 500,  commission_pct: 20, devise: "FCFA" },
+  SN: { prix_par_km: 150, prix_minimum: 750,  commission_pct: 20, devise: "FCFA" },
+  ML: { prix_par_km: 100, prix_minimum: 500,  commission_pct: 20, devise: "FCFA" },
+  GN: { prix_par_km: 800, prix_minimum: 4000, commission_pct: 20, devise: "GNF"  },
+  NE: { prix_par_km: 100, prix_minimum: 500,  commission_pct: 20, devise: "FCFA" },
+  GH: { prix_par_km: 2,   prix_minimum: 10,   commission_pct: 20, devise: "GHS"  },
 };
 
 function calculerDistance(lat1, lon1, lat2, lon2) {
@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
         tarif = {
           prix_par_km:    c.prix_par_km    || tarif.prix_par_km,
           prix_minimum:   c.prix_minimum   || tarif.prix_minimum,
-          commission_pct: c.commission_pct || tarif.commission_pct,
+          commission_pct: c.commission_pct ?? tarif.commission_pct,
           devise:         c.devise         || tarif.devise,
         };
       }
