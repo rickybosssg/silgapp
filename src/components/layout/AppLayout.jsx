@@ -28,6 +28,7 @@ function AppLayoutInner({ reseau }) {
   const [neoCount, setNeoCount] = useState(0);
   const [paiementCount, setPaiementCount] = useState(0);
   const [messageCount, setMessageCount] = useState(0);
+  const [livreursBloquesCount, setLivreursBloquesCount] = useState(0);
 
   useEffect(() => {
     const fetchNotifs = async () => {
@@ -69,6 +70,13 @@ function AppLayoutInner({ reseau }) {
     };
     fetchNeoCount();
     fetchPaiements();
+    const fetchLivreursBloques = async () => {
+      try {
+        const data = await base44.entities.Livreur.filter({ bloque_encours: true });
+        setLivreursBloquesCount((data || []).length);
+      } catch (_) {}
+    };
+    fetchLivreursBloques();
     const fetchMessages = async () => {
       try {
         const user = await base44.auth.me();
@@ -95,7 +103,7 @@ function AppLayoutInner({ reseau }) {
     const unsubMsg = base44.entities.Message.subscribe((event) => {
       if (event.type === "create") fetchMessages();
     });
-    const iv = setInterval(() => { fetchNotifs(); fetchDemandes(); fetchPartenaireDemandes(); fetchNeoCount(); fetchPaiements(); fetchMessages(); }, 30000);
+    const iv = setInterval(() => { fetchNotifs(); fetchDemandes(); fetchPartenaireDemandes(); fetchNeoCount(); fetchPaiements(); fetchLivreursBloques(); fetchMessages(); }, 30000);
     return () => { clearInterval(iv); unsubConv?.(); unsubMsg?.(); };
   }, []);
 
@@ -111,7 +119,7 @@ function AppLayoutInner({ reseau }) {
       <CourseWindowStack />
 
       <div className="hidden lg:flex min-h-screen">
-        <Sidebar notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} neoCount={neoCount} paiementCount={paiementCount} messageCount={messageCount} reseau={reseau} />
+        <Sidebar notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} neoCount={neoCount} paiementCount={paiementCount} messageCount={messageCount} livreursBloquesCount={livreursBloquesCount} reseau={reseau} />
         <main className={`flex-1 min-h-screen overflow-x-hidden bg-slate-50 transition-all ${hasWindows ? "lg:mr-96" : ""}`}>
           <Outlet />
         </main>
