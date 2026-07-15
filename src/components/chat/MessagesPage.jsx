@@ -24,7 +24,7 @@ function ConversationItem({ conv, myType, myId, active, onClick }) {
   const roleKey = otherParticipant?.type || (conv.group_type === "group" ? "group" : "client");
 
   // Détermine si la conversation est non lue
-  const isUnread = useMemo(() => {
+  const isUnread = React.useMemo(() => {
     if (!conv.last_message_date) return false;
     if (conv.last_sender_type === myType) return false; // dernier message = moi → lu
     if (myType === "admin") {
