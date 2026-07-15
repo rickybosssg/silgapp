@@ -59,10 +59,8 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
   const coursesActives = courses.filter(c => !["livree", "annulee"].includes(c.statut));
   const montantTotal = coursesLivrees.reduce((s, c) => s + (c.prix_final || 0), 0);
   const montantDu = livreur.montant_du_silga || 0;
-  const montantPaye = coursesLivrees
-    .filter(c => c.statut_paiement_livreur === "paye")
-    .reduce((s, c) => s + (c.commission_silga || 0), 0);
-  const resteAPayerSilga = Math.max(0, montantDu);
+  const encoursReel = livreur.encours || 0;
+  const resteAPayerSilga = Math.max(0, encoursReel);
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4">
@@ -182,15 +180,28 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
               <span className="font-semibold">{montantTotal.toLocaleString()} FCFA</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Montant dû à SILGAPP</span>
-              <span className="font-bold text-orange-600">{montantDu.toLocaleString()} {livreur.devise || "FCFA"}</span>
-            </div>
-            <div className="border-t pt-2 flex justify-between text-sm font-bold">
-              <span>Reste à payer</span>
-              <span className={resteAPayerSilga > 0 ? "text-red-600" : "text-green-600"}>
-                {resteAPayerSilga.toLocaleString()} FCFA
+              <span className="text-muted-foreground">Encours (commissions accumulées)</span>
+              <span className={`font-bold ${encoursReel > 0 ? "text-red-600" : "text-green-600"}`}>
+                {encoursReel.toLocaleString()} {livreur.devise || "FCFA"}
               </span>
             </div>
+            {montantDu !== encoursReel && (
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Ancien montant_du_silga</span>
+                <span className="text-gray-400 line-through">{montantDu.toLocaleString()} FCFA</span>
+              </div>
+            )}
+            <div className="border-t pt-2 flex justify-between text-sm font-bold">
+              <span>Reste à payer</span>
+              <span className={encoursReel > 0 ? "text-red-600" : "text-green-600"}>
+                {encoursReel.toLocaleString()} FCFA
+              </span>
+            </div>
+            {livreur.bloque_encours && (
+              <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-700 font-medium">
+                ⚠️ Bloqué automatiquement — plafond d'encours atteint
+              </div>
+            )}
           </div>
 
           {/* Gestion statut admin */}
@@ -588,7 +599,7 @@ export default function LivreursExternes() {
             const libre = isLibre(livreur);
             const enMission = isEnCourse(livreur);
             const appActive = isAppActive(livreur);
-            const montantDu = livreur.montant_du_silga || 0;
+            const encoursReel = livreur.encours || 0;
 
             return (
               <div
@@ -654,9 +665,9 @@ export default function LivreursExternes() {
 
                   {/* Pills finance + note */}
                   <div className="flex items-center gap-2 flex-wrap">
-                    {montantDu > 0 && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-orange-700 bg-orange-100 rounded-full px-2 py-0.5">
-                        <Banknote className="w-2.5 h-2.5" />{montantDu.toLocaleString()} F dû
+                    {encoursReel > 0 && (
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 ${livreur.bloque_encours ? "text-red-700 bg-red-100" : "text-orange-700 bg-orange-100"}`}>
+                        <Banknote className="w-2.5 h-2.5" />{encoursReel.toLocaleString()} F dû
                       </span>
                     )}
                     {livreur.note_moyenne > 0 && (
