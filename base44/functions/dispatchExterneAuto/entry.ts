@@ -138,12 +138,14 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
 
   const exclusionSet = new Set(exclusions);
   const now = Date.now();
+  const raisonsExclusion = [];
 
   const eligibles = tousLivreurs.filter(l => {
-    if (!l.latitude || !l.longitude) return false;
-    if (exclusionSet.has(l.id)) return false;         // Déjà notifié pour cette course
-    if (livreurIdsEnCourse.has(l.id)) return false;    // Déjà en course
-    if (l.admin_hors_ligne === true) return false;
+    const nomComplet = `${l.prenom || ''} ${l.nom || ''}`.trim();
+    if (!l.latitude || !l.longitude) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'sans_gps' }); return false; }
+    if (exclusionSet.has(l.id)) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'deja_notifie_ou_refuse' }); return false; }
+    if (livreurIdsEnCourse.has(l.id)) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'en_course' }); return false; }
+    if (l.admin_hors_ligne === true) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'admin_hors_ligne' }); return false; }
     return true;
   });
 
@@ -174,7 +176,22 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
     } catch (_) {}
   }
 
-  // Ni GPS ni quartier → marquer explicitement
+  // 🏙️ Fallback ville : si toujours pas de coordonnées, utiliser un quartier de la même ville
+  if ((!pickupLat || !pickupLng) && course.ville_depart) {
+    try {
+      const quartiersVille = await base44.asServiceRole.entities.Quartier.filter({
+        country_code: course.country_code, ville: course.ville_depart, actif: true,
+      });
+      if (quartiersVille?.[0]?.latitude && quartiersVille[0]?.longitude) {
+        pickupLat = quartiersVille[0].latitude;
+        pickupLng = quartiersVille[0].longitude;
+        pickupSource = 'ville';
+        console.log(`[DISPATCH] 📍 Fallback ville: ${course.ville_depart} (${pickupLat}, ${pickupLng})`);
+      }
+    } catch (_) {}
+  }
+
+  // Ni GPS ni quartier ni ville → marquer explicitement (tri par fraîcheur GPS uniquement)
   if ((!pickupLat || !pickupLng) && pickupSource === 'gps') {
     pickupSource = 'none';
   }
@@ -190,7 +207,12 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
 
     // 🚫 Exclure les livreurs sans GPS ou GPS > 60 min
     if (gpsAgeMin === null || gpsAgeMin > GPS_EXPIRE_SEUIL_MIN) {
-      return; // Exclu du dispatch
+      raisonsExclusion.push({
+        livreur_id: l.id,
+        nom: `${l.prenom || ''} ${l.nom || ''}`.trim(),
+        raison: gpsAgeMin === null ? 'gps_absent' : `gps_expire_${Math.round(gpsAgeMin)}min`,
+      });
+      return;
     }
 
     // Heartbeat pour le canal de notification (push vs WhatsApp)
@@ -232,8 +254,8 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
   const niveau1 = candidats; // rétro-compatibilité
   const niveau2 = []; // vide
   const niveau3 = []; // vide
-  console.log(`[DISPATCH] 📊 ${tous.length} candidats (exclus: ${exclusions.length}) — tri par distance, GPS en tiebreaker (< ${TIEBREAKER_DISTANCE_M}m) — pickup: ${pickupSource}`);
-  return { tous, niveau1, niveau2, niveau3, pickupSource };
+  console.log(`[DISPATCH] 📊 ${tous.length} candidats (exclus: ${raisonsExclusion.length}) — tri par distance, GPS en tiebreaker (< ${TIEBREAKER_DISTANCE_M}m) — pickup: ${pickupSource}`);
+  return { tous, niveau1, niveau2, niveau3, pickupSource, raisonsExclusion };
 }
 
 async function notifierLivreur(base44, courseId, course, livreur, timeoutSec) {
@@ -381,7 +403,7 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
 
   // Trouver les meilleurs candidats hors exclusions (tous les déjà notifiés)
   const resultat = await trouverLivreursCandidats(base44, course, exclusions);
-  const { tous: candidatsTous, niveau1, niveau2, niveau3, pickupSource } = resultat;
+  const { tous: candidatsTous, niveau1, niveau2, niveau3, pickupSource, raisonsExclusion } = resultat;
 
   // 🧠 Charger la config vagues GPS (utiliser le cache si disponible)
   const gpsConfig = cachedConfig?.gps || await chargerConfigVaguesGPS(base44);
@@ -406,6 +428,7 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
         dispatch_status: 'cycle_epuise',
         dispatch_wave: gpsConfig.waves.length,
       });
+      journaliserDispatch(base44, { course_id: courseId, country_code: course.country_code, vague: wave, evenement: 'cycle_epuise' });
       return { cycleEpuise: true };
     }
     if (dejaNotifies.length > 0) {
@@ -420,6 +443,7 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
         livreur_id: '',
         livreur_nom: '',
       });
+      journaliserDispatch(base44, { course_id: courseId, country_code: course.country_code, vague: wave, evenement: 'reset' });
       return { cycleReset: true };
     } else {
       // Aucun livreur dispo du tout
@@ -429,6 +453,7 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
         livreur_nom: '',
       });
       console.log(`[DISPATCH] ⚠️ Aucun livreur disponible — course ${courseId} en attente`);
+      journaliserDispatch(base44, { course_id: courseId, country_code: course.country_code, vague: wave, evenement: 'aucun_livreur', raisons_exclusion: raisonsExclusion });
       return { noLivreur: true };
     }
   }
@@ -480,6 +505,30 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
   }
 
   console.log(`[DISPATCH] ✅ ${selection.length} livreur(s) notifiés (total cumulé: ${totalNotifies}) pour course ${courseId}, timeout: ${timeoutSec}s`);
+
+  // 📝 Journalisation détaillée (fire-and-forget, non-bloquant)
+  journaliserDispatch(base44, {
+    course_id: courseId,
+    country_code: course.country_code,
+    vague: wave,
+    pickup_source: pickupSource,
+    evenement: 'vague',
+    livreurs_selectionnes: selection.map(l => ({
+      id: l.id, nom: `${l.prenom || ''} ${l.nom || ''}`.trim(),
+      distance_km: l.distance !== null ? Number(l.distance.toFixed(2)) : null,
+      gps_age_min: l.gpsAgeMin !== null ? Number(l.gpsAgeMin.toFixed(1)) : null,
+    })),
+    ordre_tri_complet: candidats.map(l => ({
+      id: l.id, nom: `${l.prenom || ''} ${l.nom || ''}`.trim(),
+      distance_km: l.distance !== null ? Number(l.distance.toFixed(2)) : null,
+      gps_age_min: l.gpsAgeMin !== null ? Number(l.gpsAgeMin.toFixed(1)) : null,
+    })),
+    raisons_exclusion: raisonsExclusion,
+    total_candidats: candidats.length,
+    total_exclus: raisonsExclusion.length,
+    timeout_sec: timeoutSec,
+  });
+
   return {
     propose: true,
     nb_notifies: selection.length,
@@ -496,6 +545,32 @@ async function supprimerNotificationsCourse(base44, courseId) {
       { $set: { lue: true } }
     );
   } catch (err) { console.warn('[DISPATCH] ⚠️ Erreur archivage:', err.message); }
+}
+
+// ── Journalisation détaillée du dispatch (visible par les administrateurs) ──
+// Fire-and-forget : ne bloque jamais le moteur de dispatch
+function journaliserDispatch(base44, data) {
+  try {
+    base44.asServiceRole.entities.DispatchLog.create({
+      course_id: data.course_id || '',
+      heure: new Date().toISOString(),
+      vague: data.vague || 0,
+      pickup_source: data.pickup_source || '',
+      evenement: data.evenement || 'vague',
+      country_code: data.country_code || '',
+      total_candidats: data.total_candidats || 0,
+      total_exclus: data.total_exclus || 0,
+      timeout_sec: data.timeout_sec || 0,
+      livreurs_selectionnes: data.livreurs_selectionnes ? JSON.stringify(data.livreurs_selectionnes) : '',
+      ordre_tri: data.ordre_tri_complet ? JSON.stringify(data.ordre_tri_complet) : '',
+      raisons_exclusion: data.raisons_exclusion ? JSON.stringify(data.raisons_exclusion) : '',
+      livreur_acceptant_id: data.livreur_acceptant_id || '',
+      livreur_acceptant_nom: data.livreur_acceptant_nom || '',
+      temps_avant_acceptation_sec: data.temps_avant_acceptation_sec ?? null,
+    }).catch(err => console.error('[DISPATCH] ❌ Erreur journalisation:', err.message));
+  } catch (err) {
+    console.error('[DISPATCH] ❌ Erreur journalisation (init):', err.message);
+  }
 }
 
 // ============================================================================
@@ -767,6 +842,21 @@ Deno.serve(async (req) => {
         await base44.asServiceRole.entities.Livreur.update(livreur_id, { statut: 'en_course' });
         await supprimerNotificationsCourse(base44, course_id);
         console.log(`[DISPATCH] 🎉 Course ${course_id} verrouillée (auto) par ${livreur_id}`);
+
+        // 📝 Journaliser l'acceptation avec le temps de réponse
+        let tempsAcceptationSec = null;
+        if (course.heure_sollicitation) {
+          tempsAcceptationSec = Math.round((Date.now() - new Date(course.heure_sollicitation).getTime()) / 1000);
+        }
+        journaliserDispatch(base44, {
+          course_id, country_code: course.country_code,
+          vague: course.dispatch_wave || 1,
+          evenement: 'acceptation',
+          livreur_acceptant_id: livreur_id,
+          livreur_acceptant_nom: `${livreur.prenom || ''} ${livreur.nom}`.trim(),
+          temps_avant_acceptation_sec: tempsAcceptationSec,
+        });
+
         return Response.json({ success: true, accepted: true, course_id, livreur_id });
       }
 

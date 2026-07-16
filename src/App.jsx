@@ -88,6 +88,7 @@ const NeoDashboard = lazy(() => import('./pages/NeoDashboard.jsx'));
 const BugsTracking = lazy(() => import('./pages/BugsTracking.jsx'));
 const PayerSilgapp = lazy(() => import('./pages/PayerSilgapp.jsx'));
 const PaiementsAdmin = lazy(() => import('./pages/PaiementsAdmin.jsx'));
+const DispatchLogs = lazy(() => import('./pages/DispatchLogs.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -389,6 +390,7 @@ function AppContent() {
           <Route path="/admin/pharmacies" element={<AnimatedRoutes><GestionPharmacies /></AnimatedRoutes>} />
           <Route path="/admin/commandes-partenaires" element={<AnimatedRoutes><CommandesPartenaires /></AnimatedRoutes>} />
           <Route path="/admin/paiements" element={<AnimatedRoutes><PaiementsAdmin /></AnimatedRoutes>} />
+          <Route path="/admin/dispatch-logs" element={<AnimatedRoutes><DispatchLogs /></AnimatedRoutes>} />
           <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
           <Route path="/admin/neo" element={<AnimatedRoutes><NeoDashboard /></AnimatedRoutes>} />
           <Route path="/admin/bugs" element={<AnimatedRoutes><BugsTracking /></AnimatedRoutes>} />
