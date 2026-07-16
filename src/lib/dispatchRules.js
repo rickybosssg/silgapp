@@ -45,26 +45,30 @@ export function isON(livreur) {
 }
 
 /**
- * Libre = disponibilité métier (indépendant du GPS et heartbeat)
+ * Libre = disponibilité métier + GPS ≤ 60 min (dispatchable)
  * Critères :
  *   - statut = "disponible"
  *   - actif = true
  *   - validation = "valide"
  *   - a des coordonnées GPS (lat/lng)
+ *   - GPS récent (< GPS_EXPIRE_SEUIL_MIN = 60 min)
  * 
- * ⚠️ IMPORTANT : Le GPS et heartbeat ne sont PAS des critères d'exclusion
- * Ils servent uniquement à :
- *   - prioriser les propositions (niveau 1 → 4)
- *   - choisir le canal de notification (SILGAPP vs WhatsApp)
- * 
- * Un livreur avec GPS ancien ou heartbeat ancien reste "Libre" et dispatchable.
+ * Un livreur avec GPS 10-60 min reste "Libre" et dispatchable (priorité fallback).
+ * Seul un GPS > 60 min rend le livreur non dispatchable.
  */
 export function isLibre(livreur) {
   if (livreur.statut !== "disponible") return false;
   if (livreur.actif === false) return false;
   if (livreur.validation !== "valide") return false;
   if (!livreur.latitude || !livreur.longitude) return false;
-  // GPS doit être récent (< GPS_DISPATCH_SEUIL_MIN = 10 min) pour être dispatchable
+  const dt = livreur.derniere_position_date || livreur.last_seen_at;
+  if (!dt) return false;
+  return (Date.now() - new Date(dt).getTime()) < GPS_EXPIRE_SEUIL_MIN * 60 * 1000;
+}
+
+/** GPS récent pour dispatch prioritaire (≤ 10 min) */
+export function isGPSRecentDispatch(livreur) {
+  if (!livreur.latitude || !livreur.longitude) return false;
   const dt = livreur.derniere_position_date || livreur.last_seen_at;
   if (!dt) return false;
   return (Date.now() - new Date(dt).getTime()) < GPS_DISPATCH_SEUIL_MIN * 60 * 1000;
@@ -73,9 +77,9 @@ export function isLibre(livreur) {
 /**
  * Catégorie d'un livreur pour l'affichage et les compteurs
  * Retourne une des 5 catégories mutuellement exclusives :
- *   - "libre_gps_valide" : disponible + validé + actif + GPS < 10 min (dispatchable)
- *   - "sans_gps_valide"  : disponible + validé + actif + GPS absent ou 10-60 min
- *   - "gps_expire"       : disponible + validé + actif + GPS > 60 min (app fermée)
+ *   - "libre_gps_recent" : disponible + validé + actif + GPS ≤ 10 min (dispatchable, priorité max)
+ *   - "libre_gps_ancien" : disponible + validé + actif + GPS 10-60 min (dispatchable, fallback)
+ *   - "gps_expire"       : disponible + validé + actif + GPS > 60 min ou absent (non dispatchable)
  *   - "en_course"        : a une course active en cours
  *   - "hors_ligne"       : hors_ligne, bloqué, non validé ou autre statut
  */
@@ -85,12 +89,12 @@ export function getLivreurCategorie(livreur, livreurIdsEnCourseReelle) {
   if (livreur.statut === "hors_ligne") return "hors_ligne";
   if (livreurIdsEnCourseReelle?.has(livreur.id)) return "en_course";
   if (livreur.statut !== "disponible") return "hors_ligne";
-  if (!livreur.latitude || !livreur.longitude) return "sans_gps_valide";
+  if (!livreur.latitude || !livreur.longitude) return "gps_expire";
   const dt = livreur.derniere_position_date || livreur.last_seen_at;
-  if (!dt) return "sans_gps_valide";
+  if (!dt) return "gps_expire";
   const ageMin = (Date.now() - new Date(dt).getTime()) / 60000;
-  if (ageMin < GPS_DISPATCH_SEUIL_MIN) return "libre_gps_valide";
-  if (ageMin <= GPS_EXPIRE_SEUIL_MIN) return "sans_gps_valide";
+  if (ageMin < GPS_DISPATCH_SEUIL_MIN) return "libre_gps_recent";
+  if (ageMin <= GPS_EXPIRE_SEUIL_MIN) return "libre_gps_ancien";
   return "gps_expire";
 }
 
@@ -105,14 +109,14 @@ export function isGPSExpire(livreur) {
   return (Date.now() - new Date(dt).getTime()) > GPS_EXPIRE_SEUIL_MIN * 60 * 1000;
 }
 
-/** Disponible sans GPS valide = disponible + validé + actif + (pas de GPS ou GPS 10-60 min) */
+/** GPS ancien dispatchable = disponible + validé + actif + GPS 10-60 min */
 export function isLibreSansGPSValide(livreur) {
   if (livreur.statut !== "disponible") return false;
   if (livreur.actif === false) return false;
   if (livreur.validation !== "valide") return false;
-  if (!livreur.latitude || !livreur.longitude) return true;
+  if (!livreur.latitude || !livreur.longitude) return false;
   const dt = livreur.derniere_position_date || livreur.last_seen_at;
-  if (!dt) return true;
+  if (!dt) return false;
   const ageMin = (Date.now() - new Date(dt).getTime()) / 60000;
   return ageMin >= GPS_DISPATCH_SEUIL_MIN && ageMin <= GPS_EXPIRE_SEUIL_MIN;
 }

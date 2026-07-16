@@ -3,32 +3,41 @@ import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 
 const CATEGORY_CONFIG = {
-  libre_gps_valide: {
-    label: "Libres avec GPS valide",
+  libre_total: {
+    label: "Libres — Tous dispatchables (GPS ≤ 60 min)",
     short: "Dispatchables",
     color: "text-green-700",
     bg: "bg-green-100",
     dot: "bg-green-500",
     border: "border-green-200",
-    description: "Disponibles, connectés, GPS récent (< 10 min)",
+    description: "Disponibles avec GPS récent ou ancien — tous dispatchables",
   },
-  sans_gps_valide: {
-    label: "Disponibles sans GPS valide",
-    short: "GPS stale",
+  libre_gps_recent: {
+    label: "Libres — GPS récent (≤ 10 min)",
+    short: "Priorité max",
+    color: "text-green-700",
+    bg: "bg-green-100",
+    dot: "bg-green-500",
+    border: "border-green-200",
+    description: "Disponibles, GPS récent — priorité de dispatch maximale",
+  },
+  libre_gps_ancien: {
+    label: "Libres — GPS ancien (10-60 min)",
+    short: "Fallback",
     color: "text-amber-700",
     bg: "bg-amber-100",
     dot: "bg-amber-500",
     border: "border-amber-200",
-    description: "Disponibles mais GPS absent ou ancien (10-60 min)",
+    description: "Disponibles, GPS 10-60 min — dispatchable en fallback si aucun GPS récent",
   },
   gps_expire: {
-    label: "GPS expiré",
-    short: "App fermée",
+    label: "GPS expiré (> 60 min)",
+    short: "Non dispatchable",
     color: "text-gray-700",
     bg: "bg-gray-100",
     dot: "bg-gray-500",
     border: "border-gray-200",
-    description: "Disponibles mais GPS > 60 min (application probablement fermée)",
+    description: "GPS > 60 min ou absent — non dispatchable, application probablement fermée",
   },
   en_course: {
     label: "En course",

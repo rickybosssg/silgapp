@@ -5,7 +5,7 @@ import HeatmapControls from "./HeatmapControls";
 import HeatmapLegend from "./HeatmapLegend";
 import CountrySelector from "@/components/international/CountrySelector";
 import { useZonesChaudesHalos } from "./ZonesChaudes";
-import { isLibre, GPS_DISPATCH_SEUIL_MIN, getLivreurCategorie } from "@/lib/dispatchRules";
+import { isLibre, GPS_DISPATCH_SEUIL_MIN, GPS_EXPIRE_SEUIL_MIN, getLivreurCategorie } from "@/lib/dispatchRules";
 import { isLivreurNoir } from "@/lib/livreurCounters";
 import { calculateClusters } from "@/lib/markerCluster";
 
@@ -481,8 +481,8 @@ function buildLivreurIcon(livreur, livreurIdsEnCourseReelle) {
   const cat = getLivreurCategorie(livreur, livreurIdsEnCourseReelle);
   const estNoir = cat === "hors_ligne" || cat === "gps_expire";
   const cssClass = cat === "en_course" ? "dmap-livreur-course"
-    : cat === "libre_gps_valide" ? "dmap-livreur-libre"
-    : cat === "sans_gps_valide" ? "dmap-livreur-sans-gps"
+    : cat === "libre_gps_recent" ? "dmap-livreur-libre"
+    : cat === "libre_gps_ancien" ? "dmap-livreur-sans-gps"
     : "dmap-livreur-noir";
   const initial = livreur.nom?.charAt(0)?.toUpperCase() || "L";
   const photoHtml = livreur.photo_url
@@ -533,15 +533,15 @@ function buildLivreurPopup(livreur, livreurIdsEnCourseReelle) {
   const cat = getLivreurCategorie(livreur, livreurIdsEnCourseReelle);
   const estNoir = cat === "hors_ligne" || cat === "gps_expire";
   const statutLabel = cat === "en_course" ? "🟠 En course"
-    : cat === "libre_gps_valide" ? "🟢 Libre — dispatchable"
-    : cat === "sans_gps_valide" ? "🟡 Disponible — GPS invalide"
+    : cat === "libre_gps_recent" ? "🟢 Libre — GPS récent (priorité max)"
+    : cat === "libre_gps_ancien" ? "🟡 Libre — GPS ancien (fallback dispatchable)"
     : cat === "gps_expire" ? "⚫ GPS expiré — non dispatchable"
     : "⚫ Hors ligne — non dispatchable";
   const gpsMin = getLastGPSMin(livreur);
   const gpsStr = gpsMin === null ? "?" : gpsMin < 1 ? "à l'instant" : `${gpsMin} min`;
   const statutColor = cat === "en_course" ? "#ea580c"
-    : cat === "libre_gps_valide" ? "#16a34a"
-    : cat === "sans_gps_valide" ? "#eab308"
+    : cat === "libre_gps_recent" ? "#16a34a"
+    : cat === "libre_gps_ancien" ? "#eab308"
     : "#374151";
   
   // Qualité GPS
@@ -575,7 +575,7 @@ function getRaisonInactif(livreur) {
   const dt = livreur.last_seen_at || livreur.derniere_position_date;
   if (dt) {
     const min = Math.round((Date.now() - new Date(dt).getTime()) / 60000);
-    if (min > GPS_DISPATCH_SEUIL_MIN) raisons.push(`GPS expiré ${min} min`);
+    if (min > GPS_EXPIRE_SEUIL_MIN) raisons.push(`GPS expiré ${min} min`);
   }
   if (!livreur.latitude || !livreur.longitude) raisons.push("pas de GPS");
   return raisons.length > 0 ? `(${raisons.join(", ")})` : "";
@@ -988,18 +988,20 @@ export default function DispatchMap({
 
   // 🎯 Compteurs — 5 catégories mutuellement exclusives
   const livreurCategories = livreurs.map(l => getLivreurCategorie(l, livreurIdsEnCourseReelle));
-  const nbLibresGPSValide = livreurCategories.filter(c => c === "libre_gps_valide").length;
-  const nbSansGPSValide = livreurCategories.filter(c => c === "sans_gps_valide").length;
+  const nbLibresGPSRecent = livreurCategories.filter(c => c === "libre_gps_recent").length;
+  const nbLibresGPSAncien = livreurCategories.filter(c => c === "libre_gps_ancien").length;
   const nbGPSExpire = livreurCategories.filter(c => c === "gps_expire").length;
   const nbCourse = livreurCategories.filter(c => c === "en_course").length;
   const nbHorsLigne = livreurCategories.filter(c => c === "hors_ligne").length;
-  const nbLibres = nbLibresGPSValide; // alias pour rétro-compatibilité
-  const nbLivreursInactifs = nbGPSExpire + nbHorsLigne; // alias pour rétro-compatibilité
+  const nbLibres = nbLibresGPSRecent + nbLibresGPSAncien; // TOUS dispatchables (GPS ≤ 60 min)
+  const nbLibresGPSValide = nbLibresGPSRecent; // alias rétro-compatibilité
+  const nbSansGPSValide = nbLibresGPSAncien; // alias rétro-compatibilité
+  const nbLivreursInactifs = nbGPSExpire + nbHorsLigne; // alias rétro-compatibilité
   const nbClientsActifs = clients.filter(c => getClientStatut(c) === "actif").length;
   const nbClientsRecents = clients.filter(c => getClientStatut(c) === "recent").length;
   const nbClientsInactifs = clients.filter(c => getClientStatut(c) === "inactif").length;
   const nbClientsVisibles = showClients ? nbClientsActifs + nbClientsRecents : 0;
-  const nbLivreursVisibles = showLivreurs ? nbLibresGPSValide + nbSansGPSValide + nbCourse : 0;
+  const nbLivreursVisibles = showLivreurs ? nbLibres + nbCourse : 0;
   const nbPartenairesBoutiques = partenaires.filter(p => p._type === "boutique" && p.latitude && p.longitude).length;
   const nbPartenairesRestaurants = partenaires.filter(p => p._type === "restaurant" && p.latitude && p.longitude).length;
   const nbPartenairesPharmacies = partenaires.filter(p => p._type === "pharmacie" && p.latitude && p.longitude).length;
@@ -1047,16 +1049,22 @@ export default function DispatchMap({
                     <span className="text-red-700 font-bold">{courses.length} en attente !</span>
                   </div>
                 )}
-                {showLivreurs && nbLibresGPSValide > 0 && (
-                  <button onClick={() => onCategoryClick?.("libre_gps_valide")} className="flex items-center gap-2 hover:bg-green-50 rounded-lg px-1 -mx-1 transition-colors w-full">
+                {showLivreurs && nbLibres > 0 && (
+                  <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" />
-                    <span className="text-green-700">{nbLibresGPSValide} libre{nbLibresGPSValide > 1 ? "s" : ""} (GPS valide)</span>
+                    <span className="text-green-700 font-bold">{nbLibres} libre{nbLibres > 1 ? "s" : ""} (GPS ≤ 60 min)</span>
+                  </div>
+                )}
+                {showLivreurs && nbLibresGPSRecent > 0 && (
+                  <button onClick={() => onCategoryClick?.("libre_gps_recent")} className="flex items-center gap-2 hover:bg-green-50 rounded-lg px-1 -mx-1 transition-colors w-full pl-4">
+                    <span className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0" />
+                    <span className="text-green-600">├ {nbLibresGPSRecent} GPS récent (≤ 10 min)</span>
                   </button>
                 )}
-                {showLivreurs && nbSansGPSValide > 0 && (
-                  <button onClick={() => onCategoryClick?.("sans_gps_valide")} className="flex items-center gap-2 hover:bg-amber-50 rounded-lg px-1 -mx-1 transition-colors w-full">
-                    <span className="w-3 h-3 rounded-full bg-amber-500 flex-shrink-0" />
-                    <span className="text-amber-700">{nbSansGPSValide} sans GPS valide</span>
+                {showLivreurs && nbLibresGPSAncien > 0 && (
+                  <button onClick={() => onCategoryClick?.("libre_gps_ancien")} className="flex items-center gap-2 hover:bg-amber-50 rounded-lg px-1 -mx-1 transition-colors w-full pl-4">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 flex-shrink-0" />
+                    <span className="text-amber-600">└ {nbLibresGPSAncien} GPS ancien (10-60 min)</span>
                   </button>
                 )}
                 {showLivreurs && nbGPSExpire > 0 && (

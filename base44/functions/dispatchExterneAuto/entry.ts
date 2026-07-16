@@ -147,10 +147,13 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
     return true;
   });
 
-  // Classer par priorité : heartbeat récent > GPS récent > distance
-  // 🕐 0-15 min = N1 (priorité max), 15-30 min = N2 (réduite), 30-60 min = N3 (faible)
-  // 🚫 > 60 min = exclusion automatique + mise hors ligne
-  const niveau1 = [], niveau2 = [], niveau3 = [];
+  // 🎯 NOUVELLE LOGIQUE : classification par âge GPS (pas heartbeat)
+  // N1 = GPS ≤ 10 min (priorité maximale, trié par distance)
+  // N2 = GPS 10-60 min (fallback dispatchable, trié par distance)
+  // 🚫 GPS > 60 min ou absent = EXCLU du dispatch
+  const niveau1 = [], niveau2 = [];
+  const GPS_RECENT_SEUIL_MIN = 10;
+  const GPS_EXPIRE_SEUIL_MIN = 60;
 
   // 🧠 Résoudre les coordonnées de pickup : GPS > quartier > fallback large
   let pickupLat = course.gps_depart_lat;
@@ -171,23 +174,32 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
     } catch (_) {}
   }
 
-  // Ni GPS ni quartier → marquer explicitement pour le mode vagues
+  // Ni GPS ni quartier → marquer explicitement
   if ((!pickupLat || !pickupLng) && pickupSource === 'gps') {
     pickupSource = 'none';
   }
 
   eligibles.forEach(l => {
-    const hbDate = l.last_seen_at || l.derniere_position_date;
+    // 📡 Calculer l'âge du GPS du livreur
+    const gpsDate = l.derniere_position_date || l.last_seen_at;
+    let gpsAgeMin = null;
+    if (gpsDate) {
+      const gps = new Date(gpsDate);
+      if (!isNaN(gps.getTime())) gpsAgeMin = (now - gps.getTime()) / 60000;
+    }
+
+    // 🚫 Exclure les livreurs sans GPS ou GPS > 60 min
+    if (gpsAgeMin === null || gpsAgeMin > GPS_EXPIRE_SEUIL_MIN) {
+      return; // Exclu du dispatch
+    }
+
+    // Heartbeat pour le canal de notification (push vs WhatsApp)
+    const hbDate = l.last_seen_at;
     let heartbeatAgeMin = null;
     if (hbDate) {
       const hb = new Date(hbDate);
       if (!isNaN(hb.getTime())) heartbeatAgeMin = (now - hb.getTime()) / 60000;
     }
-
-    // 📡 Aucune exclusion heartbeat : un livreur disponible reste éligible au dispatch
-    // même si son téléphone est éteint depuis plus d'1h. Il sera notifié par push
-    // (et WhatsApp si opt-in) — en ouvrant SILGAPP il pourra accepter la course.
-    // La priorisation se fait par niveaux : N1 (0-15min), N2 (15-30min), N3 (>30min).
 
     // distance = null quand ni GPS ni quartier → pas de calcul fictif
     let distance = null;
@@ -195,46 +207,30 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
       distance = calculerDistance(pickupLat, pickupLng, l.latitude, l.longitude);
     }
 
-    const enriched = { ...l, distance, heartbeatAgeMin };
+    const enriched = { ...l, distance, heartbeatAgeMin, gpsAgeMin };
 
-    if (heartbeatAgeMin === null || heartbeatAgeMin >= 30) {
-      niveau3.push(enriched); // N3 : > 30 min ou inconnu → priorité faible (mais reste notifié)
-    } else if (heartbeatAgeMin >= 15) {
-      niveau2.push(enriched); // N2 : 15-30 min → priorité réduite
+    if (gpsAgeMin < GPS_RECENT_SEUIL_MIN) {
+      niveau1.push(enriched); // N1 : GPS ≤ 10 min → priorité maximale
     } else {
-      // N1 : 0-15 min → priorité maximale, trié par GPS puis distance
-      const gpsDate = l.derniere_position_date;
-      let gpsAgeMin = null;
-      if (gpsDate) {
-        const gps = new Date(gpsDate);
-        if (!isNaN(gps.getTime())) gpsAgeMin = (now - gps.getTime()) / 60000;
-      }
-      enriched.gpsAgeMin = gpsAgeMin;
-      niveau1.push(enriched);
+      niveau2.push(enriched); // N2 : GPS 10-60 min → priorité fallback
     }
   });
 
-  niveau1.sort((a, b) => {
-    const gpsA = a.gpsAgeMin !== null ? a.gpsAgeMin : 999;
-    const gpsB = b.gpsAgeMin !== null ? b.gpsAgeMin : 999;
-    const trancheA = gpsA < 2 ? 0 : gpsA < 5 ? 1 : gpsA < 10 ? 2 : 3;
-    const trancheB = gpsB < 2 ? 0 : gpsB < 5 ? 1 : gpsB < 10 ? 2 : 3;
-    if (trancheA !== trancheB) return trancheA - trancheB;
-    // distance peut être null (ni GPS ni quartier)
-    if (a.distance === null && b.distance === null) return 0;
-    if (a.distance === null) return 1;
-    if (b.distance === null) return -1;
-    return a.distance - b.distance;
-  });
-  [niveau2, niveau3].forEach(n => n.sort((a, b) => {
-    if (a.distance === null && b.distance === null) return 0;
+  // Trier chaque niveau par distance (ou par GPS recency si pas de distance)
+  [niveau1, niveau2].forEach(n => n.sort((a, b) => {
+    if (a.distance === null && b.distance === null) {
+      const gpsA = a.gpsAgeMin !== null ? a.gpsAgeMin : 999;
+      const gpsB = b.gpsAgeMin !== null ? b.gpsAgeMin : 999;
+      return gpsA - gpsB;
+    }
     if (a.distance === null) return 1;
     if (b.distance === null) return -1;
     return a.distance - b.distance;
   }));
 
-  const tous = [...niveau1, ...niveau2, ...niveau3];
-  console.log(`[DISPATCH] 📊 ${tous.length} candidats (exclus: ${exclusions.length}) — N1:${niveau1.length} N2:${niveau2.length} N3:${niveau3.length} — pickup: ${pickupSource}${pickupSource === 'quartier' ? ` (${course.quartier_depart})` : ''}`);
+  const tous = [...niveau1, ...niveau2];
+  const niveau3 = []; // vide — conservé pour rétro-compatibilité
+  console.log(`[DISPATCH] 📊 ${tous.length} candidats (exclus: ${exclusions.length}) — N1:${niveau1.length} (GPS ≤ 10min) N2:${niveau2.length} (GPS 10-60min) — pickup: ${pickupSource}${pickupSource === 'quartier' ? ` (${course.quartier_depart})` : ''}`);
   return { tous, niveau1, niveau2, niveau3, pickupSource };
 }
 
@@ -379,53 +375,35 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
 
   // 🧠 Charger la config vagues GPS (utiliser le cache si disponible)
   const gpsConfig = cachedConfig?.gps || await chargerConfigVaguesGPS(base44);
-  const useGPSWaves = pickupSource === 'gps' && gpsConfig.gps_waves_enabled;
 
-  // 📍 Mode vagues GPS (distance + heartbeat N1/N2/N3) — courses AVEC GPS
-  // 🌊 Mode vagues heartbeat (N1/N2/N3) — courses SANS GPS (quartier/none, non-admin)
-  // ⚡ Mode direct (tous simultanés) — admin courses sans GPS waves actif
-  const modeVaguesHeartbeat = !useGPSWaves && pickupSource !== 'gps' && course.source !== 'admin';
-  let wave = modeVaguesHeartbeat
-    ? (course.dispatch_wave || 1)      // heartbeat: 1=N1, 2=N2, 3=N3
-    : useGPSWaves
-      ? (course.dispatch_wave || 1)    // GPS: 1=N1, 2=N1+N2, 3=N1+N2+N3
-      : 0;                              // direct: pas de vagues
+  // 🎯 NOUVELLE LOGIQUE : toujours utiliser les vagues GPS (N1 = GPS ≤ 10 min, N2 = GPS 10-60 min)
+  // N1 = priorité maximale, N2 = fallback dispatchable
+  // GPS > 60 min ou absent = déjà exclu par trouverLivreursCandidats
+  let wave = course.dispatch_wave || 1;
 
   let candidats;
-  if (modeVaguesHeartbeat) {
-    if (wave === 1) candidats = niveau1;
-    else if (wave === 2) candidats = niveau2;
-    else if (wave === 3) candidats = niveau3;
-    else candidats = [];
-    console.log(`[DISPATCH] 🌊 Mode vagues heartbeat — vague ${wave} (N${wave}: ${candidats.length} candidats)`);
-  } else if (useGPSWaves) {
-    // 🎯 GPS waves respectent les niveaux heartbeat N1/N2/N3
-    // N1 = HB 0-15min (triés GPS recency → distance), N2 = 15-30min, N3 = 30-60min
-    if (wave === 1) candidats = niveau1;
-    else if (wave === 2) candidats = [...niveau1, ...niveau2];
-    else if (wave === 3) candidats = candidatsTous;
-    else candidats = [];
-    console.log(`[DISPATCH] 📍 Mode vagues GPS + heartbeat — vague ${wave}/${gpsConfig.waves.length} → N1:${niveau1.length} N2:${niveau2.length} N3:${niveau3.length} = ${candidats.length} candidats`);
+  if (wave === 1) {
+    candidats = niveau1; // N1 uniquement (GPS ≤ 10 min)
   } else {
-    candidats = candidatsTous;
+    candidats = [...niveau1, ...niveau2]; // N1 + N2 (tous dispatchables, GPS ≤ 60 min)
   }
+
+  // ⚡ Si N1 vide mais N2 a des candidats → passer directement à la vague 2
+  if (candidats.length === 0 && wave === 1 && niveau2.length > 0) {
+    wave = 2;
+    candidats = [...niveau1, ...niveau2];
+    console.log(`[DISPATCH] ⚡ N1 vide — passage direct vague 2 (N1+N2: ${candidats.length} candidats)`);
+  }
+
+  console.log(`[DISPATCH] 📍 Vague GPS ${wave}/${gpsConfig.waves.length} — N1:${niveau1.length} (≤ 10min) + N2:${niveau2.length} (10-60min) = ${candidats.length} candidats`);
 
   // Récupérer les IDs déjà notifiés précédemment
   let dejaNotifies = [];
   try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
 
   if (candidats.length === 0) {
-    // 🌊 Heartbeat: vague 3 épuisée → cycle_epuise
-    if (modeVaguesHeartbeat && wave >= 3) {
-      console.log(`[DISPATCH] 🌊 Vague 3 heartbeat épuisée — cycle_epuise pour course ${courseId}`);
-      await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-        dispatch_status: 'cycle_epuise',
-        dispatch_wave: 3,
-      });
-      return { cycleEpuise: true };
-    }
     // 📍 GPS waves: dernière vague épuisée → cycle_epuise
-    if (useGPSWaves && wave > gpsConfig.waves.length) {
+    if (wave > gpsConfig.waves.length) {
       console.log(`[DISPATCH] 📍 Vague GPS ${wave} épuisée (dernière: ${gpsConfig.waves.length}) — cycle_epuise pour course ${courseId}`);
       await base44.asServiceRole.entities.CourseExterne.update(courseId, {
         dispatch_status: 'cycle_epuise',
@@ -458,22 +436,14 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
     }
   }
 
-  // Sélectionner les X meilleurs selon le mode
+  // Sélectionner les X meilleurs selon la vague
   let selection, timeoutSec, waveLabel;
-  if (useGPSWaves) {
-    const waveIndex = wave - 1; // 0-based
-    const waveCfg = gpsConfig.waves[waveIndex];
-    const maxSize = waveCfg.size >= 999 ? candidats.length : waveCfg.size;
-    selection = candidats.slice(0, maxSize);
-    timeoutSec = waveCfg.timeout_sec;
-    waveLabel = `GPS vague ${wave}/${gpsConfig.waves.length}`;
-  } else {
-    selection = config.nb >= 999 ? candidats : candidats.slice(0, config.nb);
-    // ⚡ Mode direct admin sans GPS → timeout 120s (re-notification de tous les livreurs à chaque cycle)
-    const isAdminNoGps = course.source === 'admin' && pickupSource !== 'gps';
-    timeoutSec = isAdminNoGps ? 120 : config.timeout;
-    waveLabel = modeVaguesHeartbeat ? `heartbeat N${wave}` : (isAdminNoGps ? 'direct admin 120s' : 'direct');
-  }
+  const waveIndex = Math.min(wave - 1, gpsConfig.waves.length - 1); // 0-based, clampé
+  const waveCfg = gpsConfig.waves[waveIndex];
+  const maxSize = waveCfg.size >= 999 ? candidats.length : waveCfg.size;
+  selection = candidats.slice(0, maxSize);
+  timeoutSec = waveCfg.timeout_sec;
+  waveLabel = `GPS vague ${wave}/${gpsConfig.waves.length}`;
   console.log(`[DISPATCH] 🎯 ${waveLabel} — ${selection.length}/${candidats.length} livreurs pour course ${courseId}`);
 
   const timeoutAt = new Date(Date.now() + timeoutSec * 1000).toISOString();
@@ -924,31 +894,25 @@ Deno.serve(async (req) => {
       if (expired && course.dispatch_status === 'propose' && !course.livreur_id) {
         const currentWave = course.dispatch_wave || 0;
         if (currentWave > 0) {
-          // Déterminer si GPS waves ou heartbeat (via pickupSource)
-          const pickupLat = course.gps_depart_lat;
-          const pickupLng = course.gps_depart_lng;
-          const hasGPS = !!(pickupLat && pickupLng);
-          const gpsCfg = hasGPS ? await chargerConfigVaguesGPS(base44) : null;
-          const isGPSWave = hasGPS && gpsCfg?.gps_waves_enabled;
+          const gpsCfg = await chargerConfigVaguesGPS(base44);
+          const maxWave = gpsCfg.waves.length;
 
           const nextWave = currentWave + 1;
-          const maxWave = isGPSWave ? gpsCfg.waves.length : 3;
 
           if (nextWave > maxWave) {
-            console.log(`[DISPATCH] ${isGPSWave ? '📍 GPS' : '🌊 Heartbeat'} vague ${currentWave} expirée (max: ${maxWave}) — cycle_epuise pour course ${course_id}`);
+            console.log(`[DISPATCH] 📍 GPS vague ${currentWave} expirée (max: ${maxWave}) — cycle_epuise pour course ${course_id}`);
             await base44.asServiceRole.entities.CourseExterne.update(course_id, {
               dispatch_status: 'cycle_epuise',
               dispatch_wave: maxWave,
             });
             return Response.json({ expired: true, wave_epuise: true });
           }
-          console.log(`[DISPATCH] ${isGPSWave ? '📍 GPS' : '🌊 Heartbeat'} avancement vague ${currentWave} → ${nextWave} pour course ${course_id}`);
+          console.log(`[DISPATCH] 📍 GPS avancement vague ${currentWave} → ${nextWave} pour course ${course_id}`);
           await base44.asServiceRole.entities.CourseExterne.update(course_id, {
             dispatch_status: 'redispatch',
             dispatch_wave: nextWave,
           });
         } else {
-          // Mode normal (pas de vagues)
           console.log(`[DISPATCH] ⏰ Vague expirée course ${course_id} — nouvelle sélection`);
           await base44.asServiceRole.entities.CourseExterne.update(course_id, { dispatch_status: 'redispatch' });
         }
@@ -1040,14 +1004,11 @@ Deno.serve(async (req) => {
 
           const currentWave = course.dispatch_wave || 0;
           if (currentWave > 0) {
-            // Détecter le type de vagues (utiliser le cache du tick)
-            const hasGPS = !!(course.gps_depart_lat && course.gps_depart_lng);
-            const isGPSWave = hasGPS && cachedConfig.gps.gps_waves_enabled;
-            const maxWave = isGPSWave ? cachedConfig.gps.waves.length : 3;
+            const maxWave = cachedConfig.gps.waves.length;
 
             const nextWave = currentWave + 1;
             if (nextWave > maxWave) {
-              console.log(`[DISPATCH] ${isGPSWave ? '📍 GPS' : '🌊 Heartbeat'} vague ${currentWave} expirée (max: ${maxWave}) — cycle_epuise pour course ${course.id}`);
+              console.log(`[DISPATCH] 📍 GPS vague ${currentWave} expirée (max: ${maxWave}) — cycle_epuise pour course ${course.id}`);
               await base44.asServiceRole.entities.CourseExterne.update(course.id, {
                 dispatch_status: 'cycle_epuise',
                 dispatch_wave: maxWave,
@@ -1055,21 +1016,18 @@ Deno.serve(async (req) => {
               resultats.push({ course_id: course.id, wave: `${currentWave}→epuise` });
               continue;
             }
-            console.log(`[DISPATCH] ${isGPSWave ? '📍 GPS' : '🌊 Heartbeat'} avancement vague ${currentWave} → ${nextWave} pour course ${course.id}`);
+            console.log(`[DISPATCH] 📍 GPS avancement vague ${currentWave} → ${nextWave} pour course ${course.id}`);
             await base44.asServiceRole.entities.CourseExterne.update(course.id, {
               dispatch_status: 'redispatch',
               dispatch_wave: nextWave,
             });
           } else {
-            // ⚡ Mode direct (wave=0) — admin sans GPS : reset notifiés pour re-notifier tout le monde
-            const isAdminNoGps = course.source === 'admin' && !course.gps_depart_lat && !course.gps_depart_lng;
-            if (isAdminNoGps) {
-              console.log(`[DISPATCH] ⚡ Admin sans GPS — reset notifiés + redispatch course ${course.id}`);
-              await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-                dispatch_status: 'redispatch',
-                dispatch_notified_ids: '[]',
-              });
-            }
+            // Mode direct (wave=0) — reset notifiés pour re-notifier tout le monde
+            console.log(`[DISPATCH] ⚡ Mode direct — reset notifiés + redispatch course ${course.id}`);
+            await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+              dispatch_status: 'redispatch',
+              dispatch_notified_ids: '[]',
+            });
           }
 
           const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);

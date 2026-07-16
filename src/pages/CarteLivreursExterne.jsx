@@ -301,23 +301,27 @@ export default function CarteLivreursExterne() {
   const compteursLivreurs = useMemo(() => {
     const eligibles = livreurs.filter(l => l.validation === "valide" && l.actif !== false);
     const cats = eligibles.map(l => getLivreurCategorie(l, livreurIdsEnCourseReelle));
+    const libresRecent = cats.filter(c => c === "libre_gps_recent").length;
+    const libresAncien = cats.filter(c => c === "libre_gps_ancien").length;
 
     return {
       total: eligibles.length,
-      libres: cats.filter(c => c === "libre_gps_valide").length,
-      sans_gps_valide: cats.filter(c => c === "sans_gps_valide").length,
+      libres: libresRecent + libresAncien,           // TOUS dispatchables (GPS ≤ 60 min)
+      libres_recent: libresRecent,                    // GPS ≤ 10 min (priorité max)
+      libres_ancien: libresAncien,                    // GPS 10-60 min (fallback)
+      sans_gps_valide: libresAncien,                  // alias rétro-compatibilité
       gps_expire: cats.filter(c => c === "gps_expire").length,
       enCourse: cats.filter(c => c === "en_course").length,
       hors_ligne: cats.filter(c => c === "hors_ligne").length,
       // Aliases for backward compatibility
-      verts: cats.filter(c => c === "libre_gps_valide").length,
+      verts: libresRecent + libresAncien,
       oranges: cats.filter(c => c === "en_course").length,
       noirs: cats.filter(c => c === "gps_expire").length + cats.filter(c => c === "hors_ligne").length,
       on: eligibles.filter(l => isON(l)).length,
       off: eligibles.filter(l => !isON(l)).length,
       appActive: eligibles.filter(l => isAppActive(l)).length,
       surCarte: eligibles.length,
-      visibleCarte: cats.filter(c => c === "libre_gps_valide" || c === "sans_gps_valide" || c === "en_course").length,
+      visibleCarte: libresRecent + libresAncien + cats.filter(c => c === "en_course").length,
     };
   }, [livreurs, livreurIdsEnCourseReelle]);
 
@@ -363,11 +367,13 @@ export default function CarteLivreursExterne() {
   const livreursAffiches = useMemo(() => {
     const eligibles = livreurs.filter(l => l.validation === "valide" && l.actif !== false);
     switch (filtreLivreur) {
-      case "noirs":     return eligibles.filter(l => ["gps_expire", "hors_ligne"].includes(getLivreurCategorie(l, livreurIdsEnCourseReelle)));
-      case "verts":     return eligibles.filter(l => getLivreurCategorie(l, livreurIdsEnCourseReelle) === "libre_gps_valide");
-      case "sans_gps":  return eligibles.filter(l => getLivreurCategorie(l, livreurIdsEnCourseReelle) === "sans_gps_valide");
-      case "oranges":   return eligibles.filter(l => getLivreurCategorie(l, livreurIdsEnCourseReelle) === "en_course");
-      default:          return livreurs;
+      case "noirs":       return eligibles.filter(l => ["gps_expire", "hors_ligne"].includes(getLivreurCategorie(l, livreurIdsEnCourseReelle)));
+      case "verts":       return eligibles.filter(l => ["libre_gps_recent", "libre_gps_ancien"].includes(getLivreurCategorie(l, livreurIdsEnCourseReelle)));
+      case "recent":      return eligibles.filter(l => getLivreurCategorie(l, livreurIdsEnCourseReelle) === "libre_gps_recent");
+      case "ancien":      return eligibles.filter(l => getLivreurCategorie(l, livreurIdsEnCourseReelle) === "libre_gps_ancien");
+      case "sans_gps":    return eligibles.filter(l => getLivreurCategorie(l, livreurIdsEnCourseReelle) === "libre_gps_ancien");
+      case "oranges":     return eligibles.filter(l => getLivreurCategorie(l, livreurIdsEnCourseReelle) === "en_course");
+      default:            return livreurs;
     }
   }, [livreurs, filtreLivreur, livreurIdsEnCourseReelle]);
 
@@ -414,8 +420,9 @@ export default function CarteLivreursExterne() {
   // ─── Filtres livreurs (pour la liste) ─────────────────────────────────────
   const FILTRES = [
     { key: "tous",      label: "Tous",           count: compteursLivreurs.total,          dot: "bg-gray-400" },
-    { key: "verts",     label: "Libres GPS",     count: compteursLivreurs.libres,         dot: "bg-green-500" },
-    { key: "sans_gps",  label: "Sans GPS",       count: compteursLivreurs.sans_gps_valide, dot: "bg-amber-500" },
+    { key: "verts",     label: "Libres",         count: compteursLivreurs.libres,         dot: "bg-green-500" },
+    { key: "recent",    label: "GPS récent",     count: compteursLivreurs.libres_recent,   dot: "bg-green-400" },
+    { key: "ancien",    label: "GPS ancien",     count: compteursLivreurs.libres_ancien,   dot: "bg-amber-500" },
     { key: "oranges",   label: "En course",      count: compteursLivreurs.oranges,         dot: "bg-orange-500" },
     { key: "noirs",     label: "Hors ligne",     count: compteursLivreurs.noirs,           dot: "bg-gray-700" },
   ];
@@ -466,20 +473,22 @@ export default function CarteLivreursExterne() {
             </div>
           </div>
 
-          {/* KPI tiles */}
-          <div className="grid grid-cols-5 gap-2 mt-5">
+          {/* KPI tiles — 6 compteurs livreurs */}
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mt-5">
             {[
-              { val: compteursLivreurs.libres,         label: "Libres GPS", sub: "dispatchables", dot: "bg-green-400",  glow: "shadow-green-500/20",   cat: "libre_gps_valide" },
-              { val: compteursLivreurs.sans_gps_valide, label: "Sans GPS",   sub: "GPS invalide",  dot: "bg-amber-400",  glow: "shadow-amber-500/20",   cat: "sans_gps_valide" },
-              { val: compteursClients.bleus,            label: "Clients GPS", sub: "< 30 min",      dot: "bg-blue-400",   glow: "shadow-blue-500/20",    cat: null },
-              { val: coursesEnAttente.length,            label: "En attente",  sub: `${coursesEnAttenteAvecGPS.length} avec GPS`, dot: "bg-red-400", glow: "shadow-red-500/20", cat: null },
-              { val: coursesVraimentActives.length,      label: "En cours",   sub: "livreur assigné", dot: "bg-orange-400", glow: "shadow-orange-500/20", cat: null },
+              { val: compteursLivreurs.libres,           label: "Libres",      sub: "GPS ≤ 60 min",    dot: "bg-green-400",  glow: "shadow-green-500/20",  cat: "libre_total" },
+              { val: compteursLivreurs.libres_recent,     label: "GPS récent",  sub: "≤ 10 min",        dot: "bg-green-500",  glow: "shadow-green-500/20",  cat: "libre_gps_recent" },
+              { val: compteursLivreurs.libres_ancien,     label: "GPS ancien",  sub: "10-60 min",       dot: "bg-amber-400",  glow: "shadow-amber-500/20",  cat: "libre_gps_ancien" },
+              { val: compteursLivreurs.gps_expire,        label: "GPS expiré",  sub: "> 60 min",        dot: "bg-gray-500",   glow: "shadow-gray-500/20",   cat: "gps_expire" },
+              { val: compteursLivreurs.enCourse,          label: "En course",   sub: "mission active",  dot: "bg-orange-400", glow: "shadow-orange-500/20", cat: "en_course" },
+              { val: compteursLivreurs.hors_ligne,        label: "Hors ligne",  sub: "inactifs",        dot: "bg-gray-600",   glow: "shadow-gray-600/20",   cat: "hors_ligne" },
             ].map((item, i) => (
               <button
                 key={i}
                 onClick={item.cat ? () => {
                   const eligibles = livreurs.filter(l => l.validation === "valide" && l.actif !== false);
-                  setCategoryDialog({ category: item.cat, livreurs: eligibles.filter(l => getLivreurCategorie(l, livreurIdsEnCourseReelle) === item.cat) });
+                  const cats = item.cat === "libre_total" ? ["libre_gps_recent", "libre_gps_ancien"] : [item.cat];
+                  setCategoryDialog({ category: item.cat, livreurs: eligibles.filter(l => cats.includes(getLivreurCategorie(l, livreurIdsEnCourseReelle))) });
                 } : undefined}
                 className={`bg-white/8 backdrop-blur-sm border border-white/10 rounded-2xl p-3 text-center shadow-lg ${item.glow} ${item.cat ? "hover:bg-white/15 cursor-pointer transition-all" : "cursor-default"}`}
               >
@@ -488,6 +497,21 @@ export default function CarteLivreursExterne() {
                 <p className="text-[10px] font-bold text-white/70 mt-1 leading-tight">{item.label}</p>
                 <p className="text-[9px] text-white/35 mt-0.5">{item.sub}</p>
               </button>
+            ))}
+          </div>
+          {/* Operational counters */}
+          <div className="grid grid-cols-3 gap-2 mt-2">
+            {[
+              { val: compteursClients.bleus,            label: "Clients GPS",  sub: "< 30 min",                    dot: "bg-blue-400" },
+              { val: coursesEnAttente.length,            label: "En attente",   sub: `${coursesEnAttenteAvecGPS.length} avec GPS`, dot: "bg-red-400" },
+              { val: coursesVraimentActives.length,      label: "En cours",     sub: "livreur assigné",             dot: "bg-orange-400" },
+            ].map((item, i) => (
+              <div key={i} className="bg-white/5 backdrop-blur-sm border border-white/5 rounded-xl p-2.5 text-center">
+                <div className={`w-1.5 h-1.5 rounded-full ${item.dot} mx-auto mb-1.5`} />
+                <p className="text-lg font-black text-white leading-none">{item.val}</p>
+                <p className="text-[9px] font-bold text-white/60 mt-1">{item.label}</p>
+                <p className="text-[8px] text-white/30">{item.sub}</p>
+              </div>
             ))}
           </div>
         </div>

@@ -8,15 +8,8 @@ import { isGPSRecent, hasValidGPS, isAppActive, isON, isLibre, isEnCourse, isCli
  * Livreur noir = non dispatchable
  * SOURCE UNIQUE : même règle que DispatchMap et CarteLivreursExterne
  * 
- * NOUVELLE RÈGLE : Disponibilité métier uniquement
- * Noir = hors_ligne OU inactif OU non validé OU pas de GPS
- * 
- * ⚠️ heartbeat et GPS ancien NE sont PLUS des critères d'exclusion
- * Un livreur peut être :
- *   - 🟢 Libre (disponible + ON + validé + GPS)
- *   - 📍 GPS ancien (20+ min)
- *   - 📡 Heartbeat ancien (app fermée)
- *   - → Reste dispatchable (recevra WhatsApp)
+ * Noir = hors_ligne OU gps_expire (GPS > 60 min ou absent)
+ * Un livreur avec GPS 10-60 min reste dispatchable (non noir).
  */
 export function isLivreurNoir(livreur, livreurIdsEnCourseReelle) {
   const cat = getLivreurCategorie(livreur, livreurIdsEnCourseReelle);
@@ -26,21 +19,24 @@ export function isLivreurNoir(livreur, livreurIdsEnCourseReelle) {
 /**
  * Calcule TOUS les compteurs livreurs avec une source unique de vérité
  * @param {Array} livreurs - Liste des livreurs (déjà filtrés: validation === "valide" && actif !== false)
+ * @param {Set} livreurIdsEnCourseReelle - IDs des livreurs avec course active
  * @returns {Object} - Compteurs détaillés
  */
 export function calculateLivreurCounters(livreurs, livreurIdsEnCourseReelle) {
   const cats = livreurs.map(l => getLivreurCategorie(l, livreurIdsEnCourseReelle));
-  const libres = cats.filter(c => c === "libre_gps_valide").length;
-  const sansGPS = cats.filter(c => c === "sans_gps_valide").length;
+  const libresRecent = cats.filter(c => c === "libre_gps_recent").length;
+  const libresAncien = cats.filter(c => c === "libre_gps_ancien").length;
   const expires = cats.filter(c => c === "gps_expire").length;
   const enCourse = cats.filter(c => c === "en_course").length;
   const horsLigne = cats.filter(c => c === "hors_ligne").length;
 
   return {
     total: livreurs.length,
-    libres,                     // dispatchables (GPS < 10 min)
-    sans_gps_valide: sansGPS,   // disponible mais GPS invalide (10-60 min ou absent)
-    gps_expire: expires,        // GPS > 60 min (app fermée)
+    libres: libresRecent + libresAncien,  // TOUS dispatchables (GPS ≤ 60 min)
+    libres_recent: libresRecent,           // GPS ≤ 10 min (priorité max)
+    libres_ancien: libresAncien,           // GPS 10-60 min (priorité fallback)
+    sans_gps_valide: libresAncien,         // alias rétro-compatibilité
+    gps_expire: expires,                   // GPS > 60 min (non dispatchable)
     enCourse,
     hors_ligne: horsLigne,
     // Aliases for backward compatibility
@@ -48,11 +44,11 @@ export function calculateLivreurCounters(livreurs, livreurIdsEnCourseReelle) {
     off: livreurs.filter(l => !isON(l)).length,
     appActive: livreurs.filter(l => isAppActive(l)).length,
     noirs: expires + horsLigne,
-    verts: libres,
+    verts: libresRecent + libresAncien,    // tous les dispatchables
     oranges: enCourse,
     surCarte: livreurs.length,
-    // Marqueurs visibles = libre_gps_valide + sans_gps_valide + en_course
-    visibleCarte: libres + sansGPS + enCourse,
+    // Marqueurs visibles = libre_gps_recent + libre_gps_ancien + en_course
+    visibleCarte: libresRecent + libresAncien + enCourse,
   };
 }
 
