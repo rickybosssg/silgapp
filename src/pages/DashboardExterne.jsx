@@ -131,9 +131,18 @@ export default function DashboardExterne() {
     [clients]
   );
 
+  // IDs des livreurs avec une course réellement active (pour les compteurs précis)
+  const livreurIdsEnCourseReelle = useMemo(() => {
+    const STATUTS_OCCUPE = ["livreur_en_route", "colis_recupere", "en_livraison"];
+    return new Set(coursesEnTraitement.filter(c => STATUTS_OCCUPE.includes(c.statut) && c.livreur_id).map(c => c.livreur_id));
+  }, [coursesEnTraitement]);
+
   const compteursLivreurs = useMemo(() =>
-    calculateLivreurCounters(livreurs.filter(l => l.validation === "valide" && l.actif !== false)),
-    [livreurs]
+    calculateLivreurCounters(
+      livreurs.filter(l => l.validation === "valide" && l.actif !== false),
+      livreurIdsEnCourseReelle
+    ),
+    [livreurs, livreurIdsEnCourseReelle]
   );
 
   const compteursClients = useMemo(() =>
