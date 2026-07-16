@@ -147,13 +147,13 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
     return true;
   });
 
-  // 🎯 NOUVELLE LOGIQUE : classification par âge GPS (pas heartbeat)
-  // N1 = GPS ≤ 10 min (priorité maximale, trié par distance)
-  // N2 = GPS 10-60 min (fallback dispatchable, trié par distance)
-  // 🚫 GPS > 60 min ou absent = EXCLU du dispatch
-  const niveau1 = [], niveau2 = [];
-  const GPS_RECENT_SEUIL_MIN = 10;
+  // 🎯 NOUVELLE LOGIQUE : proximité d'abord, GPS en second
+  // Tous les livreurs avec GPS ≤ 60 min sont éligibles.
+  // Tri principal : distance au point de prise en charge.
+  // Tiebreaker : si distance < 100m d'écart, privilégier GPS le plus récent.
+  const candidats = [];
   const GPS_EXPIRE_SEUIL_MIN = 60;
+  const TIEBREAKER_DISTANCE_M = 100;
 
   // 🧠 Résoudre les coordonnées de pickup : GPS > quartier > fallback large
   let pickupLat = course.gps_depart_lat;
@@ -207,17 +207,11 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
       distance = calculerDistance(pickupLat, pickupLng, l.latitude, l.longitude);
     }
 
-    const enriched = { ...l, distance, heartbeatAgeMin, gpsAgeMin };
-
-    if (gpsAgeMin < GPS_RECENT_SEUIL_MIN) {
-      niveau1.push(enriched); // N1 : GPS ≤ 10 min → priorité maximale
-    } else {
-      niveau2.push(enriched); // N2 : GPS 10-60 min → priorité fallback
-    }
+    candidats.push({ ...l, distance, heartbeatAgeMin, gpsAgeMin });
   });
 
-  // Trier chaque niveau par distance (ou par GPS recency si pas de distance)
-  [niveau1, niveau2].forEach(n => n.sort((a, b) => {
+  // 🎯 Tri : distance d'abord, GPS en tiebreaker si < 100m d'écart
+  candidats.sort((a, b) => {
     if (a.distance === null && b.distance === null) {
       const gpsA = a.gpsAgeMin !== null ? a.gpsAgeMin : 999;
       const gpsB = b.gpsAgeMin !== null ? b.gpsAgeMin : 999;
@@ -225,12 +219,20 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
     }
     if (a.distance === null) return 1;
     if (b.distance === null) return -1;
+    // Si moins de 100m d'écart → privilégier le GPS le plus récent
+    if (Math.abs(a.distance - b.distance) < TIEBREAKER_DISTANCE_M) {
+      const gpsA = a.gpsAgeMin !== null ? a.gpsAgeMin : 999;
+      const gpsB = b.gpsAgeMin !== null ? b.gpsAgeMin : 999;
+      return gpsA - gpsB;
+    }
     return a.distance - b.distance;
-  }));
+  });
 
-  const tous = [...niveau1, ...niveau2];
-  const niveau3 = []; // vide — conservé pour rétro-compatibilité
-  console.log(`[DISPATCH] 📊 ${tous.length} candidats (exclus: ${exclusions.length}) — N1:${niveau1.length} (GPS ≤ 10min) N2:${niveau2.length} (GPS 10-60min) — pickup: ${pickupSource}${pickupSource === 'quartier' ? ` (${course.quartier_depart})` : ''}`);
+  const tous = candidats;
+  const niveau1 = candidats; // rétro-compatibilité
+  const niveau2 = []; // vide
+  const niveau3 = []; // vide
+  console.log(`[DISPATCH] 📊 ${tous.length} candidats (exclus: ${exclusions.length}) — tri par distance, GPS en tiebreaker (< ${TIEBREAKER_DISTANCE_M}m) — pickup: ${pickupSource}`);
   return { tous, niveau1, niveau2, niveau3, pickupSource };
 }
 
@@ -376,26 +378,13 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
   // 🧠 Charger la config vagues GPS (utiliser le cache si disponible)
   const gpsConfig = cachedConfig?.gps || await chargerConfigVaguesGPS(base44);
 
-  // 🎯 NOUVELLE LOGIQUE : toujours utiliser les vagues GPS (N1 = GPS ≤ 10 min, N2 = GPS 10-60 min)
-  // N1 = priorité maximale, N2 = fallback dispatchable
-  // GPS > 60 min ou absent = déjà exclu par trouverLivreursCandidats
+  // 🎯 NOUVELLE LOGIQUE : tous les candidats (GPS ≤ 60 min) triés par distance
+  // Les vagues contrôlent uniquement la taille des lots, pas le filtrage GPS
   let wave = course.dispatch_wave || 1;
 
-  let candidats;
-  if (wave === 1) {
-    candidats = niveau1; // N1 uniquement (GPS ≤ 10 min)
-  } else {
-    candidats = [...niveau1, ...niveau2]; // N1 + N2 (tous dispatchables, GPS ≤ 60 min)
-  }
+  let candidats = candidatsTous;
 
-  // ⚡ Si N1 vide mais N2 a des candidats → passer directement à la vague 2
-  if (candidats.length === 0 && wave === 1 && niveau2.length > 0) {
-    wave = 2;
-    candidats = [...niveau1, ...niveau2];
-    console.log(`[DISPATCH] ⚡ N1 vide — passage direct vague 2 (N1+N2: ${candidats.length} candidats)`);
-  }
-
-  console.log(`[DISPATCH] 📍 Vague GPS ${wave}/${gpsConfig.waves.length} — N1:${niveau1.length} (≤ 10min) + N2:${niveau2.length} (10-60min) = ${candidats.length} candidats`);
+  console.log(`[DISPATCH] 📍 Vague ${wave}/${gpsConfig.waves.length} — ${candidats.length} candidats triés par distance`);
 
   // Récupérer les IDs déjà notifiés précédemment
   let dejaNotifies = [];

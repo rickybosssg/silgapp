@@ -76,12 +76,14 @@ export function isGPSRecentDispatch(livreur) {
 
 /**
  * Catégorie d'un livreur pour l'affichage et les compteurs
- * Retourne une des 5 catégories mutuellement exclusives :
- *   - "libre_gps_recent" : disponible + validé + actif + GPS ≤ 10 min (dispatchable, priorité max)
- *   - "libre_gps_ancien" : disponible + validé + actif + GPS 10-60 min (dispatchable, fallback)
- *   - "gps_expire"       : disponible + validé + actif + GPS > 60 min ou absent (non dispatchable)
- *   - "en_course"        : a une course active en cours
- *   - "hors_ligne"       : hors_ligne, bloqué, non validé ou autre statut
+ * Retourne une des 4 catégories mutuellement exclusives :
+ *   - "libre"      : disponible + validé + actif + GPS ≤ 60 min (dispatchable)
+ *   - "gps_expire" : disponible + validé + actif + GPS > 60 min ou absent (non dispatchable)
+ *   - "en_course"  : a une course active en cours
+ *   - "hors_ligne" : hors_ligne, bloqué, non validé ou autre statut
+ *
+ * NOTE : La distinction GPS récent/ancien est supprimée.
+ * Tous les GPS ≤ 60 min sont "libre" — le tri par distance se fait dans le moteur de dispatch.
  */
 export function getLivreurCategorie(livreur, livreurIdsEnCourseReelle) {
   if (livreur.actif === false) return "hors_ligne";
@@ -93,8 +95,7 @@ export function getLivreurCategorie(livreur, livreurIdsEnCourseReelle) {
   const dt = livreur.derniere_position_date || livreur.last_seen_at;
   if (!dt) return "gps_expire";
   const ageMin = (Date.now() - new Date(dt).getTime()) / 60000;
-  if (ageMin < GPS_DISPATCH_SEUIL_MIN) return "libre_gps_recent";
-  if (ageMin <= GPS_EXPIRE_SEUIL_MIN) return "libre_gps_ancien";
+  if (ageMin <= GPS_EXPIRE_SEUIL_MIN) return "libre";
   return "gps_expire";
 }
 

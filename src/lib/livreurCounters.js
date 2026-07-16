@@ -24,18 +24,17 @@ export function isLivreurNoir(livreur, livreurIdsEnCourseReelle) {
  */
 export function calculateLivreurCounters(livreurs, livreurIdsEnCourseReelle) {
   const cats = livreurs.map(l => getLivreurCategorie(l, livreurIdsEnCourseReelle));
-  const libresRecent = cats.filter(c => c === "libre_gps_recent").length;
-  const libresAncien = cats.filter(c => c === "libre_gps_ancien").length;
+  const libres = cats.filter(c => c === "libre").length;
   const expires = cats.filter(c => c === "gps_expire").length;
   const enCourse = cats.filter(c => c === "en_course").length;
   const horsLigne = cats.filter(c => c === "hors_ligne").length;
 
   return {
     total: livreurs.length,
-    libres: libresRecent + libresAncien,  // TOUS dispatchables (GPS ≤ 60 min)
-    libres_recent: libresRecent,           // GPS ≤ 10 min (priorité max)
-    libres_ancien: libresAncien,           // GPS 10-60 min (priorité fallback)
-    sans_gps_valide: libresAncien,         // alias rétro-compatibilité
+    libres,                                // TOUS dispatchables (GPS ≤ 60 min)
+    libres_recent: libres,                 // alias rétro-compatibilité
+    libres_ancien: 0,                      // plus de distinction
+    sans_gps_valide: 0,                    // alias rétro-compatibilité
     gps_expire: expires,                   // GPS > 60 min (non dispatchable)
     enCourse,
     hors_ligne: horsLigne,
@@ -44,11 +43,11 @@ export function calculateLivreurCounters(livreurs, livreurIdsEnCourseReelle) {
     off: livreurs.filter(l => !isON(l)).length,
     appActive: livreurs.filter(l => isAppActive(l)).length,
     noirs: expires + horsLigne,
-    verts: libresRecent + libresAncien,    // tous les dispatchables
+    verts: libres,                         // tous les dispatchables
     oranges: enCourse,
     surCarte: livreurs.length,
-    // Marqueurs visibles = libre_gps_recent + libre_gps_ancien + en_course
-    visibleCarte: libresRecent + libresAncien + enCourse,
+    // Marqueurs visibles = libre + en_course
+    visibleCarte: libres + enCourse,
   };
 }
 
