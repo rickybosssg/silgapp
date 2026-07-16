@@ -2,7 +2,7 @@
 // Fichier centralisé pour garantir l'uniformité des calculs dans toute l'application
 // Importer ce fichier dans DashboardExterne, CarteLivreursExterne, et tous les composants
 
-import { isGPSRecent, hasValidGPS, isAppActive, isON, isLibre, isEnCourse, isClientGPSRecent, isClientNoir } from "./dispatchRules";
+import { isGPSRecent, hasValidGPS, isAppActive, isON, isLibre, isEnCourse, isClientGPSRecent, isClientNoir, getLivreurCategorie, isGPSExpire, isLibreSansGPSValide } from "./dispatchRules";
 
 /**
  * Livreur noir = non dispatchable
@@ -19,15 +19,8 @@ import { isGPSRecent, hasValidGPS, isAppActive, isON, isLibre, isEnCourse, isCli
  *   - → Reste dispatchable (recevra WhatsApp)
  */
 export function isLivreurNoir(livreur, livreurIdsEnCourseReelle) {
-  if (!livreur.latitude || !livreur.longitude) return true;
-  if (livreur.statut === "hors_ligne") return true;
-  if (livreur.actif === false) return true;
-  if (livreur.validation !== "valide") return true;
-  // 🎯 CORRECTION : En course = avec course ACTIVE (peu importe le statut DB)
-  if (livreurIdsEnCourseReelle?.has(livreur.id)) return false;
-  // Disponible avec GPS = vert (même si GPS/heartbeat ancien)
-  if (livreur.statut === "disponible") return false;
-  return true;
+  const cat = getLivreurCategorie(livreur, livreurIdsEnCourseReelle);
+  return cat === "hors_ligne" || cat === "gps_expire";
 }
 
 /**
@@ -35,37 +28,31 @@ export function isLivreurNoir(livreur, livreurIdsEnCourseReelle) {
  * @param {Array} livreurs - Liste des livreurs (déjà filtrés: validation === "valide" && actif !== false)
  * @returns {Object} - Compteurs détaillés
  */
-export function calculateLivreurCounters(livreurs) {
-  const libres = livreurs.filter(l => isLibre(l));
-  const enCourse = livreurs.filter(l => isEnCourse(l));
-  
-  // 🔍 Diagnostic pour débogage
-  console.log("🎯 calculateLivreurCounters:", {
-    total: livreurs.length,
-    libres_count: libres.length,
-    libres_ids: libres.map(l => l.id.slice(-8)),
-    enCourse_count: enCourse.length,
-    details: libres.map(l => ({
-      id: l.id.slice(-8),
-      nom: `${l.prenom} ${l.nom}`,
-      statut: l.statut,
-      isON: isON(l),
-      isAppActive: isAppActive(l),
-      hasValidGPS: hasValidGPS(l),
-    })),
-  });
-  
+export function calculateLivreurCounters(livreurs, livreurIdsEnCourseReelle) {
+  const cats = livreurs.map(l => getLivreurCategorie(l, livreurIdsEnCourseReelle));
+  const libres = cats.filter(c => c === "libre_gps_valide").length;
+  const sansGPS = cats.filter(c => c === "sans_gps_valide").length;
+  const expires = cats.filter(c => c === "gps_expire").length;
+  const enCourse = cats.filter(c => c === "en_course").length;
+  const horsLigne = cats.filter(c => c === "hors_ligne").length;
+
   return {
     total: livreurs.length,
+    libres,                     // dispatchables (GPS < 10 min)
+    sans_gps_valide: sansGPS,   // disponible mais GPS invalide (10-60 min ou absent)
+    gps_expire: expires,        // GPS > 60 min (app fermée)
+    enCourse,
+    hors_ligne: horsLigne,
+    // Aliases for backward compatibility
     on: livreurs.filter(l => isON(l)).length,
     off: livreurs.filter(l => !isON(l)).length,
-    libres: libres.length,
-    enCourse: enCourse.length,
     appActive: livreurs.filter(l => isAppActive(l)).length,
-    noirs: livreurs.filter(l => isLivreurNoir(l)).length,
-    verts: libres.length,      // alias pour libres
-    oranges: enCourse.length,  // alias pour enCourse
-    surCarte: livreurs.length, // TOUS les livreurs enregistrés
+    noirs: expires + horsLigne,
+    verts: libres,
+    oranges: enCourse,
+    surCarte: livreurs.length,
+    // Marqueurs visibles = libre_gps_valide + sans_gps_valide + en_course
+    visibleCarte: libres + sansGPS + enCourse,
   };
 }
 
