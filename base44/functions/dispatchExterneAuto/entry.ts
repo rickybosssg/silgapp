@@ -836,7 +836,23 @@ Deno.serve(async (req) => {
         updateData.timeout_expires_at = new Date(Date.now() + 5 * 60 * 1000).toISOString();
       }
 
-      await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);
+      // 🔐 MISE À JOUR ATOMIQUE CONDITIONNELLE — empêche la course condition (race condition)
+      // où deux livreurs passent le double-check simultanément. Le updateMany ne modifie
+      // la course QUE si dispatch_status est toujours 'propose' ET livreur_id toujours vide.
+      // Si un autre livreur a déjà verrouillé la course, 0 enregistrement sera modifié.
+      await base44.asServiceRole.entities.CourseExterne.updateMany(
+        { id: course_id, dispatch_status: 'propose', livreur_id: '' },
+        { $set: updateData }
+      );
+
+      // ✅ Vérification post-update : confirmer que CE livreur détient bien le verrou
+      const courseVerifie = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+      const isMyCourse = String(courseVerifie.livreur_id) === String(livreur_id) ||
+                         String(courseVerifie.accepted_by_livreur_id) === String(livreur_id);
+      if (!isMyCourse) {
+        console.warn(`[DISPATCH] 🏁 Race condition perdue — livreur ${livreur_id} n'a pas obtenu la course ${course_id} (attribuée à ${courseVerifie.livreur_id || courseVerifie.accepted_by_livreur_id || '?'})`);
+        return Response.json(reponseDejaPrise('race_condition_lost', courseVerifie));
+      }
 
       if (!isManual) {
         await base44.asServiceRole.entities.Livreur.update(livreur_id, { statut: 'en_course' });
