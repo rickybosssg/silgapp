@@ -339,14 +339,22 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
     return { ignore: true, statut: course.statut };
   }
 
-  // 🛡️ Fusionner les exclusions passées en paramètre AVEC les IDs déjà notifiés
-  // stockés sur la course (dispatch_notified_ids). Cela garantit qu'un livreur
-  // ayant annulé ou déjà été notifié ne soit JAMAIS re-sollicité pour cette course.
-  let dejaNotifiesFusion = [];
-  try { dejaNotifiesFusion = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
+  // 🎯 RECALCUL DYNAMIQUE à chaque vague (style Uber Eats / Glovo / DoorDash)
+  // À chaque appel, trouverLivreursCandidats refait une requête DB fraîche :
+  //   - Positions GPS actuelles ( recalcul des distances )
+  //   - Statut de disponibilité ( exclusion des indisponibles / en course )
+  //   - Ajout automatique des nouveaux livreurs devenus disponibles
+  //
+  // Seuls les livreurs ayant EXPLICITEMENT refusé (dispatch_refused_ids) sont exclus
+  // de façon permanente. Les livreurs déjà notifiés mais non refusés RESTENT éligibles :
+  // si leur position GPS actuelle les place encore parmi les meilleurs, ils peuvent être
+  // re-notifiés. Le classement est toujours calculé à l'instant T, jamais réutilisé.
   let dejaRefuses = [];
   try { dejaRefuses = JSON.parse(course.dispatch_refused_ids || '[]'); } catch {}
-  exclusions = [...new Set([...exclusions, ...dejaNotifiesFusion, ...dejaRefuses])];
+  exclusions = [...new Set([...exclusions, ...dejaRefuses])];
+
+  const waveNum = course.dispatch_wave || 0;
+  console.log(`[DISPATCH] 🔄 Vague ${waveNum + 1} — recalcul dynamique des candidats (GPS, distances, statut) pour course ${courseId}`);
 
   // Si un livreur détient le verrou actif → attendre
   if (course.dispatch_status === 'propose' && course.livreur_id && course.timeout_expires_at) {
