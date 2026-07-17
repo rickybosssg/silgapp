@@ -8,6 +8,7 @@ import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useClientNotifications } from "@/hooks/useClientNotifications";
 import { registerPushToken } from "@/lib/notifications";
+import { usePushTokenRetry } from "@/hooks/usePushTokenRetry";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { 
@@ -220,6 +221,13 @@ export default function ClientExterneApp() {
       client_id: clientProfil.id,
     }).catch(() => null);
   }, [clientProfil?.id, clientProfil?.user_email]);
+
+  // ── Relance automatique du token push au retour au premier plan ──
+  usePushTokenRetry(null, clientProfil?.user_email ? {
+    email: clientProfil.user_email,
+    user_type: "client",
+    client_id: clientProfil.id,
+  } : null);
 
   useEffect(() => {
     loadProfil();

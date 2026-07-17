@@ -5,6 +5,7 @@ import { clearPersistedToken } from "@/lib/authPersistence";
 import { Truck } from "lucide-react";
 import { toast } from "sonner";
 import { registerPushToken, subscribeToNotifications } from "@/lib/notifications";
+import { usePushTokenRetry } from "@/hooks/usePushTokenRetry";
 import { requestNativeAppPermissions } from "@/lib/nativePermissions";
 import GPSIndicateur from "@/components/livreur/GPSIndicateur";
 import LivreurHeader from "@/components/livreur/LivreurHeader";
@@ -59,6 +60,13 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
     );
     return () => unsub?.();
   }, [livreurProfil?.id, livreurProfil?.user_email]);
+
+  // ── Relance automatique du token push au retour au premier plan ──
+  usePushTokenRetry(livreurProfil?.id, livreurProfil?.user_email ? {
+    email: livreurProfil.user_email,
+    user_type: "livreur",
+    livreur_id: livreurProfil.id,
+  } : null);
 
   // ── Heartbeat app_active ──────────────────────────────────────────────────
   // Marque le livreur comme actif dans l'app et met à jour last_seen_at

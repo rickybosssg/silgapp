@@ -10,6 +10,7 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 
 import { registerPushToken, subscribeToNotifications, consumePendingNotificationData } from "@/lib/notifications";
+import { usePushTokenRetry } from "@/hooks/usePushTokenRetry";
 import { requestNativeAppPermissions } from "@/lib/nativePermissions";
 import { startNativeBackgroundHeartbeat } from "@/lib/nativeAndroid";
 import { ensureBatteryOptimizationExemption } from "@/lib/batteryOptimization";
@@ -357,6 +358,13 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     consumePendingNotificationData();
     return () => window.removeEventListener("silgapp:notification-opened", handleNotificationOpened);
   }, [queryClient, livreurId]);
+
+  // ── Relance automatique du token push au retour au premier plan ──
+  usePushTokenRetry(livreurId, livreurEmail ? {
+    email: livreurEmail,
+    user_type: "livreur",
+    livreur_id: livreurId,
+  } : null);
 
   useEffect(() => {
     const handleUrgentAlertStarted = (event) => {

@@ -15,6 +15,7 @@ import OngletCodePromoPartenaire from "@/components/partenaire/OngletCodePromoPa
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { registerPushToken } from "@/lib/notifications";
+import { usePushTokenRetry } from "@/hooks/usePushTokenRetry";
 
 export default function PartenaireDashboard() {
   const [user, setUser] = useState(null);
@@ -30,6 +31,9 @@ export default function PartenaireDashboard() {
       }
     }).catch(() => {});
   }, []);
+
+  // ── Relance automatique du token push au retour au premier plan ──
+  usePushTokenRetry(null, user?.email ? { ...user, user_type: "partenaire" } : null);
 
   const { data: maBoutique, isLoading: loadingBoutique } = useQuery({
     queryKey: ["ma-boutique", user?.id],
