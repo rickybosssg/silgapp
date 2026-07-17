@@ -320,7 +320,7 @@ export default function Statistiques() {
       </div>
 
       {/* ── INSTALLATIONS ── */}
-      <InstallationsSection installations={installations} evolution={evolution.installations} />
+      <InstallationsSection installations={installations} evolution={evolution.installations} activeUsers={kpis.utilisateurs_connectes || 0} />
     </div>
   );
 }

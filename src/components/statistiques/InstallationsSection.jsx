@@ -2,7 +2,7 @@ import React from "react";
 import { Smartphone, Apple, Monitor } from "lucide-react";
 import { motion } from "framer-motion";
 
-export default function InstallationsSection({ installations, evolution }) {
+export default function InstallationsSection({ installations, evolution, activeUsers = 0 }) {
   const cards = [
     {
       label: "Android",
@@ -31,18 +31,43 @@ export default function InstallationsSection({ installations, evolution }) {
   ];
 
   const total = installations?.total || 0;
+  const engagementRate = total > 0 ? Math.round((activeUsers / total) * 100) : 0;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-      <div className="flex items-center gap-2 mb-4">
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-          <Smartphone className="w-4 h-4 text-white" />
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+            <Smartphone className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-900 text-sm">Installations de l'application</h3>
+            <p className="text-xs text-gray-500">{total} installation{total > 1 ? "s" : ""} unique{total > 1 ? "s" : ""} au total</p>
+          </div>
         </div>
-        <div>
-          <h3 className="font-bold text-gray-900 text-sm">Installations de l'application</h3>
-          <p className="text-xs text-gray-500">{total} installation{total > 1 ? "s" : ""} unique{total > 1 ? "s" : ""} au total</p>
-        </div>
+        {activeUsers > 0 && (
+          <div className="flex items-center gap-2 bg-violet-50 border border-violet-100 rounded-xl px-3 py-1.5">
+            <span className="w-2 h-2 rounded-full bg-violet-500 animate-pulse" />
+            <span className="text-xs font-bold text-violet-700">{activeUsers}</span>
+            <span className="text-xs text-violet-500">actifs · {engagementRate}%</span>
+          </div>
+        )}
       </div>
+
+      {/* Barre Installés vs Actifs */}
+      {activeUsers > 0 && total > 0 && (
+        <div className="mb-4 bg-gray-50 rounded-xl p-3">
+          <div className="flex items-center justify-between text-xs mb-1.5">
+            <span className="font-semibold text-gray-600">Installés: <span className="text-gray-900">{total.toLocaleString()}</span></span>
+            <span className="font-semibold text-violet-600">Actifs: {activeUsers.toLocaleString()}</span>
+          </div>
+          <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden flex">
+            <div className="h-full bg-gradient-to-r from-violet-500 to-purple-600 rounded-full transition-all duration-700" style={{ width: `${engagementRate}%` }} />
+            <div className="h-full bg-gray-300 transition-all duration-700" style={{ width: `${100 - engagementRate}%` }} />
+          </div>
+          <p className="text-[10px] text-gray-400 mt-1">Taux d'engagement : {engagementRate}% des appareils installés sont actifs</p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {cards.map((c, i) => {
