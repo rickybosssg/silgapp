@@ -271,7 +271,7 @@ export default function DusLivreursExternes() {
     // Livreurs avec solde dû > 0 même sans course dans la période
     livreurs.forEach(l => {
       if (map[l.id]) return;
-      const du = l.encours ?? 0;
+      const du = l.montant_du_silga ?? l.encours ?? 0;
       if (du > 0) {
         map[l.id] = { id: l.id, nom: l.nom || "Inconnu", prenom: l.prenom || "", telephone: l.telephone || "", livreurInfo: l, courses: [], montantTotal: 0, commissionTotal: 0, montantPaye: 0, montantDu: du };
       }
@@ -279,11 +279,12 @@ export default function DusLivreursExternes() {
     Object.values(map).forEach(entry => {
       const info = entry.livreurInfo;
       if (info) {
-        // encours est la source de vérité (commissions accumulées non réglées)
-        entry.montantDu = info.encours ?? 0;
+        // montant_du_silga est la source de vérité (mis à jour à chaque livraison)
+        // encours est conservé pour rétrocompatibilité mais n'est plus fiable
+        entry.montantDu = info.montant_du_silga ?? info.encours ?? 0;
         entry.montantPaye = Math.max(0, entry.commissionTotal - entry.montantDu);
       } else {
-        // Pas d'info livreur — calcul de secours basé sur les courses
+        // Pas d'info livreur — calcul de secours basé sur les courses impayées
         entry.montantDu = Math.max(0, entry.commissionTotal - entry.montantPaye);
       }
     });
