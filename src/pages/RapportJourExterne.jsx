@@ -1,10 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, CheckCircle2, MapPin, Clock, User } from "lucide-react";
-import { format, startOfDay, endOfDay } from "date-fns";
+import { ArrowLeft, CheckCircle2, MapPin, Clock, User, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { format, startOfDay, endOfDay, addDays, isToday as isDateToday } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import CountrySelector from "@/components/international/CountrySelector.jsx";
@@ -12,6 +12,7 @@ import CountrySelector from "@/components/international/CountrySelector.jsx";
 export default function RapportJourExterne() {
   const { isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
   const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
+  const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()));
 
   const { data: courses = [] } = useQuery({
     queryKey: ["courses-externes-rapport", effectiveCountry || "all"],
@@ -22,13 +23,15 @@ export default function RapportJourExterne() {
     refetchInterval: 10000,
   });
 
-  const today = startOfDay(new Date());
+  const dayStart = selectedDate;
+  const dayEnd = endOfDay(selectedDate);
+  const isTodayReport = isDateToday(selectedDate);
 
   const coursesToday = useMemo(() =>
     courses.filter(c => {
       const date = new Date(c.created_date);
-      return date >= today && date <= endOfDay(today);
-    }), [courses]);
+      return date >= dayStart && date <= dayEnd;
+    }), [courses, dayStart, dayEnd]);
 
   const stats = useMemo(() => {
     const livrees   = coursesToday.filter(c => c.statut === "livree");
@@ -77,9 +80,52 @@ export default function RapportJourExterne() {
             <div>
               <h1 className="text-xl font-black text-white tracking-tight">Rapport du Jour — Externe</h1>
               <p className="text-white/65 text-xs mt-0.5 capitalize">
-                {format(today, "EEEE d MMMM yyyy", { locale: fr })} {effectiveCountry ? `· ${effectiveCountry}` : "· tous pays"}
+                {format(selectedDate, "EEEE d MMMM yyyy", { locale: fr })} {effectiveCountry ? `· ${effectiveCountry}` : "· tous pays"}
               </p>
             </div>
+          </div>
+
+          {/* Navigation entre jours */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-white hover:bg-white/20 border border-white/30 h-9 w-9 p-0"
+              onClick={() => setSelectedDate(d => startOfDay(addDays(d, -1)))}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <div className="relative">
+              <Calendar className="w-3.5 h-3.5 text-white/60 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none z-10" />
+              <input
+                type="date"
+                value={format(selectedDate, "yyyy-MM-dd")}
+                max={format(new Date(), "yyyy-MM-dd")}
+                onChange={e => {
+                  if (e.target.value) setSelectedDate(startOfDay(new Date(e.target.value)));
+                }}
+                className="h-9 pl-7 pr-1 rounded-md bg-white/20 text-white text-xs border border-white/30 [color-scheme:dark] cursor-pointer"
+              />
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-white hover:bg-white/20 border border-white/30 h-9 w-9 p-0 disabled:opacity-30 disabled:cursor-not-allowed"
+              onClick={() => setSelectedDate(d => startOfDay(addDays(d, 1)))}
+              disabled={isTodayReport}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+            {!isTodayReport && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-white hover:bg-white/20 border border-white/30 h-9 px-2 text-xs"
+                onClick={() => setSelectedDate(startOfDay(new Date()))}
+              >
+                Aujourd'hui
+              </Button>
+            )}
           </div>
           {/* Sélecteur pays — affiché uniquement pour les admins globaux */}
           {!isPays && (
@@ -140,7 +186,7 @@ export default function RapportJourExterne() {
             </div>
             <div>
               <p className="font-bold text-foreground">Performance livreurs</p>
-              <p className="text-xs text-muted-foreground">{stats.livreurStats.length} livreur{stats.livreurStats.length > 1 ? "s" : ""} actif{stats.livreurStats.length > 1 ? "s" : ""} aujourd'hui</p>
+              <p className="text-xs text-muted-foreground">{stats.livreurStats.length} livreur{stats.livreurStats.length > 1 ? "s" : ""} actif{stats.livreurStats.length > 1 ? "s" : ""} ce jour</p>
             </div>
           </div>
           <div className="space-y-2">
@@ -168,14 +214,14 @@ export default function RapportJourExterne() {
           </div>
           <div>
             <p className="font-bold text-foreground">Courses livrées</p>
-            <p className="text-xs text-muted-foreground">{livreesDetail.length} livraison{livreesDetail.length > 1 ? "s" : ""} aujourd'hui</p>
+            <p className="text-xs text-muted-foreground">{livreesDetail.length} livraison{livreesDetail.length > 1 ? "s" : ""} {isTodayReport ? "aujourd'hui" : "ce jour"}</p>
           </div>
         </div>
 
         {livreesDetail.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3 text-2xl">📦</div>
-            <p className="font-semibold text-sm">Aucune course livrée aujourd'hui</p>
+            <p className="font-semibold text-sm">Aucune course livrée {isTodayReport ? "aujourd'hui" : "ce jour"}</p>
           </div>
         ) : (
           <div className="space-y-2">
