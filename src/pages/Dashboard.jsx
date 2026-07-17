@@ -67,10 +67,13 @@ export default function Dashboard() {
   );
 
   // Courses terminées aujourd'hui
+  // ⚠️ On utilise heure_livraison || created_date — JAMAIS updated_date
+  // car updated_date est modifié par les tâches de maintenance/correction auto,
+  // ce qui ferait réapparaître d'anciennes courses annulées dans l'historique du jour.
   const coursesTerminees = useMemo(
     () => courses.filter(c =>
       ["livree", "annulee"].includes(c.statut) &&
-      isToday(new Date(c.heure_livraison || c.updated_date || c.created_date))
+      isToday(new Date(c.heure_livraison || c.created_date))
     ),
     [courses]
   );
@@ -94,11 +97,11 @@ export default function Dashboard() {
   const stats = useMemo(() => {
     const todayAll = courses.filter(c => isToday(new Date(c.created_date)));
     const total = todayAll.length;
-    const livrees = courses.filter(c => c.statut === "livree" && isToday(new Date(c.heure_livraison || c.updated_date || c.created_date))).length;
+    const livrees = courses.filter(c => c.statut === "livree" && isToday(new Date(c.heure_livraison || c.created_date))).length;
     const annulees = todayAll.filter(c => c.statut === "annulee").length;
     const enCours = coursesEnTraitement.length;
     const aDispatcher = coursesADispatcher.length;
-    const ca = courses.filter(c => c.statut === "livree" && isToday(new Date(c.heure_livraison || c.updated_date || c.created_date)))
+    const ca = courses.filter(c => c.statut === "livree" && isToday(new Date(c.heure_livraison || c.created_date)))
       .reduce((s, c) => s + (c.prix_reel || c.prix || 0), 0);
     const dispoLivreurs = livreursEnLigne.filter(l => l.statut === "disponible").length;
     return { total, livrees, annulees, enCours, aDispatcher, ca, dispoLivreurs };

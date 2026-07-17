@@ -107,10 +107,13 @@ export default function DashboardExterne() {
     return coursesFiltrees.filter(c => c.type_course === filtreTypeDashboard);
   }, [coursesFiltrees, filtreTypeDashboard]);
 
+  // ⚠️ On utilise heure_livraison || created_date — JAMAIS updated_date
+  // car updated_date est modifié par les tâches de maintenance/correction auto,
+  // ce qui ferait réapparaître d'anciennes courses annulées dans l'historique du jour.
   const coursesTerminees = useMemo(
     () => coursesFiltrees.filter(c =>
       ["livree", "annulee"].includes(c.statut) &&
-      isToday(new Date(c.heure_livraison || c.updated_date || c.created_date))
+      isToday(new Date(c.heure_livraison || c.created_date))
     ),
     [coursesFiltrees]
   );
