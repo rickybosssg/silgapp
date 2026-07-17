@@ -29,9 +29,13 @@ export default function LivreurDetailDialog({ livreur, open, onClose }) {
     onError: () => toast.error("Erreur lors de la validation du paiement"),
   });
 
+  const isExterne = livreur.type_livreur === "externe";
+
   const { data: courses = [] } = useQuery({
-    queryKey: ["courses-all"],
-    queryFn: () => base44.entities.Course.list("-created_date", 1000),
+    queryKey: [isExterne ? "courses-externes-all" : "courses-all"],
+    queryFn: () => isExterne
+      ? base44.entities.CourseExterne.list("-created_date", 1000)
+      : base44.entities.Course.list("-created_date", 1000),
     initialData: [],
   });
 
@@ -45,11 +49,18 @@ export default function LivreurDetailDialog({ livreur, open, onClose }) {
 
     const livrees = todayCourses.filter(c => c.statut === "livree");
     const annulees = todayCourses.filter(c => c.statut === "annulee");
-    const enCours = todayCourses.filter(c => ["acceptee", "colis_recupere", "en_livraison"].includes(c.statut));
+    const enCours = todayCourses.filter(c => ["acceptee", "colis_recupere", "en_livraison", "livreur_en_route", "pris_en_charge"].includes(c.statut));
     const refusees = livreurCourses.filter(c => c.statut === "nouvelle" && !c.livreur_id);
 
-    const totalEncaisse = livrees.reduce((sum, c) => sum + (c.prix_reel || 0), 0);
-    const montantDu = totalEncaisse;
+    const totalEncaisse = isExterne
+      ? livrees.reduce((sum, c) => {
+          const isPrixManuel = c.pricing_mode === "manual" && c.manual_price_status === "accepted" && Number(c.manual_price) > 0;
+          return sum + (isPrixManuel ? Number(c.manual_price) : (c.prix_final || 0));
+        }, 0)
+      : livrees.reduce((sum, c) => sum + (c.prix_reel || 0), 0);
+    const montantDu = isExterne
+      ? livrees.reduce((sum, c) => sum + (c.commission_silga || 0), 0)
+      : totalEncaisse;
 
     return {
       coursesLivrees: livrees.length,
@@ -197,9 +208,17 @@ export default function LivreurDetailDialog({ livreur, open, onClose }) {
                         <span className="ml-1 font-medium">{course.adresse_arrivee || "N/A"}</span>
                       </div>
                     </div>
-                    {course.prix_reel && (
+                    {(isExterne ? (course.prix_final || (course.pricing_mode === "manual" && course.manual_price_status === "accepted" ? course.manual_price : 0)) : course.prix_reel) > 0 && (
                       <div className="mt-2 text-right font-bold text-blue-600">
-                        {course.prix_reel.toLocaleString()} FCFA
+                        {(isExterne
+                          ? (course.pricing_mode === "manual" && course.manual_price_status === "accepted" ? Number(course.manual_price) : Number(course.prix_final || 0))
+                          : Number(course.prix_reel)
+                        ).toLocaleString()} FCFA
+                        {isExterne && course.montant_livreur > 0 && (
+                          <span className="ml-2 text-green-600 text-xs">
+                            (gain: {Number(course.montant_livreur).toLocaleString()} F)
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>

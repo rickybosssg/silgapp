@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
     const allCourses = await base44.asServiceRole.entities.CourseExterne.filter(
       { country_code: effectiveCountry },
       '-created_date',
-      100,
+      500,
     );
 
     const coursesPourLivreur = allCourses.filter((c) => {
