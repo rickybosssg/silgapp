@@ -879,6 +879,7 @@ Deno.serve(async (req) => {
       // Mode manuel : notifier le client
       try {
         let clientEmail = null;
+        let clientIdForPush = course.expediteur_client_id || null;
         if (course.created_by_id) {
           try { const creator = await base44.asServiceRole.entities.User.get(course.created_by_id); clientEmail = creator?.email || null; } catch (_) {}
         }
@@ -888,15 +889,12 @@ Deno.serve(async (req) => {
         }
         if (clientEmail) {
           const prixMessage = `${livreur.prenom || ''} ${livreur.nom} propose cette course à ${Number(manual_price).toLocaleString()} ${course.devise || 'FCFA'}. Acceptez-vous ?`;
-          await base44.asServiceRole.entities.Notification.create({
-            titre: '💰 Prix proposé par le livreur',
-            message: prixMessage,
-            type: 'generic', course_id: course_id, destinataire_email: clientEmail, lue: false,
-          });
           // 📤 Push notification — le client n'est pas forcément dans l'app
+          // On n'appelle QUE envoiNotificationPush (qui crée déjà la notif en BDD + envoie le push FCM)
           try {
             await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
               destinataire_email: clientEmail,
+              client_id: clientIdForPush,
               titre: '💰 Prix proposé par le livreur',
               message: prixMessage,
               type: 'prix_manuel_propose',

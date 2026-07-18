@@ -15,6 +15,7 @@ const CLIENT_IMPORTANT_TYPES = [
   "course_annulee",
   "course_refusee",
   "rappel_reponse",
+  "prix_manuel_propose",
 ];
 
 const TYPE_LABELS = {
@@ -28,6 +29,7 @@ const TYPE_LABELS = {
   course_annulee:   "❌ Course annulée",
   course_refusee:   "🔄 Livreur indisponible",
   rappel_reponse:   "⏰ Rappel",
+  prix_manuel_propose: "💰 Prix proposé par le livreur",
 };
 
 /**
