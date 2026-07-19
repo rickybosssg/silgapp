@@ -1,0 +1,67 @@
+{
+  "name": "VenusBrand",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string",
+      "description": "Code unique de marque (ex: silgapp, silga_logistics, silga_food)"
+    },
+    "nom": {
+      "type": "string",
+      "description": "Nom de la marque (ex: SILGAPP, SILGA Logistics)"
+    },
+    "slogan": {
+      "type": "string",
+      "description": "Slogan de la marque"
+    },
+    "logo_url": {
+      "type": "string",
+      "description": "URL du logo de la marque"
+    },
+    "couleur_primaire": {
+      "type": "string",
+      "description": "Couleur primaire hex (ex: #E63946)"
+    },
+    "couleur_secondaire": {
+      "type": "string",
+      "description": "Couleur secondaire hex"
+    },
+    "couleur_accent": {
+      "type": "string",
+      "description": "Couleur d'accent hex"
+    },
+    "services": {
+      "type": "string",
+      "description": "JSON: [{code, nom, description}] \u2014 services offerts par cette marque"
+    },
+    "messages_perso": {
+      "type": "string",
+      "description": "JSON: {greeting, farewell, support_message} \u2014 messages personnalis\u00e9s"
+    },
+    "support_telephone": {
+      "type": "string",
+      "description": "Num\u00e9ro de support WhatsApp de la marque"
+    },
+    "support_email": {
+      "type": "string"
+    },
+    "site_web": {
+      "type": "string"
+    },
+    "actif": {
+      "type": "boolean",
+      "default": true
+    },
+    "pays_codes": {
+      "type": "string",
+      "description": "JSON: [codes pays] o\u00f9 cette marque op\u00e8re (vide = tous)"
+    },
+    "auteur": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "code",
+    "nom"
+  ]
+}

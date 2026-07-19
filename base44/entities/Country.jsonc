@@ -10,6 +10,10 @@
       "type": "string",
       "description": "Nom du pays en fran\u00e7ais"
     },
+    "nom_local": {
+      "type": "string",
+      "description": "Nom du pays dans sa langue locale (ex: Burkina)"
+    },
     "indicatif": {
       "type": "string",
       "description": "Indicatif t\u00e9l\u00e9phonique (ex: +226, +225)"
@@ -17,7 +21,49 @@
     "devise": {
       "type": "string",
       "default": "FCFA",
-      "description": "Devise locale (ex: FCFA, CFA)"
+      "description": "Code devise ISO (ex: XOF, GHS, GNF)"
+    },
+    "devise_symbole": {
+      "type": "string",
+      "default": "FCFA",
+      "description": "Symbole affich\u00e9 (ex: FCFA, \u20b5, GNF)"
+    },
+    "fuseau_horaire": {
+      "type": "string",
+      "default": "Africa/Ouagadougou",
+      "description": "Fuseau horaire IANA (ex: Africa/Abidjan, Africa/Accra)"
+    },
+    "langues_officielles": {
+      "type": "string",
+      "description": "JSON: tableau des codes langues officielles (ex: [\"fr\"])"
+    },
+    "langues_secondaires": {
+      "type": "string",
+      "description": "JSON: tableau des codes langues secondaires (ex: [\"moore\",\"dioula\"])"
+    },
+    "langue_principale": {
+      "type": "string",
+      "default": "fr",
+      "description": "Code langue principale utilis\u00e9e par VENUS"
+    },
+    "format_numero": {
+      "type": "string",
+      "description": "Format des num\u00e9ros locaux (ex: XX XX XX XX)"
+    },
+    "format_adresse": {
+      "type": "string",
+      "enum": [
+        "quartier_rue",
+        "rue_numero",
+        "landmark",
+        "gps_seul"
+      ],
+      "default": "quartier_rue",
+      "description": "Format d'adresse privil\u00e9gi\u00e9 dans ce pays"
+    },
+    "modes_paiement": {
+      "type": "string",
+      "description": "JSON: tableau des modes de paiement disponibles (ex: [\"orange_money\",\"moov\",\"especes\",\"wave\"])"
     },
     "prix_par_km": {
       "type": "number",
@@ -55,6 +101,26 @@
       "type": "number",
       "default": 30,
       "description": "Rayon d'op\u00e9ration en km autour du centre"
+    },
+    "horaires_service": {
+      "type": "string",
+      "description": "JSON: {debut: \"06:00\", fin: \"23:00\", jours_ouvrables: [\"lun\",\"mar\",...]}"
+    },
+    "politiques_locales": {
+      "type": "string",
+      "description": "JSON: r\u00e8gles sp\u00e9cifiques au pays (annulation, remboursement, etc.)"
+    },
+    "support_telephone": {
+      "type": "string",
+      "description": "Num\u00e9ro de support local WhatsApp"
+    },
+    "personnalite_id": {
+      "type": "string",
+      "description": "ID de la VenusPersonality assign\u00e9e \u00e0 ce pays (vide = personnalit\u00e9 par d\u00e9faut)"
+    },
+    "brand_id": {
+      "type": "string",
+      "description": "ID de la VenusBrand (marque) assign\u00e9e \u00e0 ce pays (vide = SILGAPP par d\u00e9faut)"
     },
     "actif": {
       "type": "boolean",

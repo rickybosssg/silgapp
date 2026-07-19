@@ -1,0 +1,98 @@
+{
+  "name": "VenusPersonality",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string",
+      "description": "Code unique de personnalit\u00e9 (ex: professionnel, chaleureux, dynamique, institutionnel)"
+    },
+    "nom": {
+      "type": "string",
+      "description": "Nom affich\u00e9 (ex: Ton Professionnel)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description de la personnalit\u00e9"
+    },
+    "ton": {
+      "type": "string",
+      "enum": [
+        "professionnel",
+        "chaleureux",
+        "dynamique",
+        "institutionnel"
+      ],
+      "default": "chaleureux",
+      "description": "Ton principal"
+    },
+    "instructions_systeme": {
+      "type": "string",
+      "description": "Instructions additionnelles inject\u00e9es dans le system prompt de VENUS"
+    },
+    "vocabulaire_prefere": {
+      "type": "string",
+      "description": "JSON: {contexte: [mots]} \u2014 vocabulaire \u00e0 privil\u00e9gier"
+    },
+    "vocabulaire_evite": {
+      "type": "string",
+      "description": "JSON: [mots] \u2014 vocabulaire \u00e0 \u00e9viter"
+    },
+    "emojis_autorises": {
+      "type": "boolean",
+      "default": true,
+      "description": "Autoriser l'usage d'emojis dans les r\u00e9ponses"
+    },
+    "niveau_formalite": {
+      "type": "string",
+      "enum": [
+        "tutoiement",
+        "vouvoiement",
+        "mixte"
+      ],
+      "default": "tutoiement",
+      "description": "Niveau de formalit\u00e9"
+    },
+    "longueur_reponse": {
+      "type": "string",
+      "enum": [
+        "concis",
+        "normal",
+        "detaille"
+      ],
+      "default": "normal",
+      "description": "Longueur souhait\u00e9e des r\u00e9ponses"
+    },
+    "voix_defaut": {
+      "type": "string",
+      "description": "Voix TTS par d\u00e9faut pour cette personnalit\u00e9 (ex: river, honey)"
+    },
+    "genre_voix": {
+      "type": "string",
+      "enum": [
+        "feminin",
+        "masculin",
+        "neutre"
+      ],
+      "default": "feminin",
+      "description": "Genre de voix par d\u00e9faut"
+    },
+    "actif": {
+      "type": "boolean",
+      "default": true,
+      "description": "Personnalit\u00e9 utilisable"
+    },
+    "pays_codes": {
+      "type": "string",
+      "description": "JSON: [codes pays] o\u00f9 cette personnalit\u00e9 est recommand\u00e9e (vide = tous)"
+    },
+    "auteur": {
+      "type": "string",
+      "description": "Email admin"
+    }
+  },
+  "required": [
+    "code",
+    "nom",
+    "ton"
+  ]
+}

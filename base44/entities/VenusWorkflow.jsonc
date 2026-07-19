@@ -39,6 +39,24 @@
       "type": "string",
       "description": "JSON: gestionnaires d'exceptions {livreur_annule: {action, message}, client_annule: {...}, ...}"
     },
+    "pays": {
+      "type": "string",
+      "default": "ALL",
+      "description": "Code pays sp\u00e9cifique (BF, CI, ...) ou 'ALL' pour tous les pays. En cas de conflit, le workflow sp\u00e9cifique au pays est prioritaire sur ALL."
+    },
+    "pays_codes": {
+      "type": "string",
+      "description": "JSON: tableau des codes pays o\u00f9 ce workflow est applicable (vide = tous). Surcharge le champ 'pays' si rempli."
+    },
+    "langue": {
+      "type": "string",
+      "default": "fr",
+      "description": "Langue des messages du workflow (si sp\u00e9cifique)"
+    },
+    "messages_localises": {
+      "type": "string",
+      "description": "JSON: {langue: {etape_id: message}} \u2014 traductions des messages par \u00e9tape"
+    },
     "actif": {
       "type": "boolean",
       "default": true,

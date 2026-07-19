@@ -152,3 +152,36 @@ export function detecterPaysDepuisTelephone(telephone) {
   }
   return 'BF';
 }
+
+/**
+ * ─── PROMPT DYNAMIQUE MULTI-PAYS / MULTILINGUE ───
+ *
+ * Construit un system prompt localisé en chargeant la configuration
+ * depuis les entités Country, VenusPersonality, VenusBrand et VenusTranslation.
+ * Fallback sur les constantes hardcoded si les entités sont vides.
+ *
+ * Utilisé par le moteur de raisonnement VENUS pour adapter dynamiquement
+ * le comportement au pays, à la langue et à la personnalité du client.
+ */
+export async function getSystemPromptLocalise(base44, telephone, messageClient) {
+  try {
+    const { construireContexteVenus } = await import('./venusI18nEngine.ts');
+    const ctx = await construireContexteVenus(base44, telephone, messageClient);
+    return {
+      systemPrompt: ctx.systemPrompt,
+      country: ctx.country,
+      personality: ctx.personality,
+      brand: ctx.brand,
+      langue: ctx.langue,
+    };
+  } catch (e) {
+    console.error('[venusPrompt] Fallback prompt statique:', e.message);
+    return {
+      systemPrompt: VENUS_SYSTEM_PROMPT,
+      country: null,
+      personality: null,
+      brand: null,
+      langue: 'fr',
+    };
+  }
+}

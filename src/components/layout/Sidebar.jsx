@@ -43,6 +43,7 @@ export const navItems = [
   { path: "/admin/venus-improvement", label: "Amélioration VENUS", icon: Brain },
   { path: "/admin/venus-documents", label: "Bibliothèque RAG", icon: Library },
   { path: "/admin/venus-supervision", label: "Supervision VENUS", icon: Activity },
+  { path: "/admin/venus-international", label: "International VENUS", icon: Globe },
   { path: "/admin/centre-notifications", label: "Notifications Push", icon: Megaphone },
   { path: "/admin/externe", label: "Config Dispatch", icon: Settings },
   { path: "/admin/demandes-livreurs", label: "Livreurs à valider", icon: UserCheck },

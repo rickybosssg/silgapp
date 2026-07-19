@@ -92,6 +92,7 @@ const VenusWorkflowCenter = lazy(() => import('./pages/VenusWorkflowCenter.jsx')
 const VenusImprovementCenter = lazy(() => import('./pages/VenusImprovementCenter.jsx'));
 const VenusDocumentLibrary = lazy(() => import('./pages/VenusDocumentLibrary.jsx'));
 const VenusSupervisionCenter = lazy(() => import('./pages/VenusSupervisionCenter.jsx'));
+const VenusInternationalCenter = lazy(() => import('./pages/VenusInternationalCenter.jsx'));
 const NeoDashboard = lazy(() => import('./pages/NeoDashboard.jsx'));
 const BugsTracking = lazy(() => import('./pages/BugsTracking.jsx'));
 const PayerSilgapp = lazy(() => import('./pages/PayerSilgapp.jsx'));
@@ -408,6 +409,7 @@ function AppContent() {
           <Route path="/admin/venus-improvement" element={<AnimatedRoutes><VenusImprovementCenter /></AnimatedRoutes>} />
           <Route path="/admin/venus-documents" element={<AnimatedRoutes><VenusDocumentLibrary /></AnimatedRoutes>} />
           <Route path="/admin/venus-supervision" element={<AnimatedRoutes><VenusSupervisionCenter /></AnimatedRoutes>} />
+          <Route path="/admin/venus-international" element={<AnimatedRoutes><VenusInternationalCenter /></AnimatedRoutes>} />
           <Route path="/admin/neo" element={<AnimatedRoutes><NeoDashboard /></AnimatedRoutes>} />
           <Route path="/admin/bugs" element={<AnimatedRoutes><BugsTracking /></AnimatedRoutes>} />
           <Route path="/admin/statistiques" element={<AnimatedRoutes><Statistiques /></AnimatedRoutes>} />
