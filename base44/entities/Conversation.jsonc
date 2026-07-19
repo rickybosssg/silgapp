@@ -4,20 +4,17 @@
   "properties": {
     "participants": {
       "type": "string",
-      "description": "JSON: [{type: 'client'|'livreur'|'admin', id: string, name: string}] - participants \u00e0 la conversation"
+      "description": "JSON: [{type: 'client'|'livreur'|'admin'|'partenaire', id: string, name: string}]"
     },
     "last_message": {
-      "type": "string",
-      "description": "Aper\u00e7u du dernier message"
+      "type": "string"
     },
     "last_message_date": {
       "type": "string",
-      "format": "date-time",
-      "description": "Date du dernier message"
+      "format": "date-time"
     },
     "last_sender_name": {
-      "type": "string",
-      "description": "Nom du dernier exp\u00e9diteur"
+      "type": "string"
     },
     "last_sender_type": {
       "type": "string",
@@ -26,17 +23,14 @@
         "livreur",
         "admin",
         "partenaire"
-      ],
-      "description": "Type du dernier exp\u00e9diteur \u2014 utilis\u00e9 pour le suivi de lecture admin"
+      ]
     },
     "admin_last_read_date": {
       "type": "string",
-      "format": "date-time",
-      "description": "Date de la derni\u00e8re fois que l'admin a ouvert cette conversation"
+      "format": "date-time"
     },
     "title": {
-      "type": "string",
-      "description": "Titre de la conversation (optionnel, auto-g\u00e9n\u00e9r\u00e9 si absent)"
+      "type": "string"
     },
     "group_type": {
       "type": "string",
@@ -44,8 +38,55 @@
         "direct",
         "group"
       ],
-      "default": "direct",
-      "description": "Type de conversation"
+      "default": "direct"
+    },
+    "whatsapp_phone": {
+      "type": "string",
+      "description": "Numero WhatsApp du client (format international sans +)"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "app",
+        "whatsapp"
+      ],
+      "default": "app",
+      "description": "Origine de la conversation"
+    },
+    "venus_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "True si Venus repond automatiquement, False si un admin a pris la main"
+    },
+    "assigned_admin_email": {
+      "type": "string",
+      "description": "Email de l'admin qui a pris la main"
+    },
+    "ville": {
+      "type": "string",
+      "description": "Ville du client (si detectee)"
+    },
+    "country_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE",
+        "GH",
+        ""
+      ],
+      "default": "",
+      "description": "Code pays detecte depuis le numero WhatsApp"
+    },
+    "archived": {
+      "type": "boolean",
+      "default": false,
+      "description": "Conversation archivee par l'admin"
     }
   },
   "required": [

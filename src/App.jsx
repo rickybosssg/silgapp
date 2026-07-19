@@ -84,6 +84,7 @@ const MesCommandesBoutique = lazy(() => import('./pages/MesCommandesBoutique.jsx
 const PharmaciesList = lazy(() => import('./pages/PharmaciesList.jsx'));
 const PharmacieDetail = lazy(() => import('./pages/PharmacieDetail.jsx'));
 const AdminMessages = lazy(() => import('./pages/AdminMessages.jsx'));
+const WhatsAppAdmin = lazy(() => import('./pages/WhatsAppAdmin.jsx'));
 const NeoDashboard = lazy(() => import('./pages/NeoDashboard.jsx'));
 const BugsTracking = lazy(() => import('./pages/BugsTracking.jsx'));
 const PayerSilgapp = lazy(() => import('./pages/PayerSilgapp.jsx'));
@@ -392,6 +393,7 @@ function AppContent() {
           <Route path="/admin/paiements" element={<AnimatedRoutes><PaiementsAdmin /></AnimatedRoutes>} />
           <Route path="/admin/dispatch-logs" element={<AnimatedRoutes><DispatchLogs /></AnimatedRoutes>} />
           <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
+          <Route path="/admin/whatsapp" element={<AnimatedRoutes><WhatsAppAdmin /></AnimatedRoutes>} />
           <Route path="/admin/neo" element={<AnimatedRoutes><NeoDashboard /></AnimatedRoutes>} />
           <Route path="/admin/bugs" element={<AnimatedRoutes><BugsTracking /></AnimatedRoutes>} />
           <Route path="/admin/statistiques" element={<AnimatedRoutes><Statistiques /></AnimatedRoutes>} />
