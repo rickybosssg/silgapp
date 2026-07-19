@@ -440,6 +440,16 @@
     "whatsapp_destinataire_erreur": {
       "type": "string"
     },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "haute",
+        "urgente"
+      ],
+      "default": "normal",
+      "description": "Niveau de priorite de dispatch \u2014 les courses urgentes sont traitees en premier"
+    },
     "commande_boutique_id": {
       "type": "string",
       "description": "ID de la CommandeBoutique li\u00e9e (si course issue d'une commande partenaire)"

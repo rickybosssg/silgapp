@@ -1036,10 +1036,19 @@ Deno.serve(async (req) => {
       const resultats = [];
 
       const MAX_COURSES_PER_TICK = 4; // Limite anti-rate-limit stricte
+      // 🎯 PHASE 8 — Tri par priorité : urgente > haute > normal
+      // Les courses prioritaires sont traitées en premier à chaque tick
+      const PRIORITY_ORDER = { urgente: 0, haute: 1, normal: 2 };
+      const sortByPriority = (a, b) => {
+        const pa = PRIORITY_ORDER[a.priority] ?? 2;
+        const pb = PRIORITY_ORDER[b.priority] ?? 2;
+        if (pa !== pb) return pa - pb;
+        return 0; // conserve l'ordre par created_date (-created_date du filtre)
+      };
       // Prioriser les courses VRAIMENT bloquées (en_attente/redispatch/cycle_epuise)
       // avant celles en "propose" qui attendent juste leur timeout
-      const stuck = courses.filter(c => ['en_attente', 'redispatch', 'cycle_epuise'].includes(c.dispatch_status));
-      const waiting = courses.filter(c => !['en_attente', 'redispatch', 'cycle_epuise'].includes(c.dispatch_status));
+      const stuck = courses.filter(c => ['en_attente', 'redispatch', 'cycle_epuise'].includes(c.dispatch_status)).sort(sortByPriority);
+      const waiting = courses.filter(c => !['en_attente', 'redispatch', 'cycle_epuise'].includes(c.dispatch_status)).sort(sortByPriority);
       const coursesToProcess = [...stuck, ...waiting].slice(0, MAX_COURSES_PER_TICK);
       if (courses.length > MAX_COURSES_PER_TICK) {
         console.log(`[DISPATCH] ⚡ ${courses.length} courses à traiter — limitation à ${MAX_COURSES_PER_TICK}/tick pour éviter rate limit`);

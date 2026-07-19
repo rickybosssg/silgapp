@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import CourseStatusBadge from "@/components/courses/CourseStatusBadge";
 import CanalNotifBadge from "@/components/courses/CanalNotifBadge";
+import PriorityBadge from "@/components/courses/PriorityBadge";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
 
@@ -66,6 +67,27 @@ export default function ToutesCoursesExternes() {
     if (filtreActif === "annulee")  return filtered.filter(c => c.statut === "annulee");
     return filtered;
   }, [courses, filtreActif, filtreType, search]);
+
+  // 🎯 Phase 8 — Tri par priorité (urgente > haute > normal) puis par date
+  const PRIORITY_ORDER = { urgente: 0, haute: 1, normal: 2 };
+  const coursesTriees = useMemo(() => {
+    return [...coursesFiltrees].sort((a, b) => {
+      const pa = PRIORITY_ORDER[a.priority] ?? 2;
+      const pb = PRIORITY_ORDER[b.priority] ?? 2;
+      if (pa !== pb) return pa - pb;
+      return 0;
+    });
+  }, [coursesFiltrees]);
+
+  const cyclePriority = async (course) => {
+    const current = course.priority || "normal";
+    const next = current === "normal" ? "haute" : current === "haute" ? "urgente" : "normal";
+    try {
+      await base44.entities.CourseExterne.update(course.id, { priority: next });
+    } catch (e) {
+      console.error("Erreur changement priorité:", e.message);
+    }
+  };
 
   return (
     <div className="p-4 space-y-5 max-w-5xl mx-auto">
@@ -180,7 +202,7 @@ export default function ToutesCoursesExternes() {
             </div>
             <div>
               <p className="font-bold text-foreground">Historique complet</p>
-              <p className="text-xs text-muted-foreground">{coursesFiltrees.length} résultat{coursesFiltrees.length > 1 ? "s" : ""}</p>
+              <p className="text-xs text-muted-foreground">{coursesTriees.length} résultat{coursesTriees.length > 1 ? "s" : ""}</p>
             </div>
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
@@ -189,14 +211,14 @@ export default function ToutesCoursesExternes() {
           </div>
         </div>
 
-        {coursesFiltrees.length === 0 ? (
+        {coursesTriees.length === 0 ? (
           <div className="text-center py-14 text-muted-foreground">
             <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3 text-2xl">📦</div>
             <p className="font-semibold text-sm">Aucune course dans cette catégorie</p>
           </div>
         ) : (
           <div className="space-y-2">
-            {coursesFiltrees.map(course => (
+            {coursesTriees.map(course => (
               <div
                 key={course.id}
                 className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all"
@@ -221,6 +243,11 @@ export default function ToutesCoursesExternes() {
                         {course.type_course === "deplacement" ? "👤" : "📥"}
                       </span>
                     )}
+                    <PriorityBadge
+                      priority={course.priority || "normal"}
+                      size="xs"
+                      onClick={() => cyclePriority(course)}
+                    />
                     <span className="font-bold text-sm text-foreground truncate">{course.client_nom || "Client"}</span>
                     <CourseStatusBadge statut={course.statut} />
                     {course.livreur_id && <CanalNotifBadge course={course} />}
