@@ -1,0 +1,80 @@
+{
+  "name": "VenusSupervisionAlert",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "reponse_incorrecte",
+        "workflow_echec",
+        "api_indisponible",
+        "document_introuvable",
+        "erreur_repetee",
+        "conversation_bloquee",
+        "outil_indisponible",
+        "anomalie_detectee",
+        "confiance_basse",
+        "escalade_declenchee",
+        "performance_degradee"
+      ],
+      "description": "Type d'alerte de supervision"
+    },
+    "severite": {
+      "type": "string",
+      "enum": [
+        "info",
+        "warning",
+        "critique"
+      ],
+      "default": "warning"
+    },
+    "titre": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    },
+    "conversation_id": {
+      "type": "string"
+    },
+    "client_telephone": {
+      "type": "string"
+    },
+    "outil_concerne": {
+      "type": "string"
+    },
+    "metadata": {
+      "type": "string",
+      "description": "JSON: donn\u00e9es contextuelles"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "active",
+        "acquitt\u00e9e",
+        "r\u00e9solue",
+        "ignor\u00e9e"
+      ],
+      "default": "active"
+    },
+    "resolue_par": {
+      "type": "string"
+    },
+    "resolue_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "resolution_note": {
+      "type": "string"
+    },
+    "creee_date": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "type",
+    "titre",
+    "severite"
+  ]
+}

@@ -25,6 +25,10 @@ import {
   lancerWorkflow,
   getWorkflowCodeFromIntention,
 } from '../../shared/venusWorkflowEngine.ts';
+import {
+  getMaintenanceMode,
+  declencherEscalade,
+} from '../../shared/venusSupervisionEngine.ts';
 
 /**
  * Webhook WhatsApp <-> Venus (via Twilio).
@@ -1180,8 +1184,14 @@ Deno.serve(async (req) => {
     }
     console.log(`[WebhookVenus] ✅ ÉTAPE 4 — Venus active, génération de la réponse...`);
 
-    // ── 4. Venus répond ──
+    // ── 3b. Vérifier le mode maintenance VENUS ──
     let reponseVenus = '';
+    const maintenanceMode = await getMaintenanceMode(base44);
+    if (maintenanceMode.active) {
+      const maintenanceMessage = maintenanceMode.message || "Certaines fonctionnalités sont momentanément indisponibles. Nous revenons très vite !";
+      reponseVenus = `Bonjour${profileName ? ' ' + profileName : ''} ! ${maintenanceMessage}\n\nPour toute urgence, contactez le support au +226 66 92 51 90.`;
+      console.log(`[WebhookVenus] 🔧 Mode maintenance actif — réponse de maintenance envoyée à ${telephone}`);
+    }
 
     // ── 4a. MOTEUR DE WORKFLOWS — Vérifier s'il y a un workflow actif ──
     // Si un workflow est en cours pour cette conversation, le moteur prend le relais

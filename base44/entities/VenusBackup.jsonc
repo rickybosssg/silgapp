@@ -1,0 +1,83 @@
+{
+  "name": "VenusBackup",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "knowledge_base",
+        "scenarios",
+        "workflows",
+        "long_term_memory",
+        "documents",
+        "improvement_data",
+        "full"
+      ],
+      "description": "Type de sauvegarde"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "en_cours",
+        "termin\u00e9",
+        "\u00e9chou\u00e9"
+      ],
+      "default": "en_cours"
+    },
+    "nb_records": {
+      "type": "number",
+      "default": 0
+    },
+    "taille_kb": {
+      "type": "number",
+      "default": 0,
+      "description": "Taille approximative en KB"
+    },
+    "data_url": {
+      "type": "string",
+      "description": "URL du fichier de sauvegarde (si upload\u00e9)"
+    },
+    "data_content": {
+      "type": "string",
+      "description": "JSON: contenu de la sauvegarde (pour petits volumes)"
+    },
+    "resume": {
+      "type": "string",
+      "description": "R\u00e9sum\u00e9 du contenu sauvegard\u00e9"
+    },
+    "declenche_par": {
+      "type": "string",
+      "description": "Email admin ou 'auto'"
+    },
+    "auto": {
+      "type": "boolean",
+      "default": false
+    },
+    "date_creation": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "date_fin": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "erreur": {
+      "type": "string"
+    },
+    "restauree": {
+      "type": "boolean",
+      "default": false
+    },
+    "restauree_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "restauree_par": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "type",
+    "statut"
+  ]
+}
