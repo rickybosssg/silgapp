@@ -721,6 +721,14 @@ export default function DispatchMap({
   const [heatmapModeLocal, setHeatmapModeLocal] = useState(heatmapMode);
   const [showHeatmapHint, setShowHeatmapHint] = useState(true);
   const [zoomLevel, setZoomLevel] = useState(0);
+  const [statsCollapsed, setStatsCollapsed] = useState(false);
+
+  // Auto-masquer le hint heatmaps après 10s
+  useEffect(() => {
+    if (!showHeatmapHint) return;
+    const timer = setTimeout(() => setShowHeatmapHint(false), 10000);
+    return () => clearTimeout(timer);
+  }, [showHeatmapHint]);
 
   // ── Recentrage manuel (bouton "Centrer") ──
   // Guardé par userInteractedRef : ne s'exécute que via clic bouton (qui reset le flag)
@@ -1036,102 +1044,111 @@ export default function DispatchMap({
       {/* Overlay controls */}
       {mapLoaded && (
         <>
-          {/* Stats + légende (top-left) */}
-          <div className="absolute top-4 left-4 z-[1000] space-y-2">
+          {/* Stats + légende (top-left) — panneau repliable */}
+          <div className="absolute top-4 left-4 z-[1000]">
             <div className="dmap-overlay-badge">
-              <div className="space-y-1 text-xs font-medium">
-                {courses.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-red-600 flex-shrink-0" />
-                    <span className="text-red-700 font-bold">{courses.length} en attente !</span>
+              {/* En-tête repliable */}
+              <button
+                onClick={() => setStatsCollapsed(v => !v)}
+                className="flex items-center justify-between w-full gap-2 mb-1"
+              >
+                <span className="text-xs font-bold text-slate-800">Activité terrain</span>
+                <span className="text-[10px] text-slate-500">{statsCollapsed ? "Afficher" : "Masquer"}</span>
+              </button>
+              {!statsCollapsed && (
+                <div className="space-y-1 text-xs font-medium">
+                  {courses.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-red-600 flex-shrink-0" />
+                      <span className="text-red-700 font-bold">{courses.length} en attente !</span>
+                    </div>
+                  )}
+                  {showLivreurs && nbLibres > 0 && (
+                    <button onClick={() => onCategoryClick?.("libre")} className="flex items-center gap-2 hover:bg-green-50 rounded-lg px-1 -mx-1 transition-colors w-full">
+                      <span className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" />
+                      <span className="text-green-700 font-bold">{nbLibres} libre{nbLibres > 1 ? "s" : ""} (GPS ≤ 60 min)</span>
+                    </button>
+                  )}
+                  {showLivreurs && nbGPSExpire > 0 && (
+                    <button onClick={() => onCategoryClick?.("gps_expire")} className="flex items-center gap-2 hover:bg-amber-50 rounded-lg px-1 -mx-1 transition-colors w-full">
+                      <span className="w-3 h-3 rounded-full bg-amber-500 flex-shrink-0" />
+                      <span className="text-amber-700 font-semibold">{nbGPSExpire} GPS expiré</span>
+                    </button>
+                  )}
+                  {showLivreurs && nbCourse > 0 && (
+                    <button onClick={() => onCategoryClick?.("en_course")} className="flex items-center gap-2 hover:bg-orange-50 rounded-lg px-1 -mx-1 transition-colors w-full">
+                      <span className="w-3 h-3 rounded-full bg-orange-500 flex-shrink-0" />
+                      <span className="text-orange-700">{nbCourse} en course</span>
+                    </button>
+                  )}
+                  {showLivreurs && nbHorsLigne > 0 && (
+                    <button onClick={() => onCategoryClick?.("hors_ligne")} className="flex items-center gap-2 hover:bg-gray-100 rounded-lg px-1 -mx-1 transition-colors w-full">
+                      <span className="w-3 h-3 rounded-full bg-gray-400 flex-shrink-0" />
+                      <span className="text-gray-600">{nbHorsLigne} hors ligne</span>
+                    </button>
+                  )}
+                  {showClients && nbClientsActifs > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-blue-600 flex-shrink-0" />
+                      <span className="text-blue-700">{nbClientsActifs} actif{nbClientsActifs > 1 ? "s" : ""} (&lt;5 min)</span>
+                    </div>
+                  )}
+                  {showClients && nbClientsRecents > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-yellow-500 flex-shrink-0" />
+                      <span className="text-yellow-700">{nbClientsRecents} récent{nbClientsRecents > 1 ? "s" : ""} (5-15 min)</span>
+                    </div>
+                  )}
+                  {!masquerInactifs && showClients && nbClientsInactifs > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-gray-400 flex-shrink-0" />
+                      <span className="text-gray-700 font-medium">⚫ {nbClientsInactifs} client{nbClientsInactifs > 1 ? "s" : ""} inactif{nbClientsInactifs > 1 ? "s" : ""}</span>
+                    </div>
+                  )}
+                  {showPartenaires && nbPartenairesBoutiques > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-violet-500 flex-shrink-0" />
+                      <span className="text-violet-700 font-medium">🏪 {nbPartenairesBoutiques} boutique{nbPartenairesBoutiques > 1 ? "s" : ""}</span>
+                    </div>
+                  )}
+                  {showPartenaires && nbPartenairesRestaurants > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-pink-500 flex-shrink-0" />
+                      <span className="text-pink-700 font-medium">🍽️ {nbPartenairesRestaurants} restaurant{nbPartenairesRestaurants > 1 ? "s" : ""}</span>
+                    </div>
+                  )}
+                  {showPartenaires && nbPartenairesPharmacies > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-blue-900 flex-shrink-0" />
+                      <span className="text-blue-900 font-medium">💊 {nbPartenairesPharmacies} pharmacie{nbPartenairesPharmacies > 1 ? "s" : ""}</span>
+                    </div>
+                  )}
+                  {courses.length === 0 && nbLivreursVisibles === 0 && nbClientsVisibles === 0 && (
+                    <span className="text-gray-500">Aucun élément visible</span>
+                  )}
+                  {/* Légende GPS qualité fusionnée */}
+                  <div className="pt-1.5 mt-1.5 border-t border-slate-200 text-[10px] text-slate-600 space-y-0.5">
+                    <div className="font-semibold text-slate-700">Qualité GPS</div>
+                    <div>❤️ &lt;2min · 💚 2-5min · 🧡 5-15min</div>
+                    <div>❤️‍🩹 15-30min · ❤️‍🔥 &gt;30min</div>
+                    <div className="text-slate-500">⚫ Noir = non dispatchable</div>
                   </div>
-                )}
-                {showLivreurs && nbLibres > 0 && (
-                  <button onClick={() => onCategoryClick?.("libre")} className="flex items-center gap-2 hover:bg-green-50 rounded-lg px-1 -mx-1 transition-colors w-full">
-                    <span className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" />
-                    <span className="text-green-700 font-bold">{nbLibres} libre{nbLibres > 1 ? "s" : ""} (GPS ≤ 60 min)</span>
-                  </button>
-                )}
-                {showLivreurs && nbGPSExpire > 0 && (
-                  <button onClick={() => onCategoryClick?.("gps_expire")} className="flex items-center gap-2 hover:bg-gray-100 rounded-lg px-1 -mx-1 transition-colors w-full">
-                    <span className="w-3 h-3 rounded-full bg-gray-500 flex-shrink-0" />
-                    <span className="text-gray-600">{nbGPSExpire} GPS expiré</span>
-                  </button>
-                )}
-                {showLivreurs && nbCourse > 0 && (
-                  <button onClick={() => onCategoryClick?.("en_course")} className="flex items-center gap-2 hover:bg-orange-50 rounded-lg px-1 -mx-1 transition-colors w-full">
-                    <span className="w-3 h-3 rounded-full bg-orange-500 flex-shrink-0" />
-                    <span className="text-orange-700">{nbCourse} en course</span>
-                  </button>
-                )}
-                {showLivreurs && nbHorsLigne > 0 && (
-                  <button onClick={() => onCategoryClick?.("hors_ligne")} className="flex items-center gap-2 hover:bg-gray-100 rounded-lg px-1 -mx-1 transition-colors w-full">
-                    <span className="w-3 h-3 rounded-full bg-gray-400 flex-shrink-0" />
-                    <span className="text-gray-600">{nbHorsLigne} hors ligne</span>
-                  </button>
-                )}
-                {showClients && nbClientsActifs > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-blue-600 flex-shrink-0" />
-                    <span className="text-blue-700">{nbClientsActifs} actif{nbClientsActifs > 1 ? "s" : ""} (&lt;5 min)</span>
-                  </div>
-                )}
-                {showClients && nbClientsRecents > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-yellow-500 flex-shrink-0" />
-                    <span className="text-yellow-700">{nbClientsRecents} récent{nbClientsRecents > 1 ? "s" : ""} (5-15 min)</span>
-                  </div>
-                )}
-                {!masquerInactifs && showClients && nbClientsInactifs > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-gray-400 flex-shrink-0" />
-                    <span className="text-gray-700 font-medium">⚫ {nbClientsInactifs} client{nbClientsInactifs > 1 ? "s" : ""} inactif{nbClientsInactifs > 1 ? "s" : ""}</span>
-                  </div>
-                )}
-                {showPartenaires && nbPartenairesBoutiques > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-violet-500 flex-shrink-0" />
-                    <span className="text-violet-700 font-medium">🏪 {nbPartenairesBoutiques} boutique{nbPartenairesBoutiques > 1 ? "s" : ""}</span>
-                  </div>
-                )}
-                {showPartenaires && nbPartenairesRestaurants > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-pink-500 flex-shrink-0" />
-                    <span className="text-pink-700 font-medium">🍽️ {nbPartenairesRestaurants} restaurant{nbPartenairesRestaurants > 1 ? "s" : ""}</span>
-                  </div>
-                )}
-                {showPartenaires && nbPartenairesPharmacies > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-blue-900 flex-shrink-0" />
-                    <span className="text-blue-900 font-medium">💊 {nbPartenairesPharmacies} pharmacie{nbPartenairesPharmacies > 1 ? "s" : ""}</span>
-                  </div>
-                )}
-                {courses.length === 0 && nbLivreursVisibles === 0 && nbClientsVisibles === 0 && (
-                  <span className="text-gray-400">Aucun élément visible</span>
-                )}
-              </div>
-            </div>
-            
-            {/* Légende GPS qualité */}
-            <div className="dmap-overlay-badge text-xs text-slate-500 space-y-1">
-              <div className="font-semibold text-slate-700 mb-1">Qualité GPS</div>
-              <div>❤️ &lt;2 min · 💚 2-5 min · 🧡 5-15 min</div>
-              <div>❤️‍🩹 15-30 min · ❤️‍🔥 &gt;30 min</div>
-              <div className="text-gray-400">⚫ Noir = non dispatchable</div>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Contrôles heatmap + légende (top-right) */}
           <div className="absolute top-4 right-4 z-[1000] space-y-2">
             {showHeatmapHint && heatmapModeLocal === "off" && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 shadow-lg animate-in fade-in slide-in-from-top-2">
-                <p className="text-xs font-semibold text-blue-800 mb-1">✨ Nouveau !</p>
-                <p className="text-xs text-blue-700">Essayez les cartes thermiques pour analyser la demande et la couverture</p>
-                <button 
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 shadow-lg max-w-[180px]">
+                <p className="text-xs font-semibold text-blue-800 mb-0.5">✨ Cartes thermiques</p>
+                <p className="text-[11px] text-blue-700 leading-tight">Analysez demande & couverture</p>
+                <button
                   onClick={() => setShowHeatmapHint(false)}
-                  className="text-xs text-blue-500 hover:text-blue-700 mt-1 underline"
+                  className="text-[10px] text-blue-600 hover:text-blue-800 mt-1 underline"
                 >
-                  Ne plus afficher
+                  Fermer
                 </button>
               </div>
             )}

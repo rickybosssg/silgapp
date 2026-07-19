@@ -485,8 +485,8 @@ export default function CarteLivreursExterne() {
               >
                 <div className={`w-2 h-2 rounded-full ${item.dot} mx-auto mb-2`} />
                 <p className="text-2xl font-black text-white leading-none">{item.val}</p>
-                <p className="text-[10px] font-bold text-white/70 mt-1 leading-tight">{item.label}</p>
-                <p className="text-[9px] text-white/35 mt-0.5">{item.sub}</p>
+                <p className="text-[10px] font-bold text-white/80 mt-1 leading-tight">{item.label}</p>
+                <p className="text-[9px] text-white/60 mt-0.5">{item.sub}</p>
               </button>
             ))}
           </div>
@@ -500,8 +500,8 @@ export default function CarteLivreursExterne() {
               <div key={i} className="bg-white/5 backdrop-blur-sm border border-white/5 rounded-xl p-2.5 text-center">
                 <div className={`w-1.5 h-1.5 rounded-full ${item.dot} mx-auto mb-1.5`} />
                 <p className="text-lg font-black text-white leading-none">{item.val}</p>
-                <p className="text-[9px] font-bold text-white/60 mt-1">{item.label}</p>
-                <p className="text-[8px] text-white/30">{item.sub}</p>
+                <p className="text-[9px] font-bold text-white/75 mt-1">{item.label}</p>
+                <p className="text-[8px] text-white/55">{item.sub}</p>
               </div>
             ))}
           </div>
