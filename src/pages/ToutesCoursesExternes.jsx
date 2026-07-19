@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Package, MapPin, Clock } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, Package, MapPin, Clock, Search, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import CourseStatusBadge from "@/components/courses/CourseStatusBadge";
@@ -23,10 +24,10 @@ export default function ToutesCoursesExternes() {
   const { isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
   const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
   const [filtreActif, setFiltreActif] = useState("tous");
-
   const [filtreType, setFiltreType] = useState("tous");
+  const [search, setSearch] = useState("");
 
-  const { data: courses = [] } = useQuery({
+  const { data: courses = [], dataUpdatedAt, isFetching } = useQuery({
     queryKey: ["courses-externes", effectiveCountry],
     queryFn: () => effectiveCountry
       ? base44.entities.CourseExterne.filter({ country_code: effectiveCountry }, "-created_date", 200)
@@ -48,13 +49,23 @@ export default function ToutesCoursesExternes() {
     if (filtreType !== "tous") {
       filtered = filtered.filter(c => c.type_course === filtreType);
     }
+    if (search.trim()) {
+      const s = search.toLowerCase().trim();
+      filtered = filtered.filter(c =>
+        (c.client_nom || "").toLowerCase().includes(s) ||
+        (c.client_telephone || "").includes(s) ||
+        (c.adresse_depart || "").toLowerCase().includes(s) ||
+        (c.adresse_arrivee || "").toLowerCase().includes(s) ||
+        (c.livreur_nom || "").toLowerCase().includes(s)
+      );
+    }
     if (filtreActif === "tous")     return filtered;
     if (filtreActif === "nouvelle") return filtered.filter(c => c.statut === "nouvelle");
     if (filtreActif === "en_cours") return filtered.filter(c => ["recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison", "arrive_prise_en_charge", "passager_embarque"].includes(c.statut));
     if (filtreActif === "livree")   return filtered.filter(c => c.statut === "livree");
     if (filtreActif === "annulee")  return filtered.filter(c => c.statut === "annulee");
     return filtered;
-  }, [courses, filtreActif, filtreType]);
+  }, [courses, filtreActif, filtreType, search]);
 
   return (
     <div className="p-4 space-y-5 max-w-5xl mx-auto">
@@ -89,17 +100,32 @@ export default function ToutesCoursesExternes() {
       {/* ── STATS KPI ───────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5">
         {[
-          { label: "Total",     value: stats.totale,   grad: "from-primary to-red-600",         shadow: "shadow-red-100" },
-          { label: "Nouvelles", value: stats.nouvelle, grad: "from-orange-500 to-amber-500",    shadow: "shadow-orange-100" },
-          { label: "En cours",  value: stats.enCours,  grad: "from-blue-500 to-indigo-500",     shadow: "shadow-blue-100" },
-          { label: "Livrées",   value: stats.livree,   grad: "from-green-500 to-emerald-500",   shadow: "shadow-green-100" },
-          { label: "Annulées",  value: stats.annulee,  grad: "from-red-400 to-rose-500",        shadow: "shadow-red-100" },
+          { label: "Total",     value: stats.totale,   grad: "from-primary to-red-600",         shadow: "shadow-red-100",    filter: "tous" },
+          { label: "Nouvelles", value: stats.nouvelle, grad: "from-orange-500 to-amber-500",    shadow: "shadow-orange-100", filter: "nouvelle" },
+          { label: "En cours",  value: stats.enCours,  grad: "from-blue-500 to-indigo-500",     shadow: "shadow-blue-100",   filter: "en_cours" },
+          { label: "Livrées",   value: stats.livree,   grad: "from-green-500 to-emerald-500",   shadow: "shadow-green-100",  filter: "livree" },
+          { label: "Annulées",  value: stats.annulee,  grad: "from-red-400 to-rose-500",        shadow: "shadow-red-100",    filter: "annulee" },
         ].map(s => (
-          <div key={s.label} className={`bg-gradient-to-br ${s.grad} rounded-2xl p-3.5 text-white shadow-md ${s.shadow}`}>
+          <button
+            key={s.label}
+            onClick={() => setFiltreActif(s.filter)}
+            className={`bg-gradient-to-br ${s.grad} rounded-2xl p-3.5 text-white shadow-md ${s.shadow} text-left transition-transform active:scale-95 ${filtreActif === s.filter ? "ring-2 ring-offset-2 ring-primary" : ""}`}
+          >
             <p className="text-[10px] font-semibold opacity-80 uppercase tracking-wide mb-1">{s.label}</p>
             <p className="text-2xl font-black leading-none">{s.value}</p>
-          </div>
+          </button>
         ))}
+      </div>
+
+      {/* ── RECHERCHE ───────────────────────────────────────────── */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Input
+          placeholder="Rechercher par client, téléphone, adresse ou livreur..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="pl-9 rounded-xl h-10"
+        />
       </div>
 
       {/* ── FILTRES ─────────────────────────────────────────────── */}
@@ -156,6 +182,10 @@ export default function ToutesCoursesExternes() {
               <p className="font-bold text-foreground">Historique complet</p>
               <p className="text-xs text-muted-foreground">{coursesFiltrees.length} résultat{coursesFiltrees.length > 1 ? "s" : ""}</p>
             </div>
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <RefreshCw className={`w-3 h-3 ${isFetching ? "animate-spin" : ""}`} />
+            {dataUpdatedAt ? format(new Date(dataUpdatedAt), "HH:mm:ss", { locale: fr }) : "—"}
           </div>
         </div>
 
