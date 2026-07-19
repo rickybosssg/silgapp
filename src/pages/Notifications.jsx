@@ -7,16 +7,29 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
 const typeConfig = {
-  nouvelle_course:  { color: "bg-blue-100 text-blue-700",     dot: "bg-blue-500",    label: "Nouvelle course" },
-  course_assignee:  { color: "bg-amber-100 text-amber-700",   dot: "bg-amber-500",   label: "Assignée" },
-  course_acceptee:  { color: "bg-green-100 text-green-700",   dot: "bg-green-500",   label: "Acceptée" },
-  course_refusee:   { color: "bg-red-100 text-red-700",       dot: "bg-red-500",     label: "Refusée" },
-  colis_recupere:   { color: "bg-indigo-100 text-indigo-700", dot: "bg-indigo-500",  label: "Colis recupere" },
-  en_livraison:     { color: "bg-blue-100 text-blue-700",     dot: "bg-blue-500",    label: "En livraison" },
-  course_livree:    { color: "bg-emerald-100 text-emerald-700",dot: "bg-emerald-500", label: "Livrée" },
-  course_bloquee:   { color: "bg-orange-100 text-orange-700", dot: "bg-orange-500",  label: "Bloquée" },
-  course_annulee:   { color: "bg-red-100 text-red-700",       dot: "bg-red-400",     label: "Annulée" },
+  // Courses
+  nouvelle_course:         { color: "bg-blue-100 text-blue-700",     dot: "bg-blue-500",    label: "Nouvelle course" },
+  course_assignee:         { color: "bg-amber-100 text-amber-700",   dot: "bg-amber-500",   label: "Assignée" },
+  course_acceptee:         { color: "bg-green-100 text-green-700",   dot: "bg-green-500",   label: "Acceptée" },
+  course_refusee:          { color: "bg-red-100 text-red-700",       dot: "bg-red-500",     label: "Refusée" },
+  colis_recupere:          { color: "bg-indigo-100 text-indigo-700", dot: "bg-indigo-500",  label: "Colis récupéré" },
+  en_livraison:            { color: "bg-blue-100 text-blue-700",     dot: "bg-blue-500",    label: "En livraison" },
+  course_livree:           { color: "bg-emerald-100 text-emerald-700",dot: "bg-emerald-500", label: "Livrée" },
+  course_bloquee:          { color: "bg-orange-100 text-orange-700", dot: "bg-orange-500",  label: "Bloquée" },
+  course_annulee:          { color: "bg-red-100 text-red-700",       dot: "bg-red-400",     label: "Annulée" },
+  // Système / admin
+  demande_livreur_rappel:  { color: "bg-orange-100 text-orange-700", dot: "bg-orange-500",  label: "Rappel demandes livreurs" },
+  dispatch:                { color: "bg-purple-100 text-purple-700", dot: "bg-purple-500",  label: "Dispatch" },
+  paiement:                { color: "bg-amber-100 text-amber-700",   dot: "bg-amber-500",   label: "Paiement" },
+  securite:                { color: "bg-red-100 text-red-700",       dot: "bg-red-500",     label: "Sécurité" },
+  maintenance:             { color: "bg-slate-100 text-slate-700",   dot: "bg-slate-500",   label: "Maintenance" },
+  info_generale:           { color: "bg-gray-100 text-gray-600",     dot: "bg-gray-400",    label: "Info générale" },
 };
+
+function prettifyType(type) {
+  if (!type) return "Notification";
+  return type.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
 
 export default function Notifications() {
   const queryClient = useQueryClient();
@@ -28,22 +41,43 @@ export default function Notifications() {
   });
 
   // 🛡️ ANTI-DOUBLON COURSE : une seule notification par course_id
-  // Priorité : non-lue > plus récente
+  // + 📦 REGROUPEMENT des notifs système identiques (même type + titre, sans course_id)
   const notifications = React.useMemo(() => {
     const seen = new Map();
     const sorted = [...notificationsRaw].sort((a, b) => {
-      // Non-lue d'abord
       if (!a.lue && b.lue) return -1;
       if (a.lue && !b.lue) return 1;
-      // Puis plus récente
       return new Date(b.created_date) - new Date(a.created_date);
     });
-    return sorted.filter(n => {
-      if (!n.course_id) return true; // garder les notifs sans course_id
-      if (seen.has(n.course_id)) return false; // déjà vu → doublon
+    const deduped = sorted.filter(n => {
+      if (!n.course_id) return true;
+      if (seen.has(n.course_id)) return false;
       seen.set(n.course_id, true);
       return true;
     });
+    // Regrouper les notifs système identiques (pas de course_id, même type + titre)
+    const grouped = new Map();
+    const result = [];
+    for (const n of deduped) {
+      if (!n.course_id && n.type && n.titre) {
+        const key = `${n.type}::${n.titre}`;
+        if (grouped.has(key)) {
+          const g = grouped.get(key);
+          g._groupCount += 1;
+          if (!n.lue) g._hasUnread = true;
+          if (new Date(n.created_date) > new Date(g.created_date)) {
+            g.created_date = n.created_date;
+          }
+          continue;
+        }
+        const copy = { ...n, _groupCount: 1, _hasUnread: !n.lue };
+        grouped.set(key, copy);
+        result.push(copy);
+      } else {
+        result.push(n);
+      }
+    }
+    return result;
   }, [notificationsRaw]);
 
   const markReadMutation = useMutation({
@@ -135,29 +169,36 @@ export default function Notifications() {
       {/* ── LISTE ────────────────────────────────────── */}
       <div className="space-y-2">
         {notifications.map(notif => {
-          const config = typeConfig[notif.type] || { color: "bg-gray-100 text-gray-600", dot: "bg-gray-400", label: notif.type };
+          const config = typeConfig[notif.type] || { color: "bg-gray-100 text-gray-600", dot: "bg-gray-400", label: prettifyType(notif.type) };
+          const isUnread = !notif.lue || notif._hasUnread;
+          const groupCount = notif._groupCount || 1;
           return (
             <div
               key={notif.id}
-              className={`rounded-2xl border p-4 transition-all ${!notif.lue ? "border-primary/20 bg-primary/5" : "border-gray-100 bg-white"}`}
+              className={`rounded-2xl border p-4 transition-all ${isUnread ? "border-primary/20 bg-primary/5" : "border-gray-100 bg-white"}`}
             >
               <div className="flex items-start gap-3">
                 {/* Dot indicateur */}
-                <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${!notif.lue ? config.dot : "bg-gray-200"}`} />
+                <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${isUnread ? config.dot : "bg-gray-200"}`} />
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${config.color}`}>
                       {config.label}
                     </span>
+                    {groupCount > 1 && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                        ×{groupCount}
+                      </span>
+                    )}
                     <span className="text-[10px] text-muted-foreground">
                       {format(new Date(notif.created_date), "dd MMM · HH:mm", { locale: fr })}
                     </span>
-                    {!notif.lue && (
+                    {isUnread && (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">Nouveau</span>
                     )}
                   </div>
-                  <p className={`text-sm font-semibold leading-snug ${notif.lue ? "text-foreground/70" : "text-foreground"}`}>{notif.titre}</p>
+                  <p className={`text-sm font-semibold leading-snug ${isUnread ? "text-foreground" : "text-foreground/70"}`}>{notif.titre}</p>
                   <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{notif.message}</p>
                 </div>
 
