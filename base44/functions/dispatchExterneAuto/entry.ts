@@ -1037,7 +1037,20 @@ Deno.serve(async (req) => {
       const filter = { statut: 'recherche_livreur' };
       if (filterCountry) filter.country_code = filterCountry;
 
-      const courses = await base44.asServiceRole.entities.CourseExterne.filter(filter, '-created_date', 20);
+      const coursesRecherche = await base44.asServiceRole.entities.CourseExterne.filter(filter, '-created_date', 20);
+
+      // ── Courses "nouvelle" avec dispatch en attente (créées par Venus/WhatsApp ou app client) ──
+      // Elles doivent être prises en charge par le moteur de dispatch automatique
+      const filterNouvelles = { statut: 'nouvelle', dispatch_status: 'en_attente' };
+      if (filterCountry) filterNouvelles.country_code = filterCountry;
+      const coursesNouvelles = await base44.asServiceRole.entities.CourseExterne.filter(filterNouvelles, '-created_date', 20);
+
+      const seenIds = new Set();
+      const courses = [...coursesRecherche, ...coursesNouvelles].filter(c => {
+        if (seenIds.has(c.id)) return false;
+        seenIds.add(c.id);
+        return true;
+      });
       const now = new Date();
       const resultats = [];
 
