@@ -664,6 +664,188 @@ async function handleLocationAssignment(base44, conversation, userMessage) {
   return null;
 }
 
+/**
+ * Gestion du contact avec le livreur pendant une course active.
+ * - Détecte l'intention "parler au livreur", "appeler le livreur", etc.
+ * - Entre en mode "contact_livreur" et fournit les coordonnées du livreur
+ * - Relaye les messages du client vers le livreur (WhatsApp + push notification)
+ */
+async function handleContactLivreur(base44: any, conversation: any, userMessage: string, telephone: string, profileName: string) {
+  let pendingCourse: any = null;
+  try {
+    pendingCourse = conversation.venus_pending_course ? JSON.parse(conversation.venus_pending_course) : null;
+  } catch { pendingCourse = null; }
+
+  const STATUTS_ACTIFS = ['livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison', 'arrivee'];
+
+  // ── Mode "contact_livreur" actif → relayer le message au livreur ──
+  if (pendingCourse?.contact_livreur_mode === true && pendingCourse?.contact_livreur_course_id) {
+    const exitKeywords = ['merci', 'au revoir', 'aurevoir', 'fin', 'annuler', 'quitter', 'stop', 'plus besoin', "c'est bon", 'cest bon', 'terminer', 'c bon', 'cest fini'];
+    const msgLower = userMessage.toLowerCase().trim();
+    if (exitKeywords.some(kw => msgLower === kw || msgLower.startsWith(kw + ' ') || msgLower.startsWith(kw + '.') || msgLower.startsWith(kw + '!'))) {
+      delete pendingCourse.contact_livreur_mode;
+      delete pendingCourse.contact_livreur_course_id;
+      delete pendingCourse.contact_livreur_livreur_id;
+      delete pendingCourse.contact_livreur_livreur_tel;
+      await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+        venus_pending_course: JSON.stringify(pendingCourse),
+      });
+      return "D'accord, j'ai mis fin à la conversation avec le livreur. N'hésitez pas si vous avez besoin d'autre chose.";
+    }
+
+    const courseId = pendingCourse.contact_livreur_course_id;
+    const livreurId = pendingCourse.contact_livreur_livreur_id;
+    const course = await base44.asServiceRole.entities.CourseExterne.get(courseId);
+
+    if (!course) {
+      delete pendingCourse.contact_livreur_mode;
+      await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(pendingCourse) });
+      return "Cette course n'est plus disponible. Pour toute question, contactez le support au +226 66 92 51 90.";
+    }
+
+    if (!STATUTS_ACTIFS.includes(course.statut)) {
+      delete pendingCourse.contact_livreur_mode;
+      await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(pendingCourse) });
+      const statutLabel = course.statut === 'livree' ? 'livrée' : course.statut === 'annulee' ? 'annulée' : 'terminée';
+      return `Votre course est désormais ${statutLabel}. Le contact avec le livreur n'est plus disponible. Merci d'utiliser SILGAPP !`;
+    }
+
+    const livreurTel = course.livreur_telephone;
+    const livreurNom = course.livreur_nom || 'votre livreur';
+
+    if (!livreurTel) {
+      delete pendingCourse.contact_livreur_mode;
+      await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(pendingCourse) });
+      return "Je ne parviens pas à joindre votre livreur. Pour toute question, contactez le support au +226 66 92 51 90.";
+    }
+
+    // 1. Notification BDD + Push pour le livreur
+    let pushSent = false;
+    try {
+      const livreur = await base44.asServiceRole.entities.Livreur.get(livreurId);
+      if (livreur?.user_email) {
+        await base44.asServiceRole.entities.Notification.create({
+          titre: `💬 Message de votre client ${profileName || telephone}`,
+          message: userMessage.substring(0, 200),
+          type: 'message_client',
+          course_id: courseId,
+          destinataire_email: livreur.user_email,
+          lue: false,
+        });
+        pushSent = true;
+        base44.asServiceRole.functions.invoke('envoiNotificationPush', {
+          destinataire_email: livreur.user_email,
+          livreur_id: livreurId,
+          titre: '💬 Message de votre client',
+          message: userMessage.substring(0, 100),
+          type: 'message_client',
+          course_id: courseId,
+        }).catch((err: any) => console.error('[WebhookVenus] ❌ Push livreur:', err.message));
+      }
+    } catch (e) { console.error('[WebhookVenus] Erreur notif livreur:', e.message); }
+
+    // 2. Envoyer via WhatsApp au livreur
+    let whatsappSent = false;
+    const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
+    const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+    const fromNumber = Deno.env.get('TWILIO_WHATSAPP_FROM') || 'whatsapp:+14155238886';
+
+    if (accountSid && authToken) {
+      const INDICATIFS: any = { BF: '+226', CI: '+225', TG: '+228', BJ: '+229', SN: '+221', ML: '+223', GN: '+224', NE: '+227', GH: '+233' };
+      const indicatif = INDICATIFS[course.country_code] || '+226';
+      let tel = livreurTel.replace(/\s+/g, '').replace(/[^\d+]/g, '');
+      if (!tel.startsWith('+')) tel = indicatif + tel;
+      try {
+        const from = fromNumber.startsWith('whatsapp:') ? fromNumber : `whatsapp:${fromNumber}`;
+        const creds = btoa(`${accountSid}:${authToken}`);
+        const formData = new URLSearchParams();
+        formData.append('From', from);
+        formData.append('To', `whatsapp:${tel}`);
+        formData.append('Body', `💬 *Message de votre client ${profileName || telephone}:*\n\n${userMessage}\n\n_Répondez ici ou dans l'application SILGAPP_`);
+        const resp = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
+          method: 'POST',
+          headers: { Authorization: `Basic ${creds}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: formData.toString(),
+        });
+        const data = await resp.json();
+        whatsappSent = resp.ok && !!data.sid;
+      } catch (e) { console.error('[WebhookVenus] Erreur WhatsApp livreur:', e.message); }
+    }
+
+    return `✅ Votre message a été transmis au livreur ${livreurNom} :\n\n"${userMessage}"\n\n${whatsappSent ? "Il vous répondra dès que possible via WhatsApp." : pushSent ? "Il a été notifié dans l'application SILGAPP." : "Vous pouvez l'appeler directement."}\n\nÉcrivez un autre message ou dites "fin" pour terminer.`;
+  }
+
+  // ── Détection de l'intention "contacter le livreur" ──
+  const contactKeywords = [
+    'parler au livreur', 'parler a mon livreur', 'parler avec le livreur',
+    'contacter le livreur', 'contacter mon livreur', 'contacter livreur',
+    'appeler le livreur', 'appeler mon livreur', 'appeler livreur',
+    'ecrire au livreur', 'écrire au livreur',
+    'envoyer un message au livreur', 'message au livreur',
+    'joindre le livreur', 'joindre mon livreur',
+    'numero du livreur', 'numéro du livreur', 'numero de mon livreur',
+    'telephone du livreur', 'téléphone du livreur', 'tel du livreur',
+    'le contact du livreur', 'contact du livreur', 'contact livreur',
+    'communiquer avec le livreur',
+    'le numero de mon livreur', 'le telephone du livreur',
+  ];
+  const msgLower = userMessage.toLowerCase();
+  const isContactIntent = contactKeywords.some(kw => msgLower.includes(kw));
+  if (!isContactIntent) return null;
+
+  // Trouver la course active avec un livreur assigné
+  let courses = await base44.asServiceRole.entities.CourseExterne.filter(
+    { client_telephone: telephone }, '-created_date', 10
+  );
+  if (!courses || courses.length === 0) {
+    courses = await base44.asServiceRole.entities.CourseExterne.filter(
+      { expediteur_telephone: telephone }, '-created_date', 10
+    );
+  }
+  if (!courses || courses.length === 0) {
+    const cc = detecterPaysDepuisTelephone(telephone);
+    const allRecent = await base44.asServiceRole.entities.CourseExterne.filter(
+      { country_code: cc }, '-created_date', 50
+    );
+    const telDigits = telephone.replace(/\D/g, '');
+    courses = allRecent.filter(c => {
+      const ct = (c.client_telephone || '').replace(/\D/g, '');
+      const et = (c.expediteur_telephone || '').replace(/\D/g, '');
+      return ct.endsWith(telDigits.slice(-8)) || et.endsWith(telDigits.slice(-8));
+    }).slice(0, 10);
+  }
+
+  const courseActive = courses.find(c => STATUTS_ACTIFS.includes(c.statut) && c.livreur_telephone);
+  if (!courseActive) {
+    return "Je ne trouve pas de course active avec un livreur assigné pour le moment. Si vous souhaitez créer une nouvelle course ou suivre une course, dites-le moi ! Pour toute question, contactez le support au +226 66 92 51 90.";
+  }
+
+  // Activer le mode contact_livreur
+  pendingCourse = pendingCourse || {};
+  pendingCourse.contact_livreur_mode = true;
+  pendingCourse.contact_livreur_course_id = courseActive.id;
+  pendingCourse.contact_livreur_livreur_id = courseActive.livreur_id;
+  pendingCourse.contact_livreur_livreur_tel = courseActive.livreur_telephone;
+  await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+    venus_pending_course: JSON.stringify(pendingCourse),
+  });
+
+  const livreurNom = courseActive.livreur_nom || 'votre livreur';
+  const livreurTel = courseActive.livreur_telephone;
+  const trackingLink = courseActive.tracking_link || '';
+
+  let response = `🧑‍✈️ Votre livreur : ${livreurNom}\n\n`;
+  response += `📞 Pour l'appeler : ${livreurTel}\n\n`;
+  response += `Vous pouvez :\n`;
+  response += `1. Appeler le livreur au numéro ci-dessus\n`;
+  response += `2. Écrire un message ici — je le transmettrai immédiatement au livreur\n`;
+  if (trackingLink) {
+    response += `3. Suivre la position du livreur : ${trackingLink}\n`;
+  }
+  response += `\nÉcrivez votre message ou dites "fin" pour terminer.`;
+  return response;
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -731,6 +913,57 @@ Deno.serve(async (req) => {
     const tarifs = TARIFS_PAYS[countryCode] || TARIFS_PAYS.BF;
 
     console.log(`[WebhookVenus] 📥 ÉTAPE 1 — Message reçu de ${telephone} (${profileName || 'N/A'}) | Pays: ${countryCode} | Body: "${body}" | Media: ${numMedia} | GPS: ${latitude},${longitude} | Sid: ${messageSid}`);
+
+    // ── Détection: le sender est-il un livreur répondant à un client ? ──
+    // Si le client est en mode "contact_livreur", relaye la réponse du livreur au client
+    const telLast8 = telephone.replace(/\D/g, '').slice(-8);
+    if (telLast8.length >= 8 && body) {
+      try {
+        const STATUTS_ACTIFS_LIVREUR = ['livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison', 'arrivee'];
+        const recentCourses = await base44.asServiceRole.entities.CourseExterne.filter(
+          { country_code: countryCode }, '-created_date', 30
+        );
+        const livreurCourse = recentCourses.find(c =>
+          STATUTS_ACTIFS_LIVREUR.includes(c.statut) &&
+          c.livreur_telephone &&
+          (c.livreur_telephone || '').replace(/\D/g, '').endsWith(telLast8)
+        );
+        if (livreurCourse && livreurCourse.client_telephone) {
+          // Vérifier que le client est en mode contact_livreur
+          const clientConvs = await base44.asServiceRole.entities.Conversation.filter({
+            whatsapp_phone: livreurCourse.client_telephone,
+          });
+          const clientConv = clientConvs?.[0];
+          let clientPending: any = null;
+          try { clientPending = clientConv?.venus_pending_course ? JSON.parse(clientConv.venus_pending_course) : null; } catch {}
+          if (clientPending?.contact_livreur_mode === true) {
+            console.log(`[WebhookVenus] 🧑‍✈️ Livreur ${livreurCourse.livreur_nom || ''} répond au client ${livreurCourse.client_telephone} — relayage`);
+            const lAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
+            const lAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+            const lFromNumber = Deno.env.get('TWILIO_WHATSAPP_FROM') || 'whatsapp:+14155238886';
+            if (lAccountSid && lAuthToken) {
+              const from = lFromNumber.startsWith('whatsapp:') ? lFromNumber : `whatsapp:${lFromNumber}`;
+              const creds = btoa(`${lAccountSid}:${lAuthToken}`);
+              const formData = new URLSearchParams();
+              formData.append('From', from);
+              formData.append('To', `whatsapp:${livreurCourse.client_telephone}`);
+              formData.append('Body', `💬 *Réponse de votre livreur ${livreurCourse.livreur_nom || ''}:*\n\n${body}`);
+              await fetch(`https://api.twilio.com/2010-04-01/Accounts/${lAccountSid}/Messages.json`, {
+                method: 'POST',
+                headers: { Authorization: `Basic ${creds}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData.toString(),
+              });
+            }
+            return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
+              status: 200,
+              headers: { 'Content-Type': 'text/xml' },
+            });
+          }
+        }
+      } catch (e) {
+        console.error('[WebhookVenus] Erreur détection livreur sender:', e.message);
+      }
+    }
 
     // ── 1. Trouver ou créer la Conversation ──
     let conversation: any = null;
@@ -867,6 +1100,14 @@ Deno.serve(async (req) => {
         messageEffectif = transcriptionData.texte;
         isAudioTranscription = true;
         console.log(`[WebhookVenus] 🎤 Audio transcrit (confiance: ${transcriptionData.confidence}, statut: ${transcriptionData.status}) traité par LLM: "${messageEffectif.substring(0, 80)}"`);
+      }
+    }
+
+    // ── Contact livreur : détection d'intention ou relayage de message ──
+    if (!reponseVenus) {
+      const contactResponse = await handleContactLivreur(base44, conversation, messageEffectif, telephone, profileName);
+      if (contactResponse) {
+        reponseVenus = contactResponse;
       }
     }
 
