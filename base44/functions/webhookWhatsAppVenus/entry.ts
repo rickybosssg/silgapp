@@ -19,6 +19,12 @@ import {
   creerCourseDepuisMemoire,
   loggerRaisonnement,
 } from '../../shared/venusReasoningEngine.ts';
+import {
+  getExecutionActive,
+  repondreWorkflow,
+  lancerWorkflow,
+  getWorkflowCodeFromIntention,
+} from '../../shared/venusWorkflowEngine.ts';
 
 /**
  * Webhook WhatsApp <-> Venus (via Twilio).
@@ -1176,6 +1182,35 @@ Deno.serve(async (req) => {
 
     // ── 4. Venus répond ──
     let reponseVenus = '';
+
+    // ── 4a. MOTEUR DE WORKFLOWS — Vérifier s'il y a un workflow actif ──
+    // Si un workflow est en cours pour cette conversation, le moteur prend le relais
+    // de manière DÉTERMINISTE (sans IA). VENUS a décidé de lancer le workflow,
+    // maintenant le moteur exécute les étapes.
+    if (!reponseVenus) {
+      try {
+        const workflowActive = await getExecutionActive(base44, conversation.id);
+        if (workflowActive) {
+          console.log(`[WebhookVenus] 🔄 Workflow actif: ${workflowActive.workflow_code} (étape: ${workflowActive.etape_actuelle}) — routage vers le moteur`);
+          const wfResult = await repondreWorkflow(base44, workflowActive.id, body || messageContent, {
+            telephone,
+            profileName,
+            countryCode,
+            tarifs,
+            conversation_id: conversation.id,
+          });
+          if (wfResult.reponse) {
+            reponseVenus = wfResult.reponse;
+            console.log(`[WebhookVenus] ✅ Workflow a répondu (${reponseVenus.length} chars)`);
+          }
+          if (wfResult.termine) {
+            console.log(`[WebhookVenus] ✅ Workflow terminé pour ${telephone}`);
+          }
+        }
+      } catch (e) {
+        console.error('[WebhookVenus] Erreur workflow engine:', e.message);
+      }
+    }
 
     // 🎤 Phase 16+ — Si audio transcrit, passer le texte au LLM avec contexte de confirmation
     // Toutes les transcriptions (même faible confiance) sont traitées par le LLM
