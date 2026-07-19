@@ -74,6 +74,10 @@
       ],
       "description": "Cat\u00e9gorie automatique de la question"
     },
+    "intention": {
+      "type": "string",
+      "description": "Intention d\u00e9tect\u00e9e par le Centre d'Apprentissage (creer_course, suivre_course, demander_tarif, etc.)"
+    },
     "statut": {
       "type": "string",
       "enum": [
@@ -82,7 +86,7 @@
         "escalade"
       ],
       "default": "resolu",
-      "description": "Statut de la r\u00e9solution"
+      "description": "Statut de la r\u00e9solution \u2014 non_resolu si confidence < seuil"
     },
     "nb_messages": {
       "type": "number",
@@ -92,7 +96,7 @@
     "duree_secondes": {
       "type": "number",
       "default": 0,
-      "description": "Dur\u00e9e de la conversation en secondes"
+      "description": "Dur\u00e9e de traitement en secondes"
     },
     "reformulations": {
       "type": "number",
@@ -107,7 +111,19 @@
         "neutre"
       ],
       "default": "neutre",
-      "description": "Estimation de la satisfaction"
+      "description": "positive=connaissance utilis\u00e9e, negative=confidence bas, neutre=LLM"
+    },
+    "knowledge_id": {
+      "type": "string",
+      "description": "ID de la connaissance VenusKnowledge utilis\u00e9e pour la r\u00e9ponse (si applicable)"
+    },
+    "confidence_score": {
+      "type": "number",
+      "description": "Score de confiance 0-100 (100 = r\u00e9ponse issue de la base de connaissances)"
+    },
+    "temps_recherche_ms": {
+      "type": "number",
+      "description": "Temps de recherche/g\u00e9n\u00e9ration en millisecondes"
     },
     "date_conversation": {
       "type": "string",

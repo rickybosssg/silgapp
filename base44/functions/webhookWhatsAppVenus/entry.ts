@@ -5,6 +5,11 @@ import {
   TARIFS_PAYS,
   detecterPaysDepuisTelephone,
 } from '../../shared/venusPrompt.ts';
+import {
+  rechercherConnaissancesValidees,
+  genererReponseAugmentee,
+  SEUIL_CONFIANCE,
+} from '../../shared/venusLearningEngine.ts';
 
 /**
  * Webhook WhatsApp <-> Venus (via Twilio).
@@ -1227,9 +1232,29 @@ Deno.serve(async (req) => {
     const isConsultationFlow = hasConsultationKeyword && !hasPendingCourse && latitude === null && !reponseVenus;
     const isCourseFlow = (hasPendingCourse || (hasCourseKeyword && !isConsultationFlow)) && latitude === null && !reponseVenus;
 
+    // ── Centre d'Apprentissage VENUS ──
+    let learningData: any = null;
+    const questionIndicators = ['comment', 'pourquoi', 'combien', 'cest quoi', 'quelle est', 'quel est', 'ou est', 'comment ca marche', 'comment ca se passe', 'aide', 'help', 'information', 'je veux savoir', 'jaimerais savoir', 'explique', 'c quoi', 'c est quoi', 'comment fonctionne', 'est ce que', 'ca coute', 'ca cout', 'le prix', 'tarif'];
+    const isLikelyQuestion = !hasPendingCourse && questionIndicators.some(kw => messageEffectif.toLowerCase().includes(kw));
+
     if (!reponseVenus && isConsultationFlow) {
       reponseVenus = await handleConsultationCourse(base44, telephone, messageEffectif, profileName);
-    } else if (!reponseVenus && isCourseFlow) {
+    }
+    if (!reponseVenus && isLikelyQuestion && latitude === null) {
+      // ── Centre d'Apprentissage : recherche dans la base de connaissances ──
+      const knowledgeEntries = await rechercherConnaissancesValidees(base44, countryCode);
+      if (knowledgeEntries.length > 0) {
+        let ctx = '';
+        try { ctx = conversation.venus_pending_course || ''; } catch {}
+        learningData = await genererReponseAugmentee(base44, messageEffectif, knowledgeEntries, ctx, countryCode, tarifs, telephone, profileName, isAudioTranscription);
+        const ACTION_INTENTIONS = ['creer_course', 'suivre_course', 'contacter_livreur', 'annuler_course', 'modifier_course'];
+        if (learningData.reponse && (learningData.knowledge_used || learningData.confidence >= SEUIL_CONFIANCE) && !ACTION_INTENTIONS.includes(learningData.intention)) {
+          reponseVenus = learningData.reponse;
+          console.log(`[WebhookVenus] 📚 Réponse ${learningData.knowledge_used ? 'issue de la base de connaissances' : 'générée'} (confiance: ${learningData.confidence}%, intention: ${learningData.intention})`);
+        }
+      }
+    }
+    if (!reponseVenus && isCourseFlow) {
       const courseResult = await handleCourseFlow(base44, conversation, messageEffectif, countryCode, tarifs, telephone, profileName, isAudioTranscription);
       reponseVenus = courseResult.response;
       if (courseResult.pendingCourse !== undefined) {
@@ -1268,30 +1293,13 @@ Deno.serve(async (req) => {
     } else if (!reponseVenus && messageType !== 'audio' && numMedia > 0) {
       reponseVenus = "J'ai bien recu votre media. Comment puis-je vous aider avec cela ?";
     } else if (!reponseVenus) {
-      const promptComplet = `${VENUS_SYSTEM_PROMPT}
-
-═══ CONTEXTE DE LA CONVERSATION ═══
-PAYS ACTIF : ${countryCode} — ${tarifs.nom} (${tarifs.ville})
-INDICATIF : ${tarifs.indicatif}
-TARIFS : ${tarifs.prix_km} ${tarifs.devise}/km | Minimum ${tarifs.minimum} ${tarifs.devise} | Rayon ${tarifs.rayon} km
-DEVISE : ${tarifs.devise}
-SUPPORT WHATSAPP : +226 66 92 51 90
-${isAudioTranscription ? `═══ NOTE IMPORTANTE - TRANSCRIPTION VOCALE ═══
-Le message ci-dessous a ete transcrit depuis une note vocale et peut contenir des erreurs (mots mal entendus, noms de quartiers mal orthographues).
-- Confirme TOUJOURS ce que tu as compris: "Si j'ai bien compris, vous souhaitez..."
-- Si l'intention est claire meme avec des erreurs, propose une correction et continue.
-- Ne demande jamais de recommencer toute la note vocale.
-- Noms de quartiers courants: Karpala, Pissy, Tampouy, Ouaga 2000, Zone du Bois, Patte d'Oie, Gounghin, Dassasgho, Cissin, Samandin, Wemtenga, Bendogo, Larle, Somgande, Saaba, Tanghin, Kossodo.` : ''}
-
-═══ MESSAGE DU CLIENT ═══
-${messageEffectif}
-
-Reponds en tant que VENUS. Sois concise (max 3-4 paragraphes), chaleureuse et utile. N'utilise pas de markdown — uniquement du texte plain pour WhatsApp.`;
-
-      const llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
-        prompt: promptComplet,
-      });
-      reponseVenus = typeof llmRes === 'string' ? llmRes : (llmRes?.response || String(llmRes));
+      // ── Centre d'Apprentissage : réponse augmentée (fallback) ──
+      const knowledgeEntries = await rechercherConnaissancesValidees(base44, countryCode);
+      let ctx = '';
+      try { ctx = conversation.venus_pending_course || ''; } catch {}
+      learningData = await genererReponseAugmentee(base44, messageEffectif, knowledgeEntries, ctx, countryCode, tarifs, telephone, profileName, isAudioTranscription);
+      reponseVenus = learningData.reponse || "Je suis VENUS, votre assistante SILGAPP. Comment puis-je vous aider ?";
+      console.log(`[WebhookVenus] 📚 Réponse générée (confiance: ${learningData.confidence}%, intention: ${learningData.intention})`);
     }
 
     // Nettoyer le markdown
@@ -1352,7 +1360,7 @@ Reponds en tant que VENUS. Sois concise (max 3-4 paragraphes), chaleureuse et ut
 
     console.log(`[WebhookVenus] ✅ ÉTAPE 7 — Flow terminé avec succès pour ${telephone} | Twilio envoi: ${twilioResult?.ok ? 'OK' : (audioResponseUrl ? 'AUDIO OK' : 'ÉCHEC')}`);
 
-    // ── 7. Log VenusInteraction ──
+    // ── 7. Log VenusInteraction (avec Centre d'Apprentissage) ──
     const conversationIdLog = `wa_${telephone.replace(/[^0-9]/g, '')}`;
     try {
       await base44.asServiceRole.entities.VenusInteraction.create({
@@ -1362,8 +1370,13 @@ Reponds en tant que VENUS. Sois concise (max 3-4 paragraphes), chaleureuse et ut
         country_code: countryCode,
         user_type: 'client',
         date_conversation: new Date().toISOString().split('T')[0],
-        statut: 'resolu',
-        satisfaction: 'neutre',
+        statut: learningData ? (learningData.confidence < SEUIL_CONFIANCE ? 'non_resolu' : 'resolu') : 'resolu',
+        satisfaction: learningData ? (learningData.confidence < SEUIL_CONFIANCE ? 'negative' : (learningData.knowledge_used ? 'positive' : 'neutre')) : 'neutre',
+        duree_secondes: learningData ? Math.round(learningData.temps_recherche_ms / 1000) : 0,
+        intention: learningData?.intention || undefined,
+        knowledge_id: learningData?.knowledge_id || undefined,
+        confidence_score: learningData?.confidence || undefined,
+        temps_recherche_ms: learningData?.temps_recherche_ms || undefined,
       });
     } catch (logErr) {
       console.error('[WebhookVenus] Erreur logging VenusInteraction:', logErr.message);
