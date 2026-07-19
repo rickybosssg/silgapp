@@ -225,6 +225,100 @@ Un livreur sera assigne prochainement. Vous recevrez une notification.`;
   };
 }
 
+/**
+ * Phase 10 — Consultation de course via WhatsApp.
+ * Recherche la course active du client par son numero de telephone
+ * et renvoie un resume du statut actuel.
+ */
+async function handleConsultationCourse(base44, telephone, userMessage, profileName) {
+  const telDigits = telephone.replace(/\D/g, '');
+
+  // Rechercher les courses du client par client_telephone
+  let courses = await base44.asServiceRole.entities.CourseExterne.filter(
+    { client_telephone: telephone },
+    '-created_date', 5
+  );
+
+  // Aussi chercher par expediteur_telephone si pas trouve
+  if (!courses || courses.length === 0) {
+    courses = await base44.asServiceRole.entities.CourseExterne.filter(
+      { expediteur_telephone: telephone },
+      '-created_date', 5
+    );
+  }
+
+  // Chercher par derniers chiffres si pas trouve (numero stocke differemment)
+  if (!courses || courses.length === 0) {
+    const countryCode = detecterPaysDepuisTelephone(telephone);
+    const allRecent = await base44.asServiceRole.entities.CourseExterne.filter(
+      { country_code: countryCode },
+      '-created_date', 50
+    );
+    courses = allRecent.filter(c => {
+      const ct = (c.client_telephone || '').replace(/\D/g, '');
+      const et = (c.expediteur_telephone || '').replace(/\D/g, '');
+      return ct.endsWith(telDigits.slice(-8)) || et.endsWith(telDigits.slice(-8));
+    }).slice(0, 5);
+  }
+
+  if (!courses || courses.length === 0) {
+    return `Bonjour ${profileName || ''}, je n'ai trouve aucune course associee a votre numero ${telephone}. Si vous souhaitez creer une nouvelle course, dites-le moi ! Pour toute question, contactez le support au +226 66 92 51 90.`;
+  }
+
+  // Prendre la course la plus recente non terminee, sinon la plus recente
+  const STATUTS_ACTIFS = ['nouvelle', 'programmee', 'recherche_livreur', 'livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison', 'arrivee'];
+  const courseActive = courses.find(c => STATUTS_ACTIFS.includes(c.statut)) || courses[0];
+
+  const ref = courseActive.id?.slice(-6) || 'N/A';
+  const statut = courseActive.statut || 'inconnu';
+  const livreurNom = courseActive.livreur_nom || '';
+  const livreurTel = courseActive.livreur_telephone || '';
+  const adresseDepart = courseActive.adresse_depart || 'Non precise';
+  const adresseArrivee = courseActive.adresse_arrivee || 'Non precise';
+  const trackingLink = courseActive.tracking_link || '';
+  const prix = courseActive.prix_final || courseActive.prix_estimate;
+
+  const STATUT_LABELS = {
+    nouvelle: "Votre course vient d'etre creee. Nous recherchons un livreur.",
+    programmee: "Votre course est programmee.",
+    recherche_livreur: "Nous recherchons actuellement un livreur pour votre course.",
+    livreur_en_route: "Votre livreur est en route vers le point de prise en charge.",
+    arrive_prise_en_charge: "Votre livreur est arrive au point de prise en charge.",
+    colis_recupere: "Votre colis a ete recupere. Livraison en cours.",
+    pris_en_charge: "Votre colis a ete recupere. Livraison en cours.",
+    passager_embarque: "Votre passager a ete pris en charge.",
+    en_livraison: "Votre colis est en cours de livraison.",
+    arrivee: "Votre livreur est arrive a destination.",
+    livree: "Votre colis a ete livre avec succes !",
+    annulee: "Votre course a ete annulee.",
+  };
+
+  let message = `COURSE SILGAPP #${ref}\n\n`;
+  message += `${STATUT_LABELS[statut] || "Statut: " + statut}\n\n`;
+  message += `Depart: ${adresseDepart}\n`;
+  message += `Arrivee: ${adresseArrivee}\n`;
+
+  if (livreurNom) {
+    message += `\nLivreur: ${livreurNom}`;
+    if (livreurTel) message += ` (${livreurTel})`;
+  }
+
+  if (prix) {
+    message += `\nPrix: ${prix.toLocaleString()} ${courseActive.devise || 'FCFA'}`;
+  }
+
+  if (trackingLink && STATUTS_ACTIFS.includes(statut)) {
+    message += `\n\nSuivez votre livreur en temps reel:`;
+    message += `\n${trackingLink}`;
+  }
+
+  if (statut === 'livree') {
+    message += `\n\nMerci d'utiliser SILGAPP !`;
+  }
+
+  return message;
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -397,12 +491,23 @@ Deno.serve(async (req) => {
       body.toLowerCase().trim() === 'bonjour' ||
       body.toLowerCase().trim() === 'salut';
 
+    // ── Phase 10 : Détection des requêtes de consultation/suivi de course ──
+    const consultationKeywords = [
+      'ou est', 'où est', 'statut', 'suivi', 'ma course', 'mon colis',
+      'livreur ou', 'en route', 'livre', 'arrive', 'position',
+      'ou en est', 'où en est', 'mon livreur', 'la course',
+    ];
+    const hasConsultationKeyword = consultationKeywords.some(kw => body.toLowerCase().includes(kw));
+
     const hasPendingCourse = !!conversation.venus_pending_course;
     const courseKeywords = ['course', 'colis', 'envoyer', 'livrer', 'recevoir', 'deplacement', 'livraison', 'expedier', 'envoie', 'paquet'];
     const hasCourseKeyword = courseKeywords.some(kw => body.toLowerCase().includes(kw));
-    const isCourseFlow = (hasPendingCourse || hasCourseKeyword) && numMedia === 0 && latitude === null;
+    const isConsultationFlow = hasConsultationKeyword && !hasPendingCourse && numMedia === 0 && latitude === null;
+    const isCourseFlow = (hasPendingCourse || (hasCourseKeyword && !isConsultationFlow)) && numMedia === 0 && latitude === null;
 
-    if (isCourseFlow) {
+    if (isConsultationFlow) {
+      reponseVenus = await handleConsultationCourse(base44, telephone, body, profileName);
+    } else if (isCourseFlow) {
       const courseResult = await handleCourseFlow(base44, conversation, body, countryCode, tarifs, telephone, profileName);
       reponseVenus = courseResult.response;
       if (courseResult.pendingCourse !== undefined) {

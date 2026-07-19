@@ -859,6 +859,12 @@ Deno.serve(async (req) => {
         await supprimerNotificationsCourse(base44, course_id);
         console.log(`[DISPATCH] 🎉 Course ${course_id} verrouillée (auto) par ${livreur_id}`);
 
+        // ── Phase 9 : Suivi WhatsApp automatique — notifier le client que le livreur est assigné ──
+        base44.asServiceRole.functions.invoke('envoyerSuiviWhatsApp', {
+          course_id: course_id,
+          evenement: 'livreur_assigne',
+        }).catch(err => console.error('[DISPATCH] ❌ Suivi WhatsApp:', err.message));
+
         // 📝 Journaliser l'acceptation avec le temps de réponse
         let tempsAcceptationSec = null;
         if (course.heure_sollicitation) {
