@@ -36,6 +36,7 @@ export const navItems = [
   { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Settings },
   { path: "/admin/externe/clients", label: "Clients externes", icon: Users },
   { path: "/admin/publicites", label: "Publicités", icon: Megaphone },
+  { path: "/admin/venus", label: "Centre VENUS", icon: Sparkles },
   { path: "/admin/venus-rapports", label: "Rapports VENUS", icon: MessageCircle },
   { path: "/admin/centre-notifications", label: "Notifications Push", icon: Megaphone },
   { path: "/admin/externe", label: "Config Dispatch", icon: Settings },
