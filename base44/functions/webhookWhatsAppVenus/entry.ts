@@ -272,6 +272,10 @@ ${userMessage}
 8. Garde les champs deja collectes dans course_data (ne les perds pas).
 
 9. Ta response doit etre en texte plain, sans markdown, concise et chaleureuse.
+10. Si gps_depart_lat est defini dans course_data, le lieu de depart est DEJA CONNU (GPS partage). Ne JAMAIS le redemander. Considere adresse_depart comme valide.
+11. Si gps_arrivee_lat est defini dans course_data, le lieu d'arrivee est DEJA CONNU (GPS partage). Ne JAMAIS le redemander. Considere adresse_arrivee comme valide.
+12. Si pending_location_lat est defini, une localisation est en attente d'assignation. Ne pas la traiter comme une adresse — l'assignation est geree hors LLM.
+13. Si adresse_depart est "Localisation GPS partagee", c'est une adresse VALIDE (GPS). Ne pas la redemander ni la traiter comme manquante. Idem pour adresse_arrivee.
 
 Reponds UNIQUEMENT avec un JSON:`;
 
@@ -318,6 +322,23 @@ Reponds UNIQUEMENT avec un JSON:`;
     ...(result.course_data || {}),
   };
 
+  // Preserver les champs GPS et adresses assignees par localisation
+  // (le LLM ne doit pas ecraser les donnees GPS deja validees par le client)
+  if (pendingCourse?.gps_depart_lat != null) {
+    updatedCourse.gps_depart_lat = pendingCourse.gps_depart_lat;
+    updatedCourse.gps_depart_lng = pendingCourse.gps_depart_lng;
+    if (!updatedCourse.adresse_depart) updatedCourse.adresse_depart = pendingCourse.adresse_depart;
+  }
+  if (pendingCourse?.gps_arrivee_lat != null) {
+    updatedCourse.gps_arrivee_lat = pendingCourse.gps_arrivee_lat;
+    updatedCourse.gps_arrivee_lng = pendingCourse.gps_arrivee_lng;
+    if (!updatedCourse.adresse_arrivee) updatedCourse.adresse_arrivee = pendingCourse.adresse_arrivee;
+  }
+  if (pendingCourse?.pending_location_lat != null) {
+    updatedCourse.pending_location_lat = pendingCourse.pending_location_lat;
+    updatedCourse.pending_location_lng = pendingCourse.pending_location_lng;
+  }
+
   // Verifier si on peut creer la course
   // Conditions: type_course + adresse_depart + adresse_arrivee + (contact_telephone OU contact_is_client)
   // Le nom du destinataire est FACULTATIF et ne bloque jamais la creation
@@ -338,6 +359,10 @@ Reponds UNIQUEMENT avec un JSON:`;
       devise: tarifs.devise,
       statut: 'nouvelle',
       notes: cd.notes || '',
+      gps_depart_lat: cd.gps_depart_lat,
+      gps_depart_lng: cd.gps_depart_lng,
+      gps_arrivee_lat: cd.gps_arrivee_lat,
+      gps_arrivee_lng: cd.gps_arrivee_lng,
     };
 
     if (cd.type_course === 'expedier') {
@@ -491,6 +516,85 @@ async function handleConsultationCourse(base44, telephone, userMessage, profileN
   }
 
   return message;
+}
+
+/**
+ * Gestion de l'assignation d'une localisation partagee a un champ (depart ou arrivee).
+ * Si une localisation est en attente (pending_location_lat) et que le client indique
+ * "recuperation" ou "livraison", assigne la localisation au bon champ de maniere permanente.
+ * Retourne la reponse VENUS si l'assignation a ete faite, ou null sinon.
+ */
+async function handleLocationAssignment(base44, conversation, userMessage) {
+  let pendingCourse: any = null;
+  try {
+    pendingCourse = conversation.venus_pending_course ? JSON.parse(conversation.venus_pending_course) : null;
+  } catch { pendingCourse = null; }
+
+  if (!pendingCourse || pendingCourse.pending_location_lat == null) {
+    return null;
+  }
+
+  const msgLower = userMessage.toLowerCase();
+  const isPickup = ['recuperation', 'récupération', 'recuperer', 'récupérer', 'depart', 'départ', 'prise en charge', 'recupere', 'récupère'].some(kw => msgLower.includes(kw));
+  const isDelivery = ['livraison', 'livrer', 'arrivee', 'arrivée', 'destination', 'arriver'].some(kw => msgLower.includes(kw));
+
+  if (!isPickup && !isDelivery) {
+    return null;
+  }
+
+  // Eviter la reassignation d'un champ deja connu
+  if (isPickup && pendingCourse.gps_depart_lat != null) {
+    return "J'ai deja enregistre votre lieu de recuperation. Veuillez m'envoyer la localisation du lieu de livraison, ou indiquez-moi le quartier de livraison.";
+  }
+  if (isDelivery && pendingCourse.gps_arrivee_lat != null) {
+    return "J'ai deja enregistre votre lieu de livraison. Veuillez m'envoyer la localisation du lieu de recuperation, ou indiquez-moi le quartier de depart.";
+  }
+
+  if (isPickup) {
+    pendingCourse.gps_depart_lat = pendingCourse.pending_location_lat;
+    pendingCourse.gps_depart_lng = pendingCourse.pending_location_lng;
+    pendingCourse.adresse_depart = 'Localisation GPS partagee';
+    delete pendingCourse.pending_location_lat;
+    delete pendingCourse.pending_location_lng;
+
+    await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+      venus_pending_course: JSON.stringify(pendingCourse),
+    });
+
+    console.log(`[WebhookVenus] 📍 Localisation assignee au DEPART pour ${conversation.id}`);
+
+    if (pendingCourse.gps_arrivee_lat == null && !pendingCourse.adresse_arrivee) {
+      return "Merci. J'ai bien enregistre votre lieu de recuperation. Veuillez maintenant m'envoyer la localisation du lieu de livraison, ou si vous ne l'avez pas, indiquez-moi le quartier de livraison.";
+    } else if (!pendingCourse.type_course) {
+      return "Merci. J'ai bien enregistre votre lieu de recuperation. Quel type de course souhaitez-vous ? (envoyer un colis, recevoir un colis, ou vous deplacer)";
+    } else {
+      return "Merci. J'ai bien enregistre votre lieu de recuperation. Votre demande est prete. Souhaitez-vous confirmer la creation de cette course ? Repondez 'oui' pour confirmer.";
+    }
+  }
+
+  if (isDelivery) {
+    pendingCourse.gps_arrivee_lat = pendingCourse.pending_location_lat;
+    pendingCourse.gps_arrivee_lng = pendingCourse.pending_location_lng;
+    pendingCourse.adresse_arrivee = 'Localisation GPS partagee';
+    delete pendingCourse.pending_location_lat;
+    delete pendingCourse.pending_location_lng;
+
+    await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+      venus_pending_course: JSON.stringify(pendingCourse),
+    });
+
+    console.log(`[WebhookVenus] 📍 Localisation assignee a l'ARRIVEE pour ${conversation.id}`);
+
+    if (pendingCourse.gps_depart_lat == null && !pendingCourse.adresse_depart) {
+      return "Merci. J'ai bien enregistre votre lieu de livraison. Veuillez maintenant m'envoyer la localisation du lieu de recuperation, ou si vous ne l'avez pas, indiquez-moi le quartier de depart.";
+    } else if (!pendingCourse.type_course) {
+      return "Merci. J'ai bien enregistre votre lieu de livraison. Quel type de course souhaitez-vous ? (envoyer un colis, recevoir un colis, ou vous deplacer)";
+    } else {
+      return "Merci. J'ai bien enregistre votre lieu de livraison. Votre demande est prete. Souhaitez-vous confirmer la creation de cette course ? Repondez 'oui' pour confirmer.";
+    }
+  }
+
+  return null;
 }
 
 Deno.serve(async (req) => {
@@ -699,6 +803,16 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── Gestion de l'assignation de localisation (avant tout autre flow) ──
+    // Si une localisation est en attente et le client indique "recuperation" ou "livraison",
+    // assigner la localisation au bon champ de maniere permanente
+    if (!reponseVenus && latitude === null) {
+      const locResponse = await handleLocationAssignment(base44, conversation, messageEffectif);
+      if (locResponse) {
+        reponseVenus = locResponse;
+      }
+    }
+
     const isGreeting =
       messageEffectif.toLowerCase().trim() === 'start' ||
       messageEffectif.toLowerCase().trim() === 'bonjour' ||
@@ -731,7 +845,31 @@ Deno.serve(async (req) => {
     } else if (!reponseVenus && isGreeting && latitude === null) {
       reponseVenus = VENUS_GREETING_WHATSAPP;
     } else if (!reponseVenus && latitude !== null && longitude !== null) {
-      reponseVenus = "J'ai bien recu votre localisation. Cette localisation correspond-elle au lieu de recuperation ou au lieu de livraison ?";
+      // Sauvegarder la localisation dans le contexte de la conversation (venus_pending_course)
+      let pendingCourse: any = null;
+      try {
+        pendingCourse = conversation.venus_pending_course ? JSON.parse(conversation.venus_pending_course) : {};
+      } catch { pendingCourse = {}; }
+
+      pendingCourse.pending_location_lat = latitude;
+      pendingCourse.pending_location_lng = longitude;
+
+      await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+        venus_pending_course: JSON.stringify(pendingCourse),
+      });
+
+      console.log(`[WebhookVenus] 📍 Localisation sauvegardée en attente d'assignation pour ${conversation.id} (${latitude}, ${longitude})`);
+
+      const hasPickup = pendingCourse.adresse_depart || pendingCourse.gps_depart_lat != null;
+      const hasDelivery = pendingCourse.adresse_arrivee || pendingCourse.gps_arrivee_lat != null;
+
+      if (hasPickup && !hasDelivery) {
+        reponseVenus = "J'ai bien recu votre localisation. Cette localisation correspond-elle au lieu de livraison ?";
+      } else if (!hasPickup && hasDelivery) {
+        reponseVenus = "J'ai bien recu votre localisation. Cette localisation correspond-elle au lieu de recuperation ?";
+      } else {
+        reponseVenus = "J'ai bien recu votre localisation. Cette localisation correspond-elle au lieu de recuperation ou au lieu de livraison ?";
+      }
     } else if (!reponseVenus && messageType !== 'audio' && numMedia > 0) {
       reponseVenus = "J'ai bien recu votre media. Comment puis-je vous aider avec cela ?";
     } else if (!reponseVenus) {

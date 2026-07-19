@@ -11,6 +11,7 @@ import {
 import { useAdminContext } from "@/hooks/useAdminContext";
 import VenusAudioSettings from "@/components/admin/VenusAudioSettings";
 import TranscriptionJournal from "@/components/admin/TranscriptionJournal";
+import PendingCoursesStatus from "@/components/admin/PendingCoursesStatus";
 
 const PAYS_FLAGS = { BF: "🇧🇫", CI: "🇨🇮", TG: "🇹🇬", BJ: "🇧🇯", SN: "🇸🇳", ML: "🇲🇱", GN: "🇬🇳", NE: "🇳🇪" };
 
@@ -183,6 +184,9 @@ export default function VenusAdminCenter() {
         </div>
         <VenusAudioSettings />
       </div>
+
+      {/* Courses en collecte avec statut GPS */}
+      <PendingCoursesStatus />
 
       {/* Journal de transcription */}
       <TranscriptionJournal />
