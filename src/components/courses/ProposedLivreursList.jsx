@@ -123,6 +123,8 @@ export default function ProposedLivreursList({ course }) {
   const isSearching = dispatchStatus === "propose" || dispatchStatus === "en_attente" || dispatchStatus === "redispatch";
   const isCycleEpuise = dispatchStatus === "cycle_epuise";
 
+  const isTerminal = course?.statut === "annulee" || course?.statut === "livree";
+
   // Construire le libellé du statut dispatch
   let dispatchLabel = "";
   let dispatchColor = "text-gray-500";
@@ -145,7 +147,7 @@ export default function ProposedLivreursList({ course }) {
       </div>
 
       {/* ── Timeline dispatch : toutes les actions avec leur timing ── */}
-      {isSearching && (
+      {isSearching && !isTerminal && (
         <div className="rounded-lg p-3 bg-white border-2 border-blue-200 space-y-2.5">
           {/* En-tête : vague + statut */}
           <div className="flex items-center justify-between gap-2">
@@ -224,11 +226,20 @@ export default function ProposedLivreursList({ course }) {
           )}
         </div>
       )}
-      {isCycleEpuise && (
+      {isCycleEpuise && !isTerminal && (
         <div className="flex items-center gap-1.5 px-2.5 py-2.5 rounded-lg bg-red-50 border-2 border-red-300">
           <RefreshCw className="w-4 h-4 text-red-500 animate-spin" />
           <span className="text-xs font-bold text-red-600">
             Tous les livreurs sollicités — nouveau cycle imminent…
+          </span>
+        </div>
+      )}
+
+      {isTerminal && (
+        <div className="flex items-center gap-1.5 px-2.5 py-2.5 rounded-lg bg-gray-50 border border-gray-200">
+          <XCircle className="w-4 h-4 text-gray-400" />
+          <span className="text-xs font-bold text-gray-500">
+            Dispatch arrêté — course {course?.statut === "annulee" ? "annulée" : "livrée"}
           </span>
         </div>
       )}
@@ -270,6 +281,11 @@ export default function ProposedLivreursList({ course }) {
                 <span className="flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-200 px-2 py-1 rounded-full shrink-0">
                   <CheckCircle2 className="w-3 h-3" />
                   Accepté
+                </span>
+              ) : isTerminal ? (
+                <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded-full shrink-0">
+                  <Clock className="w-3 h-3" />
+                  Notifié
                 </span>
               ) : (
                 <button
