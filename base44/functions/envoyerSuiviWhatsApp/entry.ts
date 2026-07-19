@@ -8,9 +8,16 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.38';
  * WhatsApp au client (expéditeur ou destinataire selon le type de course)
  * avec les informations pertinentes (livreur assigné, en route, livré, etc.)
  *
+ * Phase QR/PIN — Envoi automatique du QR Code + Code PIN :
+ * Quand un livreur est assigné (evenement: "livreur_assigne"), VENUS envoie
+ * automatiquement le QR Code officiel (image) et le Code PIN générés par SILGAPP.
+ * En cas de réaffectation, précise que les anciens codes sont toujours valables
+ * (ou invalidés si de nouveaux ont été générés).
+ *
  * Payload:
  *   - course_id: ID de la course
  *   - evenement: "livreur_assigne" | "arrive_prise_en_charge" | "pris_en_charge" | "livre" | "annule"
+ *   - is_redispatch: (optionnel) true si réaffectation après annulation livreur
  */
 
 const STATUT_LABELS = {
@@ -23,7 +30,7 @@ const STATUT_LABELS = {
   annulee: 'Votre course a été annulée',
 };
 
-function construireMessage(course, evenement) {
+function construireMessage(course, evenement, body = {}) {
   const ref = course.id?.slice(-6) || 'N/A';
   const livreurNom = course.livreur_nom || 'votre livreur';
   const livreurVehicule = course.livreur_vehicule || 'moto';
@@ -45,6 +52,23 @@ function construireMessage(course, evenement) {
         trackingLink || '',
       ].filter(l => l !== '').join('\n');
 
+    case 'livreur_assigne_qr':
+      const isRedispatch = body.is_redispatch === true;
+      const pin = course.pickup_code_4_digits || '';
+      return [
+        isRedispatch
+          ? `✅ Un nouveau livreur a accepté votre course !`
+          : `Bonne nouvelle ! Un livreur a accepté votre course.`,
+        ``,
+        `Voici votre QR Code et votre Code PIN de récupération.`,
+        ``,
+        `Code PIN : ${pin}`,
+        ``,
+        isRedispatch
+          ? `⚠️ Les anciens codes ne sont plus valables. Utilisez uniquement ce nouveau QR Code et ce Code PIN.`
+          : `🔒 Ne communiquez le QR Code et le Code PIN au livreur qu'au moment où il récupère effectivement votre colis. Pour votre sécurité, ne les partagez jamais avant son arrivée.`,
+      ].filter(l => l !== '').join('\n');
+
     case 'arrive_prise_en_charge':
       return [
         `COURSE SILGAPP #${ref}`,
@@ -55,10 +79,8 @@ function construireMessage(course, evenement) {
 
     case 'pris_en_charge':
       return [
-        `COURSE SILGAPP #${ref}`,
-        ``,
-        `Votre colis a été récupéré par ${livreurNom}.`,
-        `Livraison en cours vers ${course.adresse_arrivee || 'la destination'}.`,
+        `✅ Votre QR Code et votre Code PIN ont été validés.`,
+        `Votre colis a bien été récupéré par ${livreurNom}. Il est maintenant en route vers sa destination.`,
         trackingLink ? `Suivez l'acheminement : ${trackingLink}` : '',
       ].filter(l => l !== '').join('\n');
 
@@ -102,7 +124,7 @@ Deno.serve(async (req) => {
     } catch { /* appel interne depuis dispatchExterneAuto */ }
 
     const body = await req.json();
-    const { course_id, evenement } = body;
+    const { course_id, evenement, is_redispatch } = body;
 
     if (!course_id || !evenement) {
       return Response.json({ error: 'course_id et evenement requis' }, { status: 400 });
@@ -138,7 +160,22 @@ Deno.serve(async (req) => {
       }
     }
 
-    const message = construireMessage(course, evenement);
+    // ── Phase QR/PIN : générer et envoyer le QR Code + PIN ──
+    // Le QR Code est généré à partir du token officiel SILGAPP (pickup_qr_token).
+    // L'URL publique du QR Code est passée directement à Twilio comme MediaUrl.
+    let qrImageUrl: string | null = null;
+    let messageEvenement = evenement;
+
+    if (evenement === 'livreur_assigne' && course.pickup_qr_token && course.pickup_code_4_digits) {
+      // URL publique du QR Code générée depuis le token officiel SILGAPP
+      // Twilio téléchargera cette image automatiquement lors de l'envoi
+      qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=2&color=000000&bgcolor=ffffff&data=${encodeURIComponent(course.pickup_qr_token)}`;
+      messageEvenement = 'livreur_assigne_qr';
+      console.log(`[SuiviWhatsApp] 📱 QR Code URL: ${qrImageUrl.substring(0, 80)}...`);
+    }
+
+    // Construire le message (avec PIN si livreur_assigne_qr)
+    const message = construireMessage(course, messageEvenement, { is_redispatch });
 
     // Envoyer via Twilio
     const twilioSid = Deno.env.get('TWILIO_ACCOUNT_SID');
@@ -156,6 +193,9 @@ Deno.serve(async (req) => {
     formData.append('From', twilioFrom);
     formData.append('To', `whatsapp:+${numero}`);
     formData.append('Body', message);
+    if (qrImageUrl) {
+      formData.append('MediaUrl', qrImageUrl);
+    }
 
     const twilioRes = await fetch(twilioUrl, {
       method: 'POST',
@@ -169,8 +209,8 @@ Deno.serve(async (req) => {
     const twilioData = await twilioRes.json();
 
     if (twilioRes.ok) {
-      console.log(`[SuiviWhatsApp] Message envoyé à +${numero} pour course ${course_id} (${evenement})`);
-      return Response.json({ success: true, sid: twilioData.sid });
+      console.log(`[SuiviWhatsApp] Message envoyé à +${numero} pour course ${course_id} (${messageEvenement}${qrImageUrl ? ' + QR' : ''})`);
+      return Response.json({ success: true, sid: twilioData.sid, qr_sent: !!qrImageUrl });
     } else {
       console.error('[SuiviWhatsApp] Erreur Twilio:', twilioData.message || twilioData);
       return Response.json({ success: false, error: twilioData.message || 'Erreur Twilio' });

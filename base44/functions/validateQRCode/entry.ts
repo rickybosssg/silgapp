@@ -90,6 +90,13 @@ Deno.serve(async (req) => {
           pickup_confirmed_by: method,
           pickup_confirmed_at: new Date().toISOString(),
         });
+
+        // 📤 Notifier le client via WhatsApp : QR Code et Code PIN validés
+        base44.asServiceRole.functions.invoke('envoyerSuiviWhatsApp', {
+          course_id: course_id,
+          evenement: 'pris_en_charge',
+        }).catch(err => console.error('[validateQRCode] ❌ Suivi WhatsApp pickup:', err.message));
+
         return Response.json({ success: true, message: 'Colis récupéré !', course: { statut: 'colis_recupere' } });
       }
 
