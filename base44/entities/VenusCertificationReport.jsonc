@@ -1,0 +1,132 @@
+{
+  "name": "VenusCertificationReport",
+  "type": "object",
+  "properties": {
+    "type_audit": {
+      "type": "string",
+      "enum": [
+        "complet",
+        "architecture",
+        "securite",
+        "performance",
+        "fonctionnel",
+        "qualite"
+      ],
+      "default": "complet",
+      "description": "Type d'audit r\u00e9alis\u00e9"
+    },
+    "score_global": {
+      "type": "number",
+      "default": 0,
+      "description": "Score global de maturit\u00e9 VENUS (0-100)"
+    },
+    "score_architecture": {
+      "type": "number",
+      "default": 0
+    },
+    "score_integrations": {
+      "type": "number",
+      "default": 0
+    },
+    "score_fonctionnel": {
+      "type": "number",
+      "default": 0
+    },
+    "score_securite": {
+      "type": "number",
+      "default": 0
+    },
+    "score_performance": {
+      "type": "number",
+      "default": 0
+    },
+    "score_qualite": {
+      "type": "number",
+      "default": 0
+    },
+    "score_readiness": {
+      "type": "number",
+      "default": 0
+    },
+    "niveau_maturite": {
+      "type": "string",
+      "enum": [
+        "initial",
+        "en_developpement",
+        "operationnel",
+        "mature",
+        "certifie"
+      ],
+      "default": "initial"
+    },
+    "resume": {
+      "type": "string",
+      "description": "R\u00e9sum\u00e9 ex\u00e9cutif de l'audit"
+    },
+    "modules_audite": {
+      "type": "string",
+      "description": "JSON: [{code, nom, type, statut, score, details}]"
+    },
+    "integrations_audite": {
+      "type": "string",
+      "description": "JSON: [{from, to, desc, statut, details}]"
+    },
+    "tests_fonctionnels": {
+      "type": "string",
+      "description": "JSON: [{id, nom, categorie, statut, details}]"
+    },
+    "checks_securite": {
+      "type": "string",
+      "description": "JSON: [{id, nom, statut, details}]"
+    },
+    "metriques_performance": {
+      "type": "string",
+      "description": "JSON: {latence_moy, latence_max, erreurs_24h, cache_hit_rate, ...}"
+    },
+    "evaluation_qualite": {
+      "type": "string",
+      "description": "JSON: {taux_reussite, taux_escalade, interactions_analysees, ...}"
+    },
+    "readiness_checklist": {
+      "type": "string",
+      "description": "JSON: [{item, categorie, statut, details}]"
+    },
+    "recommandations": {
+      "type": "string",
+      "description": "JSON: [{priorite, titre, description}]"
+    },
+    "risques": {
+      "type": "string",
+      "description": "JSON: [{severite, titre, mitigation}]"
+    },
+    "fonctionnalites": {
+      "type": "string",
+      "description": "JSON: [{categorie, items: [{nom, statut}]}]"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "en_cours",
+        "termine",
+        "echec"
+      ],
+      "default": "en_cours"
+    },
+    "declenche_par": {
+      "type": "string"
+    },
+    "date_audit": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "date_fin": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "type_audit",
+    "score_global",
+    "statut"
+  ]
+}

@@ -24,10 +24,15 @@ import {
   recordMetric,
 } from '../../shared/venusPerformanceEngine.ts';
 
-export default async function handler(req, res) {
-  const base44 = createClientFromRequest(req);
+Deno.serve(async (req) => {
   try {
-    const { action, ...params } = req.body || {};
+    const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    if (!user) return Response.json({ error: 'Non autorisé' }, { status: 401 });
+    if (user.role !== 'admin') return Response.json({ error: 'Accès admin requis' }, { status: 403 });
+
+    const body = await req.json();
+    const { action, ...params } = body;
 
     switch (action) {
       case 'get_dashboard': {
@@ -36,10 +41,8 @@ export default async function handler(req, res) {
           getQueueStats(base44),
         ]);
 
-        // Récupérer les métriques récentes (dernières 24h)
         const recentMetrics = await base44.asServiceRole.entities.VenusMetric.list('-timestamp', 100);
 
-        // Calculer agrégats
         const latences = recentMetrics.filter(m => m.type_metric === 'latence');
         const avgLatency = latences.length > 0
           ? Math.round(latences.reduce((a, m) => a + m.valeur, 0) / latences.length)
@@ -47,15 +50,13 @@ export default async function handler(req, res) {
         const maxLatency = latences.length > 0 ? Math.max(...latences.map(m => m.valeur)) : 0;
         const errors = recentMetrics.filter(m => m.type_metric === 'erreur').length;
 
-        // Suggestions actives
         const suggestions = await base44.asServiceRole.entities.VenusOptimizationSuggestion.filter(
           { statut: 'active' }, '-creee_date', 20
         );
 
-        // Load tests récents
         const loadTests = await base44.asServiceRole.entities.VenusLoadTest.list('-date_debut', 5);
 
-        return res.json({
+        return Response.json({
           success: true,
           cache: cacheStats,
           queue: queueStats,
@@ -78,35 +79,35 @@ export default async function handler(req, res) {
         const metrics = await base44.asServiceRole.entities.VenusMetric.filter(
           filter, '-timestamp', limit || 100
         );
-        return res.json({ success: true, metrics });
+        return Response.json({ success: true, metrics });
       }
 
       case 'flush_metrics': {
         await flushMetrics(base44);
-        return res.json({ success: true, message: 'Metrics flushed' });
+        return Response.json({ success: true, message: 'Metrics flushed' });
       }
 
       case 'detect_optimizations': {
         const suggestions = await detecterOptimisations(base44);
-        return res.json({ success: true, suggestions, count: suggestions.length });
+        return Response.json({ success: true, suggestions, count: suggestions.length });
       }
 
       case 'launch_load_test': {
         const { nb_users, duration_seconds } = params;
         const nbUsers = Number(nb_users) || 100;
         const duration = Number(duration_seconds) || 60;
-        const testId = await lancerTestDeCharge(base44, nbUsers, duration, req.user?.email || 'admin');
-        return res.json({ success: true, test_id: testId, nb_users: nbUsers, duration_seconds: duration });
+        const testId = await lancerTestDeCharge(base44, nbUsers, duration, user.email || 'admin');
+        return Response.json({ success: true, test_id: testId, nb_users: nbUsers, duration_seconds: duration });
       }
 
       case 'get_load_tests': {
         const tests = await base44.asServiceRole.entities.VenusLoadTest.list('-date_debut', 20);
-        return res.json({ success: true, tests });
+        return Response.json({ success: true, tests });
       }
 
       case 'get_queue_stats': {
         const stats = await getQueueStats(base44);
-        return res.json({ success: true, stats });
+        return Response.json({ success: true, stats });
       }
 
       case 'clear_cache': {
@@ -114,20 +115,20 @@ export default async function handler(req, res) {
         const cleared = pattern
           ? cacheInvalidateByPattern(pattern)
           : cacheInvalidateByPattern('');
-        return res.json({ success: true, cleared });
+        return Response.json({ success: true, cleared });
       }
 
       case 'record_metric': {
         const { type_metric, composant, valeur, unite, metadata } = params;
         recordMetric(type_metric, composant, Number(valeur), unite, metadata);
-        return res.json({ success: true });
+        return Response.json({ success: true });
       }
 
       default:
-        return res.json({ success: false, error: 'Action non reconnue' });
+        return Response.json({ success: false, error: 'Action non reconnue' });
     }
   } catch (error) {
     console.error('[venusPerformance] Error:', error.message);
-    return res.json({ success: false, error: error.message });
+    return Response.json({ success: false, error: error.message });
   }
-}
+});
