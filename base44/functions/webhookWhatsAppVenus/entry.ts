@@ -210,6 +210,41 @@ async function handleCourseFlow(base44, conversation, userMessage, countryCode, 
 
   const courseContext = pendingCourse ? JSON.stringify(pendingCourse, null, 2) : 'Aucune course en cours';
 
+  // ── Détection déterministe de confirmation (anti-boucle) ──
+  // Si le récapitulatif a déjà été présenté (all_info_collected = true) et que
+  // le client répond par une confirmation, créer la course SANS appeler le LLM.
+  const CONFIRM_KEYWORDS = [
+    'oui', 'ok', "d'accord", 'd accord', 'je confirme', 'valider', 'confirmer',
+    'confirme', "c'est bon", 'cest bon', 'go', "c'est ok", 'cest ok', 'parfait',
+    'pas de probleme', 'exact', 'certainement', 'bien sur', 'ouais', 'volontiers',
+    'je valide', 'valide', 'oui je confirme', 'tout est bon', 'correct', 'daco',
+  ];
+  const REFUSE_KEYWORDS = ['non', 'annuler', 'annule', 'je refuse', 'non merci', 'pas maintenant', 'je ne confirme pas'];
+
+  function normalizeTypeCourse(type) {
+    if (!type) return null;
+    const t = type.toLowerCase().trim();
+    if (['expedier', 'recevoir', 'deplacement'].includes(t)) return t;
+    if (t.includes('expedi') || t.includes('envoi') || t.includes('envoyer')) return 'expedier';
+    if (t.includes('recev') || t.includes('reception')) return 'recevoir';
+    if (t.includes('deplac') || t.includes('trajet') || t.includes('transport person')) return 'deplacement';
+    if (t.includes('livraison') || t.includes('colis')) return 'expedier';
+    return null;
+  }
+
+  const msgLowerConfirm = userMessage.toLowerCase().trim();
+  const isRefusal = REFUSE_KEYWORDS.some(kw => msgLowerConfirm === kw || msgLowerConfirm.startsWith(kw + ' ') || msgLowerConfirm.startsWith(kw + '.') || msgLowerConfirm.startsWith(kw + '!'));
+  const isConfirmation = !isRefusal && msgLowerConfirm.length <= 25 && CONFIRM_KEYWORDS.some(kw => msgLowerConfirm.includes(kw));
+  const resumePresented = pendingCourse?.all_info_collected === true && !pendingCourse?.course_created;
+  let bypassResult: any = null;
+  if (resumePresented && isConfirmation) {
+    bypassResult = { is_course_request: true, course_data: {}, all_info_collected: true, user_confirmed: true, is_cancellation: false, response: '' };
+    console.log(`[WebhookVenus] ✅ Confirmation déterministe détectée ("${userMessage}") — création directe (bypass LLM)`);
+  } else if (resumePresented && isRefusal && !isConfirmation) {
+    console.log(`[WebhookVenus] ❌ Refus déterministe détecté ("${userMessage}") — annulation`);
+    return { response: "Aucun problème, j'annule cette demande. N'hésitez pas à me solliciter si vous avez besoin d'autre chose.", pendingCourse: null, courseCreated: false };
+  }
+
   const prompt = `Tu es VENUS, l'assistante SILGAPP. Analyse le message du client pour determiner s'il veut creer une course.
 
 PAYS: ${countryCode} (${tarifs.nom})
@@ -267,6 +302,8 @@ ${userMessage}
 
 6. Si le client confirme apres le resume, mets user_confirmed a true.
 
+6b. ANTI-BOUCLE CRITIQUE: Si all_info_collected est deja vrai dans la course en cours (le resume a DEJA ete presente) et que le client repond par une confirmation (oui, ok, d'accord, je confirme, valider, confirmer, etc.), mets user_confirmed a true IMMEDIATEMENT. Ne repete JAMAIS le resume. Ne repose JAMAIS une question deja validee. Une etape validee ne doit jamais etre reposee au client.
+
 7. Si ce n'est pas une demande de course, mets is_course_request a false et reponds normalement.
 
 8. Garde les champs deja collectes dans course_data (ne les perds pas).
@@ -279,34 +316,38 @@ ${userMessage}
 
 Reponds UNIQUEMENT avec un JSON:`;
 
-  const llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
-    prompt,
-    response_json_schema: {
-      type: 'object',
-      properties: {
-        is_course_request: { type: 'boolean' },
-        course_data: {
-          type: 'object',
-          properties: {
-            type_course: { type: 'string' },
-            adresse_depart: { type: 'string' },
-            adresse_arrivee: { type: 'string' },
-            contact_nom: { type: 'string' },
-            contact_telephone: { type: 'string' },
-            contact_is_client: { type: 'boolean' },
-            notes: { type: 'string' },
+  let result: any;
+  if (bypassResult) {
+    result = bypassResult;
+  } else {
+    const llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
+      prompt,
+      response_json_schema: {
+        type: 'object',
+        properties: {
+          is_course_request: { type: 'boolean' },
+          course_data: {
+            type: 'object',
+            properties: {
+              type_course: { type: 'string' },
+              adresse_depart: { type: 'string' },
+              adresse_arrivee: { type: 'string' },
+              contact_nom: { type: 'string' },
+              contact_telephone: { type: 'string' },
+              contact_is_client: { type: 'boolean' },
+              notes: { type: 'string' },
+            },
           },
+          all_info_collected: { type: 'boolean' },
+          user_confirmed: { type: 'boolean' },
+          is_cancellation: { type: 'boolean' },
+          response: { type: 'string' },
         },
-        all_info_collected: { type: 'boolean' },
-        user_confirmed: { type: 'boolean' },
-        is_cancellation: { type: 'boolean' },
-        response: { type: 'string' },
+        required: ['is_course_request', 'response'],
       },
-      required: ['is_course_request', 'response'],
-    },
-  });
-
-  const result: any = typeof llmRes === 'string' ? JSON.parse(llmRes) : llmRes;
+    });
+    result = typeof llmRes === 'string' ? JSON.parse(llmRes) : llmRes;
+  }
 
   if (result.is_cancellation) {
     return { response: result.response || 'Course annulee. Comment puis-je vous aider ?', pendingCourse: null, courseCreated: false };
@@ -339,11 +380,26 @@ Reponds UNIQUEMENT avec un JSON:`;
     updatedCourse.pending_location_lng = pendingCourse.pending_location_lng;
   }
 
+  // ── Persister all_info_collected dans le pending course (anti-boucle) ──
+  // Marque que le récapitulatif a été présenté — la prochaine confirmation
+  // du client créera la course sans repasser par le LLM
+  if (result.all_info_collected) {
+    updatedCourse.all_info_collected = true;
+  }
+
+  // ── Normaliser type_course en valeurs d'enum valides ──
+  const normalizedType = normalizeTypeCourse(updatedCourse.type_course);
+  if (normalizedType) {
+    updatedCourse.type_course = normalizedType;
+  }
+
   // Verifier si on peut creer la course
   // Conditions: type_course + adresse_depart + adresse_arrivee + (contact_telephone OU contact_is_client)
   // Le nom du destinataire est FACULTATIF et ne bloque jamais la creation
   const hasRequiredContact = updatedCourse.contact_telephone || updatedCourse.contact_is_client;
-  if (result.all_info_collected && result.user_confirmed && updatedCourse.type_course && updatedCourse.adresse_depart && updatedCourse.adresse_arrivee && hasRequiredContact) {
+  const hasDepart = updatedCourse.adresse_depart || updatedCourse.gps_depart_lat != null;
+  const hasArrivee = updatedCourse.adresse_arrivee || updatedCourse.gps_arrivee_lat != null;
+  if (result.all_info_collected && result.user_confirmed && updatedCourse.type_course && hasDepart && hasArrivee && hasRequiredContact) {
     const cd = updatedCourse;
     const typeLabels: any = { expedier: 'Envoi de colis', recevoir: 'Reception de colis', deplacement: 'Deplacement' };
 
@@ -358,6 +414,7 @@ Reponds UNIQUEMENT avec un JSON:`;
       prix_estimate: tarifs.minimum,
       devise: tarifs.devise,
       statut: 'nouvelle',
+      dispatch_status: 'en_attente',
       notes: cd.notes || '',
       gps_depart_lat: cd.gps_depart_lat,
       gps_depart_lng: cd.gps_depart_lng,
@@ -398,13 +455,13 @@ Reponds UNIQUEMENT avec un JSON:`;
       console.log(`[WebhookVenus] Course creee: ${course.id} pour ${telephone}`);
 
       const typeLabel = typeLabels[cd.type_course] || cd.type_course;
-      result.response = `Course creee avec succes !
+      result.response = `Votre course a ete creee avec succes dans SILGAPP !
 
 Type: ${typeLabel}
-De: ${cd.adresse_depart}
-Vers: ${cd.adresse_arrivee}
+De: ${cd.adresse_depart || 'Localisation GPS'}
+Vers: ${cd.adresse_arrivee || 'Localisation GPS'}
 
-Votre demande est bien enregistree. Un livreur va etre recherche. Des qu'il aura accepte la course, il vous contactera directement pour confirmer les details et vous communiquer le cout de la livraison avant toute validation definitive.`;
+Je recherche maintenant un livreur disponible. Je vous informerai des qu'un livreur aura accepte votre demande. Le livreur vous contactera ensuite pour confirmer les derniers details et le cout de la livraison.`;
 
       return { response: result.response, pendingCourse: null, courseCreated: true };
     } catch (e: any) {
@@ -415,6 +472,16 @@ Votre demande est bien enregistree. Un livreur va etre recherche. Des qu'il aura
         courseCreated: false,
       };
     }
+  }
+
+  // ── Fallback: si bypass mais création impossible (infos incomplètes) ──
+  if (bypassResult) {
+    delete updatedCourse.all_info_collected;
+    return {
+      response: 'Je n\'ai pas toutes les informations necessaires pour creer votre course. Pouvez-vous reformuler votre demande en precisant le type (envoyer un colis, recevoir un colis, ou se deplacer), le lieu de depart et le lieu de livraison ?',
+      pendingCourse: updatedCourse,
+      courseCreated: false,
+    };
   }
 
   return {
