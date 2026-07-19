@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Users, Phone, MapPin, Clock, CheckCircle2, XCircle, Timer, RefreshCw, Radio, Search, Zap } from "lucide-react";
+import { Users, Phone, MapPin, Clock, CheckCircle2, XCircle, Timer, RefreshCw, Radio, Search, Zap, UserCheck } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { toast } from "sonner";
 
 function fmtSec(sec) {
   if (sec <= 0) return "00:00";
@@ -12,9 +14,34 @@ function fmtSec(sec) {
 }
 
 export default function ProposedLivreursList({ course }) {
+  const queryClient = useQueryClient();
   const [livreurs, setLivreurs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(Date.now());
+  const [assigningId, setAssigningId] = useState(null);
+
+  const handleForceAssign = async (livreur) => {
+    setAssigningId(livreur.id);
+    try {
+      await base44.entities.CourseExterne.update(course.id, {
+        statut: "livreur_en_route",
+        dispatch_status: "accepte",
+        livreur_id: livreur.id,
+        livreur_nom: `${livreur.prenom || ""} ${livreur.nom || ""}`.trim(),
+        livreur_telephone: livreur.telephone || "",
+        livreur_vehicule: livreur.vehicule || livreur.type_vehicule || "",
+        heure_acceptation: new Date().toISOString(),
+        notes: (course.notes || "") + `\n[Assigné manuellement par admin → ${livreur.prenom || ""} ${livreur.nom || ""}]`,
+      });
+      await base44.entities.Livreur.update(livreur.id, { statut: "en_course" });
+      toast.success(`Course assignée à ${livreur.prenom || ""} ${livreur.nom || ""}`);
+      queryClient.invalidateQueries();
+    } catch (error) {
+      toast.error("Erreur : " + (error?.message || "assignation impossible"));
+    } finally {
+      setAssigningId(null);
+    }
+  };
 
   // ── Tick toutes les secondes pour tous les compteurs ──
   useEffect(() => {
@@ -245,10 +272,18 @@ export default function ProposedLivreursList({ course }) {
                   Accepté
                 </span>
               ) : (
-                <span className="flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-100 px-2 py-1 rounded-full shrink-0">
-                  <Clock className="w-3 h-3" />
-                  Notifié
-                </span>
+                <button
+                  onClick={() => handleForceAssign(l)}
+                  disabled={assigningId === l.id}
+                  className="flex items-center gap-1 text-[10px] font-bold text-white bg-primary px-2 py-1 rounded-full shrink-0 hover:bg-primary/90 transition disabled:opacity-50"
+                >
+                  {assigningId === l.id ? (
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <UserCheck className="w-3 h-3" />
+                  )}
+                  {assigningId === l.id ? "..." : "Assigner"}
+                </button>
               )}
             </div>
           );
