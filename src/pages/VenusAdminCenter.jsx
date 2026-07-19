@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useAdminContext } from "@/hooks/useAdminContext";
 import VenusAudioSettings from "@/components/admin/VenusAudioSettings";
+import TranscriptionJournal from "@/components/admin/TranscriptionJournal";
 
 const PAYS_FLAGS = { BF: "🇧🇫", CI: "🇨🇮", TG: "🇹🇬", BJ: "🇧🇯", SN: "🇸🇳", ML: "🇲🇱", GN: "🇬🇳", NE: "🇳🇪" };
 
@@ -182,6 +183,9 @@ export default function VenusAdminCenter() {
         </div>
         <VenusAudioSettings />
       </div>
+
+      {/* Journal de transcription */}
+      <TranscriptionJournal />
 
       {/* Accès rapides */}
       <div>

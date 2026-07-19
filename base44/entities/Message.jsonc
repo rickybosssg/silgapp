@@ -72,6 +72,19 @@
       "default": "non_transcrit",
       "description": "Statut de la transcription audio"
     },
+    "transcription_correction": {
+      "type": "string",
+      "description": "Correction de la transcription par l'admin (pour ameliorer les performances futures)"
+    },
+    "transcription_corrigee_par": {
+      "type": "string",
+      "description": "Email admin ayant corrige la transcription"
+    },
+    "transcription_corrigee_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de la correction"
+    },
     "audio_response_url": {
       "type": "string",
       "description": "URL de la reponse audio generee par Venus (TTS)"

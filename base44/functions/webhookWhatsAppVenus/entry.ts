@@ -202,7 +202,7 @@ async function envoyerReponseAudio(base44, telephone, texte, config, accountSid,
   }
 }
 
-async function handleCourseFlow(base44, conversation, userMessage, countryCode, tarifs, telephone, profileName) {
+async function handleCourseFlow(base44, conversation, userMessage, countryCode, tarifs, telephone, profileName, isAudioTranscription = false) {
   let pendingCourse: any = null;
   try {
     pendingCourse = conversation.venus_pending_course ? JSON.parse(conversation.venus_pending_course) : null;
@@ -219,7 +219,13 @@ CLIENT: ${profileName || telephone} (${telephone})
 COURSE EN COURS:
 ${courseContext}
 
-MESSAGE DU CLIENT:
+${isAudioTranscription ? `═══ NOTE IMPORTANTE - TRANSCRIPTION VOCALE ═══
+Le message du client ci-dessous a ete transcrit depuis une note vocale et peut contenir des erreurs (mots mal entendus, noms de quartiers mal orthographues).
+- Confirme TOUJOURS ce que tu as compris avant de poursuivre: "Si j'ai bien compris, vous souhaitez..."
+- Si un mot est mal reconnu mais que l'intention est claire, propose une correction et demande juste confirmation.
+- Ne demande JAMAIS de recommencer toute la note vocale. Demande uniquement les elements manquants.
+- Noms de quartiers courants a Ouagadougou: Karpala, Pissy, Tampouy, Ouaga 2000, Zone du Bois, Patte d'Oie, Gounghin, Dassasgho, Cissin, Samandin, Wemtenga, Bendogo, Larle, Somgande, Saaba, Tanghin, Kossodo, Limete, Ouaga 1, Ouaga 2, Ouaga 3.
+` : ''}MESSAGE DU CLIENT:
 ${userMessage}
 
 ═══ PRIORITE DES INFORMATIONS A COLLECTER ═══
@@ -674,21 +680,22 @@ Deno.serve(async (req) => {
     // ── 4. Venus répond ──
     let reponseVenus = '';
 
-    // 🎤 Phase 16 — Si audio transcrit, utiliser le texte transcrit comme message
-    // Si transcription faible/échec → demander au client de reformuler
+    // 🎤 Phase 16+ — Si audio transcrit, passer le texte au LLM avec contexte de confirmation
+    // Toutes les transcriptions (même faible confiance) sont traitées par le LLM
+    // qui confirme ce qu'il a compris avant de poursuivre — plus naturel pour le client
     let messageEffectif = body;
     let clientAEnvoyeAudio = false;
+    let isAudioTranscription = false;
 
     if (messageType === 'audio') {
       clientAEnvoyeAudio = true;
       if (transcriptionData?.status === 'echec' || !transcriptionData?.texte) {
-        reponseVenus = "Je n'ai pas bien compris votre note vocale. Pouvez-vous la renvoyer plus lentement ou m'ecrire le lieu de depart et le lieu de livraison ?";
-      } else if (transcriptionData?.status === 'faible_confiance') {
-        reponseVenus = `J'ai difficilement compris votre note vocale. J'ai entendu : "${transcriptionData.texte}". Est-ce correct ? Pouvez-vous confirmer ou reformuler ?`;
+        reponseVenus = "Je n'ai pas bien entendu votre note vocale. Pouvez-vous la renvoyer plus lentement ou m'ecrire votre demande (lieu de depart et lieu de livraison) ?";
       } else {
-        // Transcription OK → traiter comme un message texte
+        // Transcription (même faible confiance) → traiter par le LLM avec confirmation
         messageEffectif = transcriptionData.texte;
-        console.log(`[WebhookVenus] 🎤 Audio transcrit traité comme texte: "${messageEffectif.substring(0, 80)}"`);
+        isAudioTranscription = true;
+        console.log(`[WebhookVenus] 🎤 Audio transcrit (confiance: ${transcriptionData.confidence}, statut: ${transcriptionData.status}) traité par LLM: "${messageEffectif.substring(0, 80)}"`);
       }
     }
 
@@ -714,7 +721,7 @@ Deno.serve(async (req) => {
     if (!reponseVenus && isConsultationFlow) {
       reponseVenus = await handleConsultationCourse(base44, telephone, messageEffectif, profileName);
     } else if (!reponseVenus && isCourseFlow) {
-      const courseResult = await handleCourseFlow(base44, conversation, messageEffectif, countryCode, tarifs, telephone, profileName);
+      const courseResult = await handleCourseFlow(base44, conversation, messageEffectif, countryCode, tarifs, telephone, profileName, isAudioTranscription);
       reponseVenus = courseResult.response;
       if (courseResult.pendingCourse !== undefined) {
         await base44.asServiceRole.entities.Conversation.update(conversation.id, {
@@ -736,7 +743,12 @@ INDICATIF : ${tarifs.indicatif}
 TARIFS : ${tarifs.prix_km} ${tarifs.devise}/km | Minimum ${tarifs.minimum} ${tarifs.devise} | Rayon ${tarifs.rayon} km
 DEVISE : ${tarifs.devise}
 SUPPORT WHATSAPP : +226 66 92 51 90
-${clientAEnvoyeAudio ? '═══ NOTE : Le client a envoye une note vocale, transcite en texte ci-dessous. Sois naturel, comme si le client avait ecrit. ═══' : ''}
+${isAudioTranscription ? `═══ NOTE IMPORTANTE - TRANSCRIPTION VOCALE ═══
+Le message ci-dessous a ete transcrit depuis une note vocale et peut contenir des erreurs (mots mal entendus, noms de quartiers mal orthographues).
+- Confirme TOUJOURS ce que tu as compris: "Si j'ai bien compris, vous souhaitez..."
+- Si l'intention est claire meme avec des erreurs, propose une correction et continue.
+- Ne demande jamais de recommencer toute la note vocale.
+- Noms de quartiers courants: Karpala, Pissy, Tampouy, Ouaga 2000, Zone du Bois, Patte d'Oie, Gounghin, Dassasgho, Cissin, Samandin, Wemtenga, Bendogo, Larle, Somgande, Saaba, Tanghin, Kossodo.` : ''}
 
 ═══ MESSAGE DU CLIENT ═══
 ${messageEffectif}
