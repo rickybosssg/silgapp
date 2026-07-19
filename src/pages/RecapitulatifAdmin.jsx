@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Calendar, Building2, Globe, AlertCircle } from "lucide-react";
-import { format, subDays, startOfWeek, startOfMonth, isWithinInterval } from "date-fns";
+import { Calendar, Building2, Globe, AlertCircle, AlertTriangle } from "lucide-react";
+import { format, subDays, startOfWeek, startOfMonth, endOfDay, isWithinInterval } from "date-fns";
 import { fr } from "date-fns/locale";
 import LivreurPerformanceCard from "@/components/livreurs/LivreurPerformanceCard";
 import LivreurDetailDialog from "@/components/livreurs/LivreurDetailDialog";
@@ -47,6 +47,9 @@ function ReseauCard({ title, icon: Icon, color, livreurs, coursesLivrees, isExte
     { label: "Total",       value: totalLivreurs,                  grad: "from-violet-500 to-purple-600", icon: "👥" },
   ];
 
+  // Alerte : livreurs disponibles mais aucune course active
+  const inactiviteAlerte = disponibles > 0 && enCourse === 0 && coursesLivrees.length === 0;
+
   return (
     <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary via-red-600 to-rose-600 p-5 shadow-xl shadow-red-100">
       <div className="absolute inset-0 opacity-10">
@@ -63,6 +66,15 @@ function ReseauCard({ title, icon: Icon, color, livreurs, coursesLivrees, isExte
             <p className="text-white/65 text-xs">{totalLivreurs} livreur{totalLivreurs > 1 ? "s" : ""} enregistrés</p>
           </div>
         </div>
+
+        {inactiviteAlerte && (
+          <div className="mb-3 bg-white/15 backdrop-blur-sm rounded-xl p-3 border border-white/25 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-300 flex-shrink-0" />
+            <p className="text-white text-xs font-medium">
+              {disponibles} livreur{disponibles > 1 ? "s" : ""} disponible{disponibles > 1 ? "s" : ""} mais aucune course livrée sur la période.
+            </p>
+          </div>
+        )}
         <div className="grid grid-cols-5 md:grid-cols-10 gap-2">
           {kpis.map(k => (
             <div key={k.label} className="bg-white/15 backdrop-blur-sm rounded-xl p-2.5 text-center border border-white/20">
@@ -127,7 +139,7 @@ export default function RecapitulatifAdmin({ reseau }) {
     const yesterday = subDays(now, 1).toDateString();
     switch (period) {
       case "today":     return { start: new Date(today), end: new Date() };
-      case "yesterday": return { start: new Date(yesterday), end: new Date(yesterday) };
+      case "yesterday": return { start: new Date(yesterday), end: endOfDay(new Date(yesterday)) };
       case "week":      return { start: startOfWeek(now, { weekStartsOn: 1 }), end: now };
       case "month":     return { start: startOfMonth(now), end: now };
       default:          return { start: new Date(today), end: new Date() };
