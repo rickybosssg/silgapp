@@ -665,6 +665,85 @@ async function handleLocationAssignment(base44, conversation, userMessage) {
 }
 
 /**
+ * Gestion de la décision de redispatch (client répond à "voulez-vous un autre livreur ?").
+ * - Détecte 'oui' / 'non' dans la réponse du client
+ * - Si 'oui' → passe dispatch_status à 'en_attente' et relance le dispatch
+ * - Si 'non' → annule définitivement la course
+ */
+async function handleRedispatchDecision(base44: any, conversation: any, userMessage: string) {
+  let pendingCourse: any = null;
+  try {
+    pendingCourse = conversation.venus_pending_course ? JSON.parse(conversation.venus_pending_course) : null;
+  } catch { pendingCourse = null; }
+
+  if (!pendingCourse?.redispatch_pending || !pendingCourse?.redispatch_course_id) {
+    return null;
+  }
+
+  const courseId = pendingCourse.redispatch_course_id;
+  const msgLower = userMessage.toLowerCase().trim();
+
+  const OUI_KEYWORDS = [
+    'oui', 'ok', "d'accord", 'd accord', 'ouai', 'ouais', 'volontiers', 'bien sur',
+    "c'est bon", 'cest bon', 'go', 'confirme', 'valider', 'valide', 'oui je veux',
+    'rechercher', 'relancer', 'encore', 'pourquoi pas', 'cest ok', "c'est ok",
+  ];
+  const NON_KEYWORDS = [
+    'non', 'annuler', 'annule', 'je refuse', 'non merci', 'pas besoin',
+    'plus besoin', 'laisse', 'laisser', 'stop', 'rien', 'non plus', 'c bon', 'cest bon',
+  ];
+
+  const isOui = OUI_KEYWORDS.some(kw => msgLower === kw || msgLower.startsWith(kw + ' ') || msgLower.startsWith(kw + '.') || msgLower.startsWith(kw + '!'));
+  const isNon = NON_KEYWORDS.some(kw => msgLower === kw || msgLower.startsWith(kw + ' ') || msgLower.startsWith(kw + '.') || msgLower.startsWith(kw + '!'));
+
+  // Si ni oui ni non clair → re-demander
+  if (!isOui && !isNon) {
+    return "Je n'ai pas bien compris votre réponse. Voulez-vous que je recherche un autre livreur pour votre course ? Répondez 'oui' pour relancer la recherche ou 'non' pour annuler définitivement.";
+  }
+
+  // Nettoyer le flag redispatch_pending
+  delete pendingCourse.redispatch_pending;
+  delete pendingCourse.redispatch_course_id;
+  delete pendingCourse.redispatch_motif;
+  await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+    venus_pending_course: JSON.stringify(pendingCourse),
+  });
+
+  if (isOui) {
+    // Vérifier que la course est toujours en attente
+    const course = await base44.asServiceRole.entities.CourseExterne.get(courseId);
+    if (!course || course.statut === 'annulee' || course.statut === 'livree') {
+      return "Cette course n'est plus disponible. N'hésitez pas à me solliciter si vous avez besoin d'une nouvelle course.";
+    }
+
+    // Passer dispatch_status à 'en_attente' pour permettre au dispatch de traiter la course
+    await base44.asServiceRole.entities.CourseExterne.update(courseId, {
+      dispatch_status: 'en_attente',
+    });
+
+    // Relancer le dispatch immédiatement (fire-and-forget)
+    base44.asServiceRole.functions.invoke('dispatchExterneAuto', {
+      action: 'lancer_recherche_auto',
+      course_id: courseId,
+    }).catch((err: any) => {
+      console.error('[WebhookVenus] ❌ Erreur relance dispatch:', err?.message || err);
+    });
+
+    console.log(`[WebhookVenus] ✅ Client a accepté redispatch pour course ${courseId}`);
+    return "Parfait ! Je lance immédiatement la recherche d'un nouveau livreur pour votre course. Je vous informerai dès qu'un livreur aura accepté. Le livreur vous contactera ensuite pour confirmer les derniers détails.";
+  } else {
+    // Annuler définitivement la course
+    await base44.asServiceRole.entities.CourseExterne.update(courseId, {
+      statut: 'annulee',
+      dispatch_status: 'expire',
+    });
+
+    console.log(`[WebhookVenus] ❌ Client a refusé redispatch pour course ${courseId} — annulation définitive`);
+    return "D'accord, j'annule définitivement votre course. N'hésitez pas à me solliciter si vous avez besoin d'autre chose. Merci d'utiliser SILGAPP !";
+  }
+}
+
+/**
  * Gestion du contact avec le livreur pendant une course active.
  * - Détecte l'intention "parler au livreur", "appeler le livreur", etc.
  * - Entre en mode "contact_livreur" et fournit les coordonnées du livreur
@@ -1100,6 +1179,14 @@ Deno.serve(async (req) => {
         messageEffectif = transcriptionData.texte;
         isAudioTranscription = true;
         console.log(`[WebhookVenus] 🎤 Audio transcrit (confiance: ${transcriptionData.confidence}, statut: ${transcriptionData.status}) traité par LLM: "${messageEffectif.substring(0, 80)}"`);
+      }
+    }
+
+    // ── Décision de redispatch (livreur a annulé, Venus demande si client veut un autre) ──
+    if (!reponseVenus) {
+      const redispatchResponse = await handleRedispatchDecision(base44, conversation, messageEffectif);
+      if (redispatchResponse) {
+        reponseVenus = redispatchResponse;
       }
     }
 
