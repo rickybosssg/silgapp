@@ -119,6 +119,7 @@ function PaiementCard({ paiement, onTraiter, onRefuser, isPending }) {
 export default function PaiementsAdmin() {
   const queryClient = useQueryClient();
   const [filtre, setFiltre] = useState("en_attente");
+  const [confirmTraiter, setConfirmTraiter] = useState(null);
 
   const { data: paiements = [], isLoading } = useQuery({
     queryKey: ["paiements-silgapp"],
@@ -192,11 +193,40 @@ export default function PaiementsAdmin() {
         <div className="space-y-3">
           {filtered.map(p => (
             <PaiementCard key={p.id} paiement={p}
-              onTraiter={(p) => traiterMutation.mutate({ id: p.id, action: "traiter" })}
+              onTraiter={(p) => setConfirmTraiter(p)}
               onRefuser={(p) => traiterMutation.mutate({ id: p.id, action: "refuser" })}
               isPending={traiterMutation.isPending}
             />
           ))}
+        </div>
+      )}
+
+      {/* ── Modal de confirmation Traiter ── */}
+      {confirmTraiter && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setConfirmTraiter(null)}>
+          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
+                <CheckCircle2 className="w-8 h-8 text-green-600" />
+              </div>
+              <h3 className="text-lg font-black text-gray-900">Confirmer le traitement</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Valider le paiement de <span className="font-bold text-green-600">{(confirmTraiter.montant_paye || 0).toLocaleString()} F</span>
+              </p>
+              <p className="font-bold text-gray-900 mt-0.5">{confirmTraiter.user_nom}</p>
+              <div className="flex gap-2 mt-5">
+                <Button variant="outline" className="flex-1" onClick={() => setConfirmTraiter(null)}>Annuler</Button>
+                <Button className="flex-1 bg-green-600 hover:bg-green-700"
+                  disabled={traiterMutation.isPending}
+                  onClick={() => {
+                    traiterMutation.mutate({ id: confirmTraiter.id, action: "traiter" });
+                    setConfirmTraiter(null);
+                  }}>
+                  Confirmer
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
