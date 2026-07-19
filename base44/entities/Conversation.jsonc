@@ -87,6 +87,10 @@
       "type": "boolean",
       "default": false,
       "description": "Conversation archivee par l'admin"
+    },
+    "venus_pending_course": {
+      "type": "string",
+      "description": "JSON: donnees de course en cours de collecte par Venus (avant creation)"
     }
   },
   "required": [

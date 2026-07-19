@@ -81,6 +81,150 @@ async function downloadAndUploadMedia(mediaUrl, accountSid, authToken, base44) {
   }
 }
 
+async function handleCourseFlow(base44, conversation, userMessage, countryCode, tarifs, telephone, profileName) {
+  let pendingCourse: any = null;
+  try {
+    pendingCourse = conversation.venus_pending_course ? JSON.parse(conversation.venus_pending_course) : null;
+  } catch { pendingCourse = null; }
+
+  const courseContext = pendingCourse ? JSON.stringify(pendingCourse, null, 2) : 'Aucune course en cours';
+
+  const prompt = `Tu es VENUS, l'assistante SILGAPP. Analyse le message du client pour determiner s'il veut creer une course.
+
+PAYS: ${countryCode} (${tarifs.nom})
+TARIFS: ${tarifs.prix_km} ${tarifs.devise}/km, minimum ${tarifs.minimum} ${tarifs.devise}
+CLIENT: ${profileName || telephone} (${telephone})
+
+COURSE EN COURS:
+${courseContext}
+
+MESSAGE DU CLIENT:
+${userMessage}
+
+Pour creer une course, il faut collecter:
+- type_course: "expedier" (envoyer un colis), "recevoir" (recevoir un colis), ou "deplacement" (se deplacer)
+- adresse_depart: lieu de prise en charge
+- adresse_arrivee: lieu de livraison
+- contact_nom: nom du destinataire (si expedier) ou expediteur (si recevoir)
+- contact_telephone: telephone du contact
+
+REGLES:
+- Si le client annule ou refuse, mets is_cancellation a true.
+- Si toutes les infos sont collectees, mets all_info_collected a true et presente un resume avec le prix estime (${tarifs.minimum} ${tarifs.devise}), puis demande de confirmer par "oui".
+- Si le client confirme apres le resume, mets user_confirmed a true.
+- Si ce n'est pas une demande de course, mets is_course_request a false et reponds normalement.
+- Garde les champs deja collectes dans course_data (ne les perds pas).
+- Ta response doit etre en texte plain, sans markdown, concise et chaleureuse.
+
+Reponds UNIQUEMENT avec un JSON:`;
+
+  const llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
+    prompt,
+    response_json_schema: {
+      type: 'object',
+      properties: {
+        is_course_request: { type: 'boolean' },
+        course_data: {
+          type: 'object',
+          properties: {
+            type_course: { type: 'string' },
+            adresse_depart: { type: 'string' },
+            adresse_arrivee: { type: 'string' },
+            contact_nom: { type: 'string' },
+            contact_telephone: { type: 'string' },
+            notes: { type: 'string' },
+          },
+        },
+        all_info_collected: { type: 'boolean' },
+        user_confirmed: { type: 'boolean' },
+        is_cancellation: { type: 'boolean' },
+        response: { type: 'string' },
+      },
+      required: ['is_course_request', 'response'],
+    },
+  });
+
+  const result: any = typeof llmRes === 'string' ? JSON.parse(llmRes) : llmRes;
+
+  if (result.is_cancellation) {
+    return { response: result.response || 'Course annulee. Comment puis-je vous aider ?', pendingCourse: null, courseCreated: false };
+  }
+
+  if (!result.is_course_request) {
+    return { response: result.response || 'Comment puis-je vous aider ?', pendingCourse: undefined, courseCreated: false };
+  }
+
+  // Mettre a jour les donnees de course
+  const updatedCourse = {
+    ...(pendingCourse || {}),
+    ...(result.course_data || {}),
+  };
+
+  // Verifier si on peut creer la course
+  if (result.all_info_collected && result.user_confirmed && updatedCourse.type_course && updatedCourse.adresse_depart && updatedCourse.adresse_arrivee) {
+    const cd = updatedCourse;
+    const typeLabels: any = { expedier: 'Envoi de colis', recevoir: 'Reception de colis', deplacement: 'Deplacement' };
+
+    const courseData: any = {
+      country_code: countryCode,
+      source: 'client',
+      client_nom: profileName || telephone,
+      client_telephone: telephone,
+      type_course: cd.type_course,
+      adresse_depart: cd.adresse_depart,
+      adresse_arrivee: cd.adresse_arrivee,
+      prix_estimate: tarifs.minimum,
+      devise: tarifs.devise,
+      statut: 'nouvelle',
+      notes: cd.notes || '',
+    };
+
+    if (cd.type_course === 'expedier') {
+      courseData.destinataire_nom = cd.contact_nom || '';
+      courseData.destinataire_telephone = cd.contact_telephone || '';
+      courseData.destinataire_phone_normalized = cd.contact_telephone || '';
+    } else if (cd.type_course === 'recevoir') {
+      courseData.expediteur_nom = cd.contact_nom || '';
+      courseData.expediteur_telephone = cd.contact_telephone || '';
+      courseData.expediteur_phone_normalized = cd.contact_telephone || '';
+    } else if (cd.type_course === 'deplacement') {
+      courseData.passager_nom = profileName || telephone;
+      courseData.passager_telephone = telephone;
+    }
+
+    try {
+      const course = await base44.asServiceRole.entities.CourseExterne.create(courseData);
+      console.log(`[WebhookVenus] Course creee: ${course.id} pour ${telephone}`);
+
+      const typeLabel = typeLabels[cd.type_course] || cd.type_course;
+      result.response = `Course creee avec succes !
+
+Type: ${typeLabel}
+De: ${cd.adresse_depart}
+Vers: ${cd.adresse_arrivee}
+Contact: ${cd.contact_nom || 'N/A'} (${cd.contact_telephone || 'N/A'})
+Prix estime: ${tarifs.minimum} ${tarifs.devise}
+
+Un livreur sera assigne prochainement. Vous recevrez une notification.`;
+
+      return { response: result.response, pendingCourse: null, courseCreated: true };
+    } catch (e: any) {
+      console.error('[WebhookVenus] Erreur creation course:', e.message);
+      return {
+        response: 'Desole, une erreur est survenue lors de la creation de la course. Veuillez reessayer ou contacter le support au +226 66 92 51 90.',
+        pendingCourse: updatedCourse,
+        courseCreated: false,
+      };
+    }
+  }
+
+  return {
+    response: result.response || 'Comment puis-je vous aider ?',
+    pendingCourse: updatedCourse,
+    courseCreated: false,
+  };
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -253,7 +397,20 @@ Deno.serve(async (req) => {
       body.toLowerCase().trim() === 'bonjour' ||
       body.toLowerCase().trim() === 'salut';
 
-    if (isGreeting && numMedia === 0 && latitude === null) {
+    const hasPendingCourse = !!conversation.venus_pending_course;
+    const courseKeywords = ['course', 'colis', 'envoyer', 'livrer', 'recevoir', 'deplacement', 'livraison', 'expedier', 'envoie', 'paquet'];
+    const hasCourseKeyword = courseKeywords.some(kw => body.toLowerCase().includes(kw));
+    const isCourseFlow = (hasPendingCourse || hasCourseKeyword) && numMedia === 0 && latitude === null;
+
+    if (isCourseFlow) {
+      const courseResult = await handleCourseFlow(base44, conversation, body, countryCode, tarifs, telephone, profileName);
+      reponseVenus = courseResult.response;
+      if (courseResult.pendingCourse !== undefined) {
+        await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+          venus_pending_course: courseResult.pendingCourse ? JSON.stringify(courseResult.pendingCourse) : '',
+        });
+      }
+    } else if (isGreeting && numMedia === 0 && latitude === null) {
       reponseVenus = VENUS_GREETING_WHATSAPP;
     } else if (latitude !== null && longitude !== null) {
       reponseVenus = "J'ai bien recu votre localisation. Cette localisation correspond-elle au lieu de recuperation ou au lieu de livraison ?";
