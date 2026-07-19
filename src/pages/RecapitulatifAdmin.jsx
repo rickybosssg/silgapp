@@ -200,14 +200,12 @@ export default function RecapitulatifAdmin({ reseau }) {
   }, [activeTab, coursesInterneLivrees, coursesExterneLivrees]);
 
   const nbEndettes = useMemo(
-    () => livreursActifs.filter(l =>
-      (livreurMontants[l.id] || 0) > 0 && l.statut_paiement !== "paye"
-    ).length,
-    [livreursActifs, livreurMontants]
+    () => livreursActifs.filter(l => (Number(l.montant_du_silga) || 0) > 0).length,
+    [livreursActifs]
   );
 
   const livreursFiltres = filtreEndettes
-    ? livreursActifs.filter(l => (livreurMontants[l.id] || 0) > 0 && l.statut_paiement !== "paye")
+    ? livreursActifs.filter(l => (Number(l.montant_du_silga) || 0) > 0)
     : livreursActifs;
 
   // Si reseau est forcé (prop), afficher uniquement ce réseau sans onglets
