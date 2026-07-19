@@ -53,6 +53,29 @@
       "type": "string",
       "description": "URL du fichier audio"
     },
+    "transcription": {
+      "type": "string",
+      "description": "Texte transcrit depuis l'audio (si message_type=audio)"
+    },
+    "transcription_confidence": {
+      "type": "number",
+      "description": "Niveau de confiance de la transcription (0-1)"
+    },
+    "transcription_status": {
+      "type": "string",
+      "enum": [
+        "non_transcrit",
+        "transcrit",
+        "echec",
+        "faible_confiance"
+      ],
+      "default": "non_transcrit",
+      "description": "Statut de la transcription audio"
+    },
+    "audio_response_url": {
+      "type": "string",
+      "description": "URL de la reponse audio generee par Venus (TTS)"
+    },
     "photo_url": {
       "type": "string",
       "description": "URL de la photo"

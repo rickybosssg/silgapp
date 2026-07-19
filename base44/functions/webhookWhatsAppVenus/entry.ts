@@ -81,6 +81,127 @@ async function downloadAndUploadMedia(mediaUrl, accountSid, authToken, base44) {
   }
 }
 
+/**
+ * Phase 16 — Transcription d'une note vocale WhatsApp en texte.
+ * Utilise Core.TranscribeAudio (Whisper) qui supporte le français et les accents africains.
+ * Retourne { texte, confidence, status }.
+ */
+async function transcrireAudio(base44, audioUrl) {
+  try {
+    const result = await base44.asServiceRole.integrations.Core.TranscribeAudio({ audio_url: audioUrl });
+    const texte = typeof result === 'string' ? result : (result?.text || result?.transcript || '');
+    if (!texte || texte.trim().length < 2) {
+      return { texte: '', confidence: 0, status: 'echec' };
+    }
+    // Heuristique de confiance : si la transcription est très courte ou contient des marqueurs d'incertitude
+    const motsIncertains = ['[inaudible]', '[bruit]', '[?]', '...', 'incomprehensible'];
+    const hasIncertitude = motsIncertains.some(m => texte.toLowerCase().includes(m));
+    const confidence = hasIncertitude ? 0.4 : (texte.length > 10 ? 0.85 : 0.6);
+    const status = confidence < 0.5 ? 'faible_confiance' : 'transcrit';
+    console.log(`[WebhookVenus] 🎤 Transcription: "${texte.substring(0, 100)}" (confiance: ${confidence})`);
+    return { texte, confidence, status };
+  } catch (e) {
+    console.error('[WebhookVenus] Erreur transcription audio:', e.message);
+    return { texte: '', confidence: 0, status: 'echec' };
+  }
+}
+
+/**
+ * Phase 16 — Charge la configuration audio de Venus depuis SystemConfig.
+ * Par défaut : mode texte, réponses audio désactivées.
+ */
+const AUDIO_CACHE = { data: null, expires: 0 };
+async function chargerConfigAudio(base44) {
+  if (AUDIO_CACHE.data && Date.now() < AUDIO_CACHE.expires) return AUDIO_CACHE.data;
+  const defaults = {
+    audio_response_enabled: false,      // Venus peut-elle répondre en audio ?
+    audio_response_voice: 'honey',       // Voix TTS par défaut (warm, soft)
+    audio_response_language: 'fr',       // Langue de la réponse audio
+    audio_only_on_voice_input: true,     // Répondre en audio seulement si le client a envoyé un vocal
+    audio_max_duration_chars: 500,       // Limite de caractères pour générer un audio (évite les longs textes)
+  };
+  try {
+    const configs = await base44.asServiceRole.entities.SystemConfig.filter({});
+    const get = (cle, fallback) => {
+      const c = configs.find(x => x.cle === cle);
+      return c?.valeur ?? fallback;
+    };
+    const data = {
+      audio_response_enabled: get('VENUS_AUDIO_RESPONSE_ENABLED', 'false') === 'true',
+      audio_response_voice: get('VENUS_AUDIO_RESPONSE_VOICE', defaults.audio_response_voice),
+      audio_response_language: get('VENUS_AUDIO_RESPONSE_LANGUAGE', defaults.audio_response_language),
+      audio_only_on_voice_input: get('VENUS_AUDIO_ONLY_ON_VOICE_INPUT', 'true') === 'true',
+      audio_max_duration_chars: parseInt(get('VENUS_AUDIO_MAX_DURATION_CHARS', '500'), 10) || 500,
+    };
+    AUDIO_CACHE.data = data;
+    AUDIO_CACHE.expires = Date.now() + 5 * 60 * 1000;
+    return data;
+  } catch (e) {
+    console.warn('[WebhookVenus] Erreur chargement config audio, valeurs par défaut:', e.message);
+    return defaults;
+  }
+}
+
+/**
+ * Phase 16 — Détermine si une réponse doit être envoyée en audio.
+ * Règles : pas d'audio pour les longs textes, liens, QR codes, listes complexes, tarifs, références.
+ */
+function devraitRepondreEnAudio(reponseTexte, clientAEnvoyeAudio, config) {
+  if (!config.audio_response_enabled) return false;
+  if (config.audio_only_on_voice_input && !clientAEnvoyeAudio) return false;
+  if (reponseTexte.length > config.audio_max_duration_chars) return false;
+  // Contenu sensible : liens, QR, prix, références longues → texte uniquement
+  const patternsSensibles = [
+    /https?:\/\//i,    // liens
+    /QR/i,             // QR codes
+    /#[A-Z0-9]{4,}/,   // références de course
+    /\d{4,}\s*FCFA/i,  // montants
+    /\n.*\n.*\n.*\n/,   // listes (4+ lignes)
+  ];
+  if (patternsSensibles.some(p => p.test(reponseTexte))) return false;
+  return true;
+}
+
+/**
+ * Phase 16 — Génère une réponse audio via TTS et l'envoie via Twilio.
+ */
+async function envoyerReponseAudio(base44, telephone, texte, config, accountSid, authToken, fromNumber) {
+  try {
+    const ttsResult = await base44.asServiceRole.integrations.Core.GenerateSpeech({
+      text: texte.substring(0, 5000),
+      voice: config.audio_response_voice,
+      language_code: config.audio_response_language,
+    });
+    const audioUrl = ttsResult?.url;
+    if (!audioUrl) {
+      console.error('[WebhookVenus] Pas d URL audio TTS generée');
+      return null;
+    }
+    // Envoyer l'audio via Twilio MediaUrl
+    const to = telephone.startsWith('whatsapp:') ? telephone : `whatsapp:${telephone}`;
+    const from = fromNumber.startsWith('whatsapp:') ? fromNumber : `whatsapp:${fromNumber}`;
+    const twilioUrl = `${TWILIO_API_BASE}/${accountSid}/Messages.json`;
+    const credentials = btoa(`${accountSid}:${authToken}`);
+    const formData = new URLSearchParams();
+    formData.append('From', from);
+    formData.append('To', to);
+    formData.append('MediaUrl', audioUrl);
+    const resp = await fetch(twilioUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${credentials}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData.toString(),
+    });
+    const data = await resp.json();
+    return { ok: resp.ok, audio_url: audioUrl, twilio_data: data };
+  } catch (e) {
+    console.error('[WebhookVenus] Erreur envoi audio TTS:', e.message);
+    return null;
+  }
+}
+
 async function handleCourseFlow(base44, conversation, userMessage, countryCode, tarifs, telephone, profileName) {
   let pendingCourse: any = null;
   try {
@@ -417,6 +538,7 @@ Deno.serve(async (req) => {
     let documentUrl: string | null = null;
     let messageContent = body || '';
 
+    let transcriptionData: any = null;
     if (latitude !== null && longitude !== null) {
       messageType = 'location';
       messageContent = `Localisation: ${latitude}, ${longitude}`;
@@ -434,6 +556,12 @@ Deno.serve(async (req) => {
       } else if (contentType0.startsWith('audio/')) {
         messageType = 'audio';
         audioUrl = uploadedUrl;
+        // 🎤 Phase 16 — Transcrire la note vocale immédiatement
+        transcriptionData = await transcrireAudio(base44, uploadedUrl);
+        if (transcriptionData.texte) {
+          messageContent = transcriptionData.texte;
+        }
+        console.log(`[WebhookVenus] 🎤 Note vocale de ${telephone} — transcription: "${(transcriptionData.texte || '').substring(0, 80)}" (confiance: ${transcriptionData.confidence})`);
       } else {
         messageType = 'document';
         documentUrl = uploadedUrl;
@@ -450,6 +578,9 @@ Deno.serve(async (req) => {
       content: messageContent,
       photo_url: photoUrl,
       audio_url: audioUrl,
+      transcription: transcriptionData?.texte || '',
+      transcription_confidence: transcriptionData?.confidence || 0,
+      transcription_status: transcriptionData?.status || (messageType === 'audio' ? 'non_transcrit' : undefined),
       video_url: videoUrl,
       document_url: documentUrl,
       location_lat: latitude,
@@ -486,10 +617,28 @@ Deno.serve(async (req) => {
     // ── 4. Venus répond ──
     let reponseVenus = '';
 
+    // 🎤 Phase 16 — Si audio transcrit, utiliser le texte transcrit comme message
+    // Si transcription faible/échec → demander au client de reformuler
+    let messageEffectif = body;
+    let clientAEnvoyeAudio = false;
+
+    if (messageType === 'audio') {
+      clientAEnvoyeAudio = true;
+      if (transcriptionData?.status === 'echec' || !transcriptionData?.texte) {
+        reponseVenus = "Je n'ai pas bien compris votre note vocale. Pouvez-vous la renvoyer plus lentement ou m'ecrire le lieu de depart et le lieu de livraison ?";
+      } else if (transcriptionData?.status === 'faible_confiance') {
+        reponseVenus = `J'ai difficilement compris votre note vocale. J'ai entendu : "${transcriptionData.texte}". Est-ce correct ? Pouvez-vous confirmer ou reformuler ?`;
+      } else {
+        // Transcription OK → traiter comme un message texte
+        messageEffectif = transcriptionData.texte;
+        console.log(`[WebhookVenus] 🎤 Audio transcrit traité comme texte: "${messageEffectif.substring(0, 80)}"`);
+      }
+    }
+
     const isGreeting =
-      body.toLowerCase().trim() === 'start' ||
-      body.toLowerCase().trim() === 'bonjour' ||
-      body.toLowerCase().trim() === 'salut';
+      messageEffectif.toLowerCase().trim() === 'start' ||
+      messageEffectif.toLowerCase().trim() === 'bonjour' ||
+      messageEffectif.toLowerCase().trim() === 'salut';
 
     // ── Phase 10 : Détection des requêtes de consultation/suivi de course ──
     const consultationKeywords = [
@@ -497,31 +646,31 @@ Deno.serve(async (req) => {
       'livreur ou', 'en route', 'livre', 'arrive', 'position',
       'ou en est', 'où en est', 'mon livreur', 'la course',
     ];
-    const hasConsultationKeyword = consultationKeywords.some(kw => body.toLowerCase().includes(kw));
+    const hasConsultationKeyword = consultationKeywords.some(kw => messageEffectif.toLowerCase().includes(kw));
 
     const hasPendingCourse = !!conversation.venus_pending_course;
     const courseKeywords = ['course', 'colis', 'envoyer', 'livrer', 'recevoir', 'deplacement', 'livraison', 'expedier', 'envoie', 'paquet'];
-    const hasCourseKeyword = courseKeywords.some(kw => body.toLowerCase().includes(kw));
-    const isConsultationFlow = hasConsultationKeyword && !hasPendingCourse && numMedia === 0 && latitude === null;
-    const isCourseFlow = (hasPendingCourse || (hasCourseKeyword && !isConsultationFlow)) && numMedia === 0 && latitude === null;
+    const hasCourseKeyword = courseKeywords.some(kw => messageEffectif.toLowerCase().includes(kw));
+    const isConsultationFlow = hasConsultationKeyword && !hasPendingCourse && latitude === null && !reponseVenus;
+    const isCourseFlow = (hasPendingCourse || (hasCourseKeyword && !isConsultationFlow)) && latitude === null && !reponseVenus;
 
-    if (isConsultationFlow) {
-      reponseVenus = await handleConsultationCourse(base44, telephone, body, profileName);
-    } else if (isCourseFlow) {
-      const courseResult = await handleCourseFlow(base44, conversation, body, countryCode, tarifs, telephone, profileName);
+    if (!reponseVenus && isConsultationFlow) {
+      reponseVenus = await handleConsultationCourse(base44, telephone, messageEffectif, profileName);
+    } else if (!reponseVenus && isCourseFlow) {
+      const courseResult = await handleCourseFlow(base44, conversation, messageEffectif, countryCode, tarifs, telephone, profileName);
       reponseVenus = courseResult.response;
       if (courseResult.pendingCourse !== undefined) {
         await base44.asServiceRole.entities.Conversation.update(conversation.id, {
           venus_pending_course: courseResult.pendingCourse ? JSON.stringify(courseResult.pendingCourse) : '',
         });
       }
-    } else if (isGreeting && numMedia === 0 && latitude === null) {
+    } else if (!reponseVenus && isGreeting && latitude === null) {
       reponseVenus = VENUS_GREETING_WHATSAPP;
-    } else if (latitude !== null && longitude !== null) {
+    } else if (!reponseVenus && latitude !== null && longitude !== null) {
       reponseVenus = "J'ai bien recu votre localisation. Cette localisation correspond-elle au lieu de recuperation ou au lieu de livraison ?";
-    } else if (numMedia > 0) {
+    } else if (!reponseVenus && messageType !== 'audio' && numMedia > 0) {
       reponseVenus = "J'ai bien recu votre media. Comment puis-je vous aider avec cela ?";
-    } else {
+    } else if (!reponseVenus) {
       const promptComplet = `${VENUS_SYSTEM_PROMPT}
 
 ═══ CONTEXTE DE LA CONVERSATION ═══
@@ -530,9 +679,10 @@ INDICATIF : ${tarifs.indicatif}
 TARIFS : ${tarifs.prix_km} ${tarifs.devise}/km | Minimum ${tarifs.minimum} ${tarifs.devise} | Rayon ${tarifs.rayon} km
 DEVISE : ${tarifs.devise}
 SUPPORT WHATSAPP : +226 66 92 51 90
+${clientAEnvoyeAudio ? '═══ NOTE : Le client a envoye une note vocale, transcite en texte ci-dessous. Sois naturel, comme si le client avait ecrit. ═══' : ''}
 
 ═══ MESSAGE DU CLIENT ═══
-${body}
+${messageEffectif}
 
 Reponds en tant que VENUS. Sois concise (max 3-4 paragraphes), chaleureuse et utile. N'utilise pas de markdown — uniquement du texte plain pour WhatsApp.`;
 
@@ -548,14 +698,39 @@ Reponds en tant que VENUS. Sois concise (max 3-4 paragraphes), chaleureuse et ut
       .replace(/^#{1,6}\s+/gm, '')
       .replace(/`/g, '');
 
+    // 🎤 Phase 16 — Déterminer si on répond en audio ou en texte
+    const audioConfig = await chargerConfigAudio(base44);
+    const utiliserAudio = devraitRepondreEnAudio(reponseVenus, clientAEnvoyeAudio, audioConfig);
+    let audioResponseUrl: string | null = null;
+    let twilioResult: any = null;
+
+    if (utiliserAudio) {
+      // Envoyer d'abord un court audio TTS, puis le texte en complément (infos importantes)
+      const audioResp = await envoyerReponseAudio(base44, telephone, reponseVenus, audioConfig, accountSid, authToken, fromNumber);
+      if (audioResp?.ok) {
+        audioResponseUrl = audioResp.audio_url;
+        console.log(`[WebhookVenus] 🔊 Réponse audio envoyée à ${telephone}`);
+      } else {
+        // Fallback texte si l'audio échoue
+        twilioResult = await envoyerWhatsAppReply(telephone, reponseVenus, accountSid, authToken, fromNumber);
+      }
+    } else {
+      twilioResult = await envoyerWhatsAppReply(telephone, reponseVenus, accountSid, authToken, fromNumber);
+    }
+    if (twilioResult && !twilioResult.ok) {
+      console.error('[WebhookVenus] Erreur envoi Twilio:', twilioResult.data?.message || twilioResult.data);
+    }
+
     // ── 5. Créer le Message de réponse Venus ──
     await base44.asServiceRole.entities.Message.create({
       conversation_id: conversation.id,
       sender_type: 'admin',
       sender_id: 'venus',
       sender_name: 'VENUS',
-      message_type: 'text',
+      message_type: utiliserAudio ? 'audio' : 'text',
       content: reponseVenus,
+      audio_url: audioResponseUrl || undefined,
+      audio_response_url: audioResponseUrl || undefined,
       source: 'whatsapp',
     });
 
@@ -565,12 +740,6 @@ Reponds en tant que VENUS. Sois concise (max 3-4 paragraphes), chaleureuse et ut
       last_sender_name: 'VENUS',
       last_sender_type: 'admin',
     });
-
-    // ── 6. Envoyer via Twilio ──
-    const twilioResult = await envoyerWhatsAppReply(telephone, reponseVenus, accountSid, authToken, fromNumber);
-    if (!twilioResult.ok) {
-      console.error('[WebhookVenus] Erreur envoi Twilio:', twilioResult.data?.message || twilioResult.data);
-    }
 
     // ── 7. Log VenusInteraction ──
     const conversationIdLog = `wa_${telephone.replace(/[^0-9]/g, '')}`;

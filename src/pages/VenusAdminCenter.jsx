@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft, MessageCircle, Bot, UserCheck, Package, Zap,
-  TrendingUp, FileText, RefreshCw, Globe, Sparkles, ExternalLink,
+  TrendingUp, FileText, RefreshCw, Globe, Sparkles, ExternalLink, Mic,
 } from "lucide-react";
 import { useAdminContext } from "@/hooks/useAdminContext";
+import VenusAudioSettings from "@/components/admin/VenusAudioSettings";
 
 const PAYS_FLAGS = { BF: "🇧🇫", CI: "🇨🇮", TG: "🇹🇬", BJ: "🇧🇯", SN: "🇸🇳", ML: "🇲🇱", GN: "🇬🇳", NE: "🇳🇪" };
 
@@ -172,6 +173,15 @@ export default function VenusAdminCenter() {
           </div>
         </div>
       )}
+
+      {/* Configuration notes vocales */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <Mic className="w-4 h-4 text-purple-600" />
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Notes vocales WhatsApp</p>
+        </div>
+        <VenusAudioSettings />
+      </div>
 
       {/* Accès rapides */}
       <div>
