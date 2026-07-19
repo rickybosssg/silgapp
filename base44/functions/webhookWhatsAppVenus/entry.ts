@@ -222,20 +222,48 @@ ${courseContext}
 MESSAGE DU CLIENT:
 ${userMessage}
 
-Pour creer une course, il faut collecter:
-- type_course: "expedier" (envoyer un colis), "recevoir" (recevoir un colis), ou "deplacement" (se deplacer)
-- adresse_depart: lieu de prise en charge
-- adresse_arrivee: lieu de livraison
-- contact_nom: nom du destinataire (si expedier) ou expediteur (si recevoir)
-- contact_telephone: telephone du contact
+═══ PRIORITE DES INFORMATIONS A COLLECTER ═══
+1. Localisation de depart (OBLIGATOIRE)
+   - GPS si disponible
+   - Sinon quartier + description
 
-REGLES:
-- Si le client annule ou refuse, mets is_cancellation a true.
-- Si toutes les infos sont collectees, mets all_info_collected a true et presente un resume avec le prix estime (${tarifs.minimum} ${tarifs.devise}), puis demande de confirmer par "oui".
-- Si le client confirme apres le resume, mets user_confirmed a true.
-- Si ce n'est pas une demande de course, mets is_course_request a false et reponds normalement.
-- Garde les champs deja collectes dans course_data (ne les perds pas).
-- Ta response doit etre en texte plain, sans markdown, concise et chaleureuse.
+2. Localisation d'arrivee (OBLIGATOIRE)
+   - GPS si disponible
+   - Sinon quartier + description
+
+3. Expediteur (le client lui-meme par defaut)
+   - Nom: ${profileName || telephone} (si connu, sinon le client)
+   - Telephone: ${telephone} (OBLIGATOIRE - utilise le telephone du client par defaut)
+
+4. Destinataire
+   - Telephone: OBLIGATOIRE (si le client ne l'a pas, voir REGLES ci-dessous)
+   - Nom: FACULTATIF (ne JAMAIS bloquer pour un nom manquant)
+
+═══ REGLES CRITIQUES ═══
+1. NE JAMAIS bloquer la creation d'une course parce qu'il manque le nom du destinataire.
+   - Si le client a le telephone mais pas le nom, reponds: "Aucun probleme. Le nom du destinataire est facultatif. Votre course est prete a etre creee."
+   - Mets contact_nom a "" (chaine vide) et continue.
+
+2. Si le client ne connait NI le nom NI le numero du destinataire:
+   - Demande s'il souhaite etre lui-meme le contact a l'arrivee (mets contact_is_client a true).
+   - Ou propose d'ajouter ces informations plus tard.
+   - Ne JAMAIS rester bloque sur cette question.
+
+3. ANTI-BOUCLE: Ne repete JAMAIS la meme question deux fois de suite.
+   - Si une information demandee est absente, propose une alternative et continue le processus.
+   - Si le client dit qu'il ne sait pas ou n'a pas l'info, passe a l'etape suivante ou propose un fallback.
+
+4. Si le client annule ou refuse, mets is_cancellation a true.
+
+5. Si les infos OBLIGATOIRES sont collectees (type_course + adresse_depart + adresse_arrivee + contact_telephone OU contact_is_client), mets all_info_collected a true et presente un resume avec le prix estime (${tarifs.minimum} ${tarifs.devise}), puis demande de confirmer par "oui".
+
+6. Si le client confirme apres le resume, mets user_confirmed a true.
+
+7. Si ce n'est pas une demande de course, mets is_course_request a false et reponds normalement.
+
+8. Garde les champs deja collectes dans course_data (ne les perds pas).
+
+9. Ta response doit etre en texte plain, sans markdown, concise et chaleureuse.
 
 Reponds UNIQUEMENT avec un JSON:`;
 
@@ -253,6 +281,7 @@ Reponds UNIQUEMENT avec un JSON:`;
             adresse_arrivee: { type: 'string' },
             contact_nom: { type: 'string' },
             contact_telephone: { type: 'string' },
+            contact_is_client: { type: 'boolean' },
             notes: { type: 'string' },
           },
         },
@@ -282,7 +311,10 @@ Reponds UNIQUEMENT avec un JSON:`;
   };
 
   // Verifier si on peut creer la course
-  if (result.all_info_collected && result.user_confirmed && updatedCourse.type_course && updatedCourse.adresse_depart && updatedCourse.adresse_arrivee) {
+  // Conditions: type_course + adresse_depart + adresse_arrivee + (contact_telephone OU contact_is_client)
+  // Le nom du destinataire est FACULTATIF et ne bloque jamais la creation
+  const hasRequiredContact = updatedCourse.contact_telephone || updatedCourse.contact_is_client;
+  if (result.all_info_collected && result.user_confirmed && updatedCourse.type_course && updatedCourse.adresse_depart && updatedCourse.adresse_arrivee && hasRequiredContact) {
     const cd = updatedCourse;
     const typeLabels: any = { expedier: 'Envoi de colis', recevoir: 'Reception de colis', deplacement: 'Deplacement' };
 
@@ -301,13 +333,28 @@ Reponds UNIQUEMENT avec un JSON:`;
     };
 
     if (cd.type_course === 'expedier') {
-      courseData.destinataire_nom = cd.contact_nom || '';
-      courseData.destinataire_telephone = cd.contact_telephone || '';
-      courseData.destinataire_phone_normalized = cd.contact_telephone || '';
+      // Le destinataire est la personne qui recoit le colis
+      // Si contact_is_client, le client est aussi le contact a l'arrivee
+      if (cd.contact_is_client) {
+        courseData.destinataire_nom = profileName || telephone;
+        courseData.destinataire_telephone = telephone;
+        courseData.destinataire_phone_normalized = telephone;
+      } else {
+        courseData.destinataire_nom = cd.contact_nom || ''; // Nom FACULTATIF
+        courseData.destinataire_telephone = cd.contact_telephone || telephone;
+        courseData.destinataire_phone_normalized = cd.contact_telephone || telephone;
+      }
     } else if (cd.type_course === 'recevoir') {
-      courseData.expediteur_nom = cd.contact_nom || '';
-      courseData.expediteur_telephone = cd.contact_telephone || '';
-      courseData.expediteur_phone_normalized = cd.contact_telephone || '';
+      // L'expediteur est la personne qui envoie le colis vers le client
+      if (cd.contact_is_client) {
+        courseData.expediteur_nom = profileName || telephone;
+        courseData.expediteur_telephone = telephone;
+        courseData.expediteur_phone_normalized = telephone;
+      } else {
+        courseData.expediteur_nom = cd.contact_nom || ''; // Nom FACULTATIF
+        courseData.expediteur_telephone = cd.contact_telephone || telephone;
+        courseData.expediteur_phone_normalized = cd.contact_telephone || telephone;
+      }
     } else if (cd.type_course === 'deplacement') {
       courseData.passager_nom = profileName || telephone;
       courseData.passager_telephone = telephone;
