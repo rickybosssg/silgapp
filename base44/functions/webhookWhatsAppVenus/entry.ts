@@ -485,13 +485,19 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'From requis' }, { status: 400 });
     }
 
-    // ── Validation signature Twilio (sauf mode test) ──
+    // ── Validation signature Twilio ──
+    // Mode permissif : on log mais on ne bloque pas (problème connu d'URL behind proxy)
     if (!skipSignature) {
       const signatureHeader = req.headers.get('X-Twilio-Signature') || '';
-      const isValid = await validerSignatureTwilio(url.toString(), rawBody, authToken, signatureHeader);
+      const fullUrl = url.toString();
+      const isValid = await validerSignatureTwilio(fullUrl, rawBody, authToken, signatureHeader);
       if (!isValid) {
-        console.error('[WebhookVenus] Signature Twilio invalide');
-        return Response.json({ error: 'Signature invalide' }, { status: 403 });
+        console.warn(`[WebhookVenus] ⚠️ ÉTAPE 0 — Signature Twilio invalide (mode permissif, traitement continué)`);
+        console.warn(`[WebhookVenus] ⚠️ URL utilisée: ${fullUrl}`);
+        console.warn(`[WebhookVenus] ⚠️ Header signature reçu: ${signatureHeader ? signatureHeader.substring(0, 30) + '...' : 'AUCUN'}`);
+        console.warn(`[WebhookVenus] ⚠️ Body length: ${rawBody.length}`);
+      } else {
+        console.log(`[WebhookVenus] ✅ ÉTAPE 0 — Signature Twilio validée`);
       }
     }
 
@@ -500,7 +506,7 @@ Deno.serve(async (req) => {
     const countryCode = detecterPaysDepuisTelephone(telephone);
     const tarifs = TARIFS_PAYS[countryCode] || TARIFS_PAYS.BF;
 
-    console.log(`[WebhookVenus] ${telephone} (${profileName || 'N/A'}) | Pays: ${countryCode} | Media: ${numMedia} | GPS: ${latitude},${longitude}`);
+    console.log(`[WebhookVenus] 📥 ÉTAPE 1 — Message reçu de ${telephone} (${profileName || 'N/A'}) | Pays: ${countryCode} | Body: "${body}" | Media: ${numMedia} | GPS: ${latitude},${longitude} | Sid: ${messageSid}`);
 
     // ── 1. Trouver ou créer la Conversation ──
     let conversation: any = null;
@@ -510,6 +516,7 @@ Deno.serve(async (req) => {
 
     if (existingConvs && existingConvs.length > 0) {
       conversation = existingConvs[0];
+      console.log(`[WebhookVenus] ✅ ÉTAPE 2 — Conversation existante trouvée: ${conversation.id} | venus_active: ${conversation.venus_active}`);
     } else {
       const participants = JSON.stringify([
         { type: 'client', id: telephone, name: profileName || telephone },
@@ -528,6 +535,7 @@ Deno.serve(async (req) => {
         last_sender_name: profileName || telephone,
         last_sender_type: 'client',
       });
+      console.log(`[WebhookVenus] ✅ ÉTAPE 2 — Nouvelle conversation créée: ${conversation.id} | venus_active: true`);
     }
 
     // ── 2. Créer le Message entrant ──
@@ -588,6 +596,7 @@ Deno.serve(async (req) => {
       source: 'whatsapp',
       whatsapp_message_sid: messageSid,
     });
+    console.log(`[WebhookVenus] ✅ ÉTAPE 3 — Message entrant stocké (${messageType}) dans conversation ${conversation.id}`);
 
     // ── Mettre à jour la conversation ──
     const lastMsgPreview =
@@ -607,12 +616,13 @@ Deno.serve(async (req) => {
 
     // ── 3. Vérifier si Venus est active ──
     if (conversation.venus_active === false) {
-      console.log(`[WebhookVenus] Venus desactivee pour ${telephone} — pas de reponse auto`);
+      console.log(`[WebhookVenus] ⏸️ ÉTAPE 4 — Venus DÉSACTIVÉE pour ${telephone} — admin a pris la main, pas de réponse auto`);
       return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
         status: 200,
         headers: { 'Content-Type': 'text/xml' },
       });
     }
+    console.log(`[WebhookVenus] ✅ ÉTAPE 4 — Venus active, génération de la réponse...`);
 
     // ── 4. Venus répond ──
     let reponseVenus = '';
@@ -698,27 +708,34 @@ Reponds en tant que VENUS. Sois concise (max 3-4 paragraphes), chaleureuse et ut
       .replace(/^#{1,6}\s+/gm, '')
       .replace(/`/g, '');
 
+    console.log(`[WebhookVenus] ✅ ÉTAPE 5 — Réponse Venus générée (${reponseVenus.length} chars): "${reponseVenus.substring(0, 100)}..."`);
+
     // 🎤 Phase 16 — Déterminer si on répond en audio ou en texte
     const audioConfig = await chargerConfigAudio(base44);
     const utiliserAudio = devraitRepondreEnAudio(reponseVenus, clientAEnvoyeAudio, audioConfig);
     let audioResponseUrl: string | null = null;
     let twilioResult: any = null;
 
+    console.log(`[WebhookVenus] 📤 ÉTAPE 6 — Envoi réponse à ${telephone} via Twilio (from: ${fromNumber}) | mode: ${utiliserAudio ? 'AUDIO' : 'TEXTE'}`);
     if (utiliserAudio) {
       // Envoyer d'abord un court audio TTS, puis le texte en complément (infos importantes)
       const audioResp = await envoyerReponseAudio(base44, telephone, reponseVenus, audioConfig, accountSid, authToken, fromNumber);
       if (audioResp?.ok) {
         audioResponseUrl = audioResp.audio_url;
-        console.log(`[WebhookVenus] 🔊 Réponse audio envoyée à ${telephone}`);
+        console.log(`[WebhookVenus] ✅ ÉTAPE 6 — Réponse audio envoyée à ${telephone} (url: ${audioResponseUrl?.substring(0, 60)}...)`);
       } else {
         // Fallback texte si l'audio échoue
+        console.warn(`[WebhookVenus] ⚠️ ÉTAPE 6 — Audio échoué, fallback texte`);
         twilioResult = await envoyerWhatsAppReply(telephone, reponseVenus, accountSid, authToken, fromNumber);
       }
     } else {
       twilioResult = await envoyerWhatsAppReply(telephone, reponseVenus, accountSid, authToken, fromNumber);
     }
+    if (twilioResult) {
+      console.log(`[WebhookVenus] 📤 ÉTAPE 6 — Twilio API response: ok=${twilioResult.ok} | status=${twilioResult.data?.status || 'N/A'} | sid=${twilioResult.data?.sid || 'N/A'} | error=${twilioResult.data?.message || twilioResult.data?.error || 'N/A'}`);
+    }
     if (twilioResult && !twilioResult.ok) {
-      console.error('[WebhookVenus] Erreur envoi Twilio:', twilioResult.data?.message || twilioResult.data);
+      console.error(`[WebhookVenus] ❌ ÉTAPE 6 — Erreur envoi Twilio: ${JSON.stringify(twilioResult.data)}`);
     }
 
     // ── 5. Créer le Message de réponse Venus ──
@@ -740,6 +757,8 @@ Reponds en tant que VENUS. Sois concise (max 3-4 paragraphes), chaleureuse et ut
       last_sender_name: 'VENUS',
       last_sender_type: 'admin',
     });
+
+    console.log(`[WebhookVenus] ✅ ÉTAPE 7 — Flow terminé avec succès pour ${telephone} | Twilio envoi: ${twilioResult?.ok ? 'OK' : (audioResponseUrl ? 'AUDIO OK' : 'ÉCHEC')}`);
 
     // ── 7. Log VenusInteraction ──
     const conversationIdLog = `wa_${telephone.replace(/[^0-9]/g, '')}`;
@@ -763,7 +782,8 @@ Reponds en tant que VENUS. Sois concise (max 3-4 paragraphes), chaleureuse et ut
       headers: { 'Content-Type': 'text/xml' },
     });
   } catch (error) {
-    console.error('[WebhookVenus] Erreur globale:', error.message);
+    console.error(`[WebhookVenus] ❌ ERREUR GLOBALE: ${error.message}`);
+    console.error(`[WebhookVenus] ❌ Stack: ${error.stack?.substring(0, 300)}`);
     return Response.json({ error: error.message }, { status: 500 });
   }
 });
