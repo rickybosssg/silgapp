@@ -1,0 +1,102 @@
+{
+  "name": "VenusConversationAnalysis",
+  "type": "object",
+  "properties": {
+    "interaction_id": {
+      "type": "string",
+      "description": "ID de la VenusInteraction analys\u00e9e"
+    },
+    "conversation_id": {
+      "type": "string",
+      "description": "ID de la conversation"
+    },
+    "client_telephone": {
+      "type": "string"
+    },
+    "client_nom": {
+      "type": "string"
+    },
+    "country_code": {
+      "type": "string"
+    },
+    "objectif_atteint": {
+      "type": "boolean",
+      "description": "L'objectif du client a-t-il \u00e9t\u00e9 atteint ?"
+    },
+    "infos_suffisantes": {
+      "type": "boolean",
+      "description": "Les informations \u00e9taient-elles suffisantes ?"
+    },
+    "incomprehensions": {
+      "type": "boolean",
+      "description": "Y a-t-il eu des incompr\u00e9hensions ?"
+    },
+    "intervention_humaine": {
+      "type": "boolean",
+      "description": "Une intervention humaine a-t-elle \u00e9t\u00e9 n\u00e9cessaire ?"
+    },
+    "nb_reformulations": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de reformulations de la question"
+    },
+    "nb_messages": {
+      "type": "number",
+      "default": 1
+    },
+    "duree_secondes": {
+      "type": "number",
+      "default": 0
+    },
+    "score_qualite": {
+      "type": "number",
+      "description": "Score qualit\u00e9 global 0-100"
+    },
+    "score_exactitude": {
+      "type": "number",
+      "description": "0-100"
+    },
+    "score_clarte": {
+      "type": "number",
+      "description": "0-100"
+    },
+    "score_politesse": {
+      "type": "number",
+      "description": "0-100"
+    },
+    "score_rapidite": {
+      "type": "number",
+      "description": "0-100"
+    },
+    "score_respect_regles": {
+      "type": "number",
+      "description": "0-100 \u2014 respect des r\u00e8gles m\u00e9tier SILGAPP"
+    },
+    "score_satisfaction": {
+      "type": "number",
+      "description": "0-100 \u2014 satisfaction probable du client"
+    },
+    "intention": {
+      "type": "string"
+    },
+    "categorie": {
+      "type": "string"
+    },
+    "resume": {
+      "type": "string",
+      "description": "R\u00e9sum\u00e9 de l'analyse"
+    },
+    "points_amelioration": {
+      "type": "string",
+      "description": "JSON: [{point, severite}]"
+    },
+    "analyse_date": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "conversation_id",
+    "score_qualite"
+  ]
+}

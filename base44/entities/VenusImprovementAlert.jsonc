@@ -1,0 +1,62 @@
+{
+  "name": "VenusImprovementAlert",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "erreur_frequente",
+        "question_nouvelle",
+        "workflow_echec",
+        "outil_indisponible",
+        "score_bas",
+        "reformulation_excessive",
+        "intervention_humaine_frequente"
+      ],
+      "description": "Type d'alerte"
+    },
+    "severite": {
+      "type": "string",
+      "enum": [
+        "info",
+        "warning",
+        "critique"
+      ],
+      "default": "warning"
+    },
+    "titre": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    },
+    "metadata": {
+      "type": "string",
+      "description": "JSON: donn\u00e9es contextuelles"
+    },
+    "domaine": {
+      "type": "string",
+      "description": "Domaine concern\u00e9 (si applicable)"
+    },
+    "resolue": {
+      "type": "boolean",
+      "default": false
+    },
+    "resolue_par": {
+      "type": "string"
+    },
+    "resolue_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "creee_date": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "type",
+    "titre",
+    "severite"
+  ]
+}

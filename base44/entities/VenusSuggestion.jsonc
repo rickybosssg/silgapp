@@ -1,0 +1,105 @@
+{
+  "name": "VenusSuggestion",
+  "type": "object",
+  "properties": {
+    "question_detectee": {
+      "type": "string",
+      "description": "Question telle que pos\u00e9e par les clients"
+    },
+    "question_normalisee": {
+      "type": "string",
+      "description": "Version normalis\u00e9e pour le matching"
+    },
+    "nb_occurrences": {
+      "type": "number",
+      "default": 1,
+      "description": "Nombre de fois que cette question a \u00e9t\u00e9 d\u00e9tect\u00e9e"
+    },
+    "reponse_actuelle": {
+      "type": "string",
+      "description": "Derni\u00e8re r\u00e9ponse donn\u00e9e par VENUS (ou 'Aucune r\u00e9ponse officielle')"
+    },
+    "reponse_proposee": {
+      "type": "string",
+      "description": "Proposition de r\u00e9ponse officielle g\u00e9n\u00e9r\u00e9e par l'IA"
+    },
+    "niveau_confiance": {
+      "type": "number",
+      "description": "Score de confiance 0-100"
+    },
+    "priorite": {
+      "type": "string",
+      "enum": [
+        "basse",
+        "normale",
+        "haute",
+        "critique"
+      ],
+      "default": "normale"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "en_attente",
+        "validee",
+        "refusee",
+        "fusionnee"
+      ],
+      "default": "en_attente"
+    },
+    "categorie": {
+      "type": "string",
+      "description": "Cat\u00e9gorie sugg\u00e9r\u00e9e pour la connaissance"
+    },
+    "mots_cles": {
+      "type": "string",
+      "description": "JSON: tableau des mots-cl\u00e9s"
+    },
+    "conversations_exemples": {
+      "type": "string",
+      "description": "JSON: [{interaction_id, question, reponse, date}]"
+    },
+    "intention_detectee": {
+      "type": "string",
+      "description": "Intention VENUS d\u00e9tect\u00e9e (si applicable)"
+    },
+    "is_nouvelle_question": {
+      "type": "boolean",
+      "default": true,
+      "description": "True si aucune connaissance officielle ne couvre cette question"
+    },
+    "knowledge_id_cree": {
+      "type": "string",
+      "description": "ID de la VenusKnowledge cr\u00e9\u00e9e apr\u00e8s validation"
+    },
+    "knowledge_id_fusion": {
+      "type": "string",
+      "description": "ID de la VenusKnowledge existante si fusion"
+    },
+    "validee_par": {
+      "type": "string"
+    },
+    "validee_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "refusee_par": {
+      "type": "string"
+    },
+    "refusee_motif": {
+      "type": "string"
+    },
+    "creee_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "derniere_occurrence_date": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "question_detectee",
+    "statut"
+  ]
+}

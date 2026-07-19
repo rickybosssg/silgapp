@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
-  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill, PieChart, Sparkles, GraduationCap, Workflow
+  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill, PieChart, Sparkles, GraduationCap, Workflow, Brain
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
@@ -40,6 +40,7 @@ export const navItems = [
   { path: "/admin/venus-learning", label: "Apprentissage VENUS", icon: GraduationCap },
   { path: "/admin/venus-rapports", label: "Rapports VENUS", icon: MessageCircle },
   { path: "/admin/venus-workflows", label: "Workflows VENUS", icon: Workflow },
+  { path: "/admin/venus-improvement", label: "Amélioration VENUS", icon: Brain },
   { path: "/admin/centre-notifications", label: "Notifications Push", icon: Megaphone },
   { path: "/admin/externe", label: "Config Dispatch", icon: Settings },
   { path: "/admin/demandes-livreurs", label: "Livreurs à valider", icon: UserCheck },
