@@ -10,6 +10,15 @@ import {
   genererReponseAugmentee,
   SEUIL_CONFIANCE,
 } from '../../shared/venusLearningEngine.ts';
+import {
+  chargerMemoireLongue,
+  mettreAJourMemoireLongue,
+  chargerHistoriqueRecent,
+  trouverCourseActive,
+  raisonnerVenus,
+  creerCourseDepuisMemoire,
+  loggerRaisonnement,
+} from '../../shared/venusReasoningEngine.ts';
 
 /**
  * Webhook WhatsApp <-> Venus (via Twilio).
@@ -1213,93 +1222,115 @@ Deno.serve(async (req) => {
       }
     }
 
-    const isGreeting =
-      messageEffectif.toLowerCase().trim() === 'start' ||
-      messageEffectif.toLowerCase().trim() === 'bonjour' ||
-      messageEffectif.toLowerCase().trim() === 'salut';
-
-    // ── Phase 10 : Détection des requêtes de consultation/suivi de course ──
-    const consultationKeywords = [
-      'ou est', 'où est', 'statut', 'suivi', 'ma course', 'mon colis',
-      'livreur ou', 'en route', 'livre', 'arrive', 'position',
-      'ou en est', 'où en est', 'mon livreur', 'la course',
-    ];
-    const hasConsultationKeyword = consultationKeywords.some(kw => messageEffectif.toLowerCase().includes(kw));
-
-    const hasPendingCourse = !!conversation.venus_pending_course;
-    const courseKeywords = ['course', 'colis', 'envoyer', 'livrer', 'recevoir', 'deplacement', 'livraison', 'expedier', 'envoie', 'paquet'];
-    const hasCourseKeyword = courseKeywords.some(kw => messageEffectif.toLowerCase().includes(kw));
-    const isConsultationFlow = hasConsultationKeyword && !hasPendingCourse && latitude === null && !reponseVenus;
-    const isCourseFlow = (hasPendingCourse || (hasCourseKeyword && !isConsultationFlow)) && latitude === null && !reponseVenus;
-
-    // ── Centre d'Apprentissage VENUS ──
-    let learningData: any = null;
-    const questionIndicators = ['comment', 'pourquoi', 'combien', 'cest quoi', 'quelle est', 'quel est', 'ou est', 'comment ca marche', 'comment ca se passe', 'aide', 'help', 'information', 'je veux savoir', 'jaimerais savoir', 'explique', 'c quoi', 'c est quoi', 'comment fonctionne', 'est ce que', 'ca coute', 'ca cout', 'le prix', 'tarif'];
-    const isLikelyQuestion = !hasPendingCourse && questionIndicators.some(kw => messageEffectif.toLowerCase().includes(kw));
-
-    if (!reponseVenus && isConsultationFlow) {
-      reponseVenus = await handleConsultationCourse(base44, telephone, messageEffectif, profileName);
+    // ── Sauvegarder la localisation GPS dans la mémoire courte ──
+    if (!reponseVenus && latitude !== null && longitude !== null) {
+      let pendingCourseLoc: any = null;
+      try { pendingCourseLoc = conversation.venus_pending_course ? JSON.parse(conversation.venus_pending_course) : {}; } catch { pendingCourseLoc = {}; }
+      pendingCourseLoc.pending_location_lat = latitude;
+      pendingCourseLoc.pending_location_lng = longitude;
+      await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+        venus_pending_course: JSON.stringify(pendingCourseLoc),
+      });
+      console.log(`[WebhookVenus] 📍 Localisation sauvegardée en attente d'assignation pour ${conversation.id}`);
     }
-    if (!reponseVenus && isLikelyQuestion && latitude === null) {
-      // ── Centre d'Apprentissage : recherche dans la base de connaissances ──
-      const knowledgeEntries = await rechercherConnaissancesValidees(base44, countryCode);
-      if (knowledgeEntries.length > 0) {
-        let ctx = '';
-        try { ctx = conversation.venus_pending_course || ''; } catch {}
-        learningData = await genererReponseAugmentee(base44, messageEffectif, knowledgeEntries, ctx, countryCode, tarifs, telephone, profileName, isAudioTranscription);
-        const ACTION_INTENTIONS = ['creer_course', 'suivre_course', 'contacter_livreur', 'annuler_course', 'modifier_course'];
-        if (learningData.reponse && (learningData.knowledge_used || learningData.confidence >= SEUIL_CONFIANCE) && !ACTION_INTENTIONS.includes(learningData.intention)) {
-          reponseVenus = learningData.reponse;
-          console.log(`[WebhookVenus] 📚 Réponse ${learningData.knowledge_used ? 'issue de la base de connaissances' : 'générée'} (confiance: ${learningData.confidence}%, intention: ${learningData.intention})`);
+
+    // ═══════════════════════════════════════════════════════════════
+    // MOTEUR DE RAISONNEMENT ET DE MÉMOIRE VENUS
+    // ═══════════════════════════════════════════════════════════════
+    let reasoningResult: any = null;
+
+    if (!reponseVenus) {
+      // ── Charger la mémoire courte ──
+      let pendingCourse: any = null;
+      try { pendingCourse = conversation.venus_pending_course ? JSON.parse(conversation.venus_pending_course) : null; } catch { pendingCourse = null; }
+
+      // ── Bypass déterministe: confirmation anti-boucle ──
+      const CONFIRM_KW_BYPASS = ['oui','ok',"d'accord",'d accord','je confirme','valider','confirmer','confirme',"c'est bon",'cest bon','go',"c'est ok",'cest ok','parfait','exact','certainement','bien sur','ouais','volontiers','je valide','valide','correct','daco'];
+      const msgLowerBypass = messageEffectif.toLowerCase().trim();
+      const isConfBypass = msgLowerBypass.length <= 25 && CONFIRM_KW_BYPASS.some(kw => msgLowerBypass.includes(kw));
+      const resumeBypass = pendingCourse?.all_info_collected === true && !pendingCourse?.course_created;
+
+      if (resumeBypass && isConfBypass) {
+        console.log(`[WebhookVenus] ✅ Confirmation déterministe — création directe (bypass LLM)`);
+        const cr = await creerCourseDepuisMemoire(base44, pendingCourse, countryCode, tarifs, telephone, profileName);
+        if (cr.success) {
+          reponseVenus = cr.message;
+          pendingCourse.course_created = true;
+          pendingCourse.course_id = cr.course.id;
+          await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(pendingCourse) });
+          const ltmBP = await chargerMemoireLongue(base44, telephone, countryCode);
+          if (ltmBP) {
+            await mettreAJourMemoireLongue(base44, ltmBP.id, {
+              adresse_recuperee: pendingCourse.adresse_depart, adresse_livraison: pendingCourse.adresse_arrivee,
+              destinataire_nom: pendingCourse.contact_nom, destinataire_telephone: pendingCourse.contact_telephone,
+              type_course_prefere: pendingCourse.type_course, client_nom: profileName,
+              increment_courses: true,
+            });
+          }
         }
       }
-    }
-    if (!reponseVenus && isCourseFlow) {
-      const courseResult = await handleCourseFlow(base44, conversation, messageEffectif, countryCode, tarifs, telephone, profileName, isAudioTranscription);
-      reponseVenus = courseResult.response;
-      if (courseResult.pendingCourse !== undefined) {
-        await base44.asServiceRole.entities.Conversation.update(conversation.id, {
-          venus_pending_course: courseResult.pendingCourse ? JSON.stringify(courseResult.pendingCourse) : '',
+
+      if (!reponseVenus) {
+        // ── Charger la mémoire longue, l'historique, la course active ──
+        const memoireLongue = await chargerMemoireLongue(base44, telephone, countryCode);
+        const historiqueRecent = await chargerHistoriqueRecent(base44, conversation.id, 6);
+        const courseActive = await trouverCourseActive(base44, telephone, countryCode);
+
+        // ── Appeler le moteur de raisonnement ──
+        reasoningResult = await raisonnerVenus(base44, {
+          messageClient: messageEffectif,
+          memoireCourte: pendingCourse || {},
+          memoireLongue, historiqueRecent, courseActive,
+          countryCode, tarifs, telephone, profileName, isAudioTranscription,
+        });
+
+        // ── Exécuter l'action choisie ──
+        let reponseFinale = reasoningResult.reponse;
+
+        if (reasoningResult.action === 'creer_course') {
+          const um = { ...(pendingCourse || {}), ...reasoningResult.memoire_courte_update };
+          um.all_info_collected = true; um.user_confirmed = true;
+          const cr2 = await creerCourseDepuisMemoire(base44, um, countryCode, tarifs, telephone, profileName);
+          if (cr2.success) {
+            reponseFinale = cr2.message;
+            um.course_created = true; um.course_id = cr2.course.id;
+            if (memoireLongue) {
+              await mettreAJourMemoireLongue(base44, memoireLongue.id, {
+                adresse_recuperee: um.adresse_depart, adresse_livraison: um.adresse_arrivee,
+                destinataire_nom: um.contact_nom, destinataire_telephone: um.contact_telephone,
+                type_course_prefere: um.type_course, client_nom: profileName,
+                increment_courses: true,
+                ...reasoningResult.memoire_longue_update,
+              });
+            }
+          } else if (cr2.message) { reponseFinale = cr2.message; }
+        } else if (reasoningResult.action === 'suivre_course') {
+          reponseFinale = await handleConsultationCourse(base44, telephone, messageEffectif, profileName);
+        } else if (reasoningResult.action === 'contacter_livreur') {
+          reponseFinale = await handleContactLivreur(base44, conversation, messageEffectif, telephone, profileName);
+        }
+
+        reponseVenus = reponseFinale;
+
+        // ── Mettre à jour la mémoire courte ──
+        if (reasoningResult.memoire_courte_update && Object.keys(reasoningResult.memoire_courte_update).length > 0) {
+          const up = { ...(pendingCourse || {}), ...reasoningResult.memoire_courte_update };
+          await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(up) });
+        }
+
+        // ── Mettre à jour la mémoire longue ──
+        if (memoireLongue && reasoningResult.memoire_longue_update && Object.keys(reasoningResult.memoire_longue_update).length > 0) {
+          await mettreAJourMemoireLongue(base44, memoireLongue.id, reasoningResult.memoire_longue_update);
+        }
+
+        // ── Journaliser le raisonnement ──
+        await loggerRaisonnement(base44, {
+          conversation_id: conversation.id, client_telephone: telephone, client_nom: profileName,
+          message_recu: body || `[${messageType}]`, result: reasoningResult,
+          memoire_courte_snapshot: pendingCourse || {}, memoire_longue_id: memoireLongue?.id,
+          reponse_envoyee: reponseVenus,
         });
       }
-    } else if (!reponseVenus && isGreeting && latitude === null) {
-      reponseVenus = VENUS_GREETING_WHATSAPP;
-    } else if (!reponseVenus && latitude !== null && longitude !== null) {
-      // Sauvegarder la localisation dans le contexte de la conversation (venus_pending_course)
-      let pendingCourse: any = null;
-      try {
-        pendingCourse = conversation.venus_pending_course ? JSON.parse(conversation.venus_pending_course) : {};
-      } catch { pendingCourse = {}; }
-
-      pendingCourse.pending_location_lat = latitude;
-      pendingCourse.pending_location_lng = longitude;
-
-      await base44.asServiceRole.entities.Conversation.update(conversation.id, {
-        venus_pending_course: JSON.stringify(pendingCourse),
-      });
-
-      console.log(`[WebhookVenus] 📍 Localisation sauvegardée en attente d'assignation pour ${conversation.id} (${latitude}, ${longitude})`);
-
-      const hasPickup = pendingCourse.adresse_depart || pendingCourse.gps_depart_lat != null;
-      const hasDelivery = pendingCourse.adresse_arrivee || pendingCourse.gps_arrivee_lat != null;
-
-      if (hasPickup && !hasDelivery) {
-        reponseVenus = "J'ai bien recu votre localisation. Cette localisation correspond-elle au lieu de livraison ?";
-      } else if (!hasPickup && hasDelivery) {
-        reponseVenus = "J'ai bien recu votre localisation. Cette localisation correspond-elle au lieu de recuperation ?";
-      } else {
-        reponseVenus = "J'ai bien recu votre localisation. Cette localisation correspond-elle au lieu de recuperation ou au lieu de livraison ?";
-      }
-    } else if (!reponseVenus && messageType !== 'audio' && numMedia > 0) {
-      reponseVenus = "J'ai bien recu votre media. Comment puis-je vous aider avec cela ?";
-    } else if (!reponseVenus) {
-      // ── Centre d'Apprentissage : réponse augmentée (fallback) ──
-      const knowledgeEntries = await rechercherConnaissancesValidees(base44, countryCode);
-      let ctx = '';
-      try { ctx = conversation.venus_pending_course || ''; } catch {}
-      learningData = await genererReponseAugmentee(base44, messageEffectif, knowledgeEntries, ctx, countryCode, tarifs, telephone, profileName, isAudioTranscription);
-      reponseVenus = learningData.reponse || "Je suis VENUS, votre assistante SILGAPP. Comment puis-je vous aider ?";
-      console.log(`[WebhookVenus] 📚 Réponse générée (confiance: ${learningData.confidence}%, intention: ${learningData.intention})`);
     }
 
     // Nettoyer le markdown
@@ -1370,13 +1401,13 @@ Deno.serve(async (req) => {
         country_code: countryCode,
         user_type: 'client',
         date_conversation: new Date().toISOString().split('T')[0],
-        statut: learningData ? (learningData.confidence < SEUIL_CONFIANCE ? 'non_resolu' : 'resolu') : 'resolu',
-        satisfaction: learningData ? (learningData.confidence < SEUIL_CONFIANCE ? 'negative' : (learningData.knowledge_used ? 'positive' : 'neutre')) : 'neutre',
-        duree_secondes: learningData ? Math.round(learningData.temps_recherche_ms / 1000) : 0,
-        intention: learningData?.intention || undefined,
-        knowledge_id: learningData?.knowledge_id || undefined,
-        confidence_score: learningData?.confidence || undefined,
-        temps_recherche_ms: learningData?.temps_recherche_ms || undefined,
+        statut: reasoningResult ? (reasoningResult.confiance < SEUIL_CONFIANCE ? 'non_resolu' : 'resolu') : 'resolu',
+        satisfaction: reasoningResult ? (reasoningResult.confiance < SEUIL_CONFIANCE ? 'negative' : (reasoningResult.knowledge_id ? 'positive' : 'neutre')) : 'neutre',
+        duree_secondes: reasoningResult ? Math.round(reasoningResult.temps_traitement_ms / 1000) : 0,
+        intention: reasoningResult?.intention || undefined,
+        knowledge_id: reasoningResult?.knowledge_id || undefined,
+        confidence_score: reasoningResult?.confiance || undefined,
+        temps_recherche_ms: reasoningResult?.temps_traitement_ms || undefined,
       });
     } catch (logErr) {
       console.error('[WebhookVenus] Erreur logging VenusInteraction:', logErr.message);

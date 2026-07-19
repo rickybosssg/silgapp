@@ -1,0 +1,111 @@
+{
+  "name": "VenusReasoningLog",
+  "type": "object",
+  "properties": {
+    "interaction_id": {
+      "type": "string",
+      "description": "ID de l'interaction VenusInteraction associee"
+    },
+    "conversation_id": {
+      "type": "string",
+      "description": "ID de la conversation"
+    },
+    "client_telephone": {
+      "type": "string",
+      "description": "Telephone du client"
+    },
+    "client_nom": {
+      "type": "string",
+      "description": "Nom du client"
+    },
+    "message_recu": {
+      "type": "string",
+      "description": "Message original du client"
+    },
+    "intention": {
+      "type": "string",
+      "enum": [
+        "creer_course",
+        "suivre_course",
+        "contacter_livreur",
+        "annuler_course",
+        "modifier_info",
+        "demander_info",
+        "salutation",
+        "clarifier",
+        "autre"
+      ],
+      "description": "Intention detectee par le moteur de raisonnement"
+    },
+    "contexte": {
+      "type": "string",
+      "enum": [
+        "nouvelle_course",
+        "course_en_cours",
+        "ancienne_course",
+        "paiement",
+        "livreur",
+        "partenaire",
+        "general"
+      ],
+      "description": "Contexte de la conversation detecte"
+    },
+    "infos_connues": {
+      "type": "string",
+      "description": "JSON: informations deja connues dans la memoire courte"
+    },
+    "infos_manquantes": {
+      "type": "string",
+      "description": "JSON: tableau des informations manquantes"
+    },
+    "action_choisie": {
+      "type": "string",
+      "enum": [
+        "poser_question",
+        "creer_course",
+        "suivre_course",
+        "contacter_livreur",
+        "annuler_course",
+        "repondre_info",
+        "clarifier",
+        "saluer"
+      ],
+      "description": "Action choisie par le moteur"
+    },
+    "outils_utilises": {
+      "type": "string",
+      "description": "JSON: tableau des outils utilises (knowledge_base, course_flow, etc.)"
+    },
+    "confiance": {
+      "type": "number",
+      "description": "Score de confiance 0-100"
+    },
+    "memoire_courte_snapshot": {
+      "type": "string",
+      "description": "JSON: snapshot de la memoire courte au moment du raisonnement"
+    },
+    "memoire_longue_id": {
+      "type": "string",
+      "description": "ID de la VenusLongTermMemory utilisee"
+    },
+    "reponse_envoyee": {
+      "type": "string",
+      "description": "Reponse finale envoyee au client"
+    },
+    "temps_traitement_ms": {
+      "type": "number",
+      "description": "Temps de traitement en millisecondes"
+    },
+    "date_traitement": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date du traitement"
+    }
+  },
+  "required": [
+    "conversation_id",
+    "message_recu",
+    "intention",
+    "action_choisie"
+  ]
+}
