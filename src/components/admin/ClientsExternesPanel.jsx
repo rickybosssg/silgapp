@@ -318,6 +318,7 @@ function ClientDetailModal({ client, courses, migrationEnCours, onClose, onBloqu
 
 export default function ClientsExternesPanel({ countryCode: countryCodeProp }) {
   const [recherche, setRecherche] = useState("");
+  const [filtreStatut, setFiltreStatut] = useState("tous");
   const [clientDetail, setClientDetail] = useState(null);
   const [migrationEnCours, setMigrationEnCours] = useState(null);
   const [suppressionEnCours, setSuppressionEnCours] = useState(null);
@@ -347,17 +348,25 @@ export default function ClientsExternesPanel({ countryCode: countryCodeProp }) {
   });
 
   const clientsFiltres = useMemo(() => {
-    if (!recherche) return clients;
-    const q = recherche.toLowerCase().replace(/\s/g, "");
-    return clients.filter(c => {
-      const tel = (c.telephone || "").replace(/\D/g, "");
-      return (
-        (c.nom || "").toLowerCase().includes(recherche.toLowerCase()) ||
-        tel.includes(q) ||
-        (c.email || "").toLowerCase().includes(recherche.toLowerCase())
-      );
-    });
-  }, [clients, recherche]);
+    let result = clients;
+    // Filtre par statut (KPI cliquable)
+    if (filtreStatut === "actifs") result = result.filter(c => c.actif !== false);
+    else if (filtreStatut === "gps") result = result.filter(c => c.latitude);
+    else if (filtreStatut === "bloques") result = result.filter(c => c.actif === false);
+    // Filtre par recherche texte
+    if (recherche) {
+      const q = recherche.toLowerCase().replace(/\s/g, "");
+      result = result.filter(c => {
+        const tel = (c.telephone || "").replace(/\D/g, "");
+        return (
+          (c.nom || "").toLowerCase().includes(recherche.toLowerCase()) ||
+          tel.includes(q) ||
+          (c.email || "").toLowerCase().includes(recherche.toLowerCase())
+        );
+      });
+    }
+    return result;
+  }, [clients, recherche, filtreStatut]);
 
   const handleBloquer = async (client) => {
     await base44.entities.ClientExterne.update(client.id, { actif: client.actif === false ? true : false });
@@ -437,25 +446,49 @@ export default function ClientsExternesPanel({ countryCode: countryCodeProp }) {
         </div>
       </div>
 
-      {/* Stats rapides */}
+      {/* Stats rapides — KPIs cliquables */}
       <div className="grid grid-cols-4 gap-2">
-        <div className="bg-gradient-to-br from-pink-500 to-rose-500 rounded-2xl p-3 text-white text-center shadow-md shadow-pink-100">
+        <button
+          onClick={() => setFiltreStatut("tous")}
+          className={`bg-gradient-to-br from-pink-500 to-rose-500 rounded-2xl p-3 text-white text-center shadow-md shadow-pink-100 transition-all active:scale-95 ${filtreStatut === "tous" ? "ring-2 ring-offset-2 ring-pink-400" : ""}`}
+        >
           <p className="text-2xl font-black">{clients.length}</p>
           <p className="text-[10px] font-semibold opacity-80 mt-0.5">TOTAL</p>
-        </div>
-        <div className="bg-gradient-to-br from-emerald-500 to-green-500 rounded-2xl p-3 text-white text-center shadow-md shadow-green-100">
+        </button>
+        <button
+          onClick={() => setFiltreStatut("actifs")}
+          className={`bg-gradient-to-br from-emerald-500 to-green-500 rounded-2xl p-3 text-white text-center shadow-md shadow-green-100 transition-all active:scale-95 ${filtreStatut === "actifs" ? "ring-2 ring-offset-2 ring-emerald-400" : ""}`}
+        >
           <p className="text-2xl font-black">{clientsActifs}</p>
           <p className="text-[10px] font-semibold opacity-80 mt-0.5">ACTIFS</p>
-        </div>
-        <div className="bg-gradient-to-br from-blue-500 to-indigo-500 rounded-2xl p-3 text-white text-center shadow-md shadow-blue-100">
+        </button>
+        <button
+          onClick={() => setFiltreStatut("gps")}
+          className={`bg-gradient-to-br from-blue-500 to-indigo-500 rounded-2xl p-3 text-white text-center shadow-md shadow-blue-100 transition-all active:scale-95 ${filtreStatut === "gps" ? "ring-2 ring-offset-2 ring-blue-400" : ""}`}
+        >
           <p className="text-2xl font-black">{clientsAvecGPS}</p>
           <p className="text-[10px] font-semibold opacity-80 mt-0.5">GPS OK</p>
-        </div>
-        <div className="bg-gradient-to-br from-red-500 to-rose-600 rounded-2xl p-3 text-white text-center shadow-md shadow-red-100">
+        </button>
+        <button
+          onClick={() => setFiltreStatut("bloques")}
+          className={`bg-gradient-to-br from-red-500 to-rose-600 rounded-2xl p-3 text-white text-center shadow-md shadow-red-100 transition-all active:scale-95 ${filtreStatut === "bloques" ? "ring-2 ring-offset-2 ring-red-400" : ""}`}
+        >
           <p className="text-2xl font-black">{clientsBloques}</p>
           <p className="text-[10px] font-semibold opacity-80 mt-0.5">BLOQUÉS</p>
-        </div>
+        </button>
       </div>
+
+      {/* Indicateur filtre actif */}
+      {filtreStatut !== "tous" && (
+        <div className="flex items-center gap-2 -mt-2">
+          <Badge className="bg-gray-800 text-white text-xs gap-1">
+            Filtre: {filtreStatut === "actifs" ? "Actifs" : filtreStatut === "gps" ? "GPS OK" : "Bloqués"}
+            <button onClick={() => setFiltreStatut("tous")} className="ml-1 hover:opacity-70">
+              <X className="w-3 h-3" />
+            </button>
+          </Badge>
+        </div>
+      )}
 
       {/* Recherche */}
       <div className="relative">
@@ -501,9 +534,12 @@ export default function ClientsExternesPanel({ countryCode: countryCodeProp }) {
                 className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all duration-200 cursor-pointer"
                 onClick={() => setClientDetail(client)}
               >
-                {/* Avatar */}
-                <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${couleur} flex items-center justify-center flex-shrink-0 shadow-sm`}>
-                  <span className="text-white font-black text-sm">{initiales}</span>
+                {/* Avatar avec indicateur actif/bloqué */}
+                <div className="relative flex-shrink-0">
+                  <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${couleur} flex items-center justify-center shadow-sm`}>
+                    <span className="text-white font-black text-sm">{initiales}</span>
+                  </div>
+                  <span className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${client.actif === false ? "bg-red-500" : "bg-green-500"}`} />
                 </div>
 
                 {/* Infos */}
