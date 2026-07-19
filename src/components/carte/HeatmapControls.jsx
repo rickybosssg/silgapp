@@ -1,5 +1,5 @@
-import React from "react";
-import { MapPin, TrendingUp, Users } from "lucide-react";
+import React, { useState } from "react";
+import { MapPin, TrendingUp, Users, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import HeatmapInsights from "./HeatmapInsights";
 
@@ -8,10 +8,18 @@ import HeatmapInsights from "./HeatmapInsights";
  * Permet de basculer entre : Standard, Demande clients, Couverture livreurs
  */
 export default function HeatmapControls({ mode, onModeChange, clients = [], livreurs = [], courses = [] }) {
+  const [collapsed, setCollapsed] = useState(false);
   return (
     <div className="flex flex-col gap-2 bg-white rounded-lg shadow-lg border border-gray-200 p-2 min-w-[200px]">
-      <p className="text-xs font-semibold text-gray-700 px-1">Cartes thermiques</p>
-      
+      <button
+        onClick={() => setCollapsed(v => !v)}
+        className="flex items-center justify-between w-full px-1"
+      >
+        <p className="text-xs font-semibold text-gray-700">Cartes thermiques</p>
+        <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${collapsed ? "rotate-180" : ""}`} />
+      </button>
+      {!collapsed && (
+        <>
       {/* Mode standard */}
       <Button
         size="sm"
@@ -106,6 +114,8 @@ export default function HeatmapControls({ mode, onModeChange, clients = [], livr
             mode={mode}
           />
         </div>
+      )}
+        </>
       )}
     </div>
   );
