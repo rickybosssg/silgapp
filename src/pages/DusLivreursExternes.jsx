@@ -208,6 +208,7 @@ export default function DusLivreursExternes() {
   const [filtre, setFiltre] = useState("arecouvrer");
   const [detailEntry, setDetailEntry] = useState(null);
   const [search, setSearch] = useState("");
+  const [confirmEncaisser, setConfirmEncaisser] = useState(null);
   const { isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
   const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || "");
 
@@ -527,7 +528,7 @@ export default function DusLivreursExternes() {
                       {entry.montantDu > 0 && (
                         <Button size="sm" className="flex-1 h-9 text-xs bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-xl font-semibold border-0"
                           disabled={paiementMutation.isPending}
-                          onClick={() => paiementMutation.mutate({ entry, montant: entry.montantDu })}>
+                          onClick={() => setConfirmEncaisser({ entry, montant: entry.montantDu })}>
                           <CheckCircle2 className="w-3.5 h-3.5 mr-1" />Encaisser
                         </Button>
                       )}
@@ -604,7 +605,7 @@ export default function DusLivreursExternes() {
                       {entry.montantDu > 0 && (
                         <Button size="sm" className="flex-1 h-9 text-xs bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-xl font-semibold border-0"
                           disabled={etablissementPaiementMutation.isPending}
-                          onClick={() => etablissementPaiementMutation.mutate({ entry, montant: entry.montantDu })}>
+                          onClick={() => setConfirmEncaisser({ entry, montant: entry.montantDu })}>
                           <CheckCircle2 className="w-3.5 h-3.5 mr-1" />Encaisser
                         </Button>
                       )}
@@ -681,7 +682,7 @@ export default function DusLivreursExternes() {
                       {entry.montantDu > 0 && (
                         <Button size="sm" className="flex-1 h-9 text-xs bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-xl font-semibold border-0"
                           disabled={etablissementPaiementMutation.isPending}
-                          onClick={() => etablissementPaiementMutation.mutate({ entry, montant: entry.montantDu })}>
+                          onClick={() => setConfirmEncaisser({ entry, montant: entry.montantDu })}>
                           <CheckCircle2 className="w-3.5 h-3.5 mr-1" />Encaisser
                         </Button>
                       )}
@@ -741,6 +742,40 @@ export default function DusLivreursExternes() {
             </div>
           )}
         </>
+      )}
+
+      {/* ── Modal de confirmation Encaisser ── */}
+      {confirmEncaisser && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setConfirmEncaisser(null)}>
+          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
+                <CheckCircle2 className="w-8 h-8 text-green-600" />
+              </div>
+              <h3 className="text-lg font-black text-gray-900">Confirmer l'encaissement</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Encaisser <span className="font-bold text-green-600">{confirmEncaisser.montant.toLocaleString()} F</span> de
+              </p>
+              <p className="font-bold text-gray-900 mt-0.5">{confirmEncaisser.entry.prenom} {confirmEncaisser.entry.nom}</p>
+              <div className="flex gap-2 mt-5">
+                <Button variant="outline" className="flex-1" onClick={() => setConfirmEncaisser(null)}>Annuler</Button>
+                <Button className="flex-1 bg-green-600 hover:bg-green-700"
+                  disabled={paiementMutation.isPending || etablissementPaiementMutation.isPending}
+                  onClick={() => {
+                    const { entry, montant } = confirmEncaisser;
+                    if (entry.entityType === 'boutique' || entry.entityType === 'restaurant') {
+                      etablissementPaiementMutation.mutate({ entry, montant });
+                    } else {
+                      paiementMutation.mutate({ entry, montant });
+                    }
+                    setConfirmEncaisser(null);
+                  }}>
+                  Confirmer
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {detailEntry && (
