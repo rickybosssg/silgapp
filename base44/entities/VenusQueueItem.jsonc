@@ -1,0 +1,95 @@
+{
+  "name": "VenusQueueItem",
+  "type": "object",
+  "properties": {
+    "type_tache": {
+      "type": "string",
+      "enum": [
+        "message_entrant",
+        "notification",
+        "creation_course",
+        "envoi_qr",
+        "envoi_pin",
+        "envoi_whatsapp",
+        "dispatch",
+        "sauvegarde",
+        "audit",
+        "autre"
+      ],
+      "description": "Type de t\u00e2che en file d'attente"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "en_attente",
+        "en_cours",
+        "termine",
+        "echec",
+        "retry",
+        "mort"
+      ],
+      "default": "en_attente",
+      "description": "Statut de la t\u00e2che"
+    },
+    "priorite": {
+      "type": "string",
+      "enum": [
+        "critique",
+        "haute",
+        "normale",
+        "basse"
+      ],
+      "default": "normale"
+    },
+    "payload": {
+      "type": "string",
+      "description": "JSON: donn\u00e9es de la t\u00e2che"
+    },
+    "conversation_id": {
+      "type": "string"
+    },
+    "client_telephone": {
+      "type": "string"
+    },
+    "pays": {
+      "type": "string"
+    },
+    "nb_tentatives": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de tentatives d'ex\u00e9cution"
+    },
+    "max_tentatives": {
+      "type": "number",
+      "default": 3
+    },
+    "erreur_derniere": {
+      "type": "string",
+      "description": "Message d'erreur de la derni\u00e8re tentative"
+    },
+    "date_creation": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "date_debut_traitement": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "date_fin_traitement": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "temps_traitement_ms": {
+      "type": "number",
+      "default": 0
+    },
+    "traite_par": {
+      "type": "string",
+      "description": "ID de l'instance/worker qui traite"
+    }
+  },
+  "required": [
+    "type_tache",
+    "statut"
+  ]
+}

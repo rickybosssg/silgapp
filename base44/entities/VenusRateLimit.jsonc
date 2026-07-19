@@ -1,0 +1,64 @@
+{
+  "name": "VenusRateLimit",
+  "type": "object",
+  "properties": {
+    "identifier": {
+      "type": "string",
+      "description": "Identifiant limit\u00e9 (t\u00e9l\u00e9phone client, IP, user_id)"
+    },
+    "type_limit": {
+      "type": "string",
+      "enum": [
+        "telephone",
+        "ip",
+        "user_id",
+        "api_key",
+        "global"
+      ],
+      "description": "Type d'identifiant"
+    },
+    "compteur": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de requ\u00eates dans la fen\u00eatre courante"
+    },
+    "limite": {
+      "type": "number",
+      "default": 30,
+      "description": "Maximum de requ\u00eates autoris\u00e9es par fen\u00eatre"
+    },
+    "fenetre_minutes": {
+      "type": "number",
+      "default": 60,
+      "description": "Dur\u00e9e de la fen\u00eatre en minutes"
+    },
+    "bloque": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si l'identifiant est temporairement bloqu\u00e9"
+    },
+    "date_blocage": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "date_expiration_blocage": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "nb_blocages_total": {
+      "type": "number",
+      "default": 0
+    },
+    "derniere_requete": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "pays": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "identifier",
+    "type_limit"
+  ]
+}
