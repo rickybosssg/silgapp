@@ -214,6 +214,9 @@ export default function PayerSilgapp({ userType: forcedType }) {
               <Input type="number" placeholder="Ex: 1000" value={montantPaye}
                 onChange={e => setMontantPaye(e.target.value)}
                 className="text-lg font-bold" />
+              {Number(montantPaye) > 0 && Number(montantPaye) > montantDu && (
+                <p className="text-xs text-red-500 font-medium">Le montant payé ne peut pas dépasser le montant dû ({montantDu.toLocaleString()} F)</p>
+              )}
             </div>
 
             {/* Preuve de dépôt */}
@@ -246,7 +249,7 @@ export default function PayerSilgapp({ userType: forcedType }) {
             {/* Bouton envoyer */}
             <Button
               className="w-full h-14 text-base font-black rounded-2xl"
-              disabled={!montantPaye || !preuveUrl || submitMutation.isPending || uploading}
+              disabled={!montantPaye || !preuveUrl || submitMutation.isPending || uploading || Number(montantPaye) > montantDu}
               onClick={() => submitMutation.mutate()}
             >
               {submitMutation.isPending ? "Envoi..." : "Envoyer ma preuve"}
