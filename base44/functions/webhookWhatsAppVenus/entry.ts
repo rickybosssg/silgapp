@@ -115,7 +115,7 @@ async function chargerConfigAudio(base44) {
   if (AUDIO_CACHE.data && Date.now() < AUDIO_CACHE.expires) return AUDIO_CACHE.data;
   const defaults = {
     audio_response_enabled: false,      // Venus peut-elle répondre en audio ?
-    audio_response_voice: 'honey',       // Voix TTS par défaut (warm, soft)
+    audio_response_voice: 'honey',       // Voix TTS de Venus — jeune femme douce et chaleureuse
     audio_response_language: 'fr',       // Langue de la réponse audio
     audio_only_on_voice_input: true,     // Répondre en audio seulement si le client a envoyé un vocal
     audio_max_duration_chars: 500,       // Limite de caractères pour générer un audio (évite les longs textes)

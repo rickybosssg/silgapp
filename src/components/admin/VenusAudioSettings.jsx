@@ -7,11 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Volume2, VolumeX, Mic, Save, Loader2 } from "lucide-react";
 
 const VOICES = [
-  { value: "honey", label: "Honey — Chaleureuse, douce" },
-  { value: "river", label: "River — Calme, neutre" },
-  { value: "sunny", label: "Sunny — Vive, entraînante" },
-  { value: "storm", label: "Storm — Formelle, autoritaire" },
-  { value: "spark", label: "Spark — Énergique, rapide" },
+  { value: "honey", label: "Honey — Jeune femme, douce et chaleureuse (recommandée pour Venus)" },
+  { value: "sunny", label: "Sunny — Jeune femme, vive et entraînante" },
+  { value: "spark", label: "Spark — Jeune femme, énergique et rapide" },
+  { value: "river", label: "River — Femme, calme et neutre" },
+  { value: "storm", label: "Storm — Femme, formelle et autoritaire" },
 ];
 
 const LANGUAGES = [
