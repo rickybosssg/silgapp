@@ -39,8 +39,8 @@ function nextScanTime() {
 
 // ─── Rapport Detail ─────────────────────────────────────────────────────────
 
-function RapportDetail({ rapport }) {
-  const [open, setOpen] = useState(false);
+function RapportDetail({ rapport, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
   const bugs = parseJSON(rapport.details_bugs);
   const corrections = parseJSON(rapport.details_corrections);
   const recommandations = parseJSON(rapport.actions_recommandees);
@@ -430,7 +430,7 @@ export default function Maintenance() {
         )}
 
         <div className="space-y-3">
-          {rapports.map(r => <RapportDetail key={r.id} rapport={r} />)}
+          {rapports.map((r, i) => <RapportDetail key={r.id} rapport={r} defaultOpen={i === 0} />)}
         </div>
       </div>
     </div>
