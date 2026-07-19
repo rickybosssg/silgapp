@@ -255,7 +255,9 @@ ${userMessage}
 
 4. Si le client annule ou refuse, mets is_cancellation a true.
 
-5. Si les infos OBLIGATOIRES sont collectees (type_course + adresse_depart + adresse_arrivee + contact_telephone OU contact_is_client), mets all_info_collected a true et presente un resume avec le prix estime (${tarifs.minimum} ${tarifs.devise}), puis demande de confirmer par "oui".
+5. Si les infos OBLIGATOIRES sont collectees (type_course + adresse_depart + adresse_arrivee + contact_telephone OU contact_is_client), mets all_info_collected a true et presente un resume SANS PRIX, puis demande de confirmer par "oui".
+   IMPORTANT: N'affiche JAMAIS un prix ou un tarif estime dans le resume. Le prix sera communique par le livreur.
+   Si le client demande le prix, reponds: "Je ne peux pas encore determiner le tarif avec precision. Le livreur qui prendra votre course vous contactera pour confirmer le cout de la livraison avant le demarrage de la course."
 
 6. Si le client confirme apres le resume, mets user_confirmed a true.
 
@@ -370,10 +372,8 @@ Reponds UNIQUEMENT avec un JSON:`;
 Type: ${typeLabel}
 De: ${cd.adresse_depart}
 Vers: ${cd.adresse_arrivee}
-Contact: ${cd.contact_nom || 'N/A'} (${cd.contact_telephone || 'N/A'})
-Prix estime: ${tarifs.minimum} ${tarifs.devise}
 
-Un livreur sera assigne prochainement. Vous recevrez une notification.`;
+Votre demande est bien enregistree. Un livreur va etre recherche. Des qu'il aura accepte la course, il vous contactera directement pour confirmer les details et vous communiquer le cout de la livraison avant toute validation definitive.`;
 
       return { response: result.response, pendingCourse: null, courseCreated: true };
     } catch (e: any) {
