@@ -21,6 +21,7 @@
  */
 
 import { rechercherConnaissancesValidees } from './venusLearningEngine.ts';
+import { rechercherDocumentsRag } from './venusRagEngine.ts';
 
 // ── Types ──
 
@@ -50,6 +51,7 @@ interface ReasoningResult {
   memoire_courte_update: Record<string, any>;
   memoire_longue_update: Record<string, any>;
   knowledge_id?: string;
+  document_sources?: { document_id: string; document_titre: string; chunk_id: string; score: number; version: number }[];
   temps_traitement_ms: number;
 }
 
@@ -90,6 +92,7 @@ const RAISONNEMENT_SCHEMA = {
     memoire_courte_update: { type: 'object', additionalProperties: true },
     memoire_longue_update: { type: 'object', additionalProperties: true },
     knowledge_id: { type: 'string' },
+    document_sources: { type: 'array', items: { type: 'object', additionalProperties: true } },
   },
   required: ['intention', 'contexte', 'action', 'reponse', 'confiance'],
 };
@@ -490,7 +493,7 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
     }, null, 2);
   }
 
-  // ── Base de connaissances ──
+  // ── Base de connaissances (Source 1) ──
   let knowledgeStr = 'Aucune entree pertinente';
   let knowledgeEntries: any[] = [];
   try {
@@ -502,6 +505,26 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
     }
   } catch (e) {
     console.warn('[ReasoningEngine] Erreur chargement connaissances:', e.message);
+  }
+
+  // ── Bibliothèque documentaire RAG (Source 2) ──
+  let documentStr = 'Aucun document pertinent trouve';
+  let documentResults: any[] = [];
+  try {
+    const ragResult = await rechercherDocumentsRag(base44, input.messageClient, {
+      pays: input.countryCode,
+      limit: 5,
+      conversation_id: input.telephone,
+    });
+    if (ragResult.a_reussi && ragResult.resultats.length > 0) {
+      documentResults = ragResult.resultats;
+      documentStr = ragResult.resultats.map((r, i) =>
+        `[DOC ${i + 1}] Source: ${r.document_titre} (v${r.document_version}, ${r.document_categorie})\n    Score: ${r.score}\n    Contenu: ${(r.contenu || '').substring(0, 400)}\n    Doc ID: ${r.document_id} | Chunk ID: ${r.chunk_id}`
+      ).join('\n\n');
+      console.log(`[ReasoningEngine] 📚 RAG: ${ragResult.resultats.length} documents trouvés en ${ragResult.temps_ms}ms`);
+    }
+  } catch (e) {
+    console.warn('[ReasoningEngine] Erreur recherche documents RAG:', e.message);
   }
 
   // ── Construire le prompt de raisonnement ──
@@ -532,8 +555,11 @@ ${historiqueStr}
 ═══ COURSE ACTIVE (si applicable) ═══
 ${courseActiveStr}
 
-═══ BASE DE CONNAISSANCES ═══
+═══ BASE DE CONNAISSANCES (Source 1 - Priorité absolue) ═══
 ${knowledgeStr}
+
+═══ BIBLIOTHÈQUE DOCUMENTAIRE (Source 2 - Documents officiels SILGAPP) ═══
+${documentStr}
 
 ${audioNote}
 
@@ -615,9 +641,15 @@ Champs possibles: client_nom, ville_habituelle, quartier_habituel, langue_prefer
 
 12. Si pending_location_lat est défini dans la mémoire, une localisation est en attente d'assignation. Demande si c'est le lieu de récupération ou de livraison.
 
-13. BASE DE CONNAISSANCES: Si une entrée de la base correspond à la question du client, utilise sa réponse dans reponse et mets knowledge_id à l'ID de l'entrée. Si l'intention est une action (creer_course, suivre_course, etc.), n'utilise PAS la base de connaissances comme réponse — l'action prime.
+13. PRIORITÉ DES SOURCES: Pour répondre aux questions informationnelles (demander_info), utilise les sources dans cet ORDRE OBLIGATOIRE:
+    a) Base de connaissances (Source 1) — si une entrée correspond, utilise sa réponse et mets knowledge_id.
+    b) Bibliothèque documentaire (Source 2) — si un document officiel correspond, utilise son contenu et mets document_sources avec les IDs.
+    c) IA générale (Source 4) — uniquement si aucune source officielle ne correspond.
+    Si l'intention est une action (creer_course, suivre_course, etc.), n'utilise PAS les sources comme réponse — l'action prime.
 
-14. Si le client indique "recevoir un colis", le contact à collecter est l'EXPÉDITEUR (celui qui envoie vers le client). Si "envoyer un colis", le contact est le DESTINATAIRE (celui qui reçoit).
+14. DOCUMENTS OFFICIELS: Si la Bibliothèque documentaire contient des informations pertinentes, cite-les dans ta réponse de manière naturelle. Les documents officiels SILGAPP (procédures, tarifs, conditions générales, guides) ont priorité sur ta propre connaissance. Si tu utilises un document, mets document_sources avec [{document_id, document_titre, chunk_id, score, version}].
+
+15. Si le client indique "recevoir un colis", le contact à collecter est l'EXPÉDITEUR (celui qui envoie vers le client). Si "envoyer un colis", le contact est le DESTINATAIRE (celui qui reçoit).
 
 15. Le nom du destinataire/expéditeur est FACULTATIF. Seul le téléphone est requis. Si le client n'a pas le nom, mets contact_nom à "" et contact_is_client à false (ou true si le client est lui-même le contact).
 
@@ -673,6 +705,16 @@ Réponds UNIQUEMENT avec un JSON.`;
       }
     }
 
+    // Valider les document_sources
+    if (result.document_sources && documentResults.length > 0) {
+      const validSources = result.document_sources.filter((src: any) =>
+        documentResults.some(dr => dr.document_id === src.document_id)
+      );
+      result.document_sources = validSources.length > 0 ? validSources : undefined;
+    } else {
+      result.document_sources = undefined;
+    }
+
     console.log(`[ReasoningEngine] 🧠 Intention: ${result.intention} | Contexte: ${result.contexte} | Action: ${result.action} | Confiance: ${result.confiance}% | Temps: ${result.temps_traitement_ms}ms`);
 
     return result;
@@ -690,6 +732,7 @@ Réponds UNIQUEMENT avec un JSON.`;
       reponse: "Je suis VENUS, votre assistante SILGAPP. Comment puis-je vous aider ?",
       memoire_courte_update: {},
       memoire_longue_update: {},
+      document_sources: undefined,
       temps_traitement_ms: Date.now() - startTime,
     };
   }
@@ -722,7 +765,10 @@ export async function loggerRaisonnement(base44: any, logData: {
       infos_connues: JSON.stringify(logData.result.infos_connues || {}),
       infos_manquantes: JSON.stringify(logData.result.infos_manquantes || []),
       action_choisie: logData.result.action,
-      outils_utilises: JSON.stringify(logData.result.outils_utilises || []),
+      outils_utilises: JSON.stringify([
+        ...(logData.result.outils_utilises || []),
+        ...(logData.result.document_sources?.map((ds: any) => `doc:${ds.document_titre}`) || []),
+      ]),
       confiance: logData.result.confiance,
       memoire_courte_snapshot: JSON.stringify(logData.memoire_courte_snapshot || {}),
       memoire_longue_id: logData.memoire_longue_id || undefined,

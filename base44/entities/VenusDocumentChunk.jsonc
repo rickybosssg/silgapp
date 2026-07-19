@@ -1,0 +1,70 @@
+{
+  "name": "VenusDocumentChunk",
+  "type": "object",
+  "properties": {
+    "document_id": {
+      "type": "string",
+      "description": "ID du VenusDocument parent"
+    },
+    "document_titre": {
+      "type": "string",
+      "description": "Titre du document (snapshot pour recherche rapide)"
+    },
+    "document_version": {
+      "type": "number",
+      "description": "Version du document (snapshot)"
+    },
+    "document_categorie": {
+      "type": "string",
+      "description": "Categorie du document (snapshot)"
+    },
+    "document_statut": {
+      "type": "string",
+      "enum": [
+        "brouillon",
+        "valide",
+        "archive",
+        "desactive"
+      ],
+      "description": "Statut du document (snapshot pour filtrage)"
+    },
+    "document_pays": {
+      "type": "string",
+      "description": "Pays du document (snapshot)"
+    },
+    "chunk_index": {
+      "type": "number",
+      "default": 0,
+      "description": "Position du chunk dans le document"
+    },
+    "contenu": {
+      "type": "string",
+      "description": "Texte du chunk"
+    },
+    "mots_cles": {
+      "type": "string",
+      "description": "JSON: mots-cles specifiques a ce chunk"
+    },
+    "langue": {
+      "type": "string",
+      "default": "fr"
+    },
+    "resume_section": {
+      "type": "string",
+      "description": "Resume court de cette section"
+    },
+    "page_numero": {
+      "type": "number",
+      "description": "Numero de page (pour PDF)"
+    },
+    "nb_consultations": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de fois que ce chunk a ete utilise"
+    }
+  },
+  "required": [
+    "document_id",
+    "contenu"
+  ]
+}

@@ -1,0 +1,167 @@
+{
+  "name": "VenusDocument",
+  "type": "object",
+  "properties": {
+    "titre": {
+      "type": "string",
+      "description": "Titre du document"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description ou resume administrateur"
+    },
+    "categorie": {
+      "type": "string",
+      "enum": [
+        "SILGAPP",
+        "Administration",
+        "Livreurs",
+        "Clients",
+        "Pharmacies",
+        "Restaurants",
+        "Boutiques",
+        "Paiements",
+        "Juridique",
+        "Marketing",
+        "Technique",
+        "API",
+        "Formation"
+      ],
+      "description": "Categorie du document"
+    },
+    "type_document": {
+      "type": "string",
+      "enum": [
+        "PDF",
+        "Word",
+        "Excel",
+        "Texte",
+        "Markdown",
+        "Image",
+        "Manuel",
+        "Procedure",
+        "Contrat",
+        "Tarifs",
+        "CG",
+        "FAQ",
+        "Guide_Admin",
+        "Guide_Livreur",
+        "Guide_Partenaires",
+        "Formation",
+        "Politique"
+      ],
+      "description": "Type de document"
+    },
+    "fichier_url": {
+      "type": "string",
+      "description": "URL du fichier uploade"
+    },
+    "fichier_nom": {
+      "type": "string",
+      "description": "Nom original du fichier"
+    },
+    "fichier_type_mime": {
+      "type": "string",
+      "description": "Type MIME du fichier"
+    },
+    "fichier_taille": {
+      "type": "number",
+      "description": "Taille du fichier en octets"
+    },
+    "langue": {
+      "type": "string",
+      "default": "fr",
+      "description": "Langue detectee du document"
+    },
+    "mots_cles": {
+      "type": "string",
+      "description": "JSON: tableau des mots-cles extraits"
+    },
+    "resume": {
+      "type": "string",
+      "description": "Resume genere automatiquement"
+    },
+    "nb_chunks": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de chunks d'indexation"
+    },
+    "nb_pages": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de pages estimees"
+    },
+    "version": {
+      "type": "number",
+      "default": 1,
+      "description": "Numero de version du document"
+    },
+    "auteur": {
+      "type": "string",
+      "description": "Email admin ayant uploade le document"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "brouillon",
+        "valide",
+        "archive",
+        "desactive"
+      ],
+      "default": "brouillon",
+      "description": "Statut du document"
+    },
+    "date_validation": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "valide_par": {
+      "type": "string",
+      "description": "Email admin ayant valide"
+    },
+    "historique": {
+      "type": "string",
+      "description": "JSON: [{version, auteur, date, action}]"
+    },
+    "tags": {
+      "type": "string",
+      "description": "JSON: tableau de tags personnalises"
+    },
+    "pays": {
+      "type": "string",
+      "description": "Code pays (BF, CI, ...) ou ALL pour tous"
+    },
+    "version_precedente_id": {
+      "type": "string",
+      "description": "ID de la version precedente si mise a jour"
+    },
+    "is_latest_version": {
+      "type": "boolean",
+      "default": true,
+      "description": "True si c'est la version la plus recente"
+    },
+    "nb_consultations": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de fois que ce document a ete utilise par VENUS"
+    },
+    "derniere_consultation": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "date_indexation": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de la derniere indexation"
+    },
+    "erreur_indexation": {
+      "type": "string",
+      "description": "Message d'erreur si l'indexation a echoue"
+    }
+  },
+  "required": [
+    "titre",
+    "categorie",
+    "type_document"
+  ]
+}
