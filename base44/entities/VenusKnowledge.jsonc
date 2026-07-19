@@ -1,0 +1,97 @@
+{
+  "name": "VenusKnowledge",
+  "type": "object",
+  "properties": {
+    "titre": {
+      "type": "string",
+      "description": "Titre de la connaissance"
+    },
+    "categorie": {
+      "type": "string",
+      "enum": [
+        "tarifs",
+        "expedition_colis",
+        "reception_colis",
+        "suivi_colis",
+        "gps",
+        "prix_manuel",
+        "prix_automatique",
+        "annulation_course",
+        "paiement",
+        "remboursement",
+        "compte_client",
+        "compte_livreur",
+        "inscription",
+        "notifications",
+        "publicites",
+        "probleme_technique",
+        "comptabilite",
+        "livraison_urgente",
+        "devenir_livreur",
+        "questions_generales",
+        "autres"
+      ],
+      "description": "Cat\u00e9gorie de la connaissance"
+    },
+    "question": {
+      "type": "string",
+      "description": "Question associ\u00e9e \u00e0 la connaissance"
+    },
+    "reponse_officielle": {
+      "type": "string",
+      "description": "R\u00e9ponse officielle valid\u00e9e par l'admin"
+    },
+    "mots_cles": {
+      "type": "string",
+      "description": "JSON: tableau des mots-cl\u00e9s associ\u00e9s"
+    },
+    "pays": {
+      "type": "string",
+      "description": "Code pays (BF, CI, ...) ou 'ALL' pour tous les pays"
+    },
+    "ville": {
+      "type": "string",
+      "description": "Ville concern\u00e9e (vide = toutes)"
+    },
+    "langue": {
+      "type": "string",
+      "default": "fr",
+      "description": "Langue de la connaissance"
+    },
+    "priorite": {
+      "type": "string",
+      "enum": [
+        "basse",
+        "normale",
+        "haute",
+        "critique"
+      ],
+      "default": "normale",
+      "description": "Niveau de priorit\u00e9"
+    },
+    "auteur": {
+      "type": "string",
+      "description": "Email de l'admin auteur"
+    },
+    "version": {
+      "type": "number",
+      "default": 1,
+      "description": "Num\u00e9ro de version actuelle"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "brouillon",
+        "valide",
+        "archive"
+      ],
+      "default": "brouillon",
+      "description": "Statut de la connaissance"
+    }
+  },
+  "required": [
+    "titre",
+    "question",
+    "reponse_officielle"
+  ]
+}

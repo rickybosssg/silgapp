@@ -86,6 +86,7 @@ const PharmacieDetail = lazy(() => import('./pages/PharmacieDetail.jsx'));
 const AdminMessages = lazy(() => import('./pages/AdminMessages.jsx'));
 const WhatsAppAdmin = lazy(() => import('./pages/WhatsAppAdmin.jsx'));
 const VenusAdminCenter = lazy(() => import('./pages/VenusAdminCenter.jsx'));
+const VenusLearningCenter = lazy(() => import('./pages/VenusLearningCenter.jsx'));
 const NeoDashboard = lazy(() => import('./pages/NeoDashboard.jsx'));
 const BugsTracking = lazy(() => import('./pages/BugsTracking.jsx'));
 const PayerSilgapp = lazy(() => import('./pages/PayerSilgapp.jsx'));
@@ -396,6 +397,7 @@ function AppContent() {
           <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
           <Route path="/admin/whatsapp" element={<AnimatedRoutes><WhatsAppAdmin /></AnimatedRoutes>} />
           <Route path="/admin/venus" element={<AnimatedRoutes><VenusAdminCenter /></AnimatedRoutes>} />
+          <Route path="/admin/venus-learning" element={<AnimatedRoutes><VenusLearningCenter /></AnimatedRoutes>} />
           <Route path="/admin/neo" element={<AnimatedRoutes><NeoDashboard /></AnimatedRoutes>} />
           <Route path="/admin/bugs" element={<AnimatedRoutes><BugsTracking /></AnimatedRoutes>} />
           <Route path="/admin/statistiques" element={<AnimatedRoutes><Statistiques /></AnimatedRoutes>} />

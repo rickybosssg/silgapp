@@ -1,0 +1,58 @@
+{
+  "name": "VenusScenario",
+  "type": "object",
+  "properties": {
+    "nom": {
+      "type": "string",
+      "description": "Nom du sc\u00e9nario"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description du sc\u00e9nario"
+    },
+    "categorie": {
+      "type": "string",
+      "description": "Cat\u00e9gorie du sc\u00e9nario"
+    },
+    "declencheurs": {
+      "type": "string",
+      "description": "JSON: tableau des phrases/mots qui d\u00e9clenchent ce sc\u00e9nario"
+    },
+    "conversation": {
+      "type": "string",
+      "description": "JSON: conversation compl\u00e8te [{role, content}]"
+    },
+    "reponse_ideale": {
+      "type": "string",
+      "description": "R\u00e9ponse id\u00e9ale attendue de VENUS"
+    },
+    "outils_utilises": {
+      "type": "string",
+      "description": "JSON: tableau des outils/fonctions utilis\u00e9s"
+    },
+    "resultat_attendu": {
+      "type": "string",
+      "description": "R\u00e9sultat attendu \u00e0 la fin du sc\u00e9nario"
+    },
+    "auteur": {
+      "type": "string",
+      "description": "Email de l'admin auteur"
+    },
+    "version": {
+      "type": "number",
+      "default": 1
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "brouillon",
+        "valide",
+        "archive"
+      ],
+      "default": "brouillon"
+    }
+  },
+  "required": [
+    "nom"
+  ]
+}

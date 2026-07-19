@@ -1,0 +1,52 @@
+{
+  "name": "VenusAudit",
+  "type": "object",
+  "properties": {
+    "utilisateur": {
+      "type": "string",
+      "description": "Email de l'admin ayant effectu\u00e9 l'action"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "create",
+        "update",
+        "delete",
+        "restore",
+        "validate",
+        "archive"
+      ],
+      "description": "Action effectu\u00e9e"
+    },
+    "entite_type": {
+      "type": "string",
+      "enum": [
+        "knowledge",
+        "scenario",
+        "correction"
+      ],
+      "description": "Type d'entit\u00e9 concern\u00e9e"
+    },
+    "entite_id": {
+      "type": "string",
+      "description": "ID de l'entit\u00e9 concern\u00e9e"
+    },
+    "ancienne_valeur": {
+      "type": "string",
+      "description": "JSON: valeur avant modification"
+    },
+    "nouvelle_valeur": {
+      "type": "string",
+      "description": "JSON: valeur apr\u00e8s modification"
+    },
+    "details": {
+      "type": "string",
+      "description": "D\u00e9tails compl\u00e9mentaires"
+    }
+  },
+  "required": [
+    "utilisateur",
+    "action",
+    "entite_type"
+  ]
+}
