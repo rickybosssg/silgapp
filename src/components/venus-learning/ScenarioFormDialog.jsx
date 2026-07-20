@@ -75,18 +75,26 @@ export default function ScenarioFormDialog({ open, onClose, editEntry, presetDat
             <Label>Description</Label>
             <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><Label>Catégorie</Label><Input value={form.categorie} onChange={e => setForm(f => ({ ...f, categorie: e.target.value }))} /></div>
-            <div><Label>Statut</Label>
-              <Select value={form.statut} onValueChange={v => setForm(f => ({ ...f, statut: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="brouillon">Brouillon</SelectItem>
-                  <SelectItem value="valide">Validé</SelectItem>
-                  <SelectItem value="archive">Archivé</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div>
+            <Label>Catégorie</Label>
+            <Input value={form.categorie} onChange={e => setForm(f => ({ ...f, categorie: e.target.value }))} placeholder="Ex: creation_course, paiement, pharmacie..." />
+          </div>
+          <div>
+            <Label className="text-sm font-semibold">Statut</Label>
+            <Select value={form.statut} onValueChange={v => setForm(f => ({ ...f, statut: v }))}>
+              <SelectTrigger className="h-11 w-full text-sm font-medium"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="brouillon">📝 Brouillon</SelectItem>
+                <SelectItem value="en_revision">🔍 En révision</SelectItem>
+                <SelectItem value="valide">✅ Validé (indexation RAG auto)</SelectItem>
+                <SelectItem value="archive">📦 Archivé</SelectItem>
+              </SelectContent>
+            </Select>
+            {form.statut === 'valide' && (
+              <p className="text-xs text-green-600 mt-1 font-medium">
+                ✓ Ce scénario sera automatiquement indexé dans la base RAG de VENUS à l'enregistrement.
+              </p>
+            )}
           </div>
           <div>
             <Label>Déclencheurs (séparés par des virgules)</Label>

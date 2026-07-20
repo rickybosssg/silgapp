@@ -46,10 +46,12 @@
       "type": "string",
       "enum": [
         "brouillon",
+        "en_revision",
         "valide",
         "archive"
       ],
-      "default": "brouillon"
+      "default": "brouillon",
+      "description": "Statut du sc\u00e9nario. 'valide' d\u00e9clenche l'indexation RAG automatique."
     },
     "rag_indexe": {
       "type": "boolean",
