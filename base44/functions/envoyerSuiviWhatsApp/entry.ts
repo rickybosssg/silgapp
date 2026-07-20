@@ -21,17 +21,28 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.38';
  */
 
 const STATUT_LABELS = {
-  livreur_en_route: 'Votre livreur est en route',
-  arrive_prise_en_charge: 'Votre livreur est arrivé sur place',
-  colis_recupere: 'Votre colis a été récupéré',
-  pris_en_charge: 'Votre colis a été récupéré',
-  en_livraison: 'Votre colis est en cours de livraison',
-  livree: 'Votre colis a été livré',
-  annulee: 'Votre course a été annulée',
+  recherche_livreur: '🚚 Recherche d\'un livreur en cours',
+  livreur_en_route: '🚗 Votre livreur est en route vers vous',
+  arrive_prise_en_charge: '📍 Votre livreur est arrivé sur place',
+  colis_recupere: '📦 Votre colis a été récupéré',
+  pris_en_charge: '📦 Votre colis a été récupéré',
+  en_livraison: '🚚 Votre colis est en cours de livraison',
+  livree: '✅ Votre colis a été livré',
+  annulee: '❌ Votre course a été annulée',
 };
 
+function genererReference(course) {
+  const date = new Date(course.created_date || Date.now());
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const hexSuffix = (course.id || '').replace(/-/g, '').slice(-6) || '000000';
+  const numSuffix = String(parseInt(hexSuffix, 16) % 1000000).padStart(6, '0');
+  return `SG-${yyyy}${mm}${dd}-${numSuffix}`;
+}
+
 function construireMessage(course, evenement, body = {}) {
-  const ref = course.id?.slice(-6) || 'N/A';
+  const ref = genererReference(course);
   const livreurNom = course.livreur_nom || 'votre livreur';
   const livreurVehicule = course.livreur_vehicule || 'moto';
   const livreurTel = course.livreur_telephone || '';
@@ -41,14 +52,17 @@ function construireMessage(course, evenement, body = {}) {
   switch (evenement) {
     case 'livreur_assigne':
       return [
-        `COURSE SILGAPP #${ref}`,
+        `✅ Livreur trouvé !`,
         ``,
-        `Votre livreur a été assigné !`,
-        `Nom : ${livreurNom}`,
-        `Véhicule : ${livreurVehicule}`,
-        livreurTel ? `Téléphone : ${livreurTel}` : '',
+        `📝 Référence : ${ref}`,
+        `👤 Livreur : ${livreurNom}`,
+        `🚗 Véhicule : ${livreurVehicule}`,
+        livreurTel ? `📞 Téléphone : ${livreurTel}` : '',
         ``,
-        trackingLink ? `Suivez votre livreur en temps réel :` : '',
+        `📍 Votre livreur est en route vers le point de récupération.`,
+        `⏱️ Arrivée estimée : moins de 5 minutes`,
+        ``,
+        trackingLink ? `🔗 Suivez votre livreur en temps réel :` : '',
         trackingLink || '',
       ].filter(l => l !== '').join('\n');
 
@@ -58,11 +72,15 @@ function construireMessage(course, evenement, body = {}) {
       return [
         isRedispatch
           ? `✅ Un nouveau livreur a accepté votre course !`
-          : `Bonne nouvelle ! Un livreur a accepté votre course.`,
+          : `✅ Livreur trouvé !`,
+        ``,
+        `📝 Référence : ${ref}`,
+        `👤 Livreur : ${livreurNom}`,
+        livreurTel ? `📞 Téléphone : ${livreurTel}` : '',
         ``,
         `Voici votre QR Code et votre Code PIN de récupération.`,
         ``,
-        `Code PIN : ${pin}`,
+        `🔐 Code PIN : ${pin}`,
         ``,
         isRedispatch
           ? `⚠️ Les anciens codes ne sont plus valables. Utilisez uniquement ce nouveau QR Code et ce Code PIN.`
@@ -71,35 +89,41 @@ function construireMessage(course, evenement, body = {}) {
 
     case 'arrive_prise_en_charge':
       return [
-        `COURSE SILGAPP #${ref}`,
+        `📍 Votre livreur est arrivé sur place`,
         ``,
-        `${livreurNom} est arrivé au point de prise en charge.`,
-        livreurTel ? `Vous pouvez le contacter au ${livreurTel}.` : '',
+        `📝 Référence : ${ref}`,
+        `👤 ${livreurNom} est arrivé au point de prise en charge.`,
+        livreurTel ? `📞 Vous pouvez le contacter au ${livreurTel}.` : '',
       ].filter(l => l !== '').join('\n');
 
     case 'pris_en_charge':
       return [
-        `✅ Votre QR Code et votre Code PIN ont été validés.`,
-        `Votre colis a bien été récupéré par ${livreurNom}. Il est maintenant en route vers sa destination.`,
-        trackingLink ? `Suivez l'acheminement : ${trackingLink}` : '',
+        `📦 Votre colis a été récupéré par le livreur`,
+        ``,
+        `📝 Référence : ${ref}`,
+        `👤 Récupéré par : ${livreurNom}`,
+        ``,
+        `🚚 Votre colis est maintenant en route vers sa destination.`,
+        trackingLink ? `🔗 Suivez l'acheminement : ${trackingLink}` : '',
       ].filter(l => l !== '').join('\n');
 
     case 'livre':
       const prix = course.prix_final || course.prix_estimate;
       return [
-        `COURSE SILGAPP #${ref}`,
+        `✅ Colis livré avec succès !`,
         ``,
-        `Votre colis a été livré avec succès !`,
-        `Livré par : ${livreurNom}`,
-        prix ? `Montant : ${prix.toLocaleString()} ${devise}` : '',
+        `📝 Référence : ${ref}`,
+        `👤 Livré par : ${livreurNom}`,
+        prix ? `💰 Montant : ${prix.toLocaleString()} ${devise}` : '',
         ``,
-        `Merci d'utiliser SILGAPP.`,
+        `Merci d'avoir choisi SILGAPP ! 🎉`,
       ].filter(l => l !== '').join('\n');
 
     case 'annule':
       return [
-        `COURSE SILGAPP #${ref}`,
+        `❌ Course annulée`,
         ``,
+        `📝 Référence : ${ref}`,
         `Votre course a été annulée.`,
         course.notes ? `Motif : ${course.notes}` : '',
         ``,
@@ -107,8 +131,8 @@ function construireMessage(course, evenement, body = {}) {
       ].filter(l => l !== '').join('\n');
 
     default:
-      const label = STATUT_LABELS[course.statut] || `Statut: ${course.statut}`;
-      return `COURSE SILGAPP #${ref}\n\n${label}.`;
+      const label = STATUT_LABELS[course.statut] || `Statut : ${course.statut}`;
+      return `📝 Référence : ${ref}\n\n${label}.`;
   }
 }
 

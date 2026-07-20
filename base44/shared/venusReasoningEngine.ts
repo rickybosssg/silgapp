@@ -392,7 +392,7 @@ export async function creerCourseDepuisMemoire(
     adresse_arrivee: cd.adresse_arrivee || 'Localisation GPS partagee',
     prix_estimate: tarifs.minimum,
     devise: tarifs.devise,
-    statut: 'nouvelle',
+    statut: 'recherche_livreur',
     dispatch_status: 'en_attente',
     notes: cd.notes || '',
     gps_depart_lat: cd.gps_depart_lat,
@@ -428,15 +428,28 @@ export async function creerCourseDepuisMemoire(
 
   try {
     const course = await base44.asServiceRole.entities.CourseExterne.create(courseData);
-    const typeLabels: any = { expedier: 'Envoi de colis', recevoir: 'Reception de colis', deplacement: 'Deplacement' };
+    const typeLabels: any = { expedier: 'Envoi de colis', recevoir: 'Réception de colis', deplacement: 'Déplacement' };
     const typeLabel = typeLabels[normalizedType] || normalizedType;
-    const message = `Votre course a ete creee avec succes dans SILGAPP !
 
-Type: ${typeLabel}
-De: ${cd.adresse_depart || 'Localisation GPS'}
-Vers: ${cd.adresse_arrivee || 'Localisation GPS'}
+    // Générer la référence unique : SG-YYYYMMDD-XXXXXX
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const hexSuffix = course.id?.replace(/-/g, '').slice(-6) || '000000';
+    const numSuffix = String(parseInt(hexSuffix, 16) % 1000000).padStart(6, '0');
+    const reference = `SG-${yyyy}${mm}${dd}-${numSuffix}`;
 
-Je recherche maintenant un livreur disponible. Je vous informerai des qu'un livreur aura accepte votre demande. Le livreur vous contactera ensuite pour confirmer les derniers details et le cout de la livraison.`;
+    const message = `📦 Course créée avec succès !
+
+📝 Référence : ${reference}
+🚚 Type : ${typeLabel}
+📍 Départ : ${cd.adresse_depart || 'Localisation GPS'}
+🎯 Destination : ${cd.adresse_arrivee || 'Localisation GPS'}
+
+⏱️ Temps estimé de recherche d'un livreur : moins de 2 minutes.
+
+Je vous informerai dès qu'un livreur aura accepté votre demande. Le livreur vous contactera ensuite pour confirmer les derniers détails et le coût de la livraison.`;
 
     return { success: true, course, message };
   } catch (e: any) {

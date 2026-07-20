@@ -33,6 +33,24 @@ Deno.serve(async (req) => {
 
     console.log(`[syncStatutLivreur] event=${event?.type} statut=${statut} livreur_id=${livreurId?.slice(-8) || 'NONE'}`);
 
+    // ── Notifications WhatsApp automatiques au client sur changement de statut ──
+    const oldStatut = old_data?.statut;
+    const newStatut = course.statut;
+    if (oldStatut !== newStatut && course.id) {
+      let evenementWhatsApp = null;
+      if (newStatut === 'arrive_prise_en_charge') evenementWhatsApp = 'arrive_prise_en_charge';
+      else if (newStatut === 'colis_recupere' || newStatut === 'pris_en_charge') evenementWhatsApp = 'pris_en_charge';
+      else if (newStatut === 'livree') evenementWhatsApp = 'livre';
+
+      if (evenementWhatsApp) {
+        console.log(`[syncStatutLivreur] 📤 Notification WhatsApp client: ${evenementWhatsApp} (course ${course.id})`);
+        base44.asServiceRole.functions.invoke('envoyerSuiviWhatsApp', {
+          course_id: course.id,
+          evenement: evenementWhatsApp,
+        }).catch(err => console.error('[syncStatutLivreur] ❌ WhatsApp:', err.message));
+      }
+    }
+
     // 🔄 Auto-transition : colis_recupere → en_livraison après 10 secondes
     // Doit être traité EN PREMIER, avant Cas 1/Cas 2, car colis_recupere ∈ STATUTS_ACTIFS_LIVREUR
     // et Cas 2 fait un return early qui rendrait ce code inaccessible.
