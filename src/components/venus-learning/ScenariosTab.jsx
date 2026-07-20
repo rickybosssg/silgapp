@@ -47,13 +47,17 @@ export default function ScenariosTab({ presetData, presetOpen }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un scénario..." className="pl-9" />
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 min-w-[150px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un scénario..." className="pl-9" />
+          </div>
+          <Button size="sm" onClick={openAdd}><Plus className="w-4 h-4 mr-1" />Ajouter</Button>
         </div>
-        <Button size="sm" variant="outline" onClick={() => setPasteOpen(true)}><ClipboardPaste className="w-4 h-4 mr-1" />Coller un texte</Button>
-        <Button size="sm" onClick={openAdd}><Plus className="w-4 h-4 mr-1" />Ajouter</Button>
+        <Button variant="outline" className="w-full border-dashed border-primary text-primary" onClick={() => setPasteOpen(true)}>
+          <ClipboardPaste className="w-4 h-4 mr-2" />Coller une conversation
+        </Button>
       </div>
 
       {isLoading ? (
