@@ -4,7 +4,8 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Pencil, Trash2, Copy, Download, Upload, Filter } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Copy, Download, Upload, Filter, RefreshCw, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
 import { CATEGORIES, STATUT_LABELS, PRIORITE_LABELS, exportToCSV, logAudit, getCategoryLabel } from '@/lib/venusLearning';
 import KnowledgeFormDialog from './KnowledgeFormDialog';
 
@@ -38,6 +39,21 @@ export default function KnowledgeBaseTab({ presetQuestion, presetOpen }) {
     await base44.entities.VenusKnowledge.delete(entry.id);
     await logAudit('delete', 'knowledge', entry.id, entry, null);
     refresh();
+  };
+
+  const handleReindex = async (entry) => {
+    try {
+      toast({ title: 'Réindexation en cours...', description: entry.titre });
+      const res = await base44.functions.invoke('indexerDocumentVenus', { action: 'reindexer_knowledge', knowledge_id: entry.id });
+      if (res?.success) {
+        toast({ title: 'Document réindexé', description: entry.titre });
+      } else {
+        toast({ title: 'Erreur de réindexation', description: res?.error || 'Erreur inconnue', variant: 'destructive' });
+      }
+      refresh();
+    } catch (e) {
+      toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
+    }
   };
 
   const handleDuplicate = async (entry) => {
@@ -112,9 +128,10 @@ export default function KnowledgeBaseTab({ presetQuestion, presetOpen }) {
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <h3 className="font-semibold text-slate-900 text-sm">{entry.titre}</h3>
                   <div className="flex gap-1 flex-shrink-0">
-                    <button onClick={() => openEdit(entry)} className="p-1.5 hover:bg-slate-100 rounded-lg"><Pencil className="w-3.5 h-3.5 text-slate-500" /></button>
-                    <button onClick={() => handleDuplicate(entry)} className="p-1.5 hover:bg-slate-100 rounded-lg"><Copy className="w-3.5 h-3.5 text-slate-500" /></button>
-                    <button onClick={() => handleDelete(entry)} className="p-1.5 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
+                    <button onClick={() => openEdit(entry)} className="p-1.5 hover:bg-slate-100 rounded-lg" title="Modifier"><Pencil className="w-3.5 h-3.5 text-slate-500" /></button>
+                    <button onClick={() => handleReindex(entry)} className="p-1.5 hover:bg-blue-50 rounded-lg" title="Réindexer dans le RAG"><RefreshCw className="w-3.5 h-3.5 text-blue-500" /></button>
+                    <button onClick={() => handleDuplicate(entry)} className="p-1.5 hover:bg-slate-100 rounded-lg" title="Dupliquer"><Copy className="w-3.5 h-3.5 text-slate-500" /></button>
+                    <button onClick={() => handleDelete(entry)} className="p-1.5 hover:bg-red-50 rounded-lg" title="Supprimer"><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
                   </div>
                 </div>
                 <p className="text-xs text-slate-600 mb-2 line-clamp-2">{entry.question}</p>
@@ -125,6 +142,15 @@ export default function KnowledgeBaseTab({ presetQuestion, presetOpen }) {
                   {entry.categorie && <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{getCategoryLabel(entry.categorie)}</span>}
                   {entry.pays && entry.pays !== 'ALL' && <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{entry.pays}</span>}
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-400">v{entry.version || 1}</span>
+                  {entry.statut === 'valide' && (
+                    entry.rag_indexe ? (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium flex items-center gap-0.5"><CheckCircle className="w-2.5 h-2.5" /> RAG</span>
+                    ) : entry.rag_erreur ? (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium flex items-center gap-0.5" title={entry.rag_erreur}><AlertTriangle className="w-2.5 h-2.5" /> Erreur RAG</span>
+                    ) : (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium flex items-center gap-0.5"><Clock className="w-2.5 h-2.5" /> En attente RAG</span>
+                    )
+                  )}
                 </div>
               </div>
             );

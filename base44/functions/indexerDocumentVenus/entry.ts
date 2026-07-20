@@ -111,6 +111,146 @@ Deno.serve(async (req) => {
         return Response.json(result);
       }
 
+      // ── Désindexer un document VenusKnowledge de la base RAG ──
+      case 'desindexer_knowledge': {
+        const knowledge = await base44.asServiceRole.entities.VenusKnowledge.get(body.knowledge_id);
+        if (!knowledge) {
+          return Response.json({ success: false, error: 'Connaissance non trouvée' }, { status: 404 });
+        }
+        if (!knowledge.rag_document_id) {
+          await base44.asServiceRole.entities.VenusKnowledge.update(knowledge.id, {
+            rag_indexe: false, rag_erreur: '', rag_document_id: '',
+          });
+          return Response.json({ success: true, message: 'Aucun document RAG associé — nettoyage effectué' });
+        }
+        // Archiver le VenusDocument et ses chunks
+        try {
+          await base44.asServiceRole.entities.VenusDocument.update(knowledge.rag_document_id, {
+            statut: 'archive', is_latest_version: false,
+          });
+          const oldChunks = await base44.asServiceRole.entities.VenusDocumentChunk.filter(
+            { document_id: knowledge.rag_document_id }, '-chunk_index', 500
+          );
+          for (const oc of oldChunks) {
+            await base44.asServiceRole.entities.VenusDocumentChunk.update(oc.id, { document_statut: 'archive' });
+          }
+        } catch (e) { console.warn('[desindexer] Erreur archivage RAG:', e.message); }
+        await base44.asServiceRole.entities.VenusKnowledge.update(knowledge.id, {
+          rag_indexe: false, rag_document_id: '', rag_erreur: '',
+        });
+        return Response.json({ success: true, message: `Document désindexé du RAG (${knowledge.titre})` });
+      }
+
+      // ── Réindexer un document VenusKnowledge spécifique ──
+      case 'reindexer_knowledge': {
+        const knowledge = await base44.asServiceRole.entities.VenusKnowledge.get(body.knowledge_id);
+        if (!knowledge) {
+          return Response.json({ success: false, error: 'Connaissance non trouvée' }, { status: 404 });
+        }
+        // Désindexer l'ancienne version si elle existe
+        if (knowledge.rag_document_id) {
+          try {
+            await base44.asServiceRole.entities.VenusDocument.update(knowledge.rag_document_id, {
+              statut: 'archive', is_latest_version: false,
+            });
+            const oldChunks = await base44.asServiceRole.entities.VenusDocumentChunk.filter(
+              { document_id: knowledge.rag_document_id }, '-chunk_index', 500
+            );
+            for (const oc of oldChunks) {
+              await base44.asServiceRole.entities.VenusDocumentChunk.update(oc.id, { document_statut: 'archive' });
+            }
+          } catch (e) { console.warn('[reindexer] Erreur archivage ancien RAG:', e.message); }
+        }
+        // Réindexer avec le contenu actuel
+        const textePourRag = `Titre: ${knowledge.titre}\nDescription: ${knowledge.description || ''}\nCatégorie: ${knowledge.categorie || 'N/A'}\nSous-catégorie: ${knowledge.sous_categorie || 'N/A'}\nQuestion: ${knowledge.question || 'N/A'}\n\nContenu:\n${knowledge.reponse_officielle}\n\nMots-clés: ${knowledge.mots_cles || ''}`;
+        const result = await indexerTexteDirect(base44, {
+          texte: textePourRag,
+          auteur: body.auteur || knowledge.auteur || 'admin',
+        });
+        if (result.success && result.document?.id) {
+          await base44.asServiceRole.entities.VenusKnowledge.update(knowledge.id, {
+            rag_indexe: true, rag_document_id: result.document.id,
+            rag_indexe_at: new Date().toISOString(), rag_erreur: '',
+          });
+        } else {
+          await base44.asServiceRole.entities.VenusKnowledge.update(knowledge.id, {
+            rag_indexe: false, rag_erreur: result.error || 'Erreur d\'indexation inconnue',
+          });
+        }
+        return Response.json(result);
+      }
+
+      // ── Réindexer tous les documents validés ──
+      case 'reindexer_tout': {
+        const allKnowledge = await base44.asServiceRole.entities.VenusKnowledge.filter(
+          { statut: 'valide' }, '-updated_date', 200
+        );
+        let success = 0, errors = 0, total = allKnowledge.length;
+        for (const k of allKnowledge) {
+          try {
+            // Désindexer l'ancien
+            if (k.rag_document_id) {
+              try {
+                await base44.asServiceRole.entities.VenusDocument.update(k.rag_document_id, { statut: 'archive', is_latest_version: false });
+                const oldChunks = await base44.asServiceRole.entities.VenusDocumentChunk.filter({ document_id: k.rag_document_id }, '-chunk_index', 500);
+                for (const oc of oldChunks) await base44.asServiceRole.entities.VenusDocumentChunk.update(oc.id, { document_statut: 'archive' });
+              } catch {}
+            }
+            const textePourRag = `Titre: ${k.titre}\nDescription: ${k.description || ''}\nCatégorie: ${k.categorie || 'N/A'}\n\nContenu:\n${k.reponse_officielle}\n\nMots-clés: ${k.mots_cles || ''}`;
+            const result = await indexerTexteDirect(base44, { texte: textePourRag, auteur: body.auteur || k.auteur || 'admin' });
+            if (result.success && result.document?.id) {
+              await base44.asServiceRole.entities.VenusKnowledge.update(k.id, {
+                rag_indexe: true, rag_document_id: result.document.id,
+                rag_indexe_at: new Date().toISOString(), rag_erreur: '',
+              });
+              success++;
+            } else {
+              await base44.asServiceRole.entities.VenusKnowledge.update(k.id, {
+                rag_indexe: false, rag_erreur: result.error || 'Erreur',
+              });
+              errors++;
+            }
+          } catch (e) {
+            errors++;
+            console.error(`[reindexer_tout] Erreur sur ${k.titre}:`, e.message);
+          }
+        }
+        return Response.json({ success: true, total, success_count: success, error_count: errors });
+      }
+
+      // ── Statuts de la base de connaissances RAG ──
+      case 'stats_knowledge': {
+        const allKnowledge = await base44.asServiceRole.entities.VenusKnowledge.list('-updated_date', 500);
+        const valides = allKnowledge.filter((k: any) => k.statut === 'valide');
+        const indexes = valides.filter((k: any) => k.rag_indexe === true);
+        const enAttente = valides.filter((k: any) => !k.rag_indexe && !k.rag_erreur);
+        const erreurs = valides.filter((k: any) => k.rag_erreur && k.rag_erreur.length > 0);
+        const brouillons = allKnowledge.filter((k: any) => k.statut === 'brouillon');
+        const archives = allKnowledge.filter((k: any) => k.statut === 'archive');
+        const enRevision = allKnowledge.filter((k: any) => k.statut === 'en_revision');
+        const tailleEstimee = allKnowledge.reduce((sum: number, k: any) => sum + (k.reponse_officielle?.length || 0), 0);
+        const derniereIndexation = indexes
+          .map((k: any) => k.rag_indexe_at)
+          .filter(Boolean)
+          .sort((a: string, b: string) => b.localeCompare(a))[0] || null;
+        return Response.json({
+          success: true,
+          stats: {
+            total_documents: allKnowledge.length,
+            documents_valides: valides.length,
+            documents_indexes: indexes.length,
+            documents_en_attente: enAttente.length,
+            documents_erreur: erreurs.length,
+            documents_brouillon: brouillons.length,
+            documents_archive: archives.length,
+            documents_en_revision: enRevision.length,
+            taille_estimee_caracteres: tailleEstimee,
+            taille_estimee_mo: Math.round((tailleEstimee / 1024 / 1024) * 100) / 100,
+            derniere_indexation: derniereIndexation,
+          },
+        });
+      }
+
       default:
         return Response.json({ error: 'Action non reconnue' }, { status: 400 });
     }

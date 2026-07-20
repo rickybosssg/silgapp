@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { base44 } from '@/api/base44Client';
 import { CATEGORIES, CATEGORY_LABELS, PAYS_CODES, STATUT_LABELS, PRIORITE_LABELS, logAudit, createKnowledgeVersion, getCategoryLabel } from '@/lib/venusLearning';
-import { Eye, Edit3, Save, Send, Archive, Trash2, FileText, CheckCircle, Loader2 } from 'lucide-react';
+import { Eye, Edit3, Save, Send, Archive, Trash2, FileText, CheckCircle, Loader2, RefreshCw, AlertTriangle, Clock } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 export default function KnowledgeFormDialog({ open, onClose, editEntry, presetQuestion, onSaved }) {
@@ -157,13 +157,34 @@ export default function KnowledgeFormDialog({ open, onClose, editEntry, presetQu
   const handleArchive = async () => {
     const id = editEntry?.id || savedId;
     if (!id) return;
-    if (!confirm(`Archiver "${form.titre}" ?`)) return;
+    if (!confirm(`Archiver "${form.titre}" ? Le document sera retiré de la base RAG de VENUS mais restera consultable.`)) return;
     try {
-      await base44.entities.VenusKnowledge.update(id, { statut: 'archive' });
+      // Désindexer du RAG d'abord
+      if (editEntry?.rag_indexe && editEntry?.rag_document_id) {
+        try {
+          await base44.functions.invoke('indexerDocumentVenus', { action: 'desindexer_knowledge', knowledge_id: id });
+        } catch (e) { console.warn('Erreur désindexation RAG:', e.message); }
+      }
+      await base44.entities.VenusKnowledge.update(id, { statut: 'archive', rag_indexe: false });
       await logAudit('archive', 'knowledge', id, editEntry, { statut: 'archive' });
       onSaved?.();
       onClose();
     } catch (e) { alert('Erreur: ' + e.message); }
+  };
+
+  const handleReindex = async () => {
+    const id = editEntry?.id || savedId;
+    if (!id) return;
+    setPublishing(true);
+    try {
+      const res = await base44.functions.invoke('indexerDocumentVenus', { action: 'reindexer_knowledge', knowledge_id: id });
+      if (res?.success) {
+        alert('Document réindexé dans le RAG avec succès.');
+      } else {
+        alert('Erreur de réindexation: ' + (res?.error || 'inconnue'));
+      }
+      onSaved?.();
+    } catch (e) { alert('Erreur: ' + e.message); } finally { setPublishing(false); }
   };
 
   const handleDelete = async () => {
@@ -195,10 +216,20 @@ export default function KnowledgeFormDialog({ open, onClose, editEntry, presetQu
                   {STATUT_LABELS[form.statut]?.label || form.statut}
                 </span>
               )}
-              {form.rag_indexe && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium flex items-center gap-1">
-                  <CheckCircle className="w-3 h-3" /> RAG
-                </span>
+              {isPublished && (
+                form.rag_indexe ? (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3" /> Indexé RAG
+                  </span>
+                ) : form.rag_erreur ? (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium flex items-center gap-1" title={form.rag_erreur}>
+                    <AlertTriangle className="w-3 h-3" /> Erreur RAG
+                  </span>
+                ) : (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> En attente RAG
+                  </span>
+                )
               )}
             </DialogTitle>
             {autoSaveStatus && (
@@ -305,6 +336,11 @@ Format Markdown supporté : **gras**, *italique*, listes, titres, etc."
             {editEntry && !isPublished && (
               <Button variant="outline" size="sm" onClick={handleArchive}>
                 <Archive className="w-4 h-4 mr-1" />Archiver
+              </Button>
+            )}
+            {editEntry && isPublished && (
+              <Button variant="outline" size="sm" onClick={handleReindex} disabled={publishing}>
+                <RefreshCw className={`w-4 h-4 mr-1 ${publishing ? 'animate-spin' : ''}`} />Réindexer
               </Button>
             )}
           </div>

@@ -9,10 +9,13 @@ import CorrectionTab from '@/components/venus-learning/CorrectionTab';
 import HistoryTab from '@/components/venus-learning/HistoryTab';
 import SearchTab from '@/components/venus-learning/SearchTab';
 import AuditTab from '@/components/venus-learning/AuditTab';
+import RagStatusTab from '@/components/venus-learning/RagStatusTab';
+import { Database } from 'lucide-react';
 
 const TABS = [
   { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
   { id: 'knowledge', label: 'Base de connaissances', icon: BookOpen },
+  { id: 'rag_status', label: 'Statut RAG', icon: Database },
   { id: 'scenarios', label: 'Scénarios', icon: MessageSquare },
   { id: 'misunderstood', label: 'Questions non comprises', icon: AlertCircle },
   { id: 'correction', label: 'Correction VENUS', icon: Edit3 },
@@ -78,6 +81,7 @@ export default function VenusLearningCenter() {
         )}
         {activeTab === 'history' && <HistoryTab />}
         {activeTab === 'search' && <SearchTab />}
+        {activeTab === 'rag_status' && <RagStatusTab />}
         {activeTab === 'audit' && <AuditTab />}
       </div>
     </div>
