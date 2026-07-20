@@ -93,6 +93,41 @@ async function envoyerWhatsAppReply(telephone, message, accountSid, authToken, f
   return { ok: resp.ok, data };
 }
 
+/**
+ * Envoie l'indicateur de saisie WhatsApp officiel via Twilio v3.
+ * Marque automatiquement le message comme lu ET affiche
+ * "SILGAPP NOTIFICATIONS est en train d'écrire..." pendant 25 secondes
+ * (ou jusqu'à ce qu'une réponse soit livrée).
+ */
+async function envoyerIndicateurSaisie(messageSid, accountSid, authToken) {
+  if (!messageSid || !accountSid || !authToken) return false;
+  try {
+    const url = 'https://messaging.twilio.com/v3/Indicators/Typing.json';
+    const credentials = btoa(`${accountSid}:${authToken}`);
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${credentials}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        channel: 'WHATSAPP',
+        messageId: messageSid,
+      }),
+    });
+    if (resp.ok) {
+      console.log(`[WebhookVenus] ⌨️ Indicateur de saisie envoyé pour ${messageSid}`);
+      return true;
+    }
+    const errData = await resp.json().catch(() => ({}));
+    console.warn(`[WebhookVenus] ⌨️ Indicateur de saisie échoué: HTTP ${resp.status} — ${errData.message || errData.error || ''}`);
+    return false;
+  } catch (e) {
+    console.warn(`[WebhookVenus] ⌨️ Erreur indicateur de saisie: ${e.message}`);
+    return false;
+  }
+}
+
 async function downloadAndUploadMedia(mediaUrl, accountSid, authToken, base44, mediaContentType = '') {
   try {
     if (!mediaUrl) {
@@ -1171,6 +1206,7 @@ async function handleContactLivreur(base44: any, conversation: any, userMessage:
 }
 
 Deno.serve(async (req) => {
+  let typingInterval: any = null;
   try {
     const base44 = createClientFromRequest(req);
 
@@ -1415,6 +1451,18 @@ Deno.serve(async (req) => {
     }
     console.log(`[WebhookVenus] ✅ ÉTAPE 4 — Venus active, génération de la réponse...`);
 
+    // ── Indicateur de saisie WhatsApp + confirmation de lecture ──
+    // Envoie l'indicateur officiel Twilio qui marque le message comme lu
+    // et affiche "SILGAPP NOTIFICATIONS est en train d'écrire..." pendant 25s.
+    // Renouvelé toutes les 20s si le traitement est long (LLM, RAG, création de course).
+    // L'indicateur disparaît automatiquement dès que la réponse est livrée.
+    if (messageSid) {
+      await envoyerIndicateurSaisie(messageSid, accountSid, authToken);
+      typingInterval = setInterval(() => {
+        envoyerIndicateurSaisie(messageSid, accountSid, authToken).catch(() => {});
+      }, 20000);
+    }
+
     // ── 3b. Vérifier le mode maintenance VENUS ──
     let reponseVenus = '';
     const maintenanceMode = await getMaintenanceMode(base44);
@@ -1640,6 +1688,13 @@ Deno.serve(async (req) => {
     let audioResponseUrl: string | null = null;
     let twilioResult: any = null;
 
+    // ── Arrêter le renouvellement de l'indicateur de saisie ──
+    // L'indicateur disparaît automatiquement dès que la réponse est livrée.
+    if (typingInterval) {
+      clearInterval(typingInterval);
+      typingInterval = null;
+    }
+
     console.log(`[WebhookVenus] 📤 ÉTAPE 6 — Envoi réponse à ${telephone} via Twilio (from: ${fromNumber}) | mode: ${utiliserAudio ? 'AUDIO' : 'TEXTE'}`);
     if (utiliserAudio) {
       // Envoyer d'abord un court audio TTS, puis le texte en complément (infos importantes)
@@ -1711,6 +1766,7 @@ Deno.serve(async (req) => {
       headers: { 'Content-Type': 'text/xml' },
     });
   } catch (error) {
+    if (typingInterval) { clearInterval(typingInterval); }
     console.error(`[WebhookVenus] ❌ ERREUR GLOBALE: ${error.message}`);
     console.error(`[WebhookVenus] ❌ Stack: ${error.stack?.substring(0, 300)}`);
     return Response.json({ error: error.message }, { status: 500 });
