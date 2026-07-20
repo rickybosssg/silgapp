@@ -30,8 +30,9 @@ export default function VIConversationsTab() {
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(c =>
-        (c.client_phone || '').toLowerCase().includes(q) ||
-        (c.client_name || '').toLowerCase().includes(q)
+        (c.whatsapp_phone || '').toLowerCase().includes(q) ||
+        (c.title || '').toLowerCase().includes(q) ||
+        (c.last_sender_name || '').toLowerCase().includes(q)
       );
     }
     return result;
@@ -87,8 +88,12 @@ export default function VIConversationsTab() {
                     <Bot className="w-4 h-4 text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{c.client_name || c.client_phone || '—'}</p>
-                    <p className="text-xs text-gray-400">{c.client_phone || '—'}</p>
+                    <p className="text-sm font-medium text-gray-900 truncate">{c.title || c.whatsapp_phone || '—'}</p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {c.last_message ? `"${c.last_message}"` : 'Aucun message'}
+                      {c.last_sender_name ? ` — ${c.last_sender_name}` : ''}
+                    </p>
+                    <p className="text-[10px] text-gray-400">{c.whatsapp_phone || ''}</p>
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     {c.country_code && <span className="text-xs">{PAYS_FLAGS[c.country_code] || ''} {c.country_code}</span>}
