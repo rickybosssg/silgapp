@@ -129,7 +129,7 @@ const RAISONNEMENT_SCHEMA = {
         'paiement', 'livreur', 'partenaire', 'general',
       ],
     },
-    infos_connues: { type: 'object', additionalProperties: true },
+    infos_connues: { type: 'string', description: 'JSON stringifié des infos connues' },
     infos_manquantes: { type: 'array', items: { type: 'string' } },
     action: {
       type: 'string',
@@ -142,14 +142,20 @@ const RAISONNEMENT_SCHEMA = {
     prochaine_question: { type: 'string' },
     outils_utilises: { type: 'array', items: { type: 'string' } },
     confiance: { type: 'number' },
-    reponse: { type: 'string' },
-    memoire_courte_update: { type: 'object', additionalProperties: true },
-    memoire_longue_update: { type: 'object', additionalProperties: true },
+    reponse: { type: 'string', description: 'La réponse textuelle à envoyer au client' },
+    memoire_courte_update: { type: 'string', description: 'JSON stringifié des champs à mettre à jour' },
+    memoire_longue_update: { type: 'string', description: 'JSON stringifié des champs persistants' },
     business_rule_id: { type: 'string' },
     knowledge_id: { type: 'string' },
-    document_sources: { type: 'array', items: { type: 'object', additionalProperties: true } },
+    document_sources: { type: 'string', description: 'JSON stringifié des sources documentaires' },
   },
-  required: ['intention', 'contexte', 'action', 'reponse', 'confiance'],
+  required: [
+    'intention', 'contexte', 'infos_connues', 'infos_manquantes',
+    'action', 'prochaine_question', 'outils_utilises', 'confiance',
+    'reponse', 'memoire_courte_update', 'memoire_longue_update',
+    'business_rule_id', 'knowledge_id', 'document_sources',
+  ],
+  additionalProperties: false,
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -969,22 +975,36 @@ Réponds UNIQUEMENT avec un JSON.`;
     const llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
       prompt,
       response_json_schema: RAISONNEMENT_SCHEMA,
-      model: 'gpt_5_mini', // Modèle économique — suffisamment pour le raisonnement VENUS
+      model: 'gpt_5_mini',
     });
 
-    const result: ReasoningResult = typeof llmRes === 'string' ? JSON.parse(llmRes) : llmRes;
+    const result: ReasoningResult = typeof llmRes === 'string' ? JSON.parse(llmRes) : llmRes as ReasoningResult;
     result.temps_traitement_ms = Date.now() - startTime;
 
     // ── Post-traitement : valider et nettoyer ──
     if (!result.action) result.action = 'repondre_info';
     if (!result.reponse) result.reponse = 'Comment puis-je vous aider ?';
     if (result.confiance === undefined || result.confiance === null) result.confiance = 50;
-    // Normaliser la confiance : si le LLM retourne 0-1, convertir en 0-100
     if (result.confiance <= 1) result.confiance = Math.round(result.confiance * 100);
     if (!result.outils_utilises) result.outils_utilises = [];
     if (!result.infos_manquantes) result.infos_manquantes = [];
+
+    // ── Parser les champs stringifiés (schéma strict compatible) ──
+    if (typeof result.infos_connues === 'string') {
+      try { result.infos_connues = JSON.parse(result.infos_connues); } catch { result.infos_connues = {}; }
+    }
+    if (!result.infos_connues) result.infos_connues = {};
+    if (typeof result.memoire_courte_update === 'string') {
+      try { result.memoire_courte_update = JSON.parse(result.memoire_courte_update); } catch { result.memoire_courte_update = {}; }
+    }
     if (!result.memoire_courte_update) result.memoire_courte_update = {};
+    if (typeof result.memoire_longue_update === 'string') {
+      try { result.memoire_longue_update = JSON.parse(result.memoire_longue_update); } catch { result.memoire_longue_update = {}; }
+    }
     if (!result.memoire_longue_update) result.memoire_longue_update = {};
+    if (typeof result.document_sources === 'string') {
+      try { result.document_sources = JSON.parse(result.document_sources); } catch { result.document_sources = undefined; }
+    }
 
     // ── Heuristique post-LLM : utiliser les infos déjà extraites avant l'appel ──
     // On réutilise heuristiqueExtracted (calculé pré-LLM) pour éviter un double calcul.

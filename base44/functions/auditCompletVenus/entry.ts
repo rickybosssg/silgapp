@@ -26,10 +26,14 @@
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.38';
 import { raisonnerVenus } from '../../shared/venusReasoningEngine.ts';
-import { BANQUE_QUESTIONS, CATEGORIES_AUDIT } from '../../shared/venusAuditQuestions.ts';
+import { BANQUE_QUESTIONS } from '../../shared/venusAuditQuestions.ts';
 
-// Les catégories et la banque de questions sont importées de venusAuditQuestions.ts
-const CATEGORIES_TEST = CATEGORIES_AUDIT;
+// Catégories dérivées dynamiquement de la banque de questions
+const CATEGORIES_TEST = [...new Set(BANQUE_QUESTIONS.map(q => q.categorie))].map(code => ({
+  code,
+  label: code.replace(/_/g, ' '),
+  nb: BANQUE_QUESTIONS.filter(q => q.categorie === code).length,
+}));
 
 // ═══════════════════════════════════════════════════════════════════
 // UTILITAIRES DE MATCHING HEURISTIQUE (0 crédit)
@@ -557,6 +561,7 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const body = await req.json().catch(() => ({}));
     const action = body.action || 'full_audit';
+    console.log('[auditCompletVenus] Handler v2 — module reasoning engine mis à jour (sans response_json_schema)');
 
     // ── Phase 1 : Audit statique ──
     if (action === 'static_audit') {
