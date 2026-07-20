@@ -93,21 +93,71 @@ async function envoyerWhatsAppReply(telephone, message, accountSid, authToken, f
   return { ok: resp.ok, data };
 }
 
-async function downloadAndUploadMedia(mediaUrl, accountSid, authToken, base44) {
+async function downloadAndUploadMedia(mediaUrl, accountSid, authToken, base44, mediaContentType = '') {
   try {
+    if (!mediaUrl) {
+      console.error('[WebhookVenus] 📎 ❌ Aucun MediaUrl fourni par Twilio');
+      return null;
+    }
+
+    console.log(`[WebhookVenus] 📎 ÉTAPE A — Téléchargement média Twilio | URL: ${mediaUrl.substring(0, 80)}... | Content-Type attendu: ${mediaContentType || 'inconnu'}`);
+
     const credentials = btoa(`${accountSid}:${authToken}`);
     const resp = await fetch(mediaUrl, {
       headers: { Authorization: `Basic ${credentials}` },
     });
+
     if (!resp.ok) {
-      console.error('[WebhookVenus] Erreur telechargement media:', resp.status);
+      const errorText = await resp.text().catch(() => '');
+      console.error(`[WebhookVenus] 📎 ❌ ÉTAPE A — Téléchargement échoué | HTTP ${resp.status} ${resp.statusText} | Réponse: ${errorText.substring(0, 200)}`);
       return null;
     }
+
     const blob = await resp.blob();
-    const result = await base44.asServiceRole.integrations.Core.UploadFile({ file: blob });
-    return result?.file_url || null;
+    const blobSize = blob.size;
+    const blobType = blob.type || mediaContentType || '';
+
+    console.log(`[WebhookVenus] 📎 ✅ ÉTAPE A — Média téléchargé | Taille: ${blobSize} octets | Type: ${blobType}`);
+
+    if (blobSize === 0) {
+      console.error('[WebhookVenus] 📎 ❌ ÉTAPE A — Fichier téléchargé VIDE (0 octet)');
+      return null;
+    }
+
+    if (blobSize < 100) {
+      console.warn(`[WebhookVenus] 📎 ⚠️ ÉTAPE A — Fichier très petit (${blobSize} octets) — possible contenu invalide`);
+    }
+
+    // ── Déterminer l'extension du fichier selon le content-type ──
+    let extension = 'bin';
+    if (blobType.includes('ogg') || blobType.includes('opus')) extension = 'ogg';
+    else if (blobType.includes('mp3') || blobType.includes('mpeg')) extension = 'mp3';
+    else if (blobType.includes('wav')) extension = 'wav';
+    else if (blobType.includes('webm')) extension = 'webm';
+    else if (blobType.includes('m4a') || blobType.includes('mp4')) extension = 'm4a';
+    else if (blobType.includes('image/jpeg')) extension = 'jpg';
+    else if (blobType.includes('image/png')) extension = 'png';
+    else if (blobType.includes('video/')) extension = 'mp4';
+    else if (blobType.includes('pdf')) extension = 'pdf';
+
+    // ── Créer un objet File avec nom et content-type corrects ──
+    // UploadFile nécessite un objet File (avec name) et non un Blob simple
+    const fileName = `whatsapp_media_${Date.now()}.${extension}`;
+    const file = new File([blob], fileName, { type: blobType || 'application/octet-stream' });
+
+    console.log(`[WebhookVenus] 📎 ÉTAPE B — Upload vers stockage Base44 | Fichier: ${fileName} | Taille: ${blobSize} octets | Type: ${blobType}`);
+
+    const result = await base44.asServiceRole.integrations.Core.UploadFile({ file });
+
+    if (!result?.file_url) {
+      console.error('[WebhookVenus] 📎 ❌ ÉTAPE B — Upload échoué — aucune URL retournée');
+      return null;
+    }
+
+    console.log(`[WebhookVenus] 📎 ✅ ÉTAPE B — Upload réussi | URL: ${result.file_url.substring(0, 80)}...`);
+    return result.file_url;
   } catch (e) {
-    console.error('[WebhookVenus] Erreur upload media:', e.message);
+    console.error(`[WebhookVenus] 📎 ❌ Erreur downloadAndUploadMedia: ${e.message} | Stack: ${e.stack?.substring(0, 200)}`);
     return null;
   }
 }
@@ -118,26 +168,59 @@ async function downloadAndUploadMedia(mediaUrl, accountSid, authToken, base44) {
  * Retourne { texte, confidence, status }.
  */
 async function transcrireAudio(base44, audioUrl, mediaContentType = '') {
+  const startTime = Date.now();
   try {
-    console.log(`[WebhookVenus] 🎤 Début transcription audio | URL: ${audioUrl?.substring(0, 60)}... | Format: ${mediaContentType}`);
+    console.log(`[WebhookVenus] 🎤 ÉTAPE C — Début transcription audio`);
+    console.log(`[WebhookVenus] 🎤   URL audio: ${audioUrl?.substring(0, 100) || 'N/A'}...`);
+    console.log(`[WebhookVenus] 🎤   Format d'origine (Twilio): ${mediaContentType || 'inconnu'}`);
 
+    if (!audioUrl) {
+      console.error('[WebhookVenus] 🎤 ❌ ÉTAPE C — Aucune URL audio à transcrire');
+      return { texte: '', texte_brut: '', confidence: 0, status: 'echec', raisons: ['URL audio manquante'] };
+    }
+
+    // ── Vérifier que l'URL audio est accessible ──
+    console.log(`[WebhookVenus] 🎤 ÉTAPE C1 — Vérification accessibilité URL audio...`);
+    try {
+      const headResp = await fetch(audioUrl, { method: 'HEAD' });
+      const audioSize = headResp.headers.get('content-length') || 'inconnu';
+      const audioType = headResp.headers.get('content-type') || 'inconnu';
+      console.log(`[WebhookVenus] 🎤   HEAD ${headResp.status} | Taille: ${audioSize} octets | Type: ${audioType}`);
+      if (!headResp.ok) {
+        console.error(`[WebhookVenus] 🎤 ❌ ÉTAPE C1 — URL audio inaccessible (HTTP ${headResp.status})`);
+        return { texte: '', texte_brut: '', confidence: 0, status: 'echec', raisons: [`URL audio inaccessible: HTTP ${headResp.status}`] };
+      }
+    } catch (headErr) {
+      console.warn(`[WebhookVenus] 🎤 ⚠️ ÉTAPE C1 — HEAD request échouée (continuons quand même): ${headErr.message}`);
+    }
+
+    // ── Appeler la transcription Whisper ──
+    console.log(`[WebhookVenus] 🎤 ÉTAPE C2 — Appel Core.TranscribeAudio (Whisper)...`);
     const result = await base44.asServiceRole.integrations.Core.TranscribeAudio({ audio_url: audioUrl });
+
+    const tempsMs = Date.now() - startTime;
+    console.log(`[WebhookVenus] 🎤 ÉTAPE C2 — TranscribeAudio terminé en ${tempsMs}ms`);
+    console.log(`[WebhookVenus] 🎤   Type de réponse: ${typeof result}`);
+    console.log(`[WebhookVenus] 🎤   Clés de réponse: ${result && typeof result === 'object' ? Object.keys(result).join(', ') : 'N/A'}`);
+
     const texteBrut = typeof result === 'string' ? result : (result?.text || result?.transcript || '');
 
-    console.log(`[WebhookVenus] 🎤 Transcription brute Whisper: "${(texteBrut || '').substring(0, 150)}" | Longueur: ${texteBrut?.length || 0} chars`);
+    console.log(`[WebhookVenus] 🎤   Transcription brute: "${(texteBrut || '').substring(0, 200)}"`);
+    console.log(`[WebhookVenus] 🎤   Longueur: ${texteBrut?.length || 0} caractères`);
 
     if (!texteBrut || texteBrut.trim().length < 2) {
-      console.warn(`[WebhookVenus] 🎤 ⚠️ Transcription vide ou trop courte`);
-      return { texte: '', texte_brut: '', confidence: 0, status: 'echec', raisons: ['Transcription vide'] };
+      console.warn(`[WebhookVenus] 🎤 ❌ ÉTAPE C2 — Transcription vide ou trop courte (longueur: ${texteBrut?.length || 0})`);
+      console.warn(`[WebhookVenus] 🎤   Réponse complète de TranscribeAudio: ${JSON.stringify(result)?.substring(0, 500)}`);
+      return { texte: '', texte_brut: '', confidence: 0, status: 'echec', raisons: ['Transcription vide — Whisper n\'a retourné aucun texte'] };
     }
 
     // ── Nettoyer la transcription ──
     const texteNettoye = nettoyerTranscription(texteBrut);
-    console.log(`[WebhookVenus] 🎤 Transcription nettoyée: "${texteNettoye.substring(0, 150)}"`);
+    console.log(`[WebhookVenus] 🎤 ÉTAPE C3 — Transcription nettoyée: "${texteNettoye.substring(0, 200)}"`);
 
     // ── Évaluer la confiance ──
     const evalConfiance = evaluerConfianceTranscription(texteBrut, texteNettoye);
-    console.log(`[WebhookVenus] 🎤 Confiance: ${evalConfiance.confiance.toFixed(2)} | Statut: ${evalConfiance.status} | Raisons: ${evalConfiance.raisons.join('; ')}`);
+    console.log(`[WebhookVenus] 🎤 ÉTAPE C4 — Confiance: ${evalConfiance.confiance.toFixed(2)} | Statut: ${evalConfiance.status} | Raisons: ${evalConfiance.raisons.join('; ')}`);
 
     return {
       texte: texteNettoye,
@@ -147,8 +230,11 @@ async function transcrireAudio(base44, audioUrl, mediaContentType = '') {
       raisons: evalConfiance.raisons,
     };
   } catch (e) {
-    console.error(`[WebhookVenus] 🎤 ❌ Erreur transcription audio: ${e.message}`);
-    return { texte: '', texte_brut: '', confidence: 0, status: 'echec', raisons: [`Erreur: ${e.message}`] };
+    const tempsMs = Date.now() - startTime;
+    console.error(`[WebhookVenus] 🎤 ❌ ÉTAPE C — Erreur transcription audio après ${tempsMs}ms: ${e.message}`);
+    console.error(`[WebhookVenus] 🎤   Stack: ${e.stack?.substring(0, 300)}`);
+    console.error(`[WebhookVenus] 🎤   Nom erreur: ${e.name}`);
+    return { texte: '', texte_brut: '', confidence: 0, status: 'echec', raisons: [`Erreur transcription: ${e.name} — ${e.message}`] };
   }
 }
 
@@ -1135,7 +1221,8 @@ Deno.serve(async (req) => {
     } else if (numMedia > 0) {
       const mediaUrl0 = params.MediaUrl0;
       const contentType0 = params.MediaContentType0 || '';
-      const uploadedUrl = await downloadAndUploadMedia(mediaUrl0, accountSid, authToken, base44);
+      console.log(`[WebhookVenus] 📎 Média détecté | NumMedia: ${numMedia} | MediaUrl0: ${mediaUrl0?.substring(0, 80) || 'N/A'}... | ContentType0: ${contentType0}`);
+      const uploadedUrl = await downloadAndUploadMedia(mediaUrl0, accountSid, authToken, base44, contentType0);
 
       if (contentType0.startsWith('image/')) {
         messageType = 'photo';
@@ -1146,8 +1233,13 @@ Deno.serve(async (req) => {
       } else if (contentType0.startsWith('audio/')) {
         messageType = 'audio';
         audioUrl = uploadedUrl;
-        // 🎤 Phase 16 — Transcrire la note vocale immédiatement
-        transcriptionData = await transcrireAudio(base44, uploadedUrl);
+        if (!audioUrl) {
+          console.error('[WebhookVenus] 🎤 ❌ Upload du fichier audio échoué — transcription impossible');
+          transcriptionData = { texte: '', texte_brut: '', confidence: 0, status: 'echec', raisons: ['Échec upload fichier audio'] };
+        } else {
+          // 🎤 Phase 16 — Transcrire la note vocale immédiatement
+          transcriptionData = await transcrireAudio(base44, uploadedUrl, contentType0);
+        }
         if (transcriptionData.texte) {
           messageContent = transcriptionData.texte;
         }
