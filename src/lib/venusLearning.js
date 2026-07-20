@@ -50,6 +50,10 @@ export function exportToCSV(entries, filename = 'venus_knowledge_export.csv') {
 }
 
 export const CATEGORIES = [
+  'cas_livraison', 'cas_expedition', 'cas_client', 'cas_livreur',
+  'cas_boutique', 'cas_restaurant', 'cas_pharmacie', 'cas_administrateur',
+  'procedures', 'faq', 'bonnes_pratiques', 'regles_metier',
+  'scripts_conversation',
   'tarifs', 'expedition_colis', 'reception_colis', 'suivi_colis', 'gps',
   'prix_manuel', 'prix_automatique', 'annulation_course', 'paiement',
   'remboursement', 'compte_client', 'compte_livreur', 'inscription',
@@ -57,10 +61,52 @@ export const CATEGORIES = [
   'livraison_urgente', 'devenir_livreur', 'questions_generales', 'autres'
 ];
 
+export const CATEGORY_LABELS = {
+  cas_livraison: 'Cas de livraison',
+  cas_expedition: 'Cas d\'expédition',
+  cas_client: 'Cas Client',
+  cas_livreur: 'Cas Livreur',
+  cas_boutique: 'Cas Boutique',
+  cas_restaurant: 'Cas Restaurant',
+  cas_pharmacie: 'Cas Pharmacie',
+  cas_administrateur: 'Cas Administrateur',
+  procedures: 'Procédures',
+  faq: 'FAQ',
+  bonnes_pratiques: 'Bonnes pratiques',
+  regles_metier: 'Règles métier',
+  scripts_conversation: 'Scripts de conversation',
+  tarifs: 'Tarifs',
+  expedition_colis: 'Expédition colis',
+  reception_colis: 'Réception colis',
+  suivi_colis: 'Suivi colis',
+  gps: 'GPS',
+  prix_manuel: 'Prix manuel',
+  prix_automatique: 'Prix automatique',
+  annulation_course: 'Annulation course',
+  paiement: 'Paiement',
+  remboursement: 'Remboursement',
+  compte_client: 'Compte client',
+  compte_livreur: 'Compte livreur',
+  inscription: 'Inscription',
+  notifications: 'Notifications',
+  publicites: 'Publicités',
+  probleme_technique: 'Problème technique',
+  comptabilite: 'Comptabilité',
+  livraison_urgente: 'Livraison urgente',
+  devenir_livreur: 'Devenir livreur',
+  questions_generales: 'Questions générales',
+  autres: 'Autres',
+};
+
+export function getCategoryLabel(cat) {
+  return CATEGORY_LABELS[cat] || cat || 'Autres';
+}
+
 export const PAYS_CODES = ['ALL', 'BF', 'CI', 'TG', 'BJ', 'SN', 'ML', 'GN', 'NE', 'GH'];
 
 export const STATUT_LABELS = {
   brouillon: { label: 'Brouillon', color: 'bg-amber-100 text-amber-700' },
+  en_revision: { label: 'En révision', color: 'bg-blue-100 text-blue-700' },
   valide: { label: 'Validé', color: 'bg-green-100 text-green-700' },
   archive: { label: 'Archivé', color: 'bg-gray-100 text-gray-500' },
 };

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Search, Pencil, Trash2, Copy, Download, Upload, Filter } from 'lucide-react';
-import { CATEGORIES, STATUT_LABELS, PRIORITE_LABELS, exportToCSV, logAudit } from '@/lib/venusLearning';
+import { CATEGORIES, STATUT_LABELS, PRIORITE_LABELS, exportToCSV, logAudit, getCategoryLabel } from '@/lib/venusLearning';
 import KnowledgeFormDialog from './KnowledgeFormDialog';
 
 export default function KnowledgeBaseTab({ presetQuestion, presetOpen }) {
@@ -78,7 +78,7 @@ export default function KnowledgeBaseTab({ presetQuestion, presetOpen }) {
           <SelectTrigger className="w-[160px]"><Filter className="w-3.5 h-3.5 mr-1" /><SelectValue placeholder="Catégorie" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Toutes catégories</SelectItem>
-            {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            {CATEGORIES.map(c => <SelectItem key={c} value={c}>{getCategoryLabel(c)}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={filterStatut} onValueChange={setFilterStatut}>
@@ -122,7 +122,7 @@ export default function KnowledgeBaseTab({ presetQuestion, presetOpen }) {
                 <div className="flex flex-wrap gap-1.5">
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${statut.color}`}>{statut.label}</span>
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${prio.color}`}>{prio.label}</span>
-                  {entry.categorie && <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{entry.categorie}</span>}
+                  {entry.categorie && <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{getCategoryLabel(entry.categorie)}</span>}
                   {entry.pays && entry.pays !== 'ALL' && <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{entry.pays}</span>}
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-400">v{entry.version || 1}</span>
                 </div>

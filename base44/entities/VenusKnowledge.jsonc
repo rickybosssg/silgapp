@@ -6,9 +6,26 @@
       "type": "string",
       "description": "Titre de la connaissance"
     },
+    "description": {
+      "type": "string",
+      "description": "Description courte du document"
+    },
     "categorie": {
       "type": "string",
       "enum": [
+        "cas_livraison",
+        "cas_expedition",
+        "cas_client",
+        "cas_livreur",
+        "cas_boutique",
+        "cas_restaurant",
+        "cas_pharmacie",
+        "cas_administrateur",
+        "procedures",
+        "faq",
+        "bonnes_pratiques",
+        "regles_metier",
+        "scripts_conversation",
         "tarifs",
         "expedition_colis",
         "reception_colis",
@@ -33,13 +50,17 @@
       ],
       "description": "Cat\u00e9gorie de la connaissance"
     },
+    "sous_categorie": {
+      "type": "string",
+      "description": "Sous-cat\u00e9gorie (libre, d\u00e9finie par l'admin)"
+    },
     "question": {
       "type": "string",
-      "description": "Question associ\u00e9e \u00e0 la connaissance"
+      "description": "Question ou r\u00e9sum\u00e9 court associ\u00e9 \u00e0 la connaissance"
     },
     "reponse_officielle": {
       "type": "string",
-      "description": "R\u00e9ponse officielle valid\u00e9e par l'admin"
+      "description": "Contenu complet du document (r\u00e9ponse officielle, proc\u00e9dure, sc\u00e9nario, etc.)"
     },
     "mots_cles": {
       "type": "string",
@@ -82,16 +103,30 @@
       "type": "string",
       "enum": [
         "brouillon",
+        "en_revision",
         "valide",
         "archive"
       ],
       "default": "brouillon",
       "description": "Statut de la connaissance"
+    },
+    "rag_indexe": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si le document a \u00e9t\u00e9 index\u00e9 dans la base RAG"
+    },
+    "rag_document_id": {
+      "type": "string",
+      "description": "ID du document RAG associ\u00e9 apr\u00e8s indexation"
+    },
+    "date_publication": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de derni\u00e8re publication (validation)"
     }
   },
   "required": [
     "titre",
-    "question",
     "reponse_officielle"
   ]
 }
