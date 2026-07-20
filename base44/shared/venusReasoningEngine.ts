@@ -968,6 +968,9 @@ Champs possibles: client_nom, ville_habituelle, quartier_habituel, langue_prefer
 
 20. RÉPONSE À UNE QUESTION: Si VENUS a demandé "quel est le numéro du destinataire?" et le client répond "70 12 34 56", la réponse est contact_telephone="70123456". L'action doit être poser_question (prochaine info manquante) ou creer_course (si tout est complet). NE JAMAIS reformuler "Si j'ai bien compris vous souhaitez..." dans ce cas.
 
+═══ LANGUE OBLIGATOIRE ═══
+TU DOIS TOUJOURS RÉPONDRE EN FRANÇAIS. Ne réponds JAMAIS en anglais. Le client est au Burkina Faso ou en Côte d'Ivoire et parle français. Toutes tes réponses, questions, et reformulations doivent être en français.
+
 Réponds UNIQUEMENT avec un JSON.`;
 
   // ── Appel LLM ──
