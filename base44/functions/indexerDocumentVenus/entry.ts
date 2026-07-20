@@ -251,6 +251,62 @@ Deno.serve(async (req) => {
         });
       }
 
+      // ── Indexer un scénario validé dans la base RAG ──
+      case 'index_scenario': {
+        const scenario = await base44.asServiceRole.entities.VenusScenario.get(body.scenario_id);
+        if (!scenario) {
+          return Response.json({ success: false, error: 'Scénario non trouvé' }, { status: 404 });
+        }
+        // Désindexer l'ancienne version si elle existe
+        if (scenario.rag_document_id) {
+          try {
+            await base44.asServiceRole.entities.VenusDocument.update(scenario.rag_document_id, { statut: 'archive', is_latest_version: false });
+            const oldChunks = await base44.asServiceRole.entities.VenusDocumentChunk.filter({ document_id: scenario.rag_document_id }, '-chunk_index', 500);
+            for (const oc of oldChunks) await base44.asServiceRole.entities.VenusDocumentChunk.update(oc.id, { document_statut: 'archive' });
+          } catch (e) { console.warn('[index_scenario] Erreur archivage ancien RAG:', e.message); }
+        }
+        // Construire le texte pour le RAG
+        const triggersSc = (() => { try { return JSON.parse(scenario.declencheurs || '[]'); } catch { return []; } })();
+        const convSc = (() => { try { return JSON.parse(scenario.conversation || '[]'); } catch { return []; } })();
+        const convTextSc = convSc.map((m: any) => `${m.role === 'venus' ? 'VENUS' : 'Client'}: ${m.content}`).join('\n');
+        const textePourRagSc = `Scénario: ${scenario.nom}\nDescription: ${scenario.description || ''}\nCatégorie: ${scenario.categorie || 'N/A'}\nDéclencheurs: ${triggersSc.join(', ')}\n\nConversation:\n${convTextSc}\n\nRéponse idéale:\n${scenario.reponse_ideale || ''}\n\nRésultat attendu: ${scenario.resultat_attendu || ''}`;
+        const resultSc = await indexerTexteDirect(base44, { texte: textePourRagSc, auteur: body.auteur || scenario.auteur || 'admin' });
+        if (resultSc.success && resultSc.document?.id) {
+          await base44.asServiceRole.entities.VenusScenario.update(scenario.id, {
+            rag_indexe: true, rag_document_id: resultSc.document.id,
+            rag_indexe_at: new Date().toISOString(), rag_erreur: '',
+          });
+        } else {
+          await base44.asServiceRole.entities.VenusScenario.update(scenario.id, {
+            rag_indexe: false, rag_erreur: resultSc.error || 'Erreur d\'indexation inconnue',
+          });
+        }
+        return Response.json(resultSc);
+      }
+
+      // ── Désindexer un scénario de la base RAG ──
+      case 'desindexer_scenario': {
+        const scenario = await base44.asServiceRole.entities.VenusScenario.get(body.scenario_id);
+        if (!scenario) {
+          return Response.json({ success: false, error: 'Scénario non trouvé' }, { status: 404 });
+        }
+        if (!scenario.rag_document_id) {
+          await base44.asServiceRole.entities.VenusScenario.update(scenario.id, {
+            rag_indexe: false, rag_erreur: '', rag_document_id: '',
+          });
+          return Response.json({ success: true, message: 'Aucun document RAG associé — nettoyage effectué' });
+        }
+        try {
+          await base44.asServiceRole.entities.VenusDocument.update(scenario.rag_document_id, { statut: 'archive', is_latest_version: false });
+          const oldChunks = await base44.asServiceRole.entities.VenusDocumentChunk.filter({ document_id: scenario.rag_document_id }, '-chunk_index', 500);
+          for (const oc of oldChunks) await base44.asServiceRole.entities.VenusDocumentChunk.update(oc.id, { document_statut: 'archive' });
+        } catch (e) { console.warn('[desindexer_scenario] Erreur archivage RAG:', e.message); }
+        await base44.asServiceRole.entities.VenusScenario.update(scenario.id, {
+          rag_indexe: false, rag_document_id: '', rag_erreur: '',
+        });
+        return Response.json({ success: true, message: `Scénario désindexé du RAG (${scenario.nom})` });
+      }
+
       default:
         return Response.json({ error: 'Action non reconnue' }, { status: 400 });
     }

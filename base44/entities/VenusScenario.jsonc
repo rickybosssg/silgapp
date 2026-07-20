@@ -50,6 +50,24 @@
         "archive"
       ],
       "default": "brouillon"
+    },
+    "rag_indexe": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si le sc\u00e9nario a \u00e9t\u00e9 index\u00e9 dans la base RAG de VENUS"
+    },
+    "rag_document_id": {
+      "type": "string",
+      "description": "ID du VenusDocument RAG associ\u00e9 apr\u00e8s indexation"
+    },
+    "rag_indexe_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de la derni\u00e8re indexation RAG r\u00e9ussie"
+    },
+    "rag_erreur": {
+      "type": "string",
+      "description": "Message d'erreur si l'indexation RAG a \u00e9chou\u00e9 (vide si OK)"
     }
   },
   "required": [

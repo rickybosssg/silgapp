@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Search, Pencil, Trash2, Play, ClipboardPaste } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Play, ClipboardPaste, Database, Loader2 } from 'lucide-react';
 import { STATUT_LABELS, logAudit } from '@/lib/venusLearning';
 import ScenarioFormDialog from './ScenarioFormDialog';
 import PasteScenarioDialog from './PasteScenarioDialog';
@@ -35,6 +35,23 @@ export default function ScenariosTab({ presetData, presetOpen }) {
     await base44.entities.VenusScenario.delete(entry.id);
     await logAudit('delete', 'scenario', entry.id, entry, null);
     refresh();
+  };
+
+  const [reindexing, setReindexing] = useState(null);
+  const handleReindex = async (entry) => {
+    setReindexing(entry.id);
+    try {
+      await fetch('/api/base44/functions/indexerDocumentVenus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'index_scenario', scenario_id: entry.id }),
+      });
+      refresh();
+    } catch (e) {
+      console.error('Erreur réindexation:', e);
+    } finally {
+      setReindexing(null);
+    }
   };
 
   const openAdd = () => { setEditEntry(null); setDialogPreset(null); setDialogOpen(true); };
@@ -89,6 +106,21 @@ export default function ScenariosTab({ presetData, presetOpen }) {
                 <div className="flex flex-wrap gap-1.5">
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${statut.color}`}>{statut.label}</span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">{conv.length} msg(s)</span>
+                  {entry.statut === 'valide' && (
+                    entry.rag_indexe ? (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium flex items-center gap-0.5">
+                        <Database className="w-2.5 h-2.5" /> RAG
+                      </span>
+                    ) : entry.rag_erreur ? (
+                      <button onClick={() => handleReindex(entry)} disabled={reindexing === entry.id} className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium flex items-center gap-0.5 hover:bg-red-200">
+                        {reindexing === entry.id ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Database className="w-2.5 h-2.5" />} Erreur RAG
+                      </button>
+                    ) : (
+                      <button onClick={() => handleReindex(entry)} disabled={reindexing === entry.id} className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium flex items-center gap-0.5 hover:bg-amber-200">
+                        {reindexing === entry.id ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Database className="w-2.5 h-2.5" />} Indexer
+                      </button>
+                    )
+                  )}
                 </div>
               </div>
             );
