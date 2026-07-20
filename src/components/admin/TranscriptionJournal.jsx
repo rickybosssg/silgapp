@@ -13,6 +13,23 @@ const STATUS_CONFIG = {
   non_transcrit: { label: "Non transcrit", className: "" },
 };
 
+const METHODE_CONFIG = {
+  whisper: { label: "Whisper", className: "bg-blue-100 text-blue-700" },
+  llm_fallback: { label: "LLM Fallback", className: "bg-purple-100 text-purple-700" },
+  hybride: { label: "Hybride", className: "bg-indigo-100 text-indigo-700" },
+  aucune: { label: "Aucune", className: "bg-gray-100 text-gray-500" },
+};
+
+function parseRaisons(raisonsStr) {
+  if (!raisonsStr) return [];
+  try {
+    const parsed = JSON.parse(raisonsStr);
+    return Array.isArray(parsed) ? parsed : [String(parsed)];
+  } catch {
+    return [raisonsStr];
+  }
+}
+
 export default function TranscriptionJournal() {
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState(null);
@@ -113,11 +130,37 @@ export default function TranscriptionJournal() {
                 )}
 
                 <div>
-                  <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5">Transcription auto</p>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase">Transcription auto</p>
+                    {msg.transcription_methode && (
+                      <Badge variant="outline" className={`text-[8px] ${(METHODE_CONFIG[msg.transcription_methode] || METHODE_CONFIG.aucune).className}`}>
+                        {(METHODE_CONFIG[msg.transcription_methode] || METHODE_CONFIG.aucune).label}
+                      </Badge>
+                    )}
+                  </div>
                   <p className="text-xs text-foreground bg-white rounded-lg p-2 border border-gray-100">
                     {msg.transcription || <span className="text-muted-foreground italic">Aucune transcription</span>}
                   </p>
                 </div>
+
+                {msg.transcription_brute && msg.transcription_brute !== msg.transcription && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase mb-0.5">Brut (avant nettoyage)</p>
+                    <p className="text-[11px] text-gray-500 bg-gray-50 rounded-lg p-2 border border-gray-100 font-mono">
+                      {msg.transcription_brute}
+                    </p>
+                  </div>
+                )}
+
+                {msg.transcription_raisons && parseRaisons(msg.transcription_raisons).length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {parseRaisons(msg.transcription_raisons).map((r, i) => (
+                      <span key={i} className="text-[9px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">
+                        {r}
+                      </span>
+                    ))}
+                  </div>
+                )}
 
                 {hasCorrection && !isEditing && (
                   <div>

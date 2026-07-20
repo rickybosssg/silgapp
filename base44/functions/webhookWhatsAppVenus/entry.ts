@@ -281,13 +281,14 @@ async function transcrireAudio(base44, audioUrl, mediaContentType = '') {
       confidence: evalConfiance.confiance,
       status: evalConfiance.status,
       raisons: evalConfiance.raisons,
+      methode: usedFallback ? 'llm_fallback' : 'whisper',
     };
   } catch (e) {
     const tempsMs = Date.now() - startTime;
     console.error(`[WebhookVenus] 🎤 ❌ ÉTAPE C — Erreur transcription audio après ${tempsMs}ms: ${e.message}`);
     console.error(`[WebhookVenus] 🎤   Stack: ${e.stack?.substring(0, 300)}`);
     console.error(`[WebhookVenus] 🎤   Nom erreur: ${e.name}`);
-    return { texte: '', texte_brut: '', confidence: 0, status: 'echec', raisons: [`Erreur transcription: ${e.name} — ${e.message}`] };
+    return { texte: '', texte_brut: '', confidence: 0, status: 'echec', raisons: [`Erreur transcription: ${e.name} — ${e.message}`], methode: 'aucune' };
   }
 }
 
@@ -1377,8 +1378,11 @@ Deno.serve(async (req) => {
       photo_url: photoUrl,
       audio_url: audioUrl,
       transcription: transcriptionData?.texte || '',
+      transcription_brute: transcriptionData?.texte_brut || '',
       transcription_confidence: transcriptionData?.confidence || 0,
       transcription_status: transcriptionData?.status || (messageType === 'audio' ? 'non_transcrit' : undefined),
+      transcription_raisons: transcriptionData?.raisons ? JSON.stringify(transcriptionData.raisons) : '',
+      transcription_methode: transcriptionData?.methode || 'aucune',
       video_url: videoUrl,
       document_url: documentUrl,
       location_lat: latitude,

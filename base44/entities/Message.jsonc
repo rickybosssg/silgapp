@@ -57,6 +57,10 @@
       "type": "string",
       "description": "Texte transcrit depuis l'audio (si message_type=audio)"
     },
+    "transcription_brute": {
+      "type": "string",
+      "description": "Transcription brute avant nettoyage (ce que Whisper/Gemini a reellement retourne) \u2014 pour diagnostic"
+    },
     "transcription_confidence": {
       "type": "number",
       "description": "Niveau de confiance de la transcription (0-1)"
@@ -71,6 +75,20 @@
       ],
       "default": "non_transcrit",
       "description": "Statut de la transcription audio"
+    },
+    "transcription_raisons": {
+      "type": "string",
+      "description": "JSON: raisons detaillees du score de confiance ou de l'echec (pour diagnostic admin)"
+    },
+    "transcription_methode": {
+      "type": "string",
+      "enum": [
+        "whisper",
+        "llm_fallback",
+        "hybride",
+        "aucune"
+      ],
+      "description": "Methode de transcription utilisee (Whisper, fallback LLM, ou aucune)"
     },
     "transcription_correction": {
       "type": "string",
