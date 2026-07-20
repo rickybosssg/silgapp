@@ -43,7 +43,8 @@
         "en_attente",
         "validee",
         "refusee",
-        "fusionnee"
+        "fusionnee",
+        "amelioree"
       ],
       "default": "en_attente"
     },
@@ -61,12 +62,124 @@
     },
     "intention_detectee": {
       "type": "string",
-      "description": "Intention VENUS d\u00e9tect\u00e9e (si applicable)"
+      "description": "Intention VENUS d\u00e9tect\u00e9e"
     },
     "is_nouvelle_question": {
       "type": "boolean",
-      "default": true,
-      "description": "True si aucune connaissance officielle ne couvre cette question"
+      "default": true
+    },
+    "raisonnement_detaille": {
+      "type": "string",
+      "description": "JSON: \u00e9tapes du raisonnement de VENUS pour cette suggestion"
+    },
+    "regle_metier_id": {
+      "type": "string",
+      "description": "ID de la r\u00e8gle m\u00e9tier utilis\u00e9e (si applicable)"
+    },
+    "regle_metier_nom": {
+      "type": "string",
+      "description": "Nom de la r\u00e8gle m\u00e9tier utilis\u00e9e (snapshot)"
+    },
+    "workflow_utilise": {
+      "type": "string",
+      "description": "Code du workflow utilis\u00e9 (si applicable)"
+    },
+    "knowledge_id": {
+      "type": "string",
+      "description": "ID de la connaissance utilis\u00e9e (si applicable)"
+    },
+    "knowledge_titre": {
+      "type": "string",
+      "description": "Titre de la connaissance utilis\u00e9e (snapshot)"
+    },
+    "document_sources": {
+      "type": "string",
+      "description": "JSON: [{document_id, document_titre, chunk_id, score}] \u2014 documents consult\u00e9s"
+    },
+    "scenario_utilise": {
+      "type": "string",
+      "description": "Nom du sc\u00e9nario utilis\u00e9 (si applicable)"
+    },
+    "sources_poids": {
+      "type": "string",
+      "description": "JSON: [{source, poids, description}] \u2014 poids de chaque source dans la r\u00e9ponse"
+    },
+    "score_exactitude": {
+      "type": "number",
+      "description": "Score d'exactitude 0-100"
+    },
+    "score_clarte": {
+      "type": "number",
+      "description": "Score de clart\u00e9 0-100"
+    },
+    "score_politesse": {
+      "type": "number",
+      "description": "Score de politesse 0-100"
+    },
+    "score_respect_regles": {
+      "type": "number",
+      "description": "Score de respect des r\u00e8gles m\u00e9tier 0-100"
+    },
+    "score_utilite": {
+      "type": "number",
+      "description": "Score d'utilit\u00e9 0-100"
+    },
+    "score_coherence": {
+      "type": "number",
+      "description": "Score de coh\u00e9rence 0-100"
+    },
+    "score_global_qualite": {
+      "type": "number",
+      "description": "Note globale de qualit\u00e9 0-100"
+    },
+    "hallucination_detectee": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si une hallucination a \u00e9t\u00e9 d\u00e9tect\u00e9e dans la r\u00e9ponse"
+    },
+    "hallucination_details": {
+      "type": "string",
+      "description": "D\u00e9tails sur l'hallucination d\u00e9tect\u00e9e"
+    },
+    "amelioration_reponse": {
+      "type": "string",
+      "description": "R\u00e9ponse am\u00e9lior\u00e9e par l'administrateur"
+    },
+    "amelioration_regle_metier": {
+      "type": "string",
+      "description": "Nouvelle r\u00e8gle m\u00e9tier ajout\u00e9e lors de l'am\u00e9lioration"
+    },
+    "amelioration_mots_cles": {
+      "type": "string",
+      "description": "Nouveaux mots-cl\u00e9s (JSON)"
+    },
+    "amelioration_categorie": {
+      "type": "string",
+      "description": "Nouvelle cat\u00e9gorie"
+    },
+    "amelioration_workflow": {
+      "type": "string",
+      "description": "Workflow associ\u00e9"
+    },
+    "amelioration_commentaires": {
+      "type": "string",
+      "description": "Commentaires de l'administrateur"
+    },
+    "amelioration_par": {
+      "type": "string",
+      "description": "Email admin ayant am\u00e9lior\u00e9"
+    },
+    "amelioration_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "historique_versions": {
+      "type": "string",
+      "description": "JSON: [{version, auteur, date, ancienne_reponse, nouvelle_reponse, raison}]"
+    },
+    "recommandations": {
+      "type": "string",
+      "description": "JSON: [{type, titre, description}] \u2014 recommandations post-validation"
     },
     "knowledge_id_cree": {
       "type": "string",
