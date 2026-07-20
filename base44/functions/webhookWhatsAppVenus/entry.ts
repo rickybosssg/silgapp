@@ -1325,7 +1325,6 @@ async function handleAnnulationCourse(base44: any, conversation: any, userMessag
 
 Deno.serve(async (req) => {
   let typingInterval: any = null;
-  let waitTimeout: any = null;
   try {
     const base44 = createClientFromRequest(req);
 
@@ -1581,16 +1580,6 @@ Deno.serve(async (req) => {
         envoyerIndicateurSaisie(messageSid, accountSid, authToken).catch(() => {});
       }, 20000);
     }
-
-    // ── Délai maximum: envoyer un message d'attente si le traitement dépasse 6s ──
-    let waitMessageSent = false;
-    waitTimeout = setTimeout(() => {
-      if (!waitMessageSent) {
-        waitMessageSent = true;
-        envoyerWhatsAppReply(telephone, 'Votre demande est en cours de traitement, merci de patienter quelques instants.', accountSid, authToken, fromNumber).catch(() => {});
-        console.log('[WebhookVenus] ⏳ Message d\'attente envoyé (traitement > 6s)');
-      }
-    }, 6000);
 
     // ── 3b. Vérifier le mode maintenance VENUS ──
     let reponseVenus = '';
@@ -1871,7 +1860,6 @@ Deno.serve(async (req) => {
     // ── Arrêter le renouvellement de l'indicateur de saisie + timeout d'attente ──
     // L'indicateur disparaît automatiquement dès que la réponse est livrée.
     if (typingInterval) { clearInterval(typingInterval); typingInterval = null; }
-    if (waitTimeout) { clearTimeout(waitTimeout); }
 
     console.log(`[WebhookVenus] 📤 ÉTAPE 6 — Envoi réponse à ${telephone} via Twilio (from: ${fromNumber}) | mode: ${utiliserAudio ? 'AUDIO' : 'TEXTE'}`);
     if (utiliserAudio) {
@@ -1945,9 +1933,29 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     if (typingInterval) { clearInterval(typingInterval); }
-    if (waitTimeout) { clearTimeout(waitTimeout); }
     console.error(`[WebhookVenus] ❌ ERREUR GLOBALE: ${error.message}`);
     console.error(`[WebhookVenus] ❌ Stack: ${error.stack?.substring(0, 300)}`);
+
+    // ── Envoyer un vrai message d'erreur au client (jamais un faux succès) ──
+    try {
+      const eAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
+      const eAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+      const eFromNumber = Deno.env.get('TWILIO_WHATSAPP_FROM') || 'whatsapp:+14155238886';
+      let eTelephone = '';
+      try {
+        const eBody = await req.clone().text();
+        const eParams = Object.fromEntries(new URLSearchParams(eBody));
+        eTelephone = (eParams.From || '').replace('whatsapp:', '');
+      } catch {}
+      if (eAccountSid && eAuthToken && eTelephone) {
+        await envoyerWhatsAppReply(
+          eTelephone,
+          "⚠️ Une erreur technique est survenue lors du traitement de votre demande. Veuillez réessayer dans quelques instants. Si le problème persiste, contactez le support au +226 66 92 51 90.",
+          eAccountSid, eAuthToken, eFromNumber
+        ).catch(() => {});
+      }
+    } catch {}
+
     return Response.json({ error: error.message }, { status: 500 });
   }
 });
