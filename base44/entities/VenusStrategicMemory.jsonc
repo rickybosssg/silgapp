@@ -1,0 +1,88 @@
+{
+  "name": "VenusStrategicMemory",
+  "type": "object",
+  "properties": {
+    "categorie": {
+      "type": "string",
+      "enum": [
+        "tendance_demande",
+        "zone_chaude",
+        "heure_pointe",
+        "livreur_top",
+        "partenaire_top",
+        "cause_reclamation",
+        "fonctionnalite_demandee",
+        "probleme_recurrent",
+        "saisonnalite",
+        "performance_globale",
+        "comportement_client",
+        "opportnite_business"
+      ],
+      "description": "Cat\u00e9gorie de tendance strat\u00e9gique"
+    },
+    "cle": {
+      "type": "string",
+      "description": "Cl\u00e9 unique (ex: 'demande_livraison_programmee', 'zone_ouaga2000')"
+    },
+    "valeur": {
+      "type": "string",
+      "description": "Valeur actuelle (ex: '45 courses/mois', '18h-21h', 'Boutique Keita')"
+    },
+    "valeur_numerique": {
+      "type": "number"
+    },
+    "valeur_precedente": {
+      "type": "number",
+      "description": "Valeur de la p\u00e9riode pr\u00e9c\u00e9dente pour comparaison"
+    },
+    "tendance_pct": {
+      "type": "number",
+      "description": "Variation en % vs p\u00e9riode pr\u00e9c\u00e9dente"
+    },
+    "tendance_direction": {
+      "type": "string",
+      "enum": [
+        "hausse",
+        "baisse",
+        "stable"
+      ],
+      "default": "stable"
+    },
+    "periode_analyse": {
+      "type": "string",
+      "enum": [
+        "jour",
+        "semaine",
+        "mois",
+        "trimestre",
+        "annee"
+      ],
+      "default": "mois"
+    },
+    "pays": {
+      "type": "string",
+      "default": "ALL"
+    },
+    "historique": {
+      "type": "string",
+      "description": "JSON: [{date, valeur}] \u2014 historique des valeurs pour graphiques"
+    },
+    "metadata": {
+      "type": "string",
+      "description": "JSON: contexte additionnel"
+    },
+    "date_maj": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "date_creation": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "categorie",
+    "cle",
+    "valeur"
+  ]
+}

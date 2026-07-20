@@ -1,0 +1,105 @@
+{
+  "name": "VenusBusinessInsight",
+  "type": "object",
+  "properties": {
+    "type_analyse": {
+      "type": "string",
+      "enum": [
+        "meilleures_heures",
+        "zones_actives",
+        "livreurs_performants",
+        "partenaires_sollicites",
+        "causes_reclamations",
+        "taux_annulation",
+        "taux_retard",
+        "volume_courses",
+        "revenu_genere",
+        "satisfaction_client",
+        "tendance_demande",
+        "performance_workflow",
+        "opportnite_amelioration",
+        "risque_operationnel"
+      ],
+      "description": "Type d'analyse m\u00e9tier"
+    },
+    "titre": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description d\u00e9taill\u00e9e de l'insight"
+    },
+    "valeur_principale": {
+      "type": "string",
+      "description": "Valeur cl\u00e9 (ex: '18h-21h', 'Ouaga 2000', '15%', '120 courses')"
+    },
+    "valeur_numerique": {
+      "type": "number",
+      "description": "Valeur num\u00e9rique pour graphiques"
+    },
+    "tendance": {
+      "type": "string",
+      "enum": [
+        "hausse",
+        "baisse",
+        "stable",
+        "inconnu"
+      ],
+      "default": "inconnu"
+    },
+    "tendance_pct": {
+      "type": "number",
+      "description": "Pourcentage de variation vs p\u00e9riode pr\u00e9c\u00e9dente"
+    },
+    "periode": {
+      "type": "string",
+      "enum": [
+        "jour",
+        "semaine",
+        "mois",
+        "trimestre",
+        "annee"
+      ],
+      "default": "semaine"
+    },
+    "pays": {
+      "type": "string",
+      "default": "ALL"
+    },
+    "donnees_detaillees": {
+      "type": "string",
+      "description": "JSON: donn\u00e9es d\u00e9taill\u00e9es [{label, value, percentage}]"
+    },
+    "recommandations": {
+      "type": "string",
+      "description": "JSON: [{priorite, titre, description}]"
+    },
+    "actions_suggerees": {
+      "type": "string",
+      "description": "JSON: [{action, description, auto: boolean}]"
+    },
+    "niveau_confiance": {
+      "type": "number",
+      "default": 80,
+      "description": "Score de confiance de l'analyse (0-100)"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "actif",
+        "archive",
+        "traite"
+      ],
+      "default": "actif"
+    },
+    "date_creation": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "type_analyse",
+    "titre",
+    "periode"
+  ]
+}
