@@ -29,6 +29,13 @@ import {
   getMaintenanceMode,
   declencherEscalade,
 } from '../../shared/venusSupervisionEngine.ts';
+import {
+  nettoyerTranscription,
+  evaluerConfianceTranscription,
+  peutAgirSurAudio,
+  genererMessageConfirmationAudio,
+  genererMessageRepetitionAudio,
+} from '../../shared/venusAudioEngine.ts';
 
 /**
  * Webhook WhatsApp <-> Venus (via Twilio).
@@ -110,23 +117,38 @@ async function downloadAndUploadMedia(mediaUrl, accountSid, authToken, base44) {
  * Utilise Core.TranscribeAudio (Whisper) qui supporte le français et les accents africains.
  * Retourne { texte, confidence, status }.
  */
-async function transcrireAudio(base44, audioUrl) {
+async function transcrireAudio(base44, audioUrl, mediaContentType = '') {
   try {
+    console.log(`[WebhookVenus] 🎤 Début transcription audio | URL: ${audioUrl?.substring(0, 60)}... | Format: ${mediaContentType}`);
+
     const result = await base44.asServiceRole.integrations.Core.TranscribeAudio({ audio_url: audioUrl });
-    const texte = typeof result === 'string' ? result : (result?.text || result?.transcript || '');
-    if (!texte || texte.trim().length < 2) {
-      return { texte: '', confidence: 0, status: 'echec' };
+    const texteBrut = typeof result === 'string' ? result : (result?.text || result?.transcript || '');
+
+    console.log(`[WebhookVenus] 🎤 Transcription brute Whisper: "${(texteBrut || '').substring(0, 150)}" | Longueur: ${texteBrut?.length || 0} chars`);
+
+    if (!texteBrut || texteBrut.trim().length < 2) {
+      console.warn(`[WebhookVenus] 🎤 ⚠️ Transcription vide ou trop courte`);
+      return { texte: '', texte_brut: '', confidence: 0, status: 'echec', raisons: ['Transcription vide'] };
     }
-    // Heuristique de confiance : si la transcription est très courte ou contient des marqueurs d'incertitude
-    const motsIncertains = ['[inaudible]', '[bruit]', '[?]', '...', 'incomprehensible'];
-    const hasIncertitude = motsIncertains.some(m => texte.toLowerCase().includes(m));
-    const confidence = hasIncertitude ? 0.4 : (texte.length > 10 ? 0.85 : 0.6);
-    const status = confidence < 0.5 ? 'faible_confiance' : 'transcrit';
-    console.log(`[WebhookVenus] 🎤 Transcription: "${texte.substring(0, 100)}" (confiance: ${confidence})`);
-    return { texte, confidence, status };
+
+    // ── Nettoyer la transcription ──
+    const texteNettoye = nettoyerTranscription(texteBrut);
+    console.log(`[WebhookVenus] 🎤 Transcription nettoyée: "${texteNettoye.substring(0, 150)}"`);
+
+    // ── Évaluer la confiance ──
+    const evalConfiance = evaluerConfianceTranscription(texteBrut, texteNettoye);
+    console.log(`[WebhookVenus] 🎤 Confiance: ${evalConfiance.confiance.toFixed(2)} | Statut: ${evalConfiance.status} | Raisons: ${evalConfiance.raisons.join('; ')}`);
+
+    return {
+      texte: texteNettoye,
+      texte_brut: texteBrut,
+      confidence: evalConfiance.confiance,
+      status: evalConfiance.status,
+      raisons: evalConfiance.raisons,
+    };
   } catch (e) {
-    console.error('[WebhookVenus] Erreur transcription audio:', e.message);
-    return { texte: '', confidence: 0, status: 'echec' };
+    console.error(`[WebhookVenus] 🎤 ❌ Erreur transcription audio: ${e.message}`);
+    return { texte: '', texte_brut: '', confidence: 0, status: 'echec', raisons: [`Erreur: ${e.message}`] };
   }
 }
 
@@ -1222,22 +1244,38 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 🎤 Phase 16+ — Si audio transcrit, passer le texte au LLM avec contexte de confirmation
-    // Toutes les transcriptions (même faible confiance) sont traitées par le LLM
-    // qui confirme ce qu'il a compris avant de poursuivre — plus naturel pour le client
+    // ═══════════════════════════════════════════════════════════════
+    // CHAÎNE DE TRAITEMENT AUDIO — Phase préproduction
+    // 1. Transcription Whisper (déjà faite ci-dessus)
+    // 2. Nettoyage (déjà fait dans transcrireAudio)
+    // 3. Évaluation de la confiance (déjà faite)
+    // 4. Gating : bloquer si confiance trop faible, forcer confirmation sinon
+    // 5. Passer le texte nettoyé à VENUS avec flag force_confirmation
+    // ═══════════════════════════════════════════════════════════════
     let messageEffectif = body;
     let clientAEnvoyeAudio = false;
     let isAudioTranscription = false;
+    let forceConfirmationAudio = false;
 
     if (messageType === 'audio') {
       clientAEnvoyeAudio = true;
-      if (transcriptionData?.status === 'echec' || !transcriptionData?.texte) {
-        reponseVenus = "Je n'ai pas bien entendu votre note vocale. Pouvez-vous la renvoyer plus lentement ou m'ecrire votre demande (lieu de depart et lieu de livraison) ?";
+
+      if (transcriptionData?.status === 'echec' || !transcriptionData?.texte || transcriptionData?.confidence < 0.5) {
+        // ── Confiance trop faible ou échec → demander de répéter ──
+        reponseVenus = genererMessageRepetitionAudio();
+        console.warn(`[WebhookVenus] 🎤 ⚠️ Audio rejeté (confiance: ${transcriptionData?.confidence || 0}) — demande de répétition`);
+
       } else {
-        // Transcription (même faible confiance) → traiter par le LLM avec confirmation
+        // ── Transcription utilisable → nettoyer et passer à VENUS ──
         messageEffectif = transcriptionData.texte;
         isAudioTranscription = true;
-        console.log(`[WebhookVenus] 🎤 Audio transcrit (confiance: ${transcriptionData.confidence}, statut: ${transcriptionData.status}) traité par LLM: "${messageEffectif.substring(0, 80)}"`);
+
+        // ── Évaluer si on peut agir ou si on doit forcer la confirmation ──
+        const gating = peutAgirSurAudio(transcriptionData.confidence);
+        forceConfirmationAudio = gating.forceConfirmation;
+
+        console.log(`[WebhookVenus] 🎤 ✅ Audio accepté | Confiance: ${transcriptionData.confiance.toFixed(2)} | Force confirmation: ${forceConfirmationAudio} | Texte: "${messageEffectif.substring(0, 100)}"`);
+        console.log(`[WebhookVenus] 🎤 📊 Brut: "${(transcriptionData.texte_brut || '').substring(0, 80)}" → Nettoyé: "${messageEffectif.substring(0, 80)}"`);
       }
     }
 
@@ -1327,6 +1365,7 @@ Deno.serve(async (req) => {
           memoireCourte: pendingCourse || {},
           memoireLongue, historiqueRecent, courseActive,
           countryCode, tarifs, telephone, profileName, isAudioTranscription,
+          force_confirmation: forceConfirmationAudio,
         });
 
         // ── Exécuter l'action choisie ──

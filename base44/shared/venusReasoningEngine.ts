@@ -79,6 +79,7 @@ interface ReasoningInput {
   telephone: string;
   profileName: string;
   isAudioTranscription: boolean;
+  force_confirmation?: boolean;
   outils_resultats?: any[];
 }
 
@@ -762,6 +763,14 @@ Tu DOIS utiliser UNIQUEMENT les données ci-dessus pour répondre aux questions 
 - Ne JAMAIS inventer un nom de livreur, un statut, un prix, ou une référence de course.
 
 ${audioNote}
+
+${input.force_confirmation ? `═══ ⚠️ CONFIRMATION OBLIGATOIRE (AUDIO) ═══
+Le message du client provient d'une transcription audio. Tu DOIS :
+1. reformuler ce que tu as compris : "Si j'ai bien compris, vous souhaitez..."
+2. NE JAMAIS créer de course directement — choisis action=poser_question
+3. Demander confirmation explicite avant toute action sensible
+4. Si un mot semble incorrect ou ambigu, demande une clarification
+` : ''}
 
 ═══ MESSAGE DU CLIENT ═══
 ${input.messageClient}
