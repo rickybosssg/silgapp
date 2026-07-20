@@ -74,11 +74,31 @@
     },
     "outils_utilises": {
       "type": "string",
-      "description": "JSON: tableau des outils utilises (knowledge_base, course_flow, etc.)"
+      "description": "JSON: tableau des outils utilises (business_rule, knowledge_base, rag, workflow, etc.)"
     },
     "confiance": {
       "type": "number",
       "description": "Score de confiance 0-100"
+    },
+    "business_rule_id": {
+      "type": "string",
+      "description": "ID de la r\u00e8gle m\u00e9tier appliqu\u00e9e (si applicable)"
+    },
+    "business_rule_nom": {
+      "type": "string",
+      "description": "Nom de la r\u00e8gle m\u00e9tier appliqu\u00e9e (snapshot)"
+    },
+    "knowledge_id": {
+      "type": "string",
+      "description": "ID de l'entr\u00e9e de connaissance utilis\u00e9e (si applicable)"
+    },
+    "workflow_utilise": {
+      "type": "string",
+      "description": "Code du workflow utilis\u00e9 (si applicable)"
+    },
+    "document_sources": {
+      "type": "string",
+      "description": "JSON: [{document_id, document_titre, chunk_id, score}] \u2014 documents RAG utilis\u00e9s"
     },
     "memoire_courte_snapshot": {
       "type": "string",

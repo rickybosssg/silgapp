@@ -1,13 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Search, Bot, MessageCircle, Zap } from 'lucide-react';
+import { Search, Bot, MessageCircle, Zap, Brain } from 'lucide-react';
+import WhyThisResponseDialog from './WhyThisResponseDialog';
 
 const PAYS_FLAGS = { BF: '🇧🇫', CI: '🇨🇮', TG: '🇹🇬', BJ: '🇧🇯', SN: '🇸🇳', ML: '🇲🇱', GN: '🇬🇳', NE: '🇳🇪' };
 
 export default function VIConversationsTab() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
+  const [whyDialog, setWhyDialog] = useState({ open: false, interactionId: null });
 
   const { data: convs = [] } = useQuery({
     queryKey: ['vi-convs-list'],
@@ -125,12 +127,24 @@ export default function VIConversationsTab() {
                       {i.statut === 'non_resolu' && <span className="text-[9px] text-orange-600 font-semibold">⚠ non résolu</span>}
                     </div>
                   </div>
+                  <button
+                    onClick={() => setWhyDialog({ open: true, interactionId: i.id })}
+                    className="flex-shrink-0 w-7 h-7 rounded-lg bg-violet-100 hover:bg-violet-200 flex items-center justify-center transition-colors"
+                    title="Pourquoi cette réponse ?"
+                  >
+                    <Brain className="w-3.5 h-3.5 text-violet-600" />
+                  </button>
                 </div>
               ))}
             </div>
           )}
         </div>
       </div>
+      <WhyThisResponseDialog
+        interactionId={whyDialog.interactionId}
+        open={whyDialog.open}
+        onOpenChange={(o) => setWhyDialog({ ...whyDialog, open: o })}
+      />
     </div>
   );
 }

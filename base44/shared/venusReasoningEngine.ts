@@ -43,6 +43,23 @@ export async function rechercherScenariosValidees(base44: any, countryCode: stri
   }
 }
 
+/**
+ * Recherche les règles métier validées pour un pays donné (Source 0 — Priorité absolue).
+ * Une seule règle peut s'appliquer à des centaines de conversations similaires.
+ */
+export async function rechercherReglesMetier(base44: any, countryCode: string): Promise<any[]> {
+  try {
+    const all = await base44.asServiceRole.entities.VenusBusinessRule.list('-created_date', 200);
+    return (all || []).filter((r: any) =>
+      (r.statut === 'valide' || r.statut === 'active') &&
+      (r.pays === 'ALL' || r.pays === countryCode || !r.pays)
+    );
+  } catch (e) {
+    console.warn('[ReasoningEngine] Erreur chargement règles métier:', e.message);
+    return [];
+  }
+}
+
 // ── Types ──
 
 interface ReasoningInput {
@@ -70,6 +87,7 @@ interface ReasoningResult {
   reponse: string;
   memoire_courte_update: Record<string, any>;
   memoire_longue_update: Record<string, any>;
+  business_rule_id?: string;
   knowledge_id?: string;
   document_sources?: { document_id: string; document_titre: string; chunk_id: string; score: number; version: number }[];
   temps_traitement_ms: number;
@@ -111,6 +129,7 @@ const RAISONNEMENT_SCHEMA = {
     reponse: { type: 'string' },
     memoire_courte_update: { type: 'object', additionalProperties: true },
     memoire_longue_update: { type: 'object', additionalProperties: true },
+    business_rule_id: { type: 'string' },
     knowledge_id: { type: 'string' },
     document_sources: { type: 'array', items: { type: 'object', additionalProperties: true } },
   },
@@ -570,6 +589,21 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
     console.warn('[ReasoningEngine] Erreur chargement scénarios:', e.message);
   }
 
+  // ── Règles métier (Source 0 — Priorité absolue) ──
+  let businessRulesStr = 'Aucune règle métier applicable';
+  let businessRuleEntries: any[] = [];
+  try {
+    businessRuleEntries = await rechercherReglesMetier(base44, input.countryCode);
+    if (businessRuleEntries.length > 0) {
+      businessRulesStr = businessRuleEntries.slice(0, 20).map((r, i) =>
+        `[RÈGLE ${i + 1}] ID: ${r.id}\n    Titre: ${r.nom}\n    Principe: ${(r.description || '').substring(0, 300)}\n    Conditions: ${(r.conditions_application || 'N/A').substring(0, 200)}\n    Exceptions: ${(r.exceptions || 'N/A').substring(0, 150)}\n    Exemples: ${(r.exemples || 'N/A').substring(0, 200)}\n    Réponse associée: ${(r.reponse_associee || 'N/A').substring(0, 200)}\n    Priorité: ${r.priorite || 'haute'}`
+      ).join('\n');
+      console.log(`[ReasoningEngine] 📖 ${businessRuleEntries.length} règles métier chargées`);
+    }
+  } catch (e) {
+    console.warn('[ReasoningEngine] Erreur chargement règles métier:', e.message);
+  }
+
   // ── Construire le prompt de raisonnement ──
   const audioNote = input.isAudioTranscription
     ? `═══ NOTE: TRANSCRIPTION VOCALE ═══
@@ -580,7 +614,14 @@ Noms de quartiers courants a Ouagadougou: Karpala, Pissy, Tampouy, Ouaga 2000, Z
 
   const prompt = `${localizedSystemPrompt || 'Tu es VENUS, l\'assistante virtuelle SILGAPP. Tu possèdes un MOTEUR DE RAISONNEMENT avancé et une MÉMOIRE INTELLIGENTE.'}
 
-═══ SCÉNARIOS VALIDÉS (Source 3) ═══
+═══ RÈGLES MÉTIER (Source 0 — PRIORITÉ ABSOLUE) ═══
+Les règles métier ci-dessous sont des principes généraux validés par les administrateurs SILGAPP.
+AVANT de générer ta réponse, vérifie si une règle métier s'applique à la situation actuelle.
+Si une règle s'applique, tu DOIS la respecter avant toute autre considération.
+Mets business_rule_id avec l'ID de la règle appliquée.
+${businessRulesStr}
+
+═══ SCÉNARIOS VALIDÉS (Source 4) ═══
 ${scenarioStr}
 
 ═══ CONTEXTE CLIENT ═══
@@ -601,10 +642,10 @@ ${historiqueStr}
 ═══ COURSE ACTIVE (si applicable) ═══
 ${courseActiveStr}
 
-═══ BASE DE CONNAISSANCES (Source 1 - Priorité absolue) ═══
+═══ BASE DE CONNAISSANCES (Source 2) ═══
 ${knowledgeStr}
 
-═══ BIBLIOTHÈQUE DOCUMENTAIRE (Source 2 - Documents officiels SILGAPP) ═══
+═══ BIBLIOTHÈQUE DOCUMENTAIRE (Source 3 — Documents officiels SILGAPP) ═══
 ${documentStr}
 
 ${audioNote}
@@ -687,12 +728,14 @@ Champs possibles: client_nom, ville_habituelle, quartier_habituel, langue_prefer
 
 12. Si pending_location_lat est défini dans la mémoire, une localisation est en attente d'assignation. Demande si c'est le lieu de récupération ou de livraison.
 
-13. PRIORITÉ DES SOURCES: Pour répondre aux questions informationnelles (demander_info), utilise les sources dans cet ORDRE OBLIGATOIRE:
-    a) Base de connaissances (Source 1) — si une entrée correspond, utilise sa réponse et mets knowledge_id.
-    b) Bibliothèque documentaire (Source 2) — si un document officiel correspond, utilise son contenu et mets document_sources avec les IDs.
-    c) Scénarios validés (Source 3) — si un scénario correspond à la situation, inspire-toi de sa réponse idéale.
-    d) IA générale (Source 4) — uniquement si aucune source officielle ne correspond.
-    Si l'intention est une action (creer_course, suivre_course, etc.), n'utilise PAS les sources comme réponse — l'action prime.
+13. PRIORITÉ DES SOURCES: Avant de répondre, consulte les sources dans cet ORDRE OBLIGATOIRE:
+    a) Règles métier (Source 0) — si une règle correspond à la situation, applique son PRINCIPE et mets business_rule_id. Les règles métier ont priorité sur TOUT.
+    b) Workflows (Source 1) — si un workflow correspond à l'intention détectée, suis ses étapes.
+    c) Base de connaissances (Source 2) — si une entrée correspond, utilise sa réponse et mets knowledge_id.
+    d) Bibliothèque documentaire (Source 3) — si un document officiel correspond, utilise son contenu et mets document_sources avec les IDs.
+    e) Scénarios validés (Source 4) — si un scénario correspond à la situation, inspire-toi de sa réponse idéale.
+    f) IA générale (Source 5) — uniquement si aucune source officielle ne correspond.
+    Les règles métier s'appliquent à TOUTES les intentions, pas seulement aux questions informationnelles.
 
 14. DOCUMENTS OFFICIELS: Si la Bibliothèque documentaire contient des informations pertinentes, cite-les dans ta réponse de manière naturelle. Les documents officiels SILGAPP (procédures, tarifs, conditions générales, guides) ont priorité sur ta propre connaissance. Si tu utilises un document, mets document_sources avec [{document_id, document_titre, chunk_id, score, version}].
 
@@ -743,6 +786,20 @@ Réponds UNIQUEMENT avec un JSON.`;
       result.infos_connues = { ...input.memoireCourte, ...result.infos_connues };
     }
 
+    // Valider le business_rule_id
+    if (result.business_rule_id && businessRuleEntries.length > 0) {
+      const match = businessRuleEntries.find(r => r.id === result.business_rule_id);
+      if (!match) {
+        result.business_rule_id = undefined;
+      } else {
+        if (!result.outils_utilises) result.outils_utilises = [];
+        if (!result.outils_utilises.includes('business_rule')) {
+          result.outils_utilises.push('business_rule');
+        }
+        console.log(`[ReasoningEngine] 📖 Règle métier appliquée: ${match.nom}`);
+      }
+    }
+
     // Si la base de connaissances a été utilisée, valider le knowledge_id
     if (result.knowledge_id && knowledgeEntries.length > 0) {
       const match = knowledgeEntries.find(k => k.id === result.knowledge_id);
@@ -779,6 +836,7 @@ Réponds UNIQUEMENT avec un JSON.`;
       reponse: "Je suis VENUS, votre assistante SILGAPP. Comment puis-je vous aider ?",
       memoire_courte_update: {},
       memoire_longue_update: {},
+      business_rule_id: undefined,
       document_sources: undefined,
       temps_traitement_ms: Date.now() - startTime,
     };
@@ -819,6 +877,8 @@ export async function loggerRaisonnement(base44: any, logData: {
       confiance: logData.result.confiance,
       memoire_courte_snapshot: JSON.stringify(logData.memoire_courte_snapshot || {}),
       memoire_longue_id: logData.memoire_longue_id || undefined,
+      business_rule_id: logData.result.business_rule_id || undefined,
+      knowledge_id: logData.result.knowledge_id || undefined,
       reponse_envoyee: logData.reponse_envoyee,
       temps_traitement_ms: logData.result.temps_traitement_ms,
       date_traitement: new Date().toISOString(),

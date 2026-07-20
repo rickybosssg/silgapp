@@ -12,7 +12,7 @@ import { Save, ArrowLeft } from 'lucide-react';
 export default function CorrectionTab({ presetData, onDone }) {
   const [form, setForm] = useState({
     question_client: '', reponse_venus: '', nouvelle_reponse: '',
-    commentaires: '', categorie: 'autres', mots_cles: '',
+    regle_metier: '', commentaires: '', categorie: 'autres', mots_cles: '',
   });
   const [saving, setSaving] = useState(false);
   const queryClient = useQueryClient();
@@ -61,6 +61,28 @@ export default function CorrectionTab({ presetData, onDone }) {
         version: 1,
         statut: 'valide',
       });
+
+      // 2b. Auto-create business rule if regle_metier is provided
+      let businessRuleId = '';
+      if (form.regle_metier && form.regle_metier.trim().length > 10) {
+        const rule = await base44.entities.VenusBusinessRule.create({
+          nom: `Règle: ${form.question_client.substring(0, 60)}`,
+          description: form.regle_metier.trim(),
+          domaine: form.categorie || 'general',
+          categorie: form.categorie || 'general',
+          priorite: 'haute',
+          conditions_application: JSON.stringify([form.question_client.substring(0, 200)]),
+          exemples: JSON.stringify([form.question_client]),
+          reponse_associee: form.nouvelle_reponse,
+          statut: 'valide',
+          pays: presetData?.country_code || 'ALL',
+          langue: 'fr',
+          auteur: user?.email || 'unknown',
+          version: 1,
+          date_creation: new Date().toISOString(),
+        });
+        businessRuleId = rule.id;
+      }
 
       // 3. Link knowledge to correction
       await base44.entities.VenusCorrection.update(correction.id, { knowledge_id: knowledge.id });
@@ -112,6 +134,11 @@ export default function CorrectionTab({ presetData, onDone }) {
           <div>
             <Label>Nouvelle réponse officielle *</Label>
             <Textarea value={form.nouvelle_reponse} onChange={e => setForm(f => ({ ...f, nouvelle_reponse: e.target.value }))} rows={4} placeholder="Nouvelle réponse corrigée" className="bg-green-50" />
+          </div>
+          <div>
+            <Label>📖 Règle métier *</Label>
+            <Textarea value={form.regle_metier} onChange={e => setForm(f => ({ ...f, regle_metier: e.target.value }))} rows={4} placeholder="Principe général que VENUS devra appliquer dans toutes les situations similaires. Ex: Lorsque le client indique un seul lieu précédé de « à », « vers », « pour », considérer ce lieu comme la destination. Ne jamais redemander cette destination." className="bg-amber-50 border-amber-200" />
+            <p className="text-xs text-amber-600 mt-1">Cette règle sera appliquée automatiquement par VENUS dans toutes les conversations similaires, avant même la génération de la réponse.</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

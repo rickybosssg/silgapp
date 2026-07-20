@@ -4,11 +4,15 @@
   "properties": {
     "nom": {
       "type": "string",
-      "description": "Nom de la r\u00e8gle"
+      "description": "Titre de la r\u00e8gle"
     },
     "description": {
       "type": "string",
-      "description": "Description d\u00e9taill\u00e9e de la r\u00e8gle"
+      "description": "Principe g\u00e9n\u00e9ral que VENUS doit appliquer"
+    },
+    "domaine": {
+      "type": "string",
+      "description": "Domaine m\u00e9tier (creation_course, paiement, pharmacie, restaurant, boutique, qr_code, code_pin, gps, support, reclamation, livraison_programmee, annulation, deplacement, general)"
     },
     "categorie": {
       "type": "string",
@@ -38,18 +42,29 @@
       ],
       "default": "haute"
     },
-    "version": {
-      "type": "number",
-      "default": 1
-    },
-    "statut": {
+    "conditions_application": {
       "type": "string",
-      "enum": [
-        "active",
-        "desactivee",
-        "archive"
-      ],
-      "default": "active"
+      "description": "JSON: [conditions dans lesquelles la r\u00e8gle s'applique]"
+    },
+    "exceptions": {
+      "type": "string",
+      "description": "JSON: [cas o\u00f9 la r\u00e8gle ne s'applique pas]"
+    },
+    "exemples": {
+      "type": "string",
+      "description": "JSON: [exemples de phrases/situations couvertes par cette r\u00e8gle]"
+    },
+    "reponse_associee": {
+      "type": "string",
+      "description": "R\u00e9ponse mod\u00e8le associ\u00e9e \u00e0 cette r\u00e8gle"
+    },
+    "workflow_associe": {
+      "type": "string",
+      "description": "Code du workflow associ\u00e9"
+    },
+    "intentions_concernees": {
+      "type": "string",
+      "description": "JSON: [codes d'intentions concern\u00e9es par cette r\u00e8gle]"
     },
     "pays": {
       "type": "string",
@@ -58,6 +73,22 @@
     "langue": {
       "type": "string",
       "default": "fr"
+    },
+    "version": {
+      "type": "number",
+      "default": 1
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "brouillon",
+        "valide",
+        "archive",
+        "active",
+        "desactivee"
+      ],
+      "default": "valide",
+      "description": "Une r\u00e8gle n'est appliqu\u00e9e par VENUS que si statut=valide ou active"
     },
     "auteur": {
       "type": "string"
