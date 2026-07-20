@@ -128,7 +128,7 @@ function AppLayoutInner({ reseau }) {
       {/* Mobile layout */}
       <div className="lg:hidden">
         <MobileNav notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} neoCount={neoCount} reseau={reseau} />
-        <main className="pt-14 pb-16 min-h-screen bg-slate-50 safe-area-top safe-area-bottom">
+        <main className="pt-[calc(3.5rem+max(env(safe-area-inset-top),28px))] pb-16 min-h-screen bg-slate-50">
           <Outlet />
         </main>
       </div>
