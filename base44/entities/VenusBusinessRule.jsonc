@@ -1,0 +1,78 @@
+{
+  "name": "VenusBusinessRule",
+  "type": "object",
+  "properties": {
+    "nom": {
+      "type": "string",
+      "description": "Nom de la r\u00e8gle"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description d\u00e9taill\u00e9e de la r\u00e8gle"
+    },
+    "categorie": {
+      "type": "string",
+      "enum": [
+        "livraison",
+        "paiement",
+        "pharmacie",
+        "restaurant",
+        "boutique",
+        "qr_code",
+        "code_pin",
+        "gps",
+        "support",
+        "reclamation",
+        "securite",
+        "general"
+      ],
+      "description": "Cat\u00e9gorie de la r\u00e8gle"
+    },
+    "priorite": {
+      "type": "string",
+      "enum": [
+        "critique",
+        "haute",
+        "normale",
+        "basse"
+      ],
+      "default": "haute"
+    },
+    "version": {
+      "type": "number",
+      "default": 1
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "active",
+        "desactivee",
+        "archive"
+      ],
+      "default": "active"
+    },
+    "pays": {
+      "type": "string",
+      "default": "ALL"
+    },
+    "langue": {
+      "type": "string",
+      "default": "fr"
+    },
+    "auteur": {
+      "type": "string"
+    },
+    "date_creation": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "date_modification": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "nom",
+    "categorie"
+  ]
+}

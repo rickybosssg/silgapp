@@ -48,6 +48,12 @@ const SEARCH_INDEX = [
   { tab: 'training', subTab: 'history', label: 'Historique d\'apprentissage', keywords: ['historique', 'apprentissage', 'history'] },
   { tab: 'training', subTab: 'reports', label: 'Rapports d\'amélioration', keywords: ['rapport', 'report', 'amélioration'] },
   { tab: 'training', subTab: 'alerts', label: 'Alertes d\'apprentissage', keywords: ['alerte', 'alert', 'training'] },
+  { tab: 'training', subTab: 'paths', label: 'Parcours de formation', keywords: ['parcours', 'formation', 'académie', 'training path', 'module'] },
+  { tab: 'training', subTab: 'intentions', label: 'Intentions VENUS', keywords: ['intention', 'variante', 'reconnaissance', 'phrases exemples'] },
+  { tab: 'training', subTab: 'dialogues', label: 'Dialogues d\'entraînement', keywords: ['dialogue', 'conversation modèle', 'entraînement', 'training dialogue'] },
+  { tab: 'training', subTab: 'rules', label: 'Règles métier', keywords: ['règle', 'business rule', 'métier', 'officielle', 'tarif', 'pin', 'qr'] },
+  { tab: 'training', subTab: 'simulation', label: 'Mode Simulation', keywords: ['simulation', 'simulateur', 'jouer client', 'test venus'] },
+  { tab: 'training', subTab: 'evaluation', label: 'Évaluation VENUS', keywords: ['évaluation', 'score', 'niveau', 'maîtrise', 'progression', 'domaine'] },
   // Knowledge
   { tab: 'knowledge', subTab: 'base', label: 'FAQ & Procédures', keywords: ['faq', 'connaissance', 'knowledge', 'procédure', 'tarif', 'réponse officielle'] },
   { tab: 'knowledge', subTab: 'documents', label: 'Documents RAG', keywords: ['document', 'rag', 'bibliothèque', 'library'] },

@@ -1,0 +1,77 @@
+{
+  "name": "VenusIntent",
+  "type": "object",
+  "properties": {
+    "nom": {
+      "type": "string",
+      "description": "Nom affich\u00e9 de l'intention"
+    },
+    "code": {
+      "type": "string",
+      "description": "Code unique (ex: creer_course, annuler_course, suivre_course)"
+    },
+    "description": {
+      "type": "string"
+    },
+    "variantes": {
+      "type": "string",
+      "description": "JSON: [variantes d'expression de l'intention]"
+    },
+    "exemples_phrases": {
+      "type": "string",
+      "description": "JSON: [phrases exemples que le client pourrait dire]"
+    },
+    "workflow_associe": {
+      "type": "string",
+      "description": "Code du workflow d\u00e9clench\u00e9 par cette intention"
+    },
+    "reponse_officielle": {
+      "type": "string",
+      "description": "R\u00e9ponse officielle de VENUS pour cette intention"
+    },
+    "niveau_maitrise": {
+      "type": "number",
+      "default": 0,
+      "description": "Score de ma\u00eetrise 0-100"
+    },
+    "categorie": {
+      "type": "string",
+      "description": "Cat\u00e9gorie m\u00e9tier"
+    },
+    "pays": {
+      "type": "string",
+      "default": "ALL"
+    },
+    "langue": {
+      "type": "string",
+      "default": "fr"
+    },
+    "knowledge_ids": {
+      "type": "string",
+      "description": "JSON: [IDs des connaissances li\u00e9es]"
+    },
+    "dialogue_ids": {
+      "type": "string",
+      "description": "JSON: [IDs des dialogues d'entra\u00eenement li\u00e9s]"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "active",
+        "archive"
+      ],
+      "default": "active"
+    },
+    "auteur": {
+      "type": "string"
+    },
+    "date_creation": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "nom",
+    "code"
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "name": "VenusTrainingPath",
+  "type": "object",
+  "properties": {
+    "nom": {
+      "type": "string",
+      "description": "Nom du parcours de formation"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description du parcours"
+    },
+    "niveau": {
+      "type": "string",
+      "enum": [
+        "debutant",
+        "intermediaire",
+        "avance",
+        "expert"
+      ],
+      "default": "debutant",
+      "description": "Niveau de difficult\u00e9"
+    },
+    "categorie": {
+      "type": "string",
+      "description": "Cat\u00e9gorie m\u00e9tier (creation_course, paiement, pharmacie, restaurant, boutique, qr_code, code_pin, gps, support, reclamation, livraison_programmee, annulation)"
+    },
+    "pays": {
+      "type": "string",
+      "default": "ALL",
+      "description": "Code pays ou ALL"
+    },
+    "langue": {
+      "type": "string",
+      "default": "fr"
+    },
+    "modules": {
+      "type": "string",
+      "description": "JSON: [{id, nom, description, statut, score}] \u2014 modules du parcours"
+    },
+    "nb_modules": {
+      "type": "number",
+      "default": 0
+    },
+    "progression": {
+      "type": "number",
+      "default": 0,
+      "description": "Pourcentage de progression (0-100)"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "brouillon",
+        "actif",
+        "complete",
+        "archive"
+      ],
+      "default": "actif"
+    },
+    "intention_associee": {
+      "type": "string",
+      "description": "Code de l'intention VENUS li\u00e9e \u00e0 ce parcours"
+    },
+    "workflow_associe": {
+      "type": "string",
+      "description": "Code du workflow li\u00e9 \u00e0 ce parcours"
+    },
+    "auteur": {
+      "type": "string"
+    },
+    "date_creation": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "nom"
+  ]
+}
