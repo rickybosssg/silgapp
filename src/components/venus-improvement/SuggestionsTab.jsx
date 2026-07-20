@@ -18,6 +18,7 @@ export default function SuggestionsTab() {
   const [improveDialog, setImproveDialog] = useState(null);
   const [mergeDialog, setMergeDialog] = useState(null);
   const [analysingId, setAnalysingId] = useState(null);
+  const [transformingRagId, setTransformingRagId] = useState(null);
 
   const { data: suggestions = [], isLoading } = useQuery({
     queryKey: ['venus-suggestions', statutFilter],
@@ -171,6 +172,28 @@ Réponds UNIQUEMENT avec un JSON:`,
     }
   };
 
+  const handleTransformRag = async (s) => {
+    setTransformingRagId(s.id);
+    try {
+      const user = await base44.auth.me();
+      const data = await base44.functions.invoke('indexerDocumentVenus', {
+        action: 'index_from_suggestion',
+        suggestion_id: s.id,
+        auteur: user?.email || 'admin',
+      });
+      if (data.success) {
+        toast({ title: '📚 Document RAG créé', description: `Indexé: "${data.document?.titre?.substring(0, 60)}" — ${data.chunks?.length || 0} chunk(s)` });
+        queryClient.invalidateQueries({ queryKey: ['venus-suggestions'] });
+      } else {
+        toast({ title: 'Erreur', description: data.error || 'Échec de l\'indexation RAG', variant: 'destructive' });
+      }
+    } catch (e) {
+      toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
+    } finally {
+      setTransformingRagId(null);
+    }
+  };
+
   const handleConfirmMerge = async (knowledgeId) => {
     try {
       const user = await base44.auth.me();
@@ -237,6 +260,8 @@ Réponds UNIQUEMENT avec un JSON:`,
               onMerge={() => setMergeDialog(s)}
               onAnalyse={() => handleAnalyse(s)}
               analysing={analysingId === s.id}
+              onTransformRag={() => handleTransformRag(s)}
+              transformingRag={transformingRagId === s.id}
             />
           ))}
         </div>

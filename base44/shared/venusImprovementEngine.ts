@@ -14,7 +14,7 @@
  */
 
 // ── Seuils de configuration ──
-const SEUIL_OCCURRENCE_QUESTION = 3;       // Nb min d'occurrences pour suggérer
+const SEUIL_OCCURRENCE_QUESTION = 2;       // Nb min d'occurrences pour suggérer (abaissé pour apprentissage rapide sandbox)
 const SEUIL_SCORE_BAS = 50;                 // Score < 50 = échec
 const SEUIL_REFORMULATION_EXCESSIVE = 3;    // 3+ reformulations = problème
 const SEUIL_INTERVENTION_HUMAINE = 0.15;    // 15%+ d'interventions humaines = alerte

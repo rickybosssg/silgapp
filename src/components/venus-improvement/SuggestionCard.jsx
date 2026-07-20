@@ -3,13 +3,13 @@ import { base44 } from '@/api/base44Client';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Check, X, GitMerge, Sparkles, AlertTriangle, Brain, ChevronDown, ChevronUp, History, Target, Gauge, ScrollText, BookOpen, FileText, Workflow, Lightbulb } from 'lucide-react';
+import { Check, X, GitMerge, Sparkles, AlertTriangle, Brain, ChevronDown, ChevronUp, History, Target, Gauge, ScrollText, BookOpen, FileText, Workflow, Lightbulb, Library } from 'lucide-react';
 
 const STATUT_LABELS = { en_attente: { label: 'En attente', cls: 'bg-gray-100 text-gray-600' }, validee: { label: 'Validée', cls: 'bg-green-100 text-green-700' }, refusee: { label: 'Refusée', cls: 'bg-red-100 text-red-700' }, fusionnee: { label: 'Fusionnée', cls: 'bg-blue-100 text-blue-700' }, amelioree: { label: 'Améliorée', cls: 'bg-violet-100 text-violet-700' } };
 const PRIORITE_LABELS = { critique: { label: 'Critique', cls: 'bg-red-100 text-red-700' }, haute: { label: 'Haute', cls: 'bg-orange-100 text-orange-700' }, normale: { label: 'Normale', cls: 'bg-blue-100 text-blue-700' }, basse: { label: 'Basse', cls: 'bg-gray-100 text-gray-600' } };
 const parse = (s, f) => { try { return JSON.parse(s); } catch { return f || []; } };
 
-export default function SuggestionCard({ s, onValidate, onImprove, onRefuse, onMerge, onAnalyse, analysing }) {
+export default function SuggestionCard({ s, onValidate, onImprove, onRefuse, onMerge, onAnalyse, onTransformRag, analysing, transformingRag }) {
   const [showWhy, setShowWhy] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
@@ -215,6 +215,11 @@ export default function SuggestionCard({ s, onValidate, onImprove, onRefuse, onM
           {!hasAnalysis && (
             <Button size="sm" variant="ghost" onClick={onAnalyse} disabled={analysing}>
               <Gauge className="w-4 h-4 mr-1" /> {analysing ? 'Analyse...' : 'Analyser qualité'}
+            </Button>
+          )}
+          {onTransformRag && (
+            <Button size="sm" variant="outline" onClick={onTransformRag} disabled={transformingRag} className="border-cyan-200 text-cyan-700 hover:bg-cyan-50">
+              <Library className="w-4 h-4 mr-1" /> {transformingRag ? 'Indexation...' : 'Transformer en RAG'}
             </Button>
           )}
         </div>

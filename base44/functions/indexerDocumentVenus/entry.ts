@@ -53,6 +53,39 @@ Deno.serve(async (req) => {
         return Response.json(result);
       }
 
+      case 'index_from_suggestion': {
+        // Transforme une suggestion validée en document RAG
+        const suggestion = await base44.asServiceRole.entities.VenusSuggestion.get(body.suggestion_id);
+        if (!suggestion) {
+          return Response.json({ success: false, error: 'Suggestion non trouvée' }, { status: 404 });
+        }
+
+        const reponseFinale = suggestion.amelioration_reponse || suggestion.reponse_proposee || '';
+        if (!reponseFinale || reponseFinale.trim().length < 20) {
+          return Response.json({ success: false, error: 'Aucune réponse à indexer (vide ou trop courte)' }, { status: 400 });
+        }
+
+        const motsCles = (() => { try { return JSON.parse(suggestion.mots_cles || '[]'); } catch { return []; } })();
+        const exemples = (() => { try { return JSON.parse(suggestion.conversations_exemples || '[]'); } catch { return []; } })();
+
+        // Construire un texte structuré pour le RAG
+        const texteDoc = `Q: ${suggestion.question_detectee}\n\nR: ${reponseFinale}\n\nMots-clés: ${motsCles.join(', ')}\n\nCatégorie: ${suggestion.categorie || 'questions_generales'}\nIntention: ${suggestion.intention_detectee || 'N/A'}`;
+
+        const result = await indexerTexteDirect(base44, {
+          texte: texteDoc,
+          auteur: body.auteur || suggestion.validee_par || 'admin',
+        });
+
+        // Marquer la suggestion comme transformée en RAG
+        if (result.success) {
+          await base44.asServiceRole.entities.VenusSuggestion.update(suggestion.id, {
+            document_sources: JSON.stringify([{ document_id: result.document.id, document_titre: result.document.titre, chunk_id: '', score: 100 }]),
+          });
+        }
+
+        return Response.json(result);
+      }
+
       case 'search': {
         const result = await rechercherDocumentsRag(base44, body.query, {
           pays: body.pays,
