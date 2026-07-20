@@ -4,9 +4,10 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Search, Pencil, Trash2, Play } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Play, ClipboardPaste } from 'lucide-react';
 import { STATUT_LABELS, logAudit } from '@/lib/venusLearning';
 import ScenarioFormDialog from './ScenarioFormDialog';
+import PasteScenarioDialog from './PasteScenarioDialog';
 
 export default function ScenariosTab({ presetData, presetOpen }) {
   const [search, setSearch] = useState('');
@@ -14,6 +15,7 @@ export default function ScenariosTab({ presetData, presetOpen }) {
   const [editEntry, setEditEntry] = useState(null);
   const [dialogPreset, setDialogPreset] = useState(null);
   const [testScenario, setTestScenario] = useState(null);
+  const [pasteOpen, setPasteOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: entries = [], isLoading } = useQuery({
@@ -50,6 +52,7 @@ export default function ScenariosTab({ presetData, presetOpen }) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un scénario..." className="pl-9" />
         </div>
+        <Button size="sm" variant="outline" onClick={() => setPasteOpen(true)}><ClipboardPaste className="w-4 h-4 mr-1" />Coller un texte</Button>
         <Button size="sm" onClick={openAdd}><Plus className="w-4 h-4 mr-1" />Ajouter</Button>
       </div>
 
@@ -90,6 +93,7 @@ export default function ScenariosTab({ presetData, presetOpen }) {
       )}
 
       <ScenarioFormDialog open={dialogOpen} onClose={() => setDialogOpen(false)} editEntry={editEntry} presetData={dialogPreset} onSaved={refresh} />
+      <PasteScenarioDialog open={pasteOpen} onClose={() => setPasteOpen(false)} onSaved={refresh} />
 
       {/* Test / Preview dialog */}
       <Dialog open={!!testScenario} onOpenChange={() => setTestScenario(null)}>
