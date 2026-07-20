@@ -278,7 +278,7 @@ async function transcrireAudio(base44, audioUrl, mediaContentType = '') {
       confidence: evalConfiance.confidence,
       status: evalConfiance.status,
       raisons: evalConfiance.raisons,
-      methode: usedFallback ? 'whisper' : 'gemini_flash',
+      methode: usedFallback ? 'whisper' : 'llm_fallback',
     };
   } catch (e) {
     const tempsMs = Date.now() - startTime;
