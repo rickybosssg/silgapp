@@ -1769,6 +1769,8 @@ Deno.serve(async (req) => {
             reponseFinale = cr2.message;
             courseCreee = true;
             um.course_created = true; um.course_id = cr2.course.id;
+            pendingCourse = um;
+            await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(um) });
             if (memoireLongue) {
               await mettreAJourMemoireLongue(base44, memoireLongue.id, {
                 adresse_recuperee: um.adresse_depart, adresse_livraison: um.adresse_arrivee,
