@@ -168,19 +168,6 @@ const RACCOURCIS_FREQUENTS: { patterns: RegExp[]; reponse: string; intention: st
     action: 'repondre_info',
     outils: ['heuristic:presentation'],
   },
-  // ── Annulation ──
-  {
-    patterns: [
-      /\bje\s+veux\s+(annuler|stopper|supprimer)\s+(ma\s+)?(course|livraison|commande)\b/i,
-      /\bannuler\s+(ma\s+)?(course|livraison|commande)\b/i,
-      /\bje\s+(veux\s+)?annuler\b/i,
-      /\barreter\s+(ma\s+)?(course|livraison)\b/i,
-    ],
-    reponse: "Je comprends que vous souhaitez annuler votre course. Si un livreur a déjà été assigné et est en route, des frais d'annulation peuvent s'appliquer. Si aucune course n'est active, il n'y a rien à annuler. Pouvez-vous me confirmer la référence de la course que vous souhaitez annuler ?",
-    intention: 'annuler_course',
-    action: 'repondre_info',
-    outils: ['heuristic:annulation'],
-  },
   // ── Contacter le support ──
   {
     patterns: [

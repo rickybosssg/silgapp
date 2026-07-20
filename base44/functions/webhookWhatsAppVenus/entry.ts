@@ -1205,6 +1205,124 @@ async function handleContactLivreur(base44: any, conversation: any, userMessage:
   return response;
 }
 
+/**
+ * Gestion de l'annulation de course par le client via WhatsApp.
+ *
+ * Cette fonction est DÉTERMINISTE (0 crédit LLM) et gère deux cas :
+ * 1. Le client demande directement l'annulation ("annule", "annuler ma course", etc.)
+ * 2. Le client confirme une annulation demandée par VENUS ("oui" après que VENUS a demandé "Tu confirmes l'annulation ?")
+ *
+ * Séquence obligatoire :
+ *   1. Appeler l'API d'annulation (annulerCourseExterne)
+ *   2. Vérifier que la DB confirme le statut "annulee"
+ *   3. Stopper toutes les notifications liées à la course
+ *   4. Seulement après vérification, retourner le message de succès
+ *   5. Si échec, retourner un message d'erreur — JAMAIS de faux succès
+ */
+async function handleAnnulationCourse(base44: any, conversation: any, userMessage: string, telephone: string, profileName: string, countryCode: string): Promise<string | null> {
+  const msgLower = userMessage.toLowerCase().trim();
+
+  // ── Mots-clés d'annulation directe ──
+  const ANNUL_KEYWORDS = [
+    'annule', 'annuler', 'annulation', 'annulez',
+    'supprime', 'supprimer', 'supprimez',
+    'stoppe', 'stopper', 'arrete', 'arrêter', 'arrête',
+    'je veux annuler', 'annule la course', 'annule ma course',
+    'annule cette course', 'plus besoin de la course',
+  ];
+  // Exclure les négations
+  const isNegative = msgLower.includes('ne veux pas') || msgLower.includes('ne pas annuler') || msgLower.includes('garde') || msgLower.includes('annule pas');
+  const isDirectAnnulation = !isNegative && ANNUL_KEYWORDS.some(kw => msgLower.includes(kw));
+
+  // ── Détection de confirmation ("oui" après que VENUS a demandé l'annulation) ──
+  const CONFIRM_KW = ['oui', 'ok', "d'accord", 'd accord', 'confirme', 'valider', 'valide', 'go', 'ouais', 'volontiers', 'correct', 'daco', 'je confirme'];
+  const isConfirmation = msgLower.length <= 30 && CONFIRM_KW.some(kw => msgLower === kw || msgLower.startsWith(kw + ' ') || msgLower.startsWith(kw + '.') || msgLower.startsWith(kw + '!'));
+
+  let shouldCancel = isDirectAnnulation;
+
+  // Si c'est une confirmation, vérifier que VENUS a demandé une annulation
+  if (!shouldCancel && isConfirmation) {
+    try {
+      const recentMessages = await base44.asServiceRole.entities.Message.filter(
+        { conversation_id: conversation.id, sender_type: 'admin', source: 'whatsapp' },
+        '-created_date', 3
+      ).catch(() => []);
+      const lastVenusMsg = (recentMessages?.[0]?.content || '').toLowerCase();
+      if (lastVenusMsg.includes('annul')) {
+        shouldCancel = true;
+        console.log('[WebhookVenus] 🗑️ Confirmation d\'annulation détectée (VENUS avait demandé confirmation)');
+      }
+    } catch {}
+  }
+
+  if (!shouldCancel) return null;
+
+  // ── Trouver la course active ──
+  const STATUTS_ACTIFS = ['nouvelle', 'programmee', 'recherche_livreur', 'livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison', 'arrivee'];
+
+  let courses = await base44.asServiceRole.entities.CourseExterne.filter(
+    { client_telephone: telephone }, '-created_date', 10
+  );
+  if (!courses || courses.length === 0) {
+    courses = await base44.asServiceRole.entities.CourseExterne.filter(
+      { expediteur_telephone: telephone }, '-created_date', 10
+    );
+  }
+  if (!courses || courses.length === 0) {
+    const allRecent = await base44.asServiceRole.entities.CourseExterne.filter(
+      { country_code: countryCode }, '-created_date', 50
+    );
+    const telDigits = telephone.replace(/\D/g, '');
+    courses = (allRecent || []).filter(c => {
+      const ct = (c.client_telephone || '').replace(/\D/g, '');
+      const et = (c.expediteur_telephone || '').replace(/\D/g, '');
+      return ct.endsWith(telDigits.slice(-8)) || et.endsWith(telDigits.slice(-8));
+    }).slice(0, 10);
+  }
+
+  const courseActive = courses?.find(c => STATUTS_ACTIFS.includes(c.statut));
+  if (!courseActive) {
+    return "Je ne trouve aucune course active à annuler. Si vous souhaitez créer une nouvelle course, dites-le moi ! Pour toute question, contactez le support au +226 66 92 51 90.";
+  }
+
+  // ── Effectuer l'annulation avec vérification DB obligatoire ──
+  try {
+    console.log(`[WebhookVenus] 🗑️ Annulation demandée pour course ${courseActive.id} (statut actuel: ${courseActive.statut})`);
+
+    // 1. Appeler l'API/backend d'annulation
+    await base44.asServiceRole.functions.invoke('annulerCourseExterne', {
+      course_id: courseActive.id,
+      motif: 'client_change_avis',
+      source: 'admin',
+    });
+
+    // 2. Vérifier que la DB confirme réellement le statut "annulee"
+    const courseVerifiee = await base44.asServiceRole.entities.CourseExterne.get(courseActive.id);
+
+    if (courseVerifiee && courseVerifiee.statut === 'annulee') {
+      // 3. Vérifier que la recherche de livreur est arrêtée (dispatch_status = expire)
+      // 4. Stopper toutes les notifications liées à cette course
+      const notifsActives = await base44.asServiceRole.entities.Notification.filter({
+        course_id: courseActive.id, lue: false,
+      }).catch(() => []);
+      for (const n of notifsActives) {
+        await base44.asServiceRole.entities.Notification.update(n.id, { lue: true }).catch(() => null);
+      }
+
+      console.log(`[WebhookVenus] ✅ Annulation CONFIRMÉE en DB pour course ${courseActive.id} | dispatch: ${courseVerifiee.dispatch_status} | ${notifsActives.length} notifications stoppées`);
+
+      return `✅ Votre course a été annulée avec succès.\n\n📝 Référence : SG-${courseActive.id.slice(-6).toUpperCase()}\n\nSi vous souhaitez créer une nouvelle course, je suis à votre disposition.`;
+    } else {
+      // L'annulation n'a pas été confirmée en DB — NE JAMAIS annoncer un succès
+      console.error(`[WebhookVenus] ❌ Annulation ÉCHOUÉE pour course ${courseActive.id} — statut DB: ${courseVerifiee?.statut || 'introuvable'}`);
+      return "⚠️ Je n'ai pas pu annuler votre course. Une erreur technique est survenue. Veuillez réessayer ou contacter le support au +226 66 92 51 90.";
+    }
+  } catch (e: any) {
+    console.error(`[WebhookVenus] ❌ Erreur annulation course ${courseActive.id}:`, e.message);
+    return "⚠️ Je n'ai pas pu annuler votre course pour le moment. Veuillez réessayer ou contacter le support au +226 66 92 51 90.";
+  }
+}
+
 Deno.serve(async (req) => {
   let typingInterval: any = null;
   let waitTimeout: any = null;
@@ -1555,6 +1673,16 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── Annulation de course (bypass déterministe — 0 crédit LLM) ──
+    // Détecte les demandes d'annulation directes ET les confirmations après question VENUS.
+    // Effectue l'annulation avec vérification DB obligatoire avant d'annoncer le succès.
+    if (!reponseVenus) {
+      const annulResponse = await handleAnnulationCourse(base44, conversation, messageEffectif, telephone, profileName, countryCode);
+      if (annulResponse) {
+        reponseVenus = annulResponse;
+      }
+    }
+
     // ── Contact livreur : détection d'intention ou relayage de message ──
     if (!reponseVenus) {
       const contactResponse = await handleContactLivreur(base44, conversation, messageEffectif, telephone, profileName);
@@ -1664,6 +1792,43 @@ Deno.serve(async (req) => {
           reponseFinale = await handleConsultationCourse(base44, telephone, messageEffectif, profileName);
         } else if (reasoningResult.action === 'contacter_livreur') {
           reponseFinale = await handleContactLivreur(base44, conversation, messageEffectif, telephone, profileName);
+        } else if (reasoningResult.action === 'annuler_course') {
+          // ── ANNULATION AVEC VÉRIFICATION DB OBLIGATOIRE ──
+          // VENUS ne doit JAMAIS annoncer un succès d'annulation sans vérification DB.
+          if (!courseActive) {
+            reponseFinale = "Je ne trouve aucune course active à annuler. Si vous souhaitez créer une nouvelle course, dites-le moi ! Pour toute question, contactez le support au +226 66 92 51 90.";
+          } else {
+            try {
+              console.log(`[WebhookVenus] 🗑️ Annulation demandée pour course ${courseActive.id} (statut actuel: ${courseActive.statut})`);
+              // 1. Appeler l'API/backend d'annulation
+              await base44.asServiceRole.functions.invoke('annulerCourseExterne', {
+                course_id: courseActive.id,
+                motif: 'client_change_avis',
+                source: 'admin',
+              });
+              // 2. Vérifier que la DB confirme réellement le statut "annulee"
+              const courseVerifiee = await base44.asServiceRole.entities.CourseExterne.get(courseActive.id);
+              if (courseVerifiee && courseVerifiee.statut === 'annulee') {
+                // 3. Vérifier que la recherche de livreur est arrêtée (dispatch_status expire)
+                // 4. Stopper toutes les notifications liées à cette course
+                const notifsActives = await base44.asServiceRole.entities.Notification.filter({
+                  course_id: courseActive.id, lue: false,
+                }).catch(() => []);
+                for (const n of notifsActives) {
+                  await base44.asServiceRole.entities.Notification.update(n.id, { lue: true }).catch(() => null);
+                }
+                console.log(`[WebhookVenus] ✅ Annulation CONFIRMÉE en DB pour course ${courseActive.id} | dispatch: ${courseVerifiee.dispatch_status} | ${notifsActives.length} notifications stoppées`);
+                reponseFinale = `✅ Votre course a été annulée avec succès.\n\n📝 Référence : SG-${courseActive.id.slice(-6).toUpperCase()}\n\nSi vous souhaitez créer une nouvelle course, je suis à votre disposition.`;
+              } else {
+                // L'annulation n'a pas été confirmée en DB — NE JAMAIS annoncer un succès
+                console.error(`[WebhookVenus] ❌ Annulation ÉCHOUÉE pour course ${courseActive.id} — statut DB: ${courseVerifiee?.statut || 'introuvable'}`);
+                reponseFinale = "⚠️ Je n'ai pas pu annuler votre course. Une erreur technique est survenue. Veuillez réessayer ou contacter le support au +226 66 92 51 90.";
+              }
+            } catch (e) {
+              console.error(`[WebhookVenus] ❌ Erreur annulation course ${courseActive.id}:`, e.message);
+              reponseFinale = "⚠️ Je n'ai pas pu annuler votre course pour le moment. Veuillez réessayer ou contacter le support au +226 66 92 51 90.";
+            }
+          }
         }
 
         reponseVenus = reponseFinale;
