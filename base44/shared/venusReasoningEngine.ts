@@ -23,6 +23,12 @@
 import { rechercherConnaissancesValidees } from './venusLearningEngine.ts';
 import { rechercherDocumentsRag } from './venusRagEngine.ts';
 import { construireContexteVenus } from './venusI18nEngine.ts';
+import {
+  detecterIntentionRapide,
+  executerOutilsPourIntention,
+  formaterOutilsPourPrompt,
+  detecterHallucination,
+} from './venusToolsEngine.ts';
 
 /**
  * Recherche les scénarios validés pour un pays/langue donnés (Source 3).
@@ -73,6 +79,7 @@ interface ReasoningInput {
   telephone: string;
   profileName: string;
   isAudioTranscription: boolean;
+  outils_resultats?: any[];
 }
 
 interface ReasoningResult {
@@ -648,6 +655,16 @@ ${knowledgeStr}
 ═══ BIBLIOTHÈQUE DOCUMENTAIRE (Source 3 — Documents officiels SILGAPP) ═══
 ${documentStr}
 
+═══ DONNÉES OPÉRATIONNELLES (OUTILS SILGAPP — Source 6 — Données réelles) ═══
+${input.outils_resultats ? formaterOutilsPourPrompt(input.outils_resultats) : 'Aucun outil appelé pour cette intention.'}
+
+═══ ANTI-HALLUCINATION ═══
+Tu DOIS utiliser UNIQUEMENT les données ci-dessus pour répondre aux questions factuelles.
+- Si un outil retourne NON TROUVÉ, dis clairement que tu n\'as pas cette information. N\'INVENTE JAMAIS.
+- Si un client demande le statut d\'une course et qu\'aucune course active n\'est trouvée, dis-le.
+- Si un client demande un prix, utilise UNIQUEMENT les tarifs officiels de l\'outil obtenir_tarifs_officiels.
+- Ne JAMAIS inventer un nom de livreur, un statut, un prix, ou une référence de course.
+
 ${audioNote}
 
 ═══ MESSAGE DU CLIENT ═══
@@ -841,6 +858,57 @@ Réponds UNIQUEMENT avec un JSON.`;
       temps_traitement_ms: Date.now() - startTime,
     };
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 5b. RAISONNEMENT AVEC OUTILS (wrapper intégrant le moteur d'outils)
+// ═══════════════════════════════════════════════════════════════════
+
+export async function raisonnerVenusAvecOutils(
+  base44: any,
+  input: ReasoningInput
+): Promise<{ result: ReasoningResult; outils_resultats: any[]; intention_rapide: string; hallucination: any }> {
+  // ── Étape 1 : Détection d'intention rapide (heuristique) ──
+  const intentionRapide = detecterIntentionRapide(input.messageClient);
+  console.log(`[ReasoningEngine] 🎯 Intention rapide détectée: ${intentionRapide}`);
+
+  // ── Étape 2 : Exécution des outils pertinents ──
+  const ctx = {
+    telephone: input.telephone,
+    countryCode: input.countryCode,
+    profileName: input.profileName,
+    memoireCourte: input.memoireCourte,
+    courseActive: input.courseActive,
+  };
+
+  let outilsResultats: any[] = [];
+  try {
+    outilsResultats = await executerOutilsPourIntention(base44, intentionRapide, ctx);
+    console.log(`[ReasoningEngine] 🔧 ${outilsResultats.length} outil(s) exécuté(s) pour intention "${intentionRapide}"`);
+  } catch (e) {
+    console.warn('[ReasoningEngine] Erreur exécution outils:', e.message);
+  }
+
+  // ── Étape 3 : Raisonnement LLM avec données d'outils injectées ──
+  const result = await raisonnerVenus(base44, {
+    ...input,
+    outils_resultats: outilsResultats,
+  });
+
+  // ── Étape 4 : Vérification anti-hallucination ──
+  const hallucination = detecterHallucination(result.reponse, outilsResultats);
+  if (hallucination.suspecte) {
+    console.warn(`[ReasoningEngine] ⚠️ Hallucination suspectée: ${hallucination.details}`);
+    if (!result.outils_utilises) result.outils_utilises = [];
+    result.outils_utilises.push('hallucination_check:warn');
+  }
+
+  return {
+    result,
+    outils_resultats: outilsResultats,
+    intention_rapide: intentionRapide,
+    hallucination,
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════════
