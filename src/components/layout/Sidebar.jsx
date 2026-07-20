@@ -44,6 +44,7 @@ export const navItems = [
   { path: "/admin/livreurs-bloques", label: "Livreurs bloqués", icon: ShieldAlert },
   { path: "/admin/anti-fraude", label: "Anti-Fraude", icon: Shield },
   { path: "/admin/messages", label: "Messagerie", icon: MessageCircle },
+  { path: "/admin/whatsapp", label: "WhatsApp Admin", icon: MessageCircle },
   { path: "/admin/support", label: "Support tickets", icon: MessageCircle },
   { path: "/admin/boutiques", label: "Boutiques", icon: Store },
   { path: "/admin/restaurants", label: "Restaurants", icon: UtensilsCrossed },
