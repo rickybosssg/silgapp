@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.38';
 import {
   indexerDocumentComplet,
+  indexerTexteDirect,
   rechercherDocumentsRag,
   getStatistiquesDocuments,
   getHistoriqueVersions,
@@ -41,6 +42,14 @@ Deno.serve(async (req) => {
           document_existant_id: body.document_existant_id,
         });
 
+        return Response.json(result);
+      }
+
+      case 'index_texte_direct': {
+        const result = await indexerTexteDirect(base44, {
+          texte: body.texte,
+          auteur: body.auteur || 'admin',
+        });
         return Response.json(result);
       }
 

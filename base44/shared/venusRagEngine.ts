@@ -710,6 +710,206 @@ export async function indexerDocumentComplet(
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// 7bis. INDEXATION DIRECTE DE TEXTE (COLLER UN TEXTE)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Génère automatiquement un titre à partir d'un texte.
+ * Utilise les premières lignes significatives, ou l'IA si le texte est complexe.
+ */
+export async function genererTitreAutomatique(base44: any, texte: string): Promise<string> {
+  if (!texte || texte.trim().length === 0) return 'Document sans titre';
+
+  const lignes = texte.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const premiereLigne = lignes[0] || '';
+
+  // Si la première ligne est courte et ressemble à un titre (< 100 chars, pas de ponctuation finale)
+  if (premiereLigne.length > 5 && premiereLigne.length <= 100 && !/[.!?,;:]$/.test(premiereLigne)) {
+    return premiereLigne.substring(0, 100);
+  }
+
+  // Sinon, utiliser l'IA pour générer un titre
+  try {
+    const llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
+      prompt: `Genere un titre court et descriptif (max 80 caracteres) pour le document suivant. Retourne uniquement le titre, sans guillemets ni ponctuation finale.
+
+Document:
+${texte.substring(0, 2000)}`,
+      response_json_schema: {
+        type: 'object',
+        properties: {
+          titre: { type: 'string', description: 'Titre court et descriptif' },
+        },
+        required: ['titre'],
+      },
+    });
+    const result: any = typeof llmRes === 'string' ? JSON.parse(llmRes) : llmRes;
+    return (result.titre || premiereLigne.substring(0, 80) || 'Document sans titre').substring(0, 100);
+  } catch {
+    // Fallback: utiliser la première ligne tronquée
+    return premiereLigne.substring(0, 80) || 'Document sans titre';
+  }
+}
+
+/**
+ * Détecte automatiquement la catégorie d'un texte.
+ */
+export function detecterCategorieAutomatique(texte: string): string {
+  if (!texte) return 'SILGAPP';
+  const lower = texte.toLowerCase();
+
+  const CATEGORIES_MAP: Record<string, string[]> = {
+    'Livreurs': ['livreur', 'coursier', 'chauffeur', 'transporteur'],
+    'Clients': ['client', 'customer', 'utilisateur'],
+    'Pharmacies': ['pharmacie', 'medicament', 'ordonnance'],
+    'Restaurants': ['restaurant', 'repas', 'menu', 'plat', 'nourriture'],
+    'Boutiques': ['boutique', 'magasin', 'produit', 'commerce'],
+    'Paiements': ['paiement', 'payer', 'facture', 'transaction', 'argent'],
+    'Juridique': ['legal', 'juridique', 'contrat', 'cgu', 'confidentialite'],
+    'Marketing': ['marketing', 'publicite', 'promotion', 'campagne'],
+    'Technique': ['api', 'technique', 'integration', 'webhook', 'systeme'],
+    'Formation': ['formation', 'guide', 'tutoriel', 'apprentissage'],
+    'Administration': ['administration', 'admin', 'gestion', 'configuration'],
+  };
+
+  let bestCat = 'SILGAPP';
+  let bestScore = 0;
+
+  for (const [cat, mots] of Object.entries(CATEGORIES_MAP)) {
+    let score = 0;
+    for (const mot of mots) {
+      const matches = (lower.match(new RegExp(`\\b${mot}\\b`, 'g')) || []).length;
+      score += matches;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestCat = cat;
+    }
+  }
+
+  return bestCat;
+}
+
+/**
+ * Pipeline d'indexation directe de texte (copier-coller).
+ *
+ * Étapes :
+ * 1. Générer un titre automatique
+ * 2. Détecter la catégorie automatiquement
+ * 3. Détecter la langue
+ * 4. Découper en chunks
+ * 5. Générer un résumé
+ * 6. Extraire les mots-clés
+ * 7. Créer le VenusDocument
+ * 8. Créer les VenusDocumentChunk
+ *
+ * Aucun champ requis de la part de l'admin — juste le texte brut.
+ */
+export async function indexerTexteDirect(
+  base44: any,
+  params: {
+    texte: string;
+    auteur?: string;
+  }
+): Promise<{ success: boolean; document?: any; chunks?: any[]; error?: string }> {
+  try {
+    const texte = params.texte?.trim();
+    if (!texte || texte.length < 20) {
+      return { success: false, error: 'Le texte est trop court (minimum 20 caractères)' };
+    }
+
+    console.log(`[RAGEngine] 📝 Indexation directe de texte (${texte.length} caractères)`);
+
+    // Étape 1 : Titre automatique
+    const titre = await genererTitreAutomatique(base44, texte);
+    console.log(`[RAGEngine] ✅ Titre généré: "${titre}"`);
+
+    // Étape 2 : Catégorie automatique
+    const categorie = detecterCategorieAutomatique(texte);
+
+    // Étape 3 : Langue
+    const langue = detecterLangue(texte);
+
+    // Étape 4 : Découpage en chunks
+    const chunksTexte = decouperTexteIntelligent(texte);
+    console.log(`[RAGEngine] ✅ Découpé en ${chunksTexte.length} chunks`);
+
+    // Étape 5 : Résumé
+    const resume = await genererResumeDocument(base44, texte);
+
+    // Étape 6 : Mots-clés
+    const motsCles = await extraireMotsClesDocument(base44, texte);
+
+    // Étape 7 : Créer le document
+    const document = await base44.asServiceRole.entities.VenusDocument.create({
+      titre,
+      description: resume.substring(0, 200),
+      categorie,
+      type_document: 'Texte',
+      fichier_url: '',
+      fichier_nom: '',
+      fichier_type_mime: 'text/plain',
+      fichier_taille: texte.length,
+      langue,
+      mots_cles: JSON.stringify(motsCles),
+      resume,
+      nb_chunks: chunksTexte.length,
+      nb_pages: Math.ceil(texte.length / 3000),
+      version: 1,
+      auteur: params.auteur || 'admin',
+      statut: 'valide',
+      date_validation: new Date().toISOString(),
+      valide_par: params.auteur || 'admin',
+      historique: JSON.stringify([{ version: 1, auteur: params.auteur || 'admin', date: new Date().toISOString(), action: 'creation_directe' }]),
+      tags: JSON.stringify([]),
+      pays: 'ALL',
+      version_precedente_id: '',
+      is_latest_version: true,
+      nb_consultations: 0,
+      date_indexation: new Date().toISOString(),
+    });
+
+    console.log(`[RAGEngine] ✅ Document créé: ${document.id} (titre: "${titre}")`);
+
+    // Étape 8 : Créer les chunks
+    const chunkRecords: any[] = [];
+    for (let i = 0; i < chunksTexte.length; i++) {
+      const chunkTexte = chunksTexte[i];
+
+      let chunkMotsCles: string[] = [];
+      if (chunkTexte.length > 100) {
+        const chunkKeywordsRaw = extraireMotsClesFromQuery(chunkTexte);
+        chunkMotsCles = chunkKeywordsRaw.slice(0, 10);
+      }
+
+      const chunk = await base44.asServiceRole.entities.VenusDocumentChunk.create({
+        document_id: document.id,
+        document_titre: document.titre,
+        document_version: document.version,
+        document_categorie: document.categorie,
+        document_statut: document.statut,
+        document_pays: document.pays,
+        chunk_index: i,
+        contenu: chunkTexte,
+        mots_cles: JSON.stringify(chunkMotsCles),
+        langue,
+        resume_section: chunkTexte.substring(0, 100),
+        page_numero: Math.floor(i / 3) + 1,
+        nb_consultations: 0,
+      });
+      chunkRecords.push(chunk);
+    }
+
+    console.log(`[RAGEngine] ✅ ${chunkRecords.length} chunks indexés pour "${titre}"`);
+
+    return { success: true, document, chunks: chunkRecords };
+  } catch (e: any) {
+    console.error('[RAGEngine] Erreur indexation directe:', e.message);
+    return { success: false, error: e.message };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // 8. GESTION DES VERSIONS
 // ═══════════════════════════════════════════════════════════════════
 
