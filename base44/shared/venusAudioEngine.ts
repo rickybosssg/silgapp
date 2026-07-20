@@ -269,8 +269,8 @@ export function peutAgirSurAudio(confidence: number): {
   }
   return {
     peutAgir: true,
-    forceConfirmation: true, // Toujours confirmer pour l'audio
-    raison: 'Confiance suffisante — confirmation recommandée',
+    forceConfirmation: false, // Confiance suffisante — agir normalement
+    raison: 'Confiance suffisante — pas de confirmation forcée requise',
   };
 }
 

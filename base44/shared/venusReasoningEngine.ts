@@ -716,13 +716,20 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
   const audioNote = input.isAudioTranscription
     ? `═══ NOTE: TRANSCRIPTION VOCALE ═══
 Le message ci-dessous a ete transcrit depuis une note vocale et peut contenir des erreurs.
-Confirme ce que tu as compris avant de poursuivre si un mot semble incertain.
 Noms de quartiers et repères courants à Ouagadougou: Karpala, Pissy, Tampouy, Ouaga 2000, Zone du Bois, Patte d'Oie, Gounghin, Dassasgho, Cissin, Samandin, Wemtenga, Bendogo, Larle, Somgande, Saaba, Tanghin, Kossodo, 1200 Logements, 2000 Logements, Sonabel, Sonatur, Château, Polesgo, Sapone, Dagnoen, Zogona.
 
 IMPORTANT: Identifie d'abord QUI parle avant d'interpréter le message:
 - Un client qui demande un service: "je voudrais envoyer", "je veux livrer", "j'ai besoin d'une livraison"
 - Un livreur qui rapporte son statut: "j'ai fini à", "je suis à", "je m'en vais à", "j'ai récupéré"
-- Quelqu'un qui parle à une autre personne: "tu n'es pas au bureau?", "sors", "appelle-moi"`
+- Quelqu'un qui parle à une autre personne: "tu n'es pas au bureau?", "sors", "appelle-moi"
+
+═══ CONTINUITÉ DE CONVERSATION (TRÈS IMPORTANT) ═══
+Si VENUS a posé une question dans le dernier message de l'historique, le message actuel est probablement LA RÉPONSE à cette question.
+- Si VENUS a demandé un numéro de téléphone et le client donne des chiffres → c'est le contact_telephone, NE PAS recréer une nouvelle course.
+- Si VENUS a demandé le type de course et le client dit "envoi" ou "réception" → c'est le type_course.
+- Si VENUS a demandé une adresse et le client donne un quartier → c'est l'adresse manquante.
+- NE JAMAIS réinterpréter une réponse comme une NOUVELLE demande si des informations sont déjà dans la mémoire courte.
+- NE JAMAIS écraser une adresse déjà connue par une nouvelle adresse extraite du message, SAUF si le client corrige explicitement ("non, c'est pas X c'est Y").`
     : '';
 
   const prompt = `${localizedSystemPrompt || 'Tu es VENUS, l\'assistante virtuelle SILGAPP. Tu possèdes un MOTEUR DE RAISONNEMENT avancé et une MÉMOIRE INTELLIGENTE.'}
@@ -773,13 +780,17 @@ Tu DOIS utiliser UNIQUEMENT les données ci-dessus pour répondre aux questions 
 
 ${audioNote}
 
-${input.force_confirmation ? `═══ ⚠️ CONFIRMATION OBLIGATOIRE (AUDIO) ═══
-Le message du client provient d'une transcription audio. Tu DOIS :
+${input.force_confirmation ? `═══ ⚠️ CONFIRMATION OBLIGATOIRE (AUDIO À FAIBLE CONFIANCE) ═══
+Le message du client provient d'une transcription audio AVEC UNE CONFIANCE FAIBLE. Tu DOIS :
 1. reformuler ce que tu as compris : "Si j'ai bien compris, vous souhaitez..."
 2. NE JAMAIS créer de course directement — choisis action=poser_question
 3. Demander confirmation explicite avant toute action sensible
 4. Si un mot semble incorrect ou ambigu, demande une clarification
-` : ''}
+` : `═══ AUDIO CONFIANCE ═══
+Le message provient d'une transcription audio de BONNE qualité. Tu peux agir normalement.
+Si le client répond à une question que tu as posée, utilise sa réponse directement.
+Ne force PAS de reformulation inutile ("Si j'ai bien compris...") si la confiance est bonne.
+`}
 
 ═══ MESSAGE DU CLIENT ═══
 ${input.messageClient}
@@ -888,6 +899,15 @@ Champs possibles: client_nom, ville_habituelle, quartier_habituel, langue_prefer
 17. MESSAGE HORS CONTEXTE: Si le message s'adresse à quelqu'un d'autre et n'est pas une demande SILGAPP (ex: "tu n'es pas au bureau?", "sors dehors", "je suis devant la porte", "appelle ton numéro"), réponds poliment: "Je suis VENUS, l'assistante SILGAPP. Il semble que votre message s'adresse à quelqu'un d'autre. Si vous avez besoin d'une livraison ou d'un envoi de colis, je suis là pour vous aider !" avec intention=message_hors_contexte et action=repondre_info.
 
 18. MENTION DE LIEUX SANS DEMANDE: Le simple fait de mentionner un quartier (Karpala, Patte d'Oie, etc.) NE signifie PAS que le client veut créer une course. Ne crée une course QUE si le client exprime clairement une demande de service ("je voudrais envoyer", "je veux livrer", "j'ai besoin d'une livraison").
+
+19. CONTINUITÉ DE CONVERSATION (CRITIQUE): Si VENUS a posé une question dans son dernier message, le message actuel est probablement LA RÉPONSE à cette question. Dans ce cas:
+   - Si la mémoire courte a déjà adresse_depart, NE PAS l'écraser avec une nouvelle adresse extraite du message.
+   - Si la mémoire courte a déjà adresse_arrivee, NE PAS l'écraser.
+   - Si la mémoire courte a déjà type_course, NE PAS le redemander.
+   - Un numéro de téléphone dans la réponse = contact_telephone, PAS une nouvelle demande.
+   - NE PAS inclure dans memoire_courte_update les champs qui sont DÉJÀ présents dans la mémoire courte avec la même valeur ou une valeur non vide.
+
+20. RÉPONSE À UNE QUESTION: Si VENUS a demandé "quel est le numéro du destinataire?" et le client répond "70 12 34 56", la réponse est contact_telephone="70123456". L'action doit être poser_question (prochaine info manquante) ou creer_course (si tout est complet). NE JAMAIS reformuler "Si j'ai bien compris vous souhaitez..." dans ce cas.
 
 Réponds UNIQUEMENT avec un JSON.`;
 
