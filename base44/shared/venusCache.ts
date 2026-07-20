@@ -181,7 +181,11 @@ export function detecterConnaissanceDirecte(message: string, connaissances: any[
     const qNorm = k.question.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
     // Correspondance exacte ou quasi-exacte
-    if (msgLower === qNorm || (msgLower.length > 10 && (msgLower.includes(qNorm) || qNorm.includes(msgLower)))) {
+    // ATTENTION: on ne fait que msgLower.includes(qNorm) — le message du client doit
+    // CONTENIR la question de la connaissance. L'inverse (qNorm.includes(msgLower))
+    // ferait correspondre "je veux envoyer un colis" à "je veux envoyer un colis à Karpala"
+    // ce qui est trop permissif et provoque des hallucinations.
+    if (msgLower === qNorm || (msgLower.length > 10 && msgLower.includes(qNorm))) {
       if (k.reponse_officielle && k.reponse_officielle.length > 10) {
         console.log(`[VenusCache] 📚 Connaissance directe: ${k.titre}`);
         return {
