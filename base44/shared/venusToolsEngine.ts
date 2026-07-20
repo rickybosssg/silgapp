@@ -33,6 +33,7 @@ interface ToolContext {
   profileName: string;
   memoireCourte: any;
   courseActive?: any;
+  messageClient?: string;
 }
 
 interface VenusTool {
@@ -735,9 +736,31 @@ export async function executerOutilsPourIntention(
   intention: string,
   ctx: ToolContext
 ): Promise<ToolResult[]> {
-  const toolsToRun = TOOLS_REGISTRY.filter(t =>
+  let toolsToRun = TOOLS_REGISTRY.filter(t =>
     t.intentions.includes(intention)
   );
+
+  // ── Sub-sélection pour demander_info : n'exécuter que les outils pertinents ──
+  if (intention === 'demander_info') {
+    const lastMsg = (ctx.messageClient || '').toLowerCase();
+    
+    const isPriceQuestion = lastMsg.match(/(combien|prix|tarif|coute|ca coute|cher|montant|frais)/);
+    const isBoutiqueQuestion = lastMsg.includes('boutique') || lastMsg.includes('magasin') || lastMsg.includes('acheter');
+    const isRestaurantQuestion = lastMsg.includes('restaurant') || lastMsg.includes('manger') || lastMsg.includes('plat') || lastMsg.includes('nourriture');
+    const isPharmacieQuestion = lastMsg.includes('pharmacie') || lastMsg.includes('medicament') || lastMsg.includes('garde');
+    const isPaiementQuestion = lastMsg.includes('paiement') || lastMsg.includes('payer') || lastMsg.includes('orange money') || lastMsg.includes('moov') || lastMsg.includes('wave');
+    const isClientQuestion = lastMsg.includes('mon compte') || lastMsg.includes('mon profil') || lastMsg.includes('mon solde');
+
+    toolsToRun = toolsToRun.filter(t => {
+      if (t.nom === 'obtenir_tarifs_officiels' && (isPriceQuestion || (!isBoutiqueQuestion && !isRestaurantQuestion && !isPharmacieQuestion && !isPaiementQuestion && !isClientQuestion))) return true;
+      if (t.nom === 'consulter_boutique' && isBoutiqueQuestion) return true;
+      if (t.nom === 'consulter_restaurant' && isRestaurantQuestion) return true;
+      if (t.nom === 'consulter_pharmacie' && isPharmacieQuestion) return true;
+      if (t.nom === 'verifier_paiement' && isPaiementQuestion) return true;
+      if (t.nom === 'rechercher_client' && isClientQuestion) return true;
+      return false;
+    });
+  }
 
   if (toolsToRun.length === 0) {
     return [];
@@ -819,8 +842,11 @@ export function detecterHallucination(reponse: string, outilsResults: ToolResult
         details: 'VENUS mentionne un prix spécifique mais aucun outil n\'a retourné de données officielles.',
       };
     }
-    // Vérifier si VENUS donne un statut spécifique
-    if (r.includes('en cours') || r.includes('en livraison') || r.includes('livreur en route')) {
+    // Vérifier si VENUS donne un statut spécifique — MAIS pas si elle dit qu'il n'y en a PAS
+    const negationPresente = r.includes('aucune') || r.includes("n'ai pas") || r.includes("n'a pas") ||
+      r.includes('pas de course') || r.includes('ne trouve aucune') || r.includes('non trouv') ||
+      r.includes('pas de course active') || r.includes("je n'ai");
+    if (!negationPresente && (r.includes('en cours') || r.includes('en livraison') || r.includes('livreur en route'))) {
       return {
         suspecte: true,
         details: 'VENUS mentionne un statut de course mais l\'outil n\'a trouvé aucune course active.',

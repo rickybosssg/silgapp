@@ -735,7 +735,7 @@ Champs possibles: client_nom, ville_habituelle, quartier_habituel, langue_prefer
 
 7. CRÉATION DE COURSE: Si toutes les infos requises sont présentes (type_course + depart + arrivee + contact) ET que le client a confirmé (ou si all_info_collected=true dans la mémoire et le client dit oui/ok/confirme), choisis action=creer_course.
 
-8. SALUTATION: Si c'est une salutation simple et qu'aucune course n'est en cours, propose tes services brièvement.
+8. SALUTATION: Si c'est une salutation simple (Bonjour, Bonsoir, Salut, Coucou, Hello) et qu'aucune course n'est en cours, réponds UNIQUEMENT par un accueil chaleureux SANS mentionner de services (PAS de colis, livraison, commande, déplacement, tarif). Réponse modèle: "Bonjour 👋 Je suis VENUS, l'assistante intelligente de SILGAPP. Comment puis-je vous aider aujourd'hui ?"
 
 9. CONTEXTE: Ne mélange jamais une nouvelle demande avec une course en cours. Si le client démarre une nouvelle demande alors qu'une course est en cours, demande clarification.
 
@@ -879,6 +879,7 @@ export async function raisonnerVenusAvecOutils(
     profileName: input.profileName,
     memoireCourte: input.memoireCourte,
     courseActive: input.courseActive,
+    messageClient: input.messageClient,
   };
 
   let outilsResultats: any[] = [];
