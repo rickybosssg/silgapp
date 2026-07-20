@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
-  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill, PieChart, Sparkles, GraduationCap, Workflow, Brain, Library, Activity, Gauge, ShieldCheck, Bot
+  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill, PieChart, Sparkles, Brain
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
@@ -36,17 +36,7 @@ export const navItems = [
   { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Settings },
   { path: "/admin/externe/clients", label: "Clients externes", icon: Users },
   { path: "/admin/publicites", label: "Publicités", icon: Megaphone },
-  { path: "/admin/venus", label: "Centre VENUS", icon: Sparkles },
-  { path: "/admin/venus-learning", label: "Apprentissage VENUS", icon: GraduationCap },
-  { path: "/admin/venus-rapports", label: "Rapports VENUS", icon: MessageCircle },
-  { path: "/admin/venus-workflows", label: "Workflows VENUS", icon: Workflow },
-  { path: "/admin/venus-improvement", label: "Amélioration VENUS", icon: Brain },
-  { path: "/admin/venus-documents", label: "Bibliothèque RAG", icon: Library },
-  { path: "/admin/venus-supervision", label: "Supervision VENUS", icon: Activity },
-  { path: "/admin/venus-international", label: "International VENUS", icon: Globe },
-  { path: "/admin/venus-performance", label: "Performance VENUS", icon: Gauge },
-  { path: "/admin/venus-certification", label: "Certification VENUS", icon: ShieldCheck },
-  { path: "/admin/venus-agent", label: "Agent IA Autonome", icon: Bot },
+  { path: "/admin/venus-intelligence", label: "Centre d'Intelligence VENUS", icon: Brain },
   { path: "/admin/centre-notifications", label: "Notifications Push", icon: Megaphone },
   { path: "/admin/externe", label: "Config Dispatch", icon: Settings },
   { path: "/admin/demandes-livreurs", label: "Livreurs à valider", icon: UserCheck },
