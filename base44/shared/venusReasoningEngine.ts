@@ -487,11 +487,107 @@ function extraireInfosDepuisMessage(message: string): Record<string, any> {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// 4b. DÉTECTION D'INPUT SUSPECT (sécurité proactive)
+// ═══════════════════════════════════════════════════════════════════
+
+const PATTERNS_MALVEILLANTS = [
+  /<script[^>]*>/i,
+  /<\/script>/i,
+  /eval\s*\(/i,
+  /require\s*\(/i,
+  /child_process/i,
+  /exec\s*\(/i,
+  /document\.cookie/i,
+  /window\.location/i,
+  /localStorage/i,
+  /sessionStorage/i,
+  /fetch\s*\(/i,
+  /XMLHttpRequest/i,
+  /onerror\s*=/i,
+  /onload\s*=/i,
+  /javascript:/i,
+  /import\s+/i,
+  /export\s+/i,
+  /process\.env/i,
+  /__proto__/i,
+  /constructor\[/i,
+];
+
+const PATTERNS_INJECTION_PROMPT = [
+  /ignore (les? )?instructions? (pr[ée]c[ée]dentes?|pr[ée]c[ée]dente)/i,
+  /tu es maintenant/i,
+  /tu es d[ae]sormais/i,
+  /activer? le mode (admin|d[ée]veloppeur|root)/i,
+  /r[ée]initialiser tes instructions/i,
+  /oublie tes r[èe]gles/i,
+  /ignore tes r[èe]gles/i,
+  /system prompt/i,
+  /reveal your (system )?prompt/i,
+  /ignore your (previous )?instructions/i,
+  /instructions? syst[èe]me/i,
+  /r[èe]gles? internes?/i,
+  /affiche (le |ta )?(contenu|code) (de )?tes? (instructions?|r[èe]gles?)/i,
+  /montre (moi )?tes? (instructions?|r[èe]gles?|prompt)/i,
+  /mode (dan|jailbreak|sans restrictions?)/i,
+];
+
+/**
+ * Détecte si un message client contient des patterns potentiellement malveillants.
+ * Retourne { suspect: boolean, raison: string }.
+ */
+export function detecterInputSuspect(message: string): { suspect: boolean; raison: string } {
+  if (!message || typeof message !== 'string') return { suspect: false, raison: '' };
+
+  for (const pattern of PATTERNS_MALVEILLANTS) {
+    if (pattern.test(message)) {
+      return { suspect: true, raison: `Pattern malveillant détecté: ${pattern.source}` };
+    }
+  }
+
+  for (const pattern of PATTERNS_INJECTION_PROMPT) {
+    if (pattern.test(message)) {
+      return { suspect: true, raison: `Tentative d'injection de prompt: ${pattern.source}` };
+    }
+  }
+
+  return { suspect: false, raison: '' };
+}
+
+/**
+ * Génère une réponse de refus sécurisé pour les inputs suspects.
+ */
+function genererReponseRefusSecurite(): string {
+  return "Je suis VENUS, l'assistante de SILGAPP. Je ne peux pas traiter ce type de message. Si vous avez besoin d'une livraison, d'un envoi de colis ou d'un déplacement, je suis là pour vous aider. Comment puis-je vous être utile ?";
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // 5. MOTEUR DE RAISONNEMENT PRINCIPAL
 // ═══════════════════════════════════════════════════════════════════
 
 export async function raisonnerVenus(base44: any, input: ReasoningInput): Promise<ReasoningResult> {
   const startTime = Date.now();
+
+  // ── Pré-check sécurité : détecter les inputs potentiellement malveillants ──
+  const inputSuspect = detecterInputSuspect(input.messageClient);
+  if (inputSuspect.suspect) {
+    console.warn(`[ReasoningEngine] 🛡️ Input suspect détecté — refus proactif: ${inputSuspect.raison}`);
+    return {
+      intention: 'autre',
+      contexte: 'general',
+      infos_connues: {},
+      infos_manquantes: [],
+      action: 'repondre_info',
+      prochaine_question: '',
+      outils_utilises: ['security_check:blocked'],
+      confiance: 100,
+      reponse: genererReponseRefusSecurite(),
+      memoire_courte_update: {},
+      memoire_longue_update: {},
+      business_rule_id: undefined,
+      document_sources: undefined,
+      temps_traitement_ms: Date.now() - startTime,
+    };
+  }
 
   // ── Construire l'historique lisible ──
   const historiqueStr = input.historiqueRecent
@@ -840,7 +936,30 @@ Réponds UNIQUEMENT avec un JSON.`;
 
     return result;
   } catch (e: any) {
-    console.error('[ReasoningEngine] Erreur raisonnement:', e.message);
+    const isContentFilter = e.message && (e.message.includes('403') || e.message.includes('content filter'));
+    console.error(`[ReasoningEngine] Erreur raisonnement${isContentFilter ? ' (filtre contenu LLM)' : ''}:`, e.message);
+
+    // Si le filtre de contenu a bloqué le message, retourner un refus explicite
+    if (isContentFilter) {
+      return {
+        intention: 'autre',
+        contexte: 'general',
+        infos_connues: {},
+        infos_manquantes: [],
+        action: 'repondre_info',
+        prochaine_question: '',
+        outils_utilises: ['content_filter:blocked'],
+        confiance: 100,
+        reponse: genererReponseRefusSecurite(),
+        memoire_courte_update: {},
+        memoire_longue_update: {},
+        business_rule_id: undefined,
+        document_sources: undefined,
+        temps_traitement_ms: Date.now() - startTime,
+      };
+    }
+
+    // Erreur LLM générique — fallback standard
     return {
       intention: 'autre',
       contexte: 'general',
