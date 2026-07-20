@@ -108,7 +108,7 @@
   }
   
   .safe-area-top {
-    padding-top: env(safe-area-inset-top);
+    padding-top: max(env(safe-area-inset-top), 28px);
   }
 
   .scrollbar-hide {

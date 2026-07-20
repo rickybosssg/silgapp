@@ -31,7 +31,7 @@ export default function WhatsAppConversationList({
 }) {
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 bg-white border-b border-gray-100">
+      <div className="p-4 bg-white border-b border-gray-100 safe-area-top">
         <div className="flex items-center gap-2 mb-3">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center">
             <MessageCircle className="w-4 h-4 text-white" />

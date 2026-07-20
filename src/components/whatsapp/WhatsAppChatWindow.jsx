@@ -104,7 +104,7 @@ export default function WhatsAppChatWindow({ conv, myEmail, myName, onBack, onCo
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center gap-2 p-3 bg-white border-b border-gray-200 safe-area-top pt-6">
+      <div className="flex items-center gap-2 p-3 bg-white border-b border-gray-200 safe-area-top">
         <button onClick={onBack} className="md:hidden text-gray-500 p-1">
           <ArrowLeft className="w-5 h-5" />
         </button>
