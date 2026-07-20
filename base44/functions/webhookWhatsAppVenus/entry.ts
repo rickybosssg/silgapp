@@ -1759,6 +1759,7 @@ Deno.serve(async (req) => {
 
         // ── Exécuter l'action choisie ──
         let reponseFinale = reasoningResult.reponse;
+        let courseCreee = false;
 
         if (reasoningResult.action === 'creer_course') {
           const um = { ...(pendingCourse || {}), ...reasoningResult.memoire_courte_update };
@@ -1766,6 +1767,7 @@ Deno.serve(async (req) => {
           const cr2 = await creerCourseDepuisMemoire(base44, um, countryCode, tarifs, telephone, profileName);
           if (cr2.success) {
             reponseFinale = cr2.message;
+            courseCreee = true;
             um.course_created = true; um.course_id = cr2.course.id;
             if (memoireLongue) {
               await mettreAJourMemoireLongue(base44, memoireLongue.id, {
@@ -1816,6 +1818,61 @@ Deno.serve(async (req) => {
             } catch (e) {
               console.error(`[WebhookVenus] ❌ Erreur annulation course ${courseActive.id}:`, e.message);
               reponseFinale = "⚠️ Je n'ai pas pu annuler votre course pour le moment. Veuillez réessayer ou contacter le support au +226 66 92 51 90.";
+            }
+          }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // DÉTECTION DE FAUSSE CRÉATION DE COURSE (anti-hallucination)
+        // ═══════════════════════════════════════════════════════════════
+        // Si VENUS dit "je lance la recherche" dans sa réponse mais qu'aucune
+        // course n'a réellement été créée (action ≠ creer_course ou création échouée),
+        // forcer la création de manière DÉTERMINISTE.
+        // Cela empêche VENUS d'annoncer un faux succès au client.
+        if (!courseCreee) {
+          const PATTERNS_RECHERCHE = [
+            /je lance la recherche/i,
+            /la recherche est (bien )?en cours/i,
+            /je recherche (maintenant )?un livreur/i,
+            /recherche d'un livreur/i,
+            /je .* recherche.* livreur/i,
+            /livreur est en cours de recherche/i,
+            /je lance .* recherche/i,
+            /recherche .* lanc/i,
+          ];
+          const ditRechercheLancee = PATTERNS_RECHERCHE.some(p => p.test(reponseFinale));
+          if (ditRechercheLancee) {
+            console.warn(`[WebhookVenus] ⚠️ FAUSSE CRÉATION — VENUS dit "recherche lancée" mais action=${reasoningResult.action} — création forcée déterministe`);
+            const umFb = { ...(pendingCourse || {}), ...reasoningResult.memoire_courte_update };
+            // Si le contact destinataire est manquant, utiliser le client comme contact par défaut
+            // Le livreur collectera les informations réelles du destinataire plus tard
+            if (!umFb.contact_telephone && !umFb.contact_is_client) {
+              umFb.contact_is_client = true;
+            }
+            umFb.all_info_collected = true;
+            umFb.user_confirmed = true;
+            const crFb = await creerCourseDepuisMemoire(base44, umFb, countryCode, tarifs, telephone, profileName);
+            if (crFb.success) {
+              reponseFinale = crFb.message;
+              courseCreee = true;
+              umFb.course_created = true;
+              umFb.course_id = crFb.course.id;
+              pendingCourse = umFb;
+              await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(umFb) });
+              if (memoireLongue) {
+                await mettreAJourMemoireLongue(base44, memoireLongue.id, {
+                  adresse_recuperee: umFb.adresse_depart, adresse_livraison: umFb.adresse_arrivee,
+                  destinataire_nom: umFb.contact_nom, destinataire_telephone: umFb.contact_telephone,
+                  type_course_prefere: umFb.type_course, client_nom: profileName,
+                  increment_courses: true,
+                  ...reasoningResult.memoire_longue_update,
+                });
+              }
+              console.log(`[WebhookVenus] ✅ Course créée DÉTERMINISTEMENT (fallback anti-faux-succès) — ${crFb.course.id}`);
+            } else if (crFb.error === 'MISSING_INFO' || crFb.error === 'MISSING_TYPE') {
+              // Informations réellement manquantes — remplacer la réponse trompeuse
+              console.warn(`[WebhookVenus] ⚠️ Fallback échoué (${crFb.error}) — remplacement de la réponse trompeuse`);
+              reponseFinale = "Je n'ai pas encore toutes les informations nécessaires pour créer votre course. Pouvez-vous préciser le type de course (envoyer un colis, recevoir un colis, ou se déplacer), le lieu de départ et le lieu de livraison ?";
             }
           }
         }
