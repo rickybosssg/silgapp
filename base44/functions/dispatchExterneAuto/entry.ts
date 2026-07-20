@@ -354,7 +354,13 @@ async function notifierLivreur(base44, courseId, course, livreur, timeoutSec) {
  * - Si 0 candidat et jamais eu de notif → en_attente
  */
 async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConfig = null) {
-  const course = await base44.asServiceRole.entities.CourseExterne.get(courseId);
+  let course;
+  try {
+    course = await base44.asServiceRole.entities.CourseExterne.get(courseId);
+  } catch (e) {
+    console.warn(`[DISPATCH] ⚠️ Course ${courseId} introuvable (supprimée?) — ignorée`);
+    return { erreur: 'Course introuvable', ignore: true };
+  }
   if (!course) return { erreur: 'Course introuvable' };
 
   if (['livreur_en_route', 'colis_recupere', 'en_livraison', 'livree', 'annulee'].includes(course.statut)) {
@@ -597,7 +603,13 @@ Deno.serve(async (req) => {
     if (action === 'lancer_recherche_auto') {
       if (!course_id) return Response.json({ error: 'course_id requis' }, { status: 400 });
 
-      const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+      let course;
+      try {
+        course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+      } catch (e) {
+        console.warn(`[DISPATCH] ⚠️ Course ${course_id} introuvable (supprimée?) — recherche auto ignorée`);
+        return Response.json({ success: true, ignore: true, message: 'Course supprimée — ignorée' });
+      }
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
 
       if (!course.gps_depart_lat || !course.gps_depart_lng) {
