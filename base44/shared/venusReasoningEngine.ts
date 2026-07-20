@@ -35,6 +35,7 @@ import {
   detecterSalutation,
   detecterRegleMetierDirecte,
   detecterConnaissanceDirecte,
+  detecterRaccourciFrequent,
 } from './venusCache.ts';
 
 /**
@@ -613,6 +614,14 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
   if (salutation) {
     salutation.temps_traitement_ms = Date.now() - startTime;
     return salutation;
+  }
+
+  // ── ÉCONOMIE DE CRÉDITS: Court-circuit questions fréquentes (0 crédit LLM) ──
+  const raccourci = detecterRaccourciFrequent(input.messageClient, input.courseActive);
+  if (raccourci) {
+    raccourci.temps_traitement_ms = Date.now() - startTime;
+    stockerCache(input.telephone, input.messageClient, input.memoireCourte, raccourci);
+    return raccourci;
   }
 
   // ── ÉCONOMIE DE CRÉDITS: Vérifier le cache de réponses (0 crédit LLM) ──

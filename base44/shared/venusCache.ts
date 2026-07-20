@@ -117,6 +117,118 @@ export function detecterSalutation(message: string): any | null {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// COURT-CIRCUIT QUESTIONS FRÉQUENTES — 0 crédit LLM
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Raccourcis heuristiques pour les questions les plus fréquentes.
+ * Chaque pattern correspond à une intention claire et retourne une réponse
+ * standardisée SANS appel LLM.
+ */
+const RACCOURCIS_FREQUENTS: { patterns: RegExp[]; reponse: string; intention: string; action: string; outils: string[] }[] = [
+  // ── Suivi de livreur ──
+  {
+    patterns: [
+      /\bou\s+(est|se\s+trouve)\s+(mon\s+)?(livreur|coursier|chauffeur)\b/i,
+      /\bmon\s+livreur\s+(est\s+)?ou\b/i,
+      /\bquand\s+(est-ce\s+que\s+)?(le\s+)?livreur\s+(arrive|vient)\b/i,
+      /\bil\s+arrive\s+(quand|ou)\b/i,
+      /\bou\s+en\s+est\s+(ma\s+)?(livraison|course|commande)\b/i,
+    ],
+    reponse: "Je vérifie le statut de votre livraison. Si une course est en cours, le livreur vous contactera directement. Vous recevrez un lien de suivi en temps réel dès qu'un livreur sera assigné. Si vous n'avez pas de course active, je peux vous aider à en créer une nouvelle.",
+    intention: 'suivre_course',
+    action: 'repondre_info',
+    outils: ['heuristic:livreur_tracking'],
+  },
+  // ── Tarifs / prix ──
+  {
+    patterns: [
+      /\b(c['e]?)\s*est\s+(combien|quel\s+prix)\b/i,
+      /\bcombien\s+(c[aâ]oûte|ca\s+coute|coute)\b/i,
+      /\bquel\s+(est\s+le\s+)?(prix|tarif|cout|montant)\b/i,
+      /\b(le\s+)?prix\s+(de\s+la\s+)?(livraison|course)\b/i,
+      /\bcombien\s+(je\s+dois|ca\s+fait|ca\s+coute)\b/i,
+    ],
+    reponse: "Le prix de la livraison est confirmé par le livreur avant le démarrage de la course. Il dépend de la distance et du type de service. Le tarif minimum est de 500 FCFA. Pour un devis précis, indiquez votre point de départ et de destination.",
+    intention: 'demander_info',
+    action: 'repondre_info',
+    outils: ['heuristic:tarifs'],
+  },
+  // ── Comment ça marche ──
+  {
+    patterns: [
+      /\bcomment\s+(c?a\s+)?marche\b/i,
+      /\bcomment\s+(ca\s+)?fonctionne\b/i,
+      /\bqu['e]?\s*est-ce\s+que\s+(silgapp|venus)\b/i,
+      /\bc['e]?\s*est\s+quoi\s+(silgapp|venus)\b/i,
+      /\bpr[ée]sent(e|ation)\s+(silgapp|venus)\b/i,
+    ],
+    reponse: "SILGAPP est une plateforme de livraison à domicile au Burkina Faso. Vous pouvez envoyer un colis, recevoir un colis, ou vous déplacer. Pour commencer, dites-moi simplement ce dont vous avez besoin : « Je veux envoyer un colis », « Je veux recevoir un colis », ou « Je veux me déplacer ».",
+    intention: 'demander_info',
+    action: 'repondre_info',
+    outils: ['heuristic:presentation'],
+  },
+  // ── Annulation ──
+  {
+    patterns: [
+      /\bje\s+veux\s+(annuler|stopper|supprimer)\s+(ma\s+)?(course|livraison|commande)\b/i,
+      /\bannuler\s+(ma\s+)?(course|livraison|commande)\b/i,
+      /\bje\s+(veux\s+)?annuler\b/i,
+      /\barreter\s+(ma\s+)?(course|livraison)\b/i,
+    ],
+    reponse: "Je comprends que vous souhaitez annuler votre course. Si un livreur a déjà été assigné et est en route, des frais d'annulation peuvent s'appliquer. Si aucune course n'est active, il n'y a rien à annuler. Pouvez-vous me confirmer la référence de la course que vous souhaitez annuler ?",
+    intention: 'annuler_course',
+    action: 'repondre_info',
+    outils: ['heuristic:annulation'],
+  },
+  // ── Contacter le support ──
+  {
+    patterns: [
+      /\bje\s+veux\s+(parler|contacter)\s+(au\s+)?(support|un\s+humain|un\s+agent)\b/i,
+      /\bcontacter\s+(le\s+)?support\b/i,
+      /\bnum[ée]ro\s+(de\s+)?(support|silgapp|contact)\b/i,
+      /\bappeler\s+(silgapp|le\s+support)\b/i,
+    ],
+    reponse: "Vous pouvez contacter le support SILGAPP au +226 66 92 51 90 via WhatsApp ou appel téléphonique. Notre équipe est disponible pour vous aider.",
+    intention: 'demander_info',
+    action: 'repondre_info',
+    outils: ['heuristic:support_contact'],
+  },
+];
+
+/**
+ * Détecte si le message correspond à une question fréquente.
+ * Si oui, retourne une réponse standardisée sans appel LLM.
+ */
+export function detecterRaccourciFrequent(message: string, courseActive?: any): any | null {
+  if (!message) return null;
+  const msgTrim = message.trim();
+  if (msgTrim.length > 200) return null; // Les raccourcis concernent les messages courts
+
+  for (const raccourci of RACCOURCIS_FREQUENTS) {
+    for (const pattern of raccourci.patterns) {
+      if (pattern.test(msgTrim)) {
+        console.log(`[VenusCache] ⚡ Raccourci fréquent: ${raccourci.outils[0]}`);
+        return {
+          intention: raccourci.intention,
+          contexte: courseActive ? 'course_en_cours' : 'general',
+          infos_connues: {},
+          infos_manquantes: [],
+          action: raccourci.action,
+          prochaine_question: '',
+          outils_utilises: raccourci.outils,
+          confiance: 85,
+          reponse: raccourci.reponse,
+          memoire_courte_update: {},
+          memoire_longue_update: {},
+        };
+      }
+    }
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // COURT-CIRCUIT RÈGLES MÉTIER — 0 crédit LLM
 // ═══════════════════════════════════════════════════════════════════
 

@@ -23,7 +23,7 @@
  * ═══════════════════════════════════════════════════════════════════
  */
 
-export const SEUIL_RELEVANCE_DOCUMENT = 15;
+export const SEUIL_RELEVANCE_DOCUMENT = 5;
 export const TAILLE_CHUNK = 800;
 export const OVERLAP_CHUNK = 120;
 
@@ -336,6 +336,7 @@ export function scoreChunk(chunk: any, queryKeywords: string[]): number {
   if (!chunk || !chunk.contenu || queryKeywords.length === 0) return 0;
 
   const chunkText = normaliserRequete(chunk.contenu);
+  const chunkTitle = normaliserRequete(chunk.document_titre || '');
   let chunkKeywords: string[] = [];
   try {
     chunkKeywords = chunk.mots_cles ? JSON.parse(chunk.mots_cles).map((k: string) => normaliserRequete(k)) : [];
@@ -349,14 +350,21 @@ export function scoreChunk(chunk: any, queryKeywords: string[]): number {
     const contentMatches = (chunkText.match(regex) || []).length;
     score += contentMatches * 3;
 
+    // Correspondance dans le titre du document (poids élevé)
+    const titleMatches = (chunkTitle.match(regex) || []).length;
+    score += titleMatches * 4;
+
     // Correspondance dans les mots-clés du chunk
     if (chunkKeywords.includes(qk)) {
       score += 5;
     }
 
-    // Correspondance partielle (sous-chaîne)
+    // Correspondance partielle (sous-chaîne) dans le contenu ou le titre
     if (contentMatches === 0 && chunkText.includes(qk)) {
       score += 1;
+    }
+    if (titleMatches === 0 && chunkTitle.includes(qk)) {
+      score += 2;
     }
   }
 
