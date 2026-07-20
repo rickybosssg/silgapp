@@ -461,12 +461,13 @@ function extraireInfosDepuisMessage(message: string): Record<string, any> {
     }
   }
 
-  // Numéro de téléphone (format international ou local)
-  const phoneMatch = message.match(/(?:\+?\d{1,3}[\s.-]?)?(?:\d{2}[\s.-]?){4}/);
-  if (phoneMatch) {
-    const phone = phoneMatch[0].replace(/[\s.-]/g, '');
+  // Numéro de téléphone (format international long ou local groupé)
+  // Supporte: +22655738247, 0022655738247, 70 12 34 56, 70123456
+  const phoneMatchLong = message.match(/\+?\d[\d\s.-]{7,}/);
+  if (phoneMatchLong) {
+    const phone = phoneMatchLong[0].replace(/[\s.-]/g, '');
     if (phone.length >= 8) {
-      updates.contact_telephone = phoneMatch[0].trim();
+      updates.contact_telephone = phoneMatchLong[0].trim();
     }
   }
 
@@ -599,9 +600,24 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
     .map(m => `${m.sender_type === 'client' ? 'Client' : 'VENUS'}: ${m.content || `[${m.message_type}]`}`)
     .join('\n') || 'Aucun historique';
 
-  // ── Mémoire courte lisible ──
-  const memoireCourteStr = input.memoireCourte && Object.keys(input.memoireCourte).length > 0
-    ? JSON.stringify(input.memoireCourte, null, 2)
+  // ── Heuristique PRÉ-LLM : extraire les infos du message AVANT l'appel LLM ──
+  // On fusionne avec la mémoire courte existante pour que le LLM VOIT les infos
+  // déjà détectées (type_course, téléphone, quartiers) et ne les redemande pas.
+  const heuristiqueExtracted = extraireInfosDepuisMessage(input.messageClient);
+  const mergedMemoireCourte: Record<string, any> = { ...(input.memoireCourte || {}) };
+  for (const [k, v] of Object.entries(heuristiqueExtracted)) {
+    // Ne pas écraser les champs déjà connus dans la mémoire courte
+    if (mergedMemoireCourte[k] == null || mergedMemoireCourte[k] === '') {
+      mergedMemoireCourte[k] = v;
+    }
+  }
+  if (Object.keys(heuristiqueExtracted).length > 0) {
+    console.log(`[ReasoningEngine] 🔍 Heuristique pré-LLM: ${JSON.stringify(heuristiqueExtracted)}`);
+  }
+
+  // ── Mémoire courte lisible (avec heuristique fusionnée) ──
+  const memoireCourteStr = Object.keys(mergedMemoireCourte).length > 0
+    ? JSON.stringify(mergedMemoireCourte, null, 2)
     : 'Aucune information collectee pour le moment';
 
   // ── Mémoire longue lisible ──
@@ -932,24 +948,33 @@ Réponds UNIQUEMENT avec un JSON.`;
     if (!result.memoire_courte_update) result.memoire_courte_update = {};
     if (!result.memoire_longue_update) result.memoire_longue_update = {};
 
-    // ── Fallback heuristique : extraire les infos du message si le LLM ne l'a pas fait ──
-    const extracted = extraireInfosDepuisMessage(input.messageClient);
-    // Ne pas écraser les champs déjà connus dans la mémoire courte existante
-    for (const key of Object.keys(extracted)) {
-      if (input.memoireCourte && input.memoireCourte[key] != null && input.memoireCourte[key] !== '') {
-        delete extracted[key];
+    // ── Heuristique post-LLM : utiliser les infos déjà extraites avant l'appel ──
+    // On réutilise heuristiqueExtracted (calculé pré-LLM) pour éviter un double calcul.
+    // On filtre les champs que le LLM a déjà remplis avec une valeur non-vide.
+    const llmUpdateFiltered: Record<string, any> = {};
+    for (const [k, v] of Object.entries(result.memoire_courte_update || {})) {
+      if (v !== '' && v !== null && v !== undefined) {
+        llmUpdateFiltered[k] = v;
       }
     }
-    if (Object.keys(extracted).length > 0) {
-      result.memoire_courte_update = { ...extracted, ...result.memoire_courte_update };
-      // Aussi remplir infos_connues si vide
-      if (Object.keys(result.infos_connues || {}).length === 0) {
-        result.infos_connues = { ...input.memoireCourte, ...extracted };
+    // Les champs heuristiques que le LLM n'a pas remplis sont conservés
+    for (const key of Object.keys(heuristiqueExtracted)) {
+      if (input.memoireCourte && input.memoireCourte[key] != null && input.memoireCourte[key] !== '') {
+        // Déjà en mémoire — ne pas réinjecter
+        continue;
       }
+      if (!(key in llmUpdateFiltered)) {
+        llmUpdateFiltered[key] = heuristiqueExtracted[key];
+      }
+    }
+    result.memoire_courte_update = llmUpdateFiltered;
+    // Aussi remplir infos_connues si vide
+    if (Object.keys(result.infos_connues || {}).length === 0) {
+      result.infos_connues = { ...mergedMemoireCourte };
     }
     // Toujours fusionner infos_connues avec la mémoire existante
     if (Object.keys(result.infos_connues || {}).length > 0) {
-      result.infos_connues = { ...input.memoireCourte, ...result.infos_connues };
+      result.infos_connues = { ...mergedMemoireCourte, ...result.infos_connues };
     }
 
     // Valider le business_rule_id
