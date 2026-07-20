@@ -349,6 +349,30 @@ const WF_RECLAMATION = {
 };
 
 // ═══════════════════════════════════════════════════════════════
+//  WORKFLOW 13 : Annulation de course
+// ═══════════════════════════════════════════════════════════════
+const WF_ANNULATION = {
+  code: 'annulation_course',
+  nom: 'Annulation d\'une course',
+  description: 'Annule une course, vérifie les frais, libère le livreur et notifie',
+  categorie: 'course',
+  declencheur: 'annuler_course',
+  etapes: [
+    action('an1_trouver', 'trouver_course_active', 'Recherche de la course active', 'an2_cond'),
+    cond('an2_cond', 'has_livreur', 'equals', true, 'an3_confirm', 'an4_annule'),
+    collect('an3_confirm', 'confirme_annulation', 'Votre course a un livreur assigné. L\'annulation peut entraîner des frais. Confirmez-vous l\'annulation ? (oui/non)', 'an4_annule', { obligatoire: true, options: ['oui', 'non'] }),
+    cond('an4_cond_conf', 'confirme_annulation', 'equals', 'oui', 'an5_annule', 'an6_refus'),
+    action('an5_annule', 'annuler_course', 'Annulation de la course et libération du livreur', 'an7_notif'),
+    notif('an7_notif', '✅ Votre course a été annulée. Le livreur a été libéré. N\'hésitez pas à me solliciter pour une nouvelle demande.', 'fin'),
+    notif('an6_refus', 'D\'accord, votre course continue. Le livreur est toujours en route. N\'hésitez pas si vous avez besoin d\'autre chose.', 'fin'),
+    action('an4_annule', 'annuler_course', 'Annulation de la course sans livreur assigné', 'an8_notif'),
+    notif('an8_notif', '✅ Votre course a été annulée. N\'hésitez pas à me solliciter pour une nouvelle demande.', 'fin'),
+    fin('fin', 'Annulation traitée. N\'hésitez pas si vous avez besoin d\'une nouvelle course.'),
+  ],
+  gestion_erreurs: { ...EXCEPTIONS_COMMUNES },
+};
+
+// ═══════════════════════════════════════════════════════════════
 //  WORKFLOW 12 : Contacter le livreur
 // ═══════════════════════════════════════════════════════════════
 const WF_CONTACTER_LIVREUR = {
@@ -385,6 +409,7 @@ export const WORKFLOW_DEFINITIONS = [
   WF_PROGRAMMEE,
   WF_RECLAMATION,
   WF_CONTACTER_LIVREUR,
+  WF_ANNULATION,
 ];
 
 export const EXCEPTIONS_DEFINITIONS = EXCEPTIONS_COMMUNES;
@@ -394,7 +419,7 @@ export const INTENTION_TO_WORKFLOW: Record<string, string> = {
   creer_course: 'creer_course',
   suivre_course: 'contacter_livreur',
   contacter_livreur: 'contacter_livreur',
-  annuler_course: 'reclamation',
+  annuler_course: 'annulation_course',
   faire_reclamation: 'reclamation',
   commande_pharmacie: 'pharmacie',
   commande_restaurant: 'restaurant',

@@ -22,6 +22,26 @@
 
 import { rechercherConnaissancesValidees } from './venusLearningEngine.ts';
 import { rechercherDocumentsRag } from './venusRagEngine.ts';
+import { construireContexteVenus } from './venusI18nEngine.ts';
+
+/**
+ * Recherche les scénarios validés pour un pays/langue donnés (Source 3).
+ */
+export async function rechercherScenariosValidees(base44: any, countryCode: string, langue: string = 'fr'): Promise<any[]> {
+  try {
+    const all = await base44.asServiceRole.entities.VenusScenario.filter(
+      { statut: 'valide' },
+      '-created_date',
+      50
+    );
+    return all.filter((s: any) =>
+      (!s.categorie || s.categorie !== 'archive')
+    ).slice(0, 10);
+  } catch (e) {
+    console.warn('[ReasoningEngine] Erreur chargement scénarios:', e.message);
+    return [];
+  }
+}
 
 // ── Types ──
 
@@ -527,6 +547,29 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
     console.warn('[ReasoningEngine] Erreur recherche documents RAG:', e.message);
   }
 
+  // ── Contexte localisé (pays, personnalité, marque, langue) ──
+  let localizedSystemPrompt = '';
+  try {
+    const ctx = await construireContexteVenus(base44, input.telephone, input.messageClient);
+    localizedSystemPrompt = ctx.systemPrompt;
+  } catch (e) {
+    console.warn('[ReasoningEngine] Fallback prompt localisé:', e.message);
+  }
+
+  // ── Scénarios validés (Source 3) ──
+  let scenarioStr = 'Aucun scénario pertinent';
+  let scenarioEntries: any[] = [];
+  try {
+    scenarioEntries = await rechercherScenariosValidees(base44, input.countryCode);
+    if (scenarioEntries.length > 0) {
+      scenarioStr = scenarioEntries.slice(0, 5).map((s, i) =>
+        `[${i + 1}] Scénario: ${s.nom}\n    Déclencheurs: ${s.declencheurs || 'N/A'}\n    Réponse idéale: ${(s.reponse_ideale || '').substring(0, 200)}`
+      ).join('\n');
+    }
+  } catch (e) {
+    console.warn('[ReasoningEngine] Erreur chargement scénarios:', e.message);
+  }
+
   // ── Construire le prompt de raisonnement ──
   const audioNote = input.isAudioTranscription
     ? `═══ NOTE: TRANSCRIPTION VOCALE ═══
@@ -535,7 +578,10 @@ Confirme ce que tu as compris avant de poursuivre si un mot semble incertain.
 Noms de quartiers courants a Ouagadougou: Karpala, Pissy, Tampouy, Ouaga 2000, Zone du Bois, Patte d'Oie, Gounghin, Dassasgho, Cissin, Samandin, Wemtenga, Bendogo, Larle, Somgande, Saaba, Tanghin, Kossodo.`
     : '';
 
-  const prompt = `Tu es VENUS, l'assistante virtuelle SILGAPP. Tu possèdes un MOTEUR DE RAISONNEMENT avancé et une MÉMOIRE INTELLIGENTE.
+  const prompt = `${localizedSystemPrompt || 'Tu es VENUS, l\'assistante virtuelle SILGAPP. Tu possèdes un MOTEUR DE RAISONNEMENT avancé et une MÉMOIRE INTELLIGENTE.'}
+
+═══ SCÉNARIOS VALIDÉS (Source 3) ═══
+${scenarioStr}
 
 ═══ CONTEXTE CLIENT ═══
 Téléphone: ${input.telephone}
@@ -644,7 +690,8 @@ Champs possibles: client_nom, ville_habituelle, quartier_habituel, langue_prefer
 13. PRIORITÉ DES SOURCES: Pour répondre aux questions informationnelles (demander_info), utilise les sources dans cet ORDRE OBLIGATOIRE:
     a) Base de connaissances (Source 1) — si une entrée correspond, utilise sa réponse et mets knowledge_id.
     b) Bibliothèque documentaire (Source 2) — si un document officiel correspond, utilise son contenu et mets document_sources avec les IDs.
-    c) IA générale (Source 4) — uniquement si aucune source officielle ne correspond.
+    c) Scénarios validés (Source 3) — si un scénario correspond à la situation, inspire-toi de sa réponse idéale.
+    d) IA générale (Source 4) — uniquement si aucune source officielle ne correspond.
     Si l'intention est une action (creer_course, suivre_course, etc.), n'utilise PAS les sources comme réponse — l'action prime.
 
 14. DOCUMENTS OFFICIELS: Si la Bibliothèque documentaire contient des informations pertinentes, cite-les dans ta réponse de manière naturelle. Les documents officiels SILGAPP (procédures, tarifs, conditions générales, guides) ont priorité sur ta propre connaissance. Si tu utilises un document, mets document_sources avec [{document_id, document_titre, chunk_id, score, version}].
