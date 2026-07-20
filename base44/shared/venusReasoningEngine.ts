@@ -705,76 +705,59 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
     }, null, 2);
   }
 
-  // ── Base de connaissances (Source 1) ──
+  // ── OPTIMISATION VITESSE: Charger toutes les sources en PARALLÈLE ──
+  // Avant: 5 appels DB séquentiels (~700-1600ms). Maintenant: 1 vague parallèle (~200-400ms).
+  const tLoadStart = Date.now();
+  const [knowledgeRes, ragRes, ctxRes, scenarioRes, rulesRes] = await Promise.allSettled([
+    rechercherConnaissancesValidees(base44, input.countryCode),
+    rechercherDocumentsRag(base44, input.messageClient, { pays: input.countryCode, limit: 5, conversation_id: input.telephone }),
+    construireContexteVenus(base44, input.telephone, input.messageClient),
+    rechercherScenariosValidees(base44, input.countryCode),
+    rechercherReglesMetier(base44, input.countryCode),
+  ]);
+  console.log(`[ReasoningEngine] ⏱️ Sources chargées en parallèle: ${Date.now() - tLoadStart}ms`);
+
+  // ── Base de connaissances ──
   let knowledgeStr = 'Aucune entree pertinente';
-  let knowledgeEntries: any[] = [];
-  try {
-    knowledgeEntries = await rechercherConnaissancesValidees(base44, input.countryCode);
-    if (knowledgeEntries.length > 0) {
-      knowledgeStr = knowledgeEntries.slice(0, 10).map((k, i) =>
-        `[${i + 1}] Q: ${k.question}\n    R: ${(k.reponse_officielle || '').substring(0, 200)}\n    ID: ${k.id}`
-      ).join('\n');
-    }
-  } catch (e) {
-    console.warn('[ReasoningEngine] Erreur chargement connaissances:', e.message);
+  let knowledgeEntries: any[] = knowledgeRes.status === 'fulfilled' ? knowledgeRes.value : [];
+  if (knowledgeEntries.length > 0) {
+    knowledgeStr = knowledgeEntries.slice(0, 10).map((k, i) =>
+      `[${i + 1}] Q: ${k.question}\n    R: ${(k.reponse_officielle || '').substring(0, 200)}\n    ID: ${k.id}`
+    ).join('\n');
   }
 
-  // ── Bibliothèque documentaire RAG (Source 2) ──
+  // ── Bibliothèque documentaire RAG ──
   let documentStr = 'Aucun document pertinent trouve';
   let documentResults: any[] = [];
-  try {
-    const ragResult = await rechercherDocumentsRag(base44, input.messageClient, {
-      pays: input.countryCode,
-      limit: 5,
-      conversation_id: input.telephone,
-    });
-    if (ragResult.a_reussi && ragResult.resultats.length > 0) {
-      documentResults = ragResult.resultats;
-      documentStr = ragResult.resultats.map((r, i) =>
-        `[DOC ${i + 1}] Source: ${r.document_titre} (v${r.document_version}, ${r.document_categorie})\n    Score: ${r.score}\n    Contenu: ${(r.contenu || '').substring(0, 400)}\n    Doc ID: ${r.document_id} | Chunk ID: ${r.chunk_id}`
-      ).join('\n\n');
-      console.log(`[ReasoningEngine] 📚 RAG: ${ragResult.resultats.length} documents trouvés en ${ragResult.temps_ms}ms`);
-    }
-  } catch (e) {
-    console.warn('[ReasoningEngine] Erreur recherche documents RAG:', e.message);
+  if (ragRes.status === 'fulfilled' && ragRes.value?.a_reussi && ragRes.value.resultats.length > 0) {
+    documentResults = ragRes.value.resultats;
+    documentStr = ragRes.value.resultats.map((r, i) =>
+      `[DOC ${i + 1}] Source: ${r.document_titre} (v${r.document_version}, ${r.document_categorie})\n    Score: ${r.score}\n    Contenu: ${(r.contenu || '').substring(0, 400)}\n    Doc ID: ${r.document_id} | Chunk ID: ${r.chunk_id}`
+    ).join('\n\n');
+    console.log(`[ReasoningEngine] 📚 RAG: ${ragRes.value.resultats.length} documents trouvés en ${ragRes.value.temps_ms}ms`);
   }
 
-  // ── Contexte localisé (pays, personnalité, marque, langue) ──
+  // ── Contexte localisé ──
   let localizedSystemPrompt = '';
-  try {
-    const ctx = await construireContexteVenus(base44, input.telephone, input.messageClient);
-    localizedSystemPrompt = ctx.systemPrompt;
-  } catch (e) {
-    console.warn('[ReasoningEngine] Fallback prompt localisé:', e.message);
-  }
+  if (ctxRes.status === 'fulfilled') localizedSystemPrompt = ctxRes.value?.systemPrompt || '';
 
-  // ── Scénarios validés (Source 3) ──
+  // ── Scénarios validés ──
   let scenarioStr = 'Aucun scénario pertinent';
-  let scenarioEntries: any[] = [];
-  try {
-    scenarioEntries = await rechercherScenariosValidees(base44, input.countryCode);
-    if (scenarioEntries.length > 0) {
-      scenarioStr = scenarioEntries.slice(0, 5).map((s, i) =>
-        `[${i + 1}] Scénario: ${s.nom}\n    Déclencheurs: ${s.declencheurs || 'N/A'}\n    Réponse idéale: ${(s.reponse_ideale || '').substring(0, 200)}`
-      ).join('\n');
-    }
-  } catch (e) {
-    console.warn('[ReasoningEngine] Erreur chargement scénarios:', e.message);
+  let scenarioEntries: any[] = scenarioRes.status === 'fulfilled' ? scenarioRes.value : [];
+  if (scenarioEntries.length > 0) {
+    scenarioStr = scenarioEntries.slice(0, 5).map((s, i) =>
+      `[${i + 1}] Scénario: ${s.nom}\n    Déclencheurs: ${s.declencheurs || 'N/A'}\n    Réponse idéale: ${(s.reponse_ideale || '').substring(0, 200)}`
+    ).join('\n');
   }
 
-  // ── Règles métier (Source 0 — Priorité absolue) ──
+  // ── Règles métier ──
   let businessRulesStr = 'Aucune règle métier applicable';
-  let businessRuleEntries: any[] = [];
-  try {
-    businessRuleEntries = await rechercherReglesMetier(base44, input.countryCode);
-    if (businessRuleEntries.length > 0) {
-      businessRulesStr = businessRuleEntries.slice(0, 20).map((r, i) =>
-        `[RÈGLE ${i + 1}] ID: ${r.id}\n    Titre: ${r.nom}\n    Principe: ${(r.description || '').substring(0, 300)}\n    Conditions: ${(r.conditions_application || 'N/A').substring(0, 200)}\n    Exceptions: ${(r.exceptions || 'N/A').substring(0, 150)}\n    Exemples: ${(r.exemples || 'N/A').substring(0, 200)}\n    Réponse associée: ${(r.reponse_associee || 'N/A').substring(0, 200)}\n    Priorité: ${r.priorite || 'haute'}`
-      ).join('\n');
-      console.log(`[ReasoningEngine] 📖 ${businessRuleEntries.length} règles métier chargées`);
-    }
-  } catch (e) {
-    console.warn('[ReasoningEngine] Erreur chargement règles métier:', e.message);
+  let businessRuleEntries: any[] = rulesRes.status === 'fulfilled' ? rulesRes.value : [];
+  if (businessRuleEntries.length > 0) {
+    businessRulesStr = businessRuleEntries.slice(0, 20).map((r, i) =>
+      `[RÈGLE ${i + 1}] ID: ${r.id}\n    Titre: ${r.nom}\n    Principe: ${(r.description || '').substring(0, 300)}\n    Conditions: ${(r.conditions_application || 'N/A').substring(0, 200)}\n    Exceptions: ${(r.exceptions || 'N/A').substring(0, 150)}\n    Exemples: ${(r.exemples || 'N/A').substring(0, 200)}\n    Réponse associée: ${(r.reponse_associee || 'N/A').substring(0, 200)}\n    Priorité: ${r.priorite || 'haute'}`
+    ).join('\n');
+    console.log(`[ReasoningEngine] 📖 ${businessRuleEntries.length} règles métier chargées`);
   }
 
   // ── ÉCONOMIE DE CRÉDITS: Court-circuit règle métier directe (0 crédit LLM) ──
@@ -996,12 +979,14 @@ TU DOIS TOUJOURS RÉPONDRE EN FRANÇAIS. Ne réponds JAMAIS en anglais. Le clien
 Réponds UNIQUEMENT avec un JSON.`;
 
   // ── Appel LLM ──
+  const tLLMStart = Date.now();
   try {
     const llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
       prompt,
       response_json_schema: RAISONNEMENT_SCHEMA,
       model: 'gpt_5_mini',
     });
+    console.log(`[ReasoningEngine] ⏱️ LLM: ${Date.now() - tLLMStart}ms`);
 
     const result: ReasoningResult = typeof llmRes === 'string' ? JSON.parse(llmRes) : llmRes as ReasoningResult;
     result.temps_traitement_ms = Date.now() - startTime;

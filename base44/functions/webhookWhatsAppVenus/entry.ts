@@ -1207,6 +1207,7 @@ async function handleContactLivreur(base44: any, conversation: any, userMessage:
 
 Deno.serve(async (req) => {
   let typingInterval: any = null;
+  let waitTimeout: any = null;
   try {
     const base44 = createClientFromRequest(req);
 
@@ -1463,6 +1464,16 @@ Deno.serve(async (req) => {
       }, 20000);
     }
 
+    // ── Délai maximum: envoyer un message d'attente si le traitement dépasse 6s ──
+    let waitMessageSent = false;
+    waitTimeout = setTimeout(() => {
+      if (!waitMessageSent) {
+        waitMessageSent = true;
+        envoyerWhatsAppReply(telephone, 'Votre demande est en cours de traitement, merci de patienter quelques instants.', accountSid, authToken, fromNumber).catch(() => {});
+        console.log('[WebhookVenus] ⏳ Message d\'attente envoyé (traitement > 6s)');
+      }
+    }, 6000);
+
     // ── 3b. Vérifier le mode maintenance VENUS ──
     let reponseVenus = '';
     const maintenanceMode = await getMaintenanceMode(base44);
@@ -1611,10 +1622,14 @@ Deno.serve(async (req) => {
       }
 
       if (!reponseVenus) {
-        // ── Charger la mémoire longue, l'historique, la course active ──
-        const memoireLongue = await chargerMemoireLongue(base44, telephone, countryCode);
-        const historiqueRecent = await chargerHistoriqueRecent(base44, conversation.id, 6);
-        const courseActive = await trouverCourseActive(base44, telephone, countryCode);
+        // ── Charger la mémoire longue, l'historique, la course active en PARALLÈLE ──
+        const tCtxStart = Date.now();
+        const [memoireLongue, historiqueRecent, courseActive] = await Promise.all([
+          chargerMemoireLongue(base44, telephone, countryCode),
+          chargerHistoriqueRecent(base44, conversation.id, 6),
+          trouverCourseActive(base44, telephone, countryCode),
+        ]);
+        console.log(`[WebhookVenus] ⏱️ Contexte chargé en parallèle: ${Date.now() - tCtxStart}ms`);
 
         // ── Appeler le moteur de raisonnement ──
         reasoningResult = await raisonnerVenus(base44, {
@@ -1688,12 +1703,10 @@ Deno.serve(async (req) => {
     let audioResponseUrl: string | null = null;
     let twilioResult: any = null;
 
-    // ── Arrêter le renouvellement de l'indicateur de saisie ──
+    // ── Arrêter le renouvellement de l'indicateur de saisie + timeout d'attente ──
     // L'indicateur disparaît automatiquement dès que la réponse est livrée.
-    if (typingInterval) {
-      clearInterval(typingInterval);
-      typingInterval = null;
-    }
+    if (typingInterval) { clearInterval(typingInterval); typingInterval = null; }
+    if (waitTimeout) { clearTimeout(waitTimeout); }
 
     console.log(`[WebhookVenus] 📤 ÉTAPE 6 — Envoi réponse à ${telephone} via Twilio (from: ${fromNumber}) | mode: ${utiliserAudio ? 'AUDIO' : 'TEXTE'}`);
     if (utiliserAudio) {
@@ -1767,6 +1780,7 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     if (typingInterval) { clearInterval(typingInterval); }
+    if (waitTimeout) { clearTimeout(waitTimeout); }
     console.error(`[WebhookVenus] ❌ ERREUR GLOBALE: ${error.message}`);
     console.error(`[WebhookVenus] ❌ Stack: ${error.stack?.substring(0, 300)}`);
     return Response.json({ error: error.message }, { status: 500 });
