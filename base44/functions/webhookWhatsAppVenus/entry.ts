@@ -273,12 +273,12 @@ async function transcrireAudio(base44, audioUrl, mediaContentType = '') {
 
     // ── Évaluer la confiance ──
     const evalConfiance = evaluerConfianceTranscription(texteBrut, texteNettoye);
-    console.log(`[WebhookVenus] 🎤 ÉTAPE C4 — Confiance: ${evalConfiance.confiance.toFixed(2)} | Statut: ${evalConfiance.status} | Raisons: ${evalConfiance.raisons.join('; ')}`);
+    console.log(`[WebhookVenus] 🎤 ÉTAPE C4 — Confiance: ${evalConfiance.confidence.toFixed(2)} | Statut: ${evalConfiance.status} | Raisons: ${evalConfiance.raisons.join('; ')}`);
 
     return {
       texte: texteNettoye,
       texte_brut: texteBrut,
-      confidence: evalConfiance.confiance,
+      confidence: evalConfiance.confidence,
       status: evalConfiance.status,
       raisons: evalConfiance.raisons,
       methode: usedFallback ? 'llm_fallback' : 'whisper',
