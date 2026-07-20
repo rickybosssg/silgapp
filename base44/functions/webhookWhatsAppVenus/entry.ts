@@ -1239,6 +1239,7 @@ async function handleAnnulationCourse(base44: any, conversation: any, userMessag
   const isConfirmation = msgLower.length <= 30 && CONFIRM_KW.some(kw => msgLower === kw || msgLower.startsWith(kw + ' ') || msgLower.startsWith(kw + '.') || msgLower.startsWith(kw + '!'));
 
   let shouldCancel = isDirectAnnulation;
+  let isConfirmationTrigger = false;
 
   // Si c'est une confirmation, vérifier que VENUS a demandé une annulation
   if (!shouldCancel && isConfirmation) {
@@ -1250,6 +1251,7 @@ async function handleAnnulationCourse(base44: any, conversation: any, userMessag
       const lastVenusMsg = (recentMessages?.[0]?.content || '').toLowerCase();
       if (lastVenusMsg.includes('annul')) {
         shouldCancel = true;
+        isConfirmationTrigger = true;
         console.log('[WebhookVenus] 🗑️ Confirmation d\'annulation détectée (VENUS avait demandé confirmation)');
       }
     } catch {}
@@ -1282,6 +1284,13 @@ async function handleAnnulationCourse(base44: any, conversation: any, userMessag
 
   const courseActive = courses?.find(c => STATUTS_ACTIFS.includes(c.statut));
   if (!courseActive) {
+    // Si déclenché par confirmation (VENUS avait demandé d'annuler) mais aucune course active trouvée,
+    // retourner null pour laisser le moteur de raisonnement traiter le "Oui" et créer la nouvelle course.
+    // Cela évite la boucle: VENUS dit "course en cours" → client dit "Oui" → "aucune course" → client recommence.
+    if (isConfirmationTrigger) {
+      console.log('[WebhookVenus] 🗑️ Confirmation d\'annulation mais aucune course active trouvée — passage au moteur de raisonnement');
+      return null;
+    }
     return "Je ne trouve aucune course active à annuler. Si vous souhaitez créer une nouvelle course, dites-le moi ! Pour toute question, contactez le support au +226 66 92 51 90.";
   }
 
