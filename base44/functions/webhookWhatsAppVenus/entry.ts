@@ -103,13 +103,33 @@ async function downloadAndUploadMedia(mediaUrl, accountSid, authToken, base44, m
     console.log(`[WebhookVenus] 📎 ÉTAPE A — Téléchargement média Twilio | URL: ${mediaUrl.substring(0, 80)}... | Content-Type attendu: ${mediaContentType || 'inconnu'}`);
 
     const credentials = btoa(`${accountSid}:${authToken}`);
-    const resp = await fetch(mediaUrl, {
+
+    // ── Télécharger avec gestion manuelle des redirections ──
+    // Twilio media URLs redirigent vers S3 — l'en-tête Authorization
+    // peut être perdu lors d'une redirection cross-origin
+    let resp = await fetch(mediaUrl, {
       headers: { Authorization: `Basic ${credentials}` },
+      redirect: 'manual',
     });
+
+    // Suivre manuellement les redirections (302 → location header)
+    let redirectCount = 0;
+    while ((resp.status === 301 || resp.status === 302 || resp.status === 307 || resp.status === 308) && redirectCount < 5) {
+      const redirectUrl = resp.headers.get('location');
+      if (!redirectUrl) break;
+      redirectCount++;
+      console.log(`[WebhookVenus] 📎   Redirection ${redirectCount} → ${redirectUrl.substring(0, 80)}...`);
+      // Les URLs redirigées (S3) sont généralement pré-signées et ne nécessitent pas d'auth
+      const needsAuth = redirectUrl.includes('api.twilio.com');
+      resp = await fetch(redirectUrl, {
+        headers: needsAuth ? { Authorization: `Basic ${credentials}` } : {},
+        redirect: 'manual',
+      });
+    }
 
     if (!resp.ok) {
       const errorText = await resp.text().catch(() => '');
-      console.error(`[WebhookVenus] 📎 ❌ ÉTAPE A — Téléchargement échoué | HTTP ${resp.status} ${resp.statusText} | Réponse: ${errorText.substring(0, 200)}`);
+      console.error(`[WebhookVenus] 📎 ❌ ÉTAPE A — Téléchargement échoué | HTTP ${resp.status} ${resp.statusText} | Redirections: ${redirectCount} | Réponse: ${errorText.substring(0, 200)}`);
       return null;
     }
 
@@ -117,7 +137,14 @@ async function downloadAndUploadMedia(mediaUrl, accountSid, authToken, base44, m
     const blobSize = blob.size;
     const blobType = blob.type || mediaContentType || '';
 
-    console.log(`[WebhookVenus] 📎 ✅ ÉTAPE A — Média téléchargé | Taille: ${blobSize} octets | Type: ${blobType}`);
+    // ── Vérifier que le contenu téléchargé est bien un média (pas une page d'erreur XML) ──
+    if (blobType.includes('xml') || blobType.includes('html') || blobType.includes('text/')) {
+      const errorPeek = await blob.text().catch(() => '');
+      console.error(`[WebhookVenus] 📎 ❌ ÉTAPE A — Type de réponse inattendu: ${blobType} | Contenu: ${errorPeek.substring(0, 200)}`);
+      return null;
+    }
+
+    console.log(`[WebhookVenus] 📎 ✅ ÉTAPE A — Média téléchargé | Taille: ${blobSize} octets | Type: ${blobType} | Redirections: ${redirectCount}`);
 
     if (blobSize === 0) {
       console.error('[WebhookVenus] 📎 ❌ ÉTAPE A — Fichier téléchargé VIDE (0 octet)');
@@ -196,22 +223,48 @@ async function transcrireAudio(base44, audioUrl, mediaContentType = '') {
 
     // ── Appeler la transcription Whisper ──
     console.log(`[WebhookVenus] 🎤 ÉTAPE C2 — Appel Core.TranscribeAudio (Whisper)...`);
-    const result = await base44.asServiceRole.integrations.Core.TranscribeAudio({ audio_url: audioUrl });
+    let result: any;
+    let texteBrut = '';
+    let usedFallback = false;
 
-    const tempsMs = Date.now() - startTime;
-    console.log(`[WebhookVenus] 🎤 ÉTAPE C2 — TranscribeAudio terminé en ${tempsMs}ms`);
-    console.log(`[WebhookVenus] 🎤   Type de réponse: ${typeof result}`);
-    console.log(`[WebhookVenus] 🎤   Clés de réponse: ${result && typeof result === 'object' ? Object.keys(result).join(', ') : 'N/A'}`);
+    try {
+      result = await base44.asServiceRole.integrations.Core.TranscribeAudio({ audio_url: audioUrl });
+      const tempsMs = Date.now() - startTime;
+      console.log(`[WebhookVenus] 🎤 ÉTAPE C2 — TranscribeAudio terminé en ${tempsMs}ms`);
+      console.log(`[WebhookVenus] 🎤   Type de réponse: ${typeof result}`);
+      console.log(`[WebhookVenus] 🎤   Clés de réponse: ${result && typeof result === 'object' ? Object.keys(result).join(', ') : 'N/A'}`);
 
-    const texteBrut = typeof result === 'string' ? result : (result?.text || result?.transcript || '');
+      texteBrut = typeof result === 'string' ? result : (result?.text || result?.transcript || '');
+      console.log(`[WebhookVenus] 🎤   Transcription brute: "${(texteBrut || '').substring(0, 200)}"`);
+      console.log(`[WebhookVenus] 🎤   Longueur: ${texteBrut?.length || 0} caractères`);
+    } catch (transcribeErr) {
+      console.error(`[WebhookVenus] 🎤 ❌ ÉTAPE C2 — TranscribeAudio a échoué: ${transcribeErr.message}`);
+      console.error(`[WebhookVenus] 🎤   Nom erreur: ${transcribeErr.name}`);
+    }
 
-    console.log(`[WebhookVenus] 🎤   Transcription brute: "${(texteBrut || '').substring(0, 200)}"`);
-    console.log(`[WebhookVenus] 🎤   Longueur: ${texteBrut?.length || 0} caractères`);
+    // ── Fallback: si Whisper échoue ou retourne vide, utiliser InvokeLLM avec file_urls ──
+    if (!texteBrut || texteBrut.trim().length < 2) {
+      console.warn(`[WebhookVenus] 🎤 ⚠️ ÉTAPE C2b — Whisper vide/échec — fallback InvokeLLM (gemini_3_flash)...`);
+      try {
+        const llmResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
+          prompt: `Tu es un expert en transcription audio. Transcris ce message vocal en français. Le texte peut contenir des noms de quartiers de Ouagadougou (Karpala, Pissy, Tampouy, Ouaga 2000, Zone du Bois, Patte d'Oie, Gounghin, Dassasgho, Cissin, Samandin, Wemtenga, Bendogo, Larle, Somgande, Saaba, Tanghin, Kossodo), des numéros de téléphone, ou des demandes de livraison. Réponds UNIQUEMENT avec le texte transcrit, sans commentaire. Si l'audio est inaudible, réponds "INAUDIBLE".`,
+          file_urls: [audioUrl],
+          model: 'gemini_3_flash',
+        });
+        const fallbackText = typeof llmResult === 'string' ? llmResult : (llmResult?.response || llmResult?.text || '');
+        console.log(`[WebhookVenus] 🎤 ÉTAPE C2b — Fallback LLM terminé | Texte: "${(fallbackText || '').substring(0, 200)}"`);
+        if (fallbackText && fallbackText.trim().length >= 2 && !fallbackText.toUpperCase().includes('INAUDIBLE')) {
+          texteBrut = fallbackText.trim();
+          usedFallback = true;
+        }
+      } catch (fallbackErr) {
+        console.error(`[WebhookVenus] 🎤 ❌ ÉTAPE C2b — Fallback LLM aussi échoué: ${fallbackErr.message}`);
+      }
+    }
 
     if (!texteBrut || texteBrut.trim().length < 2) {
-      console.warn(`[WebhookVenus] 🎤 ❌ ÉTAPE C2 — Transcription vide ou trop courte (longueur: ${texteBrut?.length || 0})`);
-      console.warn(`[WebhookVenus] 🎤   Réponse complète de TranscribeAudio: ${JSON.stringify(result)?.substring(0, 500)}`);
-      return { texte: '', texte_brut: '', confidence: 0, status: 'echec', raisons: ['Transcription vide — Whisper n\'a retourné aucun texte'] };
+      console.warn(`[WebhookVenus] 🎤 ❌ ÉTAPE C2 — Toutes les méthodes de transcription ont échoué`);
+      return { texte: '', texte_brut: '', confidence: 0, status: 'echec', raisons: ['Transcription vide — Whisper et LLM fallback ont échoué'] };
     }
 
     // ── Nettoyer la transcription ──
@@ -235,6 +288,68 @@ async function transcrireAudio(base44, audioUrl, mediaContentType = '') {
     console.error(`[WebhookVenus] 🎤   Stack: ${e.stack?.substring(0, 300)}`);
     console.error(`[WebhookVenus] 🎤   Nom erreur: ${e.name}`);
     return { texte: '', texte_brut: '', confidence: 0, status: 'echec', raisons: [`Erreur transcription: ${e.name} — ${e.message}`] };
+  }
+}
+
+/**
+ * Fallback — Transcription directe depuis une URL Twilio.
+ * Télécharge le fichier, l'upload, puis transcrit.
+ * Utilisé quand downloadAndUploadMedia a échoué.
+ */
+async function transcrireAudioDepuisTwilio(base44, twilioMediaUrl, accountSid, authToken, mediaContentType) {
+  console.log(`[WebhookVenus] 🎤 ÉTAPE D — Fallback: transcription directe depuis URL Twilio`);
+  
+  // Réessayer le téléchargement avec gestion des redirections
+  try {
+    const credentials = btoa(`${accountSid}:${authToken}`);
+    let resp = await fetch(twilioMediaUrl, {
+      headers: { Authorization: `Basic ${credentials}` },
+      redirect: 'manual',
+    });
+
+    let redirectCount = 0;
+    while ((resp.status === 301 || resp.status === 302 || resp.status === 307 || resp.status === 308) && redirectCount < 5) {
+      const redirectUrl = resp.headers.get('location');
+      if (!redirectUrl) break;
+      redirectCount++;
+      const needsAuth = redirectUrl.includes('api.twilio.com');
+      resp = await fetch(redirectUrl, {
+        headers: needsAuth ? { Authorization: `Basic ${credentials}` } : {},
+        redirect: 'manual',
+      });
+    }
+
+    if (!resp.ok) {
+      console.error(`[WebhookVenus] 🎤 ❌ ÉTAPE D — Téléchargement fallback échoué: HTTP ${resp.status}`);
+      return { texte: '', texte_brut: '', confidence: 0, status: 'echec', raisons: [`Téléchargement fallback échoué: HTTP ${resp.status}`] };
+    }
+
+    const blob = await resp.blob();
+    const blobType = blob.type || mediaContentType || 'audio/ogg';
+    console.log(`[WebhookVenus] 🎤 ÉTAPE D — Fichier téléchargé: ${blob.size} octets | Type: ${blobType}`);
+
+    // Déterminer l'extension
+    let extension = 'ogg';
+    if (blobType.includes('mp3') || blobType.includes('mpeg')) extension = 'mp3';
+    else if (blobType.includes('wav')) extension = 'wav';
+    else if (blobType.includes('m4a') || blobType.includes('mp4')) extension = 'm4a';
+
+    const fileName = `whatsapp_audio_${Date.now()}.${extension}`;
+    const file = new File([blob], fileName, { type: blobType });
+
+    // Upload
+    const uploadResult = await base44.asServiceRole.integrations.Core.UploadFile({ file });
+    if (!uploadResult?.file_url) {
+      console.error('[WebhookVenus] 🎤 ❌ ÉTAPE D — Upload fallback échoué');
+      return { texte: '', texte_brut: '', confidence: 0, status: 'echec', raisons: ['Upload fallback échoué'] };
+    }
+
+    console.log(`[WebhookVenus] 🎤 ✅ ÉTAPE D — Upload réussi, transcription en cours...`);
+    // Transcrire
+    return await transcrireAudio(base44, uploadResult.file_url, blobType);
+  } catch (e) {
+    console.error(`[WebhookVenus] 🎤 ❌ ÉTAPE D — Erreur fallback: ${e.message}`);
+    return { texte: '', texte_brut: '', confidence: 0, status: 'echec', raisons: [`Erreur fallback: ${e.message}`] };
   }
 }
 
@@ -1234,8 +1349,9 @@ Deno.serve(async (req) => {
         messageType = 'audio';
         audioUrl = uploadedUrl;
         if (!audioUrl) {
-          console.error('[WebhookVenus] 🎤 ❌ Upload du fichier audio échoué — transcription impossible');
-          transcriptionData = { texte: '', texte_brut: '', confidence: 0, status: 'echec', raisons: ['Échec upload fichier audio'] };
+          console.error('[WebhookVenus] 🎤 ❌ Upload du fichier audio échoué — tentative de fallback direct avec URL Twilio');
+          // ── Fallback: essayer de transcrire directement depuis l'URL Twilio ──
+          transcriptionData = await transcrireAudioDepuisTwilio(base44, mediaUrl0, accountSid, authToken, contentType0);
         } else {
           // 🎤 Phase 16 — Transcrire la note vocale immédiatement
           transcriptionData = await transcrireAudio(base44, uploadedUrl, contentType0);

@@ -173,23 +173,29 @@ export function evaluerConfianceTranscription(
   }
 
   // 2. Longueur très courte (peut indiquer une transcription partielle)
-  // Sauf si c'est une salutation valide (bonjour, salut, bonsoir)
+  // Sauf si c'est une salutation valide, un nom de quartier, ou un numéro de téléphone
   const mots = texteBrut.trim().split(/\s+/);
-  const SALUTATIONS = ['bonjour', 'salut', 'bonsoir', 'hello', 'coucou', 'cc'];
+  const SALUTATIONS = ['bonjour', 'salut', 'bonsoir', 'hello', 'coucou', 'cc', 'oui', 'non', 'ok'];
   const isSalutationCourte = mots.length < 3 && mots.some(m => SALUTATIONS.includes(m.toLowerCase().replace(/[.,!?]/g, '')));
-  if (mots.length < 3 && !isSalutationCourte) {
-    confidence -= 0.2;
+  const hasQuartier = QUARTIERS_VALIDES.some(q => texteNettoye.toLowerCase().includes(q));
+  const hasPhoneNumber = /\d{2}\s\d{2}\s\d{2}\s\d{2}/.test(texteNettoye) || /\d{8,}/.test(texteNettoye);
+  const isShortButValid = isSalutationCourte || hasQuartier || hasPhoneNumber;
+  if (mots.length < 3 && !isShortButValid) {
+    confidence -= 0.15;
     raisons.push(`Transcription très courte (${mots.length} mot(s))`);
   }
 
   // 3. Trop de mots inconnus / non-Français
   // Compter les mots qui ne ressemblent pas à du français
+  // Les noms de quartiers et nombres sont exemptés
   const motsInconnus = mots.filter(m =>
     m.length > 3 &&
-    !/^(le|la|les|un|une|des|de|du|et|ou|mais|donc|car|ni|or|je|tu|il|elle|on|nous|vous|ils|elles|mon|ma|mes|ton|ta|tes|son|sa|ses|notre|nos|votre|vos|leur|leurs|ce|cet|cette|ces|quel|quelle|quels|quelles|qui|que|quoi|dont|où|quand|comment|pourquoi|est|suis|es|sommes|êtes|sont|ai|as|avons|avez|ont|vais|vas|va|allons|allez|vont|veux|veut|voulons|voulez|veulent|peux|peut|pouvons|pouvez|peuvent|dois|doit|devons|devez|doivent|suis|être|avoir|aller|vouloir|pouvoir|devoir|bonjour|salut|bonsoir|colis|livraison|course|envoyer|expédier|recevoir|déplacement|livreur|client|adresse|quartier|téléphone|numéro|prix|tarif|fcfa|franc|oui|non|ok|merci|pardon|silgapp|venus|ouaga|tampouy|gounghin|karpala|pissy|saaba|tanghin|zone|bois|patte|dassasgho|cissin|samandin|wemtenga|bendogo|larle|somgande|kossodo)$/i.test(m)
+    !/^\d+$/.test(m) && // ignorer les nombres
+    !QUARTIERS_VALIDES.includes(m.toLowerCase()) &&
+    !/^(le|la|les|un|une|des|de|du|et|ou|mais|donc|car|ni|or|je|tu|il|elle|on|nous|vous|ils|elles|mon|ma|mes|ton|ta|tes|son|sa|ses|notre|nos|votre|vos|leur|leurs|ce|cet|cette|ces|quel|quelle|quels|quelles|qui|que|quoi|dont|où|quand|comment|pourquoi|est|suis|es|sommes|êtes|sont|ai|as|avons|avez|ont|vais|vas|va|allons|allez|vont|veux|veut|voulons|voulez|veulent|peux|peut|pouvons|pouvez|peuvent|dois|doit|devons|devez|doivent|suis|être|avoir|aller|vouloir|pouvoir|devoir|bonjour|salut|bonsoir|colis|livraison|course|envoyer|expédier|recevoir|déplacement|livreur|client|adresse|quartier|téléphone|numéro|prix|tarif|fcfa|franc|oui|non|ok|merci|pardon|silgapp|venus|ouaga|tampouy|gounghin|karpala|pissy|saaba|tanghin|zone|bois|patte|dassasgho|cissin|samandin|wemtenga|bendogo|larle|somgande|kossodo|destinataire|expéditeur|passager|recupere|recuperation|livraison|depart|arrivee|destination|confirme|valide|dacc|daccord|accord|veux|souhaite|aimerais|besoin|envoi|reception|deplace|transport|trajet)$/i.test(m)
   );
-  if (motsInconnus.length > mots.length * 0.4) {
-    confidence -= 0.2;
+  if (motsInconnus.length > mots.length * 0.5) {
+    confidence -= 0.15;
     raisons.push(`${motsInconnus.length} mot(s) non reconnu(s) sur ${mots.length}`);
   }
 
