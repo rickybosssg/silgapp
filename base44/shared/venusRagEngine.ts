@@ -589,11 +589,35 @@ export async function indexerDocumentComplet(
     const chunksTexte = decouperTexteIntelligent(extraction.texte);
     console.log(`[RAGEngine] ✅ Découpé en ${chunksTexte.length} chunks`);
 
-    // Étape 3 : Résumé (sur les premiers 4000 caractères)
-    const resume = await genererResumeDocument(base44, extraction.texte);
+    // ── ÉCONOMIE DE CRÉDITS: Résumé + mots-clés en UN SEUL appel LLM ──
+    let resume = '';
+    let motsCles: string[] = [];
+    try {
+      const llmCombined = await base44.asServiceRole.integrations.Core.InvokeLLM({
+        prompt: `Analyse ce document et génère en UNE SEULE réponse:
+1. Un résumé concis (max 300 caractères) capturant les points essentiels
+2. Les 15 mots-clés les plus importants (minuscules, sans accents, sans mots vides)
 
-    // Étape 4 : Mots-clés globaux
-    const motsCles = await extraireMotsClesDocument(base44, extraction.texte);
+Document:
+${extraction.texte.substring(0, 4000)}`,
+        response_json_schema: {
+          type: 'object',
+          properties: {
+            resume: { type: 'string' },
+            mots_cles: { type: 'array', items: { type: 'string' } },
+          },
+          required: ['resume', 'mots_cles'],
+        },
+        model: 'gpt_5_mini',
+      });
+      const combined: any = typeof llmCombined === 'string' ? JSON.parse(llmCombined) : llmCombined;
+      resume = combined.resume || '';
+      motsCles = combined.mots_cles || [];
+    } catch (e: any) {
+      console.warn('[RAGEngine] Erreur LLM combiné, fallback:', e.message);
+      resume = extraction.texte.substring(0, 300);
+      motsCles = extraireMotsClesFromQuery(extraction.texte).slice(0, 10);
+    }
 
     // Étape 5 : Gestion du versionnement
     let version = 1;
@@ -820,25 +844,52 @@ export async function indexerTexteDirect(
 
     console.log(`[RAGEngine] 📝 Indexation directe de texte (${texte.length} caractères)`);
 
-    // Étape 1 : Titre automatique
-    const titre = await genererTitreAutomatique(base44, texte);
-    console.log(`[RAGEngine] ✅ Titre généré: "${titre}"`);
+    // ── ÉCONOMIE DE CRÉDITS: Titre + résumé + mots-clés en UN SEUL appel LLM ──
+    // (avant: 3 appels séparés → maintenant: 1 seul)
+    let titre = '';
+    let resume = '';
+    let motsCles: string[] = [];
+    try {
+      const llmCombined = await base44.asServiceRole.integrations.Core.InvokeLLM({
+        prompt: `Analyse ce document et génère en UNE SEULE réponse:
+1. Un titre court et descriptif (max 80 caractères)
+2. Un résumé concis (max 300 caractères)
+3. Les 15 mots-clés les plus importants (minuscules, sans accents)
 
-    // Étape 2 : Catégorie automatique
+Document:
+${texte.substring(0, 4000)}`,
+        response_json_schema: {
+          type: 'object',
+          properties: {
+            titre: { type: 'string', description: 'Titre court et descriptif (max 80 caractères)' },
+            resume: { type: 'string', description: 'Résumé concis (max 300 caractères)' },
+            mots_cles: { type: 'array', items: { type: 'string' }, description: '15 mots-clés importants' },
+          },
+          required: ['titre', 'resume', 'mots_cles'],
+        },
+        model: 'gpt_5_mini', // Modèle économique pour cette tâche simple
+      });
+      const combined: any = typeof llmCombined === 'string' ? JSON.parse(llmCombined) : llmCombined;
+      titre = (combined.titre || '').substring(0, 100);
+      resume = combined.resume || '';
+      motsCles = combined.mots_cles || [];
+      console.log(`[RAGEngine] ✅ Titre+résumé+mots-clés générés en 1 appel: "${titre}"`);
+    } catch (e: any) {
+      console.warn('[RAGEngine] Erreur LLM combiné, fallback heuristique:', e.message);
+      titre = texte.split('\n')[0]?.substring(0, 80) || 'Document sans titre';
+      resume = texte.substring(0, 300);
+      motsCles = extraireMotsClesFromQuery(texte).slice(0, 10);
+    }
+
+    // Étape 2 : Catégorie automatique (heuristique, 0 crédit)
     const categorie = detecterCategorieAutomatique(texte);
 
-    // Étape 3 : Langue
+    // Étape 3 : Langue (heuristique, 0 crédit)
     const langue = detecterLangue(texte);
 
-    // Étape 4 : Découpage en chunks
+    // Étape 4 : Découpage en chunks (heuristique, 0 crédit)
     const chunksTexte = decouperTexteIntelligent(texte);
     console.log(`[RAGEngine] ✅ Découpé en ${chunksTexte.length} chunks`);
-
-    // Étape 5 : Résumé
-    const resume = await genererResumeDocument(base44, texte);
-
-    // Étape 6 : Mots-clés
-    const motsCles = await extraireMotsClesDocument(base44, texte);
 
     // Étape 7 : Créer le document
     const document = await base44.asServiceRole.entities.VenusDocument.create({

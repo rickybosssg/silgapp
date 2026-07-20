@@ -29,6 +29,13 @@ import {
   formaterOutilsPourPrompt,
   detecterHallucination,
 } from './venusToolsEngine.ts';
+import {
+  recupererCache,
+  stockerCache,
+  detecterSalutation,
+  detecterRegleMetierDirecte,
+  detecterConnaissanceDirecte,
+} from './venusCache.ts';
 
 /**
  * Recherche les scénarios validés pour un pays/langue donnés (Source 3).
@@ -595,6 +602,20 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
     };
   }
 
+  // ── ÉCONOMIE DE CRÉDITS: Court-circuit salutation (0 crédit LLM) ──
+  const salutation = detecterSalutation(input.messageClient);
+  if (salutation) {
+    salutation.temps_traitement_ms = Date.now() - startTime;
+    return salutation;
+  }
+
+  // ── ÉCONOMIE DE CRÉDITS: Vérifier le cache de réponses (0 crédit LLM) ──
+  const cached = recupererCache(input.telephone, input.messageClient, input.memoireCourte);
+  if (cached) {
+    cached.temps_traitement_ms = Date.now() - startTime;
+    return cached;
+  }
+
   // ── Construire l'historique lisible ──
   const historiqueStr = input.historiqueRecent
     .map(m => `${m.sender_type === 'client' ? 'Client' : 'VENUS'}: ${m.content || `[${m.message_type}]`}`)
@@ -726,6 +747,22 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
     }
   } catch (e) {
     console.warn('[ReasoningEngine] Erreur chargement règles métier:', e.message);
+  }
+
+  // ── ÉCONOMIE DE CRÉDITS: Court-circuit règle métier directe (0 crédit LLM) ──
+  const regleDirecte = detecterRegleMetierDirecte(input.messageClient, businessRuleEntries);
+  if (regleDirecte) {
+    regleDirecte.temps_traitement_ms = Date.now() - startTime;
+    stockerCache(input.telephone, input.messageClient, input.memoireCourte, regleDirecte);
+    return regleDirecte;
+  }
+
+  // ── ÉCONOMIE DE CRÉDITS: Court-circuit connaissance directe (0 crédit LLM) ──
+  const connaissanceDirecte = detecterConnaissanceDirecte(input.messageClient, knowledgeEntries);
+  if (connaissanceDirecte) {
+    connaissanceDirecte.temps_traitement_ms = Date.now() - startTime;
+    stockerCache(input.telephone, input.messageClient, input.memoireCourte, connaissanceDirecte);
+    return connaissanceDirecte;
   }
 
   // ── Construire le prompt de raisonnement ──
@@ -932,6 +969,7 @@ Réponds UNIQUEMENT avec un JSON.`;
     const llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
       prompt,
       response_json_schema: RAISONNEMENT_SCHEMA,
+      model: 'gpt_5_mini', // Modèle économique — suffisamment pour le raisonnement VENUS
     });
 
     const result: ReasoningResult = typeof llmRes === 'string' ? JSON.parse(llmRes) : llmRes;
@@ -1011,6 +1049,9 @@ Réponds UNIQUEMENT avec un JSON.`;
     }
 
     console.log(`[ReasoningEngine] 🧠 Intention: ${result.intention} | Contexte: ${result.contexte} | Action: ${result.action} | Confiance: ${result.confiance}% | Temps: ${result.temps_traitement_ms}ms`);
+
+    // ── ÉCONOMIE DE CRÉDITS: Stocker la réponse en cache pour réutilisation ──
+    stockerCache(input.telephone, input.messageClient, input.memoireCourte, result);
 
     return result;
   } catch (e: any) {
