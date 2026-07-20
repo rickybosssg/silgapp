@@ -21,6 +21,13 @@ export default function ScenariosTab({ presetData, presetOpen }) {
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ['venus-scenarios'],
     queryFn: () => base44.entities.VenusScenario.list('-updated_date', 200),
+    refetchInterval: (query) => {
+      // Poll tant qu'il y a des scénarios validés mais pas encore indexés
+      const pending = (query.state.data || []).some(
+        e => e.statut === 'valide' && !e.rag_indexe && !e.rag_erreur
+      );
+      return pending ? 4000 : false;
+    },
   });
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['venus-scenarios'] });
 
