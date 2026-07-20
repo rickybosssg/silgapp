@@ -48,10 +48,28 @@ Deno.serve(async (req) => {
     let relancesEnvoyees = 0;
     let erreurs = 0;
 
+    // Compter les relances précédentes par conversation pour éviter le spam
     for (const conv of conversationsARelancer) {
       try {
         let pendingCourse: any = null;
         try { pendingCourse = conv.venus_pending_course ? JSON.parse(conv.venus_pending_course) : null; } catch {}
+
+        // Vérifier le nombre de relances déjà envoyées (max 2)
+        let nbRelancesPrecedentes = 0;
+        try {
+          const msgs = await base44.asServiceRole.entities.Message.filter(
+            { conversation_id: conv.id, sender_type: 'admin', source: 'whatsapp' },
+            '-created_date', 10
+          );
+          nbRelancesPrecedentes = (msgs || []).filter(m =>
+            m.content && (
+              m.content.includes('Bonjour, pour créer') ||
+              m.content.includes("j'attends toujours") ||
+              m.content.includes("j'attends votre retour") ||
+              m.content.includes('Souhaitez-vous confirmer')
+            )
+          ).length;
+        } catch {}
 
         const messageRelance = genererMessageRelance(pendingCourse);
         const telephone = conv.whatsapp_phone;
@@ -82,15 +100,21 @@ Deno.serve(async (req) => {
           });
 
           // Mettre à jour la conversation
-          await base44.asServiceRole.entities.Conversation.update(conv.id, {
+          // Après 2 relances sans réponse, nettoyer le pending_course pour stopper la boucle
+          const updateData: any = {
             last_message: messageRelance.slice(0, 80),
             last_message_date: new Date().toISOString(),
             last_sender_name: 'VENUS',
             last_sender_type: 'admin',
-          });
+          };
+          if (nbRelancesPrecedentes >= 1) {
+            updateData.venus_pending_course = '';
+            console.log(`[RelanceVenus] 🧹 pending_course nettoyé pour ${telephone} (2ème relance, stop boucle)`);
+          }
+          await base44.asServiceRole.entities.Conversation.update(conv.id, updateData);
 
           relancesEnvoyees++;
-          console.log(`[RelanceVenus] ✅ Relance envoyée à ${telephone}: "${messageRelance.substring(0, 60)}..."`);
+          console.log(`[RelanceVenus] ✅ Relance envoyée à ${telephone} (${nbRelancesPrecedentes + 1}/2): "${messageRelance.substring(0, 60)}..."`);
         } else {
           erreurs++;
           console.error(`[RelanceVenus] ❌ Erreur Twilio pour ${telephone}: ${resp.status}`);

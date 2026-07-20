@@ -841,22 +841,62 @@ export async function detecterConversationsARelancer(base44: any, delaiMinutes: 
       '-last_message_date', 100
     );
 
-    const aRelancer = conversations.filter(c => {
-      if (!c.venus_pending_course) return false;
-      if (!c.last_message_date) return false;
-      if (c.last_message_date > cutoff) return false; // Pas assez de temps écoulé
+    const aRelancer: any[] = [];
+    for (const c of conversations) {
+      if (!c.venus_pending_course) continue;
+      if (!c.last_message_date) continue;
+      if (c.last_message_date > cutoff) continue; // Pas assez de temps écoulé
 
       // Vérifier que le cours n'est pas encore créé
-      try {
-        const pending = JSON.parse(c.venus_pending_course);
-        if (pending.course_created || pending.all_info_collected === true) return false;
-        if (pending.contact_livreur_mode) return false;
-        if (pending.redispatch_pending) return false;
-        return true;
-      } catch {
-        return false;
+      let pending: any;
+      try { pending = JSON.parse(c.venus_pending_course); } catch { continue; }
+      if (pending.course_created || pending.all_info_collected === true) continue;
+      if (pending.contact_livreur_mode) continue;
+      if (pending.redispatch_pending) continue;
+
+      // ── FIX 1: Ne pas relancer si le client a une course récente (créée dans les 2h) ──
+      if (c.whatsapp_phone) {
+        try {
+          const recentCourses = await base44.asServiceRole.entities.CourseExterne.filter(
+            { client_telephone: c.whatsapp_phone },
+            '-created_date', 5
+          );
+          const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+          const hasRecentCourse = (recentCourses || []).some(course =>
+            course.created_date > twoHoursAgo &&
+            !['annulee', 'annuler', 'annule'].includes(course.statut)
+          );
+          if (hasRecentCourse) {
+            // Le client a déjà une course récente — nettoyer le pending_course pour stopper la boucle
+            await base44.asServiceRole.entities.Conversation.update(c.id, { venus_pending_course: '' });
+            continue;
+          }
+        } catch {}
       }
-    });
+
+      // ── FIX 2: Limiter à 2 relances maximum sans réponse du client ──
+      try {
+        const recentMsgs = await base44.asServiceRole.entities.Message.filter(
+          { conversation_id: c.id, sender_type: 'admin', source: 'whatsapp' },
+          '-created_date', 10
+        );
+        const relanceCount = (recentMsgs || []).filter(m =>
+          m.content && (
+            m.content.includes('Bonjour, pour créer') ||
+            m.content.includes("j'attends toujours") ||
+            m.content.includes("j'attends votre retour") ||
+            m.content.includes('Souhaitez-vous confirmer')
+          )
+        ).length;
+        if (relanceCount >= 2) {
+          // Trop de relances sans réponse — nettoyer le pending_course pour stopper définitivement
+          await base44.asServiceRole.entities.Conversation.update(c.id, { venus_pending_course: '' });
+          continue;
+        }
+      } catch {}
+
+      aRelancer.push(c);
+    }
 
     return aRelancer;
   } catch (e) {
