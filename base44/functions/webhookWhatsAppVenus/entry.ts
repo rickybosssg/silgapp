@@ -1483,7 +1483,7 @@ Deno.serve(async (req) => {
         const gating = peutAgirSurAudio(transcriptionData.confidence);
         forceConfirmationAudio = gating.forceConfirmation;
 
-        console.log(`[WebhookVenus] 🎤 ✅ Audio accepté | Confiance: ${transcriptionData.confiance.toFixed(2)} | Force confirmation: ${forceConfirmationAudio} | Texte: "${messageEffectif.substring(0, 100)}"`);
+        console.log(`[WebhookVenus] 🎤 ✅ Audio accepté | Confiance: ${transcriptionData.confidence.toFixed(2)} | Force confirmation: ${forceConfirmationAudio} | Texte: "${messageEffectif.substring(0, 100)}"`);
         console.log(`[WebhookVenus] 🎤 📊 Brut: "${(transcriptionData.texte_brut || '').substring(0, 80)}" → Nettoyé: "${messageEffectif.substring(0, 80)}"`);
       }
     }
