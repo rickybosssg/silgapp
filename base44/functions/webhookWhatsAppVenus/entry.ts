@@ -221,44 +221,41 @@ async function transcrireAudio(base44, audioUrl, mediaContentType = '') {
       console.warn(`[WebhookVenus] 🎤 ⚠️ ÉTAPE C1 — HEAD request échouée (continuons quand même): ${headErr.message}`);
     }
 
-    // ── Appeler la transcription Whisper ──
-    console.log(`[WebhookVenus] 🎤 ÉTAPE C2 — Appel Core.TranscribeAudio (Whisper)...`);
-    let result: any;
+    // ── Appeler Gemini Flash pour transcription (français forcé) ──
+    // Gemini Flash est utilisé en priorité car il permet de forcer la langue française,
+    // contrairement à Whisper qui détecte parfois le portugais sur les audios courts
+    console.log(`[WebhookVenus] 🎤 ÉTAPE C2 — Appel InvokeLLM (Gemini Flash) pour transcription française...`);
     let texteBrut = '';
     let usedFallback = false;
 
     try {
-      result = await base44.asServiceRole.integrations.Core.TranscribeAudio({ audio_url: audioUrl });
-      const tempsMs = Date.now() - startTime;
-      console.log(`[WebhookVenus] 🎤 ÉTAPE C2 — TranscribeAudio terminé en ${tempsMs}ms`);
-      console.log(`[WebhookVenus] 🎤   Type de réponse: ${typeof result}`);
-      console.log(`[WebhookVenus] 🎤   Clés de réponse: ${result && typeof result === 'object' ? Object.keys(result).join(', ') : 'N/A'}`);
-
-      texteBrut = typeof result === 'string' ? result : (result?.text || result?.transcript || '');
-      console.log(`[WebhookVenus] 🎤   Transcription brute: "${(texteBrut || '').substring(0, 200)}"`);
-      console.log(`[WebhookVenus] 🎤   Longueur: ${texteBrut?.length || 0} caractères`);
-    } catch (transcribeErr) {
-      console.error(`[WebhookVenus] 🎤 ❌ ÉTAPE C2 — TranscribeAudio a échoué: ${transcribeErr.message}`);
-      console.error(`[WebhookVenus] 🎤   Nom erreur: ${transcribeErr.name}`);
+      const llmResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
+        prompt: `Tu es un expert en transcription audio. Transcris ce message vocal en français. L'audio est en français (parlé possiblement avec un accent africain burkinabè). Le texte peut contenir des noms de quartiers de Ouagadougou (Karpala, Pissy, Tampouy, Ouaga 2000, Zone du Bois, Patte d'Oie, Gounghin, Dassasgho, Cissin, Samandin, Wemtenga, Bendogo, Larle, Somgande, Saaba, Tanghin, Kossodo), des numéros de téléphone, ou des demandes de livraison. Réponds UNIQUEMENT avec le texte transcrit en français, sans commentaire. Si l'audio est inaudible, réponds "INAUDIBLE".`,
+        file_urls: [audioUrl],
+        model: 'gemini_3_flash',
+      });
+      const llmText = typeof llmResult === 'string' ? llmResult : (llmResult?.response || llmResult?.text || '');
+      console.log(`[WebhookVenus] 🎤 ÉTAPE C2 — Gemini Flash terminé | Texte: "${(llmText || '').substring(0, 200)}"`);
+      if (llmText && llmText.trim().length >= 2 && !llmText.toUpperCase().includes('INAUDIBLE')) {
+        texteBrut = llmText.trim();
+      }
+    } catch (llmErr) {
+      console.error(`[WebhookVenus] 🎤 ❌ ÉTAPE C2 — Gemini Flash échoué: ${llmErr.message}`);
     }
 
-    // ── Fallback: si Whisper échoue ou retourne vide, utiliser InvokeLLM avec file_urls ──
+    // ── Fallback: si Gemini échoue ou retourne vide, utiliser Whisper ──
     if (!texteBrut || texteBrut.trim().length < 2) {
-      console.warn(`[WebhookVenus] 🎤 ⚠️ ÉTAPE C2b — Whisper vide/échec — fallback InvokeLLM (gemini_3_flash)...`);
+      console.warn(`[WebhookVenus] 🎤 ⚠️ ÉTAPE C2b — Gemini vide/échec — fallback Whisper...`);
+      usedFallback = true;
       try {
-        const llmResult = await base44.asServiceRole.integrations.Core.InvokeLLM({
-          prompt: `Tu es un expert en transcription audio. Transcris ce message vocal en français. Le texte peut contenir des noms de quartiers de Ouagadougou (Karpala, Pissy, Tampouy, Ouaga 2000, Zone du Bois, Patte d'Oie, Gounghin, Dassasgho, Cissin, Samandin, Wemtenga, Bendogo, Larle, Somgande, Saaba, Tanghin, Kossodo), des numéros de téléphone, ou des demandes de livraison. Réponds UNIQUEMENT avec le texte transcrit, sans commentaire. Si l'audio est inaudible, réponds "INAUDIBLE".`,
-          file_urls: [audioUrl],
-          model: 'gemini_3_flash',
-        });
-        const fallbackText = typeof llmResult === 'string' ? llmResult : (llmResult?.response || llmResult?.text || '');
-        console.log(`[WebhookVenus] 🎤 ÉTAPE C2b — Fallback LLM terminé | Texte: "${(fallbackText || '').substring(0, 200)}"`);
-        if (fallbackText && fallbackText.trim().length >= 2 && !fallbackText.toUpperCase().includes('INAUDIBLE')) {
-          texteBrut = fallbackText.trim();
-          usedFallback = true;
+        const result = await base44.asServiceRole.integrations.Core.TranscribeAudio({ audio_url: audioUrl });
+        const whisperText = typeof result === 'string' ? result : (result?.text || result?.transcript || '');
+        console.log(`[WebhookVenus] 🎤 ÉTAPE C2b — Whisper fallback terminé | Texte: "${(whisperText || '').substring(0, 200)}"`);
+        if (whisperText && whisperText.trim().length >= 2) {
+          texteBrut = whisperText.trim();
         }
-      } catch (fallbackErr) {
-        console.error(`[WebhookVenus] 🎤 ❌ ÉTAPE C2b — Fallback LLM aussi échoué: ${fallbackErr.message}`);
+      } catch (transcribeErr) {
+        console.error(`[WebhookVenus] 🎤 ❌ ÉTAPE C2b — Whisper aussi échoué: ${transcribeErr.message}`);
       }
     }
 
@@ -281,7 +278,7 @@ async function transcrireAudio(base44, audioUrl, mediaContentType = '') {
       confidence: evalConfiance.confidence,
       status: evalConfiance.status,
       raisons: evalConfiance.raisons,
-      methode: usedFallback ? 'llm_fallback' : 'whisper',
+      methode: usedFallback ? 'whisper' : 'gemini_flash',
     };
   } catch (e) {
     const tempsMs = Date.now() - startTime;
