@@ -1500,18 +1500,9 @@ Deno.serve(async (req) => {
       } else if (contentType0.startsWith('audio/')) {
         messageType = 'audio';
         audioUrl = uploadedUrl;
-        if (!audioUrl) {
-          console.error('[WebhookVenus] 🎤 ❌ Upload du fichier audio échoué — tentative de fallback direct avec URL Twilio');
-          // ── Fallback: essayer de transcrire directement depuis l'URL Twilio ──
-          transcriptionData = await transcrireAudioDepuisTwilio(base44, mediaUrl0, accountSid, authToken, contentType0);
-        } else {
-          // 🎤 Phase 16 — Transcrire la note vocale immédiatement
-          transcriptionData = await transcrireAudio(base44, uploadedUrl, contentType0);
-        }
-        if (transcriptionData.texte) {
-          messageContent = transcriptionData.texte;
-        }
-        console.log(`[WebhookVenus] 🎤 Note vocale de ${telephone} — transcription: "${(transcriptionData.texte || '').substring(0, 80)}" (confiance: ${transcriptionData.confidence})`);
+        // ── Règle stricte: les messages vocaux ne sont plus transcrits ni interprétés ──
+        // L'audio est conservé dans la conversation mais VENUS répond avec un message standard
+        console.log(`[WebhookVenus] 🎤 Note vocale reçue de ${telephone} — non transcrite (règle stricte), réponse standard à venir`);
       } else {
         messageType = 'document';
         documentUrl = uploadedUrl;
@@ -1581,8 +1572,14 @@ Deno.serve(async (req) => {
       }, 20000);
     }
 
-    // ── 3b. Vérifier le mode maintenance VENUS ──
+    // ── 3b. Règle stricte: les messages vocaux reçoivent une réponse standard ──
     let reponseVenus = '';
+    if (messageType === 'audio') {
+      reponseVenus = "Désolée, mon système de compréhension des messages vocaux n'est pas encore suffisamment fiable. Merci de m'écrire votre demande par message texte afin que je puisse vous aider correctement.";
+      console.log(`[WebhookVenus] 🎤 Réponse standard envoyée pour message vocal de ${telephone}`);
+    }
+
+    // ── 3c. Vérifier le mode maintenance VENUS ──
     const maintenanceMode = await getMaintenanceMode(base44);
     if (maintenanceMode.active) {
       const maintenanceMessage = maintenanceMode.message || "Certaines fonctionnalités sont momentanément indisponibles. Nous revenons très vite !";
@@ -1632,7 +1629,7 @@ Deno.serve(async (req) => {
     let isAudioTranscription = false;
     let forceConfirmationAudio = false;
 
-    if (messageType === 'audio') {
+    if (!reponseVenus && messageType === 'audio') {
       clientAEnvoyeAudio = true;
 
       if (transcriptionData?.status === 'echec' || !transcriptionData?.texte || transcriptionData?.confidence < 0.5) {
