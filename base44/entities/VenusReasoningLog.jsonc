@@ -32,6 +32,8 @@
         "modifier_info",
         "demander_info",
         "salutation",
+        "signalement_livreur",
+        "message_hors_contexte",
         "clarifier",
         "autre"
       ],

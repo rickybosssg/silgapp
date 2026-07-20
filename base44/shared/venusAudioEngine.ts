@@ -61,6 +61,12 @@ const CORRECTIONS_QUARTIERS: Record<string, string> = {
   // Zone du Bois
   'zone du boi': 'Zone du Bois', 'zone du bois': 'Zone du Bois',
   'zone bois': 'Zone du Bois',
+  // 1200 Logements
+  '1200 logement': '1200 Logements', '1200 logements': '1200 Logements',
+  'mille deux cents logements': '1200 Logements', 'mille deux cent logements': '1200 Logements',
+  '2000 logements': '2000 Logements', '2000 logement': '2000 Logements',
+  // Sonabel / Sonatur
+  'sonabel': 'Sonabel', 'sonatur': 'Sonatur', 'sonatour': 'Sonatur',
 };
 
 // ── Corrections phonétiques générales ──

@@ -111,7 +111,8 @@ const RAISONNEMENT_SCHEMA = {
       enum: [
         'creer_course', 'suivre_course', 'contacter_livreur',
         'annuler_course', 'modifier_info', 'demander_info',
-        'salutation', 'clarifier', 'autre',
+        'salutation', 'signalement_livreur', 'message_hors_contexte',
+        'clarifier', 'autre',
       ],
     },
     contexte: {
@@ -440,6 +441,9 @@ const QUARTIERS_OUAGA = [
   'larle', 'somgande', 'saaba', 'tanghin', 'kossodo', 'ouaga 1', 'ouaga 2',
   'ouaga 3', 'wagadogo', 'zone 1', 'zone 2', 'zone 3', 'zone 4', 'zone 5',
   'paspanga', 'tiendpalogo', 'bilbalogho', 'sandogo', 'tounouma',
+  '1200 logements', 'mille logements', '2000 logements', 'sonabel', 'sonatur',
+  'ouden', 'pestel', 'chateau', 'tanghin', 'sapone', 'polesgo', 'nongremassom',
+  'wemtenga', 'dagnoen', 'zogona', 'sigsoghesse', 'kalgondin', 'tampouy',
 ];
 
 function extraireInfosDepuisMessage(message: string): Record<string, any> {
@@ -713,7 +717,12 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
     ? `═══ NOTE: TRANSCRIPTION VOCALE ═══
 Le message ci-dessous a ete transcrit depuis une note vocale et peut contenir des erreurs.
 Confirme ce que tu as compris avant de poursuivre si un mot semble incertain.
-Noms de quartiers courants a Ouagadougou: Karpala, Pissy, Tampouy, Ouaga 2000, Zone du Bois, Patte d'Oie, Gounghin, Dassasgho, Cissin, Samandin, Wemtenga, Bendogo, Larle, Somgande, Saaba, Tanghin, Kossodo.`
+Noms de quartiers et repères courants à Ouagadougou: Karpala, Pissy, Tampouy, Ouaga 2000, Zone du Bois, Patte d'Oie, Gounghin, Dassasgho, Cissin, Samandin, Wemtenga, Bendogo, Larle, Somgande, Saaba, Tanghin, Kossodo, 1200 Logements, 2000 Logements, Sonabel, Sonatur, Château, Polesgo, Sapone, Dagnoen, Zogona.
+
+IMPORTANT: Identifie d'abord QUI parle avant d'interpréter le message:
+- Un client qui demande un service: "je voudrais envoyer", "je veux livrer", "j'ai besoin d'une livraison"
+- Un livreur qui rapporte son statut: "j'ai fini à", "je suis à", "je m'en vais à", "j'ai récupéré"
+- Quelqu'un qui parle à une autre personne: "tu n'es pas au bureau?", "sors", "appelle-moi"`
     : '';
 
   const prompt = `${localizedSystemPrompt || 'Tu es VENUS, l\'assistante virtuelle SILGAPP. Tu possèdes un MOTEUR DE RAISONNEMENT avancé et une MÉMOIRE INTELLIGENTE.'}
@@ -779,15 +788,23 @@ ${input.messageClient}
 Analyse le message du client étape par étape :
 
 ÉTAPE 1 — INTENTION: Que veut réellement le client ?
-- creer_course: Créer une nouvelle course
+- creer_course: Créer une nouvelle course (uniquement si le client demande EXPLICITEMENT à envoyer/recevoir un colis ou se déplacer: "je voudrais envoyer", "je veux livrer", "j'ai besoin d'une livraison")
 - suivre_course: Suivre ou consulter une course existante
 - contacter_livreur: Contacter ou parler au livreur
 - annuler_course: Annuler une course
 - modifier_info: Modifier/corriger une information déjà donnée
 - demander_info: Poser une question informationnelle (tarifs, fonctionnement, etc.)
 - salutation: Bonjour, salut, bonsoir
+- signalement_livreur: Le message vient d'un LIVREUR qui rapporte son statut (ex: "j'ai fini à Karpala", "je suis en route vers", "j'arrive", "je pars de") — ce n'est PAS une demande de course
+- message_hors_contexte: Le message s'adresse à quelqu'un d'autre ou n'est pas une demande SILGAPP (ex: "tu n'es pas au bureau?", "où es-tu?", "appelle-moi", "je suis devant la porte")
 - clarifier: Demande ambiguë nécessitant une clarification
 - autre: Autre chose
+
+═══ DISTINGUER UN CLIENT D'UN LIVREUR ═══
+Avant de choisir l'intention, détermine QUI parle:
+- UN CLIENT veut un service: il dit "je voudrais", "je veux", "j'aimerais", "envoyer un colis", "recevoir un colis", "me déplacer", "effectuer une livraison" → intention=creer_course
+- UN LIVREUR rapporte son activité: il dit "j'ai fini à", "je suis à", "je pars de", "je m'en vais à", "j'arrive à", "j'ai livré", "j'ai récupéré le colis" → intention=signalement_livreur (NE PAS créer de course)
+- QUELQU'UN PARLE À UNE AUTRE PERSONNE: le message s'adresse à un "tu" ou "vous" spécifique, demande où est la personne, dit d'appeler, de sortir, etc. → intention=message_hors_contexte (répondre poliment que vous êtes VENUS l'assistante SILGAPP)
 
 ÉTAPE 2 — CONTEXTE: De quoi parle le client ?
 - nouvelle_course / course_en_cours / ancienne_course / paiement / livreur / partenaire / general
@@ -806,6 +823,7 @@ Pour creer_course, requis: type_course, adresse_depart (ou GPS), adresse_arrivee
 - repondre_info: Répondre à une question informationnelle (utilise la base de connaissances si pertinent)
 - clarifier: Demander une clarification
 - saluer: Répondre à une salutation
+- repondre_info: Pour signalement_livreur et message_hors_contexte — répondre poliment sans créer de course
 
 ÉTAPE 6 — PROCHAINE QUESTION: Si action=poser_question, formule UNE SEULE question claire.
 
@@ -864,6 +882,12 @@ Champs possibles: client_nom, ville_habituelle, quartier_habituel, langue_prefer
 15. Si le client indique "recevoir un colis", le contact à collecter est l'EXPÉDITEUR (celui qui envoie vers le client). Si "envoyer un colis", le contact est le DESTINATAIRE (celui qui reçoit).
 
 15. Le nom du destinataire/expéditeur est FACULTATIF. Seul le téléphone est requis. Si le client n'a pas le nom, mets contact_nom à "" et contact_is_client à false (ou true si le client est lui-même le contact).
+
+16. SIGNALEMENT LIVREUR: Si le message indique clairement que l'expéditeur EST un livreur en train de travailler (ex: "j'ai fini à Karpala", "je m'en vais à la Patte d'Oie pour une livraison", "j'ai récupéré le colis", "je suis en route"), NE CRÉE PAS de course. Réponds: "Merci pour cette mise à jour ! Je note votre progression. Bonne continuation !" avec intention=signalement_livreur et action=repondre_info.
+
+17. MESSAGE HORS CONTEXTE: Si le message s'adresse à quelqu'un d'autre et n'est pas une demande SILGAPP (ex: "tu n'es pas au bureau?", "sors dehors", "je suis devant la porte", "appelle ton numéro"), réponds poliment: "Je suis VENUS, l'assistante SILGAPP. Il semble que votre message s'adresse à quelqu'un d'autre. Si vous avez besoin d'une livraison ou d'un envoi de colis, je suis là pour vous aider !" avec intention=message_hors_contexte et action=repondre_info.
+
+18. MENTION DE LIEUX SANS DEMANDE: Le simple fait de mentionner un quartier (Karpala, Patte d'Oie, etc.) NE signifie PAS que le client veut créer une course. Ne crée une course QUE si le client exprime clairement une demande de service ("je voudrais envoyer", "je veux livrer", "j'ai besoin d'une livraison").
 
 Réponds UNIQUEMENT avec un JSON.`;
 
