@@ -21,13 +21,7 @@ export default function ScenariosTab({ presetData, presetOpen }) {
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ['venus-scenarios'],
     queryFn: () => base44.entities.VenusScenario.list('-updated_date', 200),
-    refetchInterval: (query) => {
-      // Poll tant qu'il y a des scénarios validés mais pas encore indexés
-      const pending = (query.state.data || []).some(
-        e => e.statut === 'valide' && !e.rag_indexe && !e.rag_erreur
-      );
-      return pending ? 4000 : false;
-    },
+    refetchInterval: false,
   });
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['venus-scenarios'] });
 
@@ -61,6 +55,24 @@ export default function ScenariosTab({ presetData, presetOpen }) {
     }
   };
 
+  const [batchIndexing, setBatchIndexing] = useState(false);
+  const pendingIndex = entries.filter(e => e.statut === 'valide' && !e.rag_indexe);
+  const handleBatchIndex = async () => {
+    if (pendingIndex.length === 0) return;
+    setBatchIndexing(true);
+    try {
+      const res = await base44.functions.invoke('indexerScenarioVenus', { action: 'batch_index' });
+      const data = res.data || res;
+      alert(`${data.succes || 0} scénario(s) indexé(s), ${data.echecs || 0} échec(s)`);
+      refresh();
+    } catch (e) {
+      console.error('Erreur indexation par lot:', e);
+      alert('Erreur: ' + e.message);
+    } finally {
+      setBatchIndexing(false);
+    }
+  };
+
   const openAdd = () => { setEditEntry(null); setDialogPreset(null); setDialogOpen(true); };
   const openEdit = (entry) => { setEditEntry(entry); setDialogPreset(null); setDialogOpen(true); };
 
@@ -78,6 +90,12 @@ export default function ScenariosTab({ presetData, presetOpen }) {
             <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un scénario..." className="pl-9" />
           </div>
           <Button size="sm" onClick={openAdd}><Plus className="w-4 h-4 mr-1" />Ajouter</Button>
+          {pendingIndex.length > 0 && (
+            <Button size="sm" variant="secondary" onClick={handleBatchIndex} disabled={batchIndexing}>
+              {batchIndexing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Database className="w-4 h-4 mr-1" />}
+              Indexer par lot ({pendingIndex.length})
+            </Button>
+          )}
         </div>
         <Button variant="outline" className="w-full border-dashed border-primary text-primary" onClick={() => setPasteOpen(true)}>
           <ClipboardPaste className="w-4 h-4 mr-2" />Coller une conversation

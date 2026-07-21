@@ -15,6 +15,81 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const body = await req.json();
 
+    // ── Action manuelle : batch_index ──
+    // Indexe tous les scénarios validés non encore indexés (rag_indexe=false)
+    // ou un ensemble spécifique d'IDs. Permet l'indexation par lot après
+    // validation administrative, au lieu d'une indexation automatique à chaque création.
+    if (body.action === 'batch_index') {
+      const user = await base44.auth.me();
+      if (!user || user.role !== 'admin') {
+        return Response.json({ error: 'Réservé aux administrateurs' }, { status: 403 });
+      }
+
+      const query = body.scenario_ids
+        ? { statut: 'valide', id: { $in: body.scenario_ids } }
+        : { statut: 'valide', rag_indexe: false };
+
+      const scenarios = body.scenario_ids
+        ? await base44.asServiceRole.entities.VenusScenario.filter({ statut: 'valide' }, '-created_date', 200).then(all =>
+            all.filter(s => body.scenario_ids.includes(s.id))
+          )
+        : await base44.asServiceRole.entities.VenusScenario.filter({ statut: 'valide', rag_indexe: false }, '-created_date', 200);
+
+      const results: any[] = [];
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const scenario of scenarios) {
+        try {
+          // Désindexer l'ancienne version si elle existe
+          if (scenario.rag_document_id) {
+            try {
+              await base44.asServiceRole.entities.VenusDocument.update(scenario.rag_document_id, { statut: 'archive', is_latest_version: false });
+              const oldChunks = await base44.asServiceRole.entities.VenusDocumentChunk.filter({ document_id: scenario.rag_document_id }, '-chunk_index', 500);
+              for (const oc of oldChunks) await base44.asServiceRole.entities.VenusDocumentChunk.update(oc.id, { document_statut: 'archive' });
+            } catch (e) { console.warn('[indexerScenarioVenus] batch: archivage ancien:', e.message); }
+          }
+
+          const triggers = (() => { try { return JSON.parse(scenario.declencheurs || '[]'); } catch { return []; } })();
+          const conv = (() => { try { return JSON.parse(scenario.conversation || '[]'); } catch { return []; } })();
+          const convText = conv.map((m: any) => `${m.role === 'venus' ? 'VENUS' : 'Client'}: ${m.content}`).join('\n');
+          const textePourRag = `Scénario: ${scenario.nom}\nDescription: ${scenario.description || ''}\nCatégorie: ${scenario.categorie || 'N/A'}\nDéclencheurs: ${triggers.join(', ')}\n\nConversation:\n${convText}\n\nRéponse idéale:\n${scenario.reponse_ideale || ''}\n\nRésultat attendu: ${scenario.resultat_attendu || ''}`;
+
+          const result = await indexerTexteDirect(base44, { texte: textePourRag, auteur: scenario.auteur || 'admin' });
+
+          if (result.success && result.document?.id) {
+            await base44.asServiceRole.entities.VenusScenario.update(scenario.id, {
+              rag_indexe: true,
+              rag_document_id: result.document.id,
+              rag_indexe_at: new Date().toISOString(),
+              rag_erreur: '',
+            });
+            results.push({ id: scenario.id, nom: scenario.nom, statut: 'succes' });
+            successCount++;
+          } else {
+            await base44.asServiceRole.entities.VenusScenario.update(scenario.id, {
+              rag_indexe: false,
+              rag_erreur: result.error || 'Erreur inconnue',
+            });
+            results.push({ id: scenario.id, nom: scenario.nom, statut: 'echec', erreur: result.error });
+            failCount++;
+          }
+        } catch (e: any) {
+          results.push({ id: scenario.id, nom: scenario.nom, statut: 'echec', erreur: e.message });
+          failCount++;
+        }
+      }
+
+      return Response.json({
+        success: true,
+        message: `${successCount} scénario(s) indexé(s), ${failCount} échec(s)`,
+        total: scenarios.length,
+        succes: successCount,
+        echecs: failCount,
+        results,
+      });
+    }
+
     let scenario = body.data;
     const eventId = body.event?.entity_id;
 
