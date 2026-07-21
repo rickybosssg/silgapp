@@ -86,13 +86,13 @@ export default function ScenarioFormDialog({ open, onClose, editEntry, presetDat
               <SelectContent>
                 <SelectItem value="brouillon">📝 Brouillon</SelectItem>
                 <SelectItem value="en_revision">🔍 En révision</SelectItem>
-                <SelectItem value="valide">✅ Validé (indexation RAG auto)</SelectItem>
+                <SelectItem value="valide">✅ Validé</SelectItem>
                 <SelectItem value="archive">📦 Archivé</SelectItem>
               </SelectContent>
             </Select>
             {form.statut === 'valide' && (
               <p className="text-xs text-green-600 mt-1 font-medium">
-                ✓ Ce scénario sera automatiquement indexé dans la base RAG de VENUS à l'enregistrement.
+                ✓ Ce scénario est validé. Utilisez « Indexer par lot » dans la liste pour l'indexer dans la base RAG.
               </p>
             )}
           </div>

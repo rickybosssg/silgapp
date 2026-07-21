@@ -51,7 +51,7 @@
         "archive"
       ],
       "default": "brouillon",
-      "description": "Statut du sc\u00e9nario. 'valide' d\u00e9clenche l'indexation RAG automatique."
+      "description": "Statut du sc\u00e9nario. L'indexation RAG se fait via le bouton 'Indexer par lot' apr\u00e8s validation."
     },
     "rag_indexe": {
       "type": "boolean",
