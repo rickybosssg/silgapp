@@ -31,7 +31,9 @@
         "course_proximite",
         "rappel_reponse",
         "alerte_critique_dispatch",
-        "message_client"
+        "message_client",
+        "incident_detecte",
+        "course_modifiee"
       ],
       "description": "Type de notification"
     },

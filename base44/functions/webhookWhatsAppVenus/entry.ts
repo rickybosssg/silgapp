@@ -36,6 +36,18 @@ import {
   genererMessageConfirmationAudio,
   genererMessageRepetitionAudio,
 } from '../../shared/venusAudioEngine.ts';
+import {
+  detecterEtTraiterIncident,
+} from '../../shared/venusIncidentEngine.ts';
+import {
+  detecterIntentionModification,
+  extraireChampEtValeur,
+  appliquerModification,
+  getChampLabel,
+  getChampsModifiables,
+  STATUTS_NON_MODIFIABLES,
+  genererRecapModification,
+} from '../../shared/venusCourseModifierEngine.ts';
 
 /**
  * Webhook WhatsApp <-> Venus (via Twilio).
@@ -1442,6 +1454,199 @@ async function handlePrixManuelResponse(base44: any, conversation: any, userMess
   }
 }
 
+/**
+ * Handler: Modification de course (multi-étapes déterministe)
+ *
+ * États gérés dans venus_pending_course:
+ * - modification_mode + attente_valeur: VENUS a demandé la nouvelle valeur
+ * - modification_mode + attente_confirmation: VENUS a affiché le récap, attend oui/non
+ *
+ * Si aucune intention de modification n'est détectée, retourne null (le flux continue).
+ */
+async function handleModifierCourse(base44, conversation, userMessage, telephone, profileName, countryCode) {
+  let pendingCourse: any = null;
+  try { pendingCourse = conversation.venus_pending_course ? JSON.parse(conversation.venus_pending_course) : null; } catch { pendingCourse = null; }
+  if (!pendingCourse) pendingCourse = {};
+
+  const msgLower = userMessage.toLowerCase().trim();
+  const CONFIRM_KW_MOD = ['oui', 'ok', "d'accord", 'd accord', 'je confirme', 'valider', 'confirmer', 'confirme', "c'est bon", 'cest bon', 'go', "c'est ok", 'cest ok', 'parfait', 'exact', 'ouais', 'je valide', 'valide', 'correct', 'daco'];
+  const REFUSE_KW_MOD = ['non', 'annuler', 'annule', 'je refuse', 'non merci', 'pas maintenant', 'finalement non', 'laisse tomber'];
+
+  // ── État: attente_confirmation ──
+  if (pendingCourse.modification_mode && pendingCourse.modification_statut === 'attente_confirmation') {
+    const isRefuse = REFUSE_KW_MOD.some(kw => msgLower === kw || msgLower.startsWith(kw + ' ') || msgLower.startsWith(kw + '!'));
+    const isConfirm = !isRefuse && msgLower.length <= 30 && CONFIRM_KW_MOD.some(kw => msgLower.includes(kw));
+
+    if (isRefuse) {
+      const cleared = { ...pendingCourse };
+      delete cleared.modification_mode;
+      delete cleared.modification_statut;
+      delete cleared.modification_champ;
+      delete cleared.modification_ancienne_valeur;
+      delete cleared.modification_nouvelle_valeur;
+      delete cleared.modification_recap_presente;
+      delete cleared.modification_course_id;
+      await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+        venus_pending_course: JSON.stringify(cleared),
+      });
+      return "D'accord, modification annulée. N'hésitez pas si vous avez besoin d'autre chose.";
+    }
+
+    if (isConfirm) {
+      const champ = pendingCourse.modification_champ;
+      const courseId = pendingCourse.modification_course_id;
+      const newValue = pendingCourse.modification_nouvelle_valeur;
+      const champLabel = getChampLabel(champ);
+
+      const result = await appliquerModification(base44, {
+        course_id: courseId,
+        modifications: { [champ]: newValue },
+        auteur: telephone,
+        canal: 'whatsapp',
+      });
+
+      // Nettoyer l'état de modification
+      const cleared = { ...pendingCourse };
+      delete cleared.modification_mode;
+      delete cleared.modification_statut;
+      delete cleared.modification_champ;
+      delete cleared.modification_ancienne_valeur;
+      delete cleared.modification_nouvelle_valeur;
+      delete cleared.modification_recap_presente;
+      delete cleared.modification_course_id;
+      await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+        venus_pending_course: JSON.stringify(cleared),
+      });
+
+      if (result.success && result.changes?.length > 0 && result.changes[0].verifie) {
+        const change = result.changes[0];
+        let msg = `✅ Modification appliquée avec succès !\n\n${champLabel} :\n  Avant : ${change.ancienne_valeur || 'N/A'}\n  Après : ${change.valeur_reelle || 'N/A'}\n\nLa modification a bien été enregistrée dans le système.`;
+        if (result.livreur_notifie) msg += '\n\n📢 Le livreur a été informé de cette modification.';
+        if (result.prix_recalcule) msg += '\n💰 Le tarif a été recalculé en fonction de la nouvelle adresse.';
+        return msg;
+      } else {
+        const errMsg = result.errors?.[0]?.error || 'Une erreur est survenue.';
+        return `❌ La modification n'a pas pu être appliquée. ${errMsg} Veuillez réessayer ou contacter le support au +226 66 92 51 90.`;
+      }
+    }
+
+    // Pas une confirmation/refus → le client change d'avis ou donne une autre valeur
+    // On reprend le flux depuis le début
+  }
+
+  // ── État: attente_valeur ──
+  if (pendingCourse.modification_mode && pendingCourse.modification_statut === 'attente_valeur') {
+    const newValue = userMessage.trim();
+    if (newValue.length < 2) {
+      return `Je n'ai pas bien compris la nouvelle valeur. Pouvez-vous reformuler ? (ou répondez "annuler" pour abandonner)`;
+    }
+
+    const champ = pendingCourse.modification_champ;
+    const ancienneValeur = pendingCourse.modification_ancienne_valeur;
+    const champLabel = getChampLabel(champ);
+
+    // Vérifier que le champ est toujours modifiable (la course a pu changer de statut)
+    const course = await base44.asServiceRole.entities.CourseExterne.get(pendingCourse.modification_course_id);
+    if (!course) {
+      const cleared = { ...pendingCourse };
+      delete cleared.modification_mode;
+      delete cleared.modification_statut;
+      delete cleared.modification_champ;
+      delete cleared.modification_ancienne_valeur;
+      delete cleared.modification_nouvelle_valeur;
+      delete cleared.modification_recap_presente;
+      delete cleared.modification_course_id;
+      await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(cleared) });
+      return "Cette course n'existe plus. La modification ne peut pas être appliquée.";
+    }
+
+    if (STATUTS_NON_MODIFIABLES.includes(course.statut)) {
+      const cleared = { ...pendingCourse };
+      delete cleared.modification_mode;
+      delete cleared.modification_statut;
+      delete cleared.modification_champ;
+      delete cleared.modification_ancienne_valeur;
+      delete cleared.modification_nouvelle_valeur;
+      delete cleared.modification_recap_presente;
+      delete cleared.modification_course_id;
+      await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(cleared) });
+      return `Cette course est maintenant au statut "${course.statut}" et ne peut plus être modifiée.`;
+    }
+
+    pendingCourse.modification_nouvelle_valeur = newValue;
+    pendingCourse.modification_statut = 'attente_confirmation';
+    pendingCourse.modification_recap_presente = true;
+    await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+      venus_pending_course: JSON.stringify(pendingCourse),
+    });
+
+    return genererRecapModification(champ, ancienneValeur, newValue);
+  }
+
+  // ── État initial: détection d'intention de modification ──
+  const isModificationIntent = detecterIntentionModification(userMessage);
+  if (!isModificationIntent) return null;
+
+  // Trouver la course active
+  const courseActive = await trouverCourseActive(base44, telephone, countryCode);
+  if (!courseActive) {
+    return "Je ne trouve pas de course active à modifier. Si vous souhaitez créer une nouvelle course, dites-le moi simplement.";
+  }
+
+  // Vérifier le statut
+  if (STATUTS_NON_MODIFIABLES.includes(courseActive.statut)) {
+    return `Cette course est au statut "${courseActive.statut}" et ne peut plus être modifiée. Si vous avez un problème avec cette course, n'hésitez pas à le décrire et je transmettrai à un responsable.`;
+  }
+
+  // Extraire le champ et la valeur via LLM
+  const extraction = await extraireChampEtValeur(base44, userMessage, courseActive);
+
+  // Vérifier que le champ extrait est modifiable
+  if (extraction.champ) {
+    const allowed = getChampsModifiables(courseActive.statut);
+    if (!allowed.includes(extraction.champ)) {
+      return `Désolé, le champ "${getChampLabel(extraction.champ)}" ne peut plus être modifié à ce stade de la course (statut: ${courseActive.statut}). Les champs encore modifiables sont : ${allowed.map(c => getChampLabel(c)).join(', ')}.`;
+    }
+  }
+
+  // Si le champ et la valeur sont trouvés → afficher le récap
+  if (extraction.champ && extraction.valeur) {
+    pendingCourse.modification_mode = true;
+    pendingCourse.modification_course_id = courseActive.id;
+    pendingCourse.modification_statut = 'attente_confirmation';
+    pendingCourse.modification_champ = extraction.champ;
+    pendingCourse.modification_ancienne_valeur = courseActive[extraction.champ] || 'N/A';
+    pendingCourse.modification_nouvelle_valeur = extraction.valeur;
+    pendingCourse.modification_recap_presente = true;
+    await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+      venus_pending_course: JSON.stringify(pendingCourse),
+    });
+
+    return genererRecapModification(extraction.champ, courseActive[extraction.champ], extraction.valeur);
+  }
+
+  // Si le champ est trouvé mais pas la valeur → demander la valeur
+  if (extraction.champ && !extraction.valeur) {
+    pendingCourse.modification_mode = true;
+    pendingCourse.modification_course_id = courseActive.id;
+    pendingCourse.modification_statut = 'attente_valeur';
+    pendingCourse.modification_champ = extraction.champ;
+    pendingCourse.modification_ancienne_valeur = courseActive[extraction.champ] || 'N/A';
+    await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+      venus_pending_course: JSON.stringify(pendingCourse),
+    });
+
+    return `Vous souhaitez modifier : ${getChampLabel(extraction.champ)}.\n\nActuellement : ${courseActive[extraction.champ] || 'N/A'}\n\nQuelle est la nouvelle valeur ? (ou répondez "annuler" pour abandonner)`;
+  }
+
+  // Si aucun champ identifié → demander de clarifier
+  if (extraction.question) {
+    return extraction.question;
+  }
+
+  return "Que souhaitez-vous modifier sur votre course ? (adresse de récupération, adresse de livraison, destinataire, instructions, etc.)";
+}
+
 Deno.serve(async (req) => {
   let typingInterval: any = null;
   try {
@@ -1804,6 +2009,14 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── Modification de course (multi-étapes déterministe) ──
+    if (!reponseVenus) {
+      const modResponse = await handleModifierCourse(base44, conversation, messageEffectif, telephone, profileName, countryCode);
+      if (modResponse) {
+        reponseVenus = modResponse;
+      }
+    }
+
     // ── Gestion de l'assignation de localisation (avant tout autre flow) ──
     // Si une localisation est en attente et le client indique "recuperation" ou "livraison",
     // assigner la localisation au bon champ de maniere permanente
@@ -1824,6 +2037,29 @@ Deno.serve(async (req) => {
         venus_pending_course: JSON.stringify(pendingCourseLoc),
       });
       console.log(`[WebhookVenus] 📍 Localisation sauvegardée en attente d'assignation pour ${conversation.id}`);
+    }
+
+    // ── Détection d'incidents (avant le moteur de raisonnement) ──
+    // Détecte les situations critiques (accident, panne, colis perdu, etc.)
+    // et les escalade vers l'administrateur avec un message rassurant au client.
+    if (!reponseVenus) {
+      try {
+        const courseActiveIncident = await trouverCourseActive(base44, telephone, countryCode);
+        const incidentResult = await detecterEtTraiterIncident(base44, {
+          message: messageEffectif,
+          telephone,
+          profileName,
+          countryCode,
+          conversation_id: conversation.id,
+          courseActive: courseActiveIncident,
+        });
+        if (incidentResult) {
+          reponseVenus = incidentResult.message_client;
+          console.log(`[WebhookVenus] 🚨 Incident détecté: ${incidentResult.incident?.type_incident} (${incidentResult.incident?.niveau_gravite}) — admin notifié`);
+        }
+      } catch (e) {
+        console.error('[WebhookVenus] Erreur détection incident:', e.message);
+      }
     }
 
     // ═══════════════════════════════════════════════════════════════
