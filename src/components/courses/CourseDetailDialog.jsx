@@ -13,6 +13,7 @@ import MultiColisAdminView from "./MultiColisAdminView";
 import ProposedLivreursList from "./ProposedLivreursList";
 import ChatWindow from "@/components/chat/ChatWindow";
 import { base44 } from "@/api/base44Client";
+import { genererReferenceCourse } from "@/lib/courseReference";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
@@ -159,7 +160,7 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="w-5 h-5 text-primary" />
-            Course SG-{course.id?.slice(-6).toUpperCase()}
+            Course {genererReferenceCourse(course)}
           </DialogTitle>
         </DialogHeader>
 

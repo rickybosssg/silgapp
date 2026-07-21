@@ -37,6 +37,7 @@ import {
   detecterConnaissanceDirecte,
   detecterRaccourciFrequent,
 } from './venusCache.ts';
+import { genererReferenceCourse } from './venusCourseReference.ts';
 
 /**
  * Recherche les scénarios validés pour un pays/langue donnés (Source 3).
@@ -433,13 +434,7 @@ export async function creerCourseDepuisMemoire(
     const typeLabel = typeLabels[normalizedType] || normalizedType;
 
     // Générer la référence unique : SG-YYYYMMDD-XXXXXX
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    const hexSuffix = course.id?.replace(/-/g, '').slice(-6) || '000000';
-    const numSuffix = String(parseInt(hexSuffix, 16) % 1000000).padStart(6, '0');
-    const reference = `SG-${yyyy}${mm}${dd}-${numSuffix}`;
+    const reference = genererReferenceCourse(course);
 
     const message = `📦 Course créée avec succès !
 

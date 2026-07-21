@@ -5,6 +5,7 @@ import {
   TARIFS_PAYS,
   detecterPaysDepuisTelephone,
 } from '../../shared/venusPrompt.ts';
+import { genererReferenceCourse } from '../../shared/venusCourseReference.ts';
 import {
   rechercherConnaissancesValidees,
   genererReponseAugmentee,
@@ -1363,7 +1364,7 @@ async function handleAnnulationCourse(base44: any, conversation: any, userMessag
 
       console.log(`[WebhookVenus] ✅ Annulation CONFIRMÉE en DB pour course ${courseActive.id} | dispatch: ${courseVerifiee.dispatch_status} | ${notifsActives.length} notifications stoppées`);
 
-      return `✅ Votre course a été annulée avec succès.\n\n📝 Référence : SG-${courseActive.id.slice(-6).toUpperCase()}\n\nSi vous souhaitez créer une nouvelle course, je suis à votre disposition.`;
+      return `✅ Votre course a été annulée avec succès.\n\n📝 Référence : ${genererReferenceCourse(courseActive)}\n\nSi vous souhaitez créer une nouvelle course, je suis à votre disposition.`;
     } else {
       // L'annulation n'a pas été confirmée en DB — NE JAMAIS annoncer un succès
       console.error(`[WebhookVenus] ❌ Annulation ÉCHOUÉE pour course ${courseActive.id} — statut DB: ${courseVerifiee?.statut || 'introuvable'}`);
@@ -2171,7 +2172,7 @@ Deno.serve(async (req) => {
                   await base44.asServiceRole.entities.Notification.update(n.id, { lue: true }).catch(() => null);
                 }
                 console.log(`[WebhookVenus] ✅ Annulation CONFIRMÉE en DB pour course ${courseActive.id} | dispatch: ${courseVerifiee.dispatch_status} | ${notifsActives.length} notifications stoppées`);
-                reponseFinale = `✅ Votre course a été annulée avec succès.\n\n📝 Référence : SG-${courseActive.id.slice(-6).toUpperCase()}\n\nSi vous souhaitez créer une nouvelle course, je suis à votre disposition.`;
+                reponseFinale = `✅ Votre course a été annulée avec succès.\n\n📝 Référence : ${genererReferenceCourse(courseActive)}\n\nSi vous souhaitez créer une nouvelle course, je suis à votre disposition.`;
               } else {
                 // L'annulation n'a pas été confirmée en DB — NE JAMAIS annoncer un succès
                 console.error(`[WebhookVenus] ❌ Annulation ÉCHOUÉE pour course ${courseActive.id} — statut DB: ${courseVerifiee?.statut || 'introuvable'}`);

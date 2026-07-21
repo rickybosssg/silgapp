@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.38';
+import { genererReferenceCourse } from '../../shared/venusCourseReference.ts';
 
 /**
  * Envoie une notification WhatsApp de suivi de course au client.
@@ -31,18 +32,10 @@ const STATUT_LABELS = {
   annulee: '❌ Votre course a été annulée',
 };
 
-function genererReference(course) {
-  const date = new Date(course.created_date || Date.now());
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const dd = String(date.getDate()).padStart(2, '0');
-  const hexSuffix = (course.id || '').replace(/-/g, '').slice(-6) || '000000';
-  const numSuffix = String(parseInt(hexSuffix, 16) % 1000000).padStart(6, '0');
-  return `SG-${yyyy}${mm}${dd}-${numSuffix}`;
-}
+// genererReference est maintenant importé depuis venusCourseReference.ts
 
 function construireMessage(course, evenement, body = {}) {
-  const ref = genererReference(course);
+  const ref = genererReferenceCourse(course);
   const livreurNom = course.livreur_nom || 'votre livreur';
   const livreurVehicule = course.livreur_vehicule || 'moto';
   const livreurTel = course.livreur_telephone || '';
