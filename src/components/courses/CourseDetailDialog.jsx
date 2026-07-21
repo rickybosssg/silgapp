@@ -159,7 +159,7 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="w-5 h-5 text-primary" />
-            Course #{course.id?.slice(-6)}
+            Course SG-{course.id?.slice(-6).toUpperCase()}
           </DialogTitle>
         </DialogHeader>
 
