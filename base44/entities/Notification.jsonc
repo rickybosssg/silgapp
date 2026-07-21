@@ -16,6 +16,7 @@
         "generic",
         "test",
         "nouvelle_course",
+        "nouvelle_course_venus",
         "course_assignee",
         "course_acceptee",
         "course_refusee",
@@ -28,13 +29,15 @@
         "livreur_hors_ligne",
         "paiement_valide",
         "course_proximite",
-        "rappel_reponse"
+        "rappel_reponse",
+        "alerte_critique_dispatch",
+        "message_client"
       ],
       "description": "Type de notification"
     },
     "course_id": {
       "type": "string",
-      "description": "ID de la course li\u00e9e"
+      "description": "ID de la course liee"
     },
     "destinataire_email": {
       "type": "string",

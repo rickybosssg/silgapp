@@ -8,6 +8,7 @@ import DemandesPartenairesPopup from "@/components/admin/DemandesPartenairesPopu
 import NeoNotificationModal from "@/components/neo/NeoNotificationModal";
 import PaiementRecuModal from "@/components/admin/PaiementRecuModal";
 import SystemAlertModal from "@/components/admin/SystemAlertModal";
+import VenusCourseAlertModal from "@/components/admin/VenusCourseAlertModal";
 import CourseWindowStack from "@/components/admin/CourseWindowStack";
 import { AdminCourseWindowsProvider, useAdminCourseWindows } from "@/context/AdminCourseWindowsContext";
 
@@ -116,6 +117,7 @@ function AppLayoutInner({ reseau }) {
       <NeoNotificationModal />
       <PaiementRecuModal />
       <SystemAlertModal />
+      <VenusCourseAlertModal />
       <CourseWindowStack />
 
       <div className="hidden lg:flex min-h-screen">

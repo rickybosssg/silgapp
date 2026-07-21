@@ -385,6 +385,7 @@ export async function creerCourseDepuisMemoire(
   const courseData: any = {
     country_code: countryCode,
     source: 'client',
+    created_by_venus: true,
     client_nom: profileName || telephone,
     client_telephone: telephone,
     type_course: normalizedType,
@@ -450,6 +451,30 @@ export async function creerCourseDepuisMemoire(
 ⏱️ Temps estimé de recherche d'un livreur : moins de 2 minutes.
 
 Je vous informerai dès qu'un livreur aura accepté votre demande. Le livreur vous contactera ensuite pour confirmer les derniers détails et le coût de la livraison.`;
+
+    // ── Déclencher le dispatch immédiatement (sans attendre l'automatisation programmée) ──
+    base44.asServiceRole.functions.invoke('dispatchExterneAuto', {
+      action: 'lancer_recherche_auto',
+      course_id: course.id,
+    }).catch((err: any) => {
+      console.error(`[ReasoningEngine] ❌ Erreur dispatch immédiat course ${course.id}:`, err?.message || err);
+    });
+
+    // ── Notification modale à l'administrateur ──
+    try {
+      const now = new Date();
+      const dateStr = now.toLocaleString('fr-FR', { timeZone: 'Africa/Ouagadougou' });
+      await base44.asServiceRole.entities.Notification.create({
+        titre: `🤖 Nouvelle course créée par VENUS`,
+        message: `Client: ${profileName || telephone}\nRéf: ${reference}\nDépart: ${cd.adresse_depart || 'GPS'}\nArrivée: ${cd.adresse_arrivee || 'GPS'}\nDate: ${dateStr}`,
+        type: 'nouvelle_course_venus',
+        course_id: course.id,
+        lue: false,
+      });
+      console.log(`[ReasoningEngine] 📢 Notification admin créée pour course VENUS ${course.id}`);
+    } catch (notifErr: any) {
+      console.error(`[ReasoningEngine] Erreur notification admin:`, notifErr?.message);
+    }
 
     return { success: true, course, message };
   } catch (e: any) {

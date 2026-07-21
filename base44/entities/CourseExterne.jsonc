@@ -26,6 +26,11 @@
       "default": "client",
       "description": "Origine de la creation"
     },
+    "created_by_venus": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si la course a ete creee par VENUS (WhatsApp autonome)"
+    },
     "client_nom": {
       "type": "string",
       "description": "Nom du client"
@@ -408,11 +413,11 @@
     },
     "dispatch_wave_notified_ids": {
       "type": "string",
-      "description": "JSON: IDs des livreurs notifi\u00e9s pour la vague EN COURS uniquement (r\u00e9initialis\u00e9 \u00e0 chaque nouvelle vague)"
+      "description": "JSON: IDs des livreurs notifi\u00e9s pour la vague EN COURS uniquement"
     },
     "dispatch_refused_ids": {
       "type": "string",
-      "description": "JSON: IDs des livreurs ayant explicitement refuse la course (exclusion permanente, survit au reset de cycle)"
+      "description": "JSON: IDs des livreurs ayant explicitement refuse la course"
     },
     "whatsapp_expediteur_statut": {
       "type": "string",
@@ -448,15 +453,15 @@
         "urgente"
       ],
       "default": "normal",
-      "description": "Niveau de priorite de dispatch \u2014 les courses urgentes sont traitees en premier"
+      "description": "Niveau de priorite de dispatch"
     },
     "commande_boutique_id": {
       "type": "string",
-      "description": "ID de la CommandeBoutique li\u00e9e (si course issue d'une commande partenaire)"
+      "description": "ID de la CommandeBoutique liee"
     },
     "commande_restaurant_id": {
       "type": "string",
-      "description": "ID de la CommandeRestaurant li\u00e9e (si course issue d'une commande partenaire)"
+      "description": "ID de la CommandeRestaurant liee"
     }
   },
   "required": [

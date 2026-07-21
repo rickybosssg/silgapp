@@ -686,6 +686,7 @@ Reponds UNIQUEMENT avec un JSON:`;
     const courseData: any = {
       country_code: countryCode,
       source: 'client',
+      created_by_venus: true,
       client_nom: profileName || telephone,
       client_telephone: telephone,
       type_course: cd.type_course,
@@ -693,7 +694,7 @@ Reponds UNIQUEMENT avec un JSON:`;
       adresse_arrivee: cd.adresse_arrivee,
       prix_estimate: tarifs.minimum,
       devise: tarifs.devise,
-      statut: 'nouvelle',
+      statut: 'recherche_livreur',
       dispatch_status: 'en_attente',
       notes: cd.notes || '',
       gps_depart_lat: cd.gps_depart_lat,
@@ -733,6 +734,36 @@ Reponds UNIQUEMENT avec un JSON:`;
     try {
       const course = await base44.asServiceRole.entities.CourseExterne.create(courseData);
       console.log(`[WebhookVenus] Course creee: ${course.id} pour ${telephone}`);
+
+      // ── Déclencher le dispatch immédiatement ──
+      base44.asServiceRole.functions.invoke('dispatchExterneAuto', {
+        action: 'lancer_recherche_auto',
+        course_id: course.id,
+      }).catch((err: any) => {
+        console.error(`[WebhookVenus] ❌ Erreur dispatch immédiat course ${course.id}:`, err?.message || err);
+      });
+
+      // ── Notification modale à l'administrateur ──
+      try {
+        const hexSuffix = course.id?.replace(/-/g, '').slice(-6) || '000000';
+        const numSuffix = String(parseInt(hexSuffix, 16) % 1000000).padStart(6, '0');
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const reference = `SG-${yyyy}${mm}${dd}-${numSuffix}`;
+        const dateStr = now.toLocaleString('fr-FR', { timeZone: 'Africa/Ouagadougou' });
+        await base44.asServiceRole.entities.Notification.create({
+          titre: `🤖 Nouvelle course créée par VENUS`,
+          message: `Client: ${profileName || telephone}\nRéf: ${reference}\nDépart: ${cd.adresse_depart || 'GPS'}\nArrivée: ${cd.adresse_arrivee || 'GPS'}\nDate: ${dateStr}`,
+          type: 'nouvelle_course_venus',
+          course_id: course.id,
+          lue: false,
+        });
+        console.log(`[WebhookVenus] 📢 Notification admin créée pour course VENUS ${course.id}`);
+      } catch (notifErr: any) {
+        console.error(`[WebhookVenus] Erreur notification admin:`, notifErr?.message);
+      }
 
       const typeLabel = typeLabels[cd.type_course] || cd.type_course;
       result.response = `Votre course a ete creee avec succes dans SILGAPP !
