@@ -1332,6 +1332,85 @@ async function handleAnnulationCourse(base44: any, conversation: any, userMessag
   }
 }
 
+/**
+ * Gestion de la réponse du client à une proposition de prix manuel via WhatsApp.
+ * - Détecte si le client a une course en attente de validation de prix (manual_price_status = 'pending_client_validation')
+ * - Si le client dit "oui" → accepte le prix (dispatchExterneAuto action=valider_prix_manuel accepted=true)
+ * - Si le client dit "non" → refuse le prix (dispatchExterneAuto action=valider_prix_manuel accepted=false)
+ * - Retourne null si aucune course en attente de validation de prix
+ */
+async function handlePrixManuelResponse(base44: any, conversation: any, userMessage: string, telephone: string, countryCode: string): Promise<string | null> {
+  const msgLower = userMessage.toLowerCase().trim();
+
+  const OUI_KW = ['oui', 'ok', "d'accord", 'd accord', 'confirme', 'valider', 'valide', 'go', 'ouais', 'volontiers', 'accepte', 'accepter', "c'est bon", 'cest bon', 'correct', 'daco', 'je confirme'];
+  const NON_KW = ['non', 'refuse', 'refuser', 'je refuse', 'non merci', 'pas ok', 'trop cher', 'c est trop', 'cest trop', 'no'];
+
+  const isOui = msgLower.length <= 30 && OUI_KW.some(kw => msgLower === kw || msgLower.startsWith(kw + ' ') || msgLower.startsWith(kw + '.') || msgLower.startsWith(kw + '!'));
+  const isNon = NON_KW.some(kw => msgLower === kw || msgLower.startsWith(kw + ' ') || msgLower.startsWith(kw + '.') || msgLower.startsWith(kw + '!'));
+  if (!isOui && !isNon) return null;
+
+  // Vérifier que le dernier message VENUS mentionne un prix (pour éviter les faux positifs)
+  try {
+    const recentMessages = await base44.asServiceRole.entities.Message.filter(
+      { conversation_id: conversation.id, sender_type: 'admin', source: 'whatsapp' },
+      '-created_date', 3
+    ).catch(() => []);
+    const lastVenusMsg = (recentMessages?.[0]?.content || '').toLowerCase();
+    if (!lastVenusMsg.includes('prix') || !lastVenusMsg.includes('livreur')) return null;
+  } catch { return null; }
+
+  // Trouver la course avec manual_price_status = 'pending_client_validation'
+  const STATUTS_RECHERCHE = ['recherche_livreur', 'nouvelle'];
+  let courses = await base44.asServiceRole.entities.CourseExterne.filter(
+    { client_telephone: telephone }, '-created_date', 10
+  );
+  if (!courses || courses.length === 0) {
+    courses = await base44.asServiceRole.entities.CourseExterne.filter(
+      { expediteur_telephone: telephone }, '-created_date', 10
+    );
+  }
+  if (!courses || courses.length === 0) {
+    const allRecent = await base44.asServiceRole.entities.CourseExterne.filter(
+      { country_code: countryCode }, '-created_date', 50
+    );
+    const telDigits = telephone.replace(/\D/g, '');
+    courses = (allRecent || []).filter(c => {
+      const ct = (c.client_telephone || '').replace(/\D/g, '');
+      const et = (c.expediteur_telephone || '').replace(/\D/g, '');
+      return ct.endsWith(telDigits.slice(-8)) || et.endsWith(telDigits.slice(-8));
+    }).slice(0, 10);
+  }
+
+  const courseEnAttente = courses?.find(c =>
+    c.manual_price_status === 'pending_client_validation' &&
+    STATUTS_RECHERCHE.includes(c.statut)
+  );
+  if (!courseEnAttente) return null;
+
+  console.log(`[WebhookVenus] 💰 Réponse prix manuel détectée — course ${courseEnAttente.id} — client dit: ${isOui ? 'OUI' : 'NON'}`);
+
+  try {
+    const result = await base44.asServiceRole.functions.invoke('dispatchExterneAuto', {
+      action: 'valider_prix_manuel',
+      course_id: courseEnAttente.id,
+      accepted: isOui,
+    });
+
+    if (isOui) {
+      const prix = Number(courseEnAttente.manual_price || 0);
+      const devise = courseEnAttente.devise || 'FCFA';
+      console.log(`[WebhookVenus] 💰 ✅ Prix accepté pour course ${courseEnAttente.id}`);
+      return `✅ Parfait ! Vous avez accepté le prix de ${prix.toLocaleString()} ${devise}.\n\nVotre livreur ${courseEnAttente.livreur_nom || ''} est maintenant en route vers le point de récupération. Il vous contactera bientôt.`;
+    } else {
+      console.log(`[WebhookVenus] 💰 ❌ Prix refusé pour course ${courseEnAttente.id} — redispatch`);
+      return `D'accord, j'ai bien noté votre refus. Je recherche immédiatement un autre livreur pour votre course. Je vous informerai dès qu'un nouveau livreur aura accepté.`;
+    }
+  } catch (e: any) {
+    console.error(`[WebhookVenus] 💌 Erreur validation prix manuel: ${e.message}`);
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   let typingInterval: any = null;
   try {
@@ -1675,6 +1754,14 @@ Deno.serve(async (req) => {
       const annulResponse = await handleAnnulationCourse(base44, conversation, messageEffectif, telephone, profileName, countryCode);
       if (annulResponse) {
         reponseVenus = annulResponse;
+      }
+    }
+
+    // ── Réponse à une proposition de prix manuel (oui/non après message prix) ──
+    if (!reponseVenus) {
+      const prixResponse = await handlePrixManuelResponse(base44, conversation, messageEffectif, telephone, countryCode);
+      if (prixResponse) {
+        reponseVenus = prixResponse;
       }
     }
 

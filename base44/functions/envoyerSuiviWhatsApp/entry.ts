@@ -87,6 +87,20 @@ function construireMessage(course, evenement, body = {}) {
           : `🔒 Ne communiquez le QR Code et le Code PIN au livreur qu'au moment où il récupère effectivement votre colis. Pour votre sécurité, ne les partagez jamais avant son arrivée.`,
       ].filter(l => l !== '').join('\n');
 
+    case 'prix_manuel_propose':
+      const prixManuel = Number(course.manual_price || body.manual_price || 0);
+      return [
+        `💰 Prix proposé par votre livreur`,
+        ``,
+        `📝 Référence : ${ref}`,
+        `👤 Livreur : ${livreurNom}`,
+        `💰 Prix : ${prixManuel.toLocaleString()} ${devise}`,
+        ``,
+        `Répondez "oui" pour accepter ce prix ou "non" pour refuser.`,
+        ``,
+        `En cas de refus, je rechercherai un autre livreur pour vous.`,
+      ].filter(l => l !== '').join('\n');
+
     case 'arrive_prise_en_charge':
       return [
         `📍 Votre livreur est arrivé sur place`,

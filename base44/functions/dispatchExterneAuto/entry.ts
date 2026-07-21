@@ -927,6 +927,13 @@ Deno.serve(async (req) => {
         }
       } catch (e) { console.warn('[DISPATCH] Erreur notif client prix manuel:', e.message); }
 
+      // 📤 Envoyer le prix proposé au client via WhatsApp
+      base44.asServiceRole.functions.invoke('envoyerSuiviWhatsApp', {
+       course_id: course_id,
+       evenement: 'prix_manuel_propose',
+       manual_price: Number(manual_price),
+      }).catch(err => console.error('[DISPATCH] ❌ Suivi WhatsApp prix manuel:', err.message));
+
       return Response.json({ success: true, accepted: true, pending_client_validation: true, course_id, livreur_id });
     }
 
