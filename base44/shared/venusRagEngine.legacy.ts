@@ -387,20 +387,14 @@ export function scoreChunk(chunk: any, queryKeywords: string[]): number {
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * Recherche dans la bibliothèque documentaire (v2 — index inversé).
+ * Recherche dans la bibliothèque documentaire.
  *
- * Pipeline optimisé :
+ * Pipeline :
  * 1. Normaliser la requête et extraire les mots-clés (+ synonymes)
- * 2. Consulter VenusKeywordIndex pour récupérer les chunk_ids candidats
- * 3. Fetcher uniquement les chunks pertinents via $in (pas de scan complet)
- * 4. Filtrer par pays/catégorie en JS (sur un petit sous-ensemble)
- * 5. Scorer et retourner les top résultats
- * 6. Fallback : si l'index est vide ou insuffisant, recherche élargie DB-side
- *
- * Avantages vs v1 :
- * - Ne charge jamais tous les chunks en mémoire
- * - 2 requêtes DB ciblées au lieu d'un scan de 500+ chunks
- * - Scalte à 60 000+ chunks sans dégradation
+ * 2. Charger les chunks actifs (statut = valide)
+ * 3. Filtrer par categorie/pays si spécifié
+ * 4. Scorer chaque chunk
+ * 5. Retourner les top résultats
  *
  * @param options.pays - Code pays pour filtrer (optionnel)
  * @param options.categorie - Catégorie de document (optionnel)
@@ -426,116 +420,44 @@ export async function rechercherDocumentsRag(
   }
   const queryKeywords = etendreMotsCles(rawKeywords);
 
-  // ── STRATÉGIE INDEX INVERSÉ (v2) ──
-  // Étape 2 : Consulter l'index inversé pour récupérer les chunk_ids candidats
-  let candidateChunkIds = new Set<string>();
-  let indexUsed = false;
-
+  // Étape 2 : Charger les chunks validés
+  let chunks: any[] = [];
   try {
-    const indexEntries = await base44.asServiceRole.entities.VenusKeywordIndex.filter(
-      { mot_cle: { $in: queryKeywords } },
-      '-nb_chunks',
-      100
-    );
-
-    if (indexEntries && indexEntries.length > 0) {
-      indexUsed = true;
-      for (const entry of indexEntries) {
-        try {
-          const ids: string[] = JSON.parse(entry.chunk_ids || '[]');
-          ids.forEach(id => candidateChunkIds.add(id));
-        } catch { /* ignore parse error */ }
-      }
-      console.log(`[RAGEngine] 🎯 Index inversé: ${indexEntries.length} mots-clés matchés → ${candidateChunkIds.size} chunks candidats`);
-    }
-  } catch (e: any) {
-    console.warn('[RAGEngine] Index inversé indisponible, fallback recherche élargie:', e.message);
-  }
-
-  // Étape 3 : Fetcher uniquement les chunks pertinents
-  let chunksToScore: any[] = [];
-
-  if (candidateChunkIds.size > 0) {
-    try {
-      const candidateIdsArray = Array.from(candidateChunkIds);
-      // $in permet de fetcher uniquement les chunks dont on a besoin
-      chunksToScore = await base44.asServiceRole.entities.VenusDocumentChunk.filter(
-        { id: { $in: candidateIdsArray }, document_statut: 'valide' },
-        '-nb_consultations',
-        Math.min(candidateIdsArray.length, 500)
-      );
-      console.log(`[RAGEngine] 📦 ${chunksToScore.length}/${candidateChunkIds.size} chunks candidats fetchés`);
-    } catch (e: any) {
-      console.warn('[RAGEngine] Erreur fetch chunks par ID, fallback:', e.message);
-    }
-  }
-
-  // Étape 4 : Fallback — si l'index est vide ou résultats insuffisants
-  if (chunksToScore.length < 5) {
-    const broadFilter: any = { document_statut: 'valide' };
-    if (categorie) broadFilter.document_categorie = categorie;
-
-    const broadChunks = await base44.asServiceRole.entities.VenusDocumentChunk.filter(
-      broadFilter,
-      '-nb_consultations',
+    chunks = await base44.asServiceRole.entities.VenusDocumentChunk.filter(
+      { document_statut: 'valide' },
+      '-created_date',
       500
     );
-
-    // Filtrer par pays en JS (sur le sous-ensemble élargi)
-    let broadFiltered = broadChunks;
-    if (pays) {
-      broadFiltered = broadFiltered.filter(c =>
-        !c.document_pays || c.document_pays === 'ALL' || c.document_pays === pays
-      );
-    }
-
-    // Fusionner avec les chunks déjà récupérés (éviter les doublons)
-    const existingIds = new Set(chunksToScore.map(c => c.id));
-    for (const c of broadFiltered) {
-      if (!existingIds.has(c.id)) {
-        chunksToScore.push(c);
-        existingIds.add(c.id);
-      }
-    }
-    console.log(`[RAGEngine] 🔄 Fallback élargi: ${chunksToScore.length} chunks au total`);
+  } catch (e: any) {
+    console.error('[RAGEngine] Erreur chargement chunks:', e.message);
+    return { resultats: [], temps_ms: Date.now() - startTime, query_keywords: rawKeywords, a_reussi: false };
   }
 
-  if (chunksToScore.length === 0) {
-    const tempsMs = Date.now() - startTime;
-    try {
-      await base44.asServiceRole.entities.VenusDocumentSearchLog.create({
-        requete: query,
-        requete_normalisee: normaliserRequete(query),
-        mots_cles: JSON.stringify(rawKeywords),
-        resultats_count: 0,
-        meilleur_score: 0,
-        source_utilisee: 'ia_generale',
-        temps_recherche_ms: tempsMs,
-        a_reussi: false,
-        pays: pays || '',
-        conversation_id: conversation_id || '',
-      });
-    } catch { /* ignore */ }
-    return { resultats: [], temps_ms: tempsMs, query_keywords: rawKeywords, a_reussi: false };
+  if (!chunks || chunks.length === 0) {
+    return { resultats: [], temps_ms: Date.now() - startTime, query_keywords: rawKeywords, a_reussi: false };
   }
 
-  // Filtrer par pays/catégorie sur le sous-ensemble (si pas déjà fait par le fallback)
-  let filteredChunks = chunksToScore;
-  if (categorie && !indexUsed) {
+  // Étape 3 : Filtrer par categorie si spécifié
+  let filteredChunks = chunks;
+  if (categorie) {
     filteredChunks = filteredChunks.filter(c => c.document_categorie === categorie);
   }
+
+  // Filtrer par pays (si le chunk a un pays défini et qu'il ne correspond pas, l'exclure)
+  // Un document avec pays = "ALL" ou vide est inclus pour tous
   if (pays) {
     filteredChunks = filteredChunks.filter(c =>
       !c.document_pays || c.document_pays === 'ALL' || c.document_pays === pays
     );
   }
 
-  // Étape 5 : Scorer chaque chunk
+  // Étape 4 : Scorer chaque chunk
   const scored = filteredChunks.map(chunk => ({
     chunk,
     score: scoreChunk(chunk, queryKeywords),
   }));
 
+  // Étape 5 : Filtrer, trier et limiter
   const results = scored
     .filter(s => s.score >= SEUIL_RELEVANCE_DOCUMENT)
     .sort((a, b) => b.score - a.score)
@@ -595,230 +517,9 @@ export async function rechercherDocumentsRag(
     }
   }
 
-  console.log(`[RAGEngine] 🔍 Recherche "${query.substring(0, 50)}" → ${resultats.length} résultats en ${tempsMs}ms | Index: ${indexUsed ? 'oui' : 'non'} | Mots-clés: ${rawKeywords.join(', ')}`);
+  console.log(`[RAGEngine] 🔍 Recherche "${query.substring(0, 50)}" → ${resultats.length} résultats en ${tempsMs}ms | Mots-clés: ${rawKeywords.join(', ')}`);
 
   return { resultats, temps_ms: tempsMs, query_keywords: rawKeywords, a_reussi: aReussi };
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// 6bis. GESTION DE L'INDEX INVERSÉ (VenusKeywordIndex)
-// ═══════════════════════════════════════════════════════════════════
-
-const MAX_CHUNK_IDS_PER_KEYWORD = 500;
-
-/**
- * Indexe les mots-clés d'un chunk dans VenusKeywordIndex.
- * À appeler après la création d'un chunk.
- */
-export async function indexerMotsClesChunk(
-  base44: any,
-  chunkId: string,
-  chunkTexte: string,
-  chunkMotsCles: string[]
-): Promise<void> {
-  if (!chunkId || (chunkMotsCles.length === 0 && chunkTexte.length < 20)) return;
-
-  // Combiner les mots-clés extraits + mots-clés du texte
-  const tousMotsCles = new Set<string>([
-    ...chunkMotsCles.map(mc => normaliserRequete(mc)),
-    ...extraireMotsClesFromQuery(chunkTexte).slice(0, 10),
-  ]);
-
-  if (tousMotsCles.size === 0) return;
-
-  for (const motCle of tousMotsCles) {
-    if (!motCle || motCle.length < 2) continue;
-
-    try {
-      const existing = await base44.asServiceRole.entities.VenusKeywordIndex.filter(
-        { mot_cle: motCle },
-        '-nb_chunks',
-        1
-      );
-
-      if (existing && existing.length > 0) {
-        const entry = existing[0];
-        let ids: string[] = [];
-        try { ids = JSON.parse(entry.chunk_ids || '[]'); } catch {}
-
-        // Éviter les doublons
-        if (!ids.includes(chunkId)) {
-          ids.push(chunkId);
-
-          // Capper à MAX_CHUNK_IDS_PER_KEYWORD (conserver les plus récents)
-          if (ids.length > MAX_CHUNK_IDS_PER_KEYWORD) {
-            ids = ids.slice(ids.length - MAX_CHUNK_IDS_PER_KEYWORD);
-          }
-
-          await base44.asServiceRole.entities.VenusKeywordIndex.update(entry.id, {
-            chunk_ids: JSON.stringify(ids),
-            nb_chunks: ids.length,
-            date_maj: new Date().toISOString(),
-          });
-        }
-      } else {
-        await base44.asServiceRole.entities.VenusKeywordIndex.create({
-          mot_cle: motCle,
-          chunk_ids: JSON.stringify([chunkId]),
-          nb_chunks: 1,
-          date_maj: new Date().toISOString(),
-        });
-      }
-    } catch (e: any) {
-      // Ne pas bloquer l'indexation si une erreur survient sur un mot-clé
-      console.warn(`[RAGEngine] Erreur indexation mot-clé "${motCle}":`, e.message);
-    }
-  }
-}
-
-/**
- * Désindexe un chunk de VenusKeywordIndex.
- * À appeler lors de l'archivage ou suppression d'un chunk.
- */
-export async function desindexerMotsClesChunk(
-  base44: any,
-  chunkId: string
-): Promise<void> {
-  if (!chunkId) return;
-
-  try {
-    // Pas de moyen direct de chercher les entries contenant chunkId dans le JSON.
-    // On fetch un batch d'entries et on nettoie celles qui contiennent le chunkId.
-    const entries = await base44.asServiceRole.entities.VenusKeywordIndex.list('-nb_chunks', 2000);
-
-    for (const entry of entries) {
-      try {
-        let ids: string[] = JSON.parse(entry.chunk_ids || '[]');
-        if (ids.includes(chunkId)) {
-          ids = ids.filter(id => id !== chunkId);
-          if (ids.length === 0) {
-            // Plus aucun chunk pour ce mot-clé → supprimer l'entry
-            await base44.asServiceRole.entities.VenusKeywordIndex.delete(entry.id);
-          } else {
-            await base44.asServiceRole.entities.VenusKeywordIndex.update(entry.id, {
-              chunk_ids: JSON.stringify(ids),
-              nb_chunks: ids.length,
-              date_maj: new Date().toISOString(),
-            });
-          }
-        }
-      } catch { /* ignore */ }
-    }
-  } catch (e: any) {
-    console.warn('[RAGEngine] Erreur désindexation chunk:', e.message);
-  }
-}
-
-/**
- * Construit l'index inversé à partir des chunks existants.
- * Migration one-shot à lancer manuellement après le refactor.
- *
- * Version optimisée : traitement 100% en mémoire + bulk operations.
- * Évite les appels DB individuels qui causaient des timeouts.
- */
-export async function construireIndexMotsCles(base44: any): Promise<{
-  success: boolean;
-  chunks_traites: number;
-  mots_cles_indexes: number;
-  erreur?: string;
-}> {
-  try {
-    console.log('[RAGEngine] 🔄 Construction de l\'index inversé (mode optimisé)...');
-
-    // Étape 1 : Vider l'index existant via deleteMany
-    try {
-      await base44.asServiceRole.entities.VenusKeywordIndex.deleteMany({});
-      console.log('[RAGEngine] 🧹 Ancien index vidé');
-    } catch (e: any) {
-      console.warn('[RAGEngine] Erreur vidage index:', e.message);
-    }
-
-    // Étape 2 : Charger TOUS les chunks validés en batches
-    const allChunks: any[] = [];
-    let skip = 0;
-    const CHUNK_BATCH = 2000;
-
-    while (true) {
-      const batch = await base44.asServiceRole.entities.VenusDocumentChunk.filter(
-        { document_statut: 'valide' },
-        '-created_date',
-        CHUNK_BATCH,
-        skip
-      );
-      if (!batch || batch.length === 0) break;
-      allChunks.push(...batch);
-      skip += CHUNK_BATCH;
-      if (batch.length < CHUNK_BATCH) break;
-      console.log(`[RAGEngine] 📦 ${allChunks.length} chunks chargés...`);
-    }
-
-    console.log(`[RAGEngine] 📊 ${allChunks.length} chunks à indexer`);
-
-    // Étape 3 : Construction en mémoire de l'index Map<mot_cle, Set<chunk_id>>
-    const indexMap = new Map<string, Set<string>>();
-
-    for (const chunk of allChunks) {
-      let chunkMotsCles: string[] = [];
-      try { chunkMotsCles = JSON.parse(chunk.mots_cles || '[]'); } catch {}
-
-      const tousMotsCles = new Set<string>([
-        ...chunkMotsCles.map((mc: string) => normaliserRequete(mc)),
-        ...extraireMotsClesFromQuery(chunk.contenu || '').slice(0, 10),
-      ]);
-
-      for (const motCle of tousMotsCles) {
-        if (!motCle || motCle.length < 2) continue;
-        if (!indexMap.has(motCle)) {
-          indexMap.set(motCle, new Set());
-        }
-        indexMap.get(motCle)!.add(chunk.id);
-      }
-    }
-
-    console.log(`[RAGEngine] 🧠 ${indexMap.size} mots-clés uniques extraits en mémoire`);
-
-    // Étape 4 : Bulk create des entrées d'index
-    const now = new Date().toISOString();
-    const entriesToCreate: any[] = [];
-
-    for (const [motCle, chunkIdsSet] of indexMap) {
-      let ids = Array.from(chunkIdsSet);
-      if (ids.length > MAX_CHUNK_IDS_PER_KEYWORD) {
-        ids = ids.slice(0, MAX_CHUNK_IDS_PER_KEYWORD);
-      }
-      entriesToCreate.push({
-        mot_cle: motCle,
-        chunk_ids: JSON.stringify(ids),
-        nb_chunks: ids.length,
-        date_maj: now,
-      });
-    }
-
-    // Bulk create par lots de 500
-    const BULK_SIZE = 500;
-    let created = 0;
-    for (let i = 0; i < entriesToCreate.length; i += BULK_SIZE) {
-      const batch = entriesToCreate.slice(i, i + BULK_SIZE);
-      try {
-        await base44.asServiceRole.entities.VenusKeywordIndex.bulkCreate(batch);
-        created += batch.length;
-        console.log(`[RAGEngine] ✍️ ${created}/${entriesToCreate.length} entrées créées`);
-      } catch (e: any) {
-        console.warn(`[RAGEngine] Erreur bulk create batch ${i}:`, e.message);
-      }
-    }
-
-    console.log(`[RAGEngine] ✅ Index construit: ${allChunks.length} chunks, ${created} mots-clés indexés`);
-
-    return {
-      success: true,
-      chunks_traites: allChunks.length,
-      mots_cles_indexes: created,
-    };
-  } catch (e: any) {
-    console.error('[RAGEngine] Erreur construction index:', e.message);
-    return { success: false, chunks_traites: 0, mots_cles_indexes: 0, erreur: e.message };
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1029,9 +730,6 @@ ${extraction.texte.substring(0, 4000)}`,
         nb_consultations: 0,
       });
       chunkRecords.push(chunk);
-
-      // ── Peupler l'index inversé (VenusKeywordIndex) ──
-      await indexerMotsClesChunk(base44, chunk.id, chunkTexte, chunkMotsCles);
     }
 
     console.log(`[RAGEngine] ✅ ${chunkRecords.length} chunks indexés pour "${params.titre}"`);
@@ -1259,9 +957,6 @@ ${texte.substring(0, 4000)}`,
         nb_consultations: 0,
       });
       chunkRecords.push(chunk);
-
-      // ── Peupler l'index inversé (VenusKeywordIndex) ──
-      await indexerMotsClesChunk(base44, chunk.id, chunkTexte, chunkMotsCles);
     }
 
     console.log(`[RAGEngine] ✅ ${chunkRecords.length} chunks indexés pour "${titre}"`);

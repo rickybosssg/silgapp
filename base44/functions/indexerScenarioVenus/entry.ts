@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.38';
-import { indexerTexteDirect } from '../../shared/venusRagEngine.ts';
+import { indexerTexteDirect, construireIndexMotsCles } from '../../shared/venusRagEngine.ts';
 
 /**
  * Automatisation : indexation automatique des scénarios VENUS validés dans la base RAG.
@@ -14,6 +14,25 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const body = await req.json();
+
+    // ── Action manuelle : build_keyword_index ──
+    // Reconstruit l'index inversé (VenusKeywordIndex) à partir de tous les chunks validés.
+    // Migration one-shot à lancer après le refactor du moteur RAG.
+    if (body.action === 'build_keyword_index') {
+      const user = await base44.auth.me();
+      if (!user || user.role !== 'admin') {
+        return Response.json({ error: 'Réservé aux administrateurs' }, { status: 403 });
+      }
+
+      const result = await construireIndexMotsCles(base44);
+      return Response.json({
+        success: result.success,
+        message: result.success
+          ? `Index construit: ${result.chunks_traites} chunks traités, ${result.mots_cles_indexes} mots-clés indexés`
+          : 'Erreur lors de la construction de l\'index',
+        ...result,
+      });
+    }
 
     // ── Action manuelle : batch_index ──
     // Indexe tous les scénarios validés non encore indexés (rag_indexe=false)
