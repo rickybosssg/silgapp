@@ -1266,13 +1266,16 @@ async function handleContactLivreur(base44: any, conversation: any, userMessage:
 async function handleAnnulationCourse(base44: any, conversation: any, userMessage: string, telephone: string, profileName: string, countryCode: string): Promise<string | null> {
   const msgLower = userMessage.toLowerCase().trim();
 
-  // ── Mots-clés d'annulation directe ──
+  // ── Mots-clés d'annulation directe (incluant fautes d'orthographe courantes) ──
   const ANNUL_KEYWORDS = [
     'annule', 'annuler', 'annulation', 'annulez',
+    'anule', 'anuler', 'anulation', 'anulez', // fautes courantes (un seul 'n')
     'supprime', 'supprimer', 'supprimez',
     'stoppe', 'stopper', 'arrete', 'arrêter', 'arrête',
     'je veux annuler', 'annule la course', 'annule ma course',
-    'annule cette course', 'plus besoin de la course',
+    'anule la course', 'anule ma course', // fautes
+    'annule cette course', 'anule cette course',
+    'plus besoin de la course',
   ];
   // Exclure les négations
   const isNegative = msgLower.includes('ne veux pas') || msgLower.includes('ne pas annuler') || msgLower.includes('garde') || msgLower.includes('annule pas');
@@ -2072,6 +2075,30 @@ Deno.serve(async (req) => {
       // ── Charger la mémoire courte ──
       let pendingCourse: any = null;
       try { pendingCourse = conversation.venus_pending_course ? JSON.parse(conversation.venus_pending_course) : null; } catch { pendingCourse = null; }
+
+      // ── Détection: demande de NOUVELLE course → vider la mémoire stale ──
+      // Si le client dit "nouvelle course", "créons une course", "je veux une autre course"
+      // ET qu'une course a déjà été créée/cancelée (course_created=true), on vide la mémoire
+      // courte pour forcer VENUS à re-collecter les informations depuis zéro.
+      // Cela évite de réutiliser les adresses d'une course précédente terminée.
+      if (pendingCourse?.course_created) {
+        const NEW_COURSE_KW = [
+          'nouvelle course', 'creons une course', 'créons une course',
+          'creer une course', 'créer une course', 'je veux une course',
+          'je veux une autre course', 'une autre course', 'nouveau colis',
+          'nouvel envoi', 'nouvelle livraison', 'encore une course',
+          'je veux envoyer un colis', 'je veux envoyer un autre',
+        ];
+        const msgLowerNC = messageEffectif.toLowerCase().trim();
+        const isNewCourseRequest = NEW_COURSE_KW.some(kw => msgLowerNC.includes(kw));
+        if (isNewCourseRequest) {
+          console.log(`[WebhookVenus] 🔄 Demande de nouvelle course détectée — vidage de la mémoire courte stale`);
+          pendingCourse = {};
+          await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+            venus_pending_course: JSON.stringify(pendingCourse),
+          });
+        }
+      }
 
       // ── Bypass déterministe: confirmation anti-boucle ──
       const CONFIRM_KW_BYPASS = ['oui','ok',"d'accord",'d accord','je confirme','valider','confirmer','confirme',"c'est bon",'cest bon','go',"c'est ok",'cest ok','parfait','exact','certainement','bien sur','ouais','volontiers','je valide','valide','correct','daco'];
