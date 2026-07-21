@@ -156,8 +156,29 @@ export async function getSystemPromptLocalise(base44, telephone, messageClient) 
   try {
     const { construireContexteVenus } = await import('./venusI18nEngine.ts');
     const ctx = await construireContexteVenus(base44, telephone, messageClient);
+
+    // ── Cerveau Central versionné (VenusBrainPrompt) ──
+    // Charge le prompt système actif depuis l'entité VenusBrainPrompt.
+    // Si aucune version active n'existe, fallback sur le prompt statique VENUS_SYSTEM_PROMPT.
+    let brainPrompt: string | null = null;
+    try {
+      if (base44?.asServiceRole?.entities?.VenusBrainPrompt) {
+        const actives = await base44.asServiceRole.entities.VenusBrainPrompt.filter(
+          { personality_key: 'standard', statut: 'active' },
+          '-date_creation',
+          1
+        );
+        if (actives && actives.length > 0 && actives[0].contenu) {
+          brainPrompt = actives[0].contenu;
+        }
+      }
+    } catch (brainErr) {
+      console.warn('[venusPrompt] Erreur chargement VenusBrainPrompt, fallback statique:', brainErr.message);
+    }
+
     return {
-      systemPrompt: ctx.systemPrompt,
+      systemPrompt: brainPrompt || ctx.systemPrompt,
+      brain_prompt_active: !!brainPrompt,
       country: ctx.country,
       personality: ctx.personality,
       brand: ctx.brand,
@@ -167,6 +188,7 @@ export async function getSystemPromptLocalise(base44, telephone, messageClient) 
     console.error('[venusPrompt] Fallback prompt statique:', e.message);
     return {
       systemPrompt: VENUS_SYSTEM_PROMPT,
+      brain_prompt_active: false,
       country: null,
       personality: null,
       brand: null,

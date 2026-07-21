@@ -36,6 +36,7 @@ export const navItems = [
   { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Settings },
   { path: "/admin/externe/clients", label: "Clients externes", icon: Users },
   { path: "/admin/publicites", label: "Publicités", icon: Megaphone },
+  { path: "/admin/venus-brain", label: "Cerveau de VENUS", icon: Brain },
   { path: "/admin/venus-intelligence", label: "Centre d'Intelligence VENUS", icon: Brain },
   { path: "/admin/venus-test-lab", label: "Laboratoire de Test VENUS", icon: FlaskConical },
   { path: "/admin/centre-notifications", label: "Notifications Push", icon: Megaphone },

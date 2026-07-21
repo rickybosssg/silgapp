@@ -1,0 +1,59 @@
+{
+  "name": "VenusBrainPrompt",
+  "type": "object",
+  "properties": {
+    "personality_key": {
+      "type": "string",
+      "default": "standard",
+      "description": "Cl\u00e9 de personnalit\u00e9 (standard, sav, commercial, vip, administrateur, etc.)"
+    },
+    "personality_label": {
+      "type": "string",
+      "description": "Libell\u00e9 affichable de la personnalit\u00e9"
+    },
+    "version": {
+      "type": "number",
+      "default": 1,
+      "description": "Num\u00e9ro de version incr\u00e9mental"
+    },
+    "contenu": {
+      "type": "string",
+      "description": "Contenu complet du prompt syst\u00e8me"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notes de version (changements apport\u00e9s)"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "active",
+        "inactive",
+        "archive"
+      ],
+      "default": "inactive",
+      "description": "Une seule version par personnalit\u00e9 peut \u00eatre 'active'"
+    },
+    "auteur": {
+      "type": "string",
+      "description": "Email de l'admin ayant cr\u00e9\u00e9/modifi\u00e9 cette version"
+    },
+    "date_creation": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "date_modification": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "test_result": {
+      "type": "string",
+      "description": "JSON: r\u00e9sultat du dernier test simulateur ({reponse, sources, credits, temps_ms})"
+    }
+  },
+  "required": [
+    "personality_key",
+    "contenu",
+    "statut"
+  ]
+}

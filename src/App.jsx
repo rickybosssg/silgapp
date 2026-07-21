@@ -408,6 +408,7 @@ function AppContent() {
           <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
           <Route path="/admin/whatsapp" element={<AnimatedRoutes><WhatsAppAdmin /></AnimatedRoutes>} />
           <Route path="/admin/venus" element={<AnimatedRoutes><VenusAdminCenter /></AnimatedRoutes>} />
+          <Route path="/admin/venus-brain" element={<AnimatedRoutes><VenusBrainCenter /></AnimatedRoutes>} />
           <Route path="/admin/venus-learning" element={<AnimatedRoutes><VenusLearningCenter /></AnimatedRoutes>} />
           <Route path="/admin/venus-brain" element={<AnimatedRoutes><VenusBrainCenter /></AnimatedRoutes>} />
           <Route path="/admin/venus-workflows" element={<AnimatedRoutes><VenusWorkflowCenter /></AnimatedRoutes>} />
