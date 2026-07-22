@@ -147,7 +147,7 @@ function GeneralChatWindow({ conversationId, myType, myId, myName, onBack }) {
         sender_id: myId,
         ...msgData,
       });
-      const newMsg = res?.data?.message;
+      const newMsg = res?.message || res?.data?.message;
       if (newMsg) {
         if (!knownIdsRef.current.has(newMsg.id)) {
           knownIdsRef.current.add(newMsg.id);

@@ -128,7 +128,7 @@ export default function SupportChatWindow({ livreurId, livreurName, myType, myId
         sender_name: myName,
         ...msgData,
       });
-      const newMsg = res?.data?.message;
+      const newMsg = res?.message || res?.data?.message;
       if (newMsg && !knownIdsRef.current.has(newMsg.id)) {
         knownIdsRef.current.add(newMsg.id);
         setMessages(prev => [...prev, newMsg].sort((a, b) =>
