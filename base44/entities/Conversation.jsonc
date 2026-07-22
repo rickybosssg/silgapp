@@ -44,6 +44,10 @@
       "type": "string",
       "description": "Numero WhatsApp du client (format international sans +)"
     },
+    "silgapp_from_number": {
+      "type": "string",
+      "description": "Numero WhatsApp SILGAPP qui a recu le message (ex: whatsapp:+22655483838). Permet d'envoyer les reponses et notifications depuis le bon numero en mode dual-number (VENUS vs principal)."
+    },
     "source": {
       "type": "string",
       "enum": [
