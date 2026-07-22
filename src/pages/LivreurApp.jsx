@@ -483,7 +483,7 @@ export default function LivreurApp({ livreurProfil: initialProfil }) {
               </div>
             )}
 
-            <LivreurStatsBanner mesCourses={mesCourses} totalEncaisse={totalEncaisse} livreurId={livreurProfil?.id} />
+            <LivreurStatsBanner mesCourses={mesCourses} totalEncaisse={totalEncaisse} />
             <LivreurStatutCard statut={livreurProfil.statut} livreur={livreurProfil} />
 
             {coursesActives.length > 0 && (
