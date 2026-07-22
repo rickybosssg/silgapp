@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { GraduationCap, LayoutDashboard, BookOpen, MessageSquare, AlertCircle, Edit3, History as HistoryIcon, Search, Shield } from 'lucide-react';
+import { GraduationCap, LayoutDashboard, BookOpen, MessageSquare, AlertCircle, Edit3, History as HistoryIcon, Search, Shield, FileUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import DashboardTab from '@/components/venus-learning/DashboardTab';
 import KnowledgeBaseTab from '@/components/venus-learning/KnowledgeBaseTab';
@@ -10,11 +10,13 @@ import HistoryTab from '@/components/venus-learning/HistoryTab';
 import SearchTab from '@/components/venus-learning/SearchTab';
 import AuditTab from '@/components/venus-learning/AuditTab';
 import RagStatusTab from '@/components/venus-learning/RagStatusTab';
+import FileImportTab from '@/components/venus-learning/FileImportTab';
 import { Database } from 'lucide-react';
 
 const TABS = [
   { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
   { id: 'knowledge', label: 'Base de connaissances', icon: BookOpen },
+  { id: 'file_import', label: 'Import de fichiers', icon: FileUp },
   { id: 'rag_status', label: 'Statut RAG', icon: Database },
   { id: 'scenarios', label: 'Scénarios', icon: MessageSquare },
   { id: 'misunderstood', label: 'Questions non comprises', icon: AlertCircle },
@@ -81,6 +83,7 @@ export default function VenusLearningCenter() {
         )}
         {activeTab === 'history' && <HistoryTab />}
         {activeTab === 'search' && <SearchTab />}
+        {activeTab === 'file_import' && <FileImportTab />}
         {activeTab === 'rag_status' && <RagStatusTab />}
         {activeTab === 'audit' && <AuditTab />}
       </div>
