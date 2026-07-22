@@ -38,6 +38,7 @@ import {
   detecterRaccourciFrequent,
 } from './venusCache.ts';
 import { genererReferenceCourse } from './venusCourseReference.ts';
+import { isOpenAIEnabled, raisonnerAvecOpenAI } from './venusOpenAIEngine.ts';
 
 /**
  * Recherche les scénarios validés pour un pays/langue donnés (Source 3).
@@ -1070,15 +1071,39 @@ TU DOIS TOUJOURS RÉPONDRE EN FRANÇAIS. Ne réponds JAMAIS en anglais. Le clien
 
 Réponds UNIQUEMENT avec un JSON.`;
 
-  // ── Appel LLM ──
+  // ── Appel LLM (OpenAI en priorité, fallback InvokeLLM Base44) ──
   const tLLMStart = Date.now();
   try {
-    const llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
-      prompt,
-      response_json_schema: RAISONNEMENT_SCHEMA,
-      model: 'gpt_5_mini',
-    });
-    console.log(`[ReasoningEngine] ⏱️ LLM: ${Date.now() - tLLMStart}ms`);
+    let llmRes: any = null;
+
+    // ── Tentative OpenAI (si activé via SystemConfig VENUS_OPENAI_ENABLED) ──
+    if (await isOpenAIEnabled(base44)) {
+      try {
+        llmRes = await raisonnerAvecOpenAI(base44, prompt, RAISONNEMENT_SCHEMA, {
+          telephone: input.telephone,
+          countryCode: input.countryCode,
+          tarifs: input.tarifs,
+          profileName: input.profileName,
+          messageClient: input.messageClient,
+          memoireCourte: mergedMemoireCourte,
+          courseActive: input.courseActive,
+        });
+        console.log(`[ReasoningEngine] ⏱️ OpenAI: ${Date.now() - tLLMStart}ms | tools: ${(llmRes as any)?._outils_openai || 'none'} | tokens: ${(llmRes as any)?._tokens_openai || 'N/A'}`);
+      } catch (openaiErr: any) {
+        console.warn(`[ReasoningEngine] ⚠️ OpenAI échec (${openaiErr.message}), fallback InvokeLLM`);
+        llmRes = null;
+      }
+    }
+
+    // ── Fallback: InvokeLLM (Base44) ──
+    if (!llmRes) {
+      llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
+        prompt,
+        response_json_schema: RAISONNEMENT_SCHEMA,
+        model: 'gpt_5_mini',
+      });
+      console.log(`[ReasoningEngine] ⏱️ LLM (Base44): ${Date.now() - tLLMStart}ms`);
+    }
 
     const result: ReasoningResult = typeof llmRes === 'string' ? JSON.parse(llmRes) : llmRes as ReasoningResult;
     result.temps_traitement_ms = Date.now() - startTime;
