@@ -49,6 +49,7 @@ import {
   STATUTS_NON_MODIFIABLES,
   genererRecapModification,
 } from '../../shared/venusCourseModifierEngine.ts';
+import { normalizePhone } from '../../shared/phoneUtils.ts';
 
 /**
  * Webhook WhatsApp <-> Venus (via Twilio).
@@ -701,7 +702,7 @@ Reponds UNIQUEMENT avec un JSON:`;
       source: 'client',
       created_by_venus: true,
       client_nom: profileName || telephone,
-      client_telephone: telephone,
+      client_telephone: normalizedTel,
       type_course: cd.type_course,
       adresse_depart: cd.adresse_depart,
       adresse_arrivee: cd.adresse_arrivee,
@@ -721,27 +722,27 @@ Reponds UNIQUEMENT avec un JSON:`;
       // Si contact_is_client, le client est aussi le contact a l'arrivee
       if (cd.contact_is_client) {
         courseData.destinataire_nom = profileName || telephone;
-        courseData.destinataire_telephone = telephone;
-        courseData.destinataire_phone_normalized = telephone;
+        courseData.destinataire_telephone = normalizedTel;
+        courseData.destinataire_phone_normalized = normalizedTel;
       } else {
         courseData.destinataire_nom = cd.contact_nom || ''; // Nom FACULTATIF
-        courseData.destinataire_telephone = cd.contact_telephone || telephone;
-        courseData.destinataire_phone_normalized = cd.contact_telephone || telephone;
+        courseData.destinataire_telephone = normalizePhone(cd.contact_telephone, countryCode) || normalizedTel;
+        courseData.destinataire_phone_normalized = normalizePhone(cd.contact_telephone, countryCode) || normalizedTel;
       }
     } else if (cd.type_course === 'recevoir') {
       // L'expediteur est la personne qui envoie le colis vers le client
       if (cd.contact_is_client) {
         courseData.expediteur_nom = profileName || telephone;
-        courseData.expediteur_telephone = telephone;
-        courseData.expediteur_phone_normalized = telephone;
+        courseData.expediteur_telephone = normalizedTel;
+        courseData.expediteur_phone_normalized = normalizedTel;
       } else {
         courseData.expediteur_nom = cd.contact_nom || ''; // Nom FACULTATIF
-        courseData.expediteur_telephone = cd.contact_telephone || telephone;
-        courseData.expediteur_phone_normalized = cd.contact_telephone || telephone;
+        courseData.expediteur_telephone = normalizePhone(cd.contact_telephone, countryCode) || normalizedTel;
+        courseData.expediteur_phone_normalized = normalizePhone(cd.contact_telephone, countryCode) || normalizedTel;
       }
     } else if (cd.type_course === 'deplacement') {
       courseData.passager_nom = profileName || telephone;
-      courseData.passager_telephone = telephone;
+      courseData.passager_telephone = normalizedTel;
     }
 
     try {
@@ -1738,9 +1739,12 @@ Deno.serve(async (req) => {
     }
 
     // ── Extraction du téléphone et détection du pays ──
+    // telephone = format Twilio brut (+226XXXXXXXX) — utilisé pour les appels API Twilio
+    // normalizedTel = format canonique DB (226XXXXXXXX sans +) — utilisé pour tout stockage DB
     const telephone = from.replace('whatsapp:', '');
     const countryCode = detecterPaysDepuisTelephone(telephone);
     const tarifs = TARIFS_PAYS[countryCode] || TARIFS_PAYS.BF;
+    const normalizedTel = normalizePhone(telephone, countryCode) || telephone.replace(/\D/g, '');
 
     console.log(`[WebhookVenus] 📥 ÉTAPE 1 — Message reçu de ${telephone} (${profileName || 'N/A'}) | Pays: ${countryCode} | Body: "${body}" | Media: ${numMedia} | GPS: ${latitude},${longitude} | Sid: ${messageSid}`);
 
@@ -1761,7 +1765,7 @@ Deno.serve(async (req) => {
         if (livreurCourse && livreurCourse.client_telephone) {
           // Vérifier que le client est en mode contact_livreur
           const clientConvs = await base44.asServiceRole.entities.Conversation.filter({
-            whatsapp_phone: livreurCourse.client_telephone,
+            whatsapp_phone: normalizePhone(livreurCourse.client_telephone, countryCode) || livreurCourse.client_telephone,
           });
           const clientConv = clientConvs?.[0];
           let clientPending: any = null;
@@ -1776,7 +1780,7 @@ Deno.serve(async (req) => {
               const creds = btoa(`${lAccountSid}:${lAuthToken}`);
               const formData = new URLSearchParams();
               formData.append('From', from);
-              formData.append('To', `whatsapp:${livreurCourse.client_telephone}`);
+              formData.append('To', `whatsapp:+${(livreurCourse.client_telephone || '').replace(/\D/g, '')}`);
               formData.append('Body', `💬 *Réponse de votre livreur ${livreurCourse.livreur_nom || ''}:*\n\n${body}`);
               await fetch(`https://api.twilio.com/2010-04-01/Accounts/${lAccountSid}/Messages.json`, {
                 method: 'POST',
@@ -1798,7 +1802,7 @@ Deno.serve(async (req) => {
     // ── 1. Trouver ou créer la Conversation ──
     let conversation: any = null;
     const existingConvs = await base44.asServiceRole.entities.Conversation.filter({
-      whatsapp_phone: telephone,
+      whatsapp_phone: normalizedTel,
     });
 
     if (existingConvs && existingConvs.length > 0) {
@@ -1806,13 +1810,13 @@ Deno.serve(async (req) => {
       console.log(`[WebhookVenus] ✅ ÉTAPE 2 — Conversation existante trouvée: ${conversation.id} | venus_active: ${conversation.venus_active}`);
     } else {
       const participants = JSON.stringify([
-        { type: 'client', id: telephone, name: profileName || telephone },
+        { type: 'client', id: normalizedTel, name: profileName || telephone },
         { type: 'admin', id: 'all', name: 'Admin SILGAPP' },
       ]);
       conversation = await base44.asServiceRole.entities.Conversation.create({
         participants,
         title: profileName || telephone,
-        whatsapp_phone: telephone,
+        whatsapp_phone: normalizedTel,
         source: 'whatsapp',
         venus_active: true,
         country_code: countryCode,
@@ -1865,7 +1869,7 @@ Deno.serve(async (req) => {
     await base44.asServiceRole.entities.Message.create({
       conversation_id: conversation.id,
       sender_type: 'client',
-      sender_id: telephone,
+      sender_id: normalizedTel,
       sender_name: profileName || telephone,
       message_type: messageType,
       content: messageContent,

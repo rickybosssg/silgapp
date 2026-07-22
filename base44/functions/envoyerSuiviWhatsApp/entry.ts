@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.38';
 import { genererReferenceCourse } from '../../shared/venusCourseReference.ts';
+import { normalizePhone } from '../../shared/phoneUtils.ts';
 
 /**
  * Envoie une notification WhatsApp de suivi de course au client.
@@ -271,12 +272,13 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, skipped: 'no_phone' });
     }
 
-    // Normaliser le numéro
+    // Normaliser le numéro au format canonique DB (226XXXXXXXX sans +)
     const INDICATIFS = { BF: '+226', CI: '+225', TG: '+228', BJ: '+229', SN: '+221', ML: '+223', GN: '+224', NE: '+227', GH: '+233' };
     const indicatif = INDICATIFS[course.country_code] || '+226';
-    let numero = telephone.replace(/\D/g, '');
-    if (!numero.startsWith('+')) {
-      // Si le numéro ne commence pas par l'indicatif pays, l'ajouter
+    let numero = normalizePhone(telephone, course.country_code) || telephone.replace(/\D/g, '');
+    // Garde anti-régression : si normalizePhone n'a pas pu normaliser, appliquer l'ancienne logique
+    if (!numero || numero.length < 8) {
+      numero = telephone.replace(/\D/g, '');
       if (!numero.startsWith(indicatif.replace('+', ''))) {
         numero = indicatif.replace('+', '') + numero;
       }
@@ -309,16 +311,17 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, error: 'Configuration Twilio manquante' }, { status: 500 });
     }
 
-    // ── Helper : rechercher une conversation par numéro (gère + et sans +) ──
+    // ── Helper : rechercher une conversation par numéro (gère + et sans +, legacy) ──
     async function trouverConversationParNumero(num: string): Promise<any | null> {
-      // Essayer d'abord sans + (format canonique)
-      let convs = await base44.asServiceRole.entities.Conversation.filter({ whatsapp_phone: num });
+      const normalized = normalizePhone(num) || num.replace(/\D/g, '');
+      // 1. Format canonique (sans +) — format futur
+      let convs = await base44.asServiceRole.entities.Conversation.filter({ whatsapp_phone: normalized });
       if (convs?.[0]) return convs[0];
-      // Essayer avec + (format Twilio brut)
-      convs = await base44.asServiceRole.entities.Conversation.filter({ whatsapp_phone: `+${num}` });
+      // 2. Format legacy avec + (anciennes conversations Twilio brut)
+      convs = await base44.asServiceRole.entities.Conversation.filter({ whatsapp_phone: `+${normalized}` });
       if (convs?.[0]) return convs[0];
-      // Fallback : chercher par derniers chiffres
-      const last8 = num.slice(-8);
+      // 3. Fallback : chercher par derniers chiffres (pour données mal formées)
+      const last8 = normalized.slice(-8);
       const all = await base44.asServiceRole.entities.Conversation.filter({ source: 'whatsapp' }, '-last_message_date', 200);
       const match = (all || []).find(c => {
         const cd = (c.whatsapp_phone || '').replace(/\D/g, '');
