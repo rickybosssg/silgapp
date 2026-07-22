@@ -309,11 +309,29 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, error: 'Configuration Twilio manquante' }, { status: 500 });
     }
 
+    // ── Helper : rechercher une conversation par numéro (gère + et sans +) ──
+    async function trouverConversationParNumero(num: string): Promise<any | null> {
+      // Essayer d'abord sans + (format canonique)
+      let convs = await base44.asServiceRole.entities.Conversation.filter({ whatsapp_phone: num });
+      if (convs?.[0]) return convs[0];
+      // Essayer avec + (format Twilio brut)
+      convs = await base44.asServiceRole.entities.Conversation.filter({ whatsapp_phone: `+${num}` });
+      if (convs?.[0]) return convs[0];
+      // Fallback : chercher par derniers chiffres
+      const last8 = num.slice(-8);
+      const all = await base44.asServiceRole.entities.Conversation.filter({ source: 'whatsapp' }, '-last_message_date', 200);
+      const match = (all || []).find(c => {
+        const cd = (c.whatsapp_phone || '').replace(/\D/g, '');
+        return cd.endsWith(last8);
+      });
+      return match || null;
+    }
+
     // ── Garde anti-doublon : vérifier qu'un message identique n'a pas été envoyé
     // dans les 2 dernières minutes à ce même numéro pour cette même course ──
     try {
-      const convs = await base44.asServiceRole.entities.Conversation.filter({ whatsapp_phone: telephone });
-      const convId = convs?.[0]?.id;
+      const conv = await trouverConversationParNumero(numero);
+      const convId = conv?.id;
       if (convId) {
         const recentMsgs = await base44.asServiceRole.entities.Message.filter({
           sender_id: 'venus',
@@ -360,8 +378,7 @@ Deno.serve(async (req) => {
       // Sans cela, handlePrixManuelResponse ne peut pas détecter que le dernier message
       // VENUS était une proposition de prix (le "Oui" du client tombe alors dans le LLM)
       try {
-        const convs = await base44.asServiceRole.entities.Conversation.filter({ whatsapp_phone: telephone });
-        const conv = convs?.[0];
+        const conv = await trouverConversationParNumero(numero);
         if (conv) {
           await base44.asServiceRole.entities.Message.create({
             conversation_id: conv.id,
