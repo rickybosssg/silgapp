@@ -235,22 +235,13 @@ export default function PayerSilgapp({ userType: forcedType }) {
                   <p className="text-sm text-gray-400">Téléversement...</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Caméra */}
-                  <label className="flex flex-col items-center justify-center border-2 border-dashed border-primary/40 rounded-xl py-6 cursor-pointer hover:bg-primary/5 transition-colors">
-                    <Camera className="w-7 h-7 text-primary mb-2" />
-                    <span className="text-xs font-semibold text-primary">Prendre une photo</span>
-                    <input type="file" accept="image/*" capture="environment" className="hidden"
-                      onChange={e => handleUpload(e.target.files?.[0])} disabled={uploading} />
-                  </label>
-                  {/* Galerie */}
-                  <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl py-6 cursor-pointer hover:bg-gray-50 transition-colors">
-                    <ImageIcon className="w-7 h-7 text-gray-400 mb-2" />
-                    <span className="text-xs font-semibold text-gray-600">Depuis la galerie</span>
-                    <input type="file" accept="image/*" className="hidden"
-                      onChange={e => handleUpload(e.target.files?.[0])} disabled={uploading} />
-                  </label>
-                </div>
+                <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl py-8 cursor-pointer hover:bg-gray-50 transition-colors">
+                  <ImageIcon className="w-8 h-8 text-gray-400 mb-2" />
+                  <span className="text-sm font-semibold text-gray-600">Cliquer pour ajouter une photo</span>
+                  <span className="text-xs text-gray-400 mt-1">Caméra ou galerie</span>
+                  <input type="file" accept="image/*" className="hidden"
+                    onChange={e => handleUpload(e.target.files?.[0])} disabled={uploading} />
+                </label>
               )}
             </div>
 
