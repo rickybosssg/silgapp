@@ -496,326 +496,6 @@ async function envoyerReponseAudio(base44, telephone, texte, config, accountSid,
   }
 }
 
-async function handleCourseFlow(base44, conversation, userMessage, countryCode, tarifs, telephone, profileName, isAudioTranscription = false) {
-  let pendingCourse: any = null;
-  try {
-    pendingCourse = conversation.venus_pending_course ? JSON.parse(conversation.venus_pending_course) : null;
-  } catch { pendingCourse = null; }
-
-  const courseContext = pendingCourse ? JSON.stringify(pendingCourse, null, 2) : 'Aucune course en cours';
-
-  // ── Détection déterministe de confirmation (anti-boucle) ──
-  // Si le récapitulatif a déjà été présenté (all_info_collected = true) et que
-  // le client répond par une confirmation, créer la course SANS appeler le LLM.
-  const CONFIRM_KEYWORDS = [
-    'oui', 'ok', "d'accord", 'd accord', 'je confirme', 'valider', 'confirmer',
-    'confirme', "c'est bon", 'cest bon', 'go', "c'est ok", 'cest ok', 'parfait',
-    'pas de probleme', 'exact', 'certainement', 'bien sur', 'ouais', 'volontiers',
-    'je valide', 'valide', 'oui je confirme', 'tout est bon', 'correct', 'daco',
-  ];
-  const REFUSE_KEYWORDS = ['non', 'annuler', 'annule', 'je refuse', 'non merci', 'pas maintenant', 'je ne confirme pas'];
-
-  function normalizeTypeCourse(type) {
-    if (!type) return null;
-    const t = type.toLowerCase().trim();
-    if (['expedier', 'recevoir', 'deplacement'].includes(t)) return t;
-    if (t.includes('expedi') || t.includes('envoi') || t.includes('envoyer')) return 'expedier';
-    if (t.includes('recev') || t.includes('reception')) return 'recevoir';
-    if (t.includes('deplac') || t.includes('trajet') || t.includes('transport person')) return 'deplacement';
-    if (t.includes('livraison') || t.includes('colis')) return 'expedier';
-    return null;
-  }
-
-  const msgLowerConfirm = userMessage.toLowerCase().trim();
-  const isRefusal = REFUSE_KEYWORDS.some(kw => msgLowerConfirm === kw || msgLowerConfirm.startsWith(kw + ' ') || msgLowerConfirm.startsWith(kw + '.') || msgLowerConfirm.startsWith(kw + '!'));
-  const isConfirmation = !isRefusal && msgLowerConfirm.length <= 25 && CONFIRM_KEYWORDS.some(kw => msgLowerConfirm.includes(kw));
-  const resumePresented = pendingCourse?.all_info_collected === true && !pendingCourse?.course_created;
-  let bypassResult: any = null;
-  if (resumePresented && isConfirmation) {
-    bypassResult = { is_course_request: true, course_data: {}, all_info_collected: true, user_confirmed: true, is_cancellation: false, response: '' };
-    console.log(`[WebhookVenus] ✅ Confirmation déterministe détectée ("${userMessage}") — création directe (bypass LLM)`);
-  } else if (resumePresented && isRefusal && !isConfirmation) {
-    console.log(`[WebhookVenus] ❌ Refus déterministe détecté ("${userMessage}") — annulation`);
-    return { response: "Aucun problème, j'annule cette demande. N'hésitez pas à me solliciter si vous avez besoin d'autre chose.", pendingCourse: null, courseCreated: false };
-  }
-
-  const prompt = `Tu es VENUS, l'assistante SILGAPP. Analyse le message du client pour determiner s'il veut creer une course.
-
-PAYS: ${countryCode} (${tarifs.nom})
-TARIFS: ${tarifs.prix_km} ${tarifs.devise}/km, minimum ${tarifs.minimum} ${tarifs.devise}
-CLIENT: ${profileName || telephone} (${telephone})
-
-COURSE EN COURS:
-${courseContext}
-
-${isAudioTranscription ? `═══ NOTE IMPORTANTE - TRANSCRIPTION VOCALE ═══
-Le message du client ci-dessous a ete transcrit depuis une note vocale et peut contenir des erreurs (mots mal entendus, noms de quartiers mal orthographues).
-- Confirme TOUJOURS ce que tu as compris avant de poursuivre: "Si j'ai bien compris, vous souhaitez..."
-- Si un mot est mal reconnu mais que l'intention est claire, propose une correction et demande juste confirmation.
-- Ne demande JAMAIS de recommencer toute la note vocale. Demande uniquement les elements manquants.
-- Noms de quartiers courants a Ouagadougou: Karpala, Pissy, Tampouy, Ouaga 2000, Zone du Bois, Patte d'Oie, Gounghin, Dassasgho, Cissin, Samandin, Wemtenga, Bendogo, Larle, Somgande, Saaba, Tanghin, Kossodo, Limete, Ouaga 1, Ouaga 2, Ouaga 3.
-` : ''}MESSAGE DU CLIENT:
-${userMessage}
-
-═══ PRIORITE DES INFORMATIONS A COLLECTER ═══
-1. Localisation de depart (OBLIGATOIRE)
-   - GPS si disponible
-   - Sinon quartier + description
-
-2. Localisation d'arrivee (OBLIGATOIRE)
-   - GPS si disponible
-   - Sinon quartier + description
-
-3. Expediteur (le client lui-meme par defaut)
-   - Nom: ${profileName || telephone} (si connu, sinon le client)
-   - Telephone: ${telephone} (OBLIGATOIRE - utilise le telephone du client par defaut)
-
-4. Destinataire
-   - Telephone: OBLIGATOIRE (si le client ne l'a pas, voir REGLES ci-dessous)
-   - Nom: FACULTATIF (ne JAMAIS bloquer pour un nom manquant)
-
-═══ REGLES CRITIQUES ═══
-1. NE JAMAIS bloquer la creation d'une course parce qu'il manque le nom du destinataire.
-   - Si le client a le telephone mais pas le nom, reponds: "Aucun probleme. Le nom du destinataire est facultatif. Votre course est prete a etre creee."
-   - Mets contact_nom a "" (chaine vide) et continue.
-
-2. Si le client ne connait NI le nom NI le numero du destinataire:
-   - Demande s'il souhaite etre lui-meme le contact a l'arrivee (mets contact_is_client a true).
-   - Ou propose d'ajouter ces informations plus tard.
-   - Ne JAMAIS rester bloque sur cette question.
-
-3. ANTI-BOUCLE: Ne repete JAMAIS la meme question deux fois de suite.
-   - Si une information demandee est absente, propose une alternative et continue le processus.
-   - Si le client dit qu'il ne sait pas ou n'a pas l'info, passe a l'etape suivante ou propose un fallback.
-
-4. Si le client annule ou refuse, mets is_cancellation a true.
-
-5. Si les infos OBLIGATOIRES sont collectees (type_course + adresse_depart + adresse_arrivee + contact_telephone OU contact_is_client), mets all_info_collected a true et presente un resume SANS PRIX, puis demande de confirmer par "oui".
-   IMPORTANT: N'affiche JAMAIS un prix ou un tarif estime dans le resume. Le prix sera communique par le livreur.
-   Si le client demande le prix, reponds: "Je ne peux pas encore determiner le tarif avec precision. Le livreur qui prendra votre course vous contactera pour confirmer le cout de la livraison avant le demarrage de la course."
-
-6. Si le client confirme apres le resume, mets user_confirmed a true.
-
-6b. ANTI-BOUCLE CRITIQUE: Si all_info_collected est deja vrai dans la course en cours (le resume a DEJA ete presente) et que le client repond par une confirmation (oui, ok, d'accord, je confirme, valider, confirmer, etc.), mets user_confirmed a true IMMEDIATEMENT. Ne repete JAMAIS le resume. Ne repose JAMAIS une question deja validee. Une etape validee ne doit jamais etre reposee au client.
-
-7. Si ce n'est pas une demande de course, mets is_course_request a false et reponds normalement.
-
-8. Garde les champs deja collectes dans course_data (ne les perds pas).
-
-9. Ta response doit etre en texte plain, sans markdown, concise et chaleureuse.
-10. Si gps_depart_lat est defini dans course_data, le lieu de depart est DEJA CONNU (GPS partage). Ne JAMAIS le redemander. Considere adresse_depart comme valide.
-11. Si gps_arrivee_lat est defini dans course_data, le lieu d'arrivee est DEJA CONNU (GPS partage). Ne JAMAIS le redemander. Considere adresse_arrivee comme valide.
-12. Si pending_location_lat est defini, une localisation est en attente d'assignation. Ne pas la traiter comme une adresse — l'assignation est geree hors LLM.
-13. Si adresse_depart est "Localisation GPS partagee", c'est une adresse VALIDE (GPS). Ne pas la redemander ni la traiter comme manquante. Idem pour adresse_arrivee.
-
-Reponds UNIQUEMENT avec un JSON:`;
-
-  let result: any;
-  if (bypassResult) {
-    result = bypassResult;
-  } else {
-    const llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
-      prompt,
-      response_json_schema: {
-        type: 'object',
-        properties: {
-          is_course_request: { type: 'boolean' },
-          course_data: {
-            type: 'object',
-            properties: {
-              type_course: { type: 'string' },
-              adresse_depart: { type: 'string' },
-              adresse_arrivee: { type: 'string' },
-              contact_nom: { type: 'string' },
-              contact_telephone: { type: 'string' },
-              contact_is_client: { type: 'boolean' },
-              notes: { type: 'string' },
-            },
-          },
-          all_info_collected: { type: 'boolean' },
-          user_confirmed: { type: 'boolean' },
-          is_cancellation: { type: 'boolean' },
-          response: { type: 'string' },
-        },
-        required: ['is_course_request', 'response'],
-      },
-    });
-    result = typeof llmRes === 'string' ? JSON.parse(llmRes) : llmRes;
-  }
-
-  if (result.is_cancellation) {
-    return { response: result.response || 'Course annulee. Comment puis-je vous aider ?', pendingCourse: null, courseCreated: false };
-  }
-
-  if (!result.is_course_request) {
-    return { response: result.response || 'Comment puis-je vous aider ?', pendingCourse: undefined, courseCreated: false };
-  }
-
-  // Mettre a jour les donnees de course
-  const updatedCourse = {
-    ...(pendingCourse || {}),
-    ...(result.course_data || {}),
-  };
-
-  // Preserver les champs GPS et adresses assignees par localisation
-  // (le LLM ne doit pas ecraser les donnees GPS deja validees par le client)
-  if (pendingCourse?.gps_depart_lat != null) {
-    updatedCourse.gps_depart_lat = pendingCourse.gps_depart_lat;
-    updatedCourse.gps_depart_lng = pendingCourse.gps_depart_lng;
-    if (!updatedCourse.adresse_depart) updatedCourse.adresse_depart = pendingCourse.adresse_depart;
-  }
-  if (pendingCourse?.gps_arrivee_lat != null) {
-    updatedCourse.gps_arrivee_lat = pendingCourse.gps_arrivee_lat;
-    updatedCourse.gps_arrivee_lng = pendingCourse.gps_arrivee_lng;
-    if (!updatedCourse.adresse_arrivee) updatedCourse.adresse_arrivee = pendingCourse.adresse_arrivee;
-  }
-  if (pendingCourse?.pending_location_lat != null) {
-    updatedCourse.pending_location_lat = pendingCourse.pending_location_lat;
-    updatedCourse.pending_location_lng = pendingCourse.pending_location_lng;
-  }
-
-  // ── Persister all_info_collected dans le pending course (anti-boucle) ──
-  // Marque que le récapitulatif a été présenté — la prochaine confirmation
-  // du client créera la course sans repasser par le LLM
-  if (result.all_info_collected) {
-    updatedCourse.all_info_collected = true;
-  }
-
-  // ── Normaliser type_course en valeurs d'enum valides ──
-  const normalizedType = normalizeTypeCourse(updatedCourse.type_course);
-  if (normalizedType) {
-    updatedCourse.type_course = normalizedType;
-  }
-
-  // Verifier si on peut creer la course
-  // Conditions: type_course + adresse_depart + adresse_arrivee + (contact_telephone OU contact_is_client)
-  // Le nom du destinataire est FACULTATIF et ne bloque jamais la creation
-  const hasRequiredContact = updatedCourse.contact_telephone || updatedCourse.contact_is_client;
-  const hasDepart = updatedCourse.adresse_depart || updatedCourse.gps_depart_lat != null;
-  const hasArrivee = updatedCourse.adresse_arrivee || updatedCourse.gps_arrivee_lat != null;
-  if (result.all_info_collected && result.user_confirmed && updatedCourse.type_course && hasDepart && hasArrivee && hasRequiredContact) {
-    const cd = updatedCourse;
-    const typeLabels: any = { expedier: 'Envoi de colis', recevoir: 'Reception de colis', deplacement: 'Deplacement' };
-
-    const courseData: any = {
-      country_code: countryCode,
-      source: 'client',
-      created_by_venus: true,
-      client_nom: profileName || telephone,
-      client_telephone: normalizedTel,
-      type_course: cd.type_course,
-      adresse_depart: cd.adresse_depart,
-      adresse_arrivee: cd.adresse_arrivee,
-      prix_estimate: tarifs.minimum,
-      devise: tarifs.devise,
-      statut: 'recherche_livreur',
-      dispatch_status: 'en_attente',
-      notes: cd.notes || '',
-      gps_depart_lat: cd.gps_depart_lat,
-      gps_depart_lng: cd.gps_depart_lng,
-      gps_arrivee_lat: cd.gps_arrivee_lat,
-      gps_arrivee_lng: cd.gps_arrivee_lng,
-    };
-
-    if (cd.type_course === 'expedier') {
-      // Le destinataire est la personne qui recoit le colis
-      // Si contact_is_client, le client est aussi le contact a l'arrivee
-      if (cd.contact_is_client) {
-        courseData.destinataire_nom = profileName || telephone;
-        courseData.destinataire_telephone = normalizedTel;
-        courseData.destinataire_phone_normalized = normalizedTel;
-      } else {
-        courseData.destinataire_nom = cd.contact_nom || ''; // Nom FACULTATIF
-        courseData.destinataire_telephone = normalizePhone(cd.contact_telephone, countryCode) || normalizedTel;
-        courseData.destinataire_phone_normalized = normalizePhone(cd.contact_telephone, countryCode) || normalizedTel;
-      }
-    } else if (cd.type_course === 'recevoir') {
-      // L'expediteur est la personne qui envoie le colis vers le client
-      if (cd.contact_is_client) {
-        courseData.expediteur_nom = profileName || telephone;
-        courseData.expediteur_telephone = normalizedTel;
-        courseData.expediteur_phone_normalized = normalizedTel;
-      } else {
-        courseData.expediteur_nom = cd.contact_nom || ''; // Nom FACULTATIF
-        courseData.expediteur_telephone = normalizePhone(cd.contact_telephone, countryCode) || normalizedTel;
-        courseData.expediteur_phone_normalized = normalizePhone(cd.contact_telephone, countryCode) || normalizedTel;
-      }
-    } else if (cd.type_course === 'deplacement') {
-      courseData.passager_nom = profileName || telephone;
-      courseData.passager_telephone = normalizedTel;
-    }
-
-    try {
-      const course = await base44.asServiceRole.entities.CourseExterne.create(courseData);
-      console.log(`[WebhookVenus] Course creee: ${course.id} pour ${telephone}`);
-
-      // ── Déclencher le dispatch immédiatement ──
-      base44.asServiceRole.functions.invoke('dispatchExterneAuto', {
-        action: 'lancer_recherche_auto',
-        course_id: course.id,
-      }).catch((err: any) => {
-        console.error(`[WebhookVenus] ❌ Erreur dispatch immédiat course ${course.id}:`, err?.message || err);
-      });
-
-      // ── Notification modale à l'administrateur ──
-      try {
-        const hexSuffix = course.id?.replace(/-/g, '').slice(-6) || '000000';
-        const numSuffix = String(parseInt(hexSuffix, 16) % 1000000).padStart(6, '0');
-        const now = new Date();
-        const yyyy = now.getFullYear();
-        const mm = String(now.getMonth() + 1).padStart(2, '0');
-        const dd = String(now.getDate()).padStart(2, '0');
-        const reference = `SG-${yyyy}${mm}${dd}-${numSuffix}`;
-        const dateStr = now.toLocaleString('fr-FR', { timeZone: 'Africa/Ouagadougou' });
-        await base44.asServiceRole.entities.Notification.create({
-          titre: `🤖 Nouvelle course créée par VENUS`,
-          message: `Client: ${profileName || telephone}\nRéf: ${reference}\nDépart: ${cd.adresse_depart || 'GPS'}\nArrivée: ${cd.adresse_arrivee || 'GPS'}\nDate: ${dateStr}`,
-          type: 'nouvelle_course_venus',
-          course_id: course.id,
-          lue: false,
-        });
-        console.log(`[WebhookVenus] 📢 Notification admin créée pour course VENUS ${course.id}`);
-      } catch (notifErr: any) {
-        console.error(`[WebhookVenus] Erreur notification admin:`, notifErr?.message);
-      }
-
-      const typeLabel = typeLabels[cd.type_course] || cd.type_course;
-      result.response = `Votre course a ete creee avec succes dans SILGAPP !
-
-Type: ${typeLabel}
-De: ${cd.adresse_depart || 'Localisation GPS'}
-Vers: ${cd.adresse_arrivee || 'Localisation GPS'}
-
-Je recherche maintenant un livreur disponible. Je vous informerai des qu'un livreur aura accepte votre demande. Le livreur vous contactera ensuite pour confirmer les derniers details et le cout de la livraison.`;
-
-      return { response: result.response, pendingCourse: null, courseCreated: true };
-    } catch (e: any) {
-      console.error('[WebhookVenus] Erreur creation course:', e.message);
-      return {
-        response: 'Desole, une erreur est survenue lors de la creation de la course. Veuillez reessayer ou contacter le support au +226 66 92 51 90.',
-        pendingCourse: updatedCourse,
-        courseCreated: false,
-      };
-    }
-  }
-
-  // ── Fallback: si bypass mais création impossible (infos incomplètes) ──
-  if (bypassResult) {
-    delete updatedCourse.all_info_collected;
-    return {
-      response: 'Je n\'ai pas toutes les informations necessaires pour creer votre course. Pouvez-vous reformuler votre demande en precisant le type (envoyer un colis, recevoir un colis, ou se deplacer), le lieu de depart et le lieu de livraison ?',
-      pendingCourse: updatedCourse,
-      courseCreated: false,
-    };
-  }
-
-  return {
-    response: result.response || 'Comment puis-je vous aider ?',
-    pendingCourse: updatedCourse,
-    courseCreated: false,
-  };
-}
-
 /**
  * Phase 10 — Consultation de course via WhatsApp.
  * Recherche la course active du client par son numero de telephone
@@ -2161,6 +1841,32 @@ Deno.serve(async (req) => {
             venus_pending_course: JSON.stringify(pendingCourse),
           });
         }
+      }
+
+      // ── Bypass déterministe: ABANDON de la création en cours ──
+      // Si le client dit "laisse tomber", "oublie", "plus besoin" etc.,
+      // on vide la mémoire courte immédiatement pour stopper la relance automatique.
+      const ABANDON_KW = [
+        'laisse tomber', 'laissez tomber', 'on laisse tomber',
+        'oublie', 'oubliez', 'oublions', "j'oublie",
+        'plus besoin', 'plus la peine', 'plus maintenant',
+        'je ne veux plus', 'je veux plus', 'abandonne', 'abandonner',
+        'tant pis', 'laisse couler', 'oublie ça', 'oublie ca',
+        'non on laisse', 'non laisse', 'non oublie',
+        'non rien', 'laisse faire', 'plus rien',
+        'je change d avis', "je change d'avais",
+      ];
+      const msgLowerAbandon = messageEffectif.toLowerCase().trim();
+      const isAbandonMsg = msgLowerAbandon.length <= 60 && ABANDON_KW.some(kw => msgLowerAbandon.includes(kw));
+      const hasPendingNotCreated = pendingCourse && Object.keys(pendingCourse).length > 0 && !pendingCourse.course_created;
+
+      if (isAbandonMsg && hasPendingNotCreated) {
+        console.log(`[WebhookVenus] 🗑️ Abandon détecté — vidage mémoire courte (stop relance)`);
+        pendingCourse = {};
+        await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+          venus_pending_course: JSON.stringify(pendingCourse),
+        });
+        reponseVenus = `Entendu — je laisse tomber la création de la livraison. Aucune course n'a été créée. Si tu veux la relancer plus tard, dis-le-moi et je m'en occupe. Besoin d'autre chose ? Pour assistance, tu peux appeler le support au +226 66 92 51 90.`;
       }
 
       // ── Bypass déterministe: confirmation anti-boucle ──

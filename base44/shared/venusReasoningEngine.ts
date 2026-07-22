@@ -1343,6 +1343,24 @@ export async function detecterConversationsARelancer(base44: any, delaiMinutes: 
       if (pending.contact_livreur_mode) continue;
       if (pending.redispatch_pending) continue;
 
+      // ── Ne pas relancer si le dernier message du client indique un abandon ──
+      try {
+        const lastClientMsgs = await base44.asServiceRole.entities.Message.filter(
+          { conversation_id: c.id, sender_type: 'client' },
+          '-created_date', 1
+        );
+        const lastClientContent = (lastClientMsgs?.[0]?.content || '').toLowerCase();
+        const ABANDON_PATTERNS = [
+          'laisse tomber', 'laissez tomber', 'oublie', 'oubliez', 'plus besoin',
+          'plus la peine', 'abandonne', 'tant pis', 'non rien', 'plus rien',
+          'je ne veux plus', 'je veux plus',
+        ];
+        if (ABANDON_PATTERNS.some(p => lastClientContent.includes(p))) {
+          await base44.asServiceRole.entities.Conversation.update(c.id, { venus_pending_course: '' });
+          continue;
+        }
+      } catch {}
+
       // ── FIX 1: Ne pas relancer si le client a une course récente (créée dans les 2h) ──
       if (c.whatsapp_phone) {
         try {
