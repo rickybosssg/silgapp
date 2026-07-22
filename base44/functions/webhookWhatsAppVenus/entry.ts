@@ -1450,7 +1450,28 @@ async function handlePrixManuelResponse(base44: any, conversation: any, userMess
       const prix = Number(courseEnAttente.manual_price || 0);
       const devise = courseEnAttente.devise || 'FCFA';
       console.log(`[WebhookVenus] 💰 ✅ Prix accepté pour course ${courseEnAttente.id}`);
-      return `✅ Parfait ! Vous avez accepté le prix de ${prix.toLocaleString()} ${devise}.\n\nVotre livreur ${courseEnAttente.livreur_nom || ''} est maintenant en route vers le point de récupération. Il vous contactera bientôt.`;
+
+      // ── Générer le lien de suivi s'il n'existe pas encore ──
+      let trackingLink = courseEnAttente.tracking_link || '';
+      if (!trackingLink) {
+        try {
+          const token = crypto.randomUUID();
+          trackingLink = `https://silgapp.base44.app/suivi-public/${token}`;
+          await base44.asServiceRole.entities.CourseExterne.update(courseEnAttente.id, {
+            tracking_token: token, tracking_link: trackingLink, tracking_shared_at: new Date().toISOString(),
+          });
+        } catch (e) { console.warn(`[WebhookVenus] Generation tracking link échouée:`, e.message); }
+      }
+
+      // ── Envoyer le QR Code + PIN via envoyerSuiviWhatsApp ──
+      try {
+        await base44.asServiceRole.functions.invoke('envoyerSuiviWhatsApp', {
+          course_id: courseEnAttente.id, evenement: 'livreur_assigne',
+        });
+      } catch (e) { console.warn(`[WebhookVenus] Envoi QR/PIN échoué:`, e.message); }
+
+      const pin = courseEnAttente.pickup_code_4_digits || '';
+      return `✅ Parfait ! Vous avez accepté le prix de ${prix.toLocaleString()} ${devise}.\n\n🚗 Votre livreur ${courseEnAttente.livreur_nom || ''} est maintenant en route vers le point de récupération.${pin ? `\n\n🔐 Votre code PIN de récupération : ${pin}` : ''}${trackingLink ? `\n\n🔗 Suivez votre livreur en temps réel :\n${trackingLink}` : ''}\n\n📱 Le QR Code de récupération vous a également été envoyé. Ne le partagez qu'au moment de la récupération du colis.`;
     } else {
       console.log(`[WebhookVenus] 💰 ❌ Prix refusé pour course ${courseEnAttente.id} — redispatch`);
       return `D'accord, j'ai bien noté votre refus. Je recherche immédiatement un autre livreur pour votre course. Je vous informerai dès qu'un nouveau livreur aura accepté.`;

@@ -74,6 +74,9 @@ function construireMessage(course, evenement, body = {}) {
         `Voici votre QR Code et votre Code PIN de récupération.`,
         ``,
         `🔐 Code PIN : ${pin}`,
+        trackingLink ? `` : '',
+        trackingLink ? `🔗 Suivez votre livreur en temps réel :` : '',
+        trackingLink || '',
         ``,
         isRedispatch
           ? `⚠️ Les anciens codes ne sont plus valables. Utilisez uniquement ce nouveau QR Code et ce Code PIN.`
