@@ -16,7 +16,11 @@ function ConversationItem({ conv, myType, myId, active, onClick }) {
   useEffect(() => {
     try {
       const parts = JSON.parse(conv.participants || "[]");
-      const other = parts.find(p => !(p.type === myType && p.id === myId));
+      // Pour l'admin: l'autre participant = n'importe qui qui n'est PAS admin
+      // (couvre les conversations de support où admin id='support' ou 'all')
+      const other = myType === "admin"
+        ? parts.find(p => p.type !== "admin") || parts.find(p => !(p.type === myType && p.id === myId))
+        : parts.find(p => !(p.type === myType && p.id === myId));
       setOtherParticipant(other || parts[0]);
     } catch { setOtherParticipant(null); }
   }, [conv, myType, myId]);
@@ -280,7 +284,11 @@ export default function MessagesPage({ myType, myId, myName, onBack, initialConv
       const mine = all.filter(c => {
         try {
           const parts = JSON.parse(c.participants || "[]");
-          return parts.some(p => p.type === myType && p.id === myId);
+          // Conversations où je suis participant (matching exact)
+          if (parts.some(p => p.type === myType && p.id === myId)) return true;
+          // Admin: inclure aussi les conversations de support (admin id='support' ou 'all')
+          if (myType === "admin" && parts.some(p => p.type === "admin" && (p.id === "support" || p.id === "all"))) return true;
+          return false;
         } catch { return false; }
       });
       setConversations(mine);

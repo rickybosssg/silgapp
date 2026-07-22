@@ -1,15 +1,22 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, CheckCircle, XCircle, Phone, User, MapPin, Camera, FileText } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, Phone, User, MapPin, Camera, FileText, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
+import LivreurChatModal from "@/components/admin/LivreurChatModal";
 
 export default function DemandesLivreursAdmin() {
   const queryClient = useQueryClient();
   const [processing, setProcessing] = useState(null); // id en cours de traitement
+  const [chatLivreur, setChatLivreur] = useState(null); // livreur avec qui discuter
+  const [adminUser, setAdminUser] = useState(null);
+
+  useEffect(() => {
+    base44.auth.me().then(setAdminUser).catch(() => {});
+  }, []);
 
   const { data: demandes, isLoading } = useQuery({
     queryKey: ["demandes_livreurs"],
@@ -161,11 +168,29 @@ export default function DemandesLivreursAdmin() {
                       )}
                     </Button>
                   </div>
+
+                  {/* Discuter avec le livreur */}
+                  <Button
+                    onClick={() => setChatLivreur(livreur)}
+                    variant="outline"
+                    className="w-full h-10 rounded-xl border-primary/20 text-primary font-semibold hover:bg-primary/5"
+                  >
+                    <MessageCircle className="w-4 h-4" /> Discuter
+                  </Button>
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
+      )}
+
+      {/* Modal de chat avec un livreur */}
+      {chatLivreur && adminUser && (
+        <LivreurChatModal
+          livreur={chatLivreur}
+          user={adminUser}
+          onClose={() => setChatLivreur(null)}
+        />
       )}
     </div>
   );
