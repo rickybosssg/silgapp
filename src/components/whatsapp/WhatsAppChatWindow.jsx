@@ -16,9 +16,10 @@ export default function WhatsAppChatWindow({ conv, myEmail, myName, onBack, onCo
 
   useEffect(() => {
     if (!conv?.id) return;
-    base44.entities.Message.filter({ conversation_id: conv.id }, "created_date", 200)
+    base44.entities.Message.filter({ conversation_id: conv.id }, "-created_date", 200)
       .then(msgs => {
-        const list = msgs || [];
+        // Tri descendant = 200 messages les plus récents, puis on inverse pour affichage chronologique
+        const list = (msgs || []).reverse();
         knownIds.current = new Set(list.map(m => m.id));
         setMessages(list);
       })
