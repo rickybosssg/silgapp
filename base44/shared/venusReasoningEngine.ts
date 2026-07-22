@@ -428,6 +428,63 @@ export async function creerCourseDepuisMemoire(
     courseData.passager_telephone = telephone;
   }
 
+  // ── Vérifier si le destinataire/expéditeur est déjà inscrit dans l'app ──
+  const contactPhone = normalizedType === 'recevoir'
+    ? (courseData.expediteur_telephone || telephone)
+    : (courseData.destinataire_telephone || telephone);
+  const isContactSelf = cd.contact_is_client === true || contactPhone === telephone;
+
+  if (!isContactSelf && contactPhone) {
+    try {
+      // Normaliser le numéro pour la recherche (derniers 8 chiffres)
+      const digits = contactPhone.replace(/\D/g, '');
+      const last8 = digits.slice(-8);
+      // Rechercher par téléphone exact
+      let existingClients = await base44.asServiceRole.entities.ClientExterne.filter({
+        telephone: contactPhone,
+      });
+      // Fallback: rechercher tous et filtrer par derniers 8 chiffres
+      if (!existingClients || existingClients.length === 0) {
+        const allClients = await base44.asServiceRole.entities.ClientExterne.filter({
+          country_code: countryCode,
+        });
+        existingClients = (allClients || []).filter((c: any) => {
+          const cd2 = (c.telephone || '').replace(/\D/g, '');
+          return cd2.slice(-8) === last8;
+        });
+      }
+
+      if (existingClients && existingClients.length > 0) {
+        // Destinataire trouvé dans l'app → lier la course
+        const clientId = existingClients[0].id;
+        if (normalizedType === 'recevoir') {
+          courseData.expediteur_client_id = clientId;
+        } else {
+          courseData.destinataire_client_id = clientId;
+        }
+        courseData.recipient_has_app = true;
+        console.log(`[ReasoningEngine] ✅ Contact ${contactPhone} trouvé dans ClientExterne (${clientId})`);
+      } else {
+        // Destinataire non inscrit → envoyer infos livraison + lien téléchargement
+        console.log(`[ReasoningEngine] 📤 Contact ${contactPhone} non inscrit → envoi infos + lien téléchargement`);
+        try {
+          await base44.asServiceRole.functions.invoke('envoyerSuiviWhatsApp', {
+            course_id: 'pending',
+            evenement: 'inviter_destinataire',
+            telephone: contactPhone,
+            country_code: countryCode,
+            client_nom: profileName || telephone,
+            type_course: normalizedType,
+          });
+        } catch (inviteErr: any) {
+          console.warn(`[ReasoningEngine] Envoi invitation destinataire échoué:`, inviteErr?.message);
+        }
+      }
+    } catch (lookupErr: any) {
+      console.warn(`[ReasoningEngine] Recherche destinataire échouée:`, lookupErr?.message);
+    }
+  }
+
   try {
     const course = await base44.asServiceRole.entities.CourseExterne.create(courseData);
     const typeLabels: any = { expedier: 'Envoi de colis', recevoir: 'Réception de colis', deplacement: 'Déplacement' };

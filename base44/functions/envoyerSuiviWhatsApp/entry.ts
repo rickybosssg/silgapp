@@ -160,8 +160,96 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { course_id, evenement, is_redispatch } = body;
 
-    if (!course_id || !evenement) {
-      return Response.json({ error: 'course_id et evenement requis' }, { status: 400 });
+    if (!evenement) {
+      return Response.json({ error: 'evenement requis' }, { status: 400 });
+    }
+
+    // ── Événement spécial : inviter un destinataire non inscrit ──
+    // Pas de course_id requis : on envoie directement les infos + lien téléchargement
+    if (evenement === 'inviter_destinataire') {
+      const tel = body.telephone || '';
+      const countryCode = body.country_code || 'BF';
+      const clientNom = body.client_nom || 'un client';
+      const typeCourse = body.type_course || 'expedier';
+
+      if (!tel) {
+        return Response.json({ success: false, skipped: 'no_phone' });
+      }
+
+      const INDICATIFS2 = { BF: '+226', CI: '+225', TG: '+228', BJ: '+229', SN: '+221', ML: '+223', GN: '+224', NE: '+227', GH: '+233' };
+      const ind2 = INDICATIFS2[countryCode] || '+226';
+      let num2 = tel.replace(/\D/g, '');
+      if (!num2.startsWith(ind2.replace('+', ''))) {
+        num2 = ind2.replace('+', '') + num2;
+      }
+
+      const msgInvite = typeCourse === 'recevoir'
+        ? [
+            `📦 Bonjour !`,
+            ``,
+            `${clientNom} souhaite vous envoyer un colis via SILGAPP, le service de livraison à moto.`,
+            ``,
+            `Pour suivre l'acheminement de votre colis en temps réel et recevoir les notifications de livraison, téléchargez l'application SILGAPP :`,
+            ``,
+            `📱 Téléchargez SILGAPP gratuitement :`,
+            `https://silgapp.base44.app/telecharger`,
+            ``,
+            `Une fois installée, créez votre compte et vous pourrez suivre toutes vos livraisons en direct !`,
+            ``,
+            `Pour toute question, contactez le support au +226 66 92 51 90.`,
+          ].join('\n')
+        : [
+            `📦 Bonjour !`,
+            ``,
+            `${clientNom} a programmé une livraison vers vous via SILGAPP, le service de livraison à moto.`,
+            ``,
+            `Pour suivre l'arrivée de votre colis en temps réel et recevoir les notifications de livraison, téléchargez l'application SILGAPP :`,
+            ``,
+            `📱 Téléchargez SILGAPP gratuitement :`,
+            `https://silgapp.base44.app/telecharger`,
+            ``,
+            `Une fois installée, créez votre compte et vous pourrez suivre toutes vos livraisons en direct !`,
+            ``,
+            `Pour toute question, contactez le support au +226 66 92 51 90.`,
+          ].join('\n');
+
+      const twilioSid2 = Deno.env.get('TWILIO_ACCOUNT_SID');
+      const twilioToken2 = Deno.env.get('TWILIO_AUTH_TOKEN');
+      const twilioFrom2 = Deno.env.get('TWILIO_WHATSAPP_FROM') || 'whatsapp:+14155238886';
+
+      if (!twilioSid2 || !twilioToken2) {
+        return Response.json({ success: false, error: 'Configuration Twilio manquante' }, { status: 500 });
+      }
+
+      const twilioUrl2 = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid2}/Messages.json`;
+      const auth2 = btoa(`${twilioSid2}:${twilioToken2}`);
+      const formData2 = new URLSearchParams();
+      formData2.append('From', twilioFrom2);
+      formData2.append('To', `whatsapp:+${num2}`);
+      formData2.append('Body', msgInvite);
+
+      const twilioRes2 = await fetch(twilioUrl2, {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${auth2}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formData2.toString(),
+      });
+
+      const twilioData2 = await twilioRes2.json();
+
+      if (twilioRes2.ok) {
+        console.log(`[SuiviWhatsApp] Invitation destinataire envoyée à +${num2}`);
+        return Response.json({ success: true, sid: twilioData2.sid, type: 'invitation_destinataire' });
+      } else {
+        console.error('[SuiviWhatsApp] Erreur Twilio invitation:', twilioData2.message || twilioData2);
+        return Response.json({ success: false, error: twilioData2.message || 'Erreur Twilio' });
+      }
+    }
+
+    if (!course_id) {
+      return Response.json({ error: 'course_id requis' }, { status: 400 });
     }
 
     const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
