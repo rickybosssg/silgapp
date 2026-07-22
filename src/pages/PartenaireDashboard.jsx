@@ -191,6 +191,15 @@ export default function PartenaireDashboard() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
         <div className="w-full max-w-md space-y-6">
+          {/* Bouton retour en haut — visible et accessible */}
+          <button onClick={async () => {
+            await base44.auth.updateMe({ silgapp_role: "" }).catch(() => {});
+            window.location.reload();
+          }} className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-purple-600 transition-colors">
+            <ArrowLeft className="w-5 h-5" />
+            Retour au choix de rôle (Client / Livreur / Partenaire)
+          </button>
+
           <div className="text-center space-y-3">
             <div className="w-20 h-20 rounded-2xl bg-purple-100 flex items-center justify-center mx-auto">
               <Store className="w-10 h-10 text-purple-600" />
@@ -221,11 +230,10 @@ export default function PartenaireDashboard() {
           <div className="flex items-center justify-center gap-4 pt-2">
             <button onClick={async () => {
               await base44.auth.updateMe({ silgapp_role: "" }).catch(() => {});
-              clearPersistedToken();
-              base44.auth.logout();
+              window.location.reload();
             }} className="flex items-center gap-1.5 text-sm text-purple-600 font-medium hover:text-purple-700">
               <ArrowLeft className="w-4 h-4" />
-              Changer de rôle
+              Retour au choix de rôle
             </button>
             <span className="text-gray-300">|</span>
             <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="text-sm text-gray-400 underline">Se déconnecter</button>
