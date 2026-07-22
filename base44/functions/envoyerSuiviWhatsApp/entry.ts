@@ -309,6 +309,29 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, error: 'Configuration Twilio manquante' }, { status: 500 });
     }
 
+    // ── Garde anti-doublon : vérifier qu'un message identique n'a pas été envoyé
+    // dans les 2 dernières minutes à ce même numéro pour cette même course ──
+    try {
+      const convs = await base44.asServiceRole.entities.Conversation.filter({ whatsapp_phone: telephone });
+      const convId = convs?.[0]?.id;
+      if (convId) {
+        const recentMsgs = await base44.asServiceRole.entities.Message.filter({
+          sender_id: 'venus',
+          conversation_id: convId,
+        }, '-created_date', 5);
+        const deuxMinAgo = Date.now() - 2 * 60 * 1000;
+        const isDuplicate = (recentMsgs || []).some(m =>
+          m.content === message && new Date(m.created_date).getTime() > deuxMinAgo
+        );
+        if (isDuplicate) {
+          console.log(`[SuiviWhatsApp] ⏭️ Doublon détecté — message identique envoyé il y a < 2min, skip`);
+          return Response.json({ success: true, skipped: 'duplicate', sid: 'skipped' });
+        }
+      }
+    } catch (dedupErr) {
+      console.warn(`[SuiviWhatsApp] Garde anti-doublon échouée (non bloquant):`, dedupErr?.message);
+    }
+
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;
     const auth = btoa(`${twilioSid}:${twilioToken}`);
     const formData = new URLSearchParams();
