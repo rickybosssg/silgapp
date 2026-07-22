@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Volume2, VolumeX, Mic, Save, Loader2 } from "lucide-react";
+import { Volume2, VolumeX, Mic, Save, Loader2, Sparkles, Brain } from "lucide-react";
 
 const VOICES = [
   { value: "honey", label: "Honey — Jeune femme, douce et chaleureuse (recommandée pour Venus)" },
@@ -31,6 +31,7 @@ export default function VenusAudioSettings() {
     return c?.valeur ?? fallback;
   };
 
+  const [openaiEnabled, setOpenaiEnabled] = useState(false);
   const [enabled, setEnabled] = useState(false);
   const [voice, setVoice] = useState("honey");
   const [language, setLanguage] = useState("fr");
@@ -41,6 +42,7 @@ export default function VenusAudioSettings() {
 
   useEffect(() => {
     if (!loaded && configs.length >= 0 && !isLoading) {
+      setOpenaiEnabled(getVal("VENUS_OPENAI_ENABLED", "false") === "true");
       setEnabled(getVal("VENUS_AUDIO_RESPONSE_ENABLED", "false") === "true");
       setVoice(getVal("VENUS_AUDIO_RESPONSE_VOICE", "honey"));
       setLanguage(getVal("VENUS_AUDIO_RESPONSE_LANGUAGE", "fr"));
@@ -61,6 +63,7 @@ export default function VenusAudioSettings() {
           await base44.entities.SystemConfig.create({ cle, valeur: String(valeur), description });
         }
       };
+      await upsert("VENUS_OPENAI_ENABLED", openaiEnabled, "Active le moteur OpenAI pour VENUS (function calling + RAG). Fallback automatique vers InvokeLLM si desactive.");
       await Promise.all([
         upsert("VENUS_AUDIO_RESPONSE_ENABLED", enabled, "Activer les reponses audio de Venus"),
         upsert("VENUS_AUDIO_RESPONSE_VOICE", voice, "Voix TTS de Venus"),
@@ -99,7 +102,30 @@ export default function VenusAudioSettings() {
         Venus transcrit automatiquement les notes vocales reçues sur WhatsApp. Configurez ici si elle peut également répondre en audio.
       </p>
 
-      {/* Toggle principal */}
+      {/* ── Interrupteur OpenAI ── */}
+      <div className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-lg bg-emerald-500 flex items-center justify-center flex-shrink-0">
+            <Brain className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+              Moteur OpenAI
+              <Badge className={openaiEnabled ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"} variant="outline">
+                <Sparkles className="w-3 h-3 mr-1" />
+                {openaiEnabled ? "Activé" : "Désactivé"}
+              </Badge>
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Connecte VENUS à l'API OpenAI (gpt-4.1-mini) pour une compréhension quasi humaine + function calling.
+              Le RAG SILGAPP reste la source de connaissances. Fallback automatique vers InvokeLLM si désactivé.
+            </p>
+          </div>
+        </div>
+        <Switch checked={openaiEnabled} onCheckedChange={setOpenaiEnabled} />
+      </div>
+
+      {/* Toggle principal audio */}
       <div className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-100">
         <div>
           <p className="text-sm font-semibold text-foreground">Réponses audio de Venus</p>
