@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Wallet, Upload, CheckCircle2, Phone, Image as ImageIcon, X } from "lucide-react";
+import { ArrowLeft, Wallet, Upload, CheckCircle2, Phone, Image as ImageIcon, X, Camera } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -230,19 +230,27 @@ export default function PayerSilgapp({ userType: forcedType }) {
                     <X className="w-4 h-4" />
                   </button>
                 </div>
+              ) : uploading ? (
+                <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-xl py-8">
+                  <p className="text-sm text-gray-400">Téléversement...</p>
+                </div>
               ) : (
-                <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-xl py-8 cursor-pointer hover:border-primary transition-colors">
-                  {uploading ? (
-                    <p className="text-sm text-gray-400">Téléversement...</p>
-                  ) : (
-                    <>
-                      <ImageIcon className="w-8 h-8 text-gray-300 mb-2" />
-                      <p className="text-xs text-gray-400">Cliquer pour ajouter une photo</p>
-                    </>
-                  )}
-                  <input type="file" accept="image/*" className="hidden"
-                    onChange={e => handleUpload(e.target.files?.[0])} disabled={uploading} />
-                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Caméra */}
+                  <label className="flex flex-col items-center justify-center border-2 border-dashed border-primary/40 rounded-xl py-6 cursor-pointer hover:bg-primary/5 transition-colors">
+                    <Camera className="w-7 h-7 text-primary mb-2" />
+                    <span className="text-xs font-semibold text-primary">Prendre une photo</span>
+                    <input type="file" accept="image/*" capture="environment" className="hidden"
+                      onChange={e => handleUpload(e.target.files?.[0])} disabled={uploading} />
+                  </label>
+                  {/* Galerie */}
+                  <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl py-6 cursor-pointer hover:bg-gray-50 transition-colors">
+                    <ImageIcon className="w-7 h-7 text-gray-400 mb-2" />
+                    <span className="text-xs font-semibold text-gray-600">Depuis la galerie</span>
+                    <input type="file" accept="image/*" className="hidden"
+                      onChange={e => handleUpload(e.target.files?.[0])} disabled={uploading} />
+                  </label>
+                </div>
               )}
             </div>
 
