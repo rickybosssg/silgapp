@@ -739,7 +739,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   // Auto-resync statut supprimé — le statut ne se change QUE manuellement via le bouton
 
   // 🎯 Commission dynamique du pays du livreur
-  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+  const [countryCommissionPct, setCountryCommissionPct] = useState(0);
   useEffect(() => {
     const countryCode = livreurProfil?.country_code || mesCourses?.[0]?.country_code;
     if (!countryCode) return;

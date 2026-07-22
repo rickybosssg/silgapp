@@ -54,8 +54,13 @@ Deno.serve(async (req) => {
       }
 
       const distSafe = distanceKm;
+      let commissionPct = 30;
+      try {
+        const countries = await base44.asServiceRole.entities.Country.filter({ code: course.country_code, actif: true });
+        if (countries?.[0]?.commission_pct) commissionPct = countries[0].commission_pct;
+      } catch (_) {}
       const prixFinal = Math.round(distSafe * 100);
-      const commission = Math.round(prixFinal * 0.3);
+      const commission = Math.round(prixFinal * (commissionPct / 100));
       const montantLivreur = prixFinal - commission;
 
       await base44.asServiceRole.entities.CourseExterne.update(course.id, {

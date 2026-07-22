@@ -104,7 +104,7 @@ export default function MultiColisLivreurView({ course, colisRecupere, onAllLivr
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(true);
   const [confirmColis, setConfirmColis] = useState(null); // colis en attente de confirmation
-  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+  const [countryCommissionPct, setCountryCommissionPct] = useState(0);
 
   useEffect(() => {
     if (!course?.country_code) return;

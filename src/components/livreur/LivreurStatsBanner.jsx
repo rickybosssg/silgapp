@@ -12,7 +12,7 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
   ).length;
 
   // 🎯 Commission dynamique du pays
-  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+  const [countryCommissionPct, setCountryCommissionPct] = useState(0);
   useEffect(() => {
     const countryCode = mesCourses?.[0]?.country_code;
     if (!countryCode) return;

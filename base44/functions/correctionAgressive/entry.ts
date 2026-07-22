@@ -55,9 +55,14 @@ Deno.serve(async (req) => {
         // CORRECTION 4 : Prix final manquant sur livrées
         if (course.statut === "livree" && (!course.prix_final || course.prix_final === 0)) {
           if (course.distance_reelle_km && course.distance_reelle_km > 0) {
+            let commissionPct = 30;
+            try {
+              const countries = await base44.asServiceRole.entities.Country.filter({ code: course.country_code, actif: true });
+              if (countries?.[0]?.commission_pct) commissionPct = countries[0].commission_pct;
+            } catch (_) {}
             updates.prix_final = Math.round(course.distance_reelle_km * 100);
-            updates.commission_silga = Math.round(course.distance_reelle_km * 100 * 0.3);
-            updates.montant_livreur = Math.round(course.distance_reelle_km * 100 * 0.7);
+            updates.commission_silga = Math.round(course.distance_reelle_km * 100 * (commissionPct / 100));
+            updates.montant_livreur = Math.round(course.distance_reelle_km * 100 * ((100 - commissionPct) / 100));
           }
         }
 

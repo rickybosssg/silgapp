@@ -53,7 +53,7 @@ export default function RecapCourseLivreur() {
   const [error, setError] = useState(null);
   const inFlightRef = useRef(false);
   // 🎯 Commission dynamique du pays
-  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+  const [countryCommissionPct, setCountryCommissionPct] = useState(0);
   useEffect(() => {
     if (!course?.country_code) return;
     base44.entities.Country.filter({ code: course.country_code, actif: true })

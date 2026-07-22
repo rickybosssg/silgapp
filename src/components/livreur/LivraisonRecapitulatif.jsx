@@ -7,7 +7,7 @@ import { base44 } from "@/api/base44Client";
  * Affiche distance réelle, temps, prix final, et part livreur.
  */
 export default function LivraisonRecapitulatif({ course, onClose }) {
-  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+  const [countryCommissionPct, setCountryCommissionPct] = useState(0);
   useEffect(() => {
     if (!course?.country_code) return;
     base44.entities.Country.filter({ code: course.country_code, actif: true })

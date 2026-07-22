@@ -230,8 +230,8 @@ Deno.serve(async (req) => {
       } else {
         // GPS course (départ/arrivée) manquants → appliquer le minimum SILGAPP
         updateData.prix_final = PRIX_MINIMUM_GLOBAL;
-        updateData.commission_silga = Math.round(PRIX_MINIMUM_GLOBAL * 0.3);
-        updateData.montant_livreur = PRIX_MINIMUM_GLOBAL - Math.round(PRIX_MINIMUM_GLOBAL * 0.3);
+        updateData.commission_silga = Math.round(PRIX_MINIMUM_GLOBAL * (commissionPct / 100));
+        updateData.montant_livreur = PRIX_MINIMUM_GLOBAL - Math.round(PRIX_MINIMUM_GLOBAL * (commissionPct / 100));
         if (distReelle != null) updateData.distance_reelle_km = Math.max(Number(distReelle) || 0, 0.01);
       }
 

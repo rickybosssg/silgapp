@@ -9,7 +9,7 @@ import { toast } from "sonner";
  */
 export default function PrixManuelConfirmModal({ course, onAccepted, onRefused }) {
   const [loading, setLoading] = useState(false);
-  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+  const [countryCommissionPct, setCountryCommissionPct] = useState(0);
 
   useEffect(() => {
     if (!course?.country_code) return;

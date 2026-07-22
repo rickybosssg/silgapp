@@ -11,7 +11,7 @@ const PRIX_MIN = 1000;
 export default function ManualPriceModal({ course, onConfirm, onCancel, isSubmitting }) {
   const [montant, setMontant] = useState("");
   const [erreur, setErreur] = useState("");
-  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+  const [countryCommissionPct, setCountryCommissionPct] = useState(0);
 
   useEffect(() => {
     if (!course?.country_code) return;

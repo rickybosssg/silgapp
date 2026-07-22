@@ -156,7 +156,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   // 💬 Messagerie d'explication après annulation
   const [showAnnulationChat, setShowAnnulationChat] = useState(false);
   // 🎯 Commission dynamique du pays (fetch auto)
-  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+  const [countryCommissionPct, setCountryCommissionPct] = useState(0);
   useEffect(() => {
     if (!course.country_code) return;
     base44.entities.Country.filter({ code: course.country_code, actif: true })

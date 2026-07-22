@@ -251,7 +251,12 @@ async function scanPaiementsNonSync(base44, bugs, corrections, recommandations) 
 
       if (dist && dist > 0) {
         const prixFinal = Math.round(dist * 100);
-        const commission = Math.round(prixFinal * 0.3);
+        let commissionPct = 30;
+        try {
+          const countries = await base44.asServiceRole.entities.Country.filter({ code: c.country_code, actif: true });
+          if (countries?.[0]?.commission_pct) commissionPct = countries[0].commission_pct;
+        } catch (_) {}
+        const commission = Math.round(prixFinal * (commissionPct / 100));
         const montantLivreur = prixFinal - commission;
 
         await base44.asServiceRole.entities.CourseExterne.update(c.id, {
@@ -291,7 +296,12 @@ async function scanPaiementsNonSync(base44, bugs, corrections, recommandations) 
 
     // Courses livrées sans commission calculée
     if (c.prix_final && (!c.commission_silga || !c.montant_livreur)) {
-      const commission = Math.round(c.prix_final * 0.3);
+      let commissionPct = 30;
+      try {
+        const countries = await base44.asServiceRole.entities.Country.filter({ code: c.country_code, actif: true });
+        if (countries?.[0]?.commission_pct) commissionPct = countries[0].commission_pct;
+      } catch (_) {}
+      const commission = Math.round(c.prix_final * (commissionPct / 100));
       const montantLivreur = c.prix_final - commission;
       await base44.asServiceRole.entities.CourseExterne.update(c.id, {
         commission_silga: commission,

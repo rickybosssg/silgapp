@@ -18,7 +18,7 @@ const periodFilters = [
 export default function LivreurHistorique({ mesCourses, livreurProfil, isExterne = false }) {
   const [period, setPeriod] = useState("today");
   // 🎯 Commission dynamique du pays (récupérée depuis les courses du livreur)
-  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+  const [countryCommissionPct, setCountryCommissionPct] = useState(0);
   useEffect(() => {
     const countryCode = mesCourses?.[0]?.country_code || livreurProfil?.country_code;
     if (!countryCode) return;
