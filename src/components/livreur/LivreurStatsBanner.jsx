@@ -2,13 +2,15 @@ import React, { useEffect, useState } from "react";
 import { TrendingUp, Package, CheckCircle, AlertCircle, Banknote } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 
-export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantDüSilga, isExterne = false }) {
+export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantDüSilga, isExterne = false, livreurId }) {
   const today = new Date().toDateString();
   const livreesToday = mesCourses.filter(c =>
     c.statut === "livree" && new Date(c.heure_livraison || c.updated_date).toDateString() === today
   );
+  // Ne compter que les courses réellement assignées au livreur (exclure les simples propositions notifiées)
+  const sameLivreur = (c) => livreurId && String(c.livreur_id) === String(livreurId);
   const coursesAujourdHui = mesCourses.filter(c =>
-    new Date(c.created_date).toDateString() === today
+    sameLivreur(c) && new Date(c.created_date).toDateString() === today
   ).length;
 
   // 🎯 Commission dynamique du pays

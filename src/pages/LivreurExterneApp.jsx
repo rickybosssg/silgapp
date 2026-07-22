@@ -1371,6 +1371,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               totalEncaisse={totalEncaisse}
               montantDüSilga={montantDüSilga}
               isExterne={true}
+              livreurId={livreurProfil?.id}
             />
 
             {montantDüSilga > 0 && (
