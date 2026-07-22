@@ -76,9 +76,12 @@ Deno.serve(async (req) => {
     apiResult.interrupteur_venus = configs?.[0]?.valeur || 'non_configuré';
     apiResult.interrupteur_actif = configs?.[0]?.valeur === 'true';
 
-    // ── 4. Modèle configuré dans venusOpenAIEngine.ts ──
-    apiResult.modele_configure = 'gpt-4.1-mini';
-    apiResult.modele_source = 'base44/shared/venusOpenAIEngine.ts (const OPENAI_MODEL)';
+    // ── 4. Modèle configuré (dynamique via SystemConfig) ──
+    const modelConfigs = await base44.asServiceRole.entities.SystemConfig.filter({ cle: 'VENUS_OPENAI_MODEL' });
+    apiResult.modele_configure = modelConfigs?.[0]?.valeur || 'gpt-4.1-mini (défaut)';
+    apiResult.modele_source = modelConfigs?.[0]?.valeur
+      ? 'SystemConfig → VENUS_OPENAI_MODEL (configuré par l\'admin)'
+      : 'Défaut OPENAI_MODEL_DEFAULT (gpt-4.1-mini) — configurable via SystemConfig VENUS_OPENAI_MODEL';
 
     // ── 5. Flux VENUS confirmé ──
     apiResult.flux_venus = {

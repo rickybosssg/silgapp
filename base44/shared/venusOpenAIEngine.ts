@@ -21,11 +21,15 @@
  */
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
-const OPENAI_MODEL = 'gpt-4.1-mini';
+const OPENAI_MODEL_DEFAULT = 'gpt-4.1-mini';
 const MAX_TOOL_ROUNDS = 3;
 
 // ── Cache SystemConfig (30 secondes) ──
-const CONFIG_CACHE: { enabled: boolean | null; expires: number } = { enabled: null, expires: 0 };
+const CONFIG_CACHE: { enabled: boolean | null; model: string | null; expires: number } = {
+  enabled: null,
+  model: null,
+  expires: 0,
+};
 
 /**
  * Vérifie si OpenAI est activé via SystemConfig.
@@ -45,6 +49,28 @@ export async function isOpenAIEnabled(base44: any): Promise<boolean> {
     CONFIG_CACHE.enabled = false;
     CONFIG_CACHE.expires = Date.now() + 30000;
     return false;
+  }
+}
+
+/**
+ * Récupère le modèle OpenAI configuré via SystemConfig (clé: VENUS_OPENAI_MODEL).
+ * L'admin peut changer de modèle (ex: gpt-5.5) sans modifier le code.
+ * Fallback: gpt-4.1-mini (OPENAI_MODEL_DEFAULT).
+ */
+export async function getOpenAIModel(base44: any): Promise<string> {
+  if (CONFIG_CACHE.model !== null && Date.now() < CONFIG_CACHE.expires) {
+    return CONFIG_CACHE.model;
+  }
+  try {
+    const configs = await base44.asServiceRole.entities.SystemConfig.filter({ cle: 'VENUS_OPENAI_MODEL' });
+    const model = configs?.[0]?.valeur || OPENAI_MODEL_DEFAULT;
+    CONFIG_CACHE.model = model;
+    CONFIG_CACHE.expires = Date.now() + 30000;
+    return model;
+  } catch {
+    CONFIG_CACHE.model = OPENAI_MODEL_DEFAULT;
+    CONFIG_CACHE.expires = Date.now() + 30000;
+    return OPENAI_MODEL_DEFAULT;
   }
 }
 
@@ -257,6 +283,9 @@ export async function raisonnerAvecOpenAI(
   const apiKey = Deno.env.get('OPENAI_API_KEY');
   if (!apiKey) throw new Error('OPENAI_API_KEY non configuré');
 
+  // ── Modèle configurable via SystemConfig (VENUS_OPENAI_MODEL) ──
+  const model = await getOpenAIModel(base44);
+
   // ── Construction des messages ──
   // Le prompt contient déjà tout le contexte RAG + règles + connaissances.
   // On ajoute une instruction finale pour OpenAI (function calling + JSON).
@@ -299,7 +328,7 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: OPENAI_MODEL,
+        model,
         messages,
         tools: SILGAPP_TOOLS,
         tool_choice: 'auto',
@@ -361,7 +390,7 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
 
       // Métadonnées pour le logging
       parsed._outils_openai = toolsUsed.length > 0 ? toolsUsed.join(',') : 'none';
-      parsed._model_openai = OPENAI_MODEL;
+      parsed._model_openai = model;
       parsed._tokens_openai = usage?.total_tokens || 0;
 
       return parsed;
@@ -393,9 +422,9 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: OPENAI_MODEL,
-      messages: [
-        ...messages,
+        model,
+        messages: [
+          ...messages,
         { role: 'system', content: 'Tu as utilisé le maximum d\'outils. Réponds MAINTENANT avec le JSON final, sans appeler d\'autres outils.' },
       ],
       response_format: { type: 'json_object' },
@@ -420,7 +449,7 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
     };
   }
   finalParsed._outils_openai = toolsUsed.join(',');
-  finalParsed._model_openai = OPENAI_MODEL;
+  finalParsed._model_openai = model;
   finalParsed._tokens_openai = finalData.usage?.total_tokens || 0;
   return finalParsed;
 }
