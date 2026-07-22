@@ -1800,13 +1800,45 @@ Deno.serve(async (req) => {
     }
 
     // ── 1. Trouver ou créer la Conversation ──
+    // Recherche multi-format : le numéro peut être stocké au format canonique (226XXXXXXXX)
+    // ou au format legacy (+226XXXXXXXX). On cherche aussi par derniers chiffres pour
+    // les données mal formées, afin d'éviter de créer des conversations en double.
     let conversation: any = null;
-    const existingConvs = await base44.asServiceRole.entities.Conversation.filter({
+    let existingConvs = await base44.asServiceRole.entities.Conversation.filter({
       whatsapp_phone: normalizedTel,
     });
 
+    // Fallback: format legacy avec +
+    if (!existingConvs || existingConvs.length === 0) {
+      existingConvs = await base44.asServiceRole.entities.Conversation.filter({
+        whatsapp_phone: `+${normalizedTel}`,
+      });
+    }
+
+    // Fallback: chercher par derniers chiffres (données mal formées)
+    if (!existingConvs || existingConvs.length === 0) {
+      const last8 = normalizedTel.slice(-8);
+      if (last8.length >= 8) {
+        const allWaConvs = await base44.asServiceRole.entities.Conversation.filter(
+          { source: 'whatsapp' }, '-last_message_date', 200
+        );
+        existingConvs = (allWaConvs || []).filter(c => {
+          const cd = (c.whatsapp_phone || '').replace(/\D/g, '');
+          return cd.endsWith(last8);
+        });
+      }
+    }
+
     if (existingConvs && existingConvs.length > 0) {
       conversation = existingConvs[0];
+      // Normaliser le whatsapp_phone au format canonique si nécessaire
+      if (conversation.whatsapp_phone !== normalizedTel) {
+        console.log(`[WebhookVenus] 🔧 Normalisation whatsapp_phone: "${conversation.whatsapp_phone}" → "${normalizedTel}"`);
+        await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+          whatsapp_phone: normalizedTel,
+        }).catch(() => null);
+        conversation.whatsapp_phone = normalizedTel;
+      }
       console.log(`[WebhookVenus] ✅ ÉTAPE 2 — Conversation existante trouvée: ${conversation.id} | venus_active: ${conversation.venus_active}`);
     } else {
       const participants = JSON.stringify([
