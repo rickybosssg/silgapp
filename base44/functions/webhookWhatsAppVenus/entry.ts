@@ -866,7 +866,8 @@ async function handleConsultationCourse(base44, telephone, userMessage, profileN
   const adresseDepart = courseActive.adresse_depart || 'Non precise';
   const adresseArrivee = courseActive.adresse_arrivee || 'Non precise';
   const trackingLink = courseActive.tracking_link || '';
-  const prix = courseActive.prix_final || courseActive.prix_estimate;
+  // Priorité: prix_final > manual_price (si accepté) > prix_estimate
+  const prix = courseActive.prix_final || (courseActive.manual_price_status === 'accepted' ? courseActive.manual_price : null) || courseActive.prix_estimate;
 
   const STATUT_LABELS = {
     nouvelle: "Votre course vient d'etre creee. Nous recherchons un livreur.",
@@ -1396,14 +1397,16 @@ async function handlePrixManuelResponse(base44: any, conversation: any, userMess
   const isNon = NON_KW.some(kw => msgLower === kw || msgLower.startsWith(kw + ' ') || msgLower.startsWith(kw + '.') || msgLower.startsWith(kw + '!'));
   if (!isOui && !isNon) return null;
 
-  // Vérifier que le dernier message VENUS mentionne un prix (pour éviter les faux positifs)
+  // Vérifier qu'un message VENUS récent mentionne un prix (pour éviter les faux positifs)
   try {
     const recentMessages = await base44.asServiceRole.entities.Message.filter(
       { conversation_id: conversation.id, sender_type: 'admin', source: 'whatsapp' },
-      '-created_date', 3
+      '-created_date', 5
     ).catch(() => []);
-    const lastVenusMsg = (recentMessages?.[0]?.content || '').toLowerCase();
-    if (!lastVenusMsg.includes('prix') || !lastVenusMsg.includes('livreur')) return null;
+    const hasPrixContext = (recentMessages || []).some(m =>
+      (m.content || '').toLowerCase().includes('prix') && (m.content || '').toLowerCase().includes('livreur')
+    );
+    if (!hasPrixContext) return null;
   } catch { return null; }
 
   // Trouver la course avec manual_price_status = 'pending_client_validation'

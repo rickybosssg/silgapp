@@ -115,7 +115,7 @@ function construireMessage(course, evenement, body = {}) {
       ].filter(l => l !== '').join('\n');
 
     case 'livre':
-      const prix = course.prix_final || course.prix_estimate;
+      const prix = course.prix_final || (course.manual_price_status === 'accepted' ? course.manual_price : null) || course.prix_estimate;
       return [
         `✅ Colis livré avec succès !`,
         ``,
@@ -241,6 +241,34 @@ Deno.serve(async (req) => {
 
     if (twilioRes.ok) {
       console.log(`[SuiviWhatsApp] Message envoyé à +${numero} pour course ${course_id} (${messageEvenement}${qrImageUrl ? ' + QR' : ''})`);
+
+      // ── Stocker le message dans la DB pour l'historique et la détection contextuelle ──
+      // Sans cela, handlePrixManuelResponse ne peut pas détecter que le dernier message
+      // VENUS était une proposition de prix (le "Oui" du client tombe alors dans le LLM)
+      try {
+        const convs = await base44.asServiceRole.entities.Conversation.filter({ whatsapp_phone: telephone });
+        const conv = convs?.[0];
+        if (conv) {
+          await base44.asServiceRole.entities.Message.create({
+            conversation_id: conv.id,
+            sender_type: 'admin',
+            sender_id: 'venus',
+            sender_name: 'VENUS',
+            message_type: 'text',
+            content: message,
+            source: 'whatsapp',
+          });
+          await base44.asServiceRole.entities.Conversation.update(conv.id, {
+            last_message: message.slice(0, 80),
+            last_message_date: new Date().toISOString(),
+            last_sender_name: 'VENUS',
+            last_sender_type: 'admin',
+          });
+        }
+      } catch (storeErr) {
+        console.warn(`[SuiviWhatsApp] Stockage message DB échoué (non bloquant):`, storeErr.message);
+      }
+
       return Response.json({ success: true, sid: twilioData.sid, qr_sent: !!qrImageUrl });
     } else {
       console.error('[SuiviWhatsApp] Erreur Twilio:', twilioData.message || twilioData);
