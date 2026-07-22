@@ -2145,9 +2145,12 @@ Deno.serve(async (req) => {
         const NEW_COURSE_KW = [
           'nouvelle course', 'creons une course', 'créons une course',
           'creer une course', 'créer une course', 'je veux une course',
-          'je veux une autre course', 'une autre course', 'nouveau colis',
+          'je voudrais une course', 'je veux une autre course',
+          'je voudrais une autre course', 'une autre course', 'nouveau colis',
           'nouvel envoi', 'nouvelle livraison', 'encore une course',
-          'je veux envoyer un colis', 'je veux envoyer un autre',
+          'je veux envoyer un colis', 'je voudrais envoyer un colis',
+          'je veux envoyer un autre', 'je voudrais envoyer un autre',
+          'je voudrais un livreur', 'je veux un livreur',
         ];
         const msgLowerNC = messageEffectif.toLowerCase().trim();
         const isNewCourseRequest = NEW_COURSE_KW.some(kw => msgLowerNC.includes(kw));
@@ -2166,7 +2169,33 @@ Deno.serve(async (req) => {
       const isConfBypass = msgLowerBypass.length <= 25 && CONFIRM_KW_BYPASS.some(kw => msgLowerBypass.includes(kw));
       const resumeBypass = pendingCourse?.all_info_collected === true && !pendingCourse?.course_created;
 
+      // ── Vérifier que TOUTES les infos requises sont présentes avant le bypass ──
+      // Empêche la création quand le LLM a marqué all_info_collected=true prématurément
+      // (ex: VENUS demandait encore le numéro du destinataire)
+      const hasTypeBypass = !!pendingCourse?.type_course;
+      const hasDepartBypass = pendingCourse?.adresse_depart || pendingCourse?.gps_depart_lat != null;
+      const hasArriveeBypass = pendingCourse?.adresse_arrivee || pendingCourse?.gps_arrivee_lat != null;
+      const hasContactBypass = pendingCourse?.contact_telephone || pendingCourse?.contact_is_client;
+      const allRequiredPresent = hasTypeBypass && hasDepartBypass && hasArriveeBypass && hasContactBypass;
+
+      // ── Vérifier le dernier message VENUS — s'il posait une question, ne pas bypass ──
+      let venusWasAskingQuestion = false;
       if (resumeBypass && isConfBypass) {
+        try {
+          const lastVenusMsgs = await base44.asServiceRole.entities.Message.filter(
+            { conversation_id: conversation.id, sender_type: 'admin', source: 'whatsapp' },
+            '-created_date', 1
+          ).catch(() => []);
+          const lastVenusContent = lastVenusMsgs?.[0]?.content || '';
+          venusWasAskingQuestion = lastVenusContent.includes('?') ||
+            /peux-tu|pouvez-vous|quel est|quelle est|donnez|indiquez|precisez|j'ai besoin/i.test(lastVenusContent);
+          if (venusWasAskingQuestion) {
+            console.log(`[WebhookVenus] ⚠️ Bypass annulé — VENUS posait une question ("${lastVenusContent.substring(0, 60)}...")`);
+          }
+        } catch {}
+      }
+
+      if (resumeBypass && isConfBypass && allRequiredPresent && !venusWasAskingQuestion) {
         console.log(`[WebhookVenus] ✅ Confirmation déterministe — création directe (bypass LLM)`);
         const cr = await creerCourseDepuisMemoire(base44, pendingCourse, countryCode, tarifs, telephone, profileName);
         if (cr.success) {
