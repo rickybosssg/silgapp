@@ -337,7 +337,9 @@ export async function trouverCourseActive(base44: any, telephone: string, countr
         return ct.endsWith(telDigits.slice(-8)) || et.endsWith(telDigits.slice(-8));
       }).slice(0, 10);
     }
-    return courses.find(c => STATUTS_ACTIFS.includes(c.statut)) || null;
+    // Retourner la course active, ou à défaut la dernière course (même livrée/annulée)
+    // pour que le LLM voie le vrai statut au lieu d'halluciner depuis l'historique
+    return courses.find(c => STATUTS_ACTIFS.includes(c.statut)) || courses[0] || null;
   } catch (e) {
     console.error('[ReasoningEngine] Erreur recherche course active:', e.message);
     return null;
@@ -766,19 +768,22 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
     }, null, 2);
   }
 
-  // ── Course active ──
-  let courseActiveStr = 'Aucune course active';
+  // ── Course active (ou dernière course si aucune active) ──
+  let courseActiveStr = 'Aucune course trouvée';
   if (input.courseActive) {
     const c = input.courseActive;
+    const estActive = STATUTS_ACTIFS.includes(c.statut);
     courseActiveStr = JSON.stringify({
       ref: c.id?.slice(-6),
       statut: c.statut,
+      est_active: estActive,
       type: c.type_course,
       depart: c.adresse_depart,
       arrivee: c.adresse_arrivee,
       livreur_nom: c.livreur_nom || null,
       livreur_telephone: c.livreur_telephone || null,
       tracking_link: c.tracking_link || null,
+      heure_livraison: c.heure_livraison || null,
     }, null, 2);
   }
 
@@ -900,8 +905,10 @@ ${memoireLongueStr}
 ═══ HISTORIQUE RÉCENT ═══
 ${historiqueStr}
 
-═══ COURSE ACTIVE (si applicable) ═══
+═══ COURSE ACTIVE / DERNIÈRE COURSE ═══
 ${courseActiveStr}
+
+⚠️ IMPORTANT: Vérifie le champ "est_active". Si false (statut "livree" ou "annulee"), la course N'EST PLUS ACTIVE. Ne dis JAMAIS qu'une course livrée/annulée est "active". Si le client demande une nouvelle course et qu'est_active=false, tu PEUX créer une nouvelle course.
 
 ═══ BASE DE CONNAISSANCES (Source 2) ═══
 ${knowledgeStr}
@@ -916,6 +923,7 @@ ${input.outils_resultats ? formaterOutilsPourPrompt(input.outils_resultats) : 'A
 Tu DOIS utiliser UNIQUEMENT les données ci-dessus pour répondre aux questions factuelles.
 - Si un outil retourne NON TROUVÉ, dis clairement que tu n\'as pas cette information. N\'INVENTE JAMAIS.
 - Si un client demande le statut d\'une course et qu\'aucune course active n\'est trouvée, dis-le.
+- Si la dernière course a le statut "livree" ou "annulee" (est_active=false), elle N'EST PLUS ACTIVE. N'utilise JAMAIS l'historique de conversation pour affirmer qu'une course est active si la DB dit le contraire.
 - Si un client demande un prix, utilise UNIQUEMENT les tarifs officiels de l\'outil obtenir_tarifs_officiels.
 - Ne JAMAIS inventer un nom de livreur, un statut, un prix, ou une référence de course.
 
