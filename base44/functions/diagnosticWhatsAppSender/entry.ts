@@ -63,6 +63,44 @@ Deno.serve(async (req) => {
       rapport.messaging_services_erreur = e.message;
     }
 
+    // ── 2b. AUTO-FIX : Si aucun Messaging Service n'existe, en créer un ──
+    rapport.auto_fix_messaging_service = null;
+    if (messagingServices.length === 0) {
+      try {
+        const createMsResp = await fetch('https://messaging.twilio.com/v1/Services', {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            FriendlyName: 'SILGAPP WhatsApp',
+          }).toString(),
+        });
+        const createMsData = await createMsResp.json();
+        if (createMsResp.ok && createMsData.sid) {
+          messagingServices = [createMsData];
+          rapport.messaging_services = [{
+            sid: createMsData.sid,
+            nom: createMsData.friendly_name,
+            in_use: createMsData.in_use,
+            whatsapp_enabled: false,
+            url: createMsData.url,
+          }];
+          rapport.auto_fix_messaging_service = {
+            succes: true,
+            sid: createMsData.sid,
+            message: 'Messaging Service créé automatiquement pour permettre le diagnostic du WhatsApp Sender.',
+          };
+        } else {
+          rapport.auto_fix_messaging_service = {
+            succes: false,
+            http_status: createMsResp.status,
+            erreur: createMsData,
+          };
+        }
+      } catch (e) {
+        rapport.auto_fix_messaging_service = { succes: false, erreur: e.message };
+      }
+    }
+
     // ── 3. Pour chaque Messaging Service, lister les WhatsApp Senders ──
     const allWhatsAppSenders: any[] = [];
     for (const ms of messagingServices) {
@@ -162,6 +200,51 @@ Deno.serve(async (req) => {
       rapport.messages_erreur = e.message;
     }
 
+    // ── 7b. SONDE : Tenter l'ajout d'un WhatsApp Sender via API pour capturer l'erreur exacte ──
+    // L'API Twilio WhatsApp Senders nécessite un code OAuth (embedded signup).
+    // En appelant sans code, on récupère l'erreur exacte qui révèle l'état du binding Meta→Twilio.
+    rapport.sonde_whatsapp_sender = null;
+    if (messagingServices.length > 0) {
+      const msSid = messagingServices[0].sid;
+      try {
+        const probeResp = await fetch(`https://messaging.twilio.com/v1/Services/${msSid}/WhatsAppSenders`, {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            // Tenter avec le numéro directement — Twilio va rejeter et nous dire pourquoi
+            VerifySid: 'pending',
+          }).toString(),
+        });
+        const probeData = await probeResp.json();
+        rapport.sonde_whatsapp_sender = {
+          http_status: probeResp.status,
+          code_erreur: probeData.code,
+          message: probeData.message,
+          message_detail: probeData.more_info || probeData.detail || null,
+          champs_requis: probeData.fields || null,
+          reponse_complete: probeData,
+        };
+      } catch (e) {
+        rapport.sonde_whatsapp_sender = { erreur_reseau: e.message };
+      }
+
+      // ── 7c. SONDE 2 : Lister les Content Templates (révèle si un WABA est connecté) ──
+      try {
+        const contentResp = await fetch(
+          `https://content.twilio.com/v1/Content?PageSize=5`,
+          { headers }
+        );
+        const contentData = await contentResp.json();
+        rapport.content_templates = {
+          http_status: contentResp.status,
+          count: contentData?.contents?.length || 0,
+          waba_connecte: contentResp.ok && (contentData?.contents?.length || 0) > 0,
+        };
+      } catch (e) {
+        rapport.content_templates = { erreur: e.message };
+      }
+    }
+
     // ── 8. Diagnostic global et recommandation ──
     let diagnostic = '';
     let codeErreur = null;
@@ -169,20 +252,41 @@ Deno.serve(async (req) => {
 
     if (allWhatsAppSenders.length === 0 && messagingServices.length === 0) {
       diagnostic = 'AUCUN_MESSAGING_SERVICE';
-      correction = 'Aucun Messaging Service Twilio trouvé. Créez un Messaging Service dans Twilio Console → Messaging → Services → Create new Service, puis ajoutez le numéro WhatsApp via "WhatsApp senders".';
+      correction = 'Aucun Messaging Service Twilio trouvé. (Auto-fix tenté — voir auto_fix_messaging_service.)';
     } else if (allWhatsAppSenders.length === 0) {
-      diagnostic = 'AUCUN_WHATSAPP_SENDER';
-      correction = `${messagingServices.length} Messaging Service(s) trouvé(s) mais aucun WhatsApp Sender. Allez dans Twilio Console → Messaging → Services → sélectionnez le service → "WhatsApp senders" → "Add WhatsApp sender" et suivez l\'assistant Meta.`;
+      // ── Cas spécifique : Meta indique "contactez Twilio" mais aucun Sender n'apparaît ──
+      // Cela signifie que l'Embedded Signup Meta→Twilio est incomplet ou initié du mauvais côté.
+      diagnostic = 'EMBEDDED_SIGNUP_INCOMPLET';
+      codeErreur = rapport.sonde_whatsapp_sender?.code_erreur || null;
+      const sondeMsg = rapport.sonde_whatsapp_sender?.message || '';
+      const sondeDetail = rapport.sonde_whatsapp_sender?.message_detail || '';
+
+      if (sondeMsg.includes('code') || sondeMsg.includes('Code')) {
+        correction = `BLOCAGE PRÉCIS : L'API Twilio exige un "code" OAuth (Embedded Signup) pour ajouter un WhatsApp Sender.
+Meta indique "contactez Twilio" car le flux d'association est INCOMPLET — le numéro a été créé côté Meta mais Twilio n'a pas reçu l'autorisation OAuth pour le réclamer.
+
+ACTION MANUELLE REQUISE (impossible via API) :
+1. Dans Twilio Console → Messaging → Services → "SILGAPP WhatsApp" (Messaging Service SID: ${messagingServices[0]?.sid})
+2. Onglet "WhatsApp senders" → "Add WhatsApp sender"
+3. Twilio ouvre une fenêtre OAuth Meta — connectez le compte Meta Business "Silgapp"
+4. Autorisez Twilio à accéder au WABA et sélectionnez +226 55 48 38 38
+5. Le statut passe à "approved" en quelques secondes
+
+⚠️ NE PAS initier l'association depuis Meta Business Manager — elle doit partir de Twilio.
+Si vous avez déjà tenté depuis Meta, supprimez l'association dans Meta → WhatsApp Manager → Numéros, puis recommencez depuis Twilio Console.`;
+      } else {
+        correction = `BLOCAGE : ${sondeMsg}. Détail: ${sondeDetail}. Messaging Service SID: ${messagingServices[0]?.sid}. Réponse complète de la sonde dans sonde_whatsapp_sender.reponse_complete.`;
+      }
     } else if (!venusSender) {
       diagnostic = 'NUMERO_NON_AJOUTE';
-      correction = `WhatsApp Senders existants: ${allWhatsAppSenders.map(s => s.phone_number).join(', ')}. Le +226 55 48 38 38 n'est pas parmi eux. Ajoutez-le via Twilio Console → WhatsApp senders → Add sender.`;
+      correction = `WhatsApp Senders existants: ${allWhatsAppSenders.map(s => s.phone_number).join(', ')}. Le +226 55 48 38 38 n'est pas parmi eux.`;
     } else if (venusSender.status !== 'approved' && venusSender.status !== 'connected') {
       diagnostic = 'PROVISIONING_ECHOUE';
       codeErreur = venusSender.error_code;
-      correction = `Le numéro est ajouté mais son statut est "${venusSender.status}". Erreur: ${venusSender.error_message || 'N/A'} (code ${venusSender.error_code || 'N/A'}). Vérifiez dans Meta Business Manager que le numéro est vérifié et que le compte WhatsApp Business "Silgapp" est en statut "Verified" (Verte).`;
+      correction = `Le numéro est ajouté mais son statut est "${venusSender.status}". Erreur: ${venusSender.error_message || 'N/A'} (code ${venusSender.error_code || 'N/A'}).`;
     } else {
       diagnostic = 'NUMERO_APPROUVE';
-      correction = `Le numéro +226 55 48 38 38 est approuvé (statut: ${venusSender.status}). Vous pouvez maintenant configurer le secret TWILIO_WHATSAPP_VENUS_FROM = whatsapp:${VENUS_NUMBER}.`;
+      correction = `Le numéro +226 55 48 38 38 est approuvé (statut: ${venusSender.status}). Configurer TWILIO_WHATSAPP_VENUS_FROM = whatsapp:${VENUS_NUMBER}.`;
     }
 
     rapport.diagnostic_final = {
