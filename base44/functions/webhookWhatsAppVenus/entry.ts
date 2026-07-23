@@ -2069,14 +2069,11 @@ Deno.serve(async (req) => {
           }
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // DÉTECTION DE FAUSSE CRÉATION DE COURSE (anti-hallucination)
-        // ═══════════════════════════════════════════════════════════════
-        // Si VENUS dit "je lance la recherche" dans sa réponse mais qu'aucune
-        // course n'a réellement été créée (action ≠ creer_course ou création échouée),
-        // forcer la création de manière DÉTERMINISTE.
-        // Cela empêche VENUS d'annoncer un faux succès au client.
-        if (!courseCreee) {
+        // ── SIMPLIFICATION: L'heuristic de "fausse création" est supprimée.
+        //    GPT ne doit JAMAIS annoncer une création tant que le webhook n'a pas
+        //    confirmé le succès en DB. Le prompt GPT interdit déjà d'annoncer une
+        //    création tant que action ≠ creer_course. ──
+        if (false && !courseCreee) { // dead code — kept for reference, will be removed next
           const PATTERNS_RECHERCHE = [
             /je lance la recherche/i,
             /la recherche est (bien )?en cours/i,

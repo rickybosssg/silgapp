@@ -30,15 +30,11 @@ import {
   detecterHallucination,
 } from './venusToolsEngine.ts';
 import {
-  recupererCache,
   stockerCache,
   detecterSalutation,
-  detecterRegleMetierDirecte,
-  detecterConnaissanceDirecte,
-  detecterRaccourciFrequent,
 } from './venusCache.ts';
 import { genererReferenceCourse } from './venusCourseReference.ts';
-import { isOpenAIEnabled, raisonnerAvecOpenAI, getLearningMode } from './venusOpenAIEngine.ts';
+import { isOpenAIEnabled, raisonnerAvecOpenAI } from './venusOpenAIEngine.ts';
 import { logOpenAIUsage, loggerMessageVenus, calculateCost } from './venusOpenAITracker.ts';
 
 /**
@@ -1187,34 +1183,16 @@ Réponds UNIQUEMENT avec un JSON.`;
       try { result.document_sources = JSON.parse(result.document_sources); } catch { result.document_sources = undefined; }
     }
 
-    // ── Heuristique post-LLM : utiliser les infos déjà extraites avant l'appel ──
-    // On réutilise heuristiqueExtracted (calculé pré-LLM) pour éviter un double calcul.
-    // On filtre les champs que le LLM a déjà remplis avec une valeur non-vide.
+    // ── Filtrer les champs vides du memoire_courte_update ──
     const llmUpdateFiltered: Record<string, any> = {};
     for (const [k, v] of Object.entries(result.memoire_courte_update || {})) {
       if (v !== '' && v !== null && v !== undefined) {
         llmUpdateFiltered[k] = v;
       }
     }
-    // Les champs heuristiques que le LLM n'a pas remplis sont conservés
-    for (const key of Object.keys(heuristiqueExtracted)) {
-      if (input.memoireCourte && input.memoireCourte[key] != null && input.memoireCourte[key] !== '') {
-        // Déjà en mémoire — ne pas réinjecter
-        continue;
-      }
-      if (!(key in llmUpdateFiltered)) {
-        llmUpdateFiltered[key] = heuristiqueExtracted[key];
-      }
-    }
     result.memoire_courte_update = llmUpdateFiltered;
-    // Aussi remplir infos_connues si vide
-    if (Object.keys(result.infos_connues || {}).length === 0) {
-      result.infos_connues = { ...mergedMemoireCourte };
-    }
-    // Toujours fusionner infos_connues avec la mémoire existante
-    if (Object.keys(result.infos_connues || {}).length > 0) {
-      result.infos_connues = { ...mergedMemoireCourte, ...result.infos_connues };
-    }
+    // Fusionner infos_connues avec la mémoire existante
+    result.infos_connues = { ...mergedMemoireCourte, ...(result.infos_connues || {}) };
 
     // Valider le business_rule_id
     if (result.business_rule_id && businessRuleEntries.length > 0) {
