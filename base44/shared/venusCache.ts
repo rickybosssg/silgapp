@@ -84,9 +84,18 @@ export function stockerCache(telephone: string, message: string, memoireCourte: 
 // ═══════════════════════════════════════════════════════════════════
 
 const SALUTATIONS_PATTERNS = [
-  /^(bonjour|salut|bonsoir|hello|coucou|cc|hey|yo)\s*[!.?]*$/i,
-  /^(bonjour|salut|bonsoir)\s+(venus|silgapp)\s*[!.?]*$/i,
-  /^(bonjour|salut|bonsoir)\s+(comment\s+vas|ca\s+va)\s*[!?]*$/i,
+  // Salutations simples (avec tolérance aux fautes courantes: bonsoit→bonsoir, bonjou→bonjour)
+  /^(bonjou+r?|salut|bonsoi[rt]|hello|coucou|cc|hey|yo)\s*[!.?]*$/i,
+  // Salutation + Venus/SILGAPP
+  /^(bonjou+r?|salut|bonsoi[rt])\s+(venus|silgapp)\s*[!.?]*$/i,
+  // Salutation + comment ça va
+  /^(bonjou+r?|salut|bonsoi[rt])\s+(comment\s+vas|ca\s+va)\s*[!?]*$/i,
+  // "Je [dis/dit/vous dis/vous dit] bonjour/bonsoir/salut"
+  /^je\s+(dis|dit|vous\s+dis|vous\s+dit|te\s+dis|te\s+dit)\s+(bonjou+r?|salut|bonsoi[rt])\s*[!.?]*$/i,
+  // "Je [vous] souhaite bonjour/bonsoir"
+  /^je\s+(vous\s+)?souhaite\s+(bonjou+r?|salut|bonsoi[rt])\s*[!.?]*$/i,
+  // "Bonsoir à toi/vous"
+  /^(bonjou+r?|salut|bonsoi[rt])\s+[aà]\s+(toi|vous)\s*[!.?]*$/i,
 ];
 
 /**
