@@ -1199,6 +1199,22 @@ Réponds UNIQUEMENT avec un JSON.`;
       result.document_sources = undefined;
     }
 
+    // ── ANTI-FAUSSE-SALUTATION: Si le LLM retourne une salutation pour un message qui n'en est pas une,
+    //    cela signifie que le LLM a mal interprété le message (ou réponse par défaut d'OpenAI).
+    //    On vérifie avec les patterns de salutation — si le message ne matche pas, on remplace
+    //    la réponse par une question de clarification au lieu d'une salutation trompeuse.
+    if (result.intention === 'salutation' || result.action === 'saluer') {
+      const salutationCheck = detecterSalutation(input.messageClient);
+      if (!salutationCheck) {
+        console.warn(`[ReasoningEngine] ⚠️ Fausse salutation détectée — le LLM a retourné intention=salutation pour "${input.messageClient.substring(0, 60)}" — remplacement par clarification`);
+        result.intention = 'clarifier';
+        result.action = 'poser_question';
+        result.confiance = 40;
+        result.reponse = `Je n'ai pas bien compris votre demande. Pouvez-vous reformuler ? Si vous souhaitez envoyer un colis, recevoir un colis ou vous déplacer, dites-le-moi simplement !`;
+        result.memoire_courte_update = {};
+      }
+    }
+
     console.log(`[ReasoningEngine] 🧠 Intention: ${result.intention} | Contexte: ${result.contexte} | Action: ${result.action} | Confiance: ${result.confiance}% | Temps: ${result.temps_traitement_ms}ms`);
 
     // ── ÉCONOMIE DE CRÉDITS: Stocker la réponse en cache pour réutilisation ──
