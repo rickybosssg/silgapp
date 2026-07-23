@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
       'Content-Type': 'application/x-www-form-urlencoded',
     };
 
-    const WEBHOOK_URL = 'https://www.base44.com/api/backend_functions/webhookWhatsAppVenus';
+    const WEBHOOK_URL = 'https://silga-dispatch-go.base44.app/functions/webhookWhatsAppVenus';
     const VENUS_NUMBER = '+22655483838';
 
     const rapport: any = {
