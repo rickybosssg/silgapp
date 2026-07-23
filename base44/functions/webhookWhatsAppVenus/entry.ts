@@ -2012,25 +2012,67 @@ Deno.serve(async (req) => {
             delete pendingCourse.course_id;
             await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(pendingCourse) }).catch(() => {});
           } else {
+            // ═══ PORTE DE VALIDATION DÉTERMINISTE — AVANT TOUTE CRÉATION ═══
+            // GPT peut retourner action=creer_course prématurément (hallucination).
+            // On valide DÉTERMINISTEMENT que tous les champs obligatoires sont présents.
+            // Si un champ manque → on surcharge l'action en poser_question et on demande
+            // l'info manquante. JAMAIS de création avec des infos incomplètes.
             const um = { ...(pendingCourse || {}), ...reasoningResult.memoire_courte_update };
-            um.all_info_collected = true; um.user_confirmed = true;
-            const cr2 = await creerCourseDepuisMemoire(base44, um, countryCode, tarifs, telephone, profileName, conversation.silgapp_from_number);
-            if (cr2.success) {
-              reponseFinale = cr2.message;
-              courseCreee = true;
-              um.course_created = true; um.course_id = cr2.course.id;
-              pendingCourse = um;
-              await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(um) });
-              if (memoireLongue) {
-                await mettreAJourMemoireLongue(base44, memoireLongue.id, {
-                  adresse_recuperee: um.adresse_depart, adresse_livraison: um.adresse_arrivee,
-                  destinataire_nom: um.contact_nom, destinataire_telephone: um.contact_telephone,
-                  type_course_prefere: um.type_course, client_nom: profileName,
-                  increment_courses: true,
-                  ...reasoningResult.memoire_longue_update,
-                });
+            const _tc = (um.type_course || '').toLowerCase().trim();
+            const _hasType = ['expedier', 'recevoir', 'deplacement'].includes(_tc);
+            const _hasDepart = !!(um.adresse_depart && um.adresse_depart.trim()) || um.gps_depart_lat != null;
+            const _hasArrivee = !!(um.adresse_arrivee && um.adresse_arrivee.trim()) || um.gps_arrivee_lat != null;
+            const _needsContact = _tc === 'expedier' || _tc === 'recevoir';
+            const _hasContact = !!(um.contact_telephone && um.contact_telephone.trim()) || um.contact_is_client === true;
+
+            let _missingField = '';
+            if (!_hasType) _missingField = 'type_course';
+            else if (!_hasDepart) _missingField = 'adresse_depart';
+            else if (!_hasArrivee) _missingField = 'adresse_arrivee';
+            else if (_needsContact && !_hasContact) _missingField = 'contact';
+
+            if (_missingField) {
+              // ── Champ obligatoire manquant → surcharger en poser_question ──
+              console.warn(`[WebhookVenus] 🚫 CRÉATION BLOQUÉE — champ manquant: ${_missingField} | GPT avait retourné creer_course (confiance: ${reasoningResult.confiance}%)`);
+              let _askMsg = '';
+              if (_missingField === 'type_course') {
+                _askMsg = 'Souhaitez-vous envoyer un colis, recevoir un colis, ou vous déplacer ?';
+              } else if (_missingField === 'adresse_depart') {
+                _askMsg = 'Quel est le lieu exact de récupération ? (indiquez le quartier ou un point de repère précis)';
+              } else if (_missingField === 'adresse_arrivee') {
+                _askMsg = 'Quel est le lieu exact de livraison ? (indiquez le quartier ou un point de repère précis)';
+              } else if (_missingField === 'contact') {
+                const _role = _tc === 'expedier' ? 'destinataire' : 'expéditeur';
+                _askMsg = `Quel est le numéro de téléphone du ${_role} ? (Si vous êtes vous-même le ${_role}, dites-le moi)`;
               }
-            } else if (cr2.message) { reponseFinale = cr2.message; }
+              reasoningResult.action = 'poser_question';
+              reponseFinale = _askMsg;
+              // Mettre à jour la mémoire courte avec les infos que GPT a quand même extraites
+              if (Object.keys(reasoningResult.memoire_courte_update || {}).length > 0) {
+                pendingCourse = um;
+                await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(um) });
+              }
+            } else {
+              // ── Toutes les infos sont présentes → créer la course ──
+              um.all_info_collected = true; um.user_confirmed = true;
+              const cr2 = await creerCourseDepuisMemoire(base44, um, countryCode, tarifs, telephone, profileName, conversation.silgapp_from_number);
+              if (cr2.success) {
+                reponseFinale = cr2.message;
+                courseCreee = true;
+                um.course_created = true; um.course_id = cr2.course.id;
+                pendingCourse = um;
+                await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(um) });
+                if (memoireLongue) {
+                  await mettreAJourMemoireLongue(base44, memoireLongue.id, {
+                    adresse_recuperee: um.adresse_depart, adresse_livraison: um.adresse_arrivee,
+                    destinataire_nom: um.contact_nom, destinataire_telephone: um.contact_telephone,
+                    type_course_prefere: um.type_course, client_nom: profileName,
+                    increment_courses: true,
+                    ...reasoningResult.memoire_longue_update,
+                  });
+                }
+              } else if (cr2.message) { reponseFinale = cr2.message; }
+            }
           }
         } else if (reasoningResult.action === 'suivre_course') {
           reponseFinale = await handleConsultationCourse(base44, telephone, messageEffectif, profileName);
@@ -2092,40 +2134,58 @@ Deno.serve(async (req) => {
             /livreur est en cours de recherche/i,
             /je lance .* recherche/i,
             /recherche .* lanc/i,
+            /je lance la cr[ée]ation/i,
+            /je cr[ée]e .* course/i,
+            /course .* cr[ée][ée]e/i,
+            /toutes les informations .* (en place|collect)/i,
+            /je .* cr[ée]e .* imm[ée]diat/i,
+            /cr[ée]ation .* imm[ée]diate/i,
           ];
           const ditRechercheLancee = PATTERNS_RECHERCHE.some(p => p.test(reponseFinale));
           if (ditRechercheLancee) {
-            console.warn(`[WebhookVenus] ⚠️ FAUSSE CRÉATION — VENUS dit "recherche lancée" mais action=${reasoningResult.action} — création forcée déterministe`);
+            console.warn(`[WebhookVenus] ⚠️ FAUSSE CRÉATION — VENUS dit "création/recherche" mais action=${reasoningResult.action} — validation déterministe`);
             const umFb = { ...(pendingCourse || {}), ...reasoningResult.memoire_courte_update };
-            // Si le contact destinataire est manquant, utiliser le client comme contact par défaut
-            // Le livreur collectera les informations réelles du destinataire plus tard
-            if (!umFb.contact_telephone && !umFb.contact_is_client) {
-              umFb.contact_is_client = true;
-            }
-            umFb.all_info_collected = true;
-            umFb.user_confirmed = true;
-            const crFb = await creerCourseDepuisMemoire(base44, umFb, countryCode, tarifs, telephone, profileName);
-            if (crFb.success) {
-              reponseFinale = crFb.message;
-              courseCreee = true;
-              umFb.course_created = true;
-              umFb.course_id = crFb.course.id;
-              pendingCourse = umFb;
-              await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(umFb) });
-              if (memoireLongue) {
-                await mettreAJourMemoireLongue(base44, memoireLongue.id, {
-                  adresse_recuperee: umFb.adresse_depart, adresse_livraison: umFb.adresse_arrivee,
-                  destinataire_nom: umFb.contact_nom, destinataire_telephone: umFb.contact_telephone,
-                  type_course_prefere: umFb.type_course, client_nom: profileName,
-                  increment_courses: true,
-                  ...reasoningResult.memoire_longue_update,
-                });
+            // ═══ VALIDATION DÉTERMINISTE — ne plus utiliser le client comme contact par défaut ═══
+            const _tcFb = (umFb.type_course || '').toLowerCase().trim();
+            const _hasTypeFb = ['expedier', 'recevoir', 'deplacement'].includes(_tcFb);
+            const _hasDepartFb = !!(umFb.adresse_depart && umFb.adresse_depart.trim()) || umFb.gps_depart_lat != null;
+            const _hasArriveeFb = !!(umFb.adresse_arrivee && umFb.adresse_arrivee.trim()) || umFb.gps_arrivee_lat != null;
+            const _needsContactFb = _tcFb === 'expedier' || _tcFb === 'recevoir';
+            const _hasContactFb = !!(umFb.contact_telephone && umFb.contact_telephone.trim()) || umFb.contact_is_client === true;
+
+            if (!_hasTypeFb || !_hasDepartFb || !_hasArriveeFb || (_needsContactFb && !_hasContactFb)) {
+              let _fbAsk = "Je n'ai pas encore toutes les informations nécessaires. ";
+              if (!_hasTypeFb) _fbAsk += 'Souhaitez-vous envoyer un colis, recevoir un colis, ou vous déplacer ?';
+              else if (!_hasDepartFb) _fbAsk += 'Quel est le lieu exact de récupération ?';
+              else if (!_hasArriveeFb) _fbAsk += 'Quel est le lieu exact de livraison ?';
+              else if (_needsContactFb && !_hasContactFb) _fbAsk += `Quel est le numéro de téléphone du ${_tcFb === 'expedier' ? 'destinataire' : 'expéditeur'} ?`;
+              reponseFinale = _fbAsk;
+              console.warn(`[WebhookVenus] 🚫 Fallback création bloqué — champs manquants détectés`);
+            } else {
+              umFb.all_info_collected = true;
+              umFb.user_confirmed = true;
+              const crFb = await creerCourseDepuisMemoire(base44, umFb, countryCode, tarifs, telephone, profileName);
+              if (crFb.success) {
+                reponseFinale = crFb.message;
+                courseCreee = true;
+                umFb.course_created = true;
+                umFb.course_id = crFb.course.id;
+                pendingCourse = umFb;
+                await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(umFb) });
+                if (memoireLongue) {
+                  await mettreAJourMemoireLongue(base44, memoireLongue.id, {
+                    adresse_recuperee: umFb.adresse_depart, adresse_livraison: umFb.adresse_arrivee,
+                    destinataire_nom: umFb.contact_nom, destinataire_telephone: umFb.contact_telephone,
+                    type_course_prefere: umFb.type_course, client_nom: profileName,
+                    increment_courses: true,
+                    ...reasoningResult.memoire_longue_update,
+                  });
+                }
+                console.log(`[WebhookVenus] ✅ Course créée DÉTERMINISTEMENT (fallback anti-faux-succès) — ${crFb.course.id}`);
+              } else if (crFb.error === 'MISSING_INFO' || crFb.error === 'MISSING_TYPE') {
+                console.warn(`[WebhookVenus] ⚠️ Fallback échoué (${crFb.error}) — remplacement de la réponse trompeuse`);
+                reponseFinale = "Je n'ai pas encore toutes les informations nécessaires pour créer votre course. Pouvez-vous préciser le type de course, le lieu de départ et le lieu de livraison ?";
               }
-              console.log(`[WebhookVenus] ✅ Course créée DÉTERMINISTEMENT (fallback anti-faux-succès) — ${crFb.course.id}`);
-            } else if (crFb.error === 'MISSING_INFO' || crFb.error === 'MISSING_TYPE') {
-              // Informations réellement manquantes — remplacer la réponse trompeuse
-              console.warn(`[WebhookVenus] ⚠️ Fallback échoué (${crFb.error}) — remplacement de la réponse trompeuse`);
-              reponseFinale = "Je n'ai pas encore toutes les informations nécessaires pour créer votre course. Pouvez-vous préciser le type de course (envoyer un colis, recevoir un colis, ou se déplacer), le lieu de départ et le lieu de livraison ?";
             }
           }
         }
