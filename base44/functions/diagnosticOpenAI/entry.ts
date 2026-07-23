@@ -71,17 +71,21 @@ Deno.serve(async (req) => {
       apiResult.erreur = e.message;
     }
 
-    // ── 3. Vérifier la config SystemConfig (interrupteur) ──
-    const configs = await base44.asServiceRole.entities.SystemConfig.filter({ cle: 'VENUS_OPENAI_ENABLED' });
-    apiResult.interrupteur_venus = configs?.[0]?.valeur || 'non_configuré';
-    apiResult.interrupteur_actif = configs?.[0]?.valeur === 'true';
+    // ── 3. Vérifier la config SystemConfig (interrupteur + modèle en 1 requête) ──
+    // CRITIQUE: filter({ cle: '...' }) échoue silencieusement en production Deno.
+    // Utiliser filter({}) puis filtrer en mémoire, comme venusOpenAIEngine.ts.
+    const allConfigs = await base44.asServiceRole.entities.SystemConfig.filter({});
+    const getConfig = (cle: string) => allConfigs.find((c: any) => c.cle === cle)?.valeur;
 
-    // ── 4. Modèle configuré (dynamique via SystemConfig) ──
-    const modelConfigs = await base44.asServiceRole.entities.SystemConfig.filter({ cle: 'VENUS_OPENAI_MODEL' });
-    apiResult.modele_configure = modelConfigs?.[0]?.valeur || 'gpt-4.1-mini (défaut)';
-    apiResult.modele_source = modelConfigs?.[0]?.valeur
-      ? 'SystemConfig → VENUS_OPENAI_MODEL (configuré par l\'admin)'
-      : 'Défaut OPENAI_MODEL_DEFAULT (gpt-4.1-mini) — configurable via SystemConfig VENUS_OPENAI_MODEL';
+    const enabledVal = getConfig('VENUS_OPENAI_ENABLED');
+    apiResult.interrupteur_venus = enabledVal || 'non_configuré';
+    apiResult.interrupteur_actif = enabledVal === 'true';
+
+    const modelVal = getConfig('VENUS_PRIMARY_MODEL') || getConfig('VENUS_OPENAI_MODEL');
+    apiResult.modele_configure = modelVal || 'gpt-4.1-mini (défaut)';
+    apiResult.modele_source = modelVal
+      ? 'SystemConfig → VENUS_PRIMARY_MODEL (configuré par l\'admin)'
+      : 'Défaut OPENAI_MODEL_DEFAULT (gpt-4.1-mini) — configurable via SystemConfig VENUS_PRIMARY_MODEL';
 
     // ── 5. Flux VENUS confirmé ──
     apiResult.flux_venus = {
