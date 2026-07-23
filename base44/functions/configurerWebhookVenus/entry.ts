@@ -1,9 +1,11 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 
 /**
- * Configure le webhook URL sur un Messaging Service Twilio SPÉCIFIQUE.
- * Cible le service MG0ed68159294735903b339e257a47e927 qui reçoit les messages
- * WhatsApp envoyés à +22655483838.
+ * Configure le webhook URL sur le Messaging Service Twilio qui reçoit
+ * ACTUELLEMENT les messages WhatsApp pour +22655483838.
+ *
+ * Détecte dynamiquement quel Messaging Service reçoit les messages en
+ * consultant les derniers messages inbound, puis configure le webhook dessus.
  *
  * Admin only.
  */
@@ -16,135 +18,89 @@ Deno.serve(async (req) => {
 
     const TWILIO_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
     const TWILIO_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
-
     if (!TWILIO_SID || !TWILIO_TOKEN) {
       return Response.json({ error: 'Secrets Twilio manquants' }, { status: 500 });
     }
 
     const auth = btoa(`${TWILIO_SID}:${TWILIO_TOKEN}`);
-    const headersJson = {
-      Authorization: `Basic ${auth}`,
-      'Content-Type': 'application/json',
-    };
-    const headersForm = {
+    const headers = {
       Authorization: `Basic ${auth}`,
       'Content-Type': 'application/x-www-form-urlencoded',
     };
 
     const WEBHOOK_URL = 'https://www.base44.com/api/backend_functions/webhookWhatsAppVenus';
-    const TARGET_MS_SID = 'MG0ed68159294735903b339e257a47e927';
+    const VENUS_NUMBER = 'whatsapp:+22655483838';
 
     const rapport: any = {
       timestamp: new Date().toISOString(),
-      target_ms_sid: TARGET_MS_SID,
       webhook_url: WEBHOOK_URL,
     };
 
-    // ── 1. Vérifier si le Messaging Service existe ──
-    const checkResp = await fetch(
-      `https://messaging.twilio.com/v1/Services/${TARGET_MS_SID}`,
-      { headers: headersForm }
+    // ── 1. Trouver quel Messaging Service reçoit les messages ──
+    const msgResp = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json?PageSize=20`,
+      { headers }
+    );
+    const msgData = await msgResp.json();
+    const inboundMessages = (msgData?.messages || []).filter(
+      (m: any) => m.direction === 'inbound' && m.to === VENUS_NUMBER
     );
 
-    if (checkResp.status === 404) {
-      rapport.error = `Le Messaging Service ${TARGET_MS_SID} n'existe pas.`;
-      // Lister tous les services pour trouver le bon
-      const listResp = await fetch('https://messaging.twilio.com/v1/Services?PageSize=50', { headers: headersForm });
-      const listData = await listResp.json();
-      rapport.all_services = (listData?.data || []).map((s: any) => ({
-        sid: s.sid,
-        nom: s.friendly_name,
-        whatsapp_enabled: s.whatsapp_enabled || false,
-        inbound_request_url: s.inbound_request_url || 'NON CONFIGURÉ',
-      }));
-
-      // Si aucun service n'existe, en créer un avec le webhook
-      if (!rapport.all_services || rapport.all_services.length === 0) {
-        rapport.action = 'Création d un nouveau Messaging Service avec webhook';
-        const createResp = await fetch('https://messaging.twilio.com/v1/Services', {
-          method: 'POST',
-          headers: headersForm,
-          body: new URLSearchParams({
-            friendly_name: 'SILGAPP WhatsApp VENUS',
-            inbound_request_url: WEBHOOK_URL,
-            inbound_method: 'POST',
-          }).toString(),
-        });
-        const createData = await createResp.json();
-        rapport.new_service = {
-          sid: createData.sid,
-          nom: createData.friendly_name,
-          inbound_request_url: createData.inbound_request_url,
-        };
-        rapport.webhook_configured = createResp.ok;
-      } else {
-        // Configurer le webhook sur le premier service existant
-        const firstService = rapport.all_services[0];
-        rapport.action = `Configuration du webhook sur ${firstService.sid} (${firstService.nom})`;
-        const updateResp = await fetch(
-          `https://messaging.twilio.com/v1/Services/${firstService.sid}`,
-          {
-            method: 'POST',
-            headers: headersForm,
-            body: new URLSearchParams({
-              inbound_request_url: WEBHOOK_URL,
-              inbound_method: 'POST',
-            }).toString(),
-          }
-        );
-        const updateData = await updateResp.json();
-        rapport.webhook_configured = updateResp.ok;
-        rapport.updated_service = {
-          sid: updateData.sid,
-          inbound_request_url: updateData.inbound_request_url,
-        };
-      }
-    } else if (checkResp.ok) {
-      const msData = await checkResp.json();
-      rapport.service_trouve = {
-        sid: msData.sid,
-        nom: msData.friendly_name,
-        whatsapp_enabled: msData.whatsapp_enabled || false,
-        inbound_request_url_avant: msData.inbound_request_url || 'NON CONFIGURÉ',
-      };
-
-      // ── 2. Configurer le webhook URL (form-urlencoded) ──
-      const updateResp = await fetch(
-        `https://messaging.twilio.com/v1/Services/${TARGET_MS_SID}`,
-        {
-          method: 'POST',
-          headers: headersForm,
-          body: new URLSearchParams({
-            inbound_request_url: WEBHOOK_URL,
-            inbound_method: 'POST',
-          }).toString(),
-        }
-      );
-      const updateData = await updateResp.json();
-      rapport.webhook_configured = updateResp.ok;
-      rapport.service_apres = {
-        sid: updateData.sid,
-        inbound_request_url: updateData.inbound_request_url,
-        inbound_method: updateData.inbound_method,
-      };
-    } else {
-      const errText = await checkResp.text();
-      rapport.error = `Erreur ${checkResp.status}: ${errText.substring(0, 500)}`;
-    }
-
-    // ── 3. Lister TOUS les Messaging Services avec leur webhook ──
-    const allResp = await fetch('https://messaging.twilio.com/v1/Services?PageSize=50', { headers: headersForm });
-    const allData = await allResp.json();
-    rapport.all_services_final = (allData?.data || []).map((s: any) => ({
-      sid: s.sid,
-      nom: s.friendly_name,
-      whatsapp_enabled: s.whatsapp_enabled || false,
-      inbound_request_url: s.inbound_request_url || 'NON CONFIGURÉ',
+    rapport.messages_inbound_recents = inboundMessages.slice(0, 5).map((m: any) => ({
+      sid: m.sid,
+      from: m.from,
+      body: (m.body || '').substring(0, 50),
+      date: m.date_created,
+      messaging_service_sid: m.messaging_service_sid,
     }));
 
-    rapport.conclusion = rapport.webhook_configured
-      ? '✅ Webhook URL configuré avec succès. Les messages WhatsApp entrants devraient maintenant être transmis au webhook VENUS.'
-      : '❌ Échec de la configuration du webhook. Vérifiez les erreurs ci-dessus.';
+    // Le Messaging Service qui reçoit les messages maintenant
+    const activeMsSid = inboundMessages[0]?.messaging_service_sid;
+    if (!activeMsSid) {
+      rapport.error = 'Aucun message inbound trouvé pour +22655483838 — impossible de déterminer le Messaging Service actif';
+      return Response.json(rapport);
+    }
+
+    rapport.active_ms_sid = activeMsSid;
+
+    // ── 2. Vérifier l'état actuel du service ──
+    const beforeResp = await fetch(`https://messaging.twilio.com/v1/Services/${activeMsSid}`, { headers });
+    const beforeData = await beforeResp.json();
+    rapport.avant = {
+      sid: beforeData.sid,
+      nom: beforeData.friendly_name,
+      inbound_request_url: beforeData.inbound_request_url || 'NON CONFIGURÉ',
+      whatsapp_enabled: beforeData.whatsapp_enabled || false,
+    };
+
+    // ── 3. Configurer le webhook URL ──
+    const updateResp = await fetch(`https://messaging.twilio.com/v1/Services/${activeMsSid}`, {
+      method: 'POST',
+      headers,
+      body: new URLSearchParams({
+        InboundRequestUrl: WEBHOOK_URL,
+        InboundMethod: 'POST',
+      }).toString(),
+    });
+    const updateData = await updateResp.json();
+
+    // ── 4. Vérifier après ──
+    const afterResp = await fetch(`https://messaging.twilio.com/v1/Services/${activeMsSid}`, { headers });
+    const afterData = await afterResp.json();
+    rapport.apres = {
+      sid: afterData.sid,
+      nom: afterData.friendly_name,
+      inbound_request_url: afterData.inbound_request_url || 'NON CONFIGURÉ',
+      inbound_method: afterData.inbound_method,
+      whatsapp_enabled: afterData.whatsapp_enabled || false,
+    };
+
+    rapport.webhook_configure = afterData.inbound_request_url === WEBHOOK_URL;
+    rapport.update_http_status = updateResp.status;
+
+    rapport.conclusion = rapport.webhook_configure
+      ? '✅ Webhook URL configuré avec succès sur le service actif. VENUS devrait maintenant recevoir les messages.'
+      : `⚠️ L'API Twilio a retourné HTTP ${updateResp.status} mais l'URL n'est pas sauvegardée. Configuration manuelle requise dans Twilio Console.`;
 
     return Response.json(rapport);
   } catch (error) {
