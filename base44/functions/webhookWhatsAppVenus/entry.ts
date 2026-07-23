@@ -1966,17 +1966,44 @@ Deno.serve(async (req) => {
         let courseCreee = false;
 
         if (reasoningResult.action === 'creer_course') {
-          // ═══ ANTI-DOUBLON CRITIQUE ═══
-          // Vérifier l'état réel en DB avant toute création.
-          // Empêche le fallback InvokeLLM de dupliquer une création déjà tentée par OpenAI.
+          // ═══ ANTI-DOUBLON CRITIQUE — Requête DB DIRECTE (autonome) ═══
+          // On ne fait confiance NI à pendingCourse NI à courseActive.
+          // On interroge la DB directement pour les courses actives de ce téléphone.
           const _STATUTS_ACTIFS_GUARD = ['nouvelle', 'programmee', 'recherche_livreur', 'livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison', 'arrivee'];
+          let _activeCourseDB = null;
+          try {
+            const _telNorm = telephone.replace(/\D/g, '');
+            const _telPlus = telephone.startsWith('+') ? telephone : '+' + telephone;
+            const _coursesDB = await base44.asServiceRole.entities.CourseExterne.filter(
+              { client_telephone: _telPlus }, '-created_date', 10
+            );
+            _activeCourseDB = (_coursesDB || []).find(c => _STATUTS_ACTIFS_GUARD.includes(c.statut)) || null;
+            // Fallback: search by expediteur_telephone
+            if (!_activeCourseDB) {
+              const _expCourses = await base44.asServiceRole.entities.CourseExterne.filter(
+                { expediteur_telephone: _telPlus }, '-created_date', 10
+              );
+              _activeCourseDB = (_expCourses || []).find(c => _STATUTS_ACTIFS_GUARD.includes(c.statut)) || null;
+            }
+            // Fallback: search by last 8 digits
+            if (!_activeCourseDB) {
+              const _allRecent = await base44.asServiceRole.entities.CourseExterne.filter(
+                { country_code: countryCode }, '-created_date', 50
+              );
+              _activeCourseDB = (_allRecent || []).find(c =>
+                _STATUTS_ACTIFS_GUARD.includes(c.statut) &&
+                ((c.client_telephone || '').replace(/\D/g, '').endsWith(_telNorm.slice(-8)) ||
+                 (c.expediteur_telephone || '').replace(/\D/g, '').endsWith(_telNorm.slice(-8)))
+              ) || null;
+            }
+          } catch (e) { console.error('[WebhookVenus] ANTI-DOUBLON DB query error:', e.message); }
+
           const _dejaCree = pendingCourse?.course_created === true;
-          const _courseActiveExiste = courseActive && _STATUTS_ACTIFS_GUARD.includes(courseActive.statut);
-          console.log(`[WebhookVenus] 🔍 ANTI-DOUBLON CHECK | pendingCourse=${JSON.stringify(pendingCourse || {}).substring(0, 200)} | course_created=${pendingCourse?.course_created} | dejaCree=${_dejaCree} | courseActive=${courseActive ? courseActive.id + '/' + courseActive.statut : 'NULL'} | courseActiveExiste=${_courseActiveExiste}`);
+          const _courseActiveExiste = !!_activeCourseDB;
           if (_dejaCree || _courseActiveExiste) {
             console.warn(`[WebhookVenus] 🛡️ ANTI-DOUBLON — création bloquée | course_created=${_dejaCree} | courseActive=${_courseActiveExiste} | moteur=${reasoningResult.decision_moteur}`);
             reponseFinale = _courseActiveExiste
-              ? `Vous avez déjà une course active (réf: ${(courseActive.id || '').slice(-6).toUpperCase()}). Le livreur est en cours de recherche.`
+              ? `Vous avez déjà une course active (réf: ${(_activeCourseDB.id || '').slice(-6).toUpperCase()}). Le livreur est en cours de recherche.`
               : "Votre course a déjà été créée. Je recherche actuellement un livreur pour vous.";
           } else {
             const um = { ...(pendingCourse || {}), ...reasoningResult.memoire_courte_update };
