@@ -1363,7 +1363,6 @@ Deno.serve(async (req) => {
 
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
     const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-    const fromNumber = Deno.env.get('TWILIO_WHATSAPP_FROM') || 'whatsapp:+14155238886';
 
     if (!accountSid || !authToken) {
       console.error('[WebhookVenus] Secrets Twilio manquants');
@@ -1391,12 +1390,20 @@ Deno.serve(async (req) => {
     const skipSignature = skipSignatureByUrl || isJsonMode || params.skip_signature === 'true';
 
     const from = params.From || '';
+    const toRaw = params.To || '';
     const body = params.Body || '';
     const messageSid = params.MessageSid || '';
     const profileName = params.ProfileName || '';
     const numMedia = parseInt(params.NumMedia || '0', 10);
     const latitude = params.Latitude ? parseFloat(params.Latitude) : null;
     const longitude = params.Longitude ? parseFloat(params.Longitude) : null;
+
+    // ── Dual-number: utiliser le numéro To (celui qui a reçu le message) comme From pour la réponse.
+    //    Si le message arrive sur +22655483838 (VENUS), la réponse partira depuis +22655483838.
+    //    Sinon, fallback sur TWILIO_WHATSAPP_FROM ou le sandbox.
+    const fromNumber = toRaw
+      ? (toRaw.startsWith('whatsapp:') ? toRaw : `whatsapp:${toRaw}`)
+      : (Deno.env.get('TWILIO_WHATSAPP_FROM') || 'whatsapp:+14155238886');
 
     if (!from) {
       return Response.json({ error: 'From requis' }, { status: 400 });
@@ -1426,7 +1433,7 @@ Deno.serve(async (req) => {
     const tarifs = TARIFS_PAYS[countryCode] || TARIFS_PAYS.BF;
     const normalizedTel = normalizePhone(telephone, countryCode) || telephone.replace(/\D/g, '');
 
-    console.log(`[WebhookVenus] 📥 ÉTAPE 1 — Message reçu de ${telephone} (${profileName || 'N/A'}) | Pays: ${countryCode} | Body: "${body}" | Media: ${numMedia} | GPS: ${latitude},${longitude} | Sid: ${messageSid}`);
+    console.log(`[WebhookVenus] 📥 ÉTAPE 1 — Message reçu de ${telephone} (${profileName || 'N/A'}) | To: ${toRaw || 'N/A'} | Pays: ${countryCode} | Body: "${body}" | Media: ${numMedia} | GPS: ${latitude},${longitude} | Sid: ${messageSid} | FromNumber(réponse): ${fromNumber}`);
 
     // ── Détection: le sender est-il un livreur répondant à un client ? ──
     // Si le client est en mode "contact_livreur", relaye la réponse du livreur au client
@@ -1519,7 +1526,14 @@ Deno.serve(async (req) => {
         }).catch(() => null);
         conversation.whatsapp_phone = normalizedTel;
       }
-      console.log(`[WebhookVenus] ✅ ÉTAPE 2 — Conversation existante trouvée: ${conversation.id} | venus_active: ${conversation.venus_active}`);
+      // Mettre à jour silgapp_from_number si nécessaire (dual-number)
+      if (fromNumber && conversation.silgapp_from_number !== fromNumber) {
+        await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+          silgapp_from_number: fromNumber,
+        }).catch(() => null);
+        conversation.silgapp_from_number = fromNumber;
+      }
+      console.log(`[WebhookVenus] ✅ ÉTAPE 2 — Conversation existante trouvée: ${conversation.id} | venus_active: ${conversation.venus_active} | from_number: ${fromNumber}`);
     } else {
       const participants = JSON.stringify([
         { type: 'client', id: normalizedTel, name: profileName || telephone },
@@ -1529,6 +1543,7 @@ Deno.serve(async (req) => {
         participants,
         title: profileName || telephone,
         whatsapp_phone: normalizedTel,
+        silgapp_from_number: fromNumber,
         source: 'whatsapp',
         venus_active: true,
         country_code: countryCode,
