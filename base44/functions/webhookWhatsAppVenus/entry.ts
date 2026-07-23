@@ -1972,6 +1972,7 @@ Deno.serve(async (req) => {
           const _STATUTS_ACTIFS_GUARD = ['nouvelle', 'programmee', 'recherche_livreur', 'livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison', 'arrivee'];
           const _dejaCree = pendingCourse?.course_created === true;
           const _courseActiveExiste = courseActive && _STATUTS_ACTIFS_GUARD.includes(courseActive.statut);
+          console.log(`[WebhookVenus] 🔍 ANTI-DOUBLON CHECK | pendingCourse=${JSON.stringify(pendingCourse || {}).substring(0, 200)} | course_created=${pendingCourse?.course_created} | dejaCree=${_dejaCree} | courseActive=${courseActive ? courseActive.id + '/' + courseActive.statut : 'NULL'} | courseActiveExiste=${_courseActiveExiste}`);
           if (_dejaCree || _courseActiveExiste) {
             console.warn(`[WebhookVenus] 🛡️ ANTI-DOUBLON — création bloquée | course_created=${_dejaCree} | courseActive=${_courseActiveExiste} | moteur=${reasoningResult.decision_moteur}`);
             reponseFinale = _courseActiveExiste
