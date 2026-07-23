@@ -1966,25 +1966,38 @@ Deno.serve(async (req) => {
         let courseCreee = false;
 
         if (reasoningResult.action === 'creer_course') {
-          const um = { ...(pendingCourse || {}), ...reasoningResult.memoire_courte_update };
-          um.all_info_collected = true; um.user_confirmed = true;
-          const cr2 = await creerCourseDepuisMemoire(base44, um, countryCode, tarifs, telephone, profileName, conversation.silgapp_from_number);
-          if (cr2.success) {
-            reponseFinale = cr2.message;
-            courseCreee = true;
-            um.course_created = true; um.course_id = cr2.course.id;
-            pendingCourse = um;
-            await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(um) });
-            if (memoireLongue) {
-              await mettreAJourMemoireLongue(base44, memoireLongue.id, {
-                adresse_recuperee: um.adresse_depart, adresse_livraison: um.adresse_arrivee,
-                destinataire_nom: um.contact_nom, destinataire_telephone: um.contact_telephone,
-                type_course_prefere: um.type_course, client_nom: profileName,
-                increment_courses: true,
-                ...reasoningResult.memoire_longue_update,
-              });
-            }
-          } else if (cr2.message) { reponseFinale = cr2.message; }
+          // ═══ ANTI-DOUBLON CRITIQUE ═══
+          // Vérifier l'état réel en DB avant toute création.
+          // Empêche le fallback InvokeLLM de dupliquer une création déjà tentée par OpenAI.
+          const _STATUTS_ACTIFS_GUARD = ['nouvelle', 'programmee', 'recherche_livreur', 'livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison', 'arrivee'];
+          const _dejaCree = pendingCourse?.course_created === true;
+          const _courseActiveExiste = courseActive && _STATUTS_ACTIFS_GUARD.includes(courseActive.statut);
+          if (_dejaCree || _courseActiveExiste) {
+            console.warn(`[WebhookVenus] 🛡️ ANTI-DOUBLON — création bloquée | course_created=${_dejaCree} | courseActive=${_courseActiveExiste} | moteur=${reasoningResult.decision_moteur}`);
+            reponseFinale = _courseActiveExiste
+              ? `Vous avez déjà une course active (réf: ${(courseActive.id || '').slice(-6).toUpperCase()}). Le livreur est en cours de recherche.`
+              : "Votre course a déjà été créée. Je recherche actuellement un livreur pour vous.";
+          } else {
+            const um = { ...(pendingCourse || {}), ...reasoningResult.memoire_courte_update };
+            um.all_info_collected = true; um.user_confirmed = true;
+            const cr2 = await creerCourseDepuisMemoire(base44, um, countryCode, tarifs, telephone, profileName, conversation.silgapp_from_number);
+            if (cr2.success) {
+              reponseFinale = cr2.message;
+              courseCreee = true;
+              um.course_created = true; um.course_id = cr2.course.id;
+              pendingCourse = um;
+              await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(um) });
+              if (memoireLongue) {
+                await mettreAJourMemoireLongue(base44, memoireLongue.id, {
+                  adresse_recuperee: um.adresse_depart, adresse_livraison: um.adresse_arrivee,
+                  destinataire_nom: um.contact_nom, destinataire_telephone: um.contact_telephone,
+                  type_course_prefere: um.type_course, client_nom: profileName,
+                  increment_courses: true,
+                  ...reasoningResult.memoire_longue_update,
+                });
+              }
+            } else if (cr2.message) { reponseFinale = cr2.message; }
+          }
         } else if (reasoningResult.action === 'suivre_course') {
           reponseFinale = await handleConsultationCourse(base44, telephone, messageEffectif, profileName);
         } else if (reasoningResult.action === 'contacter_livreur') {
