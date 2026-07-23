@@ -304,7 +304,7 @@ Deno.serve(async (req) => {
     // Envoyer via Twilio
     const twilioSid = Deno.env.get('TWILIO_ACCOUNT_SID');
     const twilioToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-    const twilioFrom = Deno.env.get('TWILIO_WHATSAPP_FROM') || 'whatsapp:+14155238886';
+    const twilioFromDefault = Deno.env.get('TWILIO_WHATSAPP_FROM') || 'whatsapp:+14155238886';
 
     if (!twilioSid || !twilioToken) {
       console.error('[SuiviWhatsApp] Secrets Twilio manquants');
@@ -330,11 +330,11 @@ Deno.serve(async (req) => {
       return match || null;
     }
 
-    // ── Garde anti-doublon : vérifier qu'un message identique n'a pas été envoyé
-    // dans les 2 dernières minutes à ce même numéro pour cette même course ──
+    // ── Récupérer la conversation pour : anti-doublon + silgapp_from_number (dual-number) ──
+    let conversationForSend: any | null = null;
     try {
-      const conv = await trouverConversationParNumero(numero);
-      const convId = conv?.id;
+      conversationForSend = await trouverConversationParNumero(numero);
+      const convId = conversationForSend?.id;
       if (convId) {
         const recentMsgs = await base44.asServiceRole.entities.Message.filter({
           sender_id: 'venus',
@@ -351,6 +351,15 @@ Deno.serve(async (req) => {
       }
     } catch (dedupErr) {
       console.warn(`[SuiviWhatsApp] Garde anti-doublon échouée (non bloquant):`, dedupErr?.message);
+    }
+
+    // ── Dual-number : utiliser le silgapp_from_number de la conversation si disponible ──
+    // Le client a initié la conversation sur un numéro SILGAPP spécifique (ex: +22655483838).
+    // Les notifications doivent partir depuis CE MÊME numéro, sinon Twilio retourne 63015
+    // (outside messaging window) car la fenêtre de 24h n'est ouverte que sur ce numéro.
+    const twilioFrom = conversationForSend?.silgapp_from_number || twilioFromDefault;
+    if (conversationForSend?.silgapp_from_number) {
+      console.log(`[SuiviWhatsApp] 📱 Dual-number: envoi depuis ${conversationForSend.silgapp_from_number} (conversation)`);
     }
 
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;
@@ -378,13 +387,11 @@ Deno.serve(async (req) => {
       console.log(`[SuiviWhatsApp] Message envoyé à +${numero} pour course ${course_id} (${messageEvenement}${qrImageUrl ? ' + QR' : ''})`);
 
       // ── Stocker le message dans la DB pour l'historique et la détection contextuelle ──
-      // Sans cela, handlePrixManuelResponse ne peut pas détecter que le dernier message
-      // VENUS était une proposition de prix (le "Oui" du client tombe alors dans le LLM)
+      // Réutilise la conversation déjà trouvée ci-dessus (conversationForSend)
       try {
-        const conv = await trouverConversationParNumero(numero);
-        if (conv) {
+        if (conversationForSend) {
           await base44.asServiceRole.entities.Message.create({
-            conversation_id: conv.id,
+            conversation_id: conversationForSend.id,
             sender_type: 'admin',
             sender_id: 'venus',
             sender_name: 'VENUS',
@@ -392,7 +399,7 @@ Deno.serve(async (req) => {
             content: message,
             source: 'whatsapp',
           });
-          await base44.asServiceRole.entities.Conversation.update(conv.id, {
+          await base44.asServiceRole.entities.Conversation.update(conversationForSend.id, {
             last_message: message.slice(0, 80),
             last_message_date: new Date().toISOString(),
             last_sender_name: 'VENUS',
