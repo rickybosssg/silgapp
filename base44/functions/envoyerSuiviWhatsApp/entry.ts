@@ -331,10 +331,26 @@ Deno.serve(async (req) => {
     }
 
     // ── Récupérer la conversation pour : anti-doublon + silgapp_from_number (dual-number) ──
+    // Si le numéro cible (expéditeur/destinataire) n'a pas de conversation, on cherche
+    // aussi la conversation du client (celui qui a discuté avec VENUS) pour récupérer
+    // le bon silgapp_from_number.
     let conversationForSend: any | null = null;
+    let conversationForClient: any | null = null;
     try {
       conversationForSend = await trouverConversationParNumero(numero);
-      const convId = conversationForSend?.id;
+
+      // Fallback : si le numéro cible n'a pas de conversation (ex: expéditeur ≠ client),
+      // chercher la conversation du client_telephone pour récupérer silgapp_from_number
+      if (!conversationForSend && course.client_telephone && course.client_telephone !== telephone) {
+        const clientNum = normalizePhone(course.client_telephone, course.country_code) || course.client_telephone.replace(/\D/g, '');
+        if (clientNum && clientNum !== numero) {
+          conversationForClient = await trouverConversationParNumero(clientNum);
+          console.log(`[SuiviWhatsApp] 📱 Numéro cible sans conversation — fallback sur conversation client (${clientNum})`);
+        }
+      }
+
+      const convForDedup = conversationForSend || conversationForClient;
+      const convId = convForDedup?.id;
       if (convId) {
         const recentMsgs = await base44.asServiceRole.entities.Message.filter({
           sender_id: 'venus',
@@ -354,12 +370,14 @@ Deno.serve(async (req) => {
     }
 
     // ── Dual-number : utiliser le silgapp_from_number de la conversation si disponible ──
+    // Priorité : conversation du numéro cible > conversation du client > TWILIO_WHATSAPP_FROM
     // Le client a initié la conversation sur un numéro SILGAPP spécifique (ex: +22655483838).
     // Les notifications doivent partir depuis CE MÊME numéro, sinon Twilio retourne 63015
     // (outside messaging window) car la fenêtre de 24h n'est ouverte que sur ce numéro.
-    const twilioFrom = conversationForSend?.silgapp_from_number || twilioFromDefault;
-    if (conversationForSend?.silgapp_from_number) {
-      console.log(`[SuiviWhatsApp] 📱 Dual-number: envoi depuis ${conversationForSend.silgapp_from_number} (conversation)`);
+    const silgappFromNumber = conversationForSend?.silgapp_from_number || conversationForClient?.silgapp_from_number;
+    const twilioFrom = silgappFromNumber || twilioFromDefault;
+    if (silgappFromNumber) {
+      console.log(`[SuiviWhatsApp] 📱 Dual-number: envoi depuis ${silgappFromNumber} (${conversationForSend ? 'conversation cible' : 'conversation client'})`);
     }
 
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;
