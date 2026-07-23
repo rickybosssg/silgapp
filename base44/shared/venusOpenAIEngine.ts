@@ -24,54 +24,82 @@ const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const OPENAI_MODEL_DEFAULT = 'gpt-4.1-mini';
 const MAX_TOOL_ROUNDS = 3;
 
-// ── Cache SystemConfig (30 secondes) ──
-const CONFIG_CACHE: { enabled: boolean | null; model: string | null; expires: number } = {
+// ── Cache SystemConfig unifié (30 secondes) ──
+// CRITIQUE: filter({}) fonctionne en production Deno, filter({ cle: '...' }) échoue silencieusement.
+// Tous les configs sont chargés en UNE requête puis filtrés en mémoire.
+const CONFIG_CACHE: {
+  enabled: boolean | null;
+  model: string | null;
+  learningMode: string | null;
+  maxTokens: number | null;
+  temperature: number | null;
+  expires: number;
+} = {
   enabled: null,
   model: null,
+  learningMode: null,
+  maxTokens: null,
+  temperature: null,
   expires: 0,
 };
 
 /**
- * Vérifie si OpenAI est activé via SystemConfig.
- * L'admin peut désactiver instantanément en passant VENUS_OPENAI_ENABLED à 'false'.
+ * Charge toute la configuration VENUS depuis SystemConfig en une seule requête.
+ * Utilise filter({}) qui est prouvé fonctionnel en production.
+ * En cas d'erreur, default à enabled=true (pas false — c'était le bug racine).
  */
-export async function isOpenAIEnabled(base44: any): Promise<boolean> {
+async function chargerTouteLaConfig(base44: any) {
   if (CONFIG_CACHE.enabled !== null && Date.now() < CONFIG_CACHE.expires) {
-    return CONFIG_CACHE.enabled;
+    return CONFIG_CACHE;
   }
   try {
-    const configs = await base44.asServiceRole.entities.SystemConfig.filter({ cle: 'VENUS_OPENAI_ENABLED' });
-    const enabled = configs?.[0]?.valeur === 'true';
-    CONFIG_CACHE.enabled = enabled;
+    const configs = await base44.asServiceRole.entities.SystemConfig.filter({});
+    const get = (cle: string, fallback: string) => {
+      const c = configs.find((x: any) => x.cle === cle);
+      return c?.valeur || fallback;
+    };
+    CONFIG_CACHE.enabled = get('VENUS_OPENAI_ENABLED', 'true') === 'true';
+    CONFIG_CACHE.model = get('VENUS_PRIMARY_MODEL', '') || get('VENUS_OPENAI_MODEL', '') || OPENAI_MODEL_DEFAULT;
+    CONFIG_CACHE.learningMode = get('VENUS_LEARNING_MODE', 'gpt_principal');
+    CONFIG_CACHE.maxTokens = parseInt(get('VENUS_MAX_OUTPUT_TOKENS', '1500'), 10) || 1500;
+    CONFIG_CACHE.temperature = parseFloat(get('VENUS_TEMPERATURE', '0.3')) || 0.3;
     CONFIG_CACHE.expires = Date.now() + 30000;
-    return enabled;
-  } catch {
-    CONFIG_CACHE.enabled = false;
-    CONFIG_CACHE.expires = Date.now() + 30000;
-    return false;
+    console.log(`[OpenAIEngine] ✅ Config: enabled=${CONFIG_CACHE.enabled} | model=${CONFIG_CACHE.model} | mode=${CONFIG_CACHE.learningMode} | maxTokens=${CONFIG_CACHE.maxTokens} | temp=${CONFIG_CACHE.temperature}`);
+  } catch (e: any) {
+    console.error(`[OpenAIEngine] ❌ Erreur chargement config: ${e.message} — valeurs par défaut`);
+    CONFIG_CACHE.enabled = true;
+    CONFIG_CACHE.model = OPENAI_MODEL_DEFAULT;
+    CONFIG_CACHE.learningMode = 'gpt_principal';
+    CONFIG_CACHE.maxTokens = 1500;
+    CONFIG_CACHE.temperature = 0.3;
+    CONFIG_CACHE.expires = Date.now() + 5000;
   }
+  return CONFIG_CACHE;
 }
 
-/**
- * Récupère le modèle OpenAI configuré via SystemConfig (clé: VENUS_OPENAI_MODEL).
- * L'admin peut changer de modèle (ex: gpt-5.5) sans modifier le code.
- * Fallback: gpt-4.1-mini (OPENAI_MODEL_DEFAULT).
- */
+export async function isOpenAIEnabled(base44: any): Promise<boolean> {
+  const cfg = await chargerTouteLaConfig(base44);
+  return cfg.enabled!;
+}
+
 export async function getOpenAIModel(base44: any): Promise<string> {
-  if (CONFIG_CACHE.model !== null && Date.now() < CONFIG_CACHE.expires) {
-    return CONFIG_CACHE.model;
-  }
-  try {
-    const configs = await base44.asServiceRole.entities.SystemConfig.filter({ cle: 'VENUS_OPENAI_MODEL' });
-    const model = configs?.[0]?.valeur || OPENAI_MODEL_DEFAULT;
-    CONFIG_CACHE.model = model;
-    CONFIG_CACHE.expires = Date.now() + 30000;
-    return model;
-  } catch {
-    CONFIG_CACHE.model = OPENAI_MODEL_DEFAULT;
-    CONFIG_CACHE.expires = Date.now() + 30000;
-    return OPENAI_MODEL_DEFAULT;
-  }
+  const cfg = await chargerTouteLaConfig(base44);
+  return cfg.model!;
+}
+
+export async function getLearningMode(base44: any): Promise<string> {
+  const cfg = await chargerTouteLaConfig(base44);
+  return cfg.learningMode!;
+}
+
+export async function getMaxTokens(base44: any): Promise<number> {
+  const cfg = await chargerTouteLaConfig(base44);
+  return cfg.maxTokens!;
+}
+
+export async function getTemperature(base44: any): Promise<number> {
+  const cfg = await chargerTouteLaConfig(base44);
+  return cfg.temperature!;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -285,6 +313,8 @@ export async function raisonnerAvecOpenAI(
 
   // ── Modèle configurable via SystemConfig (VENUS_OPENAI_MODEL) ──
   const model = await getOpenAIModel(base44);
+  const maxTokens = await getMaxTokens(base44);
+  const temp = await getTemperature(base44);
 
   // ── Construction des messages ──
   // Le prompt contient déjà tout le contexte RAG + règles + connaissances.
@@ -335,8 +365,8 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
         tools: SILGAPP_TOOLS,
         tool_choice: 'auto',
         response_format: { type: 'json_object' },
-        temperature: 0.3,
-        max_tokens: 1500,
+        temperature: temp,
+        max_tokens: maxTokens,
       }),
     });
 

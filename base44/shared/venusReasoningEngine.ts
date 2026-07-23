@@ -38,7 +38,7 @@ import {
   detecterRaccourciFrequent,
 } from './venusCache.ts';
 import { genererReferenceCourse } from './venusCourseReference.ts';
-import { isOpenAIEnabled, raisonnerAvecOpenAI } from './venusOpenAIEngine.ts';
+import { isOpenAIEnabled, raisonnerAvecOpenAI, getLearningMode } from './venusOpenAIEngine.ts';
 import { logOpenAIUsage, loggerMessageVenus, calculateCost } from './venusOpenAITracker.ts';
 
 /**
@@ -859,22 +859,35 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
     console.log(`[ReasoningEngine] 📖 ${businessRuleEntries.length} règles métier chargées`);
   }
 
-  // ── ÉCONOMIE DE CRÉDITS: Court-circuit règle métier directe (0 crédit LLM) ──
-  const regleDirecte = detecterRegleMetierDirecte(input.messageClient, businessRuleEntries);
-  if (regleDirecte) {
-    regleDirecte.temps_traitement_ms = Date.now() - startTime;
-    regleDirecte.decision_moteur = 'regle_metier';
-    stockerCache(input.telephone, input.messageClient, input.memoireCourte, regleDirecte);
-    return regleDirecte;
-  }
+  // ── MODE APPRENTISSAGE: En mode gpt_principal, GPT analyse TOUS les messages ──
+  // Les bypasses agressifs (règle métier directe, connaissance directe) sont désactivés
+  // car ils interceptent des messages complexes contenant des mots-clés de connaissance.
+  // Exemple: "Bonjour VENUS. Je souhaite envoyer un colis" était intercepté par une
+  // entrée de connaissance "Bonjour VENUS" → VENUS retournait un message de présentation
+  // au lieu de créer la course. GPT reçoit quand même les règles et connaissances dans son prompt.
+  const learningMode = await getLearningMode(base44);
+  const skipBypassesAgressifs = learningMode === 'gpt_principal' || learningMode === 'observation';
 
-  // ── ÉCONOMIE DE CRÉDITS: Court-circuit connaissance directe (0 crédit LLM) ──
-  const connaissanceDirecte = detecterConnaissanceDirecte(input.messageClient, knowledgeEntries);
-  if (connaissanceDirecte) {
-    connaissanceDirecte.temps_traitement_ms = Date.now() - startTime;
-    connaissanceDirecte.decision_moteur = 'connaissance';
-    stockerCache(input.telephone, input.messageClient, input.memoireCourte, connaissanceDirecte);
-    return connaissanceDirecte;
+  if (!skipBypassesAgressifs) {
+    // ── ÉCONOMIE DE CRÉDITS: Court-circuit règle métier directe (0 crédit LLM) ──
+    const regleDirecte = detecterRegleMetierDirecte(input.messageClient, businessRuleEntries);
+    if (regleDirecte) {
+      regleDirecte.temps_traitement_ms = Date.now() - startTime;
+      regleDirecte.decision_moteur = 'regle_metier';
+      stockerCache(input.telephone, input.messageClient, input.memoireCourte, regleDirecte);
+      return regleDirecte;
+    }
+
+    // ── ÉCONOMIE DE CRÉDITS: Court-circuit connaissance directe (0 crédit LLM) ──
+    const connaissanceDirecte = detecterConnaissanceDirecte(input.messageClient, knowledgeEntries);
+    if (connaissanceDirecte) {
+      connaissanceDirecte.temps_traitement_ms = Date.now() - startTime;
+      connaissanceDirecte.decision_moteur = 'connaissance';
+      stockerCache(input.telephone, input.messageClient, input.memoireCourte, connaissanceDirecte);
+      return connaissanceDirecte;
+    }
+  } else {
+    console.log(`[ReasoningEngine] 🎓 Mode ${learningMode} — bypass agressifs désactivés, GPT traite le message`);
   }
 
   // ── Construire le prompt de raisonnement ──

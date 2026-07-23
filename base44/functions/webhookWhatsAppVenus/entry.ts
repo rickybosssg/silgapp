@@ -51,6 +51,7 @@ import {
 } from '../../shared/venusCourseModifierEngine.ts';
 import { normalizePhone } from '../../shared/phoneUtils.ts';
 import { loggerMessageVenus, calculateCost } from '../../shared/venusOpenAITracker.ts';
+import { genererExempleApprentissage } from '../../shared/venusLearningPipeline.ts';
 
 /**
  * Webhook WhatsApp <-> Venus (via Twilio).
@@ -2130,6 +2131,23 @@ Deno.serve(async (req) => {
       confiance: reasoningResult?.confiance,
       statut: reasoningResult?.decision_moteur === 'erreur' ? 'erreur' : 'succes',
     }).catch(() => {});
+
+    // ── Mode apprentissage: générer un exemple d'apprentissage (fire-and-forget) ──
+    // GPT comprend et enseigne. L'administrateur valide. VENUS observe et apprend.
+    if (reasoningResult && reponseVenus) {
+      genererExempleApprentissage(base44, {
+        conversation_id: conversation.id,
+        telephone,
+        message_client: messageEffectif || body || '',
+        reponse_envoyee: reponseVenus,
+        reasoningResult,
+        model_used: reasoningResult?.model_utilise || '',
+        tokens_total: _tokensTotal,
+        cost_usd: _coutUsd,
+        country_code: countryCode,
+        profileName,
+      }).catch(() => {});
+    }
 
     // Nettoyer le markdown
     reponseVenus = reponseVenus

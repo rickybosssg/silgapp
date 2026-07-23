@@ -31,6 +31,7 @@ import {
   detecterRegleMetierDirecte,
   detecterConnaissanceDirecte,
 } from './venusCache.ts';
+import { getLearningMode } from './venusOpenAIEngine.ts';
 import { TARIFS_PAYS } from './venusPrompt.ts';
 import { rechercherConnaissancesValidees, SEUIL_CONFIANCE } from './venusLearningEngine.ts';
 import { detecterIncidentDansMessage } from './venusIncidentEngine.ts';
@@ -175,12 +176,21 @@ export async function simulerMessage(base44: any, opts: {
   const reglesFiltered = (regles || []).filter((r: any) => r.pays === 'ALL' || r.pays === countryCode);
   const connaissancesFiltered = (connaissances || []).filter((k: any) => !k.pays || k.pays === 'ALL' || k.pays === countryCode);
 
+  // ── MODE APPRENTISSAGE: En mode gpt_principal, GPT analyse TOUS les messages ──
+  // Les bypass agressifs (règle métier directe, connaissance directe) sont désactivés
+  // car ils interceptent des messages complexes contenant des mots-clés de connaissance.
+  const learningMode = await getLearningMode(base44);
+  const skipBypassesAgressifs = learningMode === 'gpt_principal' || learningMode === 'observation';
+
   // ── Step 5: Règle métier directe (0 crédit) ──
-  const regleMatch = detecterRegleMetierDirecte(message, reglesFiltered);
+  let regleMatch: any = null;
+  if (!skipBypassesAgressifs) {
+    regleMatch = detecterRegleMetierDirecte(message, reglesFiltered);
+  }
   pipeline_steps.push({
     step: 'Règle métier directe',
     matched: !!regleMatch,
-    details: regleMatch ? `Règle: ${regleMatch.business_rule_id}` : 'Aucune règle matchée',
+    details: skipBypassesAgressifs ? `Désactivé (mode ${learningMode})` : (regleMatch ? `Règle: ${regleMatch.business_rule_id}` : 'Aucune règle matchée'),
   });
   if (regleMatch) {
     const regle = reglesFiltered.find((r: any) => r.id === regleMatch.business_rule_id);
@@ -193,11 +203,14 @@ export async function simulerMessage(base44: any, opts: {
   }
 
   // ── Step 6: Connaissance directe (0 crédit) ──
-  const connMatch = detecterConnaissanceDirecte(message, connaissancesFiltered);
+  let connMatch: any = null;
+  if (!skipBypassesAgressifs) {
+    connMatch = detecterConnaissanceDirecte(message, connaissancesFiltered);
+  }
   pipeline_steps.push({
     step: 'Connaissance directe',
     matched: !!connMatch,
-    details: connMatch ? `Connaissance: ${connMatch.knowledge_id}` : 'Aucune connaissance directe',
+    details: skipBypassesAgressifs ? `Désactivé (mode ${learningMode})` : (connMatch ? `Connaissance: ${connMatch.knowledge_id}` : 'Aucune connaissance directe'),
   });
   if (connMatch) {
     const conn = connaissancesFiltered.find((k: any) => k.id === connMatch.knowledge_id);
@@ -222,7 +235,7 @@ export async function simulerMessage(base44: any, opts: {
   });
   if (ragMatches.length > 0) {
     sources.rag_documents = ragMatches.map((k: any) => ({ id: k.id, titre: k.titre, score: 80 }));
-    if (!reponse) {
+    if (!reponse && !skipBypassesAgressifs) {
       reponse = ragMatches[0].reponse_officielle;
       action = 'repondre_info';
       intention = 'demander_info';
@@ -258,7 +271,7 @@ export async function simulerMessage(base44: any, opts: {
     action = 'modifier_course';
     intention = 'modifier_info';
     confiance = 90;
-    if (!reponse) {
+    if (!reponse && !skipBypassesAgressifs) {
       reponse = "[SIMULATION] VENUS détecte une demande de modification de course. En mode réel, elle demanderait quel champ modifier et procéderait avec vérification DB.";
     }
     return finalize();
@@ -278,17 +291,17 @@ export async function simulerMessage(base44: any, opts: {
     details: isAnnul ? 'annuler_course' : isSuivi ? 'suivre_course' : isCourse ? 'creer_course' : 'aucune intention claire',
   });
 
-  if (isAnnul && !reponse) {
+  if (isAnnul && !reponse && !skipBypassesAgressifs) {
     action = 'annuler_course';
     intention = 'annuler_course';
     confiance = 90;
     reponse = "[SIMULATION] VENUS détecte une demande d'annulation. En mode réel, elle annulerait la course avec vérification DB obligatoire avant confirmation.";
-  } else if (isSuivi && !reponse) {
+  } else if (isSuivi && !reponse && !skipBypassesAgressifs) {
     action = 'suivre_course';
     intention = 'suivre_course';
     confiance = 85;
     reponse = "[SIMULATION] VENUS détecte une demande de suivi. En mode réel, elle rechercherait votre course active et afficherait le statut.";
-  } else if (isCourse && !reponse) {
+  } else if (isCourse && !reponse && !skipBypassesAgressifs) {
     action = 'creer_course';
     intention = 'creer_course';
     confiance = 70;
