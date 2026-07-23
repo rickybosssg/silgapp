@@ -2000,11 +2000,17 @@ Deno.serve(async (req) => {
 
           const _dejaCree = pendingCourse?.course_created === true;
           const _courseActiveExiste = !!_activeCourseDB;
-          if (_dejaCree || _courseActiveExiste) {
-            console.warn(`[WebhookVenus] 🛡️ ANTI-DOUBLON — création bloquée | course_created=${_dejaCree} | courseActive=${_courseActiveExiste} | moteur=${reasoningResult.decision_moteur}`);
-            reponseFinale = _courseActiveExiste
-              ? `Vous avez déjà une course active (réf: ${(_activeCourseDB.id || '').slice(-6).toUpperCase()}). Le livreur est en cours de recherche.`
-              : "Votre course a déjà été créée. Je recherche actuellement un livreur pour vous.";
+          if (_courseActiveExiste) {
+            // ── Course active réelle en DB → bloquer (anti-doublon légitime) ──
+            console.warn(`[WebhookVenus] 🛡️ ANTI-DOUBLON — course active ${_activeCourseDB.id} (${_activeCourseDB.statut}) existe pour ${telephone}`);
+            reponseFinale = `Vous avez déjà une course active (réf: ${(_activeCourseDB.id || '').slice(-6).toUpperCase()}). Le livreur est en cours de recherche.`;
+          } else if (_dejaCree && !_courseActiveExiste) {
+            // ── course_created=true mais aucune course active en DB (course précédente annulée/livrée) ──
+            // Le flag est stale → le nettoyer et laisser la création procéder.
+            console.log(`[WebhookVenus] 🧹 Flag course_created stale détecté (aucune course active en DB) — nettoyage + poursuite création`);
+            pendingCourse.course_created = false;
+            delete pendingCourse.course_id;
+            await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(pendingCourse) }).catch(() => {});
           } else {
             const um = { ...(pendingCourse || {}), ...reasoningResult.memoire_courte_update };
             um.all_info_collected = true; um.user_confirmed = true;
