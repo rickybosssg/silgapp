@@ -498,6 +498,48 @@ export async function creerCourseDepuisMemoire(
     }
   }
 
+  // ═══ ANTI-DOUBLON CRITIQUE — Dernière ligne de défense ═══
+  // Vérification DB DIRECTE avant toute création, quelle que soit la code path appelante.
+  const _STATUTS_ACTIFS_CREATE = ['nouvelle', 'programmee', 'recherche_livreur', 'livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison', 'arrivee'];
+  try {
+    const _telDigits = telephone.replace(/\D/g, '');
+    const _telPlus = telephone.startsWith('+') ? telephone : '+' + telephone;
+    let _existingActive = null;
+    // Recherche par client_telephone exact
+    const _byClient = await base44.asServiceRole.entities.CourseExterne.filter(
+      { client_telephone: _telPlus }, '-created_date', 10
+    );
+    _existingActive = (_byClient || []).find(c => _STATUTS_ACTIFS_CREATE.includes(c.statut)) || null;
+    // Fallback: expediteur_telephone
+    if (!_existingActive) {
+      const _byExp = await base44.asServiceRole.entities.CourseExterne.filter(
+        { expediteur_telephone: _telPlus }, '-created_date', 10
+      );
+      _existingActive = (_byExp || []).find(c => _STATUTS_ACTIFS_CREATE.includes(c.statut)) || null;
+    }
+    // Fallback: derniers 8 chiffres
+    if (!_existingActive) {
+      const _allRecent = await base44.asServiceRole.entities.CourseExterne.filter(
+        { country_code: countryCode }, '-created_date', 50
+      );
+      _existingActive = (_allRecent || []).find(c =>
+        _STATUTS_ACTIFS_CREATE.includes(c.statut) &&
+        ((c.client_telephone || '').replace(/\D/g, '').endsWith(_telDigits.slice(-8)) ||
+         (c.expediteur_telephone || '').replace(/\D/g, '').endsWith(_telDigits.slice(-8)))
+      ) || null;
+    }
+    if (_existingActive) {
+      console.warn(`[ReasoningEngine] 🛡️ ANTI-DOUBLON CRÉATION BLOQUÉE — course active ${_existingActive.id} (${_existingActive.statut}) existe déjà pour ${telephone}`);
+      return {
+        success: true,
+        course: _existingActive,
+        message: `Vous avez déjà une course active (réf: ${(_existingActive.id || '').slice(-6).toUpperCase()}). Le livreur est en cours de recherche.`,
+      };
+    }
+  } catch (e: any) {
+    console.error('[ReasoningEngine] ANTI-DOUBLON check error (non-blocking):', e.message);
+  }
+
   try {
     const course = await base44.asServiceRole.entities.CourseExterne.create(courseData);
     const typeLabels: any = { expedier: 'Envoi de colis', recevoir: 'Réception de colis', deplacement: 'Déplacement' };
