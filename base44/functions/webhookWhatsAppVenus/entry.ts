@@ -50,6 +50,7 @@ import {
   genererRecapModification,
 } from '../../shared/venusCourseModifierEngine.ts';
 import { normalizePhone } from '../../shared/phoneUtils.ts';
+import { loggerMessageVenus, calculateCost } from '../../shared/venusOpenAITracker.ts';
 
 /**
  * Webhook WhatsApp <-> Venus (via Twilio).
@@ -2103,6 +2104,32 @@ Deno.serve(async (req) => {
         });
       }
     }
+
+    // ── Audit: logger le message pour le tableau de bord OpenAI ──
+    const _metaLog: any = reasoningResult || {};
+    const _modelForCost = _metaLog._model_openai || '';
+    const _tokensPrompt = _metaLog._tokens_prompt || 0;
+    const _tokensCompletion = _metaLog._tokens_completion || 0;
+    const _coutUsd = _modelForCost ? calculateCost(_modelForCost, _tokensPrompt, _tokensCompletion) : 0;
+    const _tokensTotal = _metaLog._tokens_openai || 0;
+    loggerMessageVenus(base44, {
+      telephone,
+      conversation_id: conversation.id,
+      message_client: (messageEffectif || body || '').substring(0, 2000),
+      decision_moteur: reasoningResult?.decision_moteur || 'regle_metier',
+      openai_appele: reasoningResult?.openai_appele ?? false,
+      model_utilise: reasoningResult?.model_utilise || '',
+      rag_documents: reasoningResult?.document_sources,
+      outils_utilises: reasoningResult?.outils_utilises,
+      temps_reponse_ms: reasoningResult?.temps_traitement_ms || 0,
+      cout_usd: _coutUsd,
+      tokens_total: _tokensTotal,
+      reponse_envoyee: (reponseVenus || '').substring(0, 2000),
+      intention: reasoningResult?.intention,
+      action: reasoningResult?.action,
+      confiance: reasoningResult?.confiance,
+      statut: reasoningResult?.decision_moteur === 'erreur' ? 'erreur' : 'succes',
+    }).catch(() => {});
 
     // Nettoyer le markdown
     reponseVenus = reponseVenus
