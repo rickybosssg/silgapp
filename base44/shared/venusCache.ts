@@ -89,19 +89,24 @@ const SALUTATIONS_PATTERNS = [
   /^(bonjour|salut|bonsoir)\s+(comment\s+vas|ca\s+va)\s*[!?]*$/i,
 ];
 
-const SALUTATION_RESPONSE = {
-  intention: 'salutation',
-  contexte: 'general',
-  infos_connues: {},
-  infos_manquantes: [],
-  action: 'saluer',
-  prochaine_question: '',
-  outils_utilises: ['salutation_shortcut'],
-  confiance: 100,
-  reponse: "Bonjour 👋 Je suis VENUS, l'assistante intelligente de SILGAPP. Comment puis-je vous aider aujourd'hui ?",
-  memoire_courte_update: {},
-  memoire_longue_update: {},
-};
+/**
+ * Génère le message de salutation selon l'heure de la journée.
+ * - Matin (5h–11h59) → "Bonjour"
+ * - Après-midi (12h–17h59) → "Bon après-midi"
+ * - Soir/Nuit (18h–4h59) → "Bonsoir"
+ */
+function genererSalutationSelonHeure(): string {
+  const heure = new Date().getHours();
+  let salutation: string;
+  if (heure >= 5 && heure < 12) {
+    salutation = 'Bonjour';
+  } else if (heure >= 12 && heure < 18) {
+    salutation = "Bon après-midi";
+  } else {
+    salutation = 'Bonsoir';
+  }
+  return `${salutation} 👋 Je suis VENUS, l'assistante intelligente de SILGAPP. Comment puis-je vous aider aujourd'hui ?`;
+}
 
 /**
  * Détecte si le message est une salutation simple.
@@ -115,7 +120,19 @@ export function detecterSalutation(message: string): any | null {
   for (const pattern of SALUTATIONS_PATTERNS) {
     if (pattern.test(msgTrim)) {
       console.log('[VenusCache] 👋 Salutation détectée — court-circuit LLM');
-      return { ...SALUTATION_RESPONSE };
+      return {
+        intention: 'salutation',
+        contexte: 'general',
+        infos_connues: {},
+        infos_manquantes: [],
+        action: 'saluer',
+        prochaine_question: '',
+        outils_utilises: ['salutation_shortcut'],
+        confiance: 100,
+        reponse: genererSalutationSelonHeure(),
+        memoire_courte_update: {},
+        memoire_longue_update: {},
+      };
     }
   }
   return null;
