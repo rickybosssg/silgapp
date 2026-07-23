@@ -187,7 +187,7 @@ export async function genererExempleApprentissage(
       quality_score: qualityScore,
       risk_score: riskScore,
       learning_type: learningType,
-      review_status: 'draft',
+      review_status: 'pending_review',
       model_used: data.model_used || '',
       tokens_input: r._tokens_prompt || 0,
       tokens_output: r._tokens_completion || 0,

@@ -11,10 +11,12 @@ import SearchTab from '@/components/venus-learning/SearchTab';
 import AuditTab from '@/components/venus-learning/AuditTab';
 import RagStatusTab from '@/components/venus-learning/RagStatusTab';
 import FileImportTab from '@/components/venus-learning/FileImportTab';
-import { Database } from 'lucide-react';
+import GptLearningExamplesTab from '@/components/venus-learning/GptLearningExamplesTab';
+import { Database, Sparkles } from 'lucide-react';
 
 const TABS = [
   { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
+  { id: 'gpt_examples', label: 'Exemples GPT', icon: Sparkles },
   { id: 'knowledge', label: 'Base de connaissances', icon: BookOpen },
   { id: 'file_import', label: 'Import de fichiers', icon: FileUp },
   { id: 'rag_status', label: 'Statut RAG', icon: Database },
@@ -72,6 +74,7 @@ export default function VenusLearningCenter() {
       </div>
       <div className="p-4 md:p-6">
         {activeTab === 'dashboard' && <DashboardTab />}
+        {activeTab === 'gpt_examples' && <GptLearningExamplesTab />}
         {activeTab === 'knowledge' && <KnowledgeBaseTab />}
         {activeTab === 'scenarios' && <ScenariosTab />}
         {activeTab === 'misunderstood' && <MisunderstoodTab onCorriger={openCorrection} />}
