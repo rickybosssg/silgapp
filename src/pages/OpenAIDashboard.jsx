@@ -144,11 +144,18 @@ export default function OpenAIDashboard() {
 
   const today = stats?.today || {};
   const month = stats?.month || {};
+
+  // DEBUG: afficher la réponse brute pour diagnostic
+  const _rawDebug = stats ? JSON.stringify(stats).substring(0, 300) : 'stats=null';
   const msgStats = stats?.message_stats_today || {};
   const lastCalls = stats?.last_20_calls || [];
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* DEBUG BANNER */}
+      <div className="bg-yellow-100 border-b border-yellow-300 px-4 py-2">
+        <p className="text-xs font-mono text-yellow-900 break-all">DEBUG: {_rawDebug}</p>
+      </div>
       {/* Header */}
       <div className="bg-white border-b border-slate-200 sticky top-0 z-30">
         <div className="px-4 sm:px-6 py-4 flex items-center justify-between gap-3 flex-wrap">
