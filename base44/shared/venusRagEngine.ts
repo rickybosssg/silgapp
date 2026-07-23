@@ -583,15 +583,18 @@ export async function rechercherDocumentsRag(
     console.warn('[RAGEngine] Erreur log recherche:', e.message);
   }
 
-  // Incrémenter les compteurs de consultation
+  // Incrémenter les compteurs de consultation (atomique via updateMany + $inc)
   if (aReussi) {
-    for (const r of resultats.slice(0, 3)) {
+    const docIds = [...new Set(resultats.slice(0, 3).map(r => r.document_id).filter(Boolean))];
+    if (docIds.length > 0) {
       try {
-        await base44.asServiceRole.entities.VenusDocument.update(r.document_id, {
-          nb_consultations: (await base44.asServiceRole.entities.VenusDocument.get(r.document_id))?.nb_consultations + 1 || 1,
-          derniere_consultation: new Date().toISOString(),
-        });
-      } catch { /* ignore */ }
+        await base44.asServiceRole.entities.VenusDocument.updateMany(
+          { id: { $in: docIds } },
+          { $inc: { nb_consultations: 1 }, $set: { derniere_consultation: new Date().toISOString() } }
+        );
+      } catch (e: any) {
+        console.warn('[RAGEngine] Erreur incrément consultations:', e.message);
+      }
     }
   }
 
