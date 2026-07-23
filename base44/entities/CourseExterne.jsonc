@@ -31,6 +31,10 @@
       "default": false,
       "description": "True si la course a ete creee par VENUS (WhatsApp autonome)"
     },
+    "silgapp_from_number": {
+      "type": "string",
+      "description": "Numero WhatsApp SILGAPP qui a initie la conversation avec le client (ex: whatsapp:+22655483838). Toutes les notifications liees a cette course partent depuis ce numero, quel que soit le destinataire (client, expediteur, destinataire). Secours: Conversation.silgapp_from_number, puis TWILIO_WHATSAPP_FROM."
+    },
     "client_nom": {
       "type": "string",
       "description": "Nom du client"

@@ -330,25 +330,48 @@ Deno.serve(async (req) => {
       return match || null;
     }
 
-    // ── Récupérer la conversation pour : anti-doublon + silgapp_from_number (dual-number) ──
-    // Si le numéro cible (expéditeur/destinataire) n'a pas de conversation, on cherche
-    // aussi la conversation du client (celui qui a discuté avec VENUS) pour récupérer
-    // le bon silgapp_from_number.
+    // ═════════════════════════════════════════════════════════════════
+    // ARCHITECTURE DURABLE — silgapp_from_number (dual-number par pays/compte)
+    // ═════════════════════════════════════════════════════════════════
+    // Priorité (3 niveaux) :
+    //   1. course.silgapp_from_number       — source primaire (enregistrée à la création)
+    //   2. Conversation.silgapp_from_number — secours (anciennes courses sans le champ)
+    //   3. TWILIO_WHATSAPP_FROM             — dernier fallback (default global)
+    //
+    // Séparation par pays/compte : chaque numéro SILGAPP appartient à un pays et un
+    // compte Twilio/Meta spécifiques. Enregistrer le numéro d'origine sur la course
+    // garantit que toutes les notifications (client, expéditeur, destinataire) partent
+    // du même numéro, quel que soit le destinataire de la notification.
+    // ═════════════════════════════════════════════════════════════════
+
+    // ── Niveau 1 : course.silgapp_from_number (source primaire) ──
+    let silgappFromNumber: string | null = course.silgapp_from_number || null;
+
+    // ── Niveau 2 : secours via Conversation (anciennes courses sans le champ) ──
     let conversationForSend: any | null = null;
     let conversationForClient: any | null = null;
-    try {
-      conversationForSend = await trouverConversationParNumero(numero);
+    if (!silgappFromNumber) {
+      try {
+        conversationForSend = await trouverConversationParNumero(numero);
 
-      // Fallback : si le numéro cible n'a pas de conversation (ex: expéditeur ≠ client),
-      // chercher la conversation du client_telephone pour récupérer silgapp_from_number
-      if (!conversationForSend && course.client_telephone && course.client_telephone !== telephone) {
-        const clientNum = normalizePhone(course.client_telephone, course.country_code) || course.client_telephone.replace(/\D/g, '');
-        if (clientNum && clientNum !== numero) {
-          conversationForClient = await trouverConversationParNumero(clientNum);
-          console.log(`[SuiviWhatsApp] 📱 Numéro cible sans conversation — fallback sur conversation client (${clientNum})`);
+        // Fallback : si le numéro cible n'a pas de conversation (ex: expéditeur ≠ client),
+        // chercher la conversation du client_telephone pour récupérer silgapp_from_number
+        if (!conversationForSend && course.client_telephone && course.client_telephone !== telephone) {
+          const clientNum = normalizePhone(course.client_telephone, course.country_code) || course.client_telephone.replace(/\D/g, '');
+          if (clientNum && clientNum !== numero) {
+            conversationForClient = await trouverConversationParNumero(clientNum);
+            console.log(`[SuiviWhatsApp] 📱 Numéro cible sans conversation — fallback sur conversation client (${clientNum})`);
+          }
         }
-      }
 
+        silgappFromNumber = conversationForSend?.silgapp_from_number || conversationForClient?.silgapp_from_number || null;
+      } catch (lookupErr) {
+        console.warn(`[SuiviWhatsApp] Recherche conversation (secours) échouée (non bloquant):`, lookupErr?.message);
+      }
+    }
+
+    // ── Anti-doublon : vérifier les messages récents ──
+    try {
       const convForDedup = conversationForSend || conversationForClient;
       const convId = convForDedup?.id;
       if (convId) {
@@ -369,15 +392,13 @@ Deno.serve(async (req) => {
       console.warn(`[SuiviWhatsApp] Garde anti-doublon échouée (non bloquant):`, dedupErr?.message);
     }
 
-    // ── Dual-number : utiliser le silgapp_from_number de la conversation si disponible ──
-    // Priorité : conversation du numéro cible > conversation du client > TWILIO_WHATSAPP_FROM
-    // Le client a initié la conversation sur un numéro SILGAPP spécifique (ex: +22655483838).
-    // Les notifications doivent partir depuis CE MÊME numéro, sinon Twilio retourne 63015
-    // (outside messaging window) car la fenêtre de 24h n'est ouverte que sur ce numéro.
-    const silgappFromNumber = conversationForSend?.silgapp_from_number || conversationForClient?.silgapp_from_number;
+    // ── Niveau 3 : TWILIO_WHATSAPP_FROM (dernier fallback) ──
     const twilioFrom = silgappFromNumber || twilioFromDefault;
     if (silgappFromNumber) {
-      console.log(`[SuiviWhatsApp] 📱 Dual-number: envoi depuis ${silgappFromNumber} (${conversationForSend ? 'conversation cible' : 'conversation client'})`);
+      const source = course.silgapp_from_number ? 'course' : (conversationForSend ? 'conversation cible' : 'conversation client');
+      console.log(`[SuiviWhatsApp] 📱 Dual-number: envoi depuis ${silgappFromNumber} (source: ${source})`);
+    } else {
+      console.log(`[SuiviWhatsApp] 📱 Dual-number: aucune source trouvée — fallback TWILIO_WHATSAPP_FROM (${twilioFromDefault})`);
     }
 
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;

@@ -1922,7 +1922,7 @@ Deno.serve(async (req) => {
 
       if (resumeBypass && isConfBypass && allRequiredPresent && !venusWasAskingQuestion) {
         console.log(`[WebhookVenus] ✅ Confirmation déterministe — création directe (bypass LLM)`);
-        const cr = await creerCourseDepuisMemoire(base44, pendingCourse, countryCode, tarifs, telephone, profileName);
+        const cr = await creerCourseDepuisMemoire(base44, pendingCourse, countryCode, tarifs, telephone, profileName, conversation.silgapp_from_number);
         if (cr.success) {
           reponseVenus = cr.message;
           pendingCourse.course_created = true;
@@ -1966,7 +1966,7 @@ Deno.serve(async (req) => {
         if (reasoningResult.action === 'creer_course') {
           const um = { ...(pendingCourse || {}), ...reasoningResult.memoire_courte_update };
           um.all_info_collected = true; um.user_confirmed = true;
-          const cr2 = await creerCourseDepuisMemoire(base44, um, countryCode, tarifs, telephone, profileName);
+          const cr2 = await creerCourseDepuisMemoire(base44, um, countryCode, tarifs, telephone, profileName, conversation.silgapp_from_number);
           if (cr2.success) {
             reponseFinale = cr2.message;
             courseCreee = true;

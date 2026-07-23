@@ -368,7 +368,8 @@ export async function creerCourseDepuisMemoire(
   countryCode: string,
   tarifs: any,
   telephone: string,
-  profileName: string
+  profileName: string,
+  silgappFromNumber?: string
 ): Promise<{ success: boolean; course?: any; error?: string; message?: string }> {
   const cd = { ...memoireCourte };
 
@@ -404,6 +405,10 @@ export async function creerCourseDepuisMemoire(
     gps_depart_lng: cd.gps_depart_lng,
     gps_arrivee_lat: cd.gps_arrivee_lat,
     gps_arrivee_lng: cd.gps_arrivee_lng,
+    // ── Architecture durable : enregistrer le numéro WhatsApp SILGAPP d'origine ──
+    // Toutes les notifications de cette course partiront depuis ce numéro.
+    // Séparé par pays et par compte WhatsApp/Twilio naturellement (chaque numéro = 1 pays + 1 compte).
+    silgapp_from_number: silgappFromNumber || undefined,
   };
 
   if (normalizedType === 'expedier') {
