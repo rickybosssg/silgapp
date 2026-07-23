@@ -81,7 +81,11 @@ export default function OpenAIDashboard() {
     setFetchError(null);
     try {
       const result = await base44.functions.invoke('getOpenAIStats', {});
-      setStats(result);
+      if (result?.error) {
+        setFetchError(`Réponse backend: ${result.error}`);
+      } else {
+        setStats(result);
+      }
     } catch (e) {
       console.error('Erreur fetchStats:', e);
       setFetchError(e?.message || String(e));
