@@ -74,14 +74,17 @@ export default function OpenAIDashboard() {
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
+  const [fetchError, setFetchError] = useState(null);
 
   const fetchStats = useCallback(async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const result = await base44.functions.invoke('getOpenAIStats', {});
       setStats(result);
     } catch (e) {
       console.error('Erreur fetchStats:', e);
+      setFetchError(e?.message || String(e));
     } finally {
       setLoading(false);
     }
@@ -112,6 +115,25 @@ export default function OpenAIDashboard() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
+      </div>
+    );
+  }
+
+  if (fetchError && !stats) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="bg-white rounded-xl border border-red-200 p-6 max-w-md text-center shadow-sm">
+          <XCircle className="w-10 h-10 text-red-500 mx-auto mb-3" />
+          <h2 className="text-sm font-bold text-slate-900 mb-2">Impossible de charger les statistiques</h2>
+          <p className="text-xs text-slate-500 mb-1">Erreur détectée :</p>
+          <p className="text-xs text-red-600 font-mono bg-red-50 rounded p-2 mb-4 break-all">{fetchError}</p>
+          <button
+            onClick={fetchStats}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 mx-auto"
+          >
+            <RefreshCw className="w-4 h-4" /> Réessayer
+          </button>
+        </div>
       </div>
     );
   }
