@@ -6,6 +6,33 @@ import {
   MessageSquare, Brain, Database, Shield, FileText, Cog
 } from 'lucide-react';
 
+function BudgetBar({ label, cost, budget, pct }) {
+  const isOver = pct >= 100;
+  const isWarning = pct >= 80 && pct < 100;
+  const barColor = isOver ? 'bg-red-500' : isWarning ? 'bg-amber-500' : 'bg-emerald-500';
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-xs font-medium text-slate-600">{label}</span>
+        <span className={`text-xs font-bold ${isOver ? 'text-red-600' : isWarning ? 'text-amber-600' : 'text-slate-700'}`}>
+          ${cost.toFixed(4)} / ${budget.toFixed(2)}
+        </span>
+      </div>
+      <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${barColor}`}
+          style={{ width: `${Math.min(pct, 100)}%` }}
+        />
+      </div>
+      <div className="flex items-center justify-between mt-1">
+        <span className="text-xs text-slate-400">{pct}% utilisé</span>
+        {isOver && <span className="text-xs text-red-600 font-semibold flex items-center gap-1"><AlertTriangle className="w-3 h-3" />Budget dépassé — fallback automatique</span>}
+        {isWarning && !isOver && <span className="text-xs text-amber-600 font-medium flex items-center gap-1"><AlertTriangle className="w-3 h-3" />Seuil d'alerte (80%)</span>}
+      </div>
+    </div>
+  );
+}
+
 function StatCard({ icon: Icon, label, value, sublabel, color = 'indigo' }) {
   const colorMap = {
     indigo: 'from-indigo-500 to-purple-600',
@@ -129,6 +156,33 @@ export default function OpenAIDashboard() {
       </div>
 
       <div className="p-4 sm:p-6 space-y-6">
+        {/* ═══ Section 0: Budget tracking ═══ */}
+        {stats?.budget && (
+          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <DollarSign className="w-4 h-4 text-emerald-500" />
+              <h2 className="text-sm font-semibold text-slate-700">Suivi budgétaire OpenAI</h2>
+              <span className={`ml-auto px-2 py-0.5 rounded text-xs font-semibold ${stats.learning_mode === 'gpt_principal' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                Mode: {stats.learning_mode || 'gpt_principal'}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <BudgetBar
+                label="Budget quotidien"
+                cost={stats.budget.today_cost}
+                budget={stats.budget.daily_budget}
+                pct={stats.budget.daily_pct}
+              />
+              <BudgetBar
+                label="Budget mensuel"
+                cost={stats.budget.month_cost}
+                budget={stats.budget.monthly_budget}
+                pct={stats.budget.monthly_pct}
+              />
+            </div>
+          </div>
+        )}
+
         {/* ═══ Section 1: Audit des messages WhatsApp aujourd'hui ═══ */}
         <div>
           <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">

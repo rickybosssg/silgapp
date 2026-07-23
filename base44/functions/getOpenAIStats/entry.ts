@@ -22,7 +22,10 @@ Deno.serve(async (req) => {
     const configs = await base44.asServiceRole.entities.SystemConfig.filter({});
     const getConfig = (cle: string) => configs.find((c: any) => c.cle === cle)?.valeur;
     const openai_enabled = getConfig('VENUS_OPENAI_ENABLED') === 'true';
-    const current_model = getConfig('VENUS_OPENAI_MODEL') || 'gpt-4.1-mini (défaut)';
+    const current_model = getConfig('VENUS_PRIMARY_MODEL') || getConfig('VENUS_OPENAI_MODEL') || 'gpt-4.1-mini (défaut)';
+    const daily_budget = parseFloat(getConfig('VENUS_DAILY_BUDGET') || '5') || 5;
+    const monthly_budget = parseFloat(getConfig('VENUS_MONTHLY_BUDGET') || '100') || 100;
+    const learning_mode = getConfig('VENUS_LEARNING_MODE') || 'gpt_principal';
 
     // ── Récupérer les records récents (max 1000) ──
     const records = await base44.asServiceRole.entities.VenusOpenAIUsage.list('-date_appel', 1000);
@@ -112,6 +115,15 @@ Deno.serve(async (req) => {
     return Response.json({
       current_model,
       openai_enabled,
+      learning_mode,
+      budget: {
+        daily_budget,
+        monthly_budget,
+        today_cost: aggregate(todayRecords).cost_usd,
+        month_cost: aggregate(monthRecords).cost_usd,
+        daily_pct: daily_budget > 0 ? Math.round((aggregate(todayRecords).cost_usd / daily_budget) * 100) : 0,
+        monthly_pct: monthly_budget > 0 ? Math.round((aggregate(monthRecords).cost_usd / monthly_budget) * 100) : 0,
+      },
       today: aggregate(todayRecords),
       month: aggregate(monthRecords),
       recent_errors: recentErrors,

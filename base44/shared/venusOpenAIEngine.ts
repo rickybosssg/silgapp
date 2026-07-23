@@ -33,6 +33,8 @@ const CONFIG_CACHE: {
   learningMode: string | null;
   maxTokens: number | null;
   temperature: number | null;
+  dailyBudget: number | null;
+  monthlyBudget: number | null;
   expires: number;
 } = {
   enabled: null,
@@ -40,6 +42,8 @@ const CONFIG_CACHE: {
   learningMode: null,
   maxTokens: null,
   temperature: null,
+  dailyBudget: null,
+  monthlyBudget: null,
   expires: 0,
 };
 
@@ -63,8 +67,10 @@ async function chargerTouteLaConfig(base44: any) {
     CONFIG_CACHE.learningMode = get('VENUS_LEARNING_MODE', 'gpt_principal');
     CONFIG_CACHE.maxTokens = parseInt(get('VENUS_MAX_OUTPUT_TOKENS', '1500'), 10) || 1500;
     CONFIG_CACHE.temperature = parseFloat(get('VENUS_TEMPERATURE', '0.3')) || 0.3;
+    CONFIG_CACHE.dailyBudget = parseFloat(get('VENUS_DAILY_BUDGET', '5')) || 5;
+    CONFIG_CACHE.monthlyBudget = parseFloat(get('VENUS_MONTHLY_BUDGET', '100')) || 100;
     CONFIG_CACHE.expires = Date.now() + 30000;
-    console.log(`[OpenAIEngine] ✅ Config: enabled=${CONFIG_CACHE.enabled} | model=${CONFIG_CACHE.model} | mode=${CONFIG_CACHE.learningMode} | maxTokens=${CONFIG_CACHE.maxTokens} | temp=${CONFIG_CACHE.temperature}`);
+    console.log(`[OpenAIEngine] ✅ Config: enabled=${CONFIG_CACHE.enabled} | model=${CONFIG_CACHE.model} | mode=${CONFIG_CACHE.learningMode} | maxTokens=${CONFIG_CACHE.maxTokens} | temp=${CONFIG_CACHE.temperature} | budget=$${CONFIG_CACHE.dailyBudget}/j $${CONFIG_CACHE.monthlyBudget}/m`);
   } catch (e: any) {
     console.error(`[OpenAIEngine] ❌ Erreur chargement config: ${e.message} — valeurs par défaut`);
     CONFIG_CACHE.enabled = true;
@@ -72,6 +78,8 @@ async function chargerTouteLaConfig(base44: any) {
     CONFIG_CACHE.learningMode = 'gpt_principal';
     CONFIG_CACHE.maxTokens = 1500;
     CONFIG_CACHE.temperature = 0.3;
+    CONFIG_CACHE.dailyBudget = 5;
+    CONFIG_CACHE.monthlyBudget = 100;
     CONFIG_CACHE.expires = Date.now() + 5000;
   }
   return CONFIG_CACHE;
@@ -100,6 +108,53 @@ export async function getMaxTokens(base44: any): Promise<number> {
 export async function getTemperature(base44: any): Promise<number> {
   const cfg = await chargerTouteLaConfig(base44);
   return cfg.temperature!;
+}
+
+/**
+ * Vérifie si le budget quotidien/mensuel OpenAI est dépassé.
+ * Compte le coût total des appels VenusOpenAIUsage pour aujourd'hui et ce mois-ci.
+ * @returns { depasse, raison, coutJour, coutMois, budgetJour, budgetMois }
+ */
+export async function verifierBudget(base44: any): Promise<{
+  depasse: boolean;
+  raison: string;
+  coutJour: number;
+  coutMois: number;
+  budgetJour: number;
+  budgetMois: number;
+}> {
+  const cfg = await chargerTouteLaConfig(base44);
+  const budgetJour = cfg.dailyBudget!;
+  const budgetMois = cfg.monthlyBudget!;
+
+  try {
+    const now = new Date();
+    const debutJour = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const debutMois = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+    const [usageJour, usageMois] = await Promise.all([
+      base44.asServiceRole.entities.VenusOpenAIUsage.filter(
+        { date_appel: { $gte: debutJour } }, '-date_appel', 500
+      ).catch(() => []),
+      base44.asServiceRole.entities.VenusOpenAIUsage.filter(
+        { date_appel: { $gte: debutMois } }, '-date_appel', 500
+      ).catch(() => []),
+    ]);
+
+    const coutJour = (usageJour || []).reduce((sum: number, u: any) => sum + (u.cost_usd || 0), 0);
+    const coutMois = (usageMois || []).reduce((sum: number, u: any) => sum + (u.cost_usd || 0), 0);
+
+    if (coutMois >= budgetMois) {
+      return { depasse: true, raison: `Budget mensuel dépassé: $${coutMois.toFixed(4)} / $${budgetMois}`, coutJour, coutMois, budgetJour, budgetMois };
+    }
+    if (coutJour >= budgetJour) {
+      return { depasse: true, raison: `Budget quotidien dépassé: $${coutJour.toFixed(4)} / $${budgetJour}`, coutJour, coutMois, budgetJour, budgetMois };
+    }
+    return { depasse: false, raison: '', coutJour, coutMois, budgetJour, budgetMois };
+  } catch (e: any) {
+    console.warn(`[OpenAIEngine] Erreur vérification budget: ${e.message} — autorisation par défaut`);
+    return { depasse: false, raison: '', coutJour: 0, coutMois: 0, budgetJour, budgetMois };
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -315,6 +370,13 @@ export async function raisonnerAvecOpenAI(
   const model = await getOpenAIModel(base44);
   const maxTokens = await getMaxTokens(base44);
   const temp = await getTemperature(base44);
+
+  // ── Vérification budgétaire (quotidien + mensuel) ──
+  const budget = await verifierBudget(base44);
+  if (budget.depasse) {
+    console.warn(`[OpenAIEngine] ⚠️ ${budget.raison} — bascule vers InvokeLLM (fallback)`);
+    throw new Error(`BUDGET_DEPASSE: ${budget.raison}`);
+  }
 
   // ── Construction des messages ──
   // Le prompt contient déjà tout le contexte RAG + règles + connaissances.
