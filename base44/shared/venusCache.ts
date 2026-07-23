@@ -61,6 +61,11 @@ export function stockerCache(telephone: string, message: string, memoireCourte: 
   if (response.action === 'creer_course') return;
   // Ne cacher que les réponses informationnelles et salutations
   if (!['repondre_info', 'saluer', 'poser_question'].includes(response.action)) return;
+  // ── Ne jamais cacher les réponses de fallback (erreur LLM ou confiance faible) ──
+  // Ces réponses sont des erreurs — les cacher ferait boucler VENUS sur "Comment puis-je vous aider ?"
+  if (!response.reponse || (typeof response.reponse === 'string' && response.reponse.trim().length === 0)) return;
+  if (response.confiance < 50) return;
+  if (typeof response.reponse === 'string' && response.reponse.includes('Comment puis-je vous aider')) return;
 
   const cle = genererCleCache(telephone, message, memoireCourte);
   RESPONSE_CACHE.set(cle, { response, expires: Date.now() + CACHE_TTL_MS });

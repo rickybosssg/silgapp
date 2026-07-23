@@ -310,6 +310,8 @@ ACTIONS D'ÉCRITURE :
 - Pour contacter le livreur : utilise l'outil contacter_livreur, puis mets action = "contacter_livreur".
 - Le système vérifie TOUJOURS la réussite de l'action avant d'envoyer la réponse au client.
 
+IMPORTANT: Le champ "reponse" DOIT TOUJOURS contenir un texte complet et non vide (minimum 10 caractères). Ne JAMAIS retourner un JSON avec un champ "reponse" vide.
+
 Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
   );
 
@@ -354,11 +356,15 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
     // ── Si aucun tool_call → réponse finale JSON ──
     if (!msg.tool_calls || msg.tool_calls.length === 0) {
       const content = msg.content || '';
+      // ── Si OpenAI retourne une réponse vide, lancer une exception pour déclencher le fallback InvokeLLM ──
+      if (!content || content.trim().length === 0) {
+        throw new Error('OpenAI: réponse vide (content null/empty) — fallback vers InvokeLLM');
+      }
       let parsed: any;
       try {
         parsed = JSON.parse(content);
       } catch {
-        // Si le JSON échoue, envelopper le texte dans une structure valide
+        // Content existe mais n'est pas du JSON valide — l'envelopper
         parsed = {
           intention: 'autre',
           contexte: 'general',
@@ -368,13 +374,17 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
           prochaine_question: '',
           outils_utilises: toolsUsed,
           confiance: 80,
-          reponse: content.substring(0, 500) || 'Comment puis-je vous aider ?',
+          reponse: content.substring(0, 500),
           memoire_courte_update: '{}',
           memoire_longue_update: '{}',
           business_rule_id: '',
           knowledge_id: '',
           document_sources: '',
         };
+      }
+      // ── Si la reponse est vide dans le JSON parsé, lancer une exception pour le fallback InvokeLLM ──
+      if (!parsed.reponse || (typeof parsed.reponse === 'string' && parsed.reponse.trim().length === 0)) {
+        throw new Error('OpenAI: reponse vide dans le JSON — fallback vers InvokeLLM');
       }
 
       // S'assurer que les outils utilisés sont enregistrés
@@ -437,13 +447,17 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
 
   const finalData = await finalResponse.json();
   const finalContent = finalData.choices?.[0]?.message?.content || '';
+  // ── Si la réponse finale est aussi vide, lancer une exception pour le fallback InvokeLLM ──
+  if (!finalContent || finalContent.trim().length === 0) {
+    throw new Error('OpenAI: réponse finale vide après max tool rounds — fallback InvokeLLM');
+  }
   let finalParsed: any;
   try { finalParsed = JSON.parse(finalContent); }
   catch {
     finalParsed = {
       intention: 'autre', contexte: 'general', infos_connues: '{}', infos_manquantes: [],
       action: 'repondre_info', prochaine_question: '', outils_utilises: toolsUsed,
-      confiance: 70, reponse: finalContent.substring(0, 500) || 'Comment puis-je vous aider ?',
+      confiance: 70, reponse: finalContent.substring(0, 500),
       memoire_courte_update: '{}', memoire_longue_update: '{}',
       business_rule_id: '', knowledge_id: '', document_sources: '',
     };

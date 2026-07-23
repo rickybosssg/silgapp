@@ -1692,7 +1692,7 @@ Deno.serve(async (req) => {
     // 4. Gating : bloquer si confiance trop faible, forcer confirmation sinon
     // 5. Passer le texte nettoyé à VENUS avec flag force_confirmation
     // ═══════════════════════════════════════════════════════════════
-    let messageEffectif = body;
+    let messageEffectif = messageContent || body;
     let clientAEnvoyeAudio = false;
     let isAudioTranscription = false;
     let forceConfirmationAudio = false;
@@ -1781,6 +1781,8 @@ Deno.serve(async (req) => {
         venus_pending_course: JSON.stringify(pendingCourseLoc),
       });
       console.log(`[WebhookVenus] 📍 Localisation sauvegardée en attente d'assignation pour ${conversation.id}`);
+      // ── Mettre à jour la variable locale pour que le moteur de raisonnement voie la localisation ──
+      conversation.venus_pending_course = JSON.stringify(pendingCourseLoc);
     }
 
     // ── Détection d'incidents (avant le moteur de raisonnement) ──

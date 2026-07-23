@@ -1110,7 +1110,11 @@ Réponds UNIQUEMENT avec un JSON.`;
 
     // ── Post-traitement : valider et nettoyer ──
     if (!result.action) result.action = 'repondre_info';
-    if (!result.reponse) result.reponse = 'Comment puis-je vous aider ?';
+    if (!result.reponse || (typeof result.reponse === 'string' && result.reponse.trim().length === 0)) {
+      console.warn('[ReasoningEngine] ⚠️ LLM a retourné une réponse vide — fallback contextuel');
+      result.reponse = "Je n'ai pas bien compris votre demande. Pouvez-vous reformuler ?";
+      result.confiance = 30; // Confiance faible → ne sera pas mis en cache
+    }
     if (result.confiance === undefined || result.confiance === null) result.confiance = 50;
     if (result.confiance <= 1) result.confiance = Math.round(result.confiance * 100);
     if (!result.outils_utilises) result.outils_utilises = [];
