@@ -133,8 +133,8 @@ async function envoyerIndicateurSaisie(messageSid, accountSid, authToken) {
       console.log(`[WebhookVenus] ⌨️ Indicateur de saisie envoyé pour ${messageSid}`);
       return true;
     }
-    const errData = await resp.json().catch(() => ({}));
-    console.warn(`[WebhookVenus] ⌨️ Indicateur de saisie échoué: HTTP ${resp.status} — ${errData.message || errData.error || ''}`);
+    const errText = await resp.text().catch(() => '');
+    console.warn(`[WebhookVenus] ⌨️ Indicateur de saisie échoué: HTTP ${resp.status} | messageId: ${messageSid} | Response: ${errText.substring(0, 500)}`);
     return false;
   } catch (e) {
     console.warn(`[WebhookVenus] ⌨️ Erreur indicateur de saisie: ${e.message}`);
@@ -1648,8 +1648,10 @@ Deno.serve(async (req) => {
     // et affiche "SILGAPP NOTIFICATIONS est en train d'écrire..." pendant 25s.
     // Renouvelé toutes les 20s si le traitement est long (LLM, RAG, création de course).
     // L'indicateur disparaît automatiquement dès que la réponse est livrée.
+    let typingStartTime = 0;
     if (messageSid) {
       await envoyerIndicateurSaisie(messageSid, accountSid, authToken);
+      typingStartTime = Date.now();
       typingInterval = setInterval(() => {
         envoyerIndicateurSaisie(messageSid, accountSid, authToken).catch(() => {});
       }, 20000);
@@ -2119,6 +2121,19 @@ Deno.serve(async (req) => {
     // ── Arrêter le renouvellement de l'indicateur de saisie + timeout d'attente ──
     // L'indicateur disparaît automatiquement dès que la réponse est livrée.
     if (typingInterval) { clearInterval(typingInterval); typingInterval = null; }
+
+    // ── Garantir un délai minimum (2.5s) entre l'indicateur de saisie et la réponse ──
+    // Sans ce délai, le traitement étant trop rapide (salutations cachées, etc.),
+    // l'indicateur "en train d'écrire..." disparaît avant que l'utilisateur ne le voie.
+    if (typingStartTime > 0) {
+      const elapsed = Date.now() - typingStartTime;
+      const MIN_TYPING_DISPLAY_MS = 2500;
+      if (elapsed < MIN_TYPING_DISPLAY_MS) {
+        const waitMs = MIN_TYPING_DISPLAY_MS - elapsed;
+        console.log(`[WebhookVenus] ⌨️ Attente ${waitMs}ms pour visibilité indicateur de saisie (écoulé: ${elapsed}ms)`);
+        await new Promise(resolve => setTimeout(resolve, waitMs));
+      }
+    }
 
     console.log(`[WebhookVenus] 📤 ÉTAPE 6 — Envoi réponse à ${telephone} via Twilio (from: ${fromNumber}) | mode: ${utiliserAudio ? 'AUDIO' : 'TEXTE'}`);
     if (utiliserAudio) {
