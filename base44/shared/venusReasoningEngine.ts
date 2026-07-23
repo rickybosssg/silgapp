@@ -765,42 +765,17 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
     return salutation;
   }
 
-  // ── ÉCONOMIE DE CRÉDITS: Court-circuit questions fréquentes (0 crédit LLM) ──
-  const raccourci = detecterRaccourciFrequent(input.messageClient, input.courseActive);
-  if (raccourci) {
-    raccourci.temps_traitement_ms = Date.now() - startTime;
-    raccourci.decision_moteur = 'raccourci';
-    stockerCache(input.telephone, input.messageClient, input.memoireCourte, raccourci);
-    return raccourci;
-  }
-
-  // ── ÉCONOMIE DE CRÉDITS: Vérifier le cache de réponses (0 crédit LLM) ──
-  const cached = recupererCache(input.telephone, input.messageClient, input.memoireCourte);
-  if (cached) {
-    cached.temps_traitement_ms = Date.now() - startTime;
-    cached.decision_moteur = 'cache';
-    return cached;
-  }
+  // ── SIMPLIFICATION: Les bypass (raccourcis, cache, règles métier directes,
+  //    connaissances directes) sont désactivés. GPT traite TOUS les messages.
+  //    Seuls les bypass techniques (sécurité + salutation) restent actifs.
 
   // ── Construire l'historique lisible ──
   const historiqueStr = input.historiqueRecent
     .map(m => `${m.sender_type === 'client' ? 'Client' : 'VENUS'}: ${m.content || `[${m.message_type}]`}`)
     .join('\n') || 'Aucun historique';
 
-  // ── Heuristique PRÉ-LLM : extraire les infos du message AVANT l'appel LLM ──
-  // On fusionne avec la mémoire courte existante pour que le LLM VOIT les infos
-  // déjà détectées (type_course, téléphone, quartiers) et ne les redemande pas.
-  const heuristiqueExtracted = extraireInfosDepuisMessage(input.messageClient);
+  // ── GPT extrait lui-même les infos du message. Pas d'heuristique pré-LLM. ──
   const mergedMemoireCourte: Record<string, any> = { ...(input.memoireCourte || {}) };
-  for (const [k, v] of Object.entries(heuristiqueExtracted)) {
-    // Ne pas écraser les champs déjà connus dans la mémoire courte
-    if (mergedMemoireCourte[k] == null || mergedMemoireCourte[k] === '') {
-      mergedMemoireCourte[k] = v;
-    }
-  }
-  if (Object.keys(heuristiqueExtracted).length > 0) {
-    console.log(`[ReasoningEngine] 🔍 Heuristique pré-LLM: ${JSON.stringify(heuristiqueExtracted)}`);
-  }
 
   // ── Mémoire courte lisible (avec heuristique fusionnée) ──
   const memoireCourteStr = Object.keys(mergedMemoireCourte).length > 0
@@ -901,36 +876,10 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
     console.log(`[ReasoningEngine] 📖 ${businessRuleEntries.length} règles métier chargées`);
   }
 
-  // ── MODE APPRENTISSAGE: En mode gpt_principal, GPT analyse TOUS les messages ──
-  // Les bypasses agressifs (règle métier directe, connaissance directe) sont désactivés
-  // car ils interceptent des messages complexes contenant des mots-clés de connaissance.
-  // Exemple: "Bonjour VENUS. Je souhaite envoyer un colis" était intercepté par une
-  // entrée de connaissance "Bonjour VENUS" → VENUS retournait un message de présentation
-  // au lieu de créer la course. GPT reçoit quand même les règles et connaissances dans son prompt.
-  const learningMode = await getLearningMode(base44);
-  const skipBypassesAgressifs = learningMode === 'gpt_principal' || learningMode === 'observation';
-
-  if (!skipBypassesAgressifs) {
-    // ── ÉCONOMIE DE CRÉDITS: Court-circuit règle métier directe (0 crédit LLM) ──
-    const regleDirecte = detecterRegleMetierDirecte(input.messageClient, businessRuleEntries);
-    if (regleDirecte) {
-      regleDirecte.temps_traitement_ms = Date.now() - startTime;
-      regleDirecte.decision_moteur = 'regle_metier';
-      stockerCache(input.telephone, input.messageClient, input.memoireCourte, regleDirecte);
-      return regleDirecte;
-    }
-
-    // ── ÉCONOMIE DE CRÉDITS: Court-circuit connaissance directe (0 crédit LLM) ──
-    const connaissanceDirecte = detecterConnaissanceDirecte(input.messageClient, knowledgeEntries);
-    if (connaissanceDirecte) {
-      connaissanceDirecte.temps_traitement_ms = Date.now() - startTime;
-      connaissanceDirecte.decision_moteur = 'connaissance';
-      stockerCache(input.telephone, input.messageClient, input.memoireCourte, connaissanceDirecte);
-      return connaissanceDirecte;
-    }
-  } else {
-    console.log(`[ReasoningEngine] 🎓 Mode ${learningMode} — bypass agressifs désactivés, GPT traite le message`);
-  }
+  // ── SIMPLIFICATION: Tous les bypasses (raccourcis, cache, règles métier directes,
+  //    connaissances directes, heuristique pré-LLM) sont supprimés.
+  //    GPT traite TOUS les messages. Le RAG et les règles restent dans le prompt
+  //    comme CONTEXTE, mais ne répondent pas à la place de GPT.
 
   // ── Construire le prompt de raisonnement ──
   const audioNote = input.isAudioTranscription
@@ -1090,7 +1039,12 @@ Champs possibles: client_nom, ville_habituelle, quartier_habituel, langue_prefer
 
 6. PAS DE PRIX: Ne JAMAIS inventer ou estimer un prix. Si le client demande le prix, réponds que le livreur confirmera le coût.
 
-7. CRÉATION DE COURSE: Si toutes les infos requises sont présentes (type_course + depart + arrivee + contact) ET que le client a confirmé (ou si all_info_collected=true dans la mémoire et le client dit oui/ok/confirme), choisis action=creer_course.
+7. CRÉATION DE COURSE — FLUX OBLIGATOIRE:
+   a) Si des infos manquent → action=poser_question (DEMANDE UNE SEULE question).
+   b) Si TOUTES les infos sont présentes (type_course + depart + arrivee + contact) ET que tu n'as PAS encore montré le récapitulatif → montre le récapitulatif et demande "Confirmez-vous la création de cette course ?" (action=poser_question).
+   c) Si tu as déjà montré le récapitulatif ET que le client répond par l'affirmative (oui, ok, d'accord, je confirme, valider, go, parfait, exact) → action=creer_course.
+   d) Si tu as montré le récapitulatif ET que le client corrige une info → mets à jour memoire_courte_update et reviens à l'étape (a) ou (b).
+   N'utilise JAMAIS les champs all_info_collected ou user_confirmed — ces décisions appartiennent au serveur, pas à toi.
 
 8. SALUTATION: Si c'est une salutation simple (Bonjour, Bonsoir, Salut, Coucou, Hello) et qu'aucune course n'est en cours, réponds UNIQUEMENT par un accueil chaleureux SANS mentionner de services (PAS de colis, livraison, commande, déplacement, tarif). Réponse modèle: "Bonjour 👋 Je suis VENUS, l'assistante intelligente de SILGAPP. Comment puis-je vous aider aujourd'hui ?"
 
@@ -1098,46 +1052,35 @@ Champs possibles: client_nom, ville_habituelle, quartier_habituel, langue_prefer
 
 10. MÉMOIRE LONGUE: Détecte les informations persistantes (ville, quartier, nom, destinataires fréquents) et inclus-les dans memoire_longue_update.
 
-11. Si all_info_collected est vrai dans la mémoire courte et que le client confirme (oui, ok, d'accord, je confirme, valider), choisis action=creer_course IMMÉDIATEMENT.
+11. RÔLE DU RAG ET DES RÈGLES: Les règles métier, connaissances et documents RAG ci-dessus sont fournis CONTEXTE UNIQUEMENT. Ils t'aident à formuler tes réponses. Tu ne dois JAMAIS laisser une règle ou un document RÉPONDRE À LA PLACE de ton raisonnement. C'est TOI qui comprends, extraits et décides — le RAG est une source d'information, pas un moteur de décision.
 
-12. Si pending_location_lat est défini dans la mémoire, une localisation est en attente d'assignation. Demande si c'est le lieu de récupération ou de livraison.
+12. Pas de création automatique. Pas de all_info_collected. Pas de user_confirmed. Ces champs n'existent pas dans ton raisonnement.
 
-13. PRIORITÉ DES SOURCES: Avant de répondre, consulte les sources dans cet ORDRE OBLIGATOIRE:
-    a) Règles métier (Source 0) — si une règle correspond à la situation, applique son PRINCIPE et mets business_rule_id. Les règles métier ont priorité sur TOUT.
-    b) Workflows (Source 1) — si un workflow correspond à l'intention détectée, suis ses étapes.
-    c) Base de connaissances (Source 2) — si une entrée correspond, utilise sa réponse et mets knowledge_id.
-    d) Bibliothèque documentaire (Source 3) — si un document officiel correspond, utilise son contenu et mets document_sources avec les IDs.
-    e) Scénarios validés (Source 4) — si un scénario correspond à la situation, inspire-toi de sa réponse idéale.
-    f) IA générale (Source 5) — uniquement si aucune source officielle ne correspond.
-    Les règles métier s'appliquent à TOUTES les intentions, pas seulement aux questions informationnelles.
+13. Si le client indique "recevoir un colis", le contact à collecter est l'EXPÉDITEUR (celui qui envoie vers le client). Si "envoyer un colis", le contact est le DESTINATAIRE (celui qui reçoit).
 
-14. DOCUMENTS OFFICIELS: Si la Bibliothèque documentaire contient des informations pertinentes, cite-les dans ta réponse de manière naturelle. Les documents officiels SILGAPP (procédures, tarifs, conditions générales, guides) ont priorité sur ta propre connaissance. Si tu utilises un document, mets document_sources avec [{document_id, document_titre, chunk_id, score, version}].
+14. Le nom du destinataire/expéditeur est FACULTATIF. Seul le téléphone est requis. Si le client n'a pas le nom, mets contact_nom à "" et contact_is_client à false (ou true si le client est lui-même le contact).
 
-15. Si le client indique "recevoir un colis", le contact à collecter est l'EXPÉDITEUR (celui qui envoie vers le client). Si "envoyer un colis", le contact est le DESTINATAIRE (celui qui reçoit).
+15. SIGNALEMENT LIVREUR: Si le message indique clairement que l'expéditeur EST un livreur en train de travailler (ex: "j'ai fini à Karpala", "je m'en vais à la Patte d'Oie pour une livraison", "j'ai récupéré le colis", "je suis en route"), NE CRÉE PAS de course. Réponds: "Merci pour cette mise à jour ! Je note votre progression. Bonne continuation !" avec intention=signalement_livreur et action=repondre_info.
 
-15. Le nom du destinataire/expéditeur est FACULTATIF. Seul le téléphone est requis. Si le client n'a pas le nom, mets contact_nom à "" et contact_is_client à false (ou true si le client est lui-même le contact).
+16. MESSAGE HORS CONTEXTE: Si le message s'adresse à quelqu'un d'autre et n'est pas une demande SILGAPP (ex: "tu n'es pas au bureau?", "sors dehors", "je suis devant la porte", "appelle ton numéro"), réponds poliment: "Je suis VENUS, l'assistante SILGAPP. Il semble que votre message s'adresse à quelqu'un d'autre. Si vous avez besoin d'une livraison ou d'un envoi de colis, je suis là pour vous aider !" avec intention=message_hors_contexte et action=repondre_info.
 
-16. SIGNALEMENT LIVREUR: Si le message indique clairement que l'expéditeur EST un livreur en train de travailler (ex: "j'ai fini à Karpala", "je m'en vais à la Patte d'Oie pour une livraison", "j'ai récupéré le colis", "je suis en route"), NE CRÉE PAS de course. Réponds: "Merci pour cette mise à jour ! Je note votre progression. Bonne continuation !" avec intention=signalement_livreur et action=repondre_info.
+17. MENTION DE LIEUX SANS DEMANDE: Le simple fait de mentionner un quartier (Karpala, Patte d'Oie, etc.) NE signifie PAS que le client veut créer une course. Ne crée une course QUE si le client exprime clairement une demande de service ("je voudrais envoyer", "je veux livrer", "j'ai besoin d'une livraison").
 
-17. MESSAGE HORS CONTEXTE: Si le message s'adresse à quelqu'un d'autre et n'est pas une demande SILGAPP (ex: "tu n'es pas au bureau?", "sors dehors", "je suis devant la porte", "appelle ton numéro"), réponds poliment: "Je suis VENUS, l'assistante SILGAPP. Il semble que votre message s'adresse à quelqu'un d'autre. Si vous avez besoin d'une livraison ou d'un envoi de colis, je suis là pour vous aider !" avec intention=message_hors_contexte et action=repondre_info.
-
-18. MENTION DE LIEUX SANS DEMANDE: Le simple fait de mentionner un quartier (Karpala, Patte d'Oie, etc.) NE signifie PAS que le client veut créer une course. Ne crée une course QUE si le client exprime clairement une demande de service ("je voudrais envoyer", "je veux livrer", "j'ai besoin d'une livraison").
-
-19. CONTINUITÉ DE CONVERSATION (CRITIQUE): Si VENUS a posé une question dans son dernier message, le message actuel est probablement LA RÉPONSE à cette question. Dans ce cas:
+18. CONTINUITÉ DE CONVERSATION (CRITIQUE): Si VENUS a posé une question dans son dernier message, le message actuel est probablement LA RÉPONSE à cette question. Dans ce cas:
    - Si la mémoire courte a déjà adresse_depart, NE PAS l'écraser avec une nouvelle adresse extraite du message.
    - Si la mémoire courte a déjà adresse_arrivee, NE PAS l'écraser.
    - Si la mémoire courte a déjà type_course, NE PAS le redemander.
    - Un numéro de téléphone dans la réponse = contact_telephone, PAS une nouvelle demande.
    - NE PAS inclure dans memoire_courte_update les champs qui sont DÉJÀ présents dans la mémoire courte avec la même valeur ou une valeur non vide.
 
-20. RÉPONSE À UNE QUESTION: Si VENUS a demandé "quel est le numéro du destinataire?" et le client répond "70 12 34 56", la réponse est contact_telephone="70123456". L'action doit être poser_question (prochaine info manquante) ou creer_course (si tout est complet). NE JAMAIS reformuler "Si j'ai bien compris vous souhaitez..." dans ce cas.
+19. RÉPONSE À UNE QUESTION: Si VENUS a demandé "quel est le numéro du destinataire?" et le client répond "70 12 34 56", la réponse est contact_telephone="70123456". L'action doit être poser_question (prochaine info manquante) ou creer_course (si tout est complet). NE JAMAIS reformuler "Si j'ai bien compris vous souhaitez..." dans ce cas.
 
-21. ANTI-FAUX-ANNULATION (CRITIQUE): Un message court comme "Oui", "OK", "Ouais", "D'accord" SEUL ne doit JAMAIS être interprété comme intention=annuler_course. L'annulation ne peut être choisie QUE si:
+20. ANTI-FAUX-ANNULATION (CRITIQUE): Un message court comme "Oui", "OK", "Ouais", "D'accord" SEUL ne doit JAMAIS être interprété comme intention=annuler_course. L'annulation ne peut être choisie QUE si:
     a) Le client utilise un mot d'annulation explicite ("annule", "annuler", "supprime", "stoppe", "arrête", "je veux annuler", "plus besoin"), OU
     b) VENUS a EXPLICITEMENT posé une question d'annulation dans son dernier message (ex: "Voulez-vous annuler cette course ?") ET le client répond par l'affirmative.
     Si le message est juste "Oui" sans contexte d'annulation clair, choisis intention=clarifier ou action=poser_question pour demander au client ce qu'il souhaite, JAMAIS annuler_course.
 
-22. NOUVELLE COURSE APRÈS FIN: Si le client dit "créons une nouvelle course", "nouvelle course", "je veux une autre course" ou similaire, ET qu'aucune course active n'existe, tu DOIS vider implicitement la mémoire courte et recommencer la collecte depuis zéro. Ne réutilise PAS les adresses/contacts d'une course précédente terminée ou annulée. Choisis action=poser_question pour demander le type de course et les nouvelles adresses.
+21. NOUVELLE COURSE APRÈS FIN: Si le client dit "créons une nouvelle course", "nouvelle course", "je veux une autre course" ou similaire, ET qu'aucune course active n'existe, tu DOIS vider implicitement la mémoire courte et recommencer la collecte depuis zéro. Ne réutilise PAS les adresses/contacts d'une course précédente terminée ou annulée. Choisis action=poser_question pour demander le type de course et les nouvelles adresses.
 
 ═══ LANGUE OBLIGATOIRE ═══
 TU DOIS TOUJOURS RÉPONDRE EN FRANÇAIS. Ne réponds JAMAIS en anglais. Le client est au Burkina Faso ou en Côte d'Ivoire et parle français. Toutes tes réponses, questions, et reformulations doivent être en français.
@@ -1304,22 +1247,6 @@ Réponds UNIQUEMENT avec un JSON.`;
       result.document_sources = validSources.length > 0 ? validSources : undefined;
     } else {
       result.document_sources = undefined;
-    }
-
-    // ── ANTI-FAUSSE-SALUTATION: Si le LLM retourne une salutation pour un message qui n'en est pas une,
-    //    cela signifie que le LLM a mal interprété le message (ou réponse par défaut d'OpenAI).
-    //    On vérifie avec les patterns de salutation — si le message ne matche pas, on remplace
-    //    la réponse par une question de clarification au lieu d'une salutation trompeuse.
-    if (result.intention === 'salutation' || result.action === 'saluer') {
-      const salutationCheck = detecterSalutation(input.messageClient);
-      if (!salutationCheck) {
-        console.warn(`[ReasoningEngine] ⚠️ Fausse salutation détectée — le LLM a retourné intention=salutation pour "${input.messageClient.substring(0, 60)}" — remplacement par clarification`);
-        result.intention = 'clarifier';
-        result.action = 'poser_question';
-        result.confiance = 40;
-        result.reponse = `Je n'ai pas bien compris votre demande. Pouvez-vous reformuler ? Si vous souhaitez envoyer un colis, recevoir un colis ou vous déplacer, dites-le-moi simplement !`;
-        result.memoire_courte_update = {};
-      }
     }
 
     console.log(`[ReasoningEngine] 🧠 Intention: ${result.intention} | Contexte: ${result.contexte} | Action: ${result.action} | Confiance: ${result.confiance}% | Temps: ${result.temps_traitement_ms}ms`);

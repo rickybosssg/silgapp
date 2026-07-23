@@ -1890,57 +1890,10 @@ Deno.serve(async (req) => {
         reponseVenus = `Entendu — je laisse tomber la création de la livraison. Aucune course n'a été créée. Si tu veux la relancer plus tard, dis-le-moi et je m'en occupe. Besoin d'autre chose ? Pour assistance, tu peux appeler le support au +226 66 92 51 90.`;
       }
 
-      // ── Bypass déterministe: confirmation anti-boucle ──
-      const CONFIRM_KW_BYPASS = ['oui','ok',"d'accord",'d accord','je confirme','valider','confirmer','confirme',"c'est bon",'cest bon','go',"c'est ok",'cest ok','parfait','exact','certainement','bien sur','ouais','volontiers','je valide','valide','correct','daco'];
-      const msgLowerBypass = messageEffectif.toLowerCase().trim();
-      const isConfBypass = msgLowerBypass.length <= 25 && CONFIRM_KW_BYPASS.some(kw => msgLowerBypass.includes(kw));
-      const resumeBypass = pendingCourse?.all_info_collected === true && !pendingCourse?.course_created;
-
-      // ── Vérifier que TOUTES les infos requises sont présentes avant le bypass ──
-      // Empêche la création quand le LLM a marqué all_info_collected=true prématurément
-      // (ex: VENUS demandait encore le numéro du destinataire)
-      const hasTypeBypass = !!pendingCourse?.type_course;
-      const hasDepartBypass = pendingCourse?.adresse_depart || pendingCourse?.gps_depart_lat != null;
-      const hasArriveeBypass = pendingCourse?.adresse_arrivee || pendingCourse?.gps_arrivee_lat != null;
-      const hasContactBypass = pendingCourse?.contact_telephone || pendingCourse?.contact_is_client;
-      const allRequiredPresent = hasTypeBypass && hasDepartBypass && hasArriveeBypass && hasContactBypass;
-
-      // ── Vérifier le dernier message VENUS — s'il posait une question, ne pas bypass ──
-      let venusWasAskingQuestion = false;
-      if (resumeBypass && isConfBypass) {
-        try {
-          const lastVenusMsgs = await base44.asServiceRole.entities.Message.filter(
-            { conversation_id: conversation.id, sender_type: 'admin', source: 'whatsapp' },
-            '-created_date', 1
-          ).catch(() => []);
-          const lastVenusContent = lastVenusMsgs?.[0]?.content || '';
-          venusWasAskingQuestion = lastVenusContent.includes('?') ||
-            /peux-tu|pouvez-vous|quel est|quelle est|donnez|indiquez|precisez|j'ai besoin/i.test(lastVenusContent);
-          if (venusWasAskingQuestion) {
-            console.log(`[WebhookVenus] ⚠️ Bypass annulé — VENUS posait une question ("${lastVenusContent.substring(0, 60)}...")`);
-          }
-        } catch {}
-      }
-
-      if (resumeBypass && isConfBypass && allRequiredPresent && !venusWasAskingQuestion) {
-        console.log(`[WebhookVenus] ✅ Confirmation déterministe — création directe (bypass LLM)`);
-        const cr = await creerCourseDepuisMemoire(base44, pendingCourse, countryCode, tarifs, telephone, profileName, conversation.silgapp_from_number);
-        if (cr.success) {
-          reponseVenus = cr.message;
-          pendingCourse.course_created = true;
-          pendingCourse.course_id = cr.course.id;
-          await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(pendingCourse) });
-          const ltmBP = await chargerMemoireLongue(base44, telephone, countryCode);
-          if (ltmBP) {
-            await mettreAJourMemoireLongue(base44, ltmBP.id, {
-              adresse_recuperee: pendingCourse.adresse_depart, adresse_livraison: pendingCourse.adresse_arrivee,
-              destinataire_nom: pendingCourse.contact_nom, destinataire_telephone: pendingCourse.contact_telephone,
-              type_course_prefere: pendingCourse.type_course, client_nom: profileName,
-              increment_courses: true,
-            });
-          }
-        }
-      }
+      // ── SIMPLIFICATION: Le bypass de confirmation déterministe est supprimé.
+      //    GPT gère lui-même la détection de confirmation après récapitulatif.
+      //    Le webhook ne crée la course QUE quand GPT retourne action=creer_course
+      //    ET que tous les champs obligatoires sont validés par la porte de validation. ──
 
       if (!reponseVenus) {
         // ── Charger la mémoire longue, l'historique, la course active en PARALLÈLE ──
@@ -2054,7 +2007,6 @@ Deno.serve(async (req) => {
               }
             } else {
               // ── Toutes les infos sont présentes → créer la course ──
-              um.all_info_collected = true; um.user_confirmed = true;
               const cr2 = await creerCourseDepuisMemoire(base44, um, countryCode, tarifs, telephone, profileName, conversation.silgapp_from_number);
               if (cr2.success) {
                 reponseFinale = cr2.message;
