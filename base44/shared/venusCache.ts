@@ -259,8 +259,10 @@ export function detecterRegleMetierDirecte(message: string, regles: any[]): any 
       const exNorm = exemple.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
       if (exNorm.length < 5) continue;
 
-      // Correspondance exacte ou incluse (si l'exemple est court)
-      if (exNorm.length <= 30 && msgLower.includes(exNorm)) {
+      // Correspondance exacte pour les exemples courts (≤15 chars) — évite que "bonjour"
+      // ne matche "Bonjour VENUS. Je souhaite envoyer un colis."
+      // Pour les exemples plus longs (16-30 chars), on permet l'inclusion.
+      if (exNorm.length <= 15 ? msgLower === exNorm : msgLower.includes(exNorm)) {
         if (regle.reponse_associee && regle.reponse_associee.length > 10) {
           console.log(`[VenusCache] 📖 Règle métier directe: ${regle.nom}`);
           return {
