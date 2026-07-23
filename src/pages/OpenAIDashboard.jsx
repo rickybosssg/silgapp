@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import {
   Activity, DollarSign, Clock, AlertTriangle, Zap,
-  CheckCircle, XCircle, RefreshCw, TrendingUp, Cpu, TestTube
+  CheckCircle, XCircle, RefreshCw, TrendingUp, Cpu, TestTube,
+  MessageSquare, Brain, Database, Shield, FileText, Cog
 } from 'lucide-react';
 
 function StatCard({ icon: Icon, label, value, sublabel, color = 'indigo' }) {
@@ -12,6 +13,7 @@ function StatCard({ icon: Icon, label, value, sublabel, color = 'indigo' }) {
     amber: 'from-amber-500 to-orange-600',
     red: 'from-red-500 to-rose-600',
     blue: 'from-blue-500 to-cyan-600',
+    slate: 'from-slate-500 to-slate-700',
   };
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
@@ -26,6 +28,19 @@ function StatCard({ icon: Icon, label, value, sublabel, color = 'indigo' }) {
     </div>
   );
 }
+
+const DECISION_LABELS = {
+  securite: { label: 'Sécurité', color: 'bg-red-100 text-red-700' },
+  salutation: { label: 'Salutation', color: 'bg-blue-100 text-blue-700' },
+  raccourci: { label: 'Raccourci', color: 'bg-cyan-100 text-cyan-700' },
+  cache: { label: 'Cache', color: 'bg-slate-100 text-slate-700' },
+  regle_metier: { label: 'Règle métier', color: 'bg-purple-100 text-purple-700' },
+  connaissance: { label: 'Connaissance', color: 'bg-indigo-100 text-indigo-700' },
+  rag_llm: { label: 'RAG + Base44', color: 'bg-amber-100 text-amber-700' },
+  openai: { label: 'OpenAI', color: 'bg-emerald-100 text-emerald-700' },
+  fallback_base44: { label: 'Fallback Base44', color: 'bg-orange-100 text-orange-700' },
+  erreur: { label: 'Erreur', color: 'bg-red-100 text-red-700' },
+};
 
 export default function OpenAIDashboard() {
   const [stats, setStats] = useState(null);
@@ -47,6 +62,12 @@ export default function OpenAIDashboard() {
 
   useEffect(() => { fetchStats(); }, [fetchStats]);
 
+  // Auto-refresh toutes les 30 secondes
+  useEffect(() => {
+    const interval = setInterval(fetchStats, 30000);
+    return () => clearInterval(interval);
+  }, [fetchStats]);
+
   const handleTestOpenAI = async () => {
     setTesting(true);
     setTestResult(null);
@@ -60,7 +81,7 @@ export default function OpenAIDashboard() {
     }
   };
 
-  if (loading) {
+  if (loading && !stats) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
@@ -70,6 +91,8 @@ export default function OpenAIDashboard() {
 
   const today = stats?.today || {};
   const month = stats?.month || {};
+  const msgStats = stats?.message_stats_today || {};
+  const lastCalls = stats?.last_20_calls || [];
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -81,8 +104,8 @@ export default function OpenAIDashboard() {
               <Cpu className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-slate-900">Suivi OpenAI VENUS</h1>
-              <p className="text-xs text-slate-500">Monitoring temps réel du moteur d'intelligence</p>
+              <h1 className="text-lg font-bold text-slate-900">Audit OpenAI VENUS</h1>
+              <p className="text-xs text-slate-500">Monitoring temps réel — stats de production</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -97,46 +120,137 @@ export default function OpenAIDashboard() {
             <button
               onClick={fetchStats}
               className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
-              title="Rafraîchir"
+              title="Rafraîchir (auto toutes les 30s)"
             >
-              <RefreshCw className="w-4 h-4 text-slate-500" />
+              <RefreshCw className={`w-4 h-4 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
       </div>
 
       <div className="p-4 sm:p-6 space-y-6">
-        {/* KPIs du jour */}
+        {/* ═══ Section 1: Audit des messages WhatsApp aujourd'hui ═══ */}
         <div>
           <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-            <Activity className="w-4 h-4 text-indigo-500" />
-            Aujourd'hui
+            <MessageSquare className="w-4 h-4 text-indigo-500" />
+            Audit des messages WhatsApp — Aujourd'hui
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            <StatCard icon={Zap} label="Conversations" value={today.calls || 0} sublabel={`${today.success || 0} réussies`} color="indigo" />
-            <StatCard icon={Clock} label="Temps moyen" value={`${today.avg_response_ms || 0}ms`} sublabel="par conversation" color="blue" />
-            <StatCard icon={DollarSign} label="Coût aujourd'hui" value={`$${(today.cost_usd || 0).toFixed(4)}`} sublabel={`${(today.total_tokens || 0).toLocaleString()} tokens`} color="green" />
-            <StatCard icon={AlertTriangle} label="Bascules fallback" value={today.fallbacks || 0} sublabel="vers Base44" color="amber" />
-            <StatCard icon={XCircle} label="Erreurs OpenAI" value={today.errors || 0} sublabel="échecs API" color="red" />
+            <StatCard icon={MessageSquare} label="Total messages reçus" value={msgStats.total || 0} sublabel="messages WhatsApp" color="indigo" />
+            <StatCard icon={Shield} label="Règles déterministes" value={msgStats.deterministes || 0} sublabel="0 crédit LLM" color="slate" />
+            <StatCard icon={Cpu} label="OpenAI appelé" value={msgStats.openai_success || 0} sublabel="GPT-4.1-mini" color="green" />
+            <StatCard icon={Database} label="RAG uniquement" value={msgStats.rag_only || 0} sublabel="Base44 InvokeLLM" color="amber" />
+            <StatCard icon={AlertTriangle} label="Fallback Base44" value={msgStats.fallback_base44 || 0} sublabel="OpenAI échoué" color="red" />
           </div>
         </div>
 
-        {/* KPIs du mois */}
+        {/* ═══ Section 2: KPIs OpenAI aujourd'hui ═══ */}
+        <div>
+          <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+            <Activity className="w-4 h-4 text-indigo-500" />
+            Performance OpenAI — Aujourd'hui
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <StatCard icon={Zap} label="Appels OpenAI" value={today.calls || 0} sublabel={`${today.success || 0} réussis`} color="indigo" />
+            <StatCard icon={Clock} label="Temps moyen" value={`${today.avg_response_ms || 0}ms`} sublabel="par appel" color="blue" />
+            <StatCard icon={DollarSign} label="Coût aujourd'hui" value={`$${(today.cost_usd || 0).toFixed(4)}`} sublabel={`${(today.total_tokens || 0).toLocaleString()} tokens`} color="green" />
+            <StatCard icon={AlertTriangle} label="Bascules fallback" value={today.fallbacks || 0} sublabel="vers Base44" color="amber" />
+            <StatCard icon={XCircle} label="Erreurs OpenAI" value={today.errors || 0} sublabel="timeouts, quota..." color="red" />
+          </div>
+        </div>
+
+        {/* ═══ Section 3: KPIs du mois ═══ */}
         <div>
           <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-indigo-500" />
             Ce mois-ci
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            <StatCard icon={Zap} label="Conversations" value={month.calls || 0} sublabel={`${month.success || 0} réussies`} color="indigo" />
-            <StatCard icon={Clock} label="Temps moyen" value={`${month.avg_response_ms || 0}ms`} sublabel="par conversation" color="blue" />
+            <StatCard icon={Zap} label="Appels OpenAI" value={month.calls || 0} sublabel={`${month.success || 0} réussis`} color="indigo" />
+            <StatCard icon={Clock} label="Temps moyen" value={`${month.avg_response_ms || 0}ms`} sublabel="par appel" color="blue" />
             <StatCard icon={DollarSign} label="Coût mensuel" value={`$${(month.cost_usd || 0).toFixed(4)}`} sublabel={`${(month.total_tokens || 0).toLocaleString()} tokens`} color="green" />
             <StatCard icon={AlertTriangle} label="Bascules fallback" value={month.fallbacks || 0} sublabel="vers Base44" color="amber" />
             <StatCard icon={XCircle} label="Erreurs OpenAI" value={month.errors || 0} sublabel="échecs API" color="red" />
           </div>
         </div>
 
-        {/* Test OpenAI */}
+        {/* ═══ Section 4: 20 derniers appels ═══ */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-200">
+            <h2 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+              <FileText className="w-4 h-4 text-indigo-500" />
+              20 derniers messages traités
+            </h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="px-3 py-2 text-left font-semibold text-slate-600">Heure</th>
+                  <th className="px-3 py-2 text-left font-semibold text-slate-600">Message client</th>
+                  <th className="px-3 py-2 text-left font-semibold text-slate-600">Décision</th>
+                  <th className="px-3 py-2 text-center font-semibold text-slate-600">OpenAI</th>
+                  <th className="px-3 py-2 text-left font-semibold text-slate-600">Modèle</th>
+                  <th className="px-3 py-2 text-right font-semibold text-slate-600">Durée</th>
+                  <th className="px-3 py-2 text-right font-semibold text-slate-600">Coût</th>
+                  <th className="px-3 py-2 text-left font-semibold text-slate-600 max-w-[200px]">Réponse</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {lastCalls.length > 0 ? (
+                  lastCalls.map((call, i) => {
+                    const dec = DECISION_LABELS[call.decision_moteur] || { label: call.decision_moteur, color: 'bg-slate-100 text-slate-700' };
+                    return (
+                      <tr key={i} className="hover:bg-slate-50">
+                        <td className="px-3 py-2 text-slate-500 whitespace-nowrap">
+                          {call.date ? new Date(call.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-slate-700 max-w-[180px] truncate" title={call.message_client}>
+                          {call.message_client || '—'}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold ${dec.color}`}>
+                            {dec.label}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {call.openai_appele ? (
+                            <CheckCircle className="w-4 h-4 text-emerald-500 mx-auto" />
+                          ) : (
+                            <XCircle className="w-4 h-4 text-slate-300 mx-auto" />
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
+                          {call.model_utilise || '—'}
+                        </td>
+                        <td className="px-3 py-2 text-right text-slate-600 whitespace-nowrap">
+                          {call.temps_reponse_ms > 0 ? `${call.temps_reponse_ms}ms` : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-right text-slate-600 whitespace-nowrap">
+                          {call.cout_usd > 0 ? `$${call.cout_usd.toFixed(4)}` : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-slate-500 max-w-[200px] truncate" title={call.reponse_envoyee}>
+                          {call.reponse_envoyee || '—'}
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={8} className="px-3 py-8 text-center text-slate-400">
+                      <MessageSquare className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                      Aucun message traité pour le moment.
+                      <br />
+                      <span className="text-xs">Les logs apparaîtront ici dès le prochain message WhatsApp reçu par VENUS.</span>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* ═══ Section 5: Test de connexion ═══ */}
         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -175,7 +289,7 @@ export default function OpenAIDashboard() {
           )}
         </div>
 
-        {/* Erreurs récentes */}
+        {/* ═══ Section 6: Erreurs récentes ═══ */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
           <div className="px-5 py-4 border-b border-slate-200">
             <h2 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
@@ -210,6 +324,10 @@ export default function OpenAIDashboard() {
               </div>
             )}
           </div>
+        </div>
+
+        <div className="text-center text-xs text-slate-400 pb-4">
+          Données générées le {stats?.generated_at ? new Date(stats.generated_at).toLocaleString('fr-FR') : '...'} — Auto-rafraîchissement toutes les 30 secondes
         </div>
       </div>
     </div>

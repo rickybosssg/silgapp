@@ -43,6 +43,62 @@ export function calculateCost(
  * Log un appel OpenAI dans l'entité VenusOpenAIUsage.
  * Fire-and-safe : n'échoue jamais silencieusement (catch interne).
  */
+/**
+ * Log COMPLET d'un message WhatsApp traite par VENUS.
+ * Enregistre chaque message avec la decision du moteur, le modele utilise,
+ * les documents RAG, les outils, le temps, le cout et la reponse finale.
+ *
+ * Fire-and-safe : catch interne, n'echoue jamais.
+ * Non-bloquant : a appeler SANS await (fire-and-forget).
+ */
+export async function loggerMessageVenus(
+  base44: any,
+  data: {
+    telephone: string;
+    conversation_id?: string;
+    message_client: string;
+    decision_moteur: string;
+    openai_appele: boolean;
+    model_utilise?: string;
+    rag_documents?: any[];
+    outils_utilises?: string[];
+    temps_reponse_ms: number;
+    cout_usd?: number;
+    tokens_total?: number;
+    reponse_envoyee: string;
+    intention?: string;
+    action?: string;
+    confiance?: number;
+    statut: 'succes' | 'erreur';
+    erreur_detail?: string;
+  }
+): Promise<void> {
+  try {
+    await base44.asServiceRole.entities.VenusMessageLog.create({
+      date_traitement: new Date().toISOString(),
+      telephone: data.telephone || '',
+      conversation_id: data.conversation_id || '',
+      message_client: (data.message_client || '').substring(0, 2000),
+      decision_moteur: data.decision_moteur,
+      openai_appele: data.openai_appele ?? false,
+      model_utilise: data.model_utilise || '',
+      rag_documents: data.rag_documents ? JSON.stringify(data.rag_documents).substring(0, 4000) : '',
+      outils_utilises: data.outils_utilises ? JSON.stringify(data.outils_utilises).substring(0, 2000) : '',
+      temps_reponse_ms: data.temps_reponse_ms || 0,
+      cout_usd: data.cout_usd || 0,
+      tokens_total: data.tokens_total || 0,
+      reponse_envoyee: (data.reponse_envoyee || '').substring(0, 2000),
+      intention: data.intention || '',
+      action: data.action || '',
+      confiance: data.confiance ?? 0,
+      statut: data.statut,
+      erreur_detail: (data.erreur_detail || '').substring(0, 500),
+    });
+  } catch (e: any) {
+    console.warn('[MessageLogger] Erreur logging message:', e.message);
+  }
+}
+
 export async function logOpenAIUsage(
   base44: any,
   data: {

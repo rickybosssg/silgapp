@@ -76,12 +76,47 @@ Deno.serve(async (req) => {
       };
     };
 
+    // ── Stats par message (VenusMessageLog) — audit complet ──
+    const messageLogs = await base44.asServiceRole.entities.VenusMessageLog.list('-date_traitement', 500);
+    const todayMessageLogs = (messageLogs || []).filter((m: any) => {
+      const date = new Date(m.date_traitement || m.created_date);
+      return date >= todayStart;
+    });
+
+    const DECISIONS_DETERMINISTES = ['securite', 'salutation', 'raccourci', 'cache', 'regle_metier', 'connaissance'];
+    const message_stats_today = {
+      total: todayMessageLogs.length,
+      deterministes: todayMessageLogs.filter((m: any) => DECISIONS_DETERMINISTES.includes(m.decision_moteur)).length,
+      openai_success: todayMessageLogs.filter((m: any) => m.decision_moteur === 'openai').length,
+      rag_only: todayMessageLogs.filter((m: any) => m.decision_moteur === 'rag_llm').length,
+      fallback_base44: todayMessageLogs.filter((m: any) => m.decision_moteur === 'fallback_base44').length,
+      erreurs: todayMessageLogs.filter((m: any) => m.decision_moteur === 'erreur').length,
+    };
+
+    // ── 20 derniers appels avec détails complets ──
+    const last_20_calls = (messageLogs || []).slice(0, 20).map((m: any) => ({
+      date: m.date_traitement || m.created_date,
+      telephone: m.telephone || '',
+      message_client: (m.message_client || '').substring(0, 150),
+      decision_moteur: m.decision_moteur || '',
+      openai_appele: m.openai_appele ?? false,
+      model_utilise: m.model_utilise || '',
+      temps_reponse_ms: m.temps_reponse_ms || 0,
+      cout_usd: m.cost_usd || 0,
+      tokens_total: m.tokens_total || 0,
+      reponse_envoyee: (m.reponse_envoyee || '').substring(0, 200),
+      intention: m.intention || '',
+      outils_utilises: m.outils_utilises || '',
+    }));
+
     return Response.json({
       current_model,
       openai_enabled,
       today: aggregate(todayRecords),
       month: aggregate(monthRecords),
       recent_errors: recentErrors,
+      message_stats_today,
+      last_20_calls,
       generated_at: new Date().toISOString(),
     });
   } catch (error) {

@@ -39,7 +39,7 @@ import {
 } from './venusCache.ts';
 import { genererReferenceCourse } from './venusCourseReference.ts';
 import { isOpenAIEnabled, raisonnerAvecOpenAI } from './venusOpenAIEngine.ts';
-import { logOpenAIUsage } from './venusOpenAITracker.ts';
+import { logOpenAIUsage, loggerMessageVenus, calculateCost } from './venusOpenAITracker.ts';
 
 /**
  * Recherche les scénarios validés pour un pays/langue donnés (Source 3).
@@ -92,6 +92,7 @@ interface ReasoningInput {
   isAudioTranscription: boolean;
   force_confirmation?: boolean;
   outils_resultats?: any[];
+  conversation_id?: string;
 }
 
 interface ReasoningResult {
@@ -110,6 +111,9 @@ interface ReasoningResult {
   knowledge_id?: string;
   document_sources?: { document_id: string; document_titre: string; chunk_id: string; score: number; version: number }[];
   temps_traitement_ms: number;
+  decision_moteur?: string;
+  openai_appele?: boolean;
+  model_utilise?: string;
 }
 
 // ── Schéma JSON pour la réponse LLM structurée ──
@@ -705,6 +709,9 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
       business_rule_id: undefined,
       document_sources: undefined,
       temps_traitement_ms: Date.now() - startTime,
+      decision_moteur: 'securite',
+      openai_appele: false,
+      model_utilise: '',
     };
   }
 
@@ -712,6 +719,7 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
   const salutation = detecterSalutation(input.messageClient);
   if (salutation) {
     salutation.temps_traitement_ms = Date.now() - startTime;
+    salutation.decision_moteur = 'salutation';
     return salutation;
   }
 
@@ -719,6 +727,7 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
   const raccourci = detecterRaccourciFrequent(input.messageClient, input.courseActive);
   if (raccourci) {
     raccourci.temps_traitement_ms = Date.now() - startTime;
+    raccourci.decision_moteur = 'raccourci';
     stockerCache(input.telephone, input.messageClient, input.memoireCourte, raccourci);
     return raccourci;
   }
@@ -727,6 +736,7 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
   const cached = recupererCache(input.telephone, input.messageClient, input.memoireCourte);
   if (cached) {
     cached.temps_traitement_ms = Date.now() - startTime;
+    cached.decision_moteur = 'cache';
     return cached;
   }
 
@@ -853,6 +863,7 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
   const regleDirecte = detecterRegleMetierDirecte(input.messageClient, businessRuleEntries);
   if (regleDirecte) {
     regleDirecte.temps_traitement_ms = Date.now() - startTime;
+    regleDirecte.decision_moteur = 'regle_metier';
     stockerCache(input.telephone, input.messageClient, input.memoireCourte, regleDirecte);
     return regleDirecte;
   }
@@ -861,6 +872,7 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
   const connaissanceDirecte = detecterConnaissanceDirecte(input.messageClient, knowledgeEntries);
   if (connaissanceDirecte) {
     connaissanceDirecte.temps_traitement_ms = Date.now() - startTime;
+    connaissanceDirecte.decision_moteur = 'connaissance';
     stockerCache(input.telephone, input.messageClient, input.memoireCourte, connaissanceDirecte);
     return connaissanceDirecte;
   }
@@ -1079,12 +1091,14 @@ Réponds UNIQUEMENT avec un JSON.`;
 
   // ── Appel LLM (OpenAI en priorité, fallback InvokeLLM Base44) ──
   const tLLMStart = Date.now();
+  let openaiWasAttempted = false;
   try {
     let llmRes: any = null;
 
     // ── Tentative OpenAI (si activé via SystemConfig VENUS_OPENAI_ENABLED) ──
     if (await isOpenAIEnabled(base44)) {
       try {
+        openaiWasAttempted = true;
         llmRes = await raisonnerAvecOpenAI(base44, prompt, RAISONNEMENT_SCHEMA, {
           telephone: input.telephone,
           countryCode: input.countryCode,
@@ -1255,6 +1269,22 @@ Réponds UNIQUEMENT avec un JSON.`;
 
     console.log(`[ReasoningEngine] 🧠 Intention: ${result.intention} | Contexte: ${result.contexte} | Action: ${result.action} | Confiance: ${result.confiance}% | Temps: ${result.temps_traitement_ms}ms`);
 
+    // ── Tracer la décision du moteur pour l'audit ──
+    const _meta: any = result as any;
+    if (_meta._model_openai) {
+      result.decision_moteur = 'openai';
+      result.openai_appele = true;
+      result.model_utilise = _meta._model_openai;
+    } else if (openaiWasAttempted) {
+      result.decision_moteur = 'fallback_base44';
+      result.openai_appele = true;
+      result.model_utilise = 'base44-invoke-llm (fallback)';
+    } else {
+      result.decision_moteur = 'rag_llm';
+      result.openai_appele = false;
+      result.model_utilise = 'base44-invoke-llm';
+    }
+
     // ── ÉCONOMIE DE CRÉDITS: Stocker la réponse en cache pour réutilisation ──
     stockerCache(input.telephone, input.messageClient, input.memoireCourte, result);
 
@@ -1280,6 +1310,9 @@ Réponds UNIQUEMENT avec un JSON.`;
         business_rule_id: undefined,
         document_sources: undefined,
         temps_traitement_ms: Date.now() - startTime,
+        decision_moteur: 'erreur',
+        openai_appele: false,
+        model_utilise: '',
       };
     }
 
@@ -1299,6 +1332,9 @@ Réponds UNIQUEMENT avec un JSON.`;
       business_rule_id: undefined,
       document_sources: undefined,
       temps_traitement_ms: Date.now() - startTime,
+      decision_moteur: 'erreur',
+      openai_appele: false,
+      model_utilise: '',
     };
   }
 }
@@ -1346,6 +1382,32 @@ export async function raisonnerVenusAvecOutils(
     if (!result.outils_utilises) result.outils_utilises = [];
     result.outils_utilises.push('hallucination_check:warn');
   }
+
+  // ── Étape 5 : Log COMPLET du message pour audit permanent ──
+  const _meta: any = result as any;
+  const _modelForCost = _meta._model_openai || '';
+  const _tokensPrompt = _meta._tokens_prompt || 0;
+  const _tokensCompletion = _meta._tokens_completion || 0;
+  const _coutUsd = _modelForCost ? calculateCost(_modelForCost, _tokensPrompt, _tokensCompletion) : 0;
+  const _tokensTotal = _meta._tokens_openai || 0;
+  loggerMessageVenus(base44, {
+    telephone: input.telephone,
+    conversation_id: input.conversation_id,
+    message_client: input.messageClient,
+    decision_moteur: result.decision_moteur || 'rag_llm',
+    openai_appele: result.openai_appele ?? false,
+    model_utilise: result.model_utilise || '',
+    rag_documents: result.document_sources,
+    outils_utilises: result.outils_utilises,
+    temps_reponse_ms: result.temps_traitement_ms,
+    cout_usd: _coutUsd,
+    tokens_total: _tokensTotal,
+    reponse_envoyee: result.reponse,
+    intention: result.intention,
+    action: result.action,
+    confiance: result.confiance,
+    statut: result.decision_moteur === 'erreur' ? 'erreur' : 'succes',
+  });
 
   return {
     result,
