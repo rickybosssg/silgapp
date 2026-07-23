@@ -402,6 +402,8 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
       parsed._outils_openai = toolsUsed.length > 0 ? toolsUsed.join(',') : 'none';
       parsed._model_openai = model;
       parsed._tokens_openai = usage?.total_tokens || 0;
+      parsed._tokens_prompt = usage?.prompt_tokens || 0;
+      parsed._tokens_completion = usage?.completion_tokens || 0;
 
       return parsed;
     }
@@ -465,5 +467,7 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
   finalParsed._outils_openai = toolsUsed.join(',');
   finalParsed._model_openai = model;
   finalParsed._tokens_openai = finalData.usage?.total_tokens || 0;
+  finalParsed._tokens_prompt = finalData.usage?.prompt_tokens || 0;
+  finalParsed._tokens_completion = finalData.usage?.completion_tokens || 0;
   return finalParsed;
 }

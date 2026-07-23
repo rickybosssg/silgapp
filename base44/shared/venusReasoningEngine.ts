@@ -39,6 +39,7 @@ import {
 } from './venusCache.ts';
 import { genererReferenceCourse } from './venusCourseReference.ts';
 import { isOpenAIEnabled, raisonnerAvecOpenAI } from './venusOpenAIEngine.ts';
+import { logOpenAIUsage } from './venusOpenAITracker.ts';
 
 /**
  * Recherche les scénarios validés pour un pays/langue donnés (Source 3).
@@ -1093,21 +1094,53 @@ Réponds UNIQUEMENT avec un JSON.`;
           memoireCourte: mergedMemoireCourte,
           courseActive: input.courseActive,
         });
-        console.log(`[ReasoningEngine] ⏱️ OpenAI: ${Date.now() - tLLMStart}ms | tools: ${(llmRes as any)?._outils_openai || 'none'} | tokens: ${(llmRes as any)?._tokens_openai || 'N/A'}`);
+        const openaiTime = Date.now() - tLLMStart;
+        console.log(`[ReasoningEngine] ⏱️ OpenAI: ${openaiTime}ms | tools: ${(llmRes as any)?._outils_openai || 'none'} | tokens: ${(llmRes as any)?._tokens_openai || 'N/A'}`);
+        logOpenAIUsage(base44, {
+          model: (llmRes as any)?._model_openai || 'gpt-4.1-mini',
+          tokens_prompt: (llmRes as any)?._tokens_prompt || 0,
+          tokens_completion: (llmRes as any)?._tokens_completion || 0,
+          tokens_total: (llmRes as any)?._tokens_openai || 0,
+          response_time_ms: openaiTime,
+          status: 'success',
+          telephone: input.telephone,
+          tools_used: (llmRes as any)?._outils_openai || '',
+        }).catch(() => {});
       } catch (openaiErr: any) {
+        const errTime = Date.now() - tLLMStart;
         console.warn(`[ReasoningEngine] ⚠️ OpenAI échec (${openaiErr.message}), fallback InvokeLLM`);
         llmRes = null;
+        logOpenAIUsage(base44, {
+          model: 'gpt-4.1-mini',
+          tokens_prompt: 0, tokens_completion: 0, tokens_total: 0,
+          response_time_ms: errTime,
+          status: 'error',
+          error_message: openaiErr.message?.substring(0, 500) || 'Unknown error',
+          telephone: input.telephone,
+        }).catch(() => {});
       }
     }
 
     // ── Fallback: InvokeLLM (Base44) ──
     if (!llmRes) {
+      const wasOpenAIEnabled = await isOpenAIEnabled(base44);
       llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
         prompt,
         response_json_schema: RAISONNEMENT_SCHEMA,
         model: 'gpt_5_mini',
       });
-      console.log(`[ReasoningEngine] ⏱️ LLM (Base44): ${Date.now() - tLLMStart}ms`);
+      const fallbackTime = Date.now() - tLLMStart;
+      console.log(`[ReasoningEngine] ⏱️ LLM (Base44): ${fallbackTime}ms`);
+      if (wasOpenAIEnabled) {
+        logOpenAIUsage(base44, {
+          model: 'gpt-4.1-mini',
+          tokens_prompt: 0, tokens_completion: 0, tokens_total: 0,
+          response_time_ms: fallbackTime,
+          status: 'fallback',
+          error_message: 'Fallback vers InvokeLLM (Base44)',
+          telephone: input.telephone,
+        }).catch(() => {});
+      }
     }
 
     const result: ReasoningResult = typeof llmRes === 'string' ? JSON.parse(llmRes) : llmRes as ReasoningResult;
