@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { motion } from "framer-motion";
 import { base44 } from "@/api/base44Client";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { useNavigate } from "react-router-dom";
@@ -11,10 +12,10 @@ import { registerPushToken } from "@/lib/notifications";
 import { usePushTokenRetry } from "@/hooks/usePushTokenRetry";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { 
-  MapPin, Navigation, MessageCircle, User, Package, 
+import {
+  MapPin, Navigation, MessageCircle, User, Package,
   Clock, ChevronRight, TrendingUp, Loader2, ArrowLeft, RefreshCw,
-  Store, UtensilsCrossed, Pill, Star, Calendar
+  Store, UtensilsCrossed, Pill, Star, Calendar, CheckCircle2
 } from "lucide-react";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import CourseAnnuleeRelanceDialog from "@/components/client/CourseAnnuleeRelanceDialog";
@@ -39,6 +40,7 @@ import FraisAnnulationBannerClient from "@/components/client/FraisAnnulationBann
 import SuiviBarreFlottante from "@/components/client/SuiviBarreFlottante";
 import RechercheLivreurScreen from "@/components/client/RechercheLivreurScreen";
 import SuiviCourseFullscreen from "@/components/client/SuiviCourseFullscreen";
+import EcranFinCourse from "@/components/client/EcranFinCourse";
 
 
 function haversineDistance(lat1, lon1, lat2, lon2) {
@@ -102,7 +104,9 @@ export default function ClientExterneApp() {
   const [sessionExpired, setSessionExpired] = useState(false);
   const [showRecherche, setShowRecherche] = useState(false);
   const [showSuiviFullscreen, setShowSuiviFullscreen] = useState(false);
+  const [showAcceptanceAnim, setShowAcceptanceAnim] = useState(false);
   const lastRechercheCourseId = useRef(null);
+  const prevHadRecherche = useRef(false);
 
   const [userId, setUserId] = useState(null);
   const queryClient = useQueryClient();
@@ -159,7 +163,9 @@ export default function ClientExterneApp() {
   // Détection d'une course qui vient d'être livrée (transition vers "livree")
   const prevActiveIds = useRef(new Set());
   const prevStatuses = useRef({});
+  const prevCoursesRef = useRef({});
   const [courseLivreId, setCourseLivreId] = useState(null);
+  const [courseLivreData, setCourseLivreData] = useState(null);
   useEffect(() => {
     const currentIds = new Set(coursesActives.map(c => c.id));
     // Détecter les courses qui ont disparu de coursesActives (→ livrées ou annulées)
@@ -169,11 +175,16 @@ export default function ClientExterneApp() {
         // Si la dernière statut connu n'était pas "annulee", on considère que c'est une livraison
         if (lastStatus && lastStatus !== "annulee") {
           setCourseLivreId(id);
+          setCourseLivreData(prevCoursesRef.current[id] || { id, statut: "livree", type_course: "expedier" });
+          // Vibration de livraison
+          if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
           // Auto-clear après 30 secondes
           setTimeout(() => setCourseLivreId(prev => prev === id ? null : prev), 30000);
         }
       }
     }
+    // Sauvegarder les objets course pour la détection de livraison
+    coursesActives.forEach(c => { prevCoursesRef.current[c.id] = c; });
     // Mettre à jour les refs
     prevActiveIds.current = currentIds;
     const nowStatuses = {};
@@ -196,6 +207,27 @@ export default function ClientExterneApp() {
 
   // ── Auto-ouverture de l'écran "Recherche livreur" quand une nouvelle course entre en recherche ──
   useEffect(() => {
+    const hadRecherche = prevHadRecherche.current;
+    const hasRecherche = !!courseEnRecherche;
+    const hasAssignee = !!courseAssignee;
+
+    // Détection d'acceptation : on avait une recherche, et maintenant on a un livreur assigné
+    if (hadRecherche && !hasRecherche && hasAssignee) {
+      // ── Animation d'acceptation ──
+      // Vibration native Android
+      if (navigator.vibrate) {
+        navigator.vibrate([100, 50, 100, 50, 200]);
+      }
+      setShowAcceptanceAnim(true);
+      // Fermer l'écran de recherche
+      setShowRecherche(false);
+      // Ouvrir automatiquement le suivi plein écran après l'animation
+      setTimeout(() => {
+        setShowAcceptanceAnim(false);
+        setShowSuiviFullscreen(true);
+      }, 2000);
+    }
+
     if (courseEnRecherche && courseEnRecherche.id !== lastRechercheCourseId.current) {
       lastRechercheCourseId.current = courseEnRecherche.id;
       setShowRecherche(true);
@@ -204,7 +236,9 @@ export default function ClientExterneApp() {
       setShowRecherche(false);
       lastRechercheCourseId.current = null;
     }
-  }, [courseEnRecherche]);
+
+    prevHadRecherche.current = hasRecherche;
+  }, [courseEnRecherche, courseAssignee]);
 
   // Pull-to-refresh
   const { pulling, refreshing } = usePullToRefresh(async () => {
@@ -1207,12 +1241,57 @@ export default function ClientExterneApp() {
         courseEnAttente={pubConfig.moment !== PUB_MOMENTS.OUVERTURE_APP}
       />
 
-      {/* ── ÉCRAN RECHERCHE LIVREUR — plein écran dynamique ── */}
+      {/* ── ÉCRAN RECHERCHE LIVREUR — carte vivante + vagues de dispatch ── */}
       {showRecherche && courseEnRecherche && (
         <RechercheLivreurScreen
           course={courseEnRecherche}
           position={position}
+          countryCode={clientProfil?.country_code}
           onClose={() => setShowRecherche(false)}
+        />
+      )}
+
+      {/* ── ANIMATION D'ACCEPTATION — vibration + check ── */}
+      {showAcceptanceAnim && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-sm flex items-center justify-center"
+        >
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 200, damping: 15 }}
+            className="bg-white rounded-3xl p-8 flex flex-col items-center shadow-2xl"
+          >
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 200, damping: 12, delay: 0.15 }}
+              className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-xl shadow-emerald-200"
+            >
+              <CheckCircle2 className="w-12 h-12 text-white" strokeWidth={2.5} />
+            </motion.div>
+            <p className="text-lg font-black text-gray-900 mt-4">Livreur trouvé !</p>
+            <p className="text-sm text-gray-500 mt-1">{courseAssignee?.livreur_nom || "Votre livreur"} arrive</p>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* ── ÉCRAN DE FIN — animation de réussite + actions ── */}
+      {courseLivreId && (
+        <EcranFinCourse
+          course={courseLivreData}
+          onNoter={() => {
+            if (courseLivreData) setCourseANoter(courseLivreData);
+            setCourseLivreId(null);
+          }}
+          onRefaire={() => {
+            setCourseLivreId(null);
+            navigate("/client/course/expedier");
+          }}
+          onFermer={() => setCourseLivreId(null)}
         />
       )}
 

@@ -102,6 +102,27 @@
 }
 
 @layer components {
+  /* ── Transitions fluides pour les marqueurs Leaflet (suivi temps réel) ── */
+  .livreur-marker-anim {
+    transition: transform 2s linear, -webkit-transform 2s linear;
+  }
+  .livreur-anon-marker {
+    transition: transform 3s ease-in-out, -webkit-transform 3s ease-in-out;
+  }
+  .custom-tooltip {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border: none !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    color: #1f2937 !important;
+    padding: 4px 8px !important;
+  }
+  .custom-tooltip::before {
+    display: none !important;
+  }
+
   /* Safe area for mobile devices */
   .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom);
