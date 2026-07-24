@@ -109,10 +109,18 @@ export default function OpenAIDashboard() {
     setTestResult(null);
     try {
       const result = await base44.functions.invoke('diagnosticOpenAI', {});
-      const unwrapped = result?.data ? result.data : result;
-      setTestResult(unwrapped);
+      // Dépaquetage robuste — le SDK peut envelopper dans { data: ... } ou { data: { data: ... } }
+      let unwrapped = result;
+      while (unwrapped && typeof unwrapped === 'object' && 'data' in unwrapped && !('connexion_ok' in unwrapped) && !('statut_global' in unwrapped)) {
+        unwrapped = unwrapped.data;
+      }
+      // Considérer comme succès si connexion_ok=true OU http_status=200 OU statut_global contient ACTIVE
+      const isSuccess = unwrapped?.connexion_ok === true
+        || unwrapped?.http_status === 200
+        || (typeof unwrapped?.statut_global === 'string' && unwrapped.statut_global.includes('ACTIVE'));
+      setTestResult({ ...unwrapped, connexion_ok: isSuccess });
     } catch (e) {
-      setTestResult({ statut: 'ÉCHEC', erreur: e.message });
+      setTestResult({ statut: 'ÉCHEC', erreur: e.message, connexion_ok: false });
     } finally {
       setTesting(false);
     }
