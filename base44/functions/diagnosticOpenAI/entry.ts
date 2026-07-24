@@ -62,13 +62,18 @@ Deno.serve(async (req) => {
       apiResult.latence_ms = Date.now() - t0;
       apiResult.http_status = resp.status;
 
-      if (resp.ok && data.choices?.[0]?.message?.content) {
+      if (resp.ok) {
+        // GPT-5 peut retourner un content vide (uniquement des reasoning_tokens)
+        // sur des prompts triviaux — un HTTP 200 valide = connexion OK.
         apiResult.connexion_ok = true;
         apiResult.message = `Connexion OpenAI OK avec ${modelVal}`;
         apiResult.modele_teste = data.model || modelVal;
         apiResult.modele_retourne_par_api = data.model || 'N/A';
-        apiResult.reponse_api = data.choices[0].message.content;
+        apiResult.reponse_api = data.choices?.[0]?.message?.content || '(réponse structurée — reasoning tokens uniquement)';
         apiResult.tokens = data.usage;
+        if (!data.choices?.[0]?.message?.content) {
+          apiResult.note = 'GPT-5 a répondu avec un content vide (reasoning_tokens uniquement) — connexion valide.';
+        }
       } else if (resp.ok) {
         // HTTP 200 mais pas de content — logger la structure brute
         apiResult.connexion_ok = true;
