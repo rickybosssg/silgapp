@@ -147,7 +147,7 @@ export default function OpenAIDashboard() {
   const today = stats?.today || {};
   const month = stats?.month || {};
 
-  const msgStats = stats?.message_stats_today || {};
+  const msgStats = stats?.message_stats_recent || stats?.message_stats_today || {};
   const lastCalls = stats?.last_20_calls || [];
 
   return (
@@ -216,7 +216,7 @@ export default function OpenAIDashboard() {
         <div>
           <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
             <MessageSquare className="w-4 h-4 text-indigo-500" />
-            Audit des messages WhatsApp — Aujourd'hui
+            Audit des messages WhatsApp — Récents
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             <StatCard icon={MessageSquare} label="Total messages reçus" value={msgStats.total || 0} sublabel="messages WhatsApp" color="indigo" />
@@ -272,7 +272,7 @@ export default function OpenAIDashboard() {
                   <th className="px-3 py-2 text-left font-semibold text-slate-600">Heure</th>
                   <th className="px-3 py-2 text-left font-semibold text-slate-600">Message client</th>
                   <th className="px-3 py-2 text-left font-semibold text-slate-600">Décision</th>
-                  <th className="px-3 py-2 text-center font-semibold text-slate-600">OpenAI</th>
+                  <th className="px-3 py-2 text-center font-semibold text-slate-600">Moteur</th>
                   <th className="px-3 py-2 text-left font-semibold text-slate-600">Modèle</th>
                   <th className="px-3 py-2 text-right font-semibold text-slate-600">Durée</th>
                   <th className="px-3 py-2 text-right font-semibold text-slate-600">Coût</th>
@@ -297,11 +297,14 @@ export default function OpenAIDashboard() {
                           </span>
                         </td>
                         <td className="px-3 py-2 text-center">
-                          {call.openai_appele ? (
-                            <CheckCircle className="w-4 h-4 text-emerald-500 mx-auto" />
-                          ) : (
-                            <XCircle className="w-4 h-4 text-slate-300 mx-auto" />
-                          )}
+                          {(() => {
+                            const dm = call.decision_moteur;
+                            if (dm === 'openai') return <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700" title={call.model_utilise || ''}>GPT</span>;
+                            if (dm === 'fallback_base44') return <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-700" title={call.erreur_detail || 'Fallback vers Base44'}>Base44</span>;
+                            if (dm === 'rag_llm') return <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700" title={call.model_utilise || ''}>Base44</span>;
+                            if (dm === 'erreur') return <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700" title={call.erreur_detail || ''}>Erreur</span>;
+                            return <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">Règle</span>;
+                          })()}
                         </td>
                         <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
                           {call.model_utilise || '—'}
@@ -312,8 +315,15 @@ export default function OpenAIDashboard() {
                         <td className="px-3 py-2 text-right text-slate-600 whitespace-nowrap">
                           {call.cout_usd > 0 ? `$${call.cout_usd.toFixed(4)}` : '—'}
                         </td>
-                        <td className="px-3 py-2 text-slate-500 max-w-[200px] truncate" title={call.reponse_envoyee}>
-                          {call.reponse_envoyee || '—'}
+                        <td className="px-3 py-2 text-slate-500 max-w-[200px]">
+                          <div className="truncate" title={call.reponse_envoyee}>
+                            {call.reponse_envoyee || '—'}
+                          </div>
+                          {call.erreur_detail && (
+                            <div className="text-[10px] text-red-500 mt-0.5 truncate" title={call.erreur_detail}>
+                              ⚠ {call.erreur_detail}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );

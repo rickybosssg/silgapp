@@ -1086,6 +1086,7 @@ Réponds UNIQUEMENT avec un JSON.`;
   // ── Appel LLM (OpenAI en priorité, fallback InvokeLLM Base44) ──
   const tLLMStart = Date.now();
   let openaiWasAttempted = false;
+  let openaiErrorMsg = '';
   try {
     let llmRes: any = null;
 
@@ -1115,6 +1116,7 @@ Réponds UNIQUEMENT avec un JSON.`;
           tools_used: (llmRes as any)?._outils_openai || '',
         }).catch(() => {});
       } catch (openaiErr: any) {
+        openaiErrorMsg = openaiErr.message?.substring(0, 500) || 'Unknown error';
         const errTime = Date.now() - tLLMStart;
         console.warn(`[ReasoningEngine] ⚠️ OpenAI échec (${openaiErr.message}), fallback InvokeLLM`);
         llmRes = null;
@@ -1239,6 +1241,7 @@ Réponds UNIQUEMENT avec un JSON.`;
       result.decision_moteur = 'fallback_base44';
       result.openai_appele = true;
       result.model_utilise = 'base44-invoke-llm (fallback)';
+      (result as any)._erreur_openai = openaiErrorMsg;
     } else {
       result.decision_moteur = 'rag_llm';
       result.openai_appele = false;

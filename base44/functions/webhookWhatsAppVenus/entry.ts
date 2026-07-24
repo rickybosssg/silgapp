@@ -2186,6 +2186,7 @@ Deno.serve(async (req) => {
       action: reasoningResult?.action,
       confiance: reasoningResult?.confiance,
       statut: reasoningResult?.decision_moteur === 'erreur' ? 'erreur' : 'succes',
+      erreur_detail: (reasoningResult as any)?._erreur_openai || '',
     }).catch(() => {});
 
     // ── Mode apprentissage: générer un exemple d'apprentissage (fire-and-forget) ──

@@ -96,6 +96,16 @@ Deno.serve(async (req) => {
       erreurs: todayMessageLogs.filter((m: any) => m.decision_moteur === 'erreur').length,
     };
 
+    // ── Stats sur tous les messages récents (même périmètre que la table) ──
+    const message_stats_recent = {
+      total: messageLogs.length,
+      deterministes: messageLogs.filter((m: any) => DECISIONS_DETERMINISTES.includes(m.decision_moteur)).length,
+      openai_success: messageLogs.filter((m: any) => m.decision_moteur === 'openai').length,
+      rag_only: messageLogs.filter((m: any) => m.decision_moteur === 'rag_llm').length,
+      fallback_base44: messageLogs.filter((m: any) => m.decision_moteur === 'fallback_base44').length,
+      erreurs: messageLogs.filter((m: any) => m.decision_moteur === 'erreur').length,
+    };
+
     // ── 20 derniers appels avec détails complets ──
     const last_20_calls = (messageLogs || []).slice(0, 20).map((m: any) => ({
       date: m.date_traitement || m.created_date,
@@ -110,6 +120,7 @@ Deno.serve(async (req) => {
       reponse_envoyee: (m.reponse_envoyee || '').substring(0, 200),
       intention: m.intention || '',
       outils_utilises: m.outils_utilises || '',
+      erreur_detail: m.erreur_detail || '',
     }));
 
     return Response.json({
@@ -128,6 +139,7 @@ Deno.serve(async (req) => {
       month: aggregate(monthRecords),
       recent_errors: recentErrors,
       message_stats_today,
+      message_stats_recent,
       last_20_calls,
       generated_at: new Date().toISOString(),
     });
