@@ -8,18 +8,20 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
     c.statut === "livree" && new Date(c.heure_livraison || c.updated_date).toDateString() === today
   );
   // Ne compter que les courses réellement assignées au livreur (exclure les simples propositions notifiées)
-  const sameLivreur = (c) => livreurId && String(c.livreur_id) === String(livreurId);
   const coursesAujourdHui = mesCourses.filter(c =>
-    sameLivreur(c) && new Date(c.created_date).toDateString() === today
+    c.livreur_id && new Date(c.created_date).toDateString() === today
   ).length;
 
   //  Commission dynamique du pays
-  const [countryCommissionPct, setCountryCommissionPct] = useState(30);
+  const [countryCommissionPct, setCountryCommissionPct] = useState(null);
   useEffect(() => {
     const countryCode = mesCourses?.[0]?.country_code;
     if (!countryCode) return;
     base44.entities.Country.filter({ code: countryCode, actif: true })
-      .then(countries => { if (countries?.[0]?.commission_pct) setCountryCommissionPct(countries[0].commission_pct); })
+      .then(countries => {
+        const value = Number(countries?.[0]?.commission_pct);
+        setCountryCommissionPct(Number.isFinite(value) ? value : null);
+      })
       .catch(() => {});
   }, [mesCourses]);
 
@@ -30,10 +32,12 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
   }, 0);
   const commissionToday = livreesToday.reduce((s, c) => {
     if (c.commission_silga > 0) return s + c.commission_silga;
+    if (countryCommissionPct === null) return s;
     return s + Math.round((c.prix_final || 0) * (countryCommissionPct / 100));
   }, 0);
   const gainToday = livreesToday.reduce((s, c) => {
     if (c.montant_livreur > 0) return s + c.montant_livreur;
+    if (countryCommissionPct === null) return s;
     return s + Math.round((c.prix_final || 0) * ((100 - countryCommissionPct) / 100));
   }, 0);
 
