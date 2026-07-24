@@ -2069,72 +2069,44 @@ Deno.serve(async (req) => {
           }
         }
 
-        // ── SIMPLIFICATION: L'heuristic de "fausse création" est supprimée.
-        //    GPT ne doit JAMAIS annoncer une création tant que le webhook n'a pas
-        //    confirmé le succès en DB. Le prompt GPT interdit déjà d'annoncer une
-        //    création tant que action ≠ creer_course. ──
-        if (false && !courseCreee) { // dead code — kept for reference, will be removed next
-          const PATTERNS_RECHERCHE = [
-            /je lance la recherche/i,
-            /la recherche est (bien )?en cours/i,
-            /je recherche (maintenant )?un livreur/i,
-            /recherche d'un livreur/i,
-            /je .* recherche.* livreur/i,
-            /livreur est en cours de recherche/i,
+        // ── ANTI-Fausse-Création: si VENUS dit "je lance la création/recherche"
+        //    mais que la course n'a PAS été créée (action ≠ creer_course ou bloquée),
+        //    remplacer la réponse trompeuse par une question sur l'info manquante. ──
+        if (!courseCreee) {
+          const PATTERNS_FAUSSE_CREATION = [
+            /je lance la (cr[ée]ation|recherche)/i,
+            /je cr[ée]e (la|ma|votre) course/i,
+            /je finalise/i,
+            /je valide (sans|la|votre)/i,
             /je lance .* recherche/i,
             /recherche .* lanc/i,
-            /je lance la cr[ée]ation/i,
-            /je cr[ée]e .* course/i,
-            /course .* cr[ée][ée]e/i,
-            /toutes les informations .* (en place|collect)/i,
-            /je .* cr[ée]e .* imm[ée]diat/i,
-            /cr[ée]ation .* imm[ée]diate/i,
+            /je lance .* livreur/i,
           ];
-          const ditRechercheLancee = PATTERNS_RECHERCHE.some(p => p.test(reponseFinale));
-          if (ditRechercheLancee) {
-            console.warn(`[WebhookVenus] ⚠️ FAUSSE CRÉATION — VENUS dit "création/recherche" mais action=${reasoningResult.action} — validation déterministe`);
-            const umFb = { ...(pendingCourse || {}), ...reasoningResult.memoire_courte_update };
-            // ═══ VALIDATION DÉTERMINISTE — ne plus utiliser le client comme contact par défaut ═══
-            const _tcFb = (umFb.type_course || '').toLowerCase().trim();
-            const _hasTypeFb = ['expedier', 'recevoir', 'deplacement'].includes(_tcFb);
-            const _hasDepartFb = !!(umFb.adresse_depart && umFb.adresse_depart.trim()) || umFb.gps_depart_lat != null;
-            const _hasArriveeFb = !!(umFb.adresse_arrivee && umFb.adresse_arrivee.trim()) || umFb.gps_arrivee_lat != null;
-            const _needsContactFb = _tcFb === 'expedier' || _tcFb === 'recevoir';
-            const _hasContactFb = !!(umFb.contact_telephone && umFb.contact_telephone.trim()) || umFb.contact_is_client === true;
+          const ditCreationLancee = PATTERNS_FAUSSE_CREATION.some(p => p.test(reponseFinale));
+          if (ditCreationLancee) {
+            console.warn(`[WebhookVenus] 🚫 FAUSSE CRÉATION détectée — VENUS dit "création/recherche" mais course NON créée (action=${reasoningResult.action}) — remplacement par question`);
+            const umCheck = { ...(pendingCourse || {}), ...reasoningResult.memoire_courte_update };
+            const _tcCh = (umCheck.type_course || '').toLowerCase().trim();
+            const _hasTypeCh = ['expedier', 'recevoir', 'deplacement'].includes(_tcCh);
+            const _hasDepartCh = !!(umCheck.adresse_depart && umCheck.adresse_depart.trim()) || umCheck.gps_depart_lat != null;
+            const _hasArriveeCh = !!(umCheck.adresse_arrivee && umCheck.adresse_arrivee.trim()) || umCheck.gps_arrivee_lat != null;
+            const _needsContactCh = _tcCh === 'expedier' || _tcCh === 'recevoir';
+            const _hasContactCh = !!(umCheck.contact_telephone && umCheck.contact_telephone.trim()) || umCheck.contact_is_client === true;
 
-            if (!_hasTypeFb || !_hasDepartFb || !_hasArriveeFb || (_needsContactFb && !_hasContactFb)) {
-              let _fbAsk = "Je n'ai pas encore toutes les informations nécessaires. ";
-              if (!_hasTypeFb) _fbAsk += 'Souhaitez-vous envoyer un colis, recevoir un colis, ou vous déplacer ?';
-              else if (!_hasDepartFb) _fbAsk += 'Quel est le lieu exact de récupération ?';
-              else if (!_hasArriveeFb) _fbAsk += 'Quel est le lieu exact de livraison ?';
-              else if (_needsContactFb && !_hasContactFb) _fbAsk += `Quel est le numéro de téléphone du ${_tcFb === 'expedier' ? 'destinataire' : 'expéditeur'} ?`;
-              reponseFinale = _fbAsk;
-              console.warn(`[WebhookVenus] 🚫 Fallback création bloqué — champs manquants détectés`);
+            if (!_hasTypeCh) {
+              reponseFinale = 'Souhaitez-vous envoyer un colis, recevoir un colis, ou vous déplacer ?';
+            } else if (!_hasDepartCh) {
+              reponseFinale = 'Quel est le lieu exact de récupération ? (indiquez le quartier ou un point de repère précis)';
+            } else if (!_hasArriveeCh) {
+              reponseFinale = 'Quel est le lieu exact de livraison ? (indiquez le quartier ou un point de repère précis)';
+            } else if (_needsContactCh && !_hasContactCh) {
+              const _roleCh = _tcCh === 'expedier' ? 'destinataire' : 'expéditeur';
+              reponseFinale = `Quel est le numéro de téléphone du ${_roleCh} ? (Si vous êtes vous-même le ${_roleCh}, dites-le moi)`;
             } else {
-              umFb.all_info_collected = true;
-              umFb.user_confirmed = true;
-              const crFb = await creerCourseDepuisMemoire(base44, umFb, countryCode, tarifs, telephone, profileName);
-              if (crFb.success) {
-                reponseFinale = crFb.message;
-                courseCreee = true;
-                umFb.course_created = true;
-                umFb.course_id = crFb.course.id;
-                pendingCourse = umFb;
-                await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(umFb) });
-                if (memoireLongue) {
-                  await mettreAJourMemoireLongue(base44, memoireLongue.id, {
-                    adresse_recuperee: umFb.adresse_depart, adresse_livraison: umFb.adresse_arrivee,
-                    destinataire_nom: umFb.contact_nom, destinataire_telephone: umFb.contact_telephone,
-                    type_course_prefere: umFb.type_course, client_nom: profileName,
-                    increment_courses: true,
-                    ...reasoningResult.memoire_longue_update,
-                  });
-                }
-                console.log(`[WebhookVenus] ✅ Course créée DÉTERMINISTEMENT (fallback anti-faux-succès) — ${crFb.course.id}`);
-              } else if (crFb.error === 'MISSING_INFO' || crFb.error === 'MISSING_TYPE') {
-                console.warn(`[WebhookVenus] ⚠️ Fallback échoué (${crFb.error}) — remplacement de la réponse trompeuse`);
-                reponseFinale = "Je n'ai pas encore toutes les informations nécessaires pour créer votre course. Pouvez-vous préciser le type de course, le lieu de départ et le lieu de livraison ?";
-              }
+              // Toutes les infos sont présentes mais GPT n'a pas utilisé creer_course
+              // → forcer le récapitulatif et demander confirmation explicite
+              const typeLabelCh = { expedier: 'Envoi de colis', recevoir: 'Réception de colis', deplacement: 'Déplacement' }[_tcCh] || _tcCh;
+              reponseFinale = `Récapitulatif de votre demande :\n\n🚚 Type : ${typeLabelCh}\n📍 Départ : ${umCheck.adresse_depart || 'GPS'}\n🎯 Destination : ${umCheck.adresse_arrivee || 'GPS'}\n📞 Contact : ${umCheck.contact_telephone || 'vous-même'}\n\nConfirmez-vous la création de cette course ? Répondez "oui" pour confirmer.`;
             }
           }
         }
