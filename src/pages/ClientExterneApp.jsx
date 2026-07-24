@@ -36,6 +36,9 @@ import FeedbackModal from "@/components/client/FeedbackModal";
 import ClientDashboardGuide from "@/components/client/ClientDashboardGuide";
 import CoursesProgrammeesModal from "@/components/client/CoursesProgrammeesModal";
 import FraisAnnulationBannerClient from "@/components/client/FraisAnnulationBannerClient";
+import SuiviBarreFlottante from "@/components/client/SuiviBarreFlottante";
+import RechercheLivreurScreen from "@/components/client/RechercheLivreurScreen";
+import SuiviCourseFullscreen from "@/components/client/SuiviCourseFullscreen";
 
 
 function haversineDistance(lat1, lon1, lat2, lon2) {
@@ -97,6 +100,9 @@ export default function ClientExterneApp() {
     try { return localStorage.getItem("silgapp_client_session_id") || null; } catch { return null; }
   });
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [showRecherche, setShowRecherche] = useState(false);
+  const [showSuiviFullscreen, setShowSuiviFullscreen] = useState(false);
+  const lastRechercheCourseId = useRef(null);
 
   const [userId, setUserId] = useState(null);
   const queryClient = useQueryClient();
@@ -182,6 +188,23 @@ export default function ClientExterneApp() {
     if (courseLivreId) return { moment: PUB_MOMENTS.APRES_LIVRAISON, courseId: courseLivreId, key: `livre_${courseLivreId}` };
     return { moment: PUB_MOMENTS.OUVERTURE_APP, courseId: null, key: "ouverture" };
   })();
+
+  // ── Course principale affichée dans la barre de suivi (priorité: assignée > recherche > autre) ──
+  const coursePrincipale = useMemo(() =>
+    courseAssignee || courseEnRecherche || coursesActives[0] || null
+  , [coursesActives, courseEnRecherche, courseAssignee]);
+
+  // ── Auto-ouverture de l'écran "Recherche livreur" quand une nouvelle course entre en recherche ──
+  useEffect(() => {
+    if (courseEnRecherche && courseEnRecherche.id !== lastRechercheCourseId.current) {
+      lastRechercheCourseId.current = courseEnRecherche.id;
+      setShowRecherche(true);
+    }
+    if (!courseEnRecherche) {
+      setShowRecherche(false);
+      lastRechercheCourseId.current = null;
+    }
+  }, [courseEnRecherche]);
 
   // Pull-to-refresh
   const { pulling, refreshing } = usePullToRefresh(async () => {
@@ -821,51 +844,7 @@ export default function ClientExterneApp() {
     <div className="min-h-screen bg-gray-50">
       <PullToRefreshIndicator pulling={pulling} refreshing={refreshing} />
 
-      {/* ── COURSES ACTIVES — bannière flottante ─────── */}
-      {coursesActives.length > 0 && (
-        <div className="fixed top-3 left-3 right-3 z-50 space-y-2">
-          {coursesActives.map((course) => (
-            <div
-              key={course.id}
-              className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-primary/20 overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
-              onClick={() => navigate("/client/suivi", { state: { course_id: course.id } })}
-            >
-              <div className="h-1 bg-gradient-to-r from-primary to-red-500 w-full" />
-              <div className="p-3 flex items-center gap-3">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-black text-primary">
-                    {course.type_course === "deplacement" && course.statut === "recherche_livreur" ? "🔍 Recherche chauffeur..." :
-                     course.type_course === "deplacement" && course.statut === "livreur_en_route" ? "🚗 Chauffeur en route" :
-                     course.type_course === "deplacement" && course.statut === "arrive_prise_en_charge" ? "📍 Arrivé au point de prise en charge" :
-                     course.type_course === "deplacement" && course.statut === "passager_embarque" ? "👤 Passager à bord" :
-                     course.type_course === "deplacement" && course.statut === "livree" ? "✅ Déplacement terminé" :
-                     course.statut === "recherche_livreur" ? "🔍 Recherche livreur..." :
-                     course.statut === "livreur_en_route"  ? "🚀 Livreur en route" :
-                     course.statut === "colis_recupere"    ? "📦 Colis récupéré" : "🚚 En livraison"}
-                  </p>
-                  <p className="text-[11px] text-gray-500 truncate mt-0.5">
-                    {course.livreur_nom || "Livreur assigné"} · {course.adresse_depart} → {course.adresse_arrivee}
-                  </p>
-                  {course.is_multi_colis && (
-                    <div className="mt-1">
-                      <MultiColisProgressBadge
-                        nbColis={course.nb_colis || 1}
-                        nbLivres={course.nb_colis_livres || 0}
-                        nbAnnules={course.nb_colis_annules || 0}
-                        size="sm"
-                      />
-                    </div>
-                  )}
-                </div>
-                <ChevronRight className="w-4 h-4 text-gray-600 flex-shrink-0" />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className={`px-4 pb-24 ${coursesActives.length > 1 ? 'pt-32' : coursesActives.length > 0 ? 'pt-20' : 'pt-4'}`}>
+      <div className="px-4 pb-28 pt-4">
         <div className="max-w-lg mx-auto space-y-4">
 
           {/* ── ONGLETS PROMO ─────────────────────── */}
@@ -959,7 +938,7 @@ export default function ClientExterneApp() {
                     <div className="mt-4 bg-white/15 backdrop-blur-sm rounded-2xl px-4 py-2.5 flex items-center gap-2">
                       <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
                       <p className="text-white text-xs font-semibold">
-                        {coursesActives.length} course{coursesActives.length > 1 ? "s" : ""} en cours · appuyez ci-dessus
+                        {coursesActives.length} course{coursesActives.length > 1 ? "s" : ""} en cours · suivez ci-dessous
                       </p>
                     </div>
                   )}
@@ -1227,6 +1206,54 @@ export default function ClientExterneApp() {
         courseId={pubConfig.courseId}
         courseEnAttente={pubConfig.moment !== PUB_MOMENTS.OUVERTURE_APP}
       />
+
+      {/* ── ÉCRAN RECHERCHE LIVREUR — plein écran dynamique ── */}
+      {showRecherche && courseEnRecherche && (
+        <RechercheLivreurScreen
+          course={courseEnRecherche}
+          position={position}
+          onClose={() => setShowRecherche(false)}
+        />
+      )}
+
+      {/* ── ÉCRAN SUIVI PLEIN ÉCRAN — carte + timeline + livreur ── */}
+      {showSuiviFullscreen && coursePrincipale && (
+        <SuiviCourseFullscreen
+          course={coursePrincipale}
+          position={position}
+          onClose={() => setShowSuiviFullscreen(false)}
+          onCall={() => {
+            if (coursePrincipale.livreur_telephone) {
+              window.location.href = `tel:${coursePrincipale.livreur_telephone}`;
+            }
+          }}
+          onMessage={() => {
+            setShowSuiviFullscreen(false);
+            setShowMessages(true);
+          }}
+          onCancel={async () => {
+            try {
+              await base44.functions.invoke("annulerCourseExterne", {
+                course_id: coursePrincipale.id,
+                motif: "Annulé par le client",
+              });
+              toast.success("Course annulée");
+              setShowSuiviFullscreen(false);
+              checkStatus(position, clientProfil);
+            } catch (e) {
+              toast.error("Erreur lors de l'annulation");
+            }
+          }}
+        />
+      )}
+
+      {/* ── BARRE DE SUIVI PERSISTANTE — en bas de l'écran ── */}
+      {coursePrincipale && !showRecherche && !showSuiviFullscreen && (
+        <SuiviBarreFlottante
+          course={coursePrincipale}
+          onClick={() => setShowSuiviFullscreen(true)}
+        />
+      )}
 
       {/* ── MESSAGES ── */}
       {showMessages && (
