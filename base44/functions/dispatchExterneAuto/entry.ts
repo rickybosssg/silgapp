@@ -1,4 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { notifierRedispatchClient } from '../../shared/venusRedispatchNotifier.ts';
+
+// Délai d'attente maximum avant auto-annulation quand le client ne répond pas
+const CYCLE_EPUISE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 
 // ── Cache module-level avec TTL pour les configs (évite de recharger à chaque tick) ──
 const CONFIG_CACHE = { dispatch: null, gps: null, expires: 0 };
@@ -1031,11 +1035,21 @@ Deno.serve(async (req) => {
 
           if (nextWave > maxWave) {
             console.log(`[DISPATCH] 📍 GPS vague ${currentWave} expirée (max: ${maxWave}) — cycle_epuise pour course ${course_id}`);
+            const cycleEpuiseDeadline = new Date(Date.now() + CYCLE_EPUISE_TIMEOUT_MS).toISOString();
             await base44.asServiceRole.entities.CourseExterne.update(course_id, {
               dispatch_status: 'cycle_epuise',
               dispatch_wave: maxWave,
+              timeout_expires_at: cycleEpuiseDeadline,
             });
-            return Response.json({ expired: true, wave_epuise: true });
+            // ── Notifier VENUS WhatsApp au client ──
+            const messageVenus = `📍 Nous avons sollicité tous les livreurs disponibles autour de vous, mais aucun n'a accepté votre course pour le moment.\n\nVoulez-vous que je relance la recherche ?\n\nRépondez 'oui' pour relancer ou 'non' pour annuler.`;
+            const notifie = await notifierRedispatchClient({
+              base44,
+              course,
+              messageVenus,
+              motif: 'cycle_epuise',
+            });
+            return Response.json({ expired: true, wave_epuise: true, venus_notifie: notifie });
           }
           console.log(`[DISPATCH] 📍 GPS avancement vague ${currentWave} → ${nextWave} pour course ${course_id}`);
           await base44.asServiceRole.entities.CourseExterne.update(course_id, {
@@ -1104,19 +1118,29 @@ Deno.serve(async (req) => {
 
       for (const course of coursesToProcess) {
         try {
-          // 🔄 cycle_epuise : après 2 min d'attente → reset et retour N1
+          // 🔄 cycle_epuise : VENUS a demandé au client s'il veut relancer.
+          // On attend sa réponse (15 min max). Si timeout → auto-annulation.
           if (course.dispatch_status === 'cycle_epuise') {
-            console.log(`[DISPATCH] 🔄 Cycle épuisé → reset immédiat pour course ${course.id}`);
+            const deadlineMs = course.timeout_expires_at
+              ? new Date(course.timeout_expires_at).getTime()
+              : 0;
+            const nowMs = now.getTime();
+
+            if (deadlineMs > 0 && nowMs < deadlineMs) {
+              // Délai non expiré — attendre la réponse du client
+              console.log(`[DISPATCH] ⏳ Cycle épuisé course ${course.id} — en attente réponse client (deadline: ${new Date(deadlineMs).toISOString()})`);
+              resultats.push({ course_id: course.id, wave: 'cycle_epuise_waiting' });
+              continue;
+            }
+
+            // Délai de 15 min dépassé sans réponse client — auto-annulation
+            console.log(`[DISPATCH] ⏰ Cycle épuisé + 15min sans réponse pour course ${course.id} — auto-annulation`);
             await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-              dispatch_status: 'en_attente',
-              dispatch_notified_ids: '[]',
-              dispatch_wave_notified_ids: '[]',
-              dispatch_wave: 0,
-              livreur_id: '',
-              livreur_nom: '',
+              statut: 'annulee',
+              dispatch_status: 'expire',
+              notes: (course.notes || '') + ' | [AUTO-ANNULÉ] Cycle dispatch épuisé, client sans réponse sous 15 min',
             });
-            const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
-            resultats.push({ course_id: course.id, wave: 'reset→N1', ...result });
+            resultats.push({ course_id: course.id, wave: 'cycle_epuise_auto_cancel' });
             continue;
           }
 
@@ -1161,11 +1185,21 @@ Deno.serve(async (req) => {
             const nextWave = currentWave + 1;
             if (nextWave > maxWave) {
               console.log(`[DISPATCH] 📍 GPS vague ${currentWave} expirée (max: ${maxWave}) — cycle_epuise pour course ${course.id}`);
+              const cycleEpuiseDeadline = new Date(now.getTime() + CYCLE_EPUISE_TIMEOUT_MS).toISOString();
               await base44.asServiceRole.entities.CourseExterne.update(course.id, {
                 dispatch_status: 'cycle_epuise',
                 dispatch_wave: maxWave,
+                timeout_expires_at: cycleEpuiseDeadline,
               });
-              resultats.push({ course_id: course.id, wave: `${currentWave}→epuise` });
+              // ── Notifier VENUS WhatsApp au client : voulez-vous relancer ? ──
+              const messageVenus = `📍 Nous avons sollicité tous les livreurs disponibles autour de vous, mais aucun n'a accepté votre course pour le moment.\n\nVoulez-vous que je relance la recherche ?\n\nRépondez 'oui' pour relancer ou 'non' pour annuler.`;
+              const notifie = await notifierRedispatchClient({
+                base44,
+                course,
+                messageVenus,
+                motif: 'cycle_epuise',
+              });
+              resultats.push({ course_id: course.id, wave: `${currentWave}→epuise`, venus_notifie: notifie });
               continue;
             }
             console.log(`[DISPATCH] 📍 GPS avancement vague ${currentWave} → ${nextWave} pour course ${course.id}`);

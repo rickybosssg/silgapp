@@ -724,9 +724,13 @@ async function handleRedispatchDecision(base44: any, conversation: any, userMess
       return "Cette course n'est plus disponible. N'hésitez pas à me solliciter si vous avez besoin d'une nouvelle course.";
     }
 
-    // Passer dispatch_status à 'en_attente' pour permettre au dispatch de traiter la course
+    // Passer dispatch_status à 'en_attente' + reset vagues/notifiés pour un nouveau cycle complet
     await base44.asServiceRole.entities.CourseExterne.update(courseId, {
       dispatch_status: 'en_attente',
+      dispatch_wave: 0,
+      dispatch_notified_ids: '[]',
+      dispatch_wave_notified_ids: '[]',
+      timeout_expires_at: null,
     });
 
     // Relancer le dispatch immédiatement (fire-and-forget)
