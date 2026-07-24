@@ -427,8 +427,9 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
         tools: SILGAPP_TOOLS,
         tool_choice: 'auto',
         response_format: { type: 'json_object' },
-        temperature: temp,
-        max_tokens: maxTokens,
+        temperature: model.startsWith('gpt-5') ? 1 : temp,
+        max_completion_tokens: maxTokens,
+        ...(model.startsWith('gpt-5') ? { reasoning_effort: 'low' } : {}),
       }),
     });
 
@@ -532,8 +533,9 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
         { role: 'system', content: 'Tu as utilisé le maximum d\'outils. Réponds MAINTENANT avec le JSON final, sans appeler d\'autres outils.' },
       ],
       response_format: { type: 'json_object' },
-      temperature: 0.3,
-      max_tokens: 1500,
+      temperature: model.startsWith('gpt-5') ? 1 : 0.3,
+      max_completion_tokens: 1500,
+      ...(model.startsWith('gpt-5') ? { reasoning_effort: 'low' } : {}),
     }),
   });
 

@@ -22,12 +22,23 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── 2. Test réel : appel API OpenAI ──
+    // ── 3. Vérifier la config SystemConfig AVANT le test (pour tester le bon modèle) ──
+    const allConfigs = await base44.asServiceRole.entities.SystemConfig.filter({});
+    const getConfig = (cle: string) => allConfigs.find((c: any) => c.cle === cle)?.valeur;
+
+    const enabledVal = getConfig('VENUS_OPENAI_ENABLED');
+    const modelVal = getConfig('VENUS_PRIMARY_MODEL') || getConfig('VENUS_OPENAI_MODEL') || 'gpt-4.1-mini';
+
+    // ── 2. Test réel : appel API OpenAI avec le modèle configuré ──
     const t0 = Date.now();
     let apiResult: any = {
       secret_present: true,
       secret_length: OPENAI_API_KEY.length,
       secret_prefix: OPENAI_API_KEY.substring(0, 3) + '***',
+      modele_configure: modelVal,
+      modele_source: 'SystemConfig → VENUS_PRIMARY_MODEL (configuré par l\'admin)',
+      interrupteur_venus: enabledVal || 'non_configuré',
+      interrupteur_actif: enabledVal === 'true',
     };
 
     try {
@@ -38,13 +49,12 @@ Deno.serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4.1-mini',
+          model: modelVal,
           messages: [
             { role: 'system', content: 'Réponds uniquement par "OK".' },
             { role: 'user', content: 'Test de connexion SILGAPP VENUS.' },
           ],
-          max_tokens: 5,
-          temperature: 0,
+          max_completion_tokens: 50,
         }),
       });
 
@@ -54,13 +64,22 @@ Deno.serve(async (req) => {
 
       if (resp.ok && data.choices?.[0]?.message?.content) {
         apiResult.connexion_ok = true;
-        apiResult.message = 'Connexion OpenAI OK';
-        apiResult.modele_teste = data.model || 'gpt-4.1-mini';
+        apiResult.message = `Connexion OpenAI OK avec ${modelVal}`;
+        apiResult.modele_teste = data.model || modelVal;
+        apiResult.modele_retourne_par_api = data.model || 'N/A';
         apiResult.reponse_api = data.choices[0].message.content;
         apiResult.tokens = data.usage;
+      } else if (resp.ok) {
+        // HTTP 200 mais pas de content — logger la structure brute
+        apiResult.connexion_ok = true;
+        apiResult.message = `Connexion OK avec ${modelVal} (réponse structurée)`;
+        apiResult.modele_retourne_par_api = data.model || 'N/A';
+        apiResult.tokens = data.usage;
+        apiResult.raw_choice = JSON.stringify(data.choices?.[0]?.message || {}).substring(0, 500);
+        apiResult.raw_response_keys = Object.keys(data);
       } else {
         apiResult.connexion_ok = false;
-        apiResult.message = 'Clé invalide ou erreur API';
+        apiResult.message = `Clé invalide ou modèle ${modelVal} non supporté`;
         apiResult.erreur_type = data.error?.type || 'N/A';
         apiResult.erreur_message = data.error?.message || 'N/A';
         apiResult.erreur_code = data.error?.code || 'N/A';
@@ -71,26 +90,10 @@ Deno.serve(async (req) => {
       apiResult.erreur = e.message;
     }
 
-    // ── 3. Vérifier la config SystemConfig (interrupteur + modèle en 1 requête) ──
-    // CRITIQUE: filter({ cle: '...' }) échoue silencieusement en production Deno.
-    // Utiliser filter({}) puis filtrer en mémoire, comme venusOpenAIEngine.ts.
-    const allConfigs = await base44.asServiceRole.entities.SystemConfig.filter({});
-    const getConfig = (cle: string) => allConfigs.find((c: any) => c.cle === cle)?.valeur;
-
-    const enabledVal = getConfig('VENUS_OPENAI_ENABLED');
-    apiResult.interrupteur_venus = enabledVal || 'non_configuré';
-    apiResult.interrupteur_actif = enabledVal === 'true';
-
-    const modelVal = getConfig('VENUS_PRIMARY_MODEL') || getConfig('VENUS_OPENAI_MODEL');
-    apiResult.modele_configure = modelVal || 'gpt-4.1-mini (défaut)';
-    apiResult.modele_source = modelVal
-      ? 'SystemConfig → VENUS_PRIMARY_MODEL (configuré par l\'admin)'
-      : 'Défaut OPENAI_MODEL_DEFAULT (gpt-4.1-mini) — configurable via SystemConfig VENUS_PRIMARY_MODEL';
-
     // ── 5. Flux VENUS confirmé ──
     apiResult.flux_venus = {
       webhook: 'webhookWhatsAppVenus → raisonnerVenus()',
-      moteur_principal: 'raisonnerAvecOpenAI() via gpt-4.1-mini',
+      moteur_principal: `raisonnerAvecOpenAI() via ${modelVal}`,
       fallback: 'InvokeLLM (Base44, gpt_5_mini) si OpenAI échoue',
       rag_source: 'venusRagEngine.ts — connaissances injectées dans le prompt OpenAI',
       actions_ecriture: 'Champ action → webhook exécute avec vérification DB',
