@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 import { ExternalLink, Phone, MessageCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { pubMatchMoment, pubEstValide, pubCibleUser, peutAfficherPub, marquerPubAffichee, MOMENTS } from "@/lib/publiciteUtils";
 
 // Enregistre une action pub (affichage, clic, vue_video) sans bloquer le rendu
 async function trackAction(pubId, userType, userId, action) {
@@ -13,7 +14,7 @@ async function trackAction(pubId, userType, userId, action) {
       vue_at: new Date().toISOString(),
     });
     // Incrémenter le compteur sur la pub
-    const field = action === "clic" ? "nb_clics" : action === "vue_video" ? "nb_vues_video" : "nb_affichages";
+    const field = action === "clic" ? "nb_clics" : action === "vue_video" ? "nb_vues_video" : action === "fermeture" ? "nb_fermetures" : "nb_affichages";
     const pub = await base44.entities.Publicite.filter({ id: pubId });
     if (pub?.[0]) {
       await base44.entities.Publicite.update(pubId, { [field]: (pub[0][field] || 0) + 1 });
@@ -21,7 +22,7 @@ async function trackAction(pubId, userType, userId, action) {
   } catch (_) {}
 }
 
-export default function PubliciteCarousel({ cible = "clients", userId = null, userType = "client" }) {
+export default function PubliciteCarousel({ cible = "clients", userId = null, userType = "client", moment = MOMENTS.OUVERTURE_APP }) {
   const [pubs, setPubs] = useState([]);
   const [current, setCurrent] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -34,24 +35,10 @@ export default function PubliciteCarousel({ cible = "clients", userId = null, us
       const all = await base44.entities.Publicite.filter({ actif: true, format: "carrousel" });
       const userCountry = userId ? await getUserCountry(userType, userId) : null;
       const filtered = (all || []).filter(p => {
-        // Vérifier ciblage
-        const cibles = ["tous", cible];
-        if (!cibles.includes(p.cible)) return false;
-        // Vérifier pays
-        if (p.pays_cibles && p.pays_cibles !== "tous") {
-          try {
-            const paysList = JSON.parse(p.pays_cibles);
-            if (!Array.isArray(paysList) || (userCountry && !paysList.includes(userCountry))) {
-              return false;
-            }
-          } catch (e) {
-            // Si JSON invalide, on considère "tous"
-          }
-        }
-        // Vérifier dates
-        if (p.date_debut && p.date_debut > now) return false;
-        if (p.date_fin && p.date_fin < now) return false;
-        return true;
+        if (!pubEstValide(p, now)) return false;
+        if (!pubCibleUser(p, cible, userCountry)) return false;
+        // Le carrousel s'affiche sur l'accueil → moment ouverture_app ou ouverture_et_recherche ou personnalise(ouverture_app)
+        return pubMatchMoment(p, MOMENTS.OUVERTURE_APP);
       }).sort((a, b) => (a.ordre || 0) - (b.ordre || 0));
       setPubs(filtered);
     } catch (_) {}
@@ -91,6 +78,7 @@ export default function PubliciteCarousel({ cible = "clients", userId = null, us
     if (!trackedAffichages.current.has(pubId)) {
       trackedAffichages.current.add(pubId);
       trackAction(pubId, userType, userId, "affichage");
+      marquerPubAffichee(pubs[current], null);
     }
   }, [current, pubs, userType, userId]);
 

@@ -24,13 +24,41 @@ const CIBLES = [
 
 const FORMATS = [
   { value: "carrousel",   label: "Carrousel",    icon: "🎠", desc: "Défilement dans le dashboard" },
-  { value: "plein_ecran", label: "Plein écran",  icon: "📢", desc: "Annonce importante à l'ouverture" },
+  { value: "plein_ecran", label: "Plein écran",  icon: "📢", desc: "Annonce importante" },
 ];
+
+const MOMENTS = [
+  { value: "ouverture_app",        label: "À l'ouverture de l'app",        icon: "🏠", desc: "Au lancement de l'application" },
+  { value: "recherche_livreur",    label: "Pendant la recherche",          icon: "🔍", desc: "Pendant l'attente d'un livreur" },
+  { value: "apres_assignation",    label: "Après assignation",             icon: "🛵", desc: "Après qu'un livreur est assigné" },
+  { value: "apres_livraison",      label: "Après la livraison",            icon: "📦", desc: "Après la fin de la course" },
+  { value: "ouverture_et_recherche", label: "Ouverture + recherche",       icon: "🏠🔍", desc: "Aux deux moments clés" },
+  { value: "personnalise",         label: "Personnalisé",                  icon: "⚙️", desc: "Choisir plusieurs emplacements" },
+];
+
+const MOMENTS_PERSONNALISES_OPTIONS = [
+  { value: "ouverture_app",     label: "Ouverture app",     icon: "🏠" },
+  { value: "recherche_livreur", label: "Recherche livreur", icon: "🔍" },
+  { value: "apres_assignation", label: "Après assignation", icon: "🛵" },
+  { value: "apres_livraison",   label: "Après livraison",   icon: "📦" },
+];
+
+const LIMITES = [
+  { value: "une_fois_par_course",  label: "1 fois par course",   desc: "Ne réapparaît plus pour la même course" },
+  { value: "une_fois_par_jour",    label: "1 fois par jour",     desc: "Max une fois toutes les 24h" },
+  { value: "une_fois_par_session", label: "1 fois par session",  desc: "Max une fois par session app" },
+  { value: "illimite",             label: "Illimité",            desc: "À chaque déclenchement possible" },
+];
+
+const DUREES_MIN = [3, 5, 10, 15];
 
 const defaultForm = {
   titre: "", description: "", type_media: "image", media_url: "",
   lien_whatsapp: "", lien_telephone: "", lien_url: "",
   cible: "tous", format: "carrousel", actif: true,
+  moment_affichage: "ouverture_app", moments_personnalises: [],
+  duree_min_affichage: 5, fermable_immediatement: false,
+  limite_affichage: "une_fois_par_course",
   date_debut: "", date_fin: "", ordre: 0,
   couleur_fond: "#1a1a2e", couleur_texte: "#ffffff",
   annonceur_nom: "", annonceur_contact: "",
@@ -108,6 +136,15 @@ export default function GestionPublicites() {
         editPaysCibles = Array.isArray(arr) ? arr[0] || "" : "";
       } catch { editPaysCibles = ""; }
     }
+    let editMomentsPerso = [];
+    if (pub.moments_personnalises) {
+      try { editMomentsPerso = JSON.parse(pub.moments_personnalises); } catch { editMomentsPerso = []; }
+    }
+    // Migration anciennes pubs sans moment_affichage
+    let editMoment = pub.moment_affichage || "ouverture_app";
+    if (!pub.moment_affichage && pub.format === "plein_ecran") editMoment = "ouverture_app";
+    if (!pub.moment_affichage && pub.format === "carrousel") editMoment = "ouverture_app";
+
     setForm({
       titre: pub.titre || "",
       description: pub.description || "",
@@ -119,6 +156,11 @@ export default function GestionPublicites() {
       cible: pub.cible || "tous",
       format: pub.format || "carrousel",
       actif: pub.actif !== false,
+      moment_affichage: editMoment,
+      moments_personnalises: editMomentsPerso,
+      duree_min_affichage: pub.duree_min_affichage ?? 5,
+      fermable_immediatement: pub.fermable_immediatement ?? false,
+      limite_affichage: pub.limite_affichage || "une_fois_par_course",
       date_debut: pub.date_debut ? pub.date_debut.slice(0, 16) : "",
       date_fin: pub.date_fin ? pub.date_fin.slice(0, 16) : "",
       ordre: pub.ordre || 0,
@@ -152,10 +194,12 @@ export default function GestionPublicites() {
     e.preventDefault();
     if (!form.titre.trim()) { toast.error("Titre requis"); return; }
     const paysCibles = form.pays_cible ? JSON.stringify([form.pays_cible]) : "tous";
-    const { pays_cible, ...rest } = form;
+    const { pays_cible, moments_personnalises, ...rest } = form;
     saveMutation.mutate({
       ...rest,
       pays_cibles: paysCibles,
+      moments_personnalises: JSON.stringify(moments_personnalises || []),
+      duree_min_affichage: Number(form.duree_min_affichage) || 5,
       date_debut: form.date_debut ? new Date(form.date_debut).toISOString() : null,
       date_fin: form.date_fin ? new Date(form.date_fin).toISOString() : null,
       ordre: Number(form.ordre) || 0,
@@ -274,6 +318,103 @@ export default function GestionPublicites() {
                     </button>
                   ))}
                 </div>
+              </div>
+            </div>
+
+            {/* ── MOMENT D'AFFICHAGE ── */}
+            <div className="space-y-2">
+              <Label className="font-bold text-sm">⏰ Moment d'affichage *</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {MOMENTS.map(m => (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => setForm(prev => ({ ...prev, moment_affichage: m.value }))}
+                    className={`p-3 rounded-xl border-2 text-left transition-all ${form.moment_affichage === m.value ? "border-violet-500 bg-violet-50" : "border-gray-200 bg-white hover:border-violet-200"}`}
+                  >
+                    <div className="text-lg mb-1">{m.icon}</div>
+                    <p className="text-xs font-bold text-gray-900">{m.label}</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">{m.desc}</p>
+                  </button>
+                ))}
+              </div>
+
+              {/* Sélection multiple si "personnalise" */}
+              {form.moment_affichage === "personnalise" && (
+                <div className="mt-2 p-3 bg-violet-50/50 rounded-xl border border-violet-200">
+                  <p className="text-xs font-bold text-violet-700 mb-2">Choisissez les moments :</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {MOMENTS_PERSONNALISES_OPTIONS.map(opt => {
+                      const checked = (form.moments_personnalises || []).includes(opt.value);
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => {
+                            const arr = form.moments_personnalises || [];
+                            setForm(prev => ({
+                              ...prev,
+                              moments_personnalises: checked
+                                ? arr.filter(v => v !== opt.value)
+                                : [...arr, opt.value],
+                            }));
+                          }}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition-all text-left ${checked ? "border-violet-500 bg-violet-100" : "border-gray-200 bg-white"}`}
+                        >
+                          <span className="text-sm">{opt.icon}</span>
+                          <span className={`text-xs font-semibold ${checked ? "text-violet-700" : "text-gray-600"}`}>{opt.label}</span>
+                          {checked && <Check className="w-3.5 h-3.5 text-violet-600 ml-auto" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── OPTIONS D'AFFICHAGE ── */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-gray-50 rounded-xl">
+              {/* Durée min */}
+              <div className="space-y-1.5">
+                <Label className="font-bold text-xs">⏱️ Durée min avant fermeture</Label>
+                <div className="flex gap-1.5">
+                  {DUREES_MIN.map(d => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setForm(prev => ({ ...prev, duree_min_affichage: d }))}
+                      className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${form.duree_min_affichage === d ? "bg-violet-600 text-white" : "bg-white border border-gray-200 text-gray-600"}`}
+                    >
+                      {d}s
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Fermable immédiatement */}
+              <div className="space-y-1.5">
+                <Label className="font-bold text-xs">🔓 Fermable immédiatement ?</Label>
+                <button
+                  type="button"
+                  onClick={() => setForm(prev => ({ ...prev, fermable_immediatement: !prev.fermable_immediatement }))}
+                  className={`w-full py-2 rounded-lg text-xs font-bold transition-all ${form.fermable_immediatement ? "bg-green-500 text-white" : "bg-white border border-gray-200 text-gray-600"}`}
+                >
+                  {form.fermable_immediatement ? "Oui (fermeture libre)" : "Non (durée min imposée)"}
+                </button>
+              </div>
+
+              {/* Limite d'affichage */}
+              <div className="space-y-1.5">
+                <Label className="font-bold text-xs">🔁 Limite de ré-affichage</Label>
+                <select
+                  value={form.limite_affichage}
+                  onChange={e => setForm(prev => ({ ...prev, limite_affichage: e.target.value }))}
+                  className="w-full py-2 px-2 rounded-lg border border-gray-200 text-xs font-semibold bg-white"
+                >
+                  {LIMITES.map(l => (
+                    <option key={l.value} value={l.value}>{l.label}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -513,6 +654,19 @@ export default function GestionPublicites() {
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${pub.format === "plein_ecran" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600"}`}>
                             {pub.format === "plein_ecran" ? "📢 Plein écran" : "🎠 Carrousel"}
                           </span>
+                          {(() => {
+                            const m = MOMENTS.find(x => x.value === (pub.moment_affichage || "ouverture_app"));
+                            return m ? (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 bg-teal-100 text-teal-700">
+                                {m.icon} {m.label}
+                              </span>
+                            ) : null;
+                          })()}
+                          {pub.fermable_immediatement && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 bg-green-100 text-green-700">
+                              🔓 Fermable
+                            </span>
+                          )}
                           {pub.pays_cibles && pub.pays_cibles !== "tous" && (() => {
                             try {
                               const arr = JSON.parse(pub.pays_cibles);

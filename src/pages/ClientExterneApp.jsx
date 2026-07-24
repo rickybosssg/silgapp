@@ -30,6 +30,7 @@ import ClientOnboarding from "@/components/client/ClientOnboarding";
 import OngletCodePromo from "@/components/client/OngletCodePromo";
 import PubliciteCarousel from "@/components/publicite/PubliciteCarousel";
 import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
+import { MOMENTS as PUB_MOMENTS } from "@/lib/publiciteUtils";
 import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
 import FeedbackModal from "@/components/client/FeedbackModal";
 import ClientDashboardGuide from "@/components/client/ClientDashboardGuide";
@@ -135,6 +136,52 @@ export default function ClientExterneApp() {
     ...restaurantsCarte.map(r => ({ ...r, _type: "restaurant" })),
     ...pharmaciesCarte.map(p => ({ ...p, _type: "pharmacie" })),
   ], [boutiquesCarte, restaurantsCarte, pharmaciesCarte]);
+
+  // ── ÉTAT DÉRIVÉ POUR LES PUBLICITÉS — détection des moments d'affichage ──
+  // Course en recherche de livreur (nouvelle ou recherche_livreur, sans livreur assigné)
+  const courseEnRecherche = useMemo(() =>
+    coursesActives.find(c =>
+      ["nouvelle", "recherche_livreur"].includes(c.statut) && !c.livreur_id
+    ), [coursesActives]);
+
+  // Course avec livreur assigné (en cours de livraison)
+  const courseAssignee = useMemo(() =>
+    coursesActives.find(c =>
+      c.livreur_id && ["livreur_en_route", "arrive_prise_en_charge", "colis_recupere", "en_livraison", "arrivee"].includes(c.statut)
+    ), [coursesActives]);
+
+  // Détection d'une course qui vient d'être livrée (transition vers "livree")
+  const prevActiveIds = useRef(new Set());
+  const prevStatuses = useRef({});
+  const [courseLivreId, setCourseLivreId] = useState(null);
+  useEffect(() => {
+    const currentIds = new Set(coursesActives.map(c => c.id));
+    // Détecter les courses qui ont disparu de coursesActives (→ livrées ou annulées)
+    for (const id of prevActiveIds.current) {
+      if (!currentIds.has(id)) {
+        const lastStatus = prevStatuses.current[id];
+        // Si la dernière statut connu n'était pas "annulee", on considère que c'est une livraison
+        if (lastStatus && lastStatus !== "annulee") {
+          setCourseLivreId(id);
+          // Auto-clear après 30 secondes
+          setTimeout(() => setCourseLivreId(prev => prev === id ? null : prev), 30000);
+        }
+      }
+    }
+    // Mettre à jour les refs
+    prevActiveIds.current = currentIds;
+    const nowStatuses = {};
+    coursesActives.forEach(c => { nowStatuses[c.id] = c.statut; });
+    prevStatuses.current = nowStatuses;
+  }, [coursesActives]);
+
+  // Configuration dynamique du moment publicitaire (priorité: recherche > assignation > livraison > ouverture)
+  const pubConfig = (() => {
+    if (courseEnRecherche) return { moment: PUB_MOMENTS.RECHERCHE_LIVREUR, courseId: courseEnRecherche.id, key: `recherche_${courseEnRecherche.id}` };
+    if (courseAssignee) return { moment: PUB_MOMENTS.APRES_ASSIGNATION, courseId: courseAssignee.id, key: `assignee_${courseAssignee.id}` };
+    if (courseLivreId) return { moment: PUB_MOMENTS.APRES_LIVRAISON, courseId: courseLivreId, key: `livre_${courseLivreId}` };
+    return { moment: PUB_MOMENTS.OUVERTURE_APP, courseId: null, key: "ouverture" };
+  })();
 
   // Pull-to-refresh
   const { pulling, refreshing } = usePullToRefresh(async () => {
@@ -1170,8 +1217,16 @@ export default function ClientExterneApp() {
         />
       )}
 
-      {/* ── PUBLICITÉ PLEIN ÉCRAN ── */}
-      <PubliciteFullscreen cible="clients" userId={clientProfil?.id} userType="client" />
+      {/* ── PUBLICITÉ PLEIN ÉCRAN — moment dynamique ── */}
+      <PubliciteFullscreen
+        key={pubConfig.key}
+        moment={pubConfig.moment}
+        cible="clients"
+        userId={clientProfil?.id}
+        userType="client"
+        courseId={pubConfig.courseId}
+        courseEnAttente={pubConfig.moment !== PUB_MOMENTS.OUVERTURE_APP}
+      />
 
       {/* ── MESSAGES ── */}
       {showMessages && (
