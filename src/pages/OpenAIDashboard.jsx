@@ -109,7 +109,8 @@ export default function OpenAIDashboard() {
     setTestResult(null);
     try {
       const result = await base44.functions.invoke('diagnosticOpenAI', {});
-      setTestResult(result);
+      const unwrapped = result?.data ? result.data : result;
+      setTestResult(unwrapped);
     } catch (e) {
       setTestResult({ statut: 'ÉCHEC', erreur: e.message });
     } finally {
