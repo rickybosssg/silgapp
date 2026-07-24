@@ -3,22 +3,96 @@ import { haversineKm, computeFallbackEta, isValidCoord } from "../../shared/geoU
 
 // ── Constantes ──────────────────────────────────────────────────────────────
 const ORS_BASE_URL = "https://api.openrouteservice.org/v2/directions/driving-car/geojson";
-const ORS_TIMEOUT_MS = 8000; // 8 secondes max
-const MAX_ROUTE_RATIO = 3; // Si distance ORS > 3× Haversine → aberrant
-const MIN_COORDS_POINTS = 2; // Minimum de points dans la géométrie
+const ORS_TIMEOUT_MS = 8000;
+const MAX_ROUTE_RATIO = 3;
+const MIN_COORDS_POINTS = 2;
 
-// ── Fetch ORS avec timeout ───────────────────────────────────────────────────
-async function fetchORS(fromLat, fromLng, toLat, toLng) {
+// ── Defaults (surchargeables via SystemConfig) ──────────────────────────────
+const DEFAULT_CACHE_TTL_SEC = 300;       // 5 minutes
+const DEFAULT_RECALC_DISTANCE_M = 500;   // 500 mètres
+const DEFAULT_MIN_INTERVAL_SEC = 30;     // 30 secondes
+const CACHE_MAX_SIZE = 500;
+
+// ── Cache server-side (persiste dans l'isolate Deno) ────────────────────────
+interface CacheEntry {
+  coordinates: number[][];
+  distanceKm: number;
+  durationSec: number;
+  etaMinutes: number;
+  originLat: number;
+  originLng: number;
+  timestamp: number;
+}
+
+const routeCache = new Map<string, CacheEntry>();
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function roundCoord(v: number): number {
+  return Math.round(v * 1000) / 1000; // ~10m de précision
+}
+
+function getCacheKey(courseId: string | undefined, phase: string, toLat: number, toLng: number): string {
+  return `${courseId || "nocourse"}_${phase}_${roundCoord(toLat)}_${roundCoord(toLng)}`;
+}
+
+// ── Lecture centralisée de la config SystemConfig ───────────────────────────
+async function getRoutingConfig(base44: any) {
+  const config = {
+    enabled: true,
+    cacheTtlSec: DEFAULT_CACHE_TTL_SEC,
+    recalcDistanceM: DEFAULT_RECALC_DISTANCE_M,
+    minIntervalSec: DEFAULT_MIN_INTERVAL_SEC,
+  };
+
+  try {
+    const [enabledRes, ttlRes, recalcRes, intervalRes] = await Promise.all([
+      base44.asServiceRole.entities.SystemConfig.filter({ cle: "routing_enabled" }).catch(() => []),
+      base44.asServiceRole.entities.SystemConfig.filter({ cle: "routing_cache_ttl_seconds" }).catch(() => []),
+      base44.asServiceRole.entities.SystemConfig.filter({ cle: "routing_recalculation_distance_meters" }).catch(() => []),
+      base44.asServiceRole.entities.SystemConfig.filter({ cle: "routing_minimum_interval_seconds" }).catch(() => []),
+    ]);
+
+    if (enabledRes?.length > 0) config.enabled = enabledRes[0].valeur !== "false";
+    if (ttlRes?.length > 0) {
+      const v = parseInt(ttlRes[0].valeur);
+      if (!isNaN(v) && v > 0) config.cacheTtlSec = v;
+    }
+    if (recalcRes?.length > 0) {
+      const v = parseInt(recalcRes[0].valeur);
+      if (!isNaN(v) && v > 0) config.recalcDistanceM = v;
+    }
+    if (intervalRes?.length > 0) {
+      const v = parseInt(intervalRes[0].valeur);
+      if (!isNaN(v) && v >= 0) config.minIntervalSec = v;
+    }
+  } catch (_) {}
+
+  return config;
+}
+
+// ── Nettoyage du cache si trop volumineux ───────────────────────────────────
+function cleanCache(ttlMs: number) {
+  if (routeCache.size <= CACHE_MAX_SIZE) return;
+  const now = Date.now();
+  for (const [key, entry] of routeCache) {
+    if (now - entry.timestamp > ttlMs * 2) {
+      routeCache.delete(key);
+    }
+  }
+}
+
+// ── Fetch ORS avec timeout ──────────────────────────────────────────────────
+async function fetchORS(fromLat: number, fromLng: number, toLat: number, toLng: number) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), ORS_TIMEOUT_MS);
 
   try {
     const body = {
       coordinates: [
-        [fromLng, fromLat], // ORS utilise [lng, lat]
+        [fromLng, fromLat],
         [toLng, toLat],
       ],
-      instructions: false, // Pas d'instructions de virage — on ne fait que du tracking
+      instructions: false,
     };
 
     const response = await fetch(ORS_BASE_URL, {
@@ -39,16 +113,11 @@ async function fetchORS(fromLat, fromLng, toLat, toLng) {
         const errBody = await response.json();
         if (errBody?.error?.message) errorMsg = errBody.error.message;
       } catch (_) {}
-      return {
-        ok: false,
-        httpStatus: response.status,
-        error: errorMsg,
-      };
+      return { ok: false, httpStatus: response.status, error: errorMsg };
     }
 
     const data = await response.json();
 
-    // Format GeoJSON : data.features[0].geometry.coordinates + data.features[0].properties.summary
     if (!data?.features || !Array.isArray(data.features) || data.features.length === 0) {
       return { ok: false, error: "Aucune route retournée par ORS (GeoJSON)" };
     }
@@ -71,24 +140,17 @@ async function fetchORS(fromLat, fromLng, toLat, toLng) {
     const distanceKm = summary.distance ? summary.distance / 1000 : 0;
     const durationSec = summary.duration || 0;
 
-    if (distanceKm <= 0) {
-      return { ok: false, error: "Distance nulle retournée par ORS" };
-    }
-    if (durationSec <= 0 || durationSec > 7200) {
-      return { ok: false, error: `Durée incohérente: ${durationSec}s` };
-    }
+    if (distanceKm <= 0) return { ok: false, error: "Distance nulle retournée par ORS" };
+    if (durationSec <= 0 || durationSec > 7200) return { ok: false, error: `Durée incohérente: ${durationSec}s` };
 
     // Validation anti-route aberrante
     const haversineDist = haversineKm(fromLat, fromLng, toLat, toLng);
-    if (haversineDist > 0 && distanceKm > haversineDist * MAX_ROUTE_RATIO) {
-      return {
-        ok: false,
-        error: `Route aberrante: ${distanceKm.toFixed(2)}km vs ${haversineDist.toFixed(2)}km Haversine`,
-      };
+    if (haversineDist && haversineDist > 0 && distanceKm > haversineDist * MAX_ROUTE_RATIO) {
+      return { ok: false, error: `Route aberrante: ${distanceKm.toFixed(2)}km vs ${haversineDist.toFixed(2)}km Haversine` };
     }
 
     // Convertir [lng, lat] → [lat, lng] pour Leaflet
-    const leafletCoords = coords.map(c => [c[1], c[0]]);
+    const leafletCoords = coords.map((c: number[]) => [c[1], c[0]]);
 
     return {
       ok: true,
@@ -99,9 +161,7 @@ async function fetchORS(fromLat, fromLng, toLat, toLng) {
     };
   } catch (err) {
     clearTimeout(timeoutId);
-    if (err.name === "AbortError") {
-      return { ok: false, error: "Timeout ORS (8s)" };
-    }
+    if (err.name === "AbortError") return { ok: false, error: "Timeout ORS (8s)" };
     return { ok: false, error: err.message || "Erreur réseau ORS" };
   }
 }
@@ -111,7 +171,7 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
 
-    // 1. Authentification obligatoire
+    // 1. Authentification
     const user = await base44.auth.me();
     if (!user) {
       return Response.json({ error: "Non authentifié" }, { status: 401 });
@@ -119,61 +179,80 @@ Deno.serve(async (req) => {
 
     // 2. Parse du payload
     const payload = await req.json();
-    const {
-      from_lat,
-      from_lng,
-      to_lat,
-      to_lng,
-      course_id,
-      phase,
-      livreur_id,
-      country_code,
-    } = payload;
+    const { from_lat, from_lng, to_lat, to_lng, course_id, phase, livreur_id, country_code } = payload;
 
     // 3. Validation des coordonnées
     if (!isValidCoord(from_lat, from_lng) || !isValidCoord(to_lat, to_lng)) {
       return Response.json({
-        source: "fallback",
-        status: "error",
-        coordinates: null,
-        distanceKm: 0,
-        durationSec: 0,
-        etaMinutes: 0,
+        source: "fallback", status: "error",
+        coordinates: null, distanceKm: 0, durationSec: 0, etaMinutes: 0,
         error: "Coordonnées GPS invalides",
       }, { status: 200 });
     }
 
-    // 4. Vérifier que le routing est activé (SystemConfig)
-    let routingEnabled = true;
-    try {
-      const configs = await base44.asServiceRole.entities.SystemConfig.filter({
-        cle: "routing_enabled",
-      });
-      if (configs && configs.length > 0) {
-        routingEnabled = configs[0].valeur !== "false";
-      }
-    } catch (_) {}
+    // 4. Lire la config SystemConfig (batch parallèle)
+    const config = await getRoutingConfig(base44);
 
-    if (!routingEnabled) {
-      const haversineDist = haversineKm(from_lat, from_lng, to_lat, to_lng);
-      const eta = computeFallbackEta(haversineDist);
+    // 5. Routing désactivé → fallback Haversine
+    if (!config.enabled) {
+      const dist = haversineKm(from_lat, from_lng, to_lat, to_lng) || 0;
+      const eta = computeFallbackEta(dist);
       return Response.json({
-        source: "fallback",
-        status: "fallback",
+        source: "fallback", status: "fallback",
         coordinates: [[from_lat, from_lng], [to_lat, to_lng]],
-        distanceKm: haversineDist,
-        durationSec: eta * 60,
-        etaMinutes: eta,
+        distanceKm: dist, durationSec: eta * 60, etaMinutes: eta,
         error: "Routing désactivé (routing_enabled=false)",
       });
     }
 
-    // 5. Appel ORS
+    // 6. Vérifier le cache server-side
+    const cacheKey = getCacheKey(course_id, phase, to_lat, to_lng);
+    const now = Date.now();
+    const cached = routeCache.get(cacheKey);
+
+    if (cached) {
+      const ageSec = (now - cached.timestamp) / 1000;
+
+      // Cache valide (dans le TTL)
+      if (ageSec < config.cacheTtlSec) {
+        // L'origine a-t-elle bougé significativement ?
+        const originMovedM = (haversineKm(cached.originLat, cached.originLng, from_lat, from_lng) || 0) * 1000;
+
+        if (originMovedM < config.recalcDistanceM) {
+          // Origine pas assez bougée → retourner le cache
+          return Response.json({
+            source: "cache", status: "cache",
+            coordinates: cached.coordinates,
+            distanceKm: cached.distanceKm,
+            durationSec: cached.durationSec,
+            etaMinutes: cached.etaMinutes,
+            responseTimeMs: 0,
+          });
+        }
+
+        // Origine bougée mais trop tôt pour refetch (minimum interval)
+        if (ageSec < config.minIntervalSec) {
+          return Response.json({
+            source: "cache", status: "cache",
+            coordinates: cached.coordinates,
+            distanceKm: cached.distanceKm,
+            durationSec: cached.durationSec,
+            etaMinutes: cached.etaMinutes,
+            responseTimeMs: 0,
+          });
+        }
+      }
+    }
+
+    // 7. Nettoyer le cache si trop volumineux
+    cleanCache(config.cacheTtlSec * 1000);
+
+    // 8. Appel ORS
     const startTime = Date.now();
     const orsResult = await fetchORS(from_lat, from_lng, to_lat, to_lng);
     const responseTimeMs = Date.now() - startTime;
 
-    // 6. Journaliser dans RoutingLog (sans données sensibles)
+    // 9. Journaliser (uniquement les vrais appels ORS / fallbacks, pas le cache)
     const logEntry = {
       course_id: course_id || "unknown",
       livreur_id: livreur_id || null,
@@ -182,7 +261,7 @@ Deno.serve(async (req) => {
       status: orsResult.ok ? "success" : "fallback",
       distance_km: orsResult.ok ? orsResult.distanceKm : (haversineKm(from_lat, from_lng, to_lat, to_lng) || 0),
       duration_sec: orsResult.ok ? orsResult.durationSec : 0,
-      eta_minutes: orsResult.ok ? orsResult.etaMinutes : computeFallbackEta(haversineKm(from_lat, from_lng, to_lat, to_lng)),
+      eta_minutes: orsResult.ok ? orsResult.etaMinutes : computeFallbackEta(haversineKm(from_lat, from_lng, to_lat, to_lng) || 0),
       response_time_ms: responseTimeMs,
       error_code: orsResult.ok ? null : (orsResult.httpStatus ? String(orsResult.httpStatus) : null),
       error_message: orsResult.ok ? null : orsResult.error,
@@ -195,11 +274,20 @@ Deno.serve(async (req) => {
       console.error("[getRouteORS] Erreur journalisation:", logErr.message);
     }
 
-    // 7. Retourner le résultat
+    // 10. Succès ORS → stocker en cache et retourner
     if (orsResult.ok) {
+      routeCache.set(cacheKey, {
+        coordinates: orsResult.coordinates,
+        distanceKm: orsResult.distanceKm,
+        durationSec: orsResult.durationSec,
+        etaMinutes: orsResult.etaMinutes,
+        originLat: from_lat,
+        originLng: from_lng,
+        timestamp: now,
+      });
+
       return Response.json({
-        source: "ors",
-        status: "success",
+        source: "ors", status: "success",
         coordinates: orsResult.coordinates,
         distanceKm: orsResult.distanceKm,
         durationSec: orsResult.durationSec,
@@ -208,14 +296,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 8. Fallback Haversine
-    const haversineDist = haversineKm(from_lat, from_lng, to_lat, to_lng);
-    const fallbackEta = computeFallbackEta(haversineDist);
+    // 11. ORS échoué → fallback Haversine
+    const fallbackDist = haversineKm(from_lat, from_lng, to_lat, to_lng) || 0;
+    const fallbackEta = computeFallbackEta(fallbackDist);
     return Response.json({
-      source: "fallback",
-      status: "fallback",
+      source: "fallback", status: "fallback",
       coordinates: [[from_lat, from_lng], [to_lat, to_lng]],
-      distanceKm: haversineDist,
+      distanceKm: fallbackDist,
       durationSec: fallbackEta * 60,
       etaMinutes: fallbackEta,
       responseTimeMs,
@@ -224,12 +311,8 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     return Response.json({
-      source: "fallback",
-      status: "error",
-      coordinates: null,
-      distanceKm: 0,
-      durationSec: 0,
-      etaMinutes: 0,
+      source: "fallback", status: "error",
+      coordinates: null, distanceKm: 0, durationSec: 0, etaMinutes: 0,
       error: error.message,
     }, { status: 500 });
   }
