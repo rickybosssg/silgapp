@@ -23,6 +23,27 @@
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const OPENAI_MODEL_DEFAULT = 'gpt-4.1-mini';
 const MAX_TOOL_ROUNDS = 3;
+const OPENAI_TIMEOUT_MS = 30000; // 30s — empêche les appels pendus à 42-58s
+
+/**
+ * Fetch avec timeout via AbortController.
+ * Évite les appels OpenAI qui restent bloqués 42-58s avant fallback.
+ */
+async function fetchAvecTimeout(url: string, options: any, timeoutMs: number = OPENAI_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const resp = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timer);
+    return resp;
+  } catch (e: any) {
+    clearTimeout(timer);
+    if (e.name === 'AbortError') {
+      throw new Error(`OpenAI: timeout après ${timeoutMs}ms — fallback vers InvokeLLM`);
+    }
+    throw e;
+  }
+}
 
 // ── Cache SystemConfig unifié (30 secondes) ──
 // CRITIQUE: filter({}) fonctionne en production Deno, filter({ cle: '...' }) échoue silencieusement.
@@ -415,7 +436,8 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const tCallStart = Date.now();
-    const response = await fetch(OPENAI_API_URL, {
+    const isGpt5 = model.startsWith('gpt-5');
+    const response = await fetchAvecTimeout(OPENAI_API_URL, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -427,9 +449,9 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
         tools: SILGAPP_TOOLS,
         tool_choice: 'auto',
         response_format: { type: 'json_object' },
-        temperature: model.startsWith('gpt-5') ? 1 : temp,
+        temperature: isGpt5 ? 1 : temp,
         max_completion_tokens: maxTokens,
-        ...(model.startsWith('gpt-5') ? { reasoning_effort: 'low' } : {}),
+        ...(isGpt5 ? { reasoning_effort: 'low' } : {}),
       }),
     });
 
@@ -449,13 +471,39 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
     // ── Si aucun tool_call → réponse finale JSON ──
     if (!msg.tool_calls || msg.tool_calls.length === 0) {
       const content = msg.content || '';
-      // ── Si OpenAI retourne une réponse vide, lancer une exception pour déclencher le fallback InvokeLLM ──
+      // ── GPT-5 peut retourner un content vide (reasoning tokens uniquement).
+      //    Avant de fallback vers InvokeLLM, retry une fois avec reasoning_effort='medium'. ──
       if (!content || content.trim().length === 0) {
-        throw new Error('OpenAI: réponse vide (content null/empty) — fallback vers InvokeLLM');
+        if (isGpt5 && round === 0) {
+          console.warn('[OpenAIEngine] ⚠️ GPT-5 content vide — retry avec reasoning_effort=medium');
+          const retryResp = await fetchAvecTimeout(OPENAI_API_URL, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model, messages, tools: SILGAPP_TOOLS, tool_choice: 'auto',
+              response_format: { type: 'json_object' },
+              temperature: 1, max_completion_tokens: maxTokens,
+              reasoning_effort: 'medium',
+            }),
+          });
+          if (retryResp.ok) {
+            const retryData = await retryResp.json();
+            const retryMsg = retryData.choices?.[0]?.message;
+            if (retryMsg?.content && retryMsg.content.trim().length > 0) {
+              console.log(`[OpenAIEngine] ✅ Retry medium réussi: ${Date.now() - tCallStart}ms`);
+              msg.content = retryMsg.content;
+            }
+          }
+        }
+        // Si le retry n'a pas fonctionné (ou non-GPT-5), fallback InvokeLLM
+        if (!msg.content || msg.content.trim().length === 0) {
+          throw new Error('OpenAI: réponse vide (content null/empty) — fallback vers InvokeLLM');
+        }
       }
       let parsed: any;
+      const finalContent = msg.content || content;
       try {
-        parsed = JSON.parse(content);
+        parsed = JSON.parse(finalContent);
       } catch {
         // Content existe mais n'est pas du JSON valide — l'envelopper
         parsed = {
@@ -467,7 +515,7 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
           prochaine_question: '',
           outils_utilises: toolsUsed,
           confiance: 80,
-          reponse: content.substring(0, 500),
+          reponse: finalContent.substring(0, 500),
           memoire_courte_update: '{}',
           memoire_longue_update: '{}',
           business_rule_id: '',
@@ -520,7 +568,8 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
 
   // Max rounds atteint — forcer une réponse JSON sans outils
   console.warn('[OpenAIEngine] ⚠️ Max tool rounds atteint — forçage réponse finale');
-  const finalResponse = await fetch(OPENAI_API_URL, {
+  const isGpt5Final = model.startsWith('gpt-5');
+  const finalResponse = await fetchAvecTimeout(OPENAI_API_URL, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -533,9 +582,9 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
         { role: 'system', content: 'Tu as utilisé le maximum d\'outils. Réponds MAINTENANT avec le JSON final, sans appeler d\'autres outils.' },
       ],
       response_format: { type: 'json_object' },
-      temperature: model.startsWith('gpt-5') ? 1 : 0.3,
+      temperature: isGpt5Final ? 1 : 0.3,
       max_completion_tokens: 1500,
-      ...(model.startsWith('gpt-5') ? { reasoning_effort: 'low' } : {}),
+      ...(isGpt5Final ? { reasoning_effort: 'low' } : {}),
     }),
   });
 
