@@ -1,0 +1,79 @@
+{
+  "name": "RoutingLog",
+  "type": "object",
+  "properties": {
+    "course_id": {
+      "type": "string",
+      "description": "ID de la course concern\u00e9e"
+    },
+    "livreur_id": {
+      "type": "string",
+      "description": "ID du livreur (arrondi si n\u00e9cessaire)"
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "recuperation",
+        "livraison"
+      ],
+      "description": "Phase au moment de l'appel"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "ors",
+        "fallback",
+        "cache"
+      ],
+      "description": "Moteur ayant r\u00e9pondu: ors=OpenRouteService, fallback=Haversine, cache=cache frontend"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "success",
+        "error",
+        "fallback"
+      ],
+      "default": "success",
+      "description": "R\u00e9sultat de l'appel"
+    },
+    "distance_km": {
+      "type": "number",
+      "default": 0,
+      "description": "Distance retourn\u00e9e (km)"
+    },
+    "duration_sec": {
+      "type": "number",
+      "default": 0,
+      "description": "Dur\u00e9e retourn\u00e9e (secondes)"
+    },
+    "eta_minutes": {
+      "type": "number",
+      "default": 0,
+      "description": "ETA calcul\u00e9 (minutes)"
+    },
+    "response_time_ms": {
+      "type": "number",
+      "default": 0,
+      "description": "Temps de r\u00e9ponse ORS en millisecondes"
+    },
+    "error_code": {
+      "type": "string",
+      "description": "Code d'erreur HTTP si \u00e9chec (400, 401, 403, 404, 429, 5xx)"
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Message d'erreur (sans information sensible)"
+    },
+    "country_code": {
+      "type": "string",
+      "description": "Code pays (BF, CI, ...)"
+    }
+  },
+  "required": [
+    "course_id",
+    "phase",
+    "source",
+    "status"
+  ]
+}
