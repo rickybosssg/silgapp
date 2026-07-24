@@ -1,6 +1,6 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Navigation } from "lucide-react";
+import { Navigation, Phone } from "lucide-react";
 
 /**
  * Navigation GPS intelligente pour livreurs
@@ -28,16 +28,25 @@ export default function NavigationGPSButton({ course, isExterne = false }) {
   const hasDestination = !!destCoords;
 
   if (!hasGPS && !hasDestination) {
+    const phone = course.client_telephone || course.expediteur_telephone || course.destinataire_telephone;
     return (
-      <Button
-        size="sm"
-        variant="outline"
-        disabled
-        className="gap-1 text-xs"
-      >
-        <Navigation className="w-3.5 h-3.5" />
-        GPS indisponible
-      </Button>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Navigation className="w-3.5 h-3.5 opacity-50" />
+          <span>GPS indisponible — contactez le client pour l'adresse</span>
+        </div>
+        {phone && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1 text-xs w-fit"
+            onClick={() => window.open(`tel:${phone}`, "_blank")}
+          >
+            <Phone className="w-3.5 h-3.5" />
+            Appeler le client
+          </Button>
+        )}
+      </div>
     );
   }
 

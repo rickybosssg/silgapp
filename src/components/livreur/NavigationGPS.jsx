@@ -3,6 +3,7 @@ import { Navigation, MapPin, Clock, Ruler, Eye, WifiOff, RefreshCw } from "lucid
 import { cn } from "@/lib/utils";
 import { base44 } from "@/api/base44Client";
 import { phoneVariants } from "@/lib/phoneUtils";
+import RouteMiniMap from "@/components/livreur/RouteMiniMap";
 
 // ─── Haversine ────────────────────────────────────────────────────────────────
 function haversine(lat1, lon1, lat2, lon2) {
@@ -168,6 +169,9 @@ export default function NavigationGPS({
   destinataireTelephone,
   destinationInconnue,
   contactClientId, // ID direct du ClientExterne (prioritaire sur le téléphone)
+  courseId, // pour logging ORS (optionnel)
+  countryCode, // pour logging ORS (optionnel)
+  livreurId, // pour logging ORS (optionnel)
 }) {
   const [livreurPos, setLivreurPos] = useState(null);
   const [dist, setDist] = useState(null);
@@ -416,13 +420,17 @@ export default function NavigationGPS({
         </button>
       )}
 
-      {/* Mini carte */}
+      {/* Mini carte — road-based (ORS) avec fallback iframe */}
       {showMiniMap && (
-        <MiniMap
+        <RouteMiniMap
           destLat={effectiveLat}
           destLng={effectiveLng}
           livreurLat={livreurPos?.lat}
           livreurLng={livreurPos?.lng}
+          courseId={courseId}
+          phase={phase}
+          countryCode={countryCode}
+          livreurId={livreurId}
         />
       )}
 

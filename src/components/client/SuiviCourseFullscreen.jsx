@@ -7,6 +7,7 @@ import "leaflet/dist/leaflet.css";
 import CourseTimeline from "./CourseTimeline";
 import LivreurCardModerne from "./LivreurCardModerne";
 import { base44 } from "@/api/base44Client";
+import { useRouteORS } from "@/hooks/useRouteORS";
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -88,6 +89,21 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
   const isLivraison = ["en_livraison", "arrivee"].includes(course.statut);
   const isColisRecupere = ["colis_recupere", "passager_embarque", "pris_en_charge"].includes(course.statut);
 
+  // ── Route road-based (OpenRouteService) — segment actif livreur → cible ──
+  // Rétrocompatible: si ORS indisponible, fallback ligne droite automatique
+  const activeTarget = (isLivraison || isColisRecupere) ? arrivee : depart;
+  const { route: activeRoute } = useRouteORS({
+    courseId: course.id,
+    phase: isLivraison ? "livraison" : "recuperation",
+    fromLat: livreurPos?.lat,
+    fromLng: livreurPos?.lng,
+    toLat: activeTarget?.lat,
+    toLng: activeTarget?.lng,
+    countryCode: course.country_code,
+    livreurId: course.livreur_id,
+    enabled: !!(livreurPos?.lat && activeTarget?.lat),
+  });
+
   // Fetch livreur position en temps réel (toutes les 5s)
   useEffect(() => {
     if (!course.livreur_id) return;
@@ -120,30 +136,41 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
     return () => clearInterval(interval);
   }, [isLivraison]);
 
-  // Calcul ETA dynamique
+  // Calcul ETA dynamique — priorise ORS (route réelle), fallback Haversine
   const eta = useMemo(() => {
+    // 1. Priorité: ETA road-based depuis OpenRouteService
+    if (activeRoute?.source === "ors" && activeRoute.etaMinutes > 0) {
+      return { distance: activeRoute.distanceKm.toFixed(1), minutes: activeRoute.etaMinutes, isRoadBased: true };
+    }
+    // 2. Fallback: Haversine (ligne droite, comportement actuel)
     if (!livreurPos?.lat) return null;
     const target = isLivraison ? arrivee : depart;
     if (!target?.lat) return null;
     const dist = haversine(livreurPos.lat, livreurPos.lng, target.lat, target.lng);
     const mins = Math.max(1, Math.round((dist / 25) * 60)); // 25 km/h moyenne
-    return { distance: dist.toFixed(1), minutes: mins };
-  }, [livreurPos, depart, arrivee, isLivraison]);
+    return { distance: dist.toFixed(1), minutes: mins, isRoadBased: false };
+  }, [activeRoute, livreurPos, depart, arrivee, isLivraison]);
 
-  // Route polyline (couleurs différentes selon phase)
-  const routePoints = useMemo(() => {
-    const pts = [];
-    if (livreurPos?.lat && depart.lat && !isColisRecupere && !isLivraison) {
-      pts.push({ positions: [[livreurPos.lat, livreurPos.lng], [depart.lat, depart.lng]], color: "#3b82f6" });
-    }
+  // Segments de route — road-based (ORS) avec fallback ligne droite
+  const routeSegments = useMemo(() => {
+    const segments = [];
+    // Ligne de contexte: départ → arrivée (léger, pointillé)
     if (depart.lat && arrivee.lat && (isColisRecupere || isLivraison)) {
-      pts.push({ positions: [[depart.lat, depart.lng], [arrivee.lat, arrivee.lng]], color: "#f97316" });
+      segments.push({
+        positions: [[depart.lat, depart.lng], [arrivee.lat, arrivee.lng]],
+        color: "#cbd5e1", weight: 3, opacity: 0.5, dashArray: "6 6",
+      });
     }
-    if (livreurPos?.lat && arrivee.lat && isLivraison) {
-      pts.push({ positions: [[livreurPos.lat, livreurPos.lng], [arrivee.lat, arrivee.lng]], color: "#f97316" });
+    // Route active: livreur → cible (road-based si ORS, sinon fallback ligne droite)
+    if (activeRoute?.coordinates?.length > 1) {
+      segments.push({
+        positions: activeRoute.coordinates,
+        color: isLivraison ? "#f97316" : "#3b82f6",
+        weight: 5, opacity: 0.9,
+      });
     }
-    return pts;
-  }, [livreurPos, depart, arrivee, isColisRecupere, isLivraison]);
+    return segments;
+  }, [activeRoute, depart, arrivee, isColisRecupere, isLivraison]);
 
   // Positions pour FitBounds
   const fitPositions = useMemo(() => {
@@ -179,6 +206,9 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
             <Navigation className="w-4 h-4 text-primary" />
             <span className="text-sm font-bold text-gray-900">{eta.minutes} min</span>
             <span className="text-xs text-gray-500">· {eta.distance} km</span>
+            {eta.isRoadBased && (
+              <span className="text-[9px] bg-green-100 text-green-700 font-bold px-1.5 py-0.5 rounded-full">route</span>
+            )}
           </motion.div>
         )}
         {onCancel && !isLivraison && !isColisRecupere && (
@@ -221,9 +251,9 @@ export default function SuiviCourseFullscreen({ course, position, onClose, onCal
               <Popup>{course.livreur_nom || "Livreur"}</Popup>
             </Marker>
           )}
-          {/* Routes colorées */}
-          {routePoints.map((r, i) => (
-            <Polyline key={i} positions={r.positions} color={r.color} weight={4} opacity={0.8} dashArray="8 8" />
+          {/* Routes — road-based (ORS) ou fallback ligne droite */}
+          {routeSegments.map((r, i) => (
+            <Polyline key={i} positions={r.positions} color={r.color} weight={r.weight} opacity={r.opacity} dashArray={r.dashArray} />
           ))}
         </MapContainer>
 
