@@ -11,6 +11,8 @@ const MIN_COORDS_POINTS = 2;
 const DEFAULT_CACHE_TTL_SEC = 300;       // 5 minutes
 const DEFAULT_RECALC_DISTANCE_M = 500;   // 500 mètres
 const DEFAULT_MIN_INTERVAL_SEC = 30;     // 30 secondes
+const DEFAULT_CB_THRESHOLD = 3;          // 3 échecs consécutifs → ouverture
+const DEFAULT_CB_DURATION_SEC = 60;      // 60s avant retry (half-open)
 const CACHE_MAX_SIZE = 500;
 
 // ── Cache server-side (persiste dans l'isolate Deno) ────────────────────────
@@ -25,6 +27,22 @@ interface CacheEntry {
 }
 
 const routeCache = new Map<string, CacheEntry>();
+
+// ── Circuit Breaker (état global isolate) ───────────────────────────────────
+interface CircuitBreakerState {
+  failureCount: number;
+  isOpen: boolean;
+  openedAt: number;
+}
+
+const circuitBreaker: CircuitBreakerState = {
+  failureCount: 0,
+  isOpen: false,
+  openedAt: 0,
+};
+
+// ── Déduplication des requêtes ORS en vol ───────────────────────────────────
+const inflightRequests = new Map<string, Promise<any>>();
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 function roundCoord(v: number): number {
@@ -42,14 +60,18 @@ async function getRoutingConfig(base44: any) {
     cacheTtlSec: DEFAULT_CACHE_TTL_SEC,
     recalcDistanceM: DEFAULT_RECALC_DISTANCE_M,
     minIntervalSec: DEFAULT_MIN_INTERVAL_SEC,
+    cbThreshold: DEFAULT_CB_THRESHOLD,
+    cbDurationSec: DEFAULT_CB_DURATION_SEC,
   };
 
   try {
-    const [enabledRes, ttlRes, recalcRes, intervalRes] = await Promise.all([
+    const [enabledRes, ttlRes, recalcRes, intervalRes, cbThresholdRes, cbDurationRes] = await Promise.all([
       base44.asServiceRole.entities.SystemConfig.filter({ cle: "routing_enabled" }).catch(() => []),
       base44.asServiceRole.entities.SystemConfig.filter({ cle: "routing_cache_ttl_seconds" }).catch(() => []),
       base44.asServiceRole.entities.SystemConfig.filter({ cle: "routing_recalculation_distance_meters" }).catch(() => []),
       base44.asServiceRole.entities.SystemConfig.filter({ cle: "routing_minimum_interval_seconds" }).catch(() => []),
+      base44.asServiceRole.entities.SystemConfig.filter({ cle: "routing_circuit_breaker_threshold" }).catch(() => []),
+      base44.asServiceRole.entities.SystemConfig.filter({ cle: "routing_circuit_breaker_duration_seconds" }).catch(() => []),
     ]);
 
     if (enabledRes?.length > 0) config.enabled = enabledRes[0].valeur !== "false";
@@ -65,6 +87,14 @@ async function getRoutingConfig(base44: any) {
       const v = parseInt(intervalRes[0].valeur);
       if (!isNaN(v) && v >= 0) config.minIntervalSec = v;
     }
+    if (cbThresholdRes?.length > 0) {
+      const v = parseInt(cbThresholdRes[0].valeur);
+      if (!isNaN(v) && v > 0) config.cbThreshold = v;
+    }
+    if (cbDurationRes?.length > 0) {
+      const v = parseInt(cbDurationRes[0].valeur);
+      if (!isNaN(v) && v > 0) config.cbDurationSec = v;
+    }
   } catch (_) {}
 
   return config;
@@ -78,6 +108,45 @@ function cleanCache(ttlMs: number) {
     if (now - entry.timestamp > ttlMs * 2) {
       routeCache.delete(key);
     }
+  }
+}
+
+// ── Circuit Breaker ─────────────────────────────────────────────────────────
+function isCircuitOpen(cbDurationSec: number): boolean {
+  if (!circuitBreaker.isOpen) return false;
+  const elapsedSec = (Date.now() - circuitBreaker.openedAt) / 1000;
+  if (elapsedSec >= cbDurationSec) {
+    // Half-open: allow one attempt
+    circuitBreaker.isOpen = false;
+    return false;
+  }
+  return true;
+}
+
+function recordORSSuccess() {
+  circuitBreaker.failureCount = 0;
+  circuitBreaker.isOpen = false;
+}
+
+function recordORSFailure(cbThreshold: number) {
+  circuitBreaker.failureCount++;
+  if (circuitBreaker.failureCount >= cbThreshold) {
+    circuitBreaker.isOpen = true;
+    circuitBreaker.openedAt = Date.now();
+  }
+}
+
+// ── Déduplication: requêtes ORS identiques simultanées ──────────────────────
+async function fetchORSWithDedup(cacheKey: string, fromLat: number, fromLng: number, toLat: number, toLng: number) {
+  const existing = inflightRequests.get(cacheKey);
+  if (existing) return existing;
+
+  const promise = fetchORS(fromLat, fromLng, toLat, toLng);
+  inflightRequests.set(cacheKey, promise);
+  try {
+    return await promise;
+  } finally {
+    inflightRequests.delete(cacheKey);
   }
 }
 
@@ -247,12 +316,52 @@ Deno.serve(async (req) => {
     // 7. Nettoyer le cache si trop volumineux
     cleanCache(config.cacheTtlSec * 1000);
 
-    // 8. Appel ORS
+    // 8. Circuit breaker — si ouvert, fallback immédiat sans appeler ORS
+    if (isCircuitOpen(config.cbDurationSec)) {
+      const cbFallbackDist = haversineKm(from_lat, from_lng, to_lat, to_lng) || 0;
+      const cbFallbackEta = computeFallbackEta(cbFallbackDist);
+
+      try {
+        await base44.asServiceRole.entities.RoutingLog.create({
+          course_id: course_id || "unknown",
+          livreur_id: livreur_id || null,
+          phase: phase || "recuperation",
+          source: "fallback",
+          status: "fallback",
+          distance_km: cbFallbackDist,
+          duration_sec: cbFallbackEta * 60,
+          eta_minutes: cbFallbackEta,
+          response_time_ms: 0,
+          error_code: "circuit_breaker_open",
+          error_message: `Circuit breaker ouvert (${circuitBreaker.failureCount} échecs consécutifs)`,
+          country_code: country_code || null,
+        });
+      } catch (_) {}
+
+      return Response.json({
+        source: "fallback", status: "fallback",
+        coordinates: [[from_lat, from_lng], [to_lat, to_lng]],
+        distanceKm: cbFallbackDist,
+        durationSec: cbFallbackEta * 60,
+        etaMinutes: cbFallbackEta,
+        responseTimeMs: 0,
+        error: "Circuit breaker ouvert — ORS temporairement indisponible",
+      });
+    }
+
+    // 9. Appel ORS avec déduplication des requêtes simultanées
     const startTime = Date.now();
-    const orsResult = await fetchORS(from_lat, from_lng, to_lat, to_lng);
+    const orsResult = await fetchORSWithDedup(cacheKey, from_lat, from_lng, to_lat, to_lng);
     const responseTimeMs = Date.now() - startTime;
 
-    // 9. Journaliser (uniquement les vrais appels ORS / fallbacks, pas le cache)
+    // Mettre à jour le circuit breaker
+    if (orsResult.ok) {
+      recordORSSuccess();
+    } else {
+      recordORSFailure(config.cbThreshold);
+    }
+
+    // 10. Journaliser (uniquement les vrais appels ORS / fallbacks, pas le cache)
     const logEntry = {
       course_id: course_id || "unknown",
       livreur_id: livreur_id || null,
@@ -274,7 +383,7 @@ Deno.serve(async (req) => {
       console.error("[getRouteORS] Erreur journalisation:", logErr.message);
     }
 
-    // 10. Succès ORS → stocker en cache et retourner
+    // 11. Succès ORS → stocker en cache et retourner
     if (orsResult.ok) {
       routeCache.set(cacheKey, {
         coordinates: orsResult.coordinates,
@@ -296,7 +405,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 11. ORS échoué → fallback Haversine
+    // 12. ORS échoué → fallback Haversine
     const fallbackDist = haversineKm(from_lat, from_lng, to_lat, to_lng) || 0;
     const fallbackEta = computeFallbackEta(fallbackDist);
     return Response.json({
