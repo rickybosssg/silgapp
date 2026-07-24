@@ -1,0 +1,50 @@
+{
+  "name": "VenusTranslation",
+  "type": "object",
+  "properties": {
+    "cle": {
+      "type": "string",
+      "description": "Cl\u00e9 de traduction unique (ex: venus.greeting, course.created, support.contact)"
+    },
+    "langue": {
+      "type": "string",
+      "description": "Code langue (ex: fr, en, ar, moore)"
+    },
+    "pays": {
+      "type": "string",
+      "default": "ALL",
+      "description": "Code pays sp\u00e9cifique ou 'ALL' pour toutes"
+    },
+    "valeur": {
+      "type": "string",
+      "description": "Texte traduit (peut contenir des variables {nom}, {devise}, etc.)"
+    },
+    "contexte": {
+      "type": "string",
+      "description": "Contexte d'usage (ex: whatsapp, app, notification, email)"
+    },
+    "variables": {
+      "type": "string",
+      "description": "JSON: tableau des variables support\u00e9es (ex: [\"nom\",\"devise\",\"montant\"])"
+    },
+    "auteur": {
+      "type": "string",
+      "description": "Email admin ayant cr\u00e9\u00e9/modifi\u00e9 la traduction"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "brouillon",
+        "valide",
+        "archive"
+      ],
+      "default": "valide",
+      "description": "Statut de la traduction"
+    }
+  },
+  "required": [
+    "cle",
+    "langue",
+    "valeur"
+  ]
+}

@@ -1,10 +1,10 @@
-import React, { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, CheckCircle2, MapPin, Clock, User } from "lucide-react";
-import { format, startOfDay, endOfDay } from "date-fns";
+import { ArrowLeft, CheckCircle2, MapPin, Clock, User, ChevronLeft, ChevronRight, Calendar, AlertTriangle, TrendingDown } from "lucide-react";
+import { format, startOfDay, endOfDay, addDays, isToday as isDateToday } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import CountrySelector from "@/components/international/CountrySelector.jsx";
@@ -12,6 +12,7 @@ import CountrySelector from "@/components/international/CountrySelector.jsx";
 export default function RapportJourExterne() {
   const { isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
   const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
+  const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()));
 
   const { data: courses = [] } = useQuery({
     queryKey: ["courses-externes-rapport", effectiveCountry || "all"],
@@ -22,13 +23,25 @@ export default function RapportJourExterne() {
     refetchInterval: 10000,
   });
 
-  const today = startOfDay(new Date());
+  const { data: livreursActifs = [] } = useQuery({
+    queryKey: ["livreurs-actifs-rapport", effectiveCountry || "all"],
+    queryFn: () => effectiveCountry
+      ? base44.entities.Livreur.filter({ type_livreur: "externe", actif: true, country_code: effectiveCountry }, "-nom", 100)
+      : base44.entities.Livreur.filter({ type_livreur: "externe", actif: true }, "-nom", 100),
+    initialData: [],
+    staleTime: 60000,
+  });
+
+  const dayStart = selectedDate;
+  const dayEnd = endOfDay(selectedDate);
+  const isTodayReport = isDateToday(selectedDate);
+  const isYesterdayReport = format(selectedDate, "yyyy-MM-dd") === format(addDays(startOfDay(new Date()), -1), "yyyy-MM-dd");
 
   const coursesToday = useMemo(() =>
     courses.filter(c => {
       const date = new Date(c.created_date);
-      return date >= today && date <= endOfDay(today);
-    }), [courses]);
+      return date >= dayStart && date <= dayEnd;
+    }), [courses, dayStart, dayEnd]);
 
   const stats = useMemo(() => {
     const livrees = coursesToday.filter(c => c.statut === "livree");
@@ -49,8 +62,14 @@ export default function RapportJourExterne() {
     });
     const livreurStats = Object.values(parLivreur).sort((a, b) => b.livrees - a.livrees);
 
-    return { totale: coursesToday.length, livrees: livrees.length, annulees: annulees.length, enCours: enCours.length, ca, distance, commission, livreurStats };
-  }, [coursesToday]);
+    // Livreurs actifs sans course ce jour
+    const livreursAvecCourse = new Set(Object.keys(parLivreur));
+    const livreursSansCourse = livreursActifs
+      .filter(l => !livreursAvecCourse.has(l.nom) && l.validation === "valide")
+      .map(l => l.nom);
+
+    return { totale: coursesToday.length, livrees: livrees.length, annulees: annulees.length, enCours: enCours.length, ca, distance, commission, livreurStats, livreursSansCourse };
+  }, [coursesToday, livreursActifs]);
 
   const livreesDetail = coursesToday.filter(c => c.statut === "livree");
 
@@ -77,9 +96,53 @@ export default function RapportJourExterne() {
             <div>
               <h1 className="text-xl font-black text-white tracking-tight">Rapport du Jour — Externe</h1>
               <p className="text-white/65 text-xs mt-0.5 capitalize">
-                {format(today, "EEEE d MMMM yyyy", { locale: fr })} {effectiveCountry ? `· ${effectiveCountry}` : "· tous pays"}
+                {format(selectedDate, "EEEE d MMMM yyyy", { locale: fr })} {effectiveCountry ? `· ${effectiveCountry}` : "· tous pays"}
+                {isYesterdayReport && <span className="ml-1.5 px-1.5 py-0.5 rounded bg-white/20 text-white font-bold text-[10px]">Hier</span>}
               </p>
             </div>
+          </div>
+
+          {/* Navigation entre jours */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-white hover:bg-white/20 border border-white/30 h-9 w-9 p-0"
+              onClick={() => setSelectedDate(d => startOfDay(addDays(d, -1)))}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <div className="relative">
+              <Calendar className="w-3.5 h-3.5 text-white/60 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none z-10" />
+              <input
+                type="date"
+                value={format(selectedDate, "yyyy-MM-dd")}
+                max={format(new Date(), "yyyy-MM-dd")}
+                onChange={e => {
+                  if (e.target.value) setSelectedDate(startOfDay(new Date(e.target.value)));
+                }}
+                className="h-9 pl-7 pr-1 rounded-md bg-white/20 text-white text-xs border border-white/30 [color-scheme:dark] cursor-pointer"
+              />
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-white hover:bg-white/20 border border-white/30 h-9 w-9 p-0 disabled:opacity-30 disabled:cursor-not-allowed"
+              onClick={() => setSelectedDate(d => startOfDay(addDays(d, 1)))}
+              disabled={isTodayReport}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+            {!isTodayReport && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-white hover:bg-white/20 border border-white/30 h-9 px-2 text-xs"
+                onClick={() => setSelectedDate(startOfDay(new Date()))}
+              >
+                Aujourd'hui
+              </Button>
+            )}
           </div>
           {/* Sélecteur pays — affiché uniquement pour les admins globaux */}
           {!isPays && (
@@ -93,6 +156,28 @@ export default function RapportJourExterne() {
           )}
         </div>
       </div>
+
+      {/* ── ALERTE TAUX D'ANNULATION ───────────────────────── */}
+      {stats.totale >= 5 && (() => {
+        const tauxAnnulation = (stats.annulees / stats.totale) * 100;
+        if (tauxAnnulation < 30) return null;
+        const isCritique = tauxAnnulation >= 50;
+        return (
+          <div className={`rounded-2xl p-4 border-2 flex items-start gap-3 ${isCritique ? "bg-red-50 border-red-300" : "bg-orange-50 border-orange-300"}`}>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isCritique ? "bg-red-500" : "bg-orange-500"}`}>
+              <AlertTriangle className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <p className={`font-black text-sm ${isCritique ? "text-red-700" : "text-orange-700"}`}>
+                {isCritique ? "Taux d'annulation critique" : "Taux d'annulation élevé"}
+              </p>
+              <p className={`text-xs mt-0.5 ${isCritique ? "text-red-600" : "text-orange-600"}`}>
+                {tauxAnnulation.toFixed(0)}% des courses ({stats.annulees}/{stats.totale}) ont été annulées ce jour. Vérifiez les motifs et la disponibilité des livreurs.
+              </p>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── KPI STATS ────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
@@ -140,7 +225,7 @@ export default function RapportJourExterne() {
             </div>
             <div>
               <p className="font-bold text-foreground">Performance livreurs</p>
-              <p className="text-xs text-muted-foreground">{stats.livreurStats.length} livreur{stats.livreurStats.length > 1 ? "s" : ""} actif{stats.livreurStats.length > 1 ? "s" : ""} aujourd'hui</p>
+              <p className="text-xs text-muted-foreground">{stats.livreurStats.length} livreur{stats.livreurStats.length > 1 ? "s" : ""} actif{stats.livreurStats.length > 1 ? "s" : ""} ce jour</p>
             </div>
           </div>
           <div className="space-y-2">
@@ -156,6 +241,22 @@ export default function RapportJourExterne() {
                 <span className="font-black text-sm text-green-600 flex-shrink-0">{l.ca.toLocaleString()} F</span>
               </div>
             ))}
+            {stats.livreursSansCourse.length > 0 && (
+              <div className="pt-2 border-t border-gray-100">
+                <p className="text-[10px] font-semibold text-muted-foreground mb-1.5 flex items-center gap-1">
+                  <TrendingDown className="w-3 h-3" />
+                  {stats.livreursSansCourse.length} livreur{stats.livreursSansCourse.length > 1 ? "s" : ""} actif{stats.livreursSansCourse.length > 1 ? "s" : ""} sans course
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {stats.livreursSansCourse.slice(0, 10).map(nom => (
+                    <span key={nom} className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">{nom}</span>
+                  ))}
+                  {stats.livreursSansCourse.length > 10 && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">+{stats.livreursSansCourse.length - 10}</span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -168,7 +269,7 @@ export default function RapportJourExterne() {
           </div>
           <div>
             <p className="font-bold text-foreground">Courses livrées</p>
-            <p className="text-xs text-muted-foreground">{livreesDetail.length} livraison{livreesDetail.length > 1 ? "s" : ""} aujourd'hui</p>
+            <p className="text-xs text-muted-foreground">{livreesDetail.length} livraison{livreesDetail.length > 1 ? "s" : ""} {isTodayReport ? "aujourd'hui" : "ce jour"}</p>
           </div>
         </div>
 

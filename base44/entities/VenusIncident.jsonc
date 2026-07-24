@@ -1,0 +1,137 @@
+{
+  "name": "VenusIncident",
+  "type": "object",
+  "properties": {
+    "type_incident": {
+      "type": "string",
+      "enum": [
+        "livreur_injoignable",
+        "client_injoignable",
+        "destinataire_injoignable",
+        "panne_moto",
+        "accident",
+        "colis_perdu",
+        "colis_endommage",
+        "colis_vole",
+        "colis_refuse",
+        "conflit_client_livreur",
+        "menace_agression",
+        "suspicion_fraude",
+        "probleme_paiement",
+        "probleme_qr_pin",
+        "destinataire_introuvable",
+        "erreur_adresse",
+        "urgence_medicale",
+        "situation_sensible",
+        "autre"
+      ],
+      "description": "Type d'incident d\u00e9tect\u00e9"
+    },
+    "niveau_gravite": {
+      "type": "string",
+      "enum": [
+        "faible",
+        "moyen",
+        "eleve",
+        "critique"
+      ],
+      "default": "moyen",
+      "description": "Niveau de gravit\u00e9 de l'incident"
+    },
+    "course_id": {
+      "type": "string",
+      "description": "ID de la course li\u00e9e \u00e0 l'incident"
+    },
+    "conversation_id": {
+      "type": "string"
+    },
+    "client_telephone": {
+      "type": "string"
+    },
+    "client_nom": {
+      "type": "string"
+    },
+    "livreur_id": {
+      "type": "string"
+    },
+    "livreur_nom": {
+      "type": "string"
+    },
+    "country_code": {
+      "type": "string"
+    },
+    "message_original": {
+      "type": "string",
+      "description": "Message du client/livreur qui a d\u00e9clench\u00e9 la d\u00e9tection"
+    },
+    "contexte": {
+      "type": "string",
+      "description": "JSON: contexte complet au moment de l'incident (statut course, etc.)"
+    },
+    "resume_automatique": {
+      "type": "string",
+      "description": "R\u00e9sum\u00e9 auto-g\u00e9n\u00e9r\u00e9 de l'incident"
+    },
+    "informations_transmises": {
+      "type": "string",
+      "description": "JSON: infos d\u00e9j\u00e0 collect\u00e9es transmises \u00e0 l'admin"
+    },
+    "pattern_matche": {
+      "type": "string",
+      "description": "Pattern regex qui a d\u00e9clench\u00e9 la d\u00e9tection (pour diagnostic)"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "ouvert",
+        "en_cours",
+        "resolu",
+        "ferme"
+      ],
+      "default": "ouvert"
+    },
+    "pris_en_charge_par": {
+      "type": "string",
+      "description": "Email admin ayant pris en charge"
+    },
+    "resolution": {
+      "type": "string",
+      "description": "Solution apport\u00e9e"
+    },
+    "client_informe": {
+      "type": "boolean",
+      "default": false
+    },
+    "notif_admin_envoyee": {
+      "type": "boolean",
+      "default": false
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "whatsapp",
+        "app",
+        "simulateur",
+        "auto"
+      ],
+      "default": "whatsapp"
+    },
+    "date_creation": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "date_prise_en_charge": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "date_resolution": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "type_incident",
+    "niveau_gravite",
+    "statut"
+  ]
+}

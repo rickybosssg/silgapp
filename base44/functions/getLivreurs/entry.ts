@@ -7,6 +7,10 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me().catch(() => null);
+    if (!user || user.role !== 'admin') {
+      return Response.json({ success: false, error: 'Accès réservé aux administrateurs' }, { status: 403 });
+    }
     const livreurs = await base44.asServiceRole.entities.Livreur.list('-created_date', 1000);
     return Response.json({ success: true, livreurs });
   } catch (error) {

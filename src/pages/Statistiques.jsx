@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { format } from "date-fns";
@@ -319,7 +319,7 @@ export default function Statistiques() {
       </div>
 
       {/* ── INSTALLATIONS ── */}
-      <InstallationsSection installations={installations} evolution={evolution.installations} />
+      <InstallationsSection installations={installations} evolution={evolution.installations} activeUsers={kpis.utilisateurs_connectes || 0} />
     </div>
   );
 }

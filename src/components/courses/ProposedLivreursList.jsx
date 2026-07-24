@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Users, Phone, Clock, CheckCircle2, Timer, RefreshCw, Radio, Search, Zap } from "lucide-react";
+import { Users, Phone, Clock, CheckCircle2, Timer, RefreshCw, Radio, Zap } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { toast } from "sonner";
 
 function fmtSec(sec) {
   if (sec <= 0) return "00:00";
@@ -12,9 +14,34 @@ function fmtSec(sec) {
 }
 
 export default function ProposedLivreursList({ course }) {
+  const queryClient = useQueryClient();
   const [livreurs, setLivreurs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(Date.now());
+  const [assigningId, setAssigningId] = useState(null);
+
+  const handleForceAssign = async (livreur) => {
+    setAssigningId(livreur.id);
+    try {
+      await base44.entities.CourseExterne.update(course.id, {
+        statut: "livreur_en_route",
+        dispatch_status: "accepte",
+        livreur_id: livreur.id,
+        livreur_nom: `${livreur.prenom || ""} ${livreur.nom || ""}`.trim(),
+        livreur_telephone: livreur.telephone || "",
+        livreur_vehicule: livreur.vehicule || livreur.type_vehicule || "",
+        heure_acceptation: new Date().toISOString(),
+        notes: (course.notes || "") + `\n[Assigné manuellement par admin → ${livreur.prenom || ""} ${livreur.nom || ""}]`,
+      });
+      await base44.entities.Livreur.update(livreur.id, { statut: "en_course" });
+      toast.success(`Course assignée à ${livreur.prenom || ""} ${livreur.nom || ""}`);
+      queryClient.invalidateQueries();
+    } catch (error) {
+      toast.error("Erreur : " + (error?.message || "assignation impossible"));
+    } finally {
+      setAssigningId(null);
+    }
+  };
 
   // ── Tick toutes les secondes pour tous les compteurs ──
   useEffect(() => {
@@ -31,12 +58,28 @@ export default function ProposedLivreursList({ course }) {
   const remainingSec = expiresTs ? Math.max(0, Math.floor((expiresTs - now) / 1000)) : null;
   const isExpired = expiresTs ? now >= expiresTs : false;
 
+  // ── Durée totale du timeout pour la barre de progression (dynamique selon heure_sollicitation) ──
+  const totalTimeoutSec = (sollicitationTs && expiresTs)
+    ? Math.max(1, Math.round((expiresTs - sollicitationTs) / 1000))
+    : 120;
+
+  // ── Estimation du prochain tick du moteur de dispatch (toutes les 5 min = 300s) ──
+  // Le tick est indépendant du timeout : il tourne sur son propre intervalle.
+  // On estime le reste jusqu'au prochain tick depuis updated_date de la course.
+  const DISPATCH_TICK_SEC = 300;
+  const updatedTs = course?.updated_date ? new Date(course.updated_date).getTime() : null;
+  const nextTickIn = updatedTs
+    ? Math.max(0, DISPATCH_TICK_SEC - (Math.floor((now - updatedTs) / 1000) % DISPATCH_TICK_SEC))
+    : null;
+
   useEffect(() => {
     let mounted = true;
     const fetchLivreurs = async () => {
+      // ── Afficher UNIQUEMENT les livreurs de la vague en cours
+      //    (dispatch_wave_notified_ids est réinitialisé à chaque nouvelle vague par le backend)
       let notifiedIds = [];
       try {
-        notifiedIds = JSON.parse(course.dispatch_notified_ids || "[]");
+        notifiedIds = JSON.parse(course.dispatch_wave_notified_ids || "[]");
       } catch {
         notifiedIds = [];
       }
@@ -57,7 +100,7 @@ export default function ProposedLivreursList({ course }) {
     };
     fetchLivreurs();
     return () => { mounted = false; };
-  }, [course?.id, course?.dispatch_notified_ids]);
+  }, [course?.id, course?.dispatch_wave_notified_ids]);
 
   if (loading) {
     return (
@@ -79,6 +122,8 @@ export default function ProposedLivreursList({ course }) {
   const dispatchStatus = course?.dispatch_status;
   const isSearching = dispatchStatus === "propose" || dispatchStatus === "en_attente" || dispatchStatus === "redispatch";
   const isCycleEpuise = dispatchStatus === "cycle_epuise";
+
+  const isTerminal = course?.statut === "annulee" || course?.statut === "livree";
 
   // Construire le libellé du statut dispatch
   let dispatchLabel = "";
@@ -102,7 +147,7 @@ export default function ProposedLivreursList({ course }) {
       </div>
 
       {/* ── Timeline dispatch : toutes les actions avec leur timing ── */}
-      {isSearching && (
+      {isSearching && !isTerminal && (
         <div className="rounded-lg p-3 bg-white border-2 border-blue-200 space-y-2.5">
           {/* En-tête : vague + statut */}
           <div className="flex items-center justify-between gap-2">
@@ -141,7 +186,7 @@ export default function ProposedLivreursList({ course }) {
                 <p className="text-[11px] font-semibold text-gray-700">Attente de réponse</p>
                 <p className="text-[10px] text-gray-400">expire dans {fmtSec(remainingSec)}</p>
                 <div className="mt-1 h-1.5 bg-blue-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, (remainingSec / 60) * 100)}%` }} />
+                  <div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{ width: `${Math.min(100, (remainingSec / totalTimeoutSec) * 100)}%` }} />
                 </div>
               </div>
               <span className="text-lg font-black text-blue-600 tabular-nums">{fmtSec(remainingSec)}</span>
@@ -162,28 +207,39 @@ export default function ProposedLivreursList({ course }) {
             </div>
           )}
 
-          {/* Action 4 : Prochaine vague prévue */}
-          <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
-            <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-              <Search className="w-3.5 h-3.5 text-gray-500" />
+          {/* Action 4 : Prochain tick de relance dispatch */}
+          {nextTickIn !== null && (
+            <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
+              <div className="w-6 h-6 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
+                <Zap className="w-3.5 h-3.5 text-amber-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-semibold text-gray-600">Prochain tick de relance</p>
+                <p className="text-[10px] text-gray-400">
+                  {isExpired
+                    ? `Vague #${(course?.dispatch_wave || 0) + 1} lancée au prochain tick`
+                    : `Moteur dispatch — vérification auto`}
+                </p>
+              </div>
+              <span className="text-sm font-bold text-amber-600 tabular-nums">~{fmtSec(nextTickIn)}</span>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-semibold text-gray-600">Prochaine action</p>
-              <p className="text-[10px] text-gray-400">
-                {isExpired
-                  ? `Vague #${(course?.dispatch_wave || 0) + 1} — recherche de nouveaux livreurs`
-                  : `Vague #${(course?.dispatch_wave || 0) + 1} après expiration`}
-              </p>
-            </div>
-            <Zap className="w-3.5 h-3.5 text-amber-500" />
-          </div>
+          )}
         </div>
       )}
-      {isCycleEpuise && (
+      {isCycleEpuise && !isTerminal && (
         <div className="flex items-center gap-1.5 px-2.5 py-2.5 rounded-lg bg-red-50 border-2 border-red-300">
           <RefreshCw className="w-4 h-4 text-red-500 animate-spin" />
           <span className="text-xs font-bold text-red-600">
             Tous les livreurs sollicités — nouveau cycle imminent…
+          </span>
+        </div>
+      )}
+
+      {isTerminal && (
+        <div className="flex items-center gap-1.5 px-2.5 py-2.5 rounded-lg bg-gray-50 border border-gray-200">
+          <XCircle className="w-4 h-4 text-gray-400" />
+          <span className="text-xs font-bold text-gray-500">
+            Dispatch arrêté — course {course?.statut === "annulee" ? "annulée" : "livrée"}
           </span>
         </div>
       )}
@@ -226,11 +282,24 @@ export default function ProposedLivreursList({ course }) {
                   <CheckCircle2 className="w-3 h-3" />
                   Accepté
                 </span>
-              ) : (
-                <span className="flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded-full shrink-0">
+              ) : isTerminal ? (
+                <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded-full shrink-0">
                   <Clock className="w-3 h-3" />
                   Notifié
                 </span>
+              ) : (
+                <button
+                  onClick={() => handleForceAssign(l)}
+                  disabled={assigningId === l.id}
+                  className="flex items-center gap-1 text-[10px] font-bold text-white bg-primary px-2 py-1 rounded-full shrink-0 hover:bg-primary/90 transition disabled:opacity-50"
+                >
+                  {assigningId === l.id ? (
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <UserCheck className="w-3 h-3" />
+                  )}
+                  {assigningId === l.id ? "..." : "Assigner"}
+                </button>
               )}
             </div>
           );

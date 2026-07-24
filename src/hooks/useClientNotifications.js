@@ -14,6 +14,7 @@ const CLIENT_IMPORTANT_TYPES = [
   "course_bloquee",
   "course_annulee",
   "rappel_reponse",
+  "prix_manuel_propose",
 ];
 
 const TYPE_LABELS = {

@@ -1,0 +1,91 @@
+{
+  "name": "VenusAnomaly",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "hausse_erreurs",
+        "baisse_reussite",
+        "hausse_escalades",
+        "ralentissement",
+        "comportement_anormal",
+        "pic_erreurs",
+        "baisse_confiance",
+        "outil_indisponible_long",
+        "conversation_bloquee_long"
+      ],
+      "description": "Type d'anomalie d\u00e9tect\u00e9e"
+    },
+    "severite": {
+      "type": "string",
+      "enum": [
+        "info",
+        "warning",
+        "critique"
+      ],
+      "default": "warning"
+    },
+    "titre": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "metrique": {
+      "type": "string",
+      "description": "Nom de la m\u00e9trique concern\u00e9e"
+    },
+    "valeur_actuelle": {
+      "type": "number"
+    },
+    "valeur_normale": {
+      "type": "number",
+      "description": "Valeur attendue / moyenne historique"
+    },
+    "ecart_pct": {
+      "type": "number",
+      "description": "\u00c9cart en pourcentage par rapport \u00e0 la normale"
+    },
+    "periode": {
+      "type": "string",
+      "description": "P\u00e9riode d'analyse (ex: 1h, 24h, 7j)"
+    },
+    "metadata": {
+      "type": "string",
+      "description": "JSON: donn\u00e9es d\u00e9taill\u00e9es"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "active",
+        "investigu\u00e9e",
+        "r\u00e9solue",
+        "ignor\u00e9e"
+      ],
+      "default": "active"
+    },
+    "investiguee_par": {
+      "type": "string"
+    },
+    "resolue_par": {
+      "type": "string"
+    },
+    "resolution_note": {
+      "type": "string"
+    },
+    "creee_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "resolue_date": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "type",
+    "titre",
+    "severite"
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "name": "VenusWorkflowExecution",
+  "type": "object",
+  "properties": {
+    "workflow_id": {
+      "type": "string",
+      "description": "ID du VenusWorkflow ex\u00e9cut\u00e9"
+    },
+    "workflow_code": {
+      "type": "string",
+      "description": "Code du workflow (pour r\u00e9f\u00e9rence rapide)"
+    },
+    "workflow_nom": {
+      "type": "string"
+    },
+    "conversation_id": {
+      "type": "string",
+      "description": "ID de la Conversation associ\u00e9e"
+    },
+    "client_telephone": {
+      "type": "string"
+    },
+    "client_nom": {
+      "type": "string"
+    },
+    "country_code": {
+      "type": "string"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "en_cours",
+        "en_attente",
+        "en_attente_evenement",
+        "termine",
+        "erreur",
+        "annule",
+        "simulation"
+      ],
+      "default": "en_cours",
+      "description": "Statut de l'ex\u00e9cution"
+    },
+    "etape_actuelle": {
+      "type": "string",
+      "description": "ID de l'\u00e9tape en cours d'ex\u00e9cution"
+    },
+    "etape_index": {
+      "type": "number",
+      "default": 0
+    },
+    "donnees": {
+      "type": "string",
+      "description": "JSON: donn\u00e9es collect\u00e9es pendant le workflow"
+    },
+    "historique": {
+      "type": "string",
+      "description": "JSON: historique d\u00e9taill\u00e9 [{etape, type, action, resultat, date}]"
+    },
+    "erreur_type": {
+      "type": "string",
+      "description": "Type d'exception rencontr\u00e9e (livreur_annule, gps_absent, etc.)"
+    },
+    "erreur_message": {
+      "type": "string"
+    },
+    "course_id": {
+      "type": "string",
+      "description": "ID de la CourseExterne cr\u00e9\u00e9e ou suivie (si applicable)"
+    },
+    "sous_workflow_parent_id": {
+      "type": "string",
+      "description": "ID de l'ex\u00e9cution parente si sous-workflow"
+    },
+    "is_simulation": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si ex\u00e9cution en mode simulateur (pas d'actions r\u00e9elles)"
+    },
+    "date_debut": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "date_fin": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "date_derniere_action": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "workflow_code",
+    "conversation_id",
+    "statut"
+  ]
+}

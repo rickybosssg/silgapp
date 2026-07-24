@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { motion } from "framer-motion";
 import { base44 } from "@/api/base44Client";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { useNavigate } from "react-router-dom";
@@ -8,12 +9,14 @@ import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useClientNotifications } from "@/hooks/useClientNotifications";
 import { registerPushToken } from "@/lib/notifications";
+import { usePushTokenRetry } from "@/hooks/usePushTokenRetry";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import {
   MapPin, Navigation, MessageCircle, User, Package,
   Clock, ChevronRight, TrendingUp, Loader2, ArrowLeft, RefreshCw, Wallet,
-  Store, UtensilsCrossed, Bell, Pill, Inbox, Car, Headphones, ShieldCheck, Zap
+  Store, UtensilsCrossed, Bell, Pill, Inbox, Car, Headphones, ShieldCheck,
+  Zap, CheckCircle2
 } from "lucide-react";
 import LivreurRatingDialog from "@/components/client/LivreurRatingDialog";
 import CourseAnnuleeRelanceDialog from "@/components/client/CourseAnnuleeRelanceDialog";
@@ -27,8 +30,13 @@ import ClientOnboarding from "@/components/client/ClientOnboarding";
 import OngletCodePromo from "@/components/client/OngletCodePromo";
 import PubliciteCarousel from "@/components/publicite/PubliciteCarousel";
 import PubliciteFullscreen from "@/components/publicite/PubliciteFullscreen";
+import { MOMENTS as PUB_MOMENTS } from "@/lib/publiciteUtils";
 import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
 import FraisAnnulationBannerClient from "@/components/client/FraisAnnulationBannerClient";
+import SuiviBarreFlottante from "@/components/client/SuiviBarreFlottante";
+import RechercheLivreurScreen from "@/components/client/RechercheLivreurScreen";
+import SuiviCourseFullscreen from "@/components/client/SuiviCourseFullscreen";
+import EcranFinCourse from "@/components/client/EcranFinCourse";
 
 
 function haversineDistance(lat1, lon1, lat2, lon2) {
@@ -89,6 +97,11 @@ export default function ClientExterneApp() {
     try { return localStorage.getItem("silgapp_client_session_id") || null; } catch { return null; }
   });
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [showRecherche, setShowRecherche] = useState(false);
+  const [showSuiviFullscreen, setShowSuiviFullscreen] = useState(false);
+  const [showAcceptanceAnim, setShowAcceptanceAnim] = useState(false);
+  const lastRechercheCourseId = useRef(null);
+  const prevHadRecherche = useRef(false);
 
   const [userId, setUserId] = useState(null);
   const queryClient = useQueryClient();
@@ -162,6 +175,98 @@ export default function ClientExterneApp() {
     const active = new Set(["commande_envoyee", "commande_recue", "paiement_verification", "paiement_valide", "en_preparation", "prete_recuperation", "livreur_assigne", "commande_recuperee", "en_livraison"]);
     return [...commandesBoutiqueClient, ...commandesRestaurantClient].filter(c => active.has(c.statut)).length;
   }, [commandesBoutiqueClient, commandesRestaurantClient]);
+  // ── ÉTAT DÉRIVÉ POUR LES PUBLICITÉS — détection des moments d'affichage ──
+  // Course en recherche de livreur (nouvelle ou recherche_livreur, sans livreur assigné)
+  const courseEnRecherche = useMemo(() =>
+    coursesActives.find(c =>
+      ["nouvelle", "recherche_livreur"].includes(c.statut) && !c.livreur_id
+    ), [coursesActives]);
+
+  // Course avec livreur assigné (en cours de livraison)
+  const courseAssignee = useMemo(() =>
+    coursesActives.find(c =>
+      c.livreur_id && ["livreur_en_route", "arrive_prise_en_charge", "colis_recupere", "en_livraison", "arrivee"].includes(c.statut)
+    ), [coursesActives]);
+
+  // Détection d'une course qui vient d'être livrée (transition vers "livree")
+  const prevActiveIds = useRef(new Set());
+  const prevStatuses = useRef({});
+  const prevCoursesRef = useRef({});
+  const [courseLivreId, setCourseLivreId] = useState(null);
+  const [courseLivreData, setCourseLivreData] = useState(null);
+  useEffect(() => {
+    const currentIds = new Set(coursesActives.map(c => c.id));
+    // Détecter les courses qui ont disparu de coursesActives (→ livrées ou annulées)
+    for (const id of prevActiveIds.current) {
+      if (!currentIds.has(id)) {
+        const lastStatus = prevStatuses.current[id];
+        // Si la dernière statut connu n'était pas "annulee", on considère que c'est une livraison
+        if (lastStatus && lastStatus !== "annulee") {
+          setCourseLivreId(id);
+          setCourseLivreData(prevCoursesRef.current[id] || { id, statut: "livree", type_course: "expedier" });
+          // Vibration de livraison
+          if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
+          // Auto-clear après 30 secondes
+          setTimeout(() => setCourseLivreId(prev => prev === id ? null : prev), 30000);
+        }
+      }
+    }
+    // Sauvegarder les objets course pour la détection de livraison
+    coursesActives.forEach(c => { prevCoursesRef.current[c.id] = c; });
+    // Mettre à jour les refs
+    prevActiveIds.current = currentIds;
+    const nowStatuses = {};
+    coursesActives.forEach(c => { nowStatuses[c.id] = c.statut; });
+    prevStatuses.current = nowStatuses;
+  }, [coursesActives]);
+
+  // Configuration dynamique du moment publicitaire (priorité: recherche > assignation > livraison > ouverture)
+  const pubConfig = (() => {
+    if (courseEnRecherche) return { moment: PUB_MOMENTS.RECHERCHE_LIVREUR, courseId: courseEnRecherche.id, key: `recherche_${courseEnRecherche.id}` };
+    if (courseAssignee) return { moment: PUB_MOMENTS.APRES_ASSIGNATION, courseId: courseAssignee.id, key: `assignee_${courseAssignee.id}` };
+    if (courseLivreId) return { moment: PUB_MOMENTS.APRES_LIVRAISON, courseId: courseLivreId, key: `livre_${courseLivreId}` };
+    return { moment: PUB_MOMENTS.OUVERTURE_APP, courseId: null, key: "ouverture" };
+  })();
+
+  // ── Course principale affichée dans la barre de suivi (priorité: assignée > recherche > autre) ──
+  const coursePrincipale = useMemo(() =>
+    courseAssignee || courseEnRecherche || coursesActives[0] || null
+  , [coursesActives, courseEnRecherche, courseAssignee]);
+
+  // ── Auto-ouverture de l'écran "Recherche livreur" quand une nouvelle course entre en recherche ──
+  useEffect(() => {
+    const hadRecherche = prevHadRecherche.current;
+    const hasRecherche = !!courseEnRecherche;
+    const hasAssignee = !!courseAssignee;
+
+    // Détection d'acceptation : on avait une recherche, et maintenant on a un livreur assigné
+    if (hadRecherche && !hasRecherche && hasAssignee) {
+      // ── Animation d'acceptation ──
+      // Vibration native Android
+      if (navigator.vibrate) {
+        navigator.vibrate([100, 50, 100, 50, 200]);
+      }
+      setShowAcceptanceAnim(true);
+      // Fermer l'écran de recherche
+      setShowRecherche(false);
+      // Ouvrir automatiquement le suivi plein écran après l'animation
+      setTimeout(() => {
+        setShowAcceptanceAnim(false);
+        setShowSuiviFullscreen(true);
+      }, 2000);
+    }
+
+    if (courseEnRecherche && courseEnRecherche.id !== lastRechercheCourseId.current) {
+      lastRechercheCourseId.current = courseEnRecherche.id;
+      setShowRecherche(true);
+    }
+    if (!courseEnRecherche) {
+      setShowRecherche(false);
+      lastRechercheCourseId.current = null;
+    }
+
+    prevHadRecherche.current = hasRecherche;
+  }, [courseEnRecherche, courseAssignee]);
 
   // Pull-to-refresh
   const { pulling, refreshing } = usePullToRefresh(async () => {
@@ -248,6 +353,13 @@ export default function ClientExterneApp() {
       client_id: clientProfil.id,
     }).catch(() => null);
   }, [clientProfil?.id, clientProfil?.user_email]);
+
+  // ── Relance automatique du token push au retour au premier plan ──
+  usePushTokenRetry(null, clientProfil?.user_email ? {
+    email: clientProfil.user_email,
+    user_type: "client",
+    client_id: clientProfil.id,
+  } : null);
 
   useEffect(() => {
     loadProfil();
@@ -918,7 +1030,7 @@ export default function ClientExterneApp() {
                     <div className="mt-4 bg-white/15 backdrop-blur-sm rounded-2xl px-4 py-2.5 flex items-center gap-2">
                       <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
                       <p className="text-white text-xs font-semibold">
-                        {coursesActives.length} course{coursesActives.length > 1 ? "s" : ""} en cours · appuyez ci-dessus
+                        {coursesActives.length} course{coursesActives.length > 1 ? "s" : ""} en cours · suivez ci-dessous
                       </p>
                     </div>
                   )}
@@ -1184,8 +1296,109 @@ export default function ClientExterneApp() {
         />
       )}
 
-      {/* ── PUBLICITÉ PLEIN ÉCRAN ── */}
-      <PubliciteFullscreen cible="clients" userId={clientProfil?.id} userType="client" />
+      {/* ── PUBLICITÉ PLEIN ÉCRAN — moment dynamique ── */}
+      <PubliciteFullscreen
+        key={pubConfig.key}
+        moment={pubConfig.moment}
+        cible="clients"
+        userId={clientProfil?.id}
+        userType="client"
+        courseId={pubConfig.courseId}
+        courseEnAttente={pubConfig.moment !== PUB_MOMENTS.OUVERTURE_APP}
+      />
+
+      {/* ── ÉCRAN RECHERCHE LIVREUR — carte vivante + vagues de dispatch ── */}
+      {showRecherche && courseEnRecherche && (
+        <RechercheLivreurScreen
+          course={courseEnRecherche}
+          position={position}
+          countryCode={clientProfil?.country_code}
+          onClose={() => setShowRecherche(false)}
+        />
+      )}
+
+      {/* ── ANIMATION D'ACCEPTATION — vibration + check ── */}
+      {showAcceptanceAnim && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-sm flex items-center justify-center"
+        >
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 200, damping: 15 }}
+            className="bg-white rounded-3xl p-8 flex flex-col items-center shadow-2xl"
+          >
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 200, damping: 12, delay: 0.15 }}
+              className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-xl shadow-emerald-200"
+            >
+              <CheckCircle2 className="w-12 h-12 text-white" strokeWidth={2.5} />
+            </motion.div>
+            <p className="text-lg font-black text-gray-900 mt-4">Livreur trouvé !</p>
+            <p className="text-sm text-gray-500 mt-1">{courseAssignee?.livreur_nom || "Votre livreur"} arrive</p>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* ── ÉCRAN DE FIN — animation de réussite + actions ── */}
+      {courseLivreId && (
+        <EcranFinCourse
+          course={courseLivreData}
+          onNoter={() => {
+            if (courseLivreData) setCourseANoter(courseLivreData);
+            setCourseLivreId(null);
+          }}
+          onRefaire={() => {
+            setCourseLivreId(null);
+            navigate("/client/course/expedier");
+          }}
+          onFermer={() => setCourseLivreId(null)}
+        />
+      )}
+
+      {/* ── ÉCRAN SUIVI PLEIN ÉCRAN — carte + timeline + livreur ── */}
+      {showSuiviFullscreen && coursePrincipale && (
+        <SuiviCourseFullscreen
+          course={coursePrincipale}
+          position={position}
+          onClose={() => setShowSuiviFullscreen(false)}
+          onCall={() => {
+            if (coursePrincipale.livreur_telephone) {
+              window.location.href = `tel:${coursePrincipale.livreur_telephone}`;
+            }
+          }}
+          onMessage={() => {
+            setShowSuiviFullscreen(false);
+            setShowMessages(true);
+          }}
+          onCancel={async () => {
+            try {
+              await base44.functions.invoke("annulerCourseExterne", {
+                course_id: coursePrincipale.id,
+                motif: "Annulé par le client",
+              });
+              toast.success("Course annulée");
+              setShowSuiviFullscreen(false);
+              checkStatus(position, clientProfil);
+            } catch (e) {
+              toast.error("Erreur lors de l'annulation");
+            }
+          }}
+        />
+      )}
+
+      {/* ── BARRE DE SUIVI PERSISTANTE — en bas de l'écran ── */}
+      {coursePrincipale && !showRecherche && !showSuiviFullscreen && (
+        <SuiviBarreFlottante
+          course={coursePrincipale}
+          onClick={() => setShowSuiviFullscreen(true)}
+        />
+      )}
 
       {/* ── MESSAGES ── */}
       {showNotificationsPanel && (

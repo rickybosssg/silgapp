@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import { MapPin, Truck, Wifi, WifiOff, X, Clock, Users, Wrench } from "lucide-react";
@@ -11,7 +11,7 @@ import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import CountrySelector, { usePaysActifs } from "@/components/international/CountrySelector.jsx";
-import { calculateLivreurCounters, calculateClientCounters } from "@/lib/livreurCounters.js";
+import { calculateClientCounters } from "@/lib/livreurCounters.js";
 import ZonesChaudesWidget from "@/components/carte/ZonesChaudes";
 
 // ─── Helpers — importés depuis dispatchRules.js (source unique de vérité) ────
@@ -26,6 +26,8 @@ import {
   isClientGPSRecent,
 } from "@/lib/dispatchRules.js";
 import { isLivreurNoir } from "@/lib/livreurCounters.js";
+import { getLivreurCategorie } from "@/lib/dispatchRules.js";
+import LivreurCategoryDialog from "@/components/carte/LivreurCategoryDialog.jsx";
 
 const INDICATIFS = {
   BF: "+226", CI: "+225", TG: "+228", BJ: "+229",
@@ -109,6 +111,7 @@ export default function CarteLivreursExterne() {
   const [showLivreurs, setShowLivreurs] = useState(true);
   const [showPartenaires, setShowPartenaires] = useState(true);
   const [correctionEnCours, setCorrectionEnCours] = useState(false);
+  const [categoryDialog, setCategoryDialog] = useState(null); // { category, livreurs }
 
   const handleCorrectionEnCourse = async () => {
     if (!confirm('Corriger les livreurs "en course" sans course active ?')) return;
@@ -297,8 +300,7 @@ export default function CarteLivreursExterne() {
   // Utilise les mêmes fonctions que DashboardExterne pour garantir l'uniformité
   const compteursLivreurs = useMemo(() => {
     const eligibles = livreurs.filter(l => l.validation === "valide" && l.actif !== false);
-    const base = calculateLivreurCounters(eligibles);
-
+    const cats = eligibles.map(l => getLivreurCategorie(l, livreurIdsEnCourseReelle));
     // Recalcul strict de "en course" : livreur avec course ACTIVE (peu importe le statut DB)
     // Un livreur peut avoir statut="disponible" mais avoir une course active → doit être orange
     const vraisEnCourse = eligibles.filter(l => livreurIdsEnCourseReelle.has(l.id));
@@ -313,14 +315,26 @@ export default function CarteLivreursExterne() {
     });
 
     // CORRECTION : Utiliser isLibre() pour les "verts" (GPS < 10 min)
-    const libres = eligibles.filter(l => isLibre(l));
+    const libres = eligibles.filter(l => isLibre(l)).length;
 
     return {
-      ...base,
-      enCourse: vraisEnCourse.length,
-      oranges: vraisEnCourse.length,
-      libres: libres.length,
-      verts: libres.length,
+      total: eligibles.length,
+      libres,                                          // TOUS dispatchables (GPS ≤ 60 min)
+      libres_recent: libres,                           // alias rétro-compatibilité
+      libres_ancien: 0,                                // plus de distinction
+      sans_gps_valide: 0,                              // alias rétro-compatibilité
+      gps_expire: cats.filter(c => c === "gps_expire").length,
+      enCourse: cats.filter(c => c === "en_course").length,
+      hors_ligne: cats.filter(c => c === "hors_ligne").length,
+      // Aliases for backward compatibility
+      verts: libres,
+      oranges: cats.filter(c => c === "en_course").length,
+      noirs: cats.filter(c => c === "gps_expire").length + cats.filter(c => c === "hors_ligne").length,
+      on: eligibles.filter(l => isON(l)).length,
+      off: eligibles.filter(l => !isON(l)).length,
+      appActive: eligibles.filter(l => isAppActive(l)).length,
+      surCarte: eligibles.length,
+      visibleCarte: libres + cats.filter(c => c === "en_course").length,
     };
   }, [livreurs, livreurIdsEnCourseReelle]);
 
@@ -362,8 +376,9 @@ export default function CarteLivreursExterne() {
     }
   }, [livreurs, coursesVraimentActives, livreurIdsEnCourseReelle]);
 
-  // ─── Listes filtrées ────────────────────────────────────────────────────
+  // ─── Listes filtrées — basé sur getLivreurCategorie ────────────────────
   const livreursAffiches = useMemo(() => {
+    const eligibles = livreurs.filter(l => l.validation === "valide" && l.actif !== false);
     switch (filtreLivreur) {
       case "noirs": return livreurs.filter(l => isLivreurNoir(l, livreurIdsEnCourseReelle));
       case "verts": return livreurs.filter(l => isLibre(l)); // GPS < 10 min
@@ -467,8 +482,8 @@ export default function CarteLivreursExterne() {
             </div>
           </div>
 
-          {/* KPI tiles */}
-          <div className="grid grid-cols-5 gap-2 mt-5">
+          {/* KPI tiles — 6 compteurs livreurs */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-5">
             {[
               { val: compteursLivreurs.verts, label: "Libres", sub: "livreurs", dot: "bg-green-400", glow: "shadow-green-500/20" },
               { val: compteursLivreurs.oranges, label: "En mission", sub: "livreurs", dot: "bg-orange-400", glow: "shadow-orange-500/20" },
@@ -476,11 +491,33 @@ export default function CarteLivreursExterne() {
               { val: coursesEnAttente.length, label: "En attente", sub: `${coursesEnAttenteAvecGPS.length} avec GPS`, dot: "bg-red-400", glow: "shadow-red-500/20" },
             { val: coursesVraimentActives.length, label: "En cours", sub: `livreur assigné`, dot: "bg-orange-400", glow: "shadow-orange-500/20" },
             ].map((item, i) => (
-              <div key={i} className={`bg-white/8 backdrop-blur-sm border border-white/10 rounded-2xl p-3 text-center shadow-lg ${item.glow}`}>
+              <button
+                key={i}
+                onClick={item.cat ? () => {
+                  const eligibles = livreurs.filter(l => l.validation === "valide" && l.actif !== false);
+                  setCategoryDialog({ category: item.cat, livreurs: eligibles.filter(l => getLivreurCategorie(l, livreurIdsEnCourseReelle) === item.cat) });
+                } : undefined}
+                className={`bg-white/8 backdrop-blur-sm border border-white/10 rounded-2xl p-3 text-center shadow-lg ${item.glow} ${item.cat ? "hover:bg-white/15 cursor-pointer transition-all" : "cursor-default"}`}
+              >
                 <div className={`w-2 h-2 rounded-full ${item.dot} mx-auto mb-2`} />
                 <p className="text-2xl font-black text-white leading-none">{item.val}</p>
-                <p className="text-[10px] font-bold text-white/70 mt-1 leading-tight">{item.label}</p>
-                <p className="text-[9px] text-white/35 mt-0.5">{item.sub}</p>
+                <p className="text-[10px] font-bold text-white/80 mt-1 leading-tight">{item.label}</p>
+                <p className="text-[9px] text-white/60 mt-0.5">{item.sub}</p>
+              </button>
+            ))}
+          </div>
+          {/* Operational counters */}
+          <div className="grid grid-cols-3 gap-2 mt-2">
+            {[
+              { val: compteursClients.bleus,            label: "Clients GPS",  sub: "< 30 min",                    dot: "bg-blue-400" },
+              { val: coursesEnAttente.length,            label: "En attente",   sub: `${coursesEnAttenteAvecGPS.length} avec GPS`, dot: "bg-red-400" },
+              { val: coursesVraimentActives.length,      label: "En cours",     sub: "livreur assigné",             dot: "bg-orange-400" },
+            ].map((item, i) => (
+              <div key={i} className="bg-white/5 backdrop-blur-sm border border-white/5 rounded-xl p-2.5 text-center">
+                <div className={`w-1.5 h-1.5 rounded-full ${item.dot} mx-auto mb-1.5`} />
+                <p className="text-lg font-black text-white leading-none">{item.val}</p>
+                <p className="text-[9px] font-bold text-white/75 mt-1">{item.label}</p>
+                <p className="text-[8px] text-white/55">{item.sub}</p>
               </div>
             ))}
           </div>
@@ -707,6 +744,15 @@ export default function CarteLivreursExterne() {
         </div>
       </div>
 
+      {/* ── Dialog catégorie livreurs ────────────────────────────────────── */}
+      {categoryDialog && (
+        <LivreurCategoryDialog
+          category={categoryDialog.category}
+          livreurs={categoryDialog.livreurs}
+          onClose={() => setCategoryDialog(null)}
+        />
+      )}
+
       {/* ── Modale carte interactive ─────────────────────────────────────── */}
       {showMap && (
         <div className="fixed inset-0 z-50 bg-background flex flex-col">
@@ -790,6 +836,13 @@ export default function CarteLivreursExterne() {
                 courses={coursesRecents}
                 partenaires={partenaires}
                 onMarkerClick={(entity) => setSelectedMarker(entity)}
+                onCategoryClick={(category) => {
+                  const eligibles = livreurs.filter(l => l.validation === "valide" && l.actif !== false);
+                  const filtered = category === "hors_ligne" || category === "gps_expire"
+                    ? eligibles.filter(l => ["gps_expire", "hors_ligne"].includes(getLivreurCategorie(l, livreurIdsEnCourseReelle)))
+                    : eligibles.filter(l => getLivreurCategorie(l, livreurIdsEnCourseReelle) === category);
+                  setCategoryDialog({ category, livreurs: filtered });
+                }}
                 heatmapMode={heatmapMode}
                 countryCode={effectiveCountry}
                 onCountryChange={isGlobal ? setSelectedCountry : undefined}

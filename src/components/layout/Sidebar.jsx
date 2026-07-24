@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { 
   LayoutDashboard, MapPin, Plus, Truck, BarChart3, Bell, 
-  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill, PieChart, Sparkles
+  Package, TrendingUp, ChevronLeft, ChevronRight, LogOut, Wallet, Shield, Globe, Settings, MessageCircle, Users, Megaphone, ChevronDown, Check, UserCheck, ShieldAlert, Store, UtensilsCrossed, Pill, PieChart, Sparkles, Brain, FlaskConical, Cpu
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { cn } from "@/lib/utils";
@@ -36,13 +36,17 @@ export const navItems = [
   { path: "/admin/gestion-pays", label: "Gestion des pays", icon: Settings },
   { path: "/admin/externe/clients", label: "Clients externes", icon: Users },
   { path: "/admin/publicites", label: "Publicités", icon: Megaphone },
-  { path: "/admin/venus-rapports", label: "Rapports VENUS", icon: MessageCircle },
+  { path: "/admin/venus-brain", label: "Cerveau de VENUS", icon: Brain },
+  { path: "/admin/venus-intelligence", label: "Centre d'Intelligence VENUS", icon: Brain },
+  { path: "/admin/venus-test-lab", label: "Laboratoire de Test VENUS", icon: FlaskConical },
+  { path: "/admin/openai-dashboard", label: "Suivi OpenAI", icon: Cpu },
   { path: "/admin/centre-notifications", label: "Notifications Push", icon: Megaphone },
   { path: "/admin/externe", label: "Config Dispatch", icon: Settings },
   { path: "/admin/demandes-livreurs", label: "Livreurs à valider", icon: UserCheck },
   { path: "/admin/livreurs-bloques", label: "Livreurs bloqués", icon: ShieldAlert },
   { path: "/admin/anti-fraude", label: "Anti-Fraude", icon: Shield },
   { path: "/admin/messages", label: "Messagerie", icon: MessageCircle },
+  { path: "/admin/whatsapp", label: "WhatsApp Admin", icon: MessageCircle },
   { path: "/admin/support", label: "Support tickets", icon: MessageCircle },
   { path: "/admin/boutiques", label: "Boutiques", icon: Store },
   { path: "/admin/restaurants", label: "Restaurants", icon: UtensilsCrossed },
@@ -54,7 +58,7 @@ export const navItems = [
   { path: "/maintenance", label: "Maintenance", icon: Shield },
 ];
 
-export default function Sidebar({ notificationCount = 0, demandesCount = 0, partenaireDemandesCount = 0, neoCount = 0, paiementCount = 0, messageCount = 0, reseau }) {
+export default function Sidebar({ notificationCount = 0, demandesCount = 0, partenaireDemandesCount = 0, neoCount = 0, paiementCount = 0, messageCount = 0, livreursBloquesCount = 0, reseau }) {
   const [collapsed, setCollapsed] = useState(false);
   const [countryOpen, setCountryOpen] = useState(false);
   const location = useLocation();
@@ -133,9 +137,14 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
                   {item.path === "/admin/messages" && messageCount > 0 && (
                     <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
                   )}
+                  {item.path === "/admin/livreurs-bloques" && livreursBloquesCount > 0 && (
+                    <Badge className="bg-destructive text-white text-[10px] h-5 min-w-5 flex items-center justify-center px-1">
+                      {livreursBloquesCount}
+                    </Badge>
+                  )}
                 </>
               )}
-              {(item.path === "/notifications" && notificationCount > 0) || (item.path === "/admin/demandes-livreurs" && demandesCount > 0) || (["/admin/boutiques", "/admin/restaurants", "/admin/pharmacies"].includes(item.path) && partenaireDemandesCount > 0) || (item.path === "/admin/neo" && neoCount > 0) || (item.path === "/admin/messages" && messageCount > 0) ? (
+              {(item.path === "/notifications" && notificationCount > 0) || (item.path === "/admin/demandes-livreurs" && demandesCount > 0) || (["/admin/boutiques", "/admin/restaurants", "/admin/pharmacies"].includes(item.path) && partenaireDemandesCount > 0) || (item.path === "/admin/neo" && neoCount > 0) || (item.path === "/admin/messages" && messageCount > 0) || (item.path === "/admin/livreurs-bloques" && livreursBloquesCount > 0) ? (
                 collapsed && (
                   <span className="absolute right-1 top-1 w-2 h-2 rounded-full bg-destructive" />
                 )

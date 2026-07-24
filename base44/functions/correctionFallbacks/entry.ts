@@ -15,6 +15,19 @@ async function chargerCommissionPays(base44, countryCode) {
   return pct;
 }
 
+async function chargerTarifPays(base44, countryCode) {
+  const code = String(countryCode || '').trim().toUpperCase();
+  if (!code) throw new Error('country_code manquant pour calculer le tarif');
+  const countries = await base44.asServiceRole.entities.Country.filter({ code, actif: true });
+  const country = countries?.[0];
+  const prixParKm = Number(country?.prix_par_km);
+  const prixMinimum = Number(country?.prix_minimum);
+  if (!Number.isFinite(prixParKm) || prixParKm <= 0 || !Number.isFinite(prixMinimum) || prixMinimum < 0) {
+    throw new Error(`Tarification non configuree pour le pays ${code}`);
+  }
+  return { prixParKm, prixMinimum };
+}
+
 /**
  * CORRECTION GLOBALE DES FALLBACKS ERRONÉS
  * Supprime TOUS les fallbacks parasites : prix=0, distance=0, ETA=null, NaN
@@ -45,7 +58,8 @@ Deno.serve(async (req) => {
         );
 
         if (dist && dist > 0) {
-          const prixEstimate = Math.round(dist * 100);
+          const tarif = await chargerTarifPays(base44, course.country_code);
+          const prixEstimate = Math.max(Math.round(dist * tarif.prixParKm), tarif.prixMinimum);
           await base44.entities.CourseExterne.update(course.id, {
             prix_estimate: prixEstimate,
             distance_reelle_km: dist
@@ -68,7 +82,11 @@ Deno.serve(async (req) => {
     for (const course of coursesLivreesSansPrix) {
       try {
         if (course.distance_reelle_km && course.distance_reelle_km > 0) {
-          const prixFinal = Math.round(course.distance_reelle_km * 100);
+          const tarif = await chargerTarifPays(base44, course.country_code);
+          const prixFinal = Math.max(
+            Math.round(course.distance_reelle_km * tarif.prixParKm),
+            tarif.prixMinimum,
+          );
           const commissionPct = await chargerCommissionPays(base44, course.country_code);
           const commissionSilga = Math.round(prixFinal * (commissionPct / 100));
           const montantLivreur = prixFinal - commissionSilga;

@@ -4,6 +4,10 @@ Deno.serve(async (req) => {
   try {
     console.log(" [createLivreur] Requête reçue");
     const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me().catch(() => null);
+    if (!user || user.role !== 'admin') {
+      return Response.json({ success: false, error: 'Accès réservé aux administrateurs' }, { status: 403 });
+    }
     const { data } = await req.json();
     console.log(" [createLivreur] Data:", data);
 

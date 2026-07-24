@@ -1,0 +1,72 @@
+{
+  "name": "VenusCity",
+  "type": "object",
+  "properties": {
+    "country_code": {
+      "type": "string",
+      "description": "Code ISO du pays (ex: BF, CI)"
+    },
+    "nom": {
+      "type": "string",
+      "description": "Nom de la ville (ex: Ouagadougou, Abidjan)"
+    },
+    "nom_alternatif": {
+      "type": "string",
+      "description": "Nom alternatif ou local (ex: Ouaga)"
+    },
+    "type_zone": {
+      "type": "string",
+      "enum": [
+        "ville",
+        "quartier",
+        "zone",
+        "secteur",
+        "sous_quartier"
+      ],
+      "default": "ville",
+      "description": "Type de zone g\u00e9ographique"
+    },
+    "parent_id": {
+      "type": "string",
+      "description": "ID de la zone parente (ex: quartier \u2192 ville parente)"
+    },
+    "parent_nom": {
+      "type": "string",
+      "description": "Nom de la zone parente (snapshot pour affichage rapide)"
+    },
+    "latitude": {
+      "type": "number",
+      "description": "Latitude du centre de la zone"
+    },
+    "longitude": {
+      "type": "number",
+      "description": "Longitude du centre de la zone"
+    },
+    "rayon_km": {
+      "type": "number",
+      "default": 5,
+      "description": "Rayon couvert par cette zone (km)"
+    },
+    "code_postal": {
+      "type": "string"
+    },
+    "actif": {
+      "type": "boolean",
+      "default": true,
+      "description": "Zone active pour les op\u00e9rations"
+    },
+    "alias": {
+      "type": "string",
+      "description": "JSON: tableau des alias/surnoms (ex: [\"Ouaga2000\",\"Ouaga 2000\"])"
+    },
+    "metadata": {
+      "type": "string",
+      "description": "JSON: donn\u00e9es additionnelles (densit\u00e9, zone_chaude, etc.)"
+    }
+  },
+  "required": [
+    "country_code",
+    "nom",
+    "type_zone"
+  ]
+}

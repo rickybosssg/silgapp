@@ -1,6 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { CheckCircle, MessageCircle, Phone, ExternalLink } from "lucide-react";
+import { CheckCircle, MessageCircle, Phone, ExternalLink, X } from "lucide-react";
+import {
+  pubMatchMoment, pubEstValide, pubCibleUser,
+  peutAfficherPub, marquerPubAffichee, MOMENTS,
+} from "@/lib/publiciteUtils";
 
 async function trackAction(pubId, userType, userId, action) {
   try {
@@ -11,7 +15,11 @@ async function trackAction(pubId, userType, userId, action) {
       action,
       vue_at: new Date().toISOString(),
     });
-    const field = action === "clic" ? "nb_clics" : action === "vue_video" ? "nb_vues_video" : action === "accuse_lecture" ? "nb_affichages" : "nb_affichages";
+    const field =
+      action === "clic" ? "nb_clics"
+      : action === "vue_video" ? "nb_vues_video"
+      : action === "fermeture" ? "nb_fermetures"
+      : "nb_affichages";
     const pub = await base44.entities.Publicite.filter({ id: pubId });
     if (pub?.[0]) {
       await base44.entities.Publicite.update(pubId, { [field]: (pub[0][field] || 0) + 1 });
@@ -19,86 +27,95 @@ async function trackAction(pubId, userType, userId, action) {
   } catch (_) {}
 }
 
-const STORAGE_KEY = "silgapp_pub_fullscreen_vues";
-
-function getVuesLocales() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); } catch (_) { return {}; }
-}
-
-function marquerVuLocalement(pubId) {
+async function getUserCountry(userType, userId) {
   try {
-    const vues = getVuesLocales();
-    vues[pubId] = new Date().toISOString();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(vues));
+    if (userType === "client") {
+      const clients = await base44.entities.ClientExterne.filter({ id: userId });
+      return clients?.[0]?.country_code || null;
+    } else if (userType === "livreur") {
+      const livreurs = await base44.entities.Livreur.filter({ id: userId });
+      return livreurs?.[0]?.country_code || null;
+    }
   } catch (_) {}
+  return null;
 }
 
-export default function PubliciteFullscreen({ cible = "clients", userId = null, userType = "client" }) {
+/**
+ * Composant unifié pour afficher une publicité plein écran à différents moments.
+ *
+ * Props :
+ * - moment : "ouverture_app" | "recherche_livreur" | "apres_assignation" | "apres_livraison"
+ * - cible : "clients" | "livreurs" | ...
+ * - userId, userType
+ * - courseId : ID de la course (pour anti-répétition par course)
+ * - courseEnAttente : boolean — si false, ne pas afficher (pour recherche_livreur)
+ * - onClose : callback optionnel appelé quand la pub est fermée
+ * - autoCloseSignal : si fourni et true, ferme automatiquement la pub (ex: livreur assigné)
+ */
+export default function PubliciteFullscreen({
+  moment = MOMENTS.OUVERTURE_APP,
+  cible = "clients",
+  userId = null,
+  userType = "client",
+  courseId = null,
+  courseEnAttente = true,
+  onClose = null,
+  autoCloseSignal = false,
+}) {
   const [pub, setPub] = useState(null);
   const [visible, setVisible] = useState(false);
   const [videoEnded, setVideoEnded] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const loadedRef = useRef(false);
+  const trackedRef = useRef(false);
 
+  // ── Chargement de la pub ──
   useEffect(() => {
+    if (loadedRef.current) return;
+    // Pour les moments liés à une course, on exige courseEnAttente=true
+    if (moment !== MOMENTS.OUVERTURE_APP && !courseEnAttente) return;
+
+    loadedRef.current = true;
     const load = async () => {
       try {
         const now = new Date().toISOString();
         const all = await base44.entities.Publicite.filter({ actif: true, format: "plein_ecran" });
         const userCountry = userId ? await getUserCountry(userType, userId) : null;
-        const vuesLocales = getVuesLocales();
         const filtered = (all || []).filter(p => {
-          const cibles = ["tous", cible];
-          if (!cibles.includes(p.cible)) return false;
-          // Vérifier pays
-          if (p.pays_cibles && p.pays_cibles !== "tous") {
-            try {
-              const paysList = JSON.parse(p.pays_cibles);
-              if (!Array.isArray(paysList) || (userCountry && !paysList.includes(userCountry))) {
-                return false;
-              }
-            } catch (e) {
-              // Si JSON invalide, on considère "tous"
-            }
-          }
-          if (p.date_debut && p.date_debut > now) return false;
-          if (p.date_fin && p.date_fin < now) return false;
-          // Ne pas afficher si déjà vu aujourd'hui
-          const derniereVue = vuesLocales[p.id];
-          if (derniereVue) {
-            const age = (Date.now() - new Date(derniereVue).getTime()) / (1000 * 3600);
-            if (age < 24) return false;
-          }
+          if (!pubEstValide(p, now)) return false;
+          if (!pubCibleUser(p, cible, userCountry)) return false;
+          if (!pubMatchMoment(p, moment)) return false;
+          if (!peutAfficherPub(p, courseId)) return false;
           return true;
         }).sort((a, b) => (a.ordre || 0) - (b.ordre || 0));
 
+        // Sélection aléatoire si plusieurs pubs éligibles
         if (filtered.length > 0) {
-          setPub(filtered[0]);
+          const selected = filtered[Math.floor(Math.random() * filtered.length)];
+          setPub(selected);
           setVisible(true);
-          // Countdown pour les pubs sans vidéo (5s avant de pouvoir fermer)
-          if (filtered[0].type_media !== "video") {
-            setCountdown(5);
+          // Countdown si la pub n'est pas fermable immédiatement
+          if (!selected.fermable_immediatement && selected.type_media !== "video") {
+            setCountdown(selected.duree_min_affichage || 5);
           }
-          trackAction(filtered[0].id, userType, userId, "affichage");
+          trackAction(selected.id, userType, userId, "affichage");
+          marquerPubAffichee(selected, courseId);
+          trackedRef.current = true;
         }
       } catch (_) {}
     };
-    // Délai de 2s après le montage pour ne pas gêner le chargement
-    const t = setTimeout(load, 2000);
+    // Délai différent selon le moment
+    const delay = moment === MOMENTS.OUVERTURE_APP ? 2000 : 500;
+    const t = setTimeout(load, delay);
     return () => clearTimeout(t);
-  }, [cible, userId, userType]);
+  }, [moment, cible, userId, userType, courseId, courseEnAttente]);
 
-  async function getUserCountry(userType, userId) {
-    try {
-      if (userType === "client") {
-        const clients = await base44.entities.ClientExterne.filter({ id: userId });
-        return clients?.[0]?.country_code || null;
-      } else if (userType === "livreur") {
-        const livreurs = await base44.entities.Livreur.filter({ id: userId });
-        return livreurs?.[0]?.country_code || null;
-      }
-    } catch (_) {}
-    return null;
-  }
+  // ── Fermeture automatique quand le signal change (ex: livreur assigné) ──
+  useEffect(() => {
+    if (autoCloseSignal && visible) {
+      handleClose(true);
+    }
+  }, [autoCloseSignal, visible]);
 
   // Countdown
   useEffect(() => {
@@ -110,16 +127,21 @@ export default function PubliciteFullscreen({ cible = "clients", userId = null, 
     return () => clearInterval(t);
   }, [countdown]);
 
-  const canClose = pub?.type_media === "video" ? videoEnded : countdown === 0;
+  const canClose = pub
+    ? (pub.fermable_immediatement || (pub.type_media === "video" ? videoEnded : countdown === 0))
+    : false;
 
-  const handleAccuse = () => {
-    if (!canClose) return;
-    trackAction(pub.id, userType, userId, "accuse_lecture");
-    marquerVuLocalement(pub.id);
+  function handleClose(auto = false) {
+    if (!auto && !canClose) return;
+    if (pub && trackedRef.current) {
+      trackAction(pub.id, userType, userId, "fermeture");
+    }
     setVisible(false);
-  };
+    if (onClose) onClose();
+  }
 
-  const handleClic = () => {
+  function handleClic() {
+    if (!pub) return;
     trackAction(pub.id, userType, userId, "clic");
     if (pub.lien_whatsapp) {
       const msg = encodeURIComponent(`Bonjour, j'ai vu votre annonce sur SILGAPP : ${pub.titre}`);
@@ -133,12 +155,22 @@ export default function PubliciteFullscreen({ cible = "clients", userId = null, 
     } else if (pub.lien_url) {
       window.open(pub.lien_url, "_blank");
     }
-  };
+  }
 
   if (!visible || !pub) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] flex flex-col" style={{ background: pub.couleur_fond || "#0f0f1a" }}>
+      {/* Bouton fermeture (toujours visible, mais désactivé si !canClose et !fermable_immediatement) */}
+      {pub.fermable_immediatement && (
+        <button
+          onClick={() => handleClose(false)}
+          className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-black/40 flex items-center justify-center hover:bg-black/60 transition-colors"
+        >
+          <X className="w-5 h-5 text-white" />
+        </button>
+      )}
+
       {/* Vidéo ou Image */}
       {pub.media_url && pub.type_media === "image" && (
         <div className="flex-1 relative overflow-hidden">
@@ -160,7 +192,7 @@ export default function PubliciteFullscreen({ cible = "clients", userId = null, 
             playsInline
             onEnded={() => setVideoEnded(true)}
           />
-          {!videoEnded && (
+          {!videoEnded && !pub.fermable_immediatement && (
             <div className="absolute top-4 right-4 bg-black/50 text-white text-xs px-3 py-1 rounded-full">
               Regardez jusqu'à la fin
             </div>
@@ -214,9 +246,9 @@ export default function PubliciteFullscreen({ cible = "clients", userId = null, 
           </button>
         )}
 
-        {/* Bouton VU obligatoire */}
+        {/* Bouton fermer */}
         <button
-          onClick={handleAccuse}
+          onClick={() => handleClose(false)}
           disabled={!canClose}
           className={`w-full py-3.5 rounded-2xl font-black text-base flex items-center justify-center gap-2 transition-all ${
             canClose

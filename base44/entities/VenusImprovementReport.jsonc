@@ -1,0 +1,103 @@
+{
+  "name": "VenusImprovementReport",
+  "type": "object",
+  "properties": {
+    "type_rapport": {
+      "type": "string",
+      "enum": [
+        "quotidien",
+        "hebdomadaire",
+        "mensuel"
+      ]
+    },
+    "periode_debut": {
+      "type": "string",
+      "format": "date"
+    },
+    "periode_fin": {
+      "type": "string",
+      "format": "date"
+    },
+    "total_conversations": {
+      "type": "number",
+      "default": 0
+    },
+    "total_reussites": {
+      "type": "number",
+      "default": 0
+    },
+    "total_echecs": {
+      "type": "number",
+      "default": 0
+    },
+    "taux_reussite": {
+      "type": "number",
+      "description": "0-100"
+    },
+    "intentions_detectees": {
+      "type": "string",
+      "description": "JSON: [{intention, count}]"
+    },
+    "questions_nouvelles": {
+      "type": "string",
+      "description": "JSON: [{question, count}]"
+    },
+    "suggestions_generees": {
+      "type": "number",
+      "default": 0
+    },
+    "suggestions_validees": {
+      "type": "number",
+      "default": 0
+    },
+    "corrections_validees": {
+      "type": "number",
+      "default": 0
+    },
+    "temps_moyen_resolution_sec": {
+      "type": "number",
+      "default": 0
+    },
+    "score_moyen_global": {
+      "type": "number",
+      "default": 0,
+      "description": "Score qualit\u00e9 moyen 0-100"
+    },
+    "points_forts": {
+      "type": "string",
+      "description": "JSON: [{domaine, score, total_conversations}]"
+    },
+    "points_faibles": {
+      "type": "string",
+      "description": "JSON: [{domaine, score, taux_echec, total_conversations}]"
+    },
+    "ameliorations_proposees": {
+      "type": "string",
+      "description": "JSON: [{description, priorite, domaine}]"
+    },
+    "connaissances_les_plus_utilisees": {
+      "type": "string",
+      "description": "JSON: [{knowledge_id, titre, count}]"
+    },
+    "scenarios_les_plus_utilises": {
+      "type": "string",
+      "description": "JSON: [{scenario_nom, count}]"
+    },
+    "nouvelles_intentions": {
+      "type": "string",
+      "description": "JSON: [{intention, exemples: [{question, date}]}]"
+    },
+    "resume_executif": {
+      "type": "string",
+      "description": "R\u00e9sum\u00e9 textuel du rapport"
+    },
+    "genere_par": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "type_rapport",
+    "periode_debut",
+    "periode_fin"
+  ]
+}

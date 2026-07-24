@@ -1,0 +1,69 @@
+{
+  "name": "VenusMetric",
+  "type": "object",
+  "properties": {
+    "type_metric": {
+      "type": "string",
+      "enum": [
+        "latence",
+        "throughput",
+        "erreur",
+        "disponibilite",
+        "cache_hit",
+        "cache_miss",
+        "file_attente",
+        "api_call",
+        "db_query",
+        "llm_call"
+      ],
+      "description": "Type de m\u00e9trique collect\u00e9e"
+    },
+    "composant": {
+      "type": "string",
+      "description": "Composant mesur\u00e9 (ex: webhook, reasoning_engine, rag_engine, workflow_engine, knowledge_base)"
+    },
+    "valeur": {
+      "type": "number",
+      "description": "Valeur de la m\u00e9trique (ex: temps en ms, nombre d'erreurs, % de hit)"
+    },
+    "unite": {
+      "type": "string",
+      "description": "Unit\u00e9 (ms, %, count, req/s)"
+    },
+    "pays": {
+      "type": "string",
+      "default": "ALL",
+      "description": "Code pays concern\u00e9 (ALL pour global)"
+    },
+    "conversation_id": {
+      "type": "string",
+      "description": "ID de conversation si applicable"
+    },
+    "metadata": {
+      "type": "string",
+      "description": "JSON: donn\u00e9es contextuelles additionnelles"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Moment de la mesure"
+    },
+    "periode": {
+      "type": "string",
+      "enum": [
+        "temps_reel",
+        "1min",
+        "5min",
+        "1h",
+        "24h",
+        "7j"
+      ],
+      "default": "temps_reel"
+    }
+  },
+  "required": [
+    "type_metric",
+    "composant",
+    "valeur"
+  ]
+}

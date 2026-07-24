@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -208,6 +208,7 @@ export default function DusLivreursExternes() {
   const [filtre, setFiltre] = useState("arecouvrer");
   const [detailEntry, setDetailEntry] = useState(null);
   const [search, setSearch] = useState("");
+  const [confirmEncaisser, setConfirmEncaisser] = useState(null);
   const { isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
   const effectiveCountry = isPays ? adminCountryCode : (selectedCountry || "");
 
@@ -271,7 +272,7 @@ export default function DusLivreursExternes() {
     // Livreurs avec solde dû > 0 même sans course dans la période
     livreurs.forEach(l => {
       if (map[l.id]) return;
-      const du = l.montant_du_silga ?? 0;
+      const du = l.montant_du_silga ?? l.encours ?? 0;
       if (du > 0) {
         map[l.id] = { id: l.id, nom: l.nom || "Inconnu", prenom: l.prenom || "", telephone: l.telephone || "", livreurInfo: l, courses: [], montantTotal: 0, commissionTotal: 0, montantPaye: 0, montantDu: du };
       }
@@ -279,11 +280,12 @@ export default function DusLivreursExternes() {
     Object.values(map).forEach(entry => {
       const info = entry.livreurInfo;
       if (info) {
-        // montant_du_silga est la source de vérité — 0 signifie 0
-        entry.montantDu = info.montant_du_silga ?? 0;
+        // montant_du_silga est la source de vérité (mis à jour à chaque livraison)
+        // encours est conservé pour rétrocompatibilité mais n'est plus fiable
+        entry.montantDu = info.montant_du_silga ?? info.encours ?? 0;
         entry.montantPaye = Math.max(0, entry.commissionTotal - entry.montantDu);
       } else {
-        // Pas d'info livreur — calcul de secours basé sur les courses
+        // Pas d'info livreur — calcul de secours basé sur les courses impayées
         entry.montantDu = Math.max(0, entry.commissionTotal - entry.montantPaye);
       }
     });
@@ -339,7 +341,7 @@ export default function DusLivreursExternes() {
     mutationFn: async ({ entry, montant }) => {
       const nouveauSolde = Math.max(0, (entry.montantDu ?? 0) - montant);
       const impayees = nouveauSolde === 0 ? entry.courses.filter(c => c.statut_paiement_livreur !== "paye").map(c => c.id) : [];
-      const res = await base44.functions.invoke("updateLivreur", { id: entry.id, data: { montant_du_silga: nouveauSolde }, mark_courses_paid: impayees });
+      const res = await base44.functions.invoke("updateLivreur", { id: entry.id, data: { encours: nouveauSolde, montant_du_silga: nouveauSolde }, mark_courses_paid: impayees });
       if (res?.data && res.data.success === false) throw new Error(res.data.error || "Échec");
       return { nouveauSolde, montant, entry };
     },
@@ -350,7 +352,7 @@ export default function DusLivreursExternes() {
       const prevCourses = queryClient.getQueryData(["courses-externes-livrees", effectiveCountry]);
       const prevLivreurs = queryClient.getQueryData(["livreurs-externes-all", effectiveCountry]);
       queryClient.setQueryData(["livreurs-externes-all", effectiveCountry], (old) =>
-        (old || []).map(l => l.id === entry.id ? { ...l, montant_du_silga: nouveauSolde } : l));
+        (old || []).map(l => l.id === entry.id ? { ...l, encours: nouveauSolde, montant_du_silga: nouveauSolde } : l));
       if (nouveauSolde === 0) {
         queryClient.setQueryData(["courses-externes-livrees", effectiveCountry], (old) =>
           (old || []).map(c => entry.courses.some(ec => ec.id === c.id) ? { ...c, statut_paiement_livreur: "paye" } : c));
@@ -526,7 +528,7 @@ export default function DusLivreursExternes() {
                       {entry.montantDu > 0 && (
                         <Button size="sm" className="flex-1 h-9 text-xs bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-xl font-semibold border-0"
                           disabled={paiementMutation.isPending}
-                          onClick={() => paiementMutation.mutate({ entry, montant: entry.montantDu })}>
+                          onClick={() => setConfirmEncaisser({ entry, montant: entry.montantDu })}>
                           <CheckCircle2 className="w-3.5 h-3.5 mr-1" />Encaisser
                         </Button>
                       )}
@@ -603,7 +605,7 @@ export default function DusLivreursExternes() {
                       {entry.montantDu > 0 && (
                         <Button size="sm" className="flex-1 h-9 text-xs bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-xl font-semibold border-0"
                           disabled={etablissementPaiementMutation.isPending}
-                          onClick={() => etablissementPaiementMutation.mutate({ entry, montant: entry.montantDu })}>
+                          onClick={() => setConfirmEncaisser({ entry, montant: entry.montantDu })}>
                           <CheckCircle2 className="w-3.5 h-3.5 mr-1" />Encaisser
                         </Button>
                       )}
@@ -680,7 +682,7 @@ export default function DusLivreursExternes() {
                       {entry.montantDu > 0 && (
                         <Button size="sm" className="flex-1 h-9 text-xs bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-xl font-semibold border-0"
                           disabled={etablissementPaiementMutation.isPending}
-                          onClick={() => etablissementPaiementMutation.mutate({ entry, montant: entry.montantDu })}>
+                          onClick={() => setConfirmEncaisser({ entry, montant: entry.montantDu })}>
                           <CheckCircle2 className="w-3.5 h-3.5 mr-1" />Encaisser
                         </Button>
                       )}
@@ -740,6 +742,40 @@ export default function DusLivreursExternes() {
             </div>
           )}
         </>
+      )}
+
+      {/* ── Modal de confirmation Encaisser ── */}
+      {confirmEncaisser && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setConfirmEncaisser(null)}>
+          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
+                <CheckCircle2 className="w-8 h-8 text-green-600" />
+              </div>
+              <h3 className="text-lg font-black text-gray-900">Confirmer l'encaissement</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Encaisser <span className="font-bold text-green-600">{confirmEncaisser.montant.toLocaleString()} F</span> de
+              </p>
+              <p className="font-bold text-gray-900 mt-0.5">{confirmEncaisser.entry.prenom} {confirmEncaisser.entry.nom}</p>
+              <div className="flex gap-2 mt-5">
+                <Button variant="outline" className="flex-1" onClick={() => setConfirmEncaisser(null)}>Annuler</Button>
+                <Button className="flex-1 bg-green-600 hover:bg-green-700"
+                  disabled={paiementMutation.isPending || etablissementPaiementMutation.isPending}
+                  onClick={() => {
+                    const { entry, montant } = confirmEncaisser;
+                    if (entry.entityType === 'boutique' || entry.entityType === 'restaurant') {
+                      etablissementPaiementMutation.mutate({ entry, montant });
+                    } else {
+                      paiementMutation.mutate({ entry, montant });
+                    }
+                    setConfirmEncaisser(null);
+                  }}>
+                  Confirmer
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {detailEntry && (

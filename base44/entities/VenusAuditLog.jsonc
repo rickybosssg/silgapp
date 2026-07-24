@@ -1,0 +1,81 @@
+{
+  "name": "VenusAuditLog",
+  "type": "object",
+  "properties": {
+    "utilisateur": {
+      "type": "string",
+      "description": "Email de l'administrateur"
+    },
+    "role": {
+      "type": "string",
+      "description": "R\u00f4le de l'utilisateur au moment de l'action"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "create",
+        "update",
+        "delete",
+        "restore",
+        "validate",
+        "archive",
+        "export",
+        "import",
+        "login",
+        "logout",
+        "configuration_change",
+        "maintenance_toggle",
+        "backup_create",
+        "backup_restore",
+        "alert_resolve",
+        "escalation_handle",
+        "role_change",
+        "other"
+      ],
+      "description": "Action effectu\u00e9e"
+    },
+    "categorie": {
+      "type": "string",
+      "enum": [
+        "configuration",
+        "knowledge",
+        "scenario",
+        "workflow",
+        "document",
+        "memory",
+        "maintenance",
+        "securite",
+        "supervision",
+        "escalation",
+        "autre"
+      ]
+    },
+    "entity_type": {
+      "type": "string",
+      "description": "Type d'entit\u00e9 concern\u00e9e"
+    },
+    "entity_id": {
+      "type": "string"
+    },
+    "ancienne_valeur": {
+      "type": "string",
+      "description": "JSON: valeur avant modification"
+    },
+    "nouvelle_valeur": {
+      "type": "string",
+      "description": "JSON: valeur apr\u00e8s modification"
+    },
+    "details": {
+      "type": "string"
+    },
+    "date_action": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "utilisateur",
+    "action",
+    "categorie"
+  ]
+}

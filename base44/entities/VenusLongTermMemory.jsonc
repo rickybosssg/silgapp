@@ -1,0 +1,94 @@
+{
+  "name": "VenusLongTermMemory",
+  "type": "object",
+  "properties": {
+    "client_telephone": {
+      "type": "string",
+      "description": "Telephone WhatsApp du client (cle unique)"
+    },
+    "client_nom": {
+      "type": "string",
+      "description": "Nom du client (mis a jour automatiquement)"
+    },
+    "country_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE",
+        "GH"
+      ],
+      "description": "Pays detecte du client"
+    },
+    "ville_habituelle": {
+      "type": "string",
+      "description": "Ville la plus frequente du client"
+    },
+    "quartier_habituel": {
+      "type": "string",
+      "description": "Quartier le plus frequent du client"
+    },
+    "langue_preferee": {
+      "type": "string",
+      "default": "fr",
+      "description": "Langue de communication preferee"
+    },
+    "adresses_frequentes": {
+      "type": "string",
+      "description": "JSON: [{adresse, type: 'recuperation'|'livraison', gps_lat, gps_lng, count, last_used}]"
+    },
+    "destinataires_habituels": {
+      "type": "string",
+      "description": "JSON: [{nom, telephone, count, last_used}]"
+    },
+    "type_course_prefere": {
+      "type": "string",
+      "enum": [
+        "expedier",
+        "recevoir",
+        "deplacement"
+      ],
+      "description": "Type de course le plus demande par le client"
+    },
+    "mode_paiement_prefere": {
+      "type": "string",
+      "description": "Mode de paiement prefere (Orange Money, Especes, etc.)"
+    },
+    "preferences": {
+      "type": "string",
+      "description": "JSON: cle-valeur de preferences diverses (instructions speciales, horaires, etc.)"
+    },
+    "total_interactions": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre total d'interactions avec VENUS"
+    },
+    "total_courses": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre total de courses creees via VENUS"
+    },
+    "derniere_interaction": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de la derniere interaction"
+    },
+    "derniere_course_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de la derniere course creee"
+    },
+    "notes_admin": {
+      "type": "string",
+      "description": "Notes internes admin sur ce client"
+    }
+  },
+  "required": [
+    "client_telephone"
+  ]
+}

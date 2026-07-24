@@ -1,0 +1,60 @@
+{
+  "name": "VenusTrainingDialogue",
+  "type": "object",
+  "properties": {
+    "nom": {
+      "type": "string",
+      "description": "Nom du dialogue"
+    },
+    "description": {
+      "type": "string"
+    },
+    "messages": {
+      "type": "string",
+      "description": "JSON: [{role: 'client'|'venus', content: string}] \u2014 tours de conversation"
+    },
+    "nb_messages": {
+      "type": "number",
+      "default": 0
+    },
+    "categorie": {
+      "type": "string",
+      "description": "Cat\u00e9gorie m\u00e9tier"
+    },
+    "intention_associee": {
+      "type": "string",
+      "description": "Code de l'intention li\u00e9e"
+    },
+    "workflow_associe": {
+      "type": "string",
+      "description": "Code du workflow li\u00e9"
+    },
+    "pays": {
+      "type": "string",
+      "default": "ALL"
+    },
+    "langue": {
+      "type": "string",
+      "default": "fr"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "brouillon",
+        "valide",
+        "archive"
+      ],
+      "default": "valide"
+    },
+    "auteur": {
+      "type": "string"
+    },
+    "date_creation": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "nom"
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "name": "VenusWeaknessReport",
+  "type": "object",
+  "properties": {
+    "domaine": {
+      "type": "string",
+      "enum": [
+        "tarifs",
+        "expedition_colis",
+        "reception_colis",
+        "suivi_colis",
+        "gps",
+        "prix_manuel",
+        "prix_automatique",
+        "annulation_course",
+        "paiement",
+        "remboursement",
+        "compte_client",
+        "compte_livreur",
+        "inscription",
+        "notifications",
+        "publicites",
+        "probleme_technique",
+        "comptabilite",
+        "livraison_urgente",
+        "devenir_livreur",
+        "questions_generales",
+        "pharmacies",
+        "restaurants",
+        "boutiques",
+        "qr_code",
+        "code_pin",
+        "reclamations",
+        "autres"
+      ],
+      "description": "Domaine de comp\u00e9tence \u00e9valu\u00e9"
+    },
+    "periode_debut": {
+      "type": "string",
+      "format": "date"
+    },
+    "periode_fin": {
+      "type": "string",
+      "format": "date"
+    },
+    "total_conversations": {
+      "type": "number",
+      "default": 0
+    },
+    "conversations_reussies": {
+      "type": "number",
+      "default": 0
+    },
+    "conversations_echouees": {
+      "type": "number",
+      "default": 0
+    },
+    "taux_echec": {
+      "type": "number",
+      "description": "0-100"
+    },
+    "questions_sans_reponse": {
+      "type": "number",
+      "default": 0
+    },
+    "reformulations_moyennes": {
+      "type": "number",
+      "default": 0
+    },
+    "score_moyen": {
+      "type": "number",
+      "default": 0,
+      "description": "Score qualit\u00e9 moyen 0-100"
+    },
+    "temps_moyen_resolution_sec": {
+      "type": "number",
+      "default": 0
+    },
+    "tendance": {
+      "type": "string",
+      "enum": [
+        "amelioration",
+        "stable",
+        "degradation"
+      ],
+      "default": "stable"
+    },
+    "score_precedent": {
+      "type": "number",
+      "description": "Score de la p\u00e9riode pr\u00e9c\u00e9dente pour comparaison"
+    },
+    "details": {
+      "type": "string",
+      "description": "JSON: d\u00e9tails additionnels (exemples d'erreurs, etc.)"
+    }
+  },
+  "required": [
+    "domaine",
+    "periode_debut",
+    "periode_fin"
+  ]
+}

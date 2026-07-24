@@ -1,0 +1,96 @@
+{
+  "name": "VenusEscalation",
+  "type": "object",
+  "properties": {
+    "conversation_id": {
+      "type": "string"
+    },
+    "client_telephone": {
+      "type": "string"
+    },
+    "client_nom": {
+      "type": "string"
+    },
+    "country_code": {
+      "type": "string"
+    },
+    "raison_escalade": {
+      "type": "string",
+      "description": "Pourquoi VENUS n'a pas pu r\u00e9soudre"
+    },
+    "niveau_confiance": {
+      "type": "number",
+      "description": "Score de confiance VENUS au moment de l'escalade (0-100)"
+    },
+    "intention_detectee": {
+      "type": "string"
+    },
+    "historique_resume": {
+      "type": "string",
+      "description": "R\u00e9sum\u00e9 textuel de la conversation"
+    },
+    "infos_collectees": {
+      "type": "string",
+      "description": "JSON: toutes les informations d\u00e9j\u00e0 collect\u00e9es par VENUS"
+    },
+    "outils_utilises": {
+      "type": "string",
+      "description": "JSON: liste des outils utilis\u00e9s"
+    },
+    "erreurs_rencontrees": {
+      "type": "string",
+      "description": "JSON: liste des erreurs rencontr\u00e9es"
+    },
+    "messages_resume": {
+      "type": "string",
+      "description": "JSON: [{role, content, timestamp}] \u2014 derniers messages"
+    },
+    "knowledge_consultees": {
+      "type": "string",
+      "description": "JSON: connaissances consult\u00e9es"
+    },
+    "workflows_executes": {
+      "type": "string",
+      "description": "JSON: workflows ex\u00e9cut\u00e9s"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "en_attente",
+        "pris_en_charge",
+        "r\u00e9solu",
+        "abandonn\u00e9"
+      ],
+      "default": "en_attente"
+    },
+    "assigne_a": {
+      "type": "string",
+      "description": "Email de l'op\u00e9rateur humain"
+    },
+    "resolution": {
+      "type": "string",
+      "description": "Solution apport\u00e9e par l'humain"
+    },
+    "client_informe": {
+      "type": "boolean",
+      "default": false
+    },
+    "creee_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "prise_en_charge_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "resolue_date": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "conversation_id",
+    "raison_escalade",
+    "statut"
+  ]
+}

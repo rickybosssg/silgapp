@@ -1,0 +1,36 @@
+{
+  "name": "VenusKnowledgeVersion",
+  "type": "object",
+  "properties": {
+    "knowledge_id": {
+      "type": "string",
+      "description": "ID de la connaissance concern\u00e9e"
+    },
+    "version": {
+      "type": "number",
+      "description": "Num\u00e9ro de version"
+    },
+    "donnees": {
+      "type": "string",
+      "description": "JSON: snapshot complet de la connaissance \u00e0 cette version"
+    },
+    "auteur": {
+      "type": "string",
+      "description": "Email de l'admin ayant cr\u00e9\u00e9 cette version"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "create",
+        "update",
+        "restore"
+      ],
+      "description": "Action qui a cr\u00e9\u00e9 cette version"
+    }
+  },
+  "required": [
+    "knowledge_id",
+    "version",
+    "donnees"
+  ]
+}

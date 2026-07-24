@@ -1,0 +1,88 @@
+{
+  "name": "VenusCourseModificationLog",
+  "type": "object",
+  "properties": {
+    "course_id": {
+      "type": "string",
+      "description": "ID de la course modifi\u00e9e"
+    },
+    "champ_modifie": {
+      "type": "string",
+      "description": "Nom du champ modifi\u00e9 (adresse_depart, adresse_arrivee, etc.)"
+    },
+    "ancienne_valeur": {
+      "type": "string",
+      "description": "Valeur avant modification"
+    },
+    "nouvelle_valeur": {
+      "type": "string",
+      "description": "Valeur apr\u00e8s modification"
+    },
+    "valeur_reelle_apres": {
+      "type": "string",
+      "description": "Valeur r\u00e9ellement lue en DB apr\u00e8s l'op\u00e9ration (v\u00e9rification)"
+    },
+    "verifie": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si la modification a \u00e9t\u00e9 confirm\u00e9e par relecture DB"
+    },
+    "auteur": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone client, email admin, ou 'venus'"
+    },
+    "canal": {
+      "type": "string",
+      "enum": [
+        "whatsapp",
+        "app",
+        "simulateur",
+        "admin"
+      ],
+      "description": "Canal d'origine de la modification"
+    },
+    "resultat": {
+      "type": "string",
+      "enum": [
+        "succes",
+        "echec"
+      ],
+      "description": "R\u00e9sultat de l'op\u00e9ration"
+    },
+    "motif": {
+      "type": "string",
+      "description": "Motif de la modification (optionnel)"
+    },
+    "erreur": {
+      "type": "string",
+      "description": "Message d'erreur si \u00e9chec"
+    },
+    "statut_course": {
+      "type": "string",
+      "description": "Statut de la course au moment de la modification"
+    },
+    "prix_recalcule": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si le prix a \u00e9t\u00e9 recalcul\u00e9 suite \u00e0 la modification"
+    },
+    "livreur_notifie": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si le livreur a \u00e9t\u00e9 notifi\u00e9 du changement"
+    },
+    "date_modification": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "course_id",
+    "champ_modifie",
+    "ancienne_valeur",
+    "nouvelle_valeur",
+    "auteur",
+    "canal",
+    "resultat"
+  ]
+}

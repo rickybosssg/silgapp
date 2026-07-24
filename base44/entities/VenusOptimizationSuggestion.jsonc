@@ -1,0 +1,88 @@
+{
+  "name": "VenusOptimizationSuggestion",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "requete_lente",
+        "workflow_inefficace",
+        "recherche_couteuse",
+        "api_lente",
+        "cache_manquant",
+        "db_query_lourde",
+        "llm_appel_excessif",
+        "memoire_fuite"
+      ],
+      "description": "Type d'optimisation d\u00e9tect\u00e9e"
+    },
+    "severite": {
+      "type": "string",
+      "enum": [
+        "info",
+        "warning",
+        "critique"
+      ],
+      "default": "warning"
+    },
+    "titre": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "composant_concerne": {
+      "type": "string"
+    },
+    "metrique_actuelle": {
+      "type": "number",
+      "description": "Valeur mesur\u00e9e actuelle (ex: temps en ms)"
+    },
+    "metrique_cible": {
+      "type": "number",
+      "description": "Valeur cible recommand\u00e9e"
+    },
+    "recommandation": {
+      "type": "string",
+      "description": "Action recommand\u00e9e pour optimiser"
+    },
+    "code_suggestion": {
+      "type": "string",
+      "description": "Snippet de code ou configuration sugg\u00e9r\u00e9e"
+    },
+    "gain_estime_pct": {
+      "type": "number",
+      "description": "Gain de performance estim\u00e9 en %"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "active",
+        "en_cours",
+        "appliquee",
+        "ignoree"
+      ],
+      "default": "active"
+    },
+    "appliquee_par": {
+      "type": "string"
+    },
+    "appliquee_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "creee_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "metadata": {
+      "type": "string",
+      "description": "JSON: donn\u00e9es d\u00e9taill\u00e9es"
+    }
+  },
+  "required": [
+    "type",
+    "titre",
+    "severite"
+  ]
+}

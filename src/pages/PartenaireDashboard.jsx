@@ -15,6 +15,7 @@ import OngletCodePromoPartenaire from "@/components/partenaire/OngletCodePromoPa
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { registerPushToken } from "@/lib/notifications";
+import { usePushTokenRetry } from "@/hooks/usePushTokenRetry";
 
 export default function PartenaireDashboard() {
   const [user, setUser] = useState(null);
@@ -30,6 +31,9 @@ export default function PartenaireDashboard() {
       }
     }).catch(() => {});
   }, []);
+
+  // ── Relance automatique du token push au retour au premier plan ──
+  usePushTokenRetry(null, user?.email ? { ...user, user_type: "partenaire" } : null);
 
   const { data: maBoutique, isLoading: loadingBoutique } = useQuery({
     queryKey: ["ma-boutique", user?.id],
@@ -229,7 +233,17 @@ export default function PartenaireDashboard() {
               </div>
             </button>
           </div>
-          <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="w-full text-sm text-gray-400 underline">Se déconnecter</button>
+          <div className="flex items-center justify-center gap-4 pt-2">
+            <button onClick={async () => {
+              await base44.auth.updateMe({ silgapp_role: "" }).catch(() => {});
+              window.location.reload();
+            }} className="flex items-center gap-1.5 text-sm text-purple-600 font-medium hover:text-purple-700">
+              <ArrowLeft className="w-4 h-4" />
+              Retour au choix de rôle
+            </button>
+            <span className="text-gray-300">|</span>
+            <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="text-sm text-gray-400 underline">Se déconnecter</button>
+          </div>
           {tab === "boutique_form" && (
             <EtablissementForm type="boutique" partenaireId={user.id} userEmail={user.email} isAdmin={user?.role === 'admin'}
               onSaved={() => { setTab("home"); queryClient.invalidateQueries({ queryKey: ["ma-boutique"] }); }}
@@ -265,7 +279,18 @@ export default function PartenaireDashboard() {
             <p className="text-xs text-amber-700 font-medium">Validation sous 24-48h ouvrées</p>
           </div>
           <p className="text-xs text-gray-400">📞 Support : +226 66 92 51 90</p>
-          <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="text-xs text-gray-500 underline underline-offset-2 hover:text-gray-700 py-2 px-4">Se déconnecter</button>
+          <div className="flex items-center justify-center gap-3 pt-1">
+            <button onClick={async () => {
+              await base44.auth.updateMe({ silgapp_role: "" }).catch(() => {});
+              clearPersistedToken();
+              base44.auth.logout();
+            }} className="flex items-center gap-1 text-xs text-purple-600 font-medium hover:text-purple-700 py-2 px-3">
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Changer de rôle
+            </button>
+            <span className="text-gray-300">|</span>
+            <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="text-xs text-gray-500 underline underline-offset-2 hover:text-gray-700 py-2 px-3">Se déconnecter</button>
+          </div>
         </div>
       </div>
     );
@@ -281,7 +306,18 @@ export default function PartenaireDashboard() {
           <h1 className="text-xl font-black text-gray-900">{etablissement.validation === "refuse" ? "Compte refusé" : "Compte suspendu"}</h1>
           <p className="text-sm text-gray-500">{etablissement.motif_refus || "Contactez le support SILGAPP pour plus d'informations."}</p>
           <p className="text-xs text-gray-400">📞 Support : +226 66 92 51 90</p>
-          <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="text-xs text-purple-600 underline">Se déconnecter</button>
+          <div className="flex items-center justify-center gap-3 pt-1">
+            <button onClick={async () => {
+              await base44.auth.updateMe({ silgapp_role: "" }).catch(() => {});
+              clearPersistedToken();
+              base44.auth.logout();
+            }} className="flex items-center gap-1 text-xs text-purple-600 font-medium hover:text-purple-700 py-2 px-3">
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Changer de rôle
+            </button>
+            <span className="text-gray-300">|</span>
+            <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="text-xs text-purple-600 underline py-2 px-3">Se déconnecter</button>
+          </div>
         </div>
       </div>
     );

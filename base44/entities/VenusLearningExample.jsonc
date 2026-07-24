@@ -1,0 +1,178 @@
+{
+  "name": "VenusLearningExample",
+  "type": "object",
+  "properties": {
+    "conversation_id": {
+      "type": "string",
+      "description": "ID de la conversation WhatsApp"
+    },
+    "source_message_id": {
+      "type": "string",
+      "description": "ID du message client ayant d\u00e9clench\u00e9 l'exemple"
+    },
+    "customer_message": {
+      "type": "string",
+      "description": "Message du client anonymis\u00e9 (t\u00e9l\u00e9phones, GPS, emails remplac\u00e9s)"
+    },
+    "conversation_context": {
+      "type": "string",
+      "description": "JSON: r\u00e9sum\u00e9 du contexte (m\u00e9moire courte, historique r\u00e9cent)"
+    },
+    "detected_intent": {
+      "type": "string",
+      "description": "Intention d\u00e9tect\u00e9e par GPT (creer_course, suivre_course, salutation, etc.)"
+    },
+    "extracted_entities": {
+      "type": "string",
+      "description": "JSON: entit\u00e9s extraites (adresses, contacts, type_course, etc.)"
+    },
+    "rag_documents_used": {
+      "type": "string",
+      "description": "JSON: documents RAG consult\u00e9s [{document_id, document_titre, chunk_id, score}]"
+    },
+    "tools_called": {
+      "type": "string",
+      "description": "JSON: outils appel\u00e9s et leurs r\u00e9sultats"
+    },
+    "gpt_response": {
+      "type": "string",
+      "description": "R\u00e9ponse g\u00e9n\u00e9r\u00e9e par GPT (anonymis\u00e9e)"
+    },
+    "final_response_sent": {
+      "type": "string",
+      "description": "R\u00e9ponse finale envoy\u00e9e au client (anonymis\u00e9e)"
+    },
+    "customer_next_message": {
+      "type": "string",
+      "description": "Message suivant du client (pour \u00e9valuer la satisfaction, rempli ult\u00e9rieurement)"
+    },
+    "customer_feedback": {
+      "type": "string",
+      "enum": [
+        "positive",
+        "negative",
+        "neutral",
+        "unknown"
+      ],
+      "default": "unknown",
+      "description": "Feedback du client"
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "success",
+        "failure",
+        "partial",
+        "unknown"
+      ],
+      "default": "unknown",
+      "description": "R\u00e9sultat de l'interaction"
+    },
+    "quality_score": {
+      "type": "number",
+      "default": 0,
+      "description": "Score de qualit\u00e9 0-100"
+    },
+    "risk_score": {
+      "type": "number",
+      "default": 0,
+      "description": "Score de risque 0-100"
+    },
+    "duplicate_score": {
+      "type": "number",
+      "default": 0,
+      "description": "Score de doublon 0-100"
+    },
+    "learning_type": {
+      "type": "string",
+      "enum": [
+        "faq",
+        "scenario",
+        "intent_example",
+        "entity_extraction",
+        "tool_routing",
+        "response_template",
+        "business_rule_candidate",
+        "error_case"
+      ],
+      "default": "intent_example",
+      "description": "Type d'apprentissage"
+    },
+    "review_status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "pending_review",
+        "approved",
+        "rejected",
+        "archived"
+      ],
+      "default": "draft",
+      "description": "Statut de r\u00e9vision. Aucun exemple n'est publi\u00e9 sans validation admin."
+    },
+    "reviewer_id": {
+      "type": "string",
+      "description": "Email de l'admin ayant r\u00e9vis\u00e9"
+    },
+    "review_comment": {
+      "type": "string",
+      "description": "Commentaire de l'admin"
+    },
+    "approved_content": {
+      "type": "string",
+      "description": "JSON: contenu valid\u00e9 pour publication (connaissance, sc\u00e9nario, r\u00e8gle, etc.)"
+    },
+    "model_used": {
+      "type": "string",
+      "description": "Mod\u00e8le OpenAI utilis\u00e9 (ex: gpt-4.1-mini)"
+    },
+    "tokens_input": {
+      "type": "number",
+      "default": 0,
+      "description": "Tokens d'entr\u00e9e (prompt)"
+    },
+    "tokens_output": {
+      "type": "number",
+      "default": 0,
+      "description": "Tokens de sortie (completion)"
+    },
+    "latency_ms": {
+      "type": "number",
+      "default": 0,
+      "description": "Latence en millisecondes"
+    },
+    "cost_usd": {
+      "type": "number",
+      "default": 0,
+      "description": "Co\u00fbt USD estim\u00e9"
+    },
+    "country_code": {
+      "type": "string",
+      "description": "Code pays (BF, CI, TG, etc.)"
+    },
+    "telephone_hash": {
+      "type": "string",
+      "description": "Hash du t\u00e9l\u00e9phone pour d\u00e9duplication (pas le vrai num\u00e9ro)"
+    },
+    "is_anonymized": {
+      "type": "boolean",
+      "default": true,
+      "description": "True si les donn\u00e9es sensibles ont \u00e9t\u00e9 anonymis\u00e9es"
+    },
+    "decision_moteur": {
+      "type": "string",
+      "description": "Moteur ayant trait\u00e9: openai, fallback_base44, rag_llm, salutation, etc."
+    },
+    "reviewed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de r\u00e9vision"
+    }
+  },
+  "required": [
+    "customer_message",
+    "detected_intent",
+    "learning_type",
+    "review_status"
+  ]
+}

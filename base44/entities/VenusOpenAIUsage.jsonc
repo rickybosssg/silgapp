@@ -1,0 +1,70 @@
+{
+  "name": "VenusOpenAIUsage",
+  "type": "object",
+  "properties": {
+    "date_appel": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Moment de l'appel OpenAI"
+    },
+    "model_used": {
+      "type": "string",
+      "description": "Mod\u00e8le OpenAI utilis\u00e9 (ex: gpt-4.1-mini)"
+    },
+    "tokens_prompt": {
+      "type": "number",
+      "default": 0,
+      "description": "Tokens d'entr\u00e9e (prompt)"
+    },
+    "tokens_completion": {
+      "type": "number",
+      "default": 0,
+      "description": "Tokens de sortie (completion)"
+    },
+    "tokens_total": {
+      "type": "number",
+      "default": 0,
+      "description": "Tokens totaux"
+    },
+    "cost_usd": {
+      "type": "number",
+      "default": 0,
+      "description": "Co\u00fbt estim\u00e9 en USD"
+    },
+    "response_time_ms": {
+      "type": "number",
+      "default": 0,
+      "description": "Temps de r\u00e9ponse en millisecondes"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "success",
+        "fallback",
+        "error"
+      ],
+      "default": "success",
+      "description": "Statut: success, fallback (vers Base44 InvokeLLM), error"
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Message d'erreur si status=error ou fallback"
+    },
+    "conversation_id": {
+      "type": "string",
+      "description": "ID de la conversation WhatsApp si applicable"
+    },
+    "telephone": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone du client si applicable"
+    },
+    "tools_used": {
+      "type": "string",
+      "description": "Outils SILGAPP utilis\u00e9s (comma-separated)"
+    }
+  },
+  "required": [
+    "model_used",
+    "status"
+  ]
+}

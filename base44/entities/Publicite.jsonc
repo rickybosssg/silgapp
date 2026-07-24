@@ -61,6 +61,44 @@
       "default": "carrousel",
       "description": "Format d'affichage"
     },
+    "moment_affichage": {
+      "type": "string",
+      "enum": [
+        "ouverture_app",
+        "recherche_livreur",
+        "apres_assignation",
+        "apres_livraison",
+        "ouverture_et_recherche",
+        "personnalise"
+      ],
+      "default": "ouverture_app",
+      "description": "Moment d'affichage de la publicit\u00e9"
+    },
+    "moments_personnalises": {
+      "type": "string",
+      "description": "JSON \u2014 liste des moments s\u00e9lectionn\u00e9s quand moment_affichage=personnalise. Valeurs: ouverture_app, recherche_livreur, apres_assignation, apres_livraison"
+    },
+    "duree_min_affichage": {
+      "type": "number",
+      "default": 5,
+      "description": "Dur\u00e9e minimale d'affichage en secondes avant que le bouton fermer ne soit activ\u00e9"
+    },
+    "fermable_immediatement": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si true, le client peut fermer la publicit\u00e9 imm\u00e9diatement (ignore duree_min_affichage)"
+    },
+    "limite_affichage": {
+      "type": "string",
+      "enum": [
+        "une_fois_par_course",
+        "une_fois_par_jour",
+        "une_fois_par_session",
+        "illimite"
+      ],
+      "default": "une_fois_par_course",
+      "description": "Limite de r\u00e9-affichage de la publicit\u00e9"
+    },
     "actif": {
       "type": "boolean",
       "default": true,
@@ -84,7 +122,7 @@
     "nb_affichages": {
       "type": "number",
       "default": 0,
-      "description": "Nombre total d'affichages"
+      "description": "Nombre total d'affichages (impressions)"
     },
     "nb_clics": {
       "type": "number",
@@ -95,6 +133,11 @@
       "type": "number",
       "default": 0,
       "description": "Nombre de vues vid\u00e9o compl\u00e8tes"
+    },
+    "nb_fermetures": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de fois o\u00f9 la publicit\u00e9 a \u00e9t\u00e9 ferm\u00e9e par l'utilisateur"
     },
     "couleur_fond": {
       "type": "string",

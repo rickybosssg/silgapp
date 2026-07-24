@@ -171,7 +171,7 @@ function GeneralChatWindow({ conversationId, myType, myId, myName, onBack }) {
         client_message_id: clientMessageId,
         ...msgData,
       });
-      const newMsg = res?.data?.message;
+      const newMsg = res?.message || res?.data?.message;
       if (newMsg) {
         const key = getMessageKey(newMsg);
         if (!knownIdsRef.current.has(key)) {

@@ -276,6 +276,10 @@ export default function PayerSilgapp({ userType: forcedType }) {
                     <X className="w-4 h-4" />
                   </button>
                 </div>
+              ) : uploading ? (
+                <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-xl py-8">
+                  <p className="text-sm text-gray-400">Téléversement...</p>
+                </div>
               ) : (
                 <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl py-8 cursor-pointer hover:border-blue-500 transition-colors">
                   {uploading ? (
@@ -300,7 +304,7 @@ export default function PayerSilgapp({ userType: forcedType }) {
 
             <Button
               className="w-full h-14 text-base font-black rounded-2xl"
-              disabled={!montantPaye || !preuveUrl || submitMutation.isPending || uploading}
+              disabled={!montantPaye || !preuveUrl || submitMutation.isPending || uploading || Number(montantPaye) > montantDu}
               onClick={() => submitMutation.mutate()}
             >
               {submitMutation.isPending ? "Envoi..." : "Envoyer ma preuve"}

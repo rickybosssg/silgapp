@@ -1,0 +1,96 @@
+{
+  "name": "VenusLoadTest",
+  "type": "object",
+  "properties": {
+    "nom_test": {
+      "type": "string",
+      "description": "Nom du test de charge"
+    },
+    "nb_utilisateurs_simules": {
+      "type": "number",
+      "description": "Nombre d'utilisateurs simultan\u00e9s simul\u00e9s"
+    },
+    "duree_secondes": {
+      "type": "number",
+      "description": "Dur\u00e9e du test en secondes"
+    },
+    "nb_messages_envoyes": {
+      "type": "number",
+      "default": 0
+    },
+    "nb_reponses_recues": {
+      "type": "number",
+      "default": 0
+    },
+    "nb_erreurs": {
+      "type": "number",
+      "default": 0
+    },
+    "taux_erreur_pct": {
+      "type": "number",
+      "default": 0
+    },
+    "temps_reponse_moyen_ms": {
+      "type": "number",
+      "default": 0
+    },
+    "temps_reponse_p95_ms": {
+      "type": "number",
+      "default": 0
+    },
+    "temps_reponse_max_ms": {
+      "type": "number",
+      "default": 0
+    },
+    "throughput_msg_par_sec": {
+      "type": "number",
+      "default": 0
+    },
+    "disponibilite_pct": {
+      "type": "number",
+      "default": 100
+    },
+    "consommation_cpu_pct": {
+      "type": "number"
+    },
+    "consommation_memoire_mb": {
+      "type": "number"
+    },
+    "nb_conversations_paralleles": {
+      "type": "number"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "planifie",
+        "en_cours",
+        "termine",
+        "echec"
+      ],
+      "default": "planifie"
+    },
+    "date_debut": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "date_fin": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "resultats_detail": {
+      "type": "string",
+      "description": "JSON: r\u00e9sultats d\u00e9taill\u00e9s par palier"
+    },
+    "recommandations": {
+      "type": "string",
+      "description": "JSON: [{priorite, recommandation}]"
+    },
+    "declenche_par": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "nom_test",
+    "nb_utilisateurs_simules"
+  ]
+}

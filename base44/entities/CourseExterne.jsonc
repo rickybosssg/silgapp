@@ -26,6 +26,15 @@
       "default": "client",
       "description": "Origine de la creation"
     },
+    "created_by_venus": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si la course a ete creee par VENUS (WhatsApp autonome)"
+    },
+    "silgapp_from_number": {
+      "type": "string",
+      "description": "Numero WhatsApp SILGAPP qui a initie la conversation avec le client (ex: whatsapp:+22655483838). Toutes les notifications liees a cette course partent depuis ce numero, quel que soit le destinataire (client, expediteur, destinataire). Secours: Conversation.silgapp_from_number, puis TWILIO_WHATSAPP_FROM."
+    },
     "client_nom": {
       "type": "string",
       "description": "Nom du client"
@@ -406,6 +415,10 @@
     "dispatch_notified_ids": {
       "type": "string"
     },
+    "dispatch_wave_notified_ids": {
+      "type": "string",
+      "description": "JSON: IDs des livreurs notifi\u00e9s pour la vague EN COURS uniquement"
+    },
     "dispatch_refused_ids": {
       "type": "string",
       "description": "JSON array des livreurs ayant refuse, annule ou indique etre occupes pour cette course uniquement"
@@ -436,9 +449,19 @@
     "whatsapp_destinataire_erreur": {
       "type": "string"
     },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "haute",
+        "urgente"
+      ],
+      "default": "normal",
+      "description": "Niveau de priorite de dispatch"
+    },
     "commande_boutique_id": {
       "type": "string",
-      "description": "ID de la CommandeBoutique li\u00e9e (si course issue d'une commande partenaire)"
+      "description": "ID de la CommandeBoutique liee"
     },
     "commande_restaurant_id": {
       "type": "string",

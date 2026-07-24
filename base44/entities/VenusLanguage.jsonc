@@ -1,0 +1,67 @@
+{
+  "name": "VenusLanguage",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string",
+      "description": "Code langue ISO 639-1 ou code local (ex: fr, en, ar, moore, dioula, fulfulde)"
+    },
+    "nom": {
+      "type": "string",
+      "description": "Nom de la langue en fran\u00e7ais (ex: Fran\u00e7ais, Anglais, Moor\u00e9)"
+    },
+    "nom_local": {
+      "type": "string",
+      "description": "Nom de la langue dans sa propre langue (ex: Fran\u00e7ais, English, Moore)"
+    },
+    "famille": {
+      "type": "string",
+      "enum": [
+        "indo_europeenne",
+        "niger_congo",
+        "afro_asiatique",
+        "autres"
+      ],
+      "description": "Famille linguistique"
+    },
+    "direction": {
+      "type": "string",
+      "enum": [
+        "ltr",
+        "rtl"
+      ],
+      "default": "ltr",
+      "description": "Sens d'\u00e9criture (ltr = gauche \u00e0 droite, rtl = droite \u00e0 gauche pour l'arabe)"
+    },
+    "actif": {
+      "type": "boolean",
+      "default": true,
+      "description": "Langue activ\u00e9e pour VENUS"
+    },
+    "pays_codes": {
+      "type": "string",
+      "description": "JSON: tableau des codes pays o\u00f9 cette langue est utilis\u00e9e (ex: [\"BF\",\"CI\"])"
+    },
+    "voix_disponibles": {
+      "type": "string",
+      "description": "JSON: [{voice_id, genre: \"m\"|\"f\", accent, description}] \u2014 voix TTS disponibles"
+    },
+    "vocabulaire_specifique": {
+      "type": "string",
+      "description": "JSON: {terme: traduction} \u2014 vocabulaire local SILGAPP (ex: {\"bo\u00eetier\": \"boutique\"})"
+    },
+    "salutations": {
+      "type": "string",
+      "description": "JSON: {matin, apres_midi, soir, general} \u2014 salutations par p\u00e9riode"
+    },
+    "ordre": {
+      "type": "number",
+      "default": 99,
+      "description": "Ordre d'affichage"
+    }
+  },
+  "required": [
+    "code",
+    "nom"
+  ]
+}

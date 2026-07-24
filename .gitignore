@@ -37,3 +37,4 @@ work-certs/
 
 .env
 .vite
+base44/.app.jsonc

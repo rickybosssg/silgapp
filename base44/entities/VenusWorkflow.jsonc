@@ -1,0 +1,79 @@
+{
+  "name": "VenusWorkflow",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string",
+      "description": "Code unique du workflow (ex: creer_course, recherche_livreur)"
+    },
+    "nom": {
+      "type": "string",
+      "description": "Nom affich\u00e9 du workflow"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description du workflow"
+    },
+    "categorie": {
+      "type": "string",
+      "enum": [
+        "course",
+        "livraison",
+        "paiement",
+        "partenaire",
+        "support",
+        "programmation",
+        "communication"
+      ],
+      "description": "Cat\u00e9gorie du workflow"
+    },
+    "declencheur": {
+      "type": "string",
+      "description": "Intention VENUS qui d\u00e9clenche ce workflow (ex: creer_course, suivre_course)"
+    },
+    "etapes": {
+      "type": "string",
+      "description": "JSON: tableau des \u00e9tapes [{id, type, libelle, champ, question, options, action, message, condition, prochaine_etape, ...}]"
+    },
+    "gestion_erreurs": {
+      "type": "string",
+      "description": "JSON: gestionnaires d'exceptions {livreur_annule: {action, message}, client_annule: {...}, ...}"
+    },
+    "pays": {
+      "type": "string",
+      "default": "ALL",
+      "description": "Code pays sp\u00e9cifique (BF, CI, ...) ou 'ALL' pour tous les pays. En cas de conflit, le workflow sp\u00e9cifique au pays est prioritaire sur ALL."
+    },
+    "pays_codes": {
+      "type": "string",
+      "description": "JSON: tableau des codes pays o\u00f9 ce workflow est applicable (vide = tous). Surcharge le champ 'pays' si rempli."
+    },
+    "langue": {
+      "type": "string",
+      "default": "fr",
+      "description": "Langue des messages du workflow (si sp\u00e9cifique)"
+    },
+    "messages_localises": {
+      "type": "string",
+      "description": "JSON: {langue: {etape_id: message}} \u2014 traductions des messages par \u00e9tape"
+    },
+    "actif": {
+      "type": "boolean",
+      "default": true,
+      "description": "Workflow actif et utilisable par VENUS"
+    },
+    "version": {
+      "type": "number",
+      "default": 1
+    },
+    "auteur": {
+      "type": "string",
+      "description": "Email admin ayant cr\u00e9\u00e9/modifi\u00e9 le workflow"
+    }
+  },
+  "required": [
+    "code",
+    "nom",
+    "etapes"
+  ]
+}

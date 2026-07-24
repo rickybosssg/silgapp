@@ -203,18 +203,36 @@ export default function VenusChat({ onClose, countryContext }) {
 
       // Enregistrer l'interaction pour les rapports VENUS (fire & forget)
       const nbMessages = messages.filter(m => m.role === "user").length + 1;
-      base44.functions.invoke("venusAnalytics", {
-        action: "save_interaction",
-        conversation_id: conversationId,
-        user_id: userEmail || "anonymous",
-        user_type: "client",
-        country_code: countryContext?.code || "BF",
-        ville: countryContext?.ville || "",
-        question: userQuestion,
-        reponse: "",
-        nb_messages: nbMessages,
-        duree_secondes: Math.round((Date.now() - msgStartTime) / 1000),
-      }).catch(() => null); // silencieux
+      // Détection du vrai user_type via le role du profil utilisateur
+      let detectedUserType = "client";
+      try {
+        const me = await base44.auth.me();
+        if (me?.role === "admin") detectedUserType = "admin";
+        else if (me?.silgapp_role === "livreur" || me?.silgapp_role === "partenaire") detectedUserType = me.silgapp_role;
+      } catch {}
+
+      // Sauvegarder l'interaction avec la réponse réelle de VENUS après un délai suffisant
+      setTimeout(async () => {
+        try {
+          const conv = await base44.agents.getConversation(conversationId);
+          const msgs = conv?.messages || [];
+          const lastAssistant = [...msgs].reverse().find(m => m.role === "assistant");
+          if (lastAssistant?.content) {
+            await base44.functions.invoke("venusAnalytics", {
+              action: "save_interaction",
+              conversation_id: conversationId,
+              user_id: userEmail || "anonymous",
+              user_type: detectedUserType,
+              country_code: countryContext?.code || "BF",
+              ville: countryContext?.ville || "",
+              question: userQuestion,
+              reponse: lastAssistant.content.substring(0, 500),
+              nb_messages: nbMessages,
+              duree_secondes: Math.round((Date.now() - msgStartTime) / 1000),
+            }).catch(err => console.error("[VENUS] Erreur save_interaction (reponse):", err?.message || err));
+          }
+        } catch {}
+      }, 8000);
     } catch (err) {
       console.error("Erreur envoi message VENUS — utilisation du fallback local:", err);
       triggerFallback();

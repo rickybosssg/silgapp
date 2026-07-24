@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
@@ -107,10 +107,13 @@ export default function DashboardExterne() {
     return coursesFiltrees.filter(c => c.type_course === filtreTypeDashboard);
   }, [coursesFiltrees, filtreTypeDashboard]);
 
+  // ⚠️ On utilise heure_livraison || created_date — JAMAIS updated_date
+  // car updated_date est modifié par les tâches de maintenance/correction auto,
+  // ce qui ferait réapparaître d'anciennes courses annulées dans l'historique du jour.
   const coursesTerminees = useMemo(
     () => coursesFiltrees.filter(c =>
       ["livree", "annulee"].includes(c.statut) &&
-      isToday(new Date(c.heure_livraison || c.updated_date || c.created_date))
+      isToday(new Date(c.heure_livraison || c.created_date))
     ),
     [coursesFiltrees]
   );
@@ -131,9 +134,18 @@ export default function DashboardExterne() {
     [clients]
   );
 
+  // IDs des livreurs avec une course réellement active (pour les compteurs précis)
+  const livreurIdsEnCourseReelle = useMemo(() => {
+    const STATUTS_OCCUPE = ["livreur_en_route", "colis_recupere", "en_livraison"];
+    return new Set(coursesEnTraitement.filter(c => STATUTS_OCCUPE.includes(c.statut) && c.livreur_id).map(c => c.livreur_id));
+  }, [coursesEnTraitement]);
+
   const compteursLivreurs = useMemo(() =>
-    calculateLivreurCounters(livreurs.filter(l => l.validation === "valide" && l.actif !== false)),
-    [livreurs]
+    calculateLivreurCounters(
+      livreurs.filter(l => l.validation === "valide" && l.actif !== false),
+      livreurIdsEnCourseReelle
+    ),
+    [livreurs, livreurIdsEnCourseReelle]
   );
 
   const compteursClients = useMemo(() =>

@@ -1,0 +1,105 @@
+{
+  "name": "DispatchLog",
+  "type": "object",
+  "properties": {
+    "course_id": {
+      "type": "string",
+      "description": "ID de la course concern\u00e9e"
+    },
+    "heure": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Heure de l'\u00e9v\u00e9nement"
+    },
+    "vague": {
+      "type": "number",
+      "default": 0,
+      "description": "Num\u00e9ro de vague de dispatch"
+    },
+    "pickup_source": {
+      "type": "string",
+      "enum": [
+        "gps",
+        "quartier",
+        "ville",
+        "none",
+        ""
+      ],
+      "default": "",
+      "description": "Source du point de prise en charge"
+    },
+    "evenement": {
+      "type": "string",
+      "enum": [
+        "vague",
+        "cycle_epuise",
+        "reset",
+        "aucun_livreur",
+        "acceptation",
+        "refus",
+        "expiration"
+      ],
+      "description": "Type d'\u00e9v\u00e9nement de dispatch"
+    },
+    "country_code": {
+      "type": "string",
+      "enum": [
+        "BF",
+        "CI",
+        "TG",
+        "BJ",
+        "SN",
+        "ML",
+        "GN",
+        "NE",
+        "GH",
+        ""
+      ],
+      "default": "",
+      "description": "Code pays de la course"
+    },
+    "total_candidats": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre total de candidats \u00e9ligibles"
+    },
+    "total_exclus": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de livreurs exclus"
+    },
+    "timeout_sec": {
+      "type": "number",
+      "default": 0
+    },
+    "livreurs_selectionnes": {
+      "type": "string",
+      "description": "JSON: [{id, nom, distance_km, gps_age_min}] \u2014 livreurs notifi\u00e9s dans cette vague"
+    },
+    "ordre_tri": {
+      "type": "string",
+      "description": "JSON: ordre complet de tri des candidats (tous les candidats, pas seulement les s\u00e9lectionn\u00e9s)"
+    },
+    "raisons_exclusion": {
+      "type": "string",
+      "description": "JSON: [{livreur_id, nom, raison}] \u2014 livreurs exclus et pourquoi"
+    },
+    "livreur_acceptant_id": {
+      "type": "string",
+      "description": "ID du livreur ayant accept\u00e9 (si applicable)"
+    },
+    "livreur_acceptant_nom": {
+      "type": "string",
+      "description": "Nom du livreur ayant accept\u00e9"
+    },
+    "temps_avant_acceptation_sec": {
+      "type": "number",
+      "description": "Temps entre la notification et l'acceptation en secondes"
+    }
+  },
+  "required": [
+    "course_id",
+    "heure",
+    "evenement"
+  ]
+}

@@ -1,0 +1,133 @@
+{
+  "name": "VenusAutomationRule",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string",
+      "description": "Code unique de la r\u00e8gle (ex: retard_livreur_alerte_client)"
+    },
+    "nom": {
+      "type": "string",
+      "description": "Nom affich\u00e9 de la r\u00e8gle"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description en langage naturel"
+    },
+    "categorie": {
+      "type": "string",
+      "enum": [
+        "course",
+        "livreur",
+        "client",
+        "partenaire",
+        "paiement",
+        "notification",
+        "gps",
+        "performance",
+        "securite",
+        "autre"
+      ],
+      "description": "Cat\u00e9gorie de la r\u00e8gle"
+    },
+    "condition_type": {
+      "type": "string",
+      "enum": [
+        "livreur_retard",
+        "course_annulee",
+        "paiement_refuse",
+        "qr_code_oublie",
+        "client_silencieux",
+        "livreur_hors_ligne",
+        "course_bloquee",
+        "encours_depasse",
+        "zone_saturee",
+        "demande_frequente",
+        "performance_basse",
+        "horaire_pointe",
+        "event_custom"
+      ],
+      "description": "Type de condition d\u00e9clencheuse"
+    },
+    "condition_params": {
+      "type": "string",
+      "description": "JSON: param\u00e8tres de la condition (ex: {retard_minutes: 15, seuil_alerte: 3})"
+    },
+    "action_type": {
+      "type": "string",
+      "enum": [
+        "notifier_client",
+        "notifier_livreur",
+        "notifier_admin",
+        "relancer_dispatch",
+        "proposer_alternative",
+        "envoyer_rappel",
+        "creer_alerte",
+        "generer_insight",
+        "proposer_amelioration",
+        "declencher_workflow",
+        "action_custom"
+      ],
+      "description": "Type d'action \u00e0 ex\u00e9cuter"
+    },
+    "action_params": {
+      "type": "string",
+      "description": "JSON: param\u00e8tres de l'action (ex: {message: '...', canal: 'whatsapp'})"
+    },
+    "priorite": {
+      "type": "string",
+      "enum": [
+        "critique",
+        "haute",
+        "normale",
+        "basse"
+      ],
+      "default": "normale"
+    },
+    "niveau_autonomie": {
+      "type": "string",
+      "enum": [
+        "suggest_only",
+        "auto_execute"
+      ],
+      "default": "auto_execute",
+      "description": "auto_execute = VENUS agit directement; suggest_only = propose \u00e0 l'admin"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    },
+    "nb_declenchements": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de fois que cette r\u00e8gle a \u00e9t\u00e9 d\u00e9clench\u00e9e"
+    },
+    "dernier_declenchement": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "pays": {
+      "type": "string",
+      "default": "ALL"
+    },
+    "cree_par": {
+      "type": "string",
+      "description": "Email admin"
+    },
+    "date_creation": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "date_modification": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "code",
+    "nom",
+    "condition_type",
+    "action_type",
+    "active"
+  ]
+}

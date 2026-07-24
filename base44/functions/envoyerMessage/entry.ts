@@ -116,7 +116,11 @@ Deno.serve(async (req) => {
       const c = convs[0];
       let participants = [];
       try { participants = JSON.parse(c.participants || '[]'); } catch {}
-      const isParticipant = participants.some(p => p.type === sender_type && p.id === final_sender_id);
+      // Admin: autorisé si la conversation contient un participant admin (id='support', 'all', ou email)
+      // Cela permet aux admins de répondre aux conversations de support créées par les livreurs bloqués
+      const isParticipant = sender_type === 'admin'
+        ? participants.some(p => p.type === 'admin')
+        : participants.some(p => p.type === sender_type && p.id === final_sender_id);
       if (!isParticipant) {
         return Response.json({ error: 'Vous n\'êtes pas participant de cette conversation' }, { status: 403 });
       }
@@ -202,6 +206,8 @@ Deno.serve(async (req) => {
           for (const p of participants) {
             // Ne pas notifier l'expéditeur
             if (p.type === sender_type && p.id === final_sender_id) continue;
+            // Si l'expéditeur est admin, ne pas notifier les autres admins (évite auto-notif)
+            if (sender_type === 'admin' && p.type === 'admin') continue;
 
             if (p.type === 'partenaire') {
               // Résoudre l'email du partenaire via Boutique / Restaurant / Pharmacie

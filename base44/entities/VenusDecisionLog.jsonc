@@ -1,0 +1,78 @@
+{
+  "name": "VenusDecisionLog",
+  "type": "object",
+  "properties": {
+    "action_id": {
+      "type": "string",
+      "description": "ID de la VenusAgentAction associ\u00e9e"
+    },
+    "agent": {
+      "type": "string",
+      "default": "venus",
+      "description": "Nom de l'agent (venus, observer, advisor, etc.)"
+    },
+    "type_decision": {
+      "type": "string",
+      "enum": [
+        "proactive_suggestion",
+        "auto_notification",
+        "auto_reminder",
+        "automation_trigger",
+        "business_insight",
+        "recommendation",
+        "admin_response",
+        "workflow_decision"
+      ],
+      "description": "Type de d\u00e9cision"
+    },
+    "raisonnement": {
+      "type": "string",
+      "description": "Raisonnement complet de l'agent: pourquoi cette d\u00e9cision"
+    },
+    "etapes_raisonnement": {
+      "type": "string",
+      "description": "JSON: [{etape, description}] \u2014 d\u00e9composition de la boucle Comprendre\u2192Raisonner\u2192Planifier\u2192Agir\u2192V\u00e9rifier\u2192Am\u00e9liorer"
+    },
+    "regles_appliquees": {
+      "type": "string",
+      "description": "JSON: [{regle_id, regle_nom, condition, action}] \u2014 r\u00e8gles d'automatisation appliqu\u00e9es"
+    },
+    "donnees_utilisees": {
+      "type": "string",
+      "description": "JSON: {source, data} \u2014 donn\u00e9es utilis\u00e9es pour la d\u00e9cision"
+    },
+    "contexte": {
+      "type": "string",
+      "description": "JSON: contexte complet au moment de la d\u00e9cision"
+    },
+    "alternatives_envisagees": {
+      "type": "string",
+      "description": "JSON: [{option, raison_rejet}] \u2014 alternatives consid\u00e9r\u00e9es"
+    },
+    "niveau_confiance": {
+      "type": "number",
+      "default": 80,
+      "description": "Score de confiance (0-100)"
+    },
+    "explication_simple": {
+      "type": "string",
+      "description": "Explication en langage simple pour l'administrateur"
+    },
+    "pays": {
+      "type": "string",
+      "default": "ALL"
+    },
+    "conversation_id": {
+      "type": "string"
+    },
+    "date_creation": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "agent",
+    "type_decision",
+    "raisonnement"
+  ]
+}

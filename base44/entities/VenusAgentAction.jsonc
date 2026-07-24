@@ -1,0 +1,141 @@
+{
+  "name": "VenusAgentAction",
+  "type": "object",
+  "properties": {
+    "type_action": {
+      "type": "string",
+      "enum": [
+        "proactive_suggestion",
+        "auto_notification",
+        "auto_reminder",
+        "auto_alert",
+        "business_insight",
+        "recommendation",
+        "workflow_optimization",
+        "knowledge_suggestion",
+        "admin_assistant_response",
+        "initiative"
+      ],
+      "description": "Type d'action entreprise par l'agent VENUS"
+    },
+    "declencheur": {
+      "type": "string",
+      "description": "Ce qui a d\u00e9clench\u00e9 l'action (event_id, conversation_id, observation, admin_request, etc.)"
+    },
+    "cible_type": {
+      "type": "string",
+      "enum": [
+        "client",
+        "livreur",
+        "partenaire",
+        "admin",
+        "system",
+        "course",
+        "none"
+      ],
+      "default": "none",
+      "description": "Cible de l'action"
+    },
+    "cible_id": {
+      "type": "string",
+      "description": "ID de la cible (t\u00e9l\u00e9phone client, ID livreur, etc.)"
+    },
+    "contexte": {
+      "type": "string",
+      "description": "JSON: contexte complet au moment de l'action"
+    },
+    "raisonnement": {
+      "type": "string",
+      "description": "Raisonnement de l'agent (pourquoi cette action)"
+    },
+    "plan": {
+      "type": "string",
+      "description": "JSON: \u00e9tapes planifi\u00e9es [{etape, description, statut}]"
+    },
+    "action_executee": {
+      "type": "string",
+      "description": "Description de l'action r\u00e9ellement ex\u00e9cut\u00e9e"
+    },
+    "resultat": {
+      "type": "string",
+      "description": "R\u00e9sultat de l'action (succ\u00e8s/\u00e9chec + d\u00e9tails)"
+    },
+    "explication": {
+      "type": "string",
+      "description": "Explication d\u00e9taill\u00e9e pour l'administrateur: pourquoi, quelles r\u00e8gles, quelles donn\u00e9es"
+    },
+    "regles_appliquees": {
+      "type": "string",
+      "description": "JSON: liste des r\u00e8gles/automatisations appliqu\u00e9es"
+    },
+    "donnees_utilisees": {
+      "type": "string",
+      "description": "JSON: donn\u00e9es utilis\u00e9es pour la d\u00e9cision"
+    },
+    "niveau_autonomie": {
+      "type": "string",
+      "enum": [
+        "suggest_only",
+        "auto_execute",
+        "auto_execute_with_log"
+      ],
+      "default": "suggest_only",
+      "description": "Niveau d'autonomie de l'action"
+    },
+    "validation_requise": {
+      "type": "boolean",
+      "default": true,
+      "description": "True si l'action n\u00e9cessite validation admin avant ex\u00e9cution"
+    },
+    "valide_par": {
+      "type": "string",
+      "description": "Email admin ayant valid\u00e9"
+    },
+    "valide_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "proposee",
+        "validee",
+        "executee",
+        "rejetee",
+        "echec",
+        "expiree"
+      ],
+      "default": "proposee"
+    },
+    "priorite": {
+      "type": "string",
+      "enum": [
+        "critique",
+        "haute",
+        "normale",
+        "basse"
+      ],
+      "default": "normale"
+    },
+    "pays": {
+      "type": "string",
+      "default": "ALL"
+    },
+    "conversation_id": {
+      "type": "string"
+    },
+    "date_creation": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "date_execution": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "type_action",
+    "declencheur",
+    "statut"
+  ]
+}

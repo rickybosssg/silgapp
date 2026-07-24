@@ -1,0 +1,70 @@
+{
+  "name": "VenusDomainScore",
+  "type": "object",
+  "properties": {
+    "domaine": {
+      "type": "string",
+      "enum": [
+        "creation_course",
+        "paiement",
+        "qr_code",
+        "code_pin",
+        "restaurant",
+        "pharmacie",
+        "boutique",
+        "reclamation",
+        "gps",
+        "support",
+        "livraison_programmee",
+        "annulation",
+        "deplacement"
+      ],
+      "description": "Domaine d'\u00e9valuation"
+    },
+    "label": {
+      "type": "string",
+      "description": "Libell\u00e9 affichable (ex: Cr\u00e9ation de course)"
+    },
+    "score": {
+      "type": "number",
+      "default": 0,
+      "description": "Score actuel 0-100"
+    },
+    "progression": {
+      "type": "number",
+      "default": 0,
+      "description": "Variation depuis la derni\u00e8re \u00e9valuation"
+    },
+    "nb_interactions": {
+      "type": "number",
+      "default": 0
+    },
+    "nb_reussies": {
+      "type": "number",
+      "default": 0
+    },
+    "nb_echecs": {
+      "type": "number",
+      "default": 0
+    },
+    "historique": {
+      "type": "string",
+      "description": "JSON: [{date, score}] \u2014 historique des scores"
+    },
+    "derniere_amelioration": {
+      "type": "string",
+      "description": "Description de la derni\u00e8re am\u00e9lioration"
+    },
+    "pays": {
+      "type": "string",
+      "default": "ALL"
+    },
+    "date_maj": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "domaine"
+  ]
+}

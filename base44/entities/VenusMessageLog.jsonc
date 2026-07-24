@@ -1,0 +1,104 @@
+{
+  "name": "VenusMessageLog",
+  "type": "object",
+  "properties": {
+    "date_traitement": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Moment exact du traitement du message"
+    },
+    "telephone": {
+      "type": "string",
+      "description": "Numero de telephone du client"
+    },
+    "conversation_id": {
+      "type": "string",
+      "description": "ID de la conversation WhatsApp si applicable"
+    },
+    "message_client": {
+      "type": "string",
+      "description": "Message original recu du client (tronque a 2000 chars)"
+    },
+    "decision_moteur": {
+      "type": "string",
+      "enum": [
+        "securite",
+        "salutation",
+        "raccourci",
+        "cache",
+        "regle_metier",
+        "connaissance",
+        "rag_llm",
+        "openai",
+        "fallback_base44",
+        "erreur"
+      ],
+      "description": "Decision du moteur: quel chemin a traite ce message. securite=blocage securite, salutation=bonjour/bonsoir, raccourci=question frequente, cache=reponse en cache, regle_metier=regle deterministe, connaissance=base de connaissances, rag_llm=LLM Base44 sans OpenAI, openai=OpenAI reussi, fallback_base44=OpenAI echoue puis Base44, erreur=erreur traitement"
+    },
+    "openai_appele": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si l'API OpenAI a ete reellement appelee (reussite ou echec)"
+    },
+    "model_utilise": {
+      "type": "string",
+      "description": "Modele utilise (gpt-4.1-mini, base44-invoke-llm, etc.)"
+    },
+    "rag_documents": {
+      "type": "string",
+      "description": "JSON: [{document_id, document_titre, chunk_id, score}] - documents RAG recuperes"
+    },
+    "outils_utilises": {
+      "type": "string",
+      "description": "JSON: tableau des outils appels (consulter_statut_course, contacter_livreur, etc.)"
+    },
+    "temps_reponse_ms": {
+      "type": "number",
+      "default": 0,
+      "description": "Temps de reponse total en millisecondes"
+    },
+    "cout_usd": {
+      "type": "number",
+      "default": 0,
+      "description": "Cout USD estime pour cet appel"
+    },
+    "tokens_total": {
+      "type": "number",
+      "default": 0,
+      "description": "Tokens totaux OpenAI (0 si non-OpenAI)"
+    },
+    "reponse_envoyee": {
+      "type": "string",
+      "description": "Reponse finale envoyee au client (tronquee a 2000 chars)"
+    },
+    "intention": {
+      "type": "string",
+      "description": "Intention detectee (creer_course, suivre_course, salutation, etc.)"
+    },
+    "action": {
+      "type": "string",
+      "description": "Action choisie (poser_question, creer_course, repondre_info, etc.)"
+    },
+    "confiance": {
+      "type": "number",
+      "description": "Score de confiance 0-100"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "succes",
+        "erreur"
+      ],
+      "default": "succes",
+      "description": "Succes ou erreur de traitement"
+    },
+    "erreur_detail": {
+      "type": "string",
+      "description": "Message d'erreur si statut=erreur"
+    }
+  },
+  "required": [
+    "message_client",
+    "decision_moteur"
+  ]
+}

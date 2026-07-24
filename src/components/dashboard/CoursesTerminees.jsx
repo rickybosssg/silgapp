@@ -31,7 +31,7 @@ function CourseItem({ course, onView }) {
           <span className="text-xs font-bold text-green-700">{(course.prix_reel || course.prix).toLocaleString()} F</span>
         )}
         <span className="text-[10px] text-muted-foreground">
-          {format(new Date(course.heure_livraison || course.updated_date || course.created_date), "HH:mm")}
+          {format(new Date(course.heure_livraison || course.created_date), "HH:mm")}
         </span>
         <Button
           size="sm"

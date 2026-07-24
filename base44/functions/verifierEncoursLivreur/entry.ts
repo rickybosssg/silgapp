@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, error: 'Livreur introuvable' }, { status: 404 });
     }
 
-    // Si déjà bloqué, ne rien faire (pas accumuler)
+    // Si déjà bloqué, ne rien faire
     if (livreur.bloque_encours) {
       return Response.json({ success: true, skipped: true, reason: 'deja_bloque' });
     }
@@ -106,14 +106,13 @@ Deno.serve(async (req) => {
     // Pourcentage du seuil atteint
     const pourcentage = Math.round((nouvelEncours / seuil) * 100);
 
-    console.log(`[ENCOURS] Livreur ${livreurId} (${livreur.nom}): ${encoursAvant} → ${nouvelEncours} (${pourcentage}% du seuil ${seuil} ${devise})`);
+    console.log(`[ENCOURS] Livreur ${livreurId} (${livreur.nom}): ${nouvelEncours} (${pourcentage}% du seuil ${seuil} ${devise})`);
 
     const now = new Date().toISOString();
 
     // ── BLOCAGE : ≥ 100% du seuil ──
     if (nouvelEncours >= seuil) {
       await base44.asServiceRole.entities.Livreur.update(livreurId, {
-        encours: nouvelEncours,
         bloque_encours: true,
         encours_bloque_at: now,
         statut: 'hors_ligne',

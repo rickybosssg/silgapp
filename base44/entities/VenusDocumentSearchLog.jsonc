@@ -1,0 +1,83 @@
+{
+  "name": "VenusDocumentSearchLog",
+  "type": "object",
+  "properties": {
+    "requete": {
+      "type": "string",
+      "description": "Requete originale de recherche"
+    },
+    "requete_normalisee": {
+      "type": "string",
+      "description": "Requete apres normalisation"
+    },
+    "mots_cles": {
+      "type": "string",
+      "description": "JSON: mots-cles extraits de la requete"
+    },
+    "resultats_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de resultats trouves"
+    },
+    "meilleur_score": {
+      "type": "number",
+      "default": 0,
+      "description": "Score du meilleur resultat"
+    },
+    "document_id_trouve": {
+      "type": "string",
+      "description": "ID du document principal trouve"
+    },
+    "document_titre_trouve": {
+      "type": "string"
+    },
+    "document_version_trouvee": {
+      "type": "number"
+    },
+    "document_categorie_trouvee": {
+      "type": "string"
+    },
+    "chunk_id_trouve": {
+      "type": "string"
+    },
+    "chunk_contenu_extrait": {
+      "type": "string",
+      "description": "Extrait du chunk trouve"
+    },
+    "source_utilisee": {
+      "type": "string",
+      "enum": [
+        "knowledge_base",
+        "document_library",
+        "scenario",
+        "ia_generale"
+      ],
+      "description": "Source finalement utilisee pour la reponse"
+    },
+    "temps_recherche_ms": {
+      "type": "number",
+      "default": 0,
+      "description": "Temps de recherche en millisecondes"
+    },
+    "a_reussi": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si au moins un resultat pertinent a ete trouve"
+    },
+    "reponse_envoyee": {
+      "type": "string",
+      "description": "Reponse envoyee au client (extrait)"
+    },
+    "pays": {
+      "type": "string",
+      "description": "Code pays de la requete"
+    },
+    "conversation_id": {
+      "type": "string",
+      "description": "ID de la conversation (si applicable)"
+    }
+  },
+  "required": [
+    "requete"
+  ]
+}

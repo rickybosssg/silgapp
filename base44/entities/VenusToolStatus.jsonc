@@ -1,0 +1,77 @@
+{
+  "name": "VenusToolStatus",
+  "type": "object",
+  "properties": {
+    "outil": {
+      "type": "string",
+      "enum": [
+        "creer_course",
+        "recherche_livreur",
+        "qr_code",
+        "pin",
+        "gps",
+        "paiement",
+        "whatsapp",
+        "notifications",
+        "knowledge_base",
+        "document_library",
+        "workflow_engine",
+        "rag_engine",
+        "reasoning_engine",
+        "tts",
+        "transcription"
+      ],
+      "description": "Nom de l'outil surveill\u00e9"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "operationnel",
+        "degradation",
+        "indisponible",
+        "inconnu"
+      ],
+      "default": "inconnu",
+      "description": "\u00c9tat actuel de l'outil"
+    },
+    "derniere_verification": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "temps_reponse_ms": {
+      "type": "number",
+      "default": 0,
+      "description": "Dernier temps de r\u00e9ponse mesur\u00e9"
+    },
+    "message_erreur": {
+      "type": "string"
+    },
+    "nb_incidents_24h": {
+      "type": "number",
+      "default": 0
+    },
+    "nb_incidents_total": {
+      "type": "number",
+      "default": 0
+    },
+    "dernier_incident": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "procedure_secours_activee": {
+      "type": "boolean",
+      "default": false
+    },
+    "description_secours": {
+      "type": "string",
+      "description": "Description de la proc\u00e9dure de secours utilis\u00e9e"
+    },
+    "metadata": {
+      "type": "string",
+      "description": "JSON: donn\u00e9es techniques additionnelles"
+    }
+  },
+  "required": [
+    "outil"
+  ]
+}

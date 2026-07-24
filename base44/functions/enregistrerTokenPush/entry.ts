@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.38';
 
 Deno.serve(async (req) => {
   try {
@@ -6,6 +6,11 @@ Deno.serve(async (req) => {
 
     if (req.method !== 'POST') {
       return Response.json({ error: 'Method not allowed' }, { status: 405 });
+    }
+
+    const user = await base44.auth.me().catch(() => null);
+    if (!user) {
+      return Response.json({ error: 'Authentification requise' }, { status: 401 });
     }
 
     const body = await req.json();
@@ -30,6 +35,10 @@ Deno.serve(async (req) => {
 
     const normalizedPlatform = platform || 'android';
     const normalizedEmail = String(user_email).trim().toLowerCase();
+    const authenticatedEmail = String(user.email || '').trim().toLowerCase();
+    if (user.role !== 'admin' && normalizedEmail !== authenticatedEmail) {
+      return Response.json({ error: 'Impossible d’enregistrer un token pour un autre utilisateur' }, { status: 403 });
+    }
 
     // Résoudre le user_type correct
     let resolvedUserType = 'livreur';
@@ -57,13 +66,18 @@ Deno.serve(async (req) => {
     if (existingTokens.length > 0) {
       await base44.asServiceRole.entities.NotificationToken.update(existingTokens[0].id, payload);
       if (!String(token).startsWith('web_')) {
+        const currentCreatedMs = new Date(existingTokens[0].created_date || Date.now()).getTime();
         const sameUserTokens = await base44.asServiceRole.entities.NotificationToken.filter({
           user_email: normalizedEmail,
           user_type: resolvedUserType,
           actif: true,
         });
         await Promise.all((sameUserTokens || [])
-          .filter(item => item.id !== existingTokens[0].id && !String(item.token || '').startsWith('web_'))
+          .filter(item =>
+            item.id !== existingTokens[0].id &&
+            !String(item.token || '').startsWith('web_') &&
+            new Date(item.created_date || 0).getTime() < currentCreatedMs
+          )
           .map(item => base44.asServiceRole.entities.NotificationToken.update(item.id, { actif: false })));
       }
       console.log('[enregistrerTokenPush] Token updated', {
@@ -77,13 +91,18 @@ Deno.serve(async (req) => {
 
     const created = await base44.asServiceRole.entities.NotificationToken.create(payload);
     if (!String(token).startsWith('web_')) {
+      const currentCreatedMs = new Date(created.created_date || Date.now()).getTime();
       const sameUserTokens = await base44.asServiceRole.entities.NotificationToken.filter({
         user_email: normalizedEmail,
         user_type: resolvedUserType,
         actif: true,
       });
       await Promise.all((sameUserTokens || [])
-        .filter(item => item.id !== created.id && !String(item.token || '').startsWith('web_'))
+        .filter(item =>
+          item.id !== created.id &&
+          !String(item.token || '').startsWith('web_') &&
+          new Date(item.created_date || 0).getTime() < currentCreatedMs
+        )
         .map(item => base44.asServiceRole.entities.NotificationToken.update(item.id, { actif: false })));
     }
     console.log('[enregistrerTokenPush] Token created', {

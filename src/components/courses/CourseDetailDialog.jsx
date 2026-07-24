@@ -13,6 +13,7 @@ import MultiColisAdminView from "./MultiColisAdminView";
 import ProposedLivreursList from "./ProposedLivreursList";
 import ChatWindow from "@/components/chat/ChatWindow";
 import { base44 } from "@/api/base44Client";
+import { genererReferenceCourse } from "@/lib/courseReference";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
@@ -127,13 +128,15 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
         return;
       }
       await base44.entities.CourseExterne.update(course.id, {
-        statut: "recherche_livreur",
+        statut: "livreur_en_route",
         dispatch_status: "accepte",
         livreur_id: livreurId,
         heure_acceptation: new Date().toISOString(),
         notes: (course.notes || "") + "\n[Réattribué au même livreur par admin]",
       });
-      toast.success("Course réattribuée à " + (course.livreur_nom || "ce livreur"));
+      // Remettre le livreur en course
+      await base44.entities.Livreur.update(livreurId, { statut: "en_course" });
+      toast.success("Course réattribuée à " + (course.livreur_nom || "ce livreur") + " — statut: En route");
       queryClient.invalidateQueries();
       onClose();
     } catch (error) {
@@ -157,7 +160,7 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="w-5 h-5 text-primary" />
-            Course #{course.id?.slice(-6)}
+            Course {genererReferenceCourse(course)}
           </DialogTitle>
         </DialogHeader>
 

@@ -1,0 +1,27 @@
+{
+  "name": "VenusKeywordIndex",
+  "type": "object",
+  "properties": {
+    "mot_cle": {
+      "type": "string",
+      "description": "Mot-cl\u00e9 normalis\u00e9 (minuscules, sans accents). Uniquement unique par mot-cl\u00e9."
+    },
+    "chunk_ids": {
+      "type": "string",
+      "description": "JSON: tableau des IDs de VenusDocumentChunk contenant ce mot-cl\u00e9 (capp\u00e9 \u00e0 500 pour limiter la taille du champ)"
+    },
+    "nb_chunks": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre total de chunks r\u00e9f\u00e9renc\u00e9s dans chunk_ids"
+    },
+    "date_maj": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de derni\u00e8re mise \u00e0 jour de l'index"
+    }
+  },
+  "required": [
+    "mot_cle"
+  ]
+}

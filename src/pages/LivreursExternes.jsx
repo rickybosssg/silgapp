@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
 import { base44 } from "@/api/base44Client";
@@ -8,9 +8,10 @@ import { toast } from "sonner";
 import {
   ArrowLeft, Users, UserCheck, UserX, Phone, Mail, MapPin,
   Ban, CheckCircle2, RefreshCw, Bike, Car, Truck,
-  XCircle, Banknote, Star, Wifi, WifiOff, Power, PowerOff
+  XCircle, Banknote, Star, Wifi, WifiOff, Power, PowerOff, Send, Search
 } from "lucide-react";
 import CreateLivreurDialog from "@/components/livreurs/CreateLivreurDialog";
+import EmailLivreursModal from "@/components/livreurs/EmailLivreursModal";
 import NotationLivreurPanel from "@/components/admin/NotationLivreurPanel";
 import LivreurPhotoUploader from "@/components/livreur/LivreurPhotoUploader";
 import AdminStatutLivreurPanel from "@/components/livreurs/AdminStatutLivreurPanel";
@@ -58,10 +59,8 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
   const coursesActives = courses.filter(c => !["livree", "annulee"].includes(c.statut));
   const montantTotal = coursesLivrees.reduce((s, c) => s + (c.prix_final || 0), 0);
   const montantDu = livreur.montant_du_silga || 0;
-  const montantPaye = coursesLivrees
-    .filter(c => c.statut_paiement_livreur === "paye")
-    .reduce((s, c) => s + (c.commission_silga || 0), 0);
-  const resteAPayerSilga = Math.max(0, montantDu);
+  const encoursReel = livreur.encours || 0;
+  const resteAPayerSilga = Math.max(0, encoursReel);
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4">
@@ -181,15 +180,28 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
               <span className="font-semibold">{montantTotal.toLocaleString()} FCFA</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Montant dû à SILGAPP</span>
-              <span className="font-bold text-orange-600">{montantDu.toLocaleString()} {livreur.devise || "FCFA"}</span>
-            </div>
-            <div className="border-t pt-2 flex justify-between text-sm font-bold">
-              <span>Reste à payer</span>
-              <span className={resteAPayerSilga > 0 ? "text-red-600" : "text-green-600"}>
-                {resteAPayerSilga.toLocaleString()} FCFA
+              <span className="text-muted-foreground">Encours (commissions accumulées)</span>
+              <span className={`font-bold ${encoursReel > 0 ? "text-red-600" : "text-green-600"}`}>
+                {encoursReel.toLocaleString()} {livreur.devise || "FCFA"}
               </span>
             </div>
+            {montantDu !== encoursReel && (
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Ancien montant_du_silga</span>
+                <span className="text-gray-400 line-through">{montantDu.toLocaleString()} FCFA</span>
+              </div>
+            )}
+            <div className="border-t pt-2 flex justify-between text-sm font-bold">
+              <span>Reste à payer</span>
+              <span className={encoursReel > 0 ? "text-red-600" : "text-green-600"}>
+                {encoursReel.toLocaleString()} FCFA
+              </span>
+            </div>
+            {livreur.bloque_encours && (
+              <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-700 font-medium">
+                ⚠️ Bloqué automatiquement — plafond d'encours atteint
+              </div>
+            )}
           </div>
 
           {/* Gestion statut admin */}
@@ -325,6 +337,8 @@ export default function LivreursExternes() {
   const queryClient = useQueryClient();
   const [selectedLivreur, setSelectedLivreur] = useState(null);
   const [filterStatut, setFilterStatut] = useState("tous");
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const { isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
   const effectiveCountry = isPays ? adminCountryCode : selectedCountry;
 
@@ -372,6 +386,18 @@ export default function LivreursExternes() {
     if (filterStatut === "en_attente") return livreurs.filter(l => l.validation === "en_attente");
     return livreurs;
   }, [livreurs, filterStatut]);
+
+  const livreursRecherches = useMemo(() => {
+    if (!searchQuery.trim()) return livreursFiltres;
+    const q = searchQuery.trim().toLowerCase();
+    return livreursFiltres.filter(l => {
+      const nomComplet = `${l.prenom || ""} ${l.nom || ""}`.trim().toLowerCase();
+      const tel = (l.telephone || "").toLowerCase();
+      const quartier = (l.quartier || "").toLowerCase();
+      const code = (l.code_identification || "").toLowerCase();
+      return nomComplet.includes(q) || tel.includes(q) || quartier.includes(q) || code.includes(q);
+    });
+  }, [livreursFiltres, searchQuery]);
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.functions.invoke("updateLivreur", { id, data }),
@@ -482,8 +508,45 @@ export default function LivreursExternes() {
             <RefreshCw className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Resync tous</span>
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
+            onClick={() => setEmailModalOpen(true)}
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Email tous</span>
+          </Button>
           <CreateLivreurDialog reseau="externe" countryCode={effectiveCountry} />
         </div>
+      </div>
+
+      {/* Modal envoi email groupé */}
+      {emailModalOpen && (
+        <EmailLivreursModal
+          onClose={() => setEmailModalOpen(false)}
+          countryCode={effectiveCountry}
+        />
+      )}
+
+      {/* Barre de recherche */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Rechercher par nom, téléphone, quartier ou code..."
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          >
+            <XCircle className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Statistiques — harmonisées avec la carte dispatch */}
@@ -518,17 +581,17 @@ export default function LivreursExternes() {
       </div>
 
       {/* Liste */}
-      {livreursFiltres.length === 0 ? (
+      {livreursRecherches.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
             <Users className="w-7 h-7 opacity-30" />
           </div>
           <p className="font-semibold">Aucun livreur</p>
-          <p className="text-xs mt-1 opacity-60">Modifiez le filtre ou ajoutez un livreur.</p>
+          <p className="text-xs mt-1 opacity-60">{searchQuery ? "Aucun résultat pour votre recherche." : "Modifiez le filtre ou ajoutez un livreur."}</p>
         </div>
       ) : (
         <div className="space-y-2">
-          {livreursFiltres.map(livreur => {
+          {livreursRecherches.map(livreur => {
             const nomComplet = `${livreur.prenom || ""} ${livreur.nom}`.trim();
             const vb = validationBadge(livreur.validation);
             const isBloque = livreur.actif === false;
@@ -536,7 +599,7 @@ export default function LivreursExternes() {
             const libre = isLibre(livreur);
             const enMission = isEnCourse(livreur);
             const appActive = isAppActive(livreur);
-            const montantDu = livreur.montant_du_silga || 0;
+            const encoursReel = livreur.encours || 0;
 
             return (
               <div
@@ -602,9 +665,9 @@ export default function LivreursExternes() {
 
                   {/* Pills finance + note */}
                   <div className="flex items-center gap-2 flex-wrap">
-                    {montantDu > 0 && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-orange-700 bg-orange-100 rounded-full px-2 py-0.5">
-                        <Banknote className="w-2.5 h-2.5" />{montantDu.toLocaleString()} F dû
+                    {encoursReel > 0 && (
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 ${livreur.bloque_encours ? "text-red-700 bg-red-100" : "text-orange-700 bg-orange-100"}`}>
+                        <Banknote className="w-2.5 h-2.5" />{encoursReel.toLocaleString()} F dû
                       </span>
                     )}
                     {livreur.note_moyenne > 0 && (

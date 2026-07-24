@@ -3,7 +3,7 @@ import { useEffect } from "react";
 
 const SilgappPush = registerPlugin("SilgappPush");
 
-export const DEFAULT_LIVREUR_ALERT_DURATION_SECONDS = 60;
+export const DEFAULT_LIVREUR_ALERT_DURATION_SECONDS = 120;
 export const DEFAULT_LIVREUR_ALERT_INTERVAL_SECONDS = 5;
 
 const STORAGE_DURATION_KEY = "silgapp_livreur_alert_duration_seconds";
@@ -31,7 +31,7 @@ function readStoredNumber(key, fallback) {
 
 export function normalizeLivreurAlertConfig(config = {}) {
   const duration = toPositiveNumber(
-    config.alert_duration_seconds ?? config.duree_alerte_livreur_secondes ?? config.durationSeconds,
+    config.alert_duration_seconds ?? config.duree_alerte_livreur_secondes ?? config.durationSeconds ?? config.timeout_secondes,
     readStoredNumber(STORAGE_DURATION_KEY, DEFAULT_LIVREUR_ALERT_DURATION_SECONDS)
   );
   const interval = toPositiveNumber(

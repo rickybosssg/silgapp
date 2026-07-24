@@ -14,12 +14,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        // Transmettre le token APNs au plugin Capacitor PushNotifications
+        // (requis pour la génération du token FCM sur iOS)
         NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        print("[SILGAPP] Echec enregistrement notifications remote: \(error.localizedDescription)")
         NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
+        print("[SILGAPP] Échec enregistrement notifications remote: \(error.localizedDescription)")
     }
 
     func applicationWillResignActive(_ application: UIApplication) {

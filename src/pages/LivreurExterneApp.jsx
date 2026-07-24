@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { clearPersistedToken } from "@/lib/authPersistence";
@@ -10,6 +10,7 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 
 import { registerPushToken, subscribeToNotifications, consumePendingNotificationData } from "@/lib/notifications";
+import { usePushTokenRetry } from "@/hooks/usePushTokenRetry";
 import { requestNativeAppPermissions } from "@/lib/nativePermissions";
 import { startNativeBackgroundHeartbeat } from "@/lib/nativeAndroid";
 import { ensureBatteryOptimizationExemption } from "@/lib/batteryOptimization";
@@ -382,6 +383,13 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     consumePendingNotificationData();
     return () => window.removeEventListener("silgapp:notification-opened", handleNotificationOpened);
   }, [queryClient, livreurId]);
+
+  // ── Relance automatique du token push au retour au premier plan ──
+  usePushTokenRetry(livreurId, livreurEmail ? {
+    email: livreurEmail,
+    user_type: "livreur",
+    livreur_id: livreurId,
+  } : null);
 
   useEffect(() => {
     const handleUrgentAlertStarted = (event) => {
@@ -1102,10 +1110,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           montant_livreur: split.montant_livreur,
         },
       });
-      saveLivreur(livreurProfil.id, {
-        montant_du_silga: (livreurProfil.montant_du_silga || 0) + split.commission_silga,
-      }).catch(() => null);
-
       await verifierEncoursApresCourse(course.id);
       await remettreDisponibleSiAutorise();
       toast.success(`Livraison terminée ! ${montantSaisi.toLocaleString()} F`);
@@ -1151,9 +1155,6 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           commission_silga: split.commission_silga,
           montant_livreur: split.montant_livreur,
         },
-      });
-      saveLivreur(livreurProfil.id, {
-        montant_du_silga: (livreurProfil.montant_du_silga || 0) + split.commission_silga
       });
     } else {
       await updateCourseMutation.mutateAsync({ id: course.id, data: baseData });
@@ -1408,6 +1409,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
               totalEncaisse={totalEncaisse}
               montantDuSilga={montantDuSilga}
               isExterne={true}
+              livreurId={livreurProfil?.id}
             />
 
             <Link to="/payer-silgapp">

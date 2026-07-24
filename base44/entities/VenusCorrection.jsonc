@@ -1,0 +1,56 @@
+{
+  "name": "VenusCorrection",
+  "type": "object",
+  "properties": {
+    "interaction_id": {
+      "type": "string",
+      "description": "ID de l'interaction Venus corrig\u00e9e (si issue d'une question non comprise)"
+    },
+    "question_client": {
+      "type": "string",
+      "description": "Question pos\u00e9e par le client"
+    },
+    "reponse_venus": {
+      "type": "string",
+      "description": "R\u00e9ponse actuelle/erron\u00e9e de VENUS"
+    },
+    "nouvelle_reponse": {
+      "type": "string",
+      "description": "Nouvelle r\u00e9ponse officielle corrig\u00e9e"
+    },
+    "commentaires": {
+      "type": "string",
+      "description": "Commentaires de l'admin sur la correction"
+    },
+    "categorie": {
+      "type": "string",
+      "description": "Cat\u00e9gorie assign\u00e9e \u00e0 la correction"
+    },
+    "mots_cles": {
+      "type": "string",
+      "description": "JSON: tableau des mots-cl\u00e9s"
+    },
+    "knowledge_id": {
+      "type": "string",
+      "description": "ID de la connaissance cr\u00e9\u00e9e dans VenusKnowledge apr\u00e8s validation"
+    },
+    "auteur": {
+      "type": "string",
+      "description": "Email de l'admin ayant corrig\u00e9"
+    },
+    "statut": {
+      "type": "string",
+      "enum": [
+        "en_cours",
+        "validee",
+        "appliquee"
+      ],
+      "default": "validee",
+      "description": "Statut de la correction"
+    }
+  },
+  "required": [
+    "question_client",
+    "nouvelle_reponse"
+  ]
+}

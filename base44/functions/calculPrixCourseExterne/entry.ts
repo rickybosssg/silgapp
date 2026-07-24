@@ -123,13 +123,15 @@ Deno.serve(async (req) => {
       heure_livraison: new Date().toISOString(),
     });
 
-    // Mettre à jour le montant dû par le livreur à Silga
+    // Accumuler la commission dans l'encours du livreur (source de vérité unique)
+    // + garder montant_du_silga synchronisé pour rétrocompatibilité
     if (course.livreur_id) {
       const livreur = await base44.asServiceRole.entities.Livreur.get(course.livreur_id);
       if (livreur) {
-        const nouveauMontantDu = (livreur.montant_du_silga || 0) + commissionSilga;
+        const nouvelEncours = (livreur.encours || 0) + commissionSilga;
         await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
-          montant_du_silga: nouveauMontantDu,
+          encours: nouvelEncours,
+          montant_du_silga: nouvelEncours,
           statut_paiement: 'non_paye',
         });
       }

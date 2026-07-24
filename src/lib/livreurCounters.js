@@ -2,7 +2,7 @@
 // Fichier centralisé pour garantir l'uniformité des calculs dans toute l'application
 // Importer ce fichier dans DashboardExterne, CarteLivreursExterne, et tous les composants
 
-import { isGPSRecent, hasValidGPS, isAppActive, isON, isLibre, isEnCourse, isClientGPSRecent, isClientNoir } from "./dispatchRules";
+import { isGPSRecent, hasValidGPS, isAppActive, isON, isLibre, isEnCourse, isClientGPSRecent, isClientNoir, getLivreurCategorie, isGPSExpire, isLibreSansGPSValide } from "./dispatchRules";
 
 /**
  * Livreur noir = non dispatchable
@@ -33,6 +33,7 @@ export function isLivreurNoir(livreur, livreurIdsEnCourseReelle) {
 /**
  * Calcule TOUS les compteurs livreurs avec une source unique de vérité
  * @param {Array} livreurs - Liste des livreurs (déjà filtrés: validation === "valide" && actif !== false)
+ * @param {Set} livreurIdsEnCourseReelle - IDs des livreurs avec course active
  * @returns {Object} - Compteurs détaillés
  */
 export function calculateLivreurCounters(livreurs) {
@@ -57,10 +58,16 @@ export function calculateLivreurCounters(livreurs) {
 
   return {
     total: livreurs.length,
+    libres,                                // TOUS dispatchables (GPS ≤ 60 min)
+    libres_recent: libres,                 // alias rétro-compatibilité
+    libres_ancien: 0,                      // plus de distinction
+    sans_gps_valide: 0,                    // alias rétro-compatibilité
+    gps_expire: expires,                   // GPS > 60 min (non dispatchable)
+    enCourse,
+    hors_ligne: horsLigne,
+    // Aliases for backward compatibility
     on: livreurs.filter(l => isON(l)).length,
     off: livreurs.filter(l => !isON(l)).length,
-    libres: libres.length,
-    enCourse: enCourse.length,
     appActive: livreurs.filter(l => isAppActive(l)).length,
     noirs: livreurs.filter(l => isLivreurNoir(l)).length,
     verts: libres.length, // alias pour libres

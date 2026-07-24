@@ -11,6 +11,7 @@ import SelectionReseau from './pages/SelectionReseau.jsx';
 import AppMaintenanceGate from './components/admin/AppMaintenanceGate.jsx';
 import { restoreTokenFromCookie, syncTokenFromPreferences, clearPersistedToken } from '@/lib/authPersistence';
 import { trackAppInstall } from '@/lib/trackInstall';
+import IOSAppStoreBanner from './components/IOSAppStoreBanner.jsx';
 
 // LoadingScreen défini IMMÉDIATEMENT avant lazy loading
 const LoadingScreen = () => <SplashScreen />;
@@ -83,10 +84,26 @@ const MesCommandesBoutique = lazy(() => import('./pages/MesCommandesBoutique.jsx
 const PharmaciesList = lazy(() => import('./pages/PharmaciesList.jsx'));
 const PharmacieDetail = lazy(() => import('./pages/PharmacieDetail.jsx'));
 const AdminMessages = lazy(() => import('./pages/AdminMessages.jsx'));
+const WhatsAppAdmin = lazy(() => import('./pages/WhatsAppAdmin.jsx'));
+const VenusAdminCenter = lazy(() => import('./pages/VenusAdminCenter.jsx'));
+const VenusLearningCenter = lazy(() => import('./pages/VenusLearningCenter.jsx'));
+const VenusBrainCenter = lazy(() => import('./pages/VenusBrainCenter.jsx'));
+const VenusWorkflowCenter = lazy(() => import('./pages/VenusWorkflowCenter.jsx'));
+const VenusImprovementCenter = lazy(() => import('./pages/VenusImprovementCenter.jsx'));
+const VenusDocumentLibrary = lazy(() => import('./pages/VenusDocumentLibrary.jsx'));
+const VenusSupervisionCenter = lazy(() => import('./pages/VenusSupervisionCenter.jsx'));
+const VenusInternationalCenter = lazy(() => import('./pages/VenusInternationalCenter.jsx'));
+const VenusPerformanceCenter = lazy(() => import('./pages/VenusPerformanceCenter.jsx'));
+const VenusCertificationCenter = lazy(() => import('./pages/VenusCertificationCenter.jsx'));
+const VenusAgentCenter = lazy(() => import('./pages/VenusAgentCenter.jsx'));
+const VenusIntelligenceCenter = lazy(() => import('./pages/VenusIntelligenceCenter.jsx'));
+const VenusTestLab = lazy(() => import('./pages/VenusTestLab.jsx'));
+const OpenAIDashboard = lazy(() => import('./pages/OpenAIDashboard.jsx'));
 const NeoDashboard = lazy(() => import('./pages/NeoDashboard.jsx'));
 const BugsTracking = lazy(() => import('./pages/BugsTracking.jsx'));
 const PayerSilgapp = lazy(() => import('./pages/PayerSilgapp.jsx'));
 const PaiementsAdmin = lazy(() => import('./pages/PaiementsAdmin.jsx'));
+const DispatchLogs = lazy(() => import('./pages/DispatchLogs.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -388,7 +405,24 @@ function AppContent() {
           <Route path="/admin/pharmacies" element={<AnimatedRoutes><GestionPharmacies /></AnimatedRoutes>} />
           <Route path="/admin/commandes-partenaires" element={<AnimatedRoutes><CommandesPartenaires /></AnimatedRoutes>} />
           <Route path="/admin/paiements" element={<AnimatedRoutes><PaiementsAdmin /></AnimatedRoutes>} />
+          <Route path="/admin/dispatch-logs" element={<AnimatedRoutes><DispatchLogs /></AnimatedRoutes>} />
           <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
+          <Route path="/admin/whatsapp" element={<AnimatedRoutes><WhatsAppAdmin /></AnimatedRoutes>} />
+          <Route path="/admin/venus" element={<AnimatedRoutes><VenusAdminCenter /></AnimatedRoutes>} />
+          <Route path="/admin/venus-brain" element={<AnimatedRoutes><VenusBrainCenter /></AnimatedRoutes>} />
+          <Route path="/admin/venus-learning" element={<AnimatedRoutes><VenusLearningCenter /></AnimatedRoutes>} />
+          <Route path="/admin/venus-brain" element={<AnimatedRoutes><VenusBrainCenter /></AnimatedRoutes>} />
+          <Route path="/admin/venus-workflows" element={<AnimatedRoutes><VenusWorkflowCenter /></AnimatedRoutes>} />
+          <Route path="/admin/venus-improvement" element={<AnimatedRoutes><VenusImprovementCenter /></AnimatedRoutes>} />
+          <Route path="/admin/venus-documents" element={<AnimatedRoutes><VenusDocumentLibrary /></AnimatedRoutes>} />
+          <Route path="/admin/venus-supervision" element={<AnimatedRoutes><VenusSupervisionCenter /></AnimatedRoutes>} />
+          <Route path="/admin/venus-international" element={<AnimatedRoutes><VenusInternationalCenter /></AnimatedRoutes>} />
+          <Route path="/admin/venus-performance" element={<AnimatedRoutes><VenusPerformanceCenter /></AnimatedRoutes>} />
+          <Route path="/admin/venus-certification" element={<AnimatedRoutes><VenusCertificationCenter /></AnimatedRoutes>} />
+          <Route path="/admin/venus-agent" element={<AnimatedRoutes><VenusAgentCenter /></AnimatedRoutes>} />
+          <Route path="/admin/venus-intelligence" element={<AnimatedRoutes><VenusIntelligenceCenter /></AnimatedRoutes>} />
+          <Route path="/admin/venus-test-lab" element={<AnimatedRoutes><VenusTestLab /></AnimatedRoutes>} />
+          <Route path="/admin/openai-dashboard" element={<AnimatedRoutes><OpenAIDashboard /></AnimatedRoutes>} />
           <Route path="/admin/neo" element={<AnimatedRoutes><NeoDashboard /></AnimatedRoutes>} />
           <Route path="/admin/bugs" element={<AnimatedRoutes><BugsTracking /></AnimatedRoutes>} />
           <Route path="/admin/statistiques" element={<AnimatedRoutes><Statistiques /></AnimatedRoutes>} />
@@ -425,6 +459,7 @@ function AppWithProviders() {
   return (
     <QueryClientProvider client={queryClientInstance}>
       <App />
+      <IOSAppStoreBanner />
     </QueryClientProvider>
   );
 }

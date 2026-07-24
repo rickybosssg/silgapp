@@ -20,6 +20,19 @@ async function chargerCommissionPays(base44, countryCode) {
   return pct;
 }
 
+async function chargerTarifPays(base44, countryCode) {
+  const code = String(countryCode || '').trim().toUpperCase();
+  if (!code) throw new Error('country_code manquant pour calculer le tarif');
+  const countries = await base44.asServiceRole.entities.Country.filter({ code, actif: true });
+  const country = countries?.[0];
+  const prixParKm = Number(country?.prix_par_km);
+  const prixMinimum = Number(country?.prix_minimum);
+  if (!Number.isFinite(prixParKm) || prixParKm <= 0 || !Number.isFinite(prixMinimum) || prixMinimum < 0) {
+    throw new Error(`Tarification non configuree pour le pays ${code}`);
+  }
+  return { prixParKm, prixMinimum };
+}
+
 function haversine(lat1, lon1, lat2, lon2) {
   if (!lat1 || !lon1 || !lat2 || !lon2) return null;
   const R = 6371;
@@ -69,7 +82,8 @@ Deno.serve(async (req) => {
       }
 
       const distSafe = distanceKm;
-      const prixFinal = Math.round(distSafe * 100);
+      const tarif = await chargerTarifPays(base44, course.country_code);
+      const prixFinal = Math.max(Math.round(distSafe * tarif.prixParKm), tarif.prixMinimum);
       const commissionPct = await chargerCommissionPays(base44, course.country_code);
       const commission = Math.round(prixFinal * (commissionPct / 100));
       const montantLivreur = prixFinal - commission;
