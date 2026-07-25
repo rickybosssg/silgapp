@@ -1363,6 +1363,23 @@ async function handleModifierCourse(base44, conversation, userMessage, telephone
 }
 
 Deno.serve(async (req) => {
+  // ── Diagnostic GET : retourne l'URL vue par Deno ──
+  if (req.method === 'GET') {
+    const url = new URL(req.url);
+    return Response.json({
+      method: req.method,
+      url_seen: url.toString(),
+      href: url.href,
+      origin: url.origin,
+      host: url.host,
+      pathname: url.pathname,
+      host_header: req.headers.get('host') || '',
+      x_forwarded_host: req.headers.get('x-forwarded-host') || '',
+      x_forwarded_proto: req.headers.get('x-forwarded-proto') || '',
+      timestamp: new Date().toISOString()
+    });
+  }
+
   let typingInterval: any = null;
   try {
     const base44 = createClientFromRequest(req);
