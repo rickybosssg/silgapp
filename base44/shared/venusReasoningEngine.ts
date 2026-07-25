@@ -34,7 +34,7 @@ import {
   detecterSalutation,
 } from './venusCache.ts';
 import { genererReferenceCourse } from './venusCourseReference.ts';
-import { isOpenAIEnabled, raisonnerAvecOpenAI } from './venusOpenAIEngine.ts';
+import { isOpenAIEnabled, raisonnerAvecOpenAI, getOpenAIModel } from './venusOpenAIEngine.ts';
 import { logOpenAIUsage, loggerMessageVenus, calculateCost } from './venusOpenAITracker.ts';
 
 /**
@@ -1166,7 +1166,7 @@ Réponds UNIQUEMENT avec un JSON.`;
         console.warn(`[ReasoningEngine] ⚠️ OpenAI échec (${openaiErr.message}), fallback InvokeLLM`);
         llmRes = null;
         logOpenAIUsage(base44, {
-          model: 'gpt-4.1-mini',
+          model: await getOpenAIModel(base44),
           tokens_prompt: 0, tokens_completion: 0, tokens_total: 0,
           response_time_ms: errTime,
           status: 'error',
@@ -1188,7 +1188,7 @@ Réponds UNIQUEMENT avec un JSON.`;
       console.log(`[ReasoningEngine] ⏱️ LLM (Base44): ${fallbackTime}ms`);
       if (wasOpenAIEnabled) {
         logOpenAIUsage(base44, {
-          model: 'gpt-4.1-mini',
+          model: await getOpenAIModel(base44),
           tokens_prompt: 0, tokens_completion: 0, tokens_total: 0,
           response_time_ms: fallbackTime,
           status: 'fallback',

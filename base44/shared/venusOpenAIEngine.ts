@@ -23,7 +23,8 @@
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const OPENAI_MODEL_DEFAULT = 'gpt-4.1-mini';
 const MAX_TOOL_ROUNDS = 3;
-const OPENAI_TIMEOUT_MS = 30000; // 30s — empêche les appels pendus à 42-58s
+const OPENAI_TIMEOUT_MS = 45000; // 45s — GPT-5 (reasoning model) peut prendre jusqu'à 40s
+const OPENAI_RETRY_TIMEOUT_MS = 30000; // 30s pour le retry (plus court = échec plus rapide si serveur surchargé)
 
 /**
  * Fetch avec timeout via AbortController.
@@ -441,26 +442,61 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const tCallStart = Date.now();
     const isGpt5 = model.startsWith('gpt-5');
-    const response = await fetchAvecTimeout(OPENAI_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        tools: SILGAPP_TOOLS,
-        tool_choice: 'auto',
-        response_format: { type: 'json_object' },
-        temperature: isGpt5 ? 1 : temp,
-        max_completion_tokens: maxTokens,
-        ...(isGpt5 ? { reasoning_effort: 'low' } : {}),
-      }),
-    });
+
+    // ── Retry sur timeout (GPT-5 peut nécessiter plus de temps) ──
+    let response: Response;
+    try {
+      response = await fetchAvecTimeout(OPENAI_API_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          tools: SILGAPP_TOOLS,
+          tool_choice: 'auto',
+          response_format: { type: 'json_object' },
+          temperature: isGpt5 ? 1 : temp,
+          max_completion_tokens: maxTokens,
+          ...(isGpt5 ? { reasoning_effort: 'low' } : {}),
+        }),
+      });
+    } catch (timeoutErr: any) {
+      // Retry unique sur timeout avec un délai plus court
+      if (timeoutErr.message?.includes('timeout')) {
+        console.warn(`[OpenAIEngine] ⚠️ Timeout au premier essai — retry (30s)`);
+        response = await fetchAvecTimeout(OPENAI_API_URL, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            tools: SILGAPP_TOOLS,
+            tool_choice: 'auto',
+            response_format: { type: 'json_object' },
+            temperature: isGpt5 ? 1 : temp,
+            max_completion_tokens: maxTokens,
+            ...(isGpt5 ? { reasoning_effort: 'low' } : {}),
+          }),
+        }, OPENAI_RETRY_TIMEOUT_MS);
+      } else {
+        throw timeoutErr;
+      }
+    }
 
     if (!response.ok) {
       const errText = await response.text();
+      // Retry sur erreur 500 (serveur instable OpenAI)
+      if (response.status >= 500 && round === 0) {
+        console.warn(`[OpenAIEngine] ⚠️ Erreur ${response.status} OpenAI — retry`);
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
       throw new Error(`OpenAI API ${response.status}: ${errText.substring(0, 300)}`);
     }
 
