@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Bike, Users, Wifi } from "lucide-react";
+import { isLibre } from "@/lib/dispatchRules";
 
 /**
  * Badge premium affichant les livreurs disponibles en temps réel.
@@ -37,12 +38,12 @@ export default function LiveCounterBadge({ type = "livreurs", count: externalCou
     try {
       const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
       if (type === "livreurs") {
-        // Règle métier : disponible + actif + validé + GPS renseigné
-        // app_active N'EST PAS un critère de disponibilité
+        // Règle métier : disponible + actif + validé + GPS ≤ 60 min (isLibre)
+        // Cohérent avec le dashboard admin — un GPS expiré n'est pas vraiment disponible
         const filter = { statut: "disponible", actif: true, validation: "valide" };
         if (userCountry) filter.country_code = userCountry;
         const livreurs = await base44.entities.Livreur.filter(filter);
-        const eligibles = (livreurs || []).filter(l => l.latitude && l.longitude);
+        const eligibles = (livreurs || []).filter(l => isLibre(l));
         setInternalCount(eligibles.length);
       } else {
         const filter = { app_active: true, actif: true };

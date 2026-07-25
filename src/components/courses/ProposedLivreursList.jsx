@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Users, Phone, Clock, CheckCircle2, Timer, RefreshCw, Radio, Zap } from "lucide-react";
+import { Users, Phone, Clock, CheckCircle2, Timer, RefreshCw, Radio, Zap, XCircle, UserCheck } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";

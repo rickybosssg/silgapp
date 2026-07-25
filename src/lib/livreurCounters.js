@@ -62,9 +62,9 @@ export function calculateLivreurCounters(livreurs) {
     libres_recent: libres,                 // alias rétro-compatibilité
     libres_ancien: 0,                      // plus de distinction
     sans_gps_valide: 0,                    // alias rétro-compatibilité
-    gps_expire: expires,                   // GPS > 60 min (non dispatchable)
+    gps_expire: livreurs.filter(l => isGPSExpire(l)).length,
     enCourse,
-    hors_ligne: horsLigne,
+    hors_ligne: livreurs.filter(l => l.statut === "hors_ligne" || l.actif === false || l.validation !== "valide").length,
     // Aliases for backward compatibility
     on: livreurs.filter(l => isON(l)).length,
     off: livreurs.filter(l => !isON(l)).length,

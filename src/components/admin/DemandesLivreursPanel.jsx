@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, CheckCircle, XCircle, Phone, User, MapPin, FileText } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, Phone, User, MapPin, FileText, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import LivreurChatModal from "@/components/admin/LivreurChatModal";
 

@@ -37,6 +37,7 @@ import SuiviBarreFlottante from "@/components/client/SuiviBarreFlottante";
 import RechercheLivreurScreen from "@/components/client/RechercheLivreurScreen";
 import SuiviCourseFullscreen from "@/components/client/SuiviCourseFullscreen";
 import EcranFinCourse from "@/components/client/EcranFinCourse";
+import { isLibre } from "@/lib/dispatchRules";
 
 
 function haversineDistance(lat1, lon1, lat2, lon2) {
@@ -779,9 +780,9 @@ export default function ClientExterneApp() {
       }
       const livreurs = await base44.entities.Livreur.filter(filter);
 
-      // Seul critère restant : GPS renseigné (latitude + longitude)
-      // app_active n'est PAS un critère de disponibilité — seulement un critère de mode de notification
-      const eligibles = (livreurs || []).filter(l => l.latitude && l.longitude);
+      // ── Cohérence avec le dashboard admin : GPS ≤ 60 min (isLibre) ──
+      // Un livreur avec GPS expiré (> 60 min) n'est PAS vraiment disponible.
+      const eligibles = (livreurs || []).filter(l => isLibre(l));
       console.log(`[Carte] Affichés sur la carte: ${eligibles.length}`);
 
       // Ne pas écraser si la requête retourne vide (protection anti-flash)
