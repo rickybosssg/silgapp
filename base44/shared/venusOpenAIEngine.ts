@@ -563,8 +563,44 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
           document_sources: '',
         };
       }
-      // ── Si la reponse est vide dans le JSON parsé, lancer une exception pour le fallback InvokeLLM ──
+      // ── Si la reponse est vide dans le JSON parsé, retry une fois avec instruction explicite ──
       if (!parsed.reponse || (typeof parsed.reponse === 'string' && parsed.reponse.trim().length === 0)) {
+        if (round === 0) {
+          console.warn('[OpenAIEngine] ⚠️ Champ "reponse" vide — retry avec instruction explicite');
+          const retryResp = await fetchAvecTimeout(OPENAI_API_URL, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model,
+              messages: [
+                ...messages,
+                { role: 'user', content: 'Le champ "reponse" de ton JSON était vide. RÉPONDS À NOUVEAU avec un JSON complet où "reponse" contient un texte non vide (minimum 10 caractères) répondant au client.' },
+              ],
+              response_format: { type: 'json_object' },
+              temperature: isGpt5 ? 1 : temp,
+              max_completion_tokens: maxTokens,
+              ...(isGpt5 ? { reasoning_effort: 'low' } : {}),
+            }),
+          }, OPENAI_RETRY_TIMEOUT_MS);
+          if (retryResp.ok) {
+            const retryData = await retryResp.json();
+            const retryMsg = retryData.choices?.[0]?.message;
+            if (retryMsg?.content && retryMsg.content.trim().length > 0) {
+              try {
+                const retryParsed = JSON.parse(retryMsg.content);
+                if (retryParsed.reponse && retryParsed.reponse.trim().length > 0) {
+                  console.log(`[OpenAIEngine] ✅ Retry reponse vide réussi: ${Date.now() - tCallStart}ms`);
+                  retryParsed._outils_openai = toolsUsed.length > 0 ? toolsUsed.join(',') : 'none';
+                  retryParsed._model_openai = model;
+                  retryParsed._tokens_openai = retryData.usage?.total_tokens || 0;
+                  retryParsed._tokens_prompt = retryData.usage?.prompt_tokens || 0;
+                  retryParsed._tokens_completion = retryData.usage?.completion_tokens || 0;
+                  return retryParsed;
+                }
+              } catch {}
+            }
+          }
+        }
         throw new Error('OpenAI: reponse vide dans le JSON — fallback vers InvokeLLM');
       }
 
