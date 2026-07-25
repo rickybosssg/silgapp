@@ -5,7 +5,7 @@ import { Check, X, GitMerge, Sparkles, AlertTriangle, Brain, ChevronDown, Chevro
 
 const STATUT_LABELS = { en_attente: { label: 'En attente', cls: 'bg-gray-100 text-gray-600' }, validee: { label: 'Validée', cls: 'bg-green-100 text-green-700' }, refusee: { label: 'Refusée', cls: 'bg-red-100 text-red-700' }, fusionnee: { label: 'Fusionnée', cls: 'bg-blue-100 text-blue-700' }, amelioree: { label: 'Améliorée', cls: 'bg-violet-100 text-violet-700' } };
 const PRIORITE_LABELS = { critique: { label: 'Critique', cls: 'bg-red-100 text-red-700' }, haute: { label: 'Haute', cls: 'bg-orange-100 text-orange-700' }, normale: { label: 'Normale', cls: 'bg-blue-100 text-blue-700' }, basse: { label: 'Basse', cls: 'bg-gray-100 text-gray-600' } };
-const parse = (s, f) => { try { return JSON.parse(s); } catch { return f || []; } };
+const parse = (s, f) => { try { const r = JSON.parse(s); return r ?? (f || []); } catch { return f || []; } };
 
 export default function SuggestionCard({ s, onValidate, onImprove, onRefuse, onMerge, onAnalyse, onTransformRag, analysing, transformingRag }) {
   const [showWhy, setShowWhy] = useState(false);
