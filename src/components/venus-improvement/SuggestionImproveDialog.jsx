@@ -18,10 +18,12 @@ export default function SuggestionImproveDialog({ suggestion, onClose, onSaved }
 
   useEffect(() => {
     if (suggestion) {
+      let motsClesStr = '';
+      try { const arr = JSON.parse(suggestion.mots_cles || '[]'); motsClesStr = Array.isArray(arr) ? arr.join(', ') : ''; } catch {}
       setForm({
         amelioration_reponse: suggestion.reponse_proposee || '',
         amelioration_regle_metier: '',
-        amelioration_mots_cles: suggestion.mots_cles ? (Array.isArray(JSON.parse(suggestion.mots_cles)) ? JSON.parse(suggestion.mots_cles).join(', ') : '') : '',
+        amelioration_mots_cles: motsClesStr,
         amelioration_categorie: suggestion.categorie || 'questions_generales',
         amelioration_workflow: '',
         amelioration_commentaires: '',
@@ -37,7 +39,8 @@ export default function SuggestionImproveDialog({ suggestion, onClose, onSaved }
       const motsArray = form.amelioration_mots_cles.split(',').map(s => s.trim()).filter(Boolean);
 
       // Build history entry
-      const existingHistory = suggestion.historique_versions ? JSON.parse(suggestion.historique_versions) : [];
+      let existingHistory = [];
+      try { existingHistory = JSON.parse(suggestion.historique_versions) || []; } catch {}
       const newVersion = {
         version: existingHistory.length + 1,
         auteur: user?.email || 'admin',

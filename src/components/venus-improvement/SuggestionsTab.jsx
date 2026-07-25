@@ -283,10 +283,11 @@ Réponds UNIQUEMENT avec un JSON:`,
 }
 
 function MergeDialog({ suggestion, onClose, onMerge }) {
-  const { data: connaissances = [] } = useQuery({
+  const { data: rawData } = useQuery({
     queryKey: ['venus-knowledge-for-merge'],
     queryFn: () => base44.entities.VenusKnowledge.filter({ statut: 'valide' }, '-created_date', 200),
   });
+  const connaissances = rawData || [];
   const [selected, setSelected] = useState('');
   const [search, setSearch] = useState('');
   const filtered = connaissances.filter(k => k.titre?.toLowerCase().includes(search.toLowerCase()) || k.question?.toLowerCase().includes(search.toLowerCase()));
