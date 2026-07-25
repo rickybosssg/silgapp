@@ -10,32 +10,36 @@ export default function ImprovementOverviewTab({ onNavigate }) {
   const [tendance, setTendance] = useState(null);
 
   // Analyses récentes
-  const { data: analyses = [] } = useQuery({
+  const { data: rawAnalyses } = useQuery({
     queryKey: ['venus-analyses-recentes'],
     queryFn: () => base44.entities.VenusConversationAnalysis.list('-analyse_date', 100),
     refetchInterval: 30000,
   });
+  const analyses = rawAnalyses || [];
 
   // Suggestions en attente
-  const { data: suggestions = [] } = useQuery({
+  const { data: rawSuggestions } = useQuery({
     queryKey: ['venus-suggestions-attente'],
     queryFn: () => base44.entities.VenusSuggestion.filter({ statut: 'en_attente' }, '-nb_occurrences', 50),
     refetchInterval: 30000,
   });
+  const suggestions = rawSuggestions || [];
 
   // Faiblesses
-  const { data: faiblesses = [] } = useQuery({
+  const { data: rawFaiblesses } = useQuery({
     queryKey: ['venus-faiblesses'],
     queryFn: () => base44.entities.VenusWeaknessReport.list('-score_moyen', 30),
     refetchInterval: 60000,
   });
+  const faiblesses = rawFaiblesses || [];
 
   // Alertes non résolues
-  const { data: alertes = [] } = useQuery({
+  const { data: rawAlertes } = useQuery({
     queryKey: ['venus-alertes-non-resolues'],
     queryFn: () => base44.entities.VenusImprovementAlert.filter({ resolue: false }, '-creee_date', 20),
     refetchInterval: 30000,
   });
+  const alertes = rawAlertes || [];
 
   // Dernier rapport
   const { data: dernierRapport } = useQuery({
@@ -45,11 +49,12 @@ export default function ImprovementOverviewTab({ onNavigate }) {
   });
 
   // Connaissances les plus utilisées
-  const { data: connaissances = [] } = useQuery({
+  const { data: rawConnaissances } = useQuery({
     queryKey: ['venus-connaissances-top'],
     queryFn: () => base44.entities.VenusKnowledge.filter({ statut: 'valide' }, '-created_date', 100),
     refetchInterval: 60000,
   });
+  const connaissances = rawConnaissances || [];
 
   // Calculer score global et tendance
   useEffect(() => {
