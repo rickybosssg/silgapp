@@ -82,6 +82,22 @@ export default function SuggestionsTab() {
       toast({ title: '✅ Connaissance créée', description: 'La réponse est maintenant active pour VENUS.' });
       queryClient.invalidateQueries({ queryKey: ['venus-suggestions'] });
       queryClient.invalidateQueries({ queryKey: ['venus-knowledge'] });
+
+      // Indexation RAG automatique
+      try {
+        const ragRes = await base44.functions.invoke('indexerDocumentVenus', {
+          action: 'index_from_suggestion',
+          suggestion_id: s.id,
+          auteur: user?.email || 'admin',
+        });
+        if (ragRes.success) {
+          toast({ title: '📚 RAG indexé', description: `${ragRes.chunks?.length || 0} chunk(s) — VENUS peut maintenant retrouver cette réponse.` });
+        } else {
+          toast({ title: '⚠ RAG partiel', description: ragRes.error || 'Indexation RAG échouée — utilisez « Transformer en RAG » manuellement.', variant: 'destructive' });
+        }
+      } catch (ragErr) {
+        toast({ title: '⚠ RAG échoué', description: 'Connaissance créée mais indexation RAG échouée. Cliquez « Transformer en RAG » pour réessayer.', variant: 'destructive' });
+      }
     } catch (e) {
       toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
     }
