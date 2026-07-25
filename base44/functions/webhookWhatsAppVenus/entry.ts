@@ -1430,10 +1430,17 @@ Deno.serve(async (req) => {
     if (!skipSignature) {
       const signatureHeader = req.headers.get('X-Twilio-Signature') || '';
       const fullUrl = url.toString();
-      const isValid = await validerSignatureTwilio(fullUrl, rawBody, authToken, signatureHeader);
+      // Fallback: en environnement serverless, req.url peut différer de l'URL Twilio
+      const EXPECTED_WEBHOOK_URL = 'https://silga-dispatch-go.base44.app/functions/webhookWhatsAppVenus';
+      let isValid = await validerSignatureTwilio(fullUrl, rawBody, authToken, signatureHeader);
+      if (!isValid && fullUrl !== EXPECTED_WEBHOOK_URL) {
+        isValid = await validerSignatureTwilio(EXPECTED_WEBHOOK_URL, rawBody, authToken, signatureHeader);
+        if (isValid) console.log(`[WebhookVenus] ✅ ÉTAPE 0 — Signature validée via URL de fallback`);
+      }
+      console.log(`[WebhookVenus] 🔐 SIG CHECK | URL: ${fullUrl} | HasSig: ${!!signatureHeader} | Valid: ${isValid}`);
       if (!isValid) {
         console.warn(`[WebhookVenus] ⚠️ ÉTAPE 0 — Signature Twilio invalide, requête rejetée`);
-        console.warn(`[WebhookVenus] ⚠️ URL utilisée: ${fullUrl}`);
+        console.warn(`[WebhookVenus] ⚠️ URL utilisée: ${fullUrl} | URL attendue: ${EXPECTED_WEBHOOK_URL}`);
         console.warn(`[WebhookVenus] ⚠️ Header signature reçu: ${signatureHeader ? signatureHeader.substring(0, 30) + '...' : 'AUCUN'}`);
         console.warn(`[WebhookVenus] ⚠️ Body length: ${rawBody.length}`);
         return Response.json({ error: 'Signature Twilio invalide' }, { status: 403 });
