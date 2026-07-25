@@ -20,7 +20,7 @@ export default function SuggestionsTab() {
   const [analysingId, setAnalysingId] = useState(null);
   const [transformingRagId, setTransformingRagId] = useState(null);
 
-  const { data: suggestions = [], isLoading } = useQuery({
+  const { data: rawData, isLoading } = useQuery({
     queryKey: ['venus-suggestions', statutFilter],
     queryFn: () => base44.entities.VenusSuggestion.filter(
       statutFilter === 'tous' ? {} : { statut: statutFilter },
@@ -28,6 +28,7 @@ export default function SuggestionsTab() {
     ),
     refetchInterval: 30000,
   });
+  const suggestions = rawData || [];
 
   const filtered = search.trim()
     ? suggestions.filter(s =>
