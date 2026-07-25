@@ -104,11 +104,9 @@ export default function SuggestionsTab() {
   };
 
   const handleRefuse = async (s) => {
-    const motif = prompt('Motif du refus:');
-    if (!motif) return;
     try {
       await base44.entities.VenusSuggestion.delete(s.id);
-      toast({ title: '🗑 Suggestion supprimée', description: motif ? `Motif: ${motif}` : undefined });
+      toast({ title: '🗑 Suggestion supprimée' });
       queryClient.invalidateQueries({ queryKey: ['venus-suggestions'] });
     } catch (e) {
       toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
