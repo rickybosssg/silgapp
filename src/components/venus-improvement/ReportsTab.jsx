@@ -24,11 +24,12 @@ export default function ReportsTab() {
   const [generating, setGenerating] = useState(false);
   const [genType, setGenType] = useState('quotidien');
 
-  const { data: rapports = [], isLoading } = useQuery({
+  const { data: rawData, isLoading } = useQuery({
     queryKey: ['venus-improvement-reports'],
     queryFn: () => base44.entities.VenusImprovementReport.list('-created_date', 50),
     refetchInterval: 60000,
   });
+  const rapports = rawData || [];
 
   const handleGenerate = async () => {
     setGenerating(true);
