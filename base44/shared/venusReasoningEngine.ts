@@ -1083,6 +1083,13 @@ Réponds UNIQUEMENT avec un JSON.`;
 
     // ── Post-traitement : valider et nettoyer ──
     if (!result.action) result.action = 'repondre_info';
+    // GPT-5 omet parfois le champ intention — utiliser l'heuristique rapide comme fallback
+    if (!result.intention || result.intention === 'undefined') {
+      const intentionRapide = detecterIntentionRapide(input.messageClient);
+      result.intention = intentionRapide || 'autre';
+      console.log(`[ReasoningEngine] ℹ️ Intention LLM vide → fallback heuristique: ${result.intention}`);
+    }
+    if (!result.contexte) result.contexte = 'general';
     if (!result.reponse || (typeof result.reponse === 'string' && result.reponse.trim().length === 0)) {
       console.warn('[ReasoningEngine] ⚠️ LLM a retourné une réponse vide — fallback contextuel');
       result.reponse = "Je n'ai pas bien compris votre demande. Pouvez-vous reformuler ?";
