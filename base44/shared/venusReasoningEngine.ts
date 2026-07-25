@@ -1349,6 +1349,19 @@ export async function raisonnerVenusAvecOutils(
     outils_resultats: outilsResultats,
   });
 
+  // Les outils opérationnels restent la source de vérité lorsque le LLM
+  // reformule mal une intention pourtant détectée sans ambiguïté.
+  if (intentionRapide === 'suivre_course') {
+    const courseTool = outilsResultats.find(o => o.outil === 'rechercher_course_active');
+    if (courseTool && !courseTool.trouve) {
+      result.intention = 'suivre_course';
+      result.action = 'suivre_course';
+      result.reponse = "Je ne trouve aucune course active associée à votre compte.";
+    }
+  } else if (intentionRapide === 'demander_info' && result.intention === 'autre') {
+    result.intention = 'demander_info';
+  }
+
   // ── Étape 4 : Vérification anti-hallucination ──
   const hallucination = detecterHallucination(result.reponse, outilsResultats);
   if (hallucination.suspecte) {

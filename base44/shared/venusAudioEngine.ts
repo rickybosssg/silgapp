@@ -36,7 +36,8 @@ const CORRECTIONS_QUARTIERS: Record<string, string> = {
   // Patte d'Oie
   "patte d'huile": "Patte d'Oie", "patte doye": "Patte d'Oie",
   "patte doi": "Patte d'Oie", "pate doye": "Patte d'Oie",
-  "pate d'huile": "Patte d'Oie", "patte d'oie": "Patte d'Oie",
+  "pate d'huile": "Patte d'Oie", "patte d huile": "Patte d'Oie",
+  "pate d huile": "Patte d'Oie", "patte d'oie": "Patte d'Oie",
   // Dassasgho
   'dassasco': 'Dassasgho', 'dassasgo': 'Dassasgho', 'dassasko': 'Dassasgho',
   'dassasgho': 'Dassasgho',
@@ -73,7 +74,8 @@ const CORRECTIONS_QUARTIERS: Record<string, string> = {
 
 const CORRECTIONS_PHONETIQUES: Record<string, string> = {
   'colie': 'colis', 'colis': 'colis', 'collie': 'colis',
-  'livrison': 'livraison', 'livraison': 'livraison',
+  'coli': 'colis',
+  'livrison': 'livraison', 'livrason': 'livraison', 'livraison': 'livraison',
   'expedie': 'expédier', 'expédie': 'expédier',
   'deplace': 'déplacement', 'déplace': 'déplacement',
   'recu': 'reçu', 'recue': 'reçu',
@@ -205,6 +207,13 @@ export function evaluerConfianceTranscription(
     raisons.push(`${motsInconnus.length} mot(s) non reconnu(s) sur ${mots.length}`);
   }
 
+  // Les mélanges de langue non reconnus doivent toujours être confirmés.
+  // Ces marqueurs sont fréquents dans les transcriptions français/mooré de test.
+  if (/\b(yaa?|doga|kibre|m\s+ba)\b/i.test(texteLower)) {
+    confidence -= 0.25;
+    raisons.push('Mélange de langue ou termes locaux détectés');
+  }
+
   // 4. Présence de noms de quartiers (bon signe de compréhension)
   const aQuartier = QUARTIERS_VALIDES.some(q => texteNettoye.toLowerCase().includes(q));
   if (aQuartier) {
@@ -246,7 +255,7 @@ export function evaluerConfianceTranscription(
  * Règles :
  * - confidence < 0.5 → JAMAIS (demander de répéter)
  * - confidence 0.5-0.7 → UNIQUEMENT avec confirmation explicite
- * - confidence > 0.7 → OK mais confirmation recommandée
+ * - confidence >= 0.7 → transcription exploitable, confirmation obligatoire
  */
 export function peutAgirSurAudio(confidence: number): {
   peutAgir: boolean;
@@ -269,8 +278,8 @@ export function peutAgirSurAudio(confidence: number): {
   }
   return {
     peutAgir: true,
-    forceConfirmation: false, // Confiance suffisante — agir normalement
-    raison: 'Confiance suffisante — pas de confirmation forcée requise',
+    forceConfirmation: true,
+    raison: 'Transcription exploitable — confirmation obligatoire avant toute action sensible',
   };
 }
 
