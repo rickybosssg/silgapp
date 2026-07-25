@@ -465,6 +465,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 { id: "colis_inexistant", label: "Colis inexistant", icon: "" },
                 { id: "client_change_avis", label: "Client a changé d'avis", icon: "" },
                 { id: "colis_interdit", label: "Colis interdit", icon: "" },
+                { id: "désaccord_prix", label: "Désaccord sur le prix", icon: "💰" },
                 { id: "panne_vehicule", label: "Panne du véhicule", icon: "" },
                 { id: "accident", label: "Accident", icon: "" },
                 { id: "autre", label: "Autre", icon: "" },
