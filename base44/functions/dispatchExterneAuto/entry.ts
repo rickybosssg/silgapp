@@ -119,7 +119,8 @@ async function chargerConfigVaguesGPS(base44) {
  * Trouve les livreurs candidats classés par priorité.
  * @param {Array} exclusions - IDs des livreurs déjà notifiés (à exclure totalement de ce cycle)
  */
-async function trouverLivreursCandidats(base44, course, exclusions = []) {
+async function trouverLivreursCandidats(base44, course, exclusions = [], options = {}) {
+  const { skipGpsFilter = false } = options;
   if (!course.country_code) {
     console.error(`[DISPATCH] ❌ BLOQUÉ — course ${course.id} sans country_code`);
     return { tous: [], niveau1: [], niveau2: [], niveau3: [], pickupSource: 'none' };
@@ -146,7 +147,7 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
 
   const eligibles = tousLivreurs.filter(l => {
     const nomComplet = `${l.prenom || ''} ${l.nom || ''}`.trim();
-    if (!l.latitude || !l.longitude) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'sans_gps' }); return false; }
+    if (!skipGpsFilter && (!l.latitude || !l.longitude)) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'sans_gps' }); return false; }
     if (exclusionSet.has(l.id)) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'deja_notifie_ou_refuse' }); return false; }
     if (livreurIdsEnCourse.has(l.id)) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'en_course' }); return false; }
     if (l.admin_hors_ligne === true) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'admin_hors_ligne' }); return false; }
@@ -209,8 +210,8 @@ async function trouverLivreursCandidats(base44, course, exclusions = []) {
       if (!isNaN(gps.getTime())) gpsAgeMin = (now - gps.getTime()) / 60000;
     }
 
-    // 🚫 Exclure les livreurs sans GPS ou GPS > 60 min
-    if (gpsAgeMin === null || gpsAgeMin > GPS_EXPIRE_SEUIL_MIN) {
+    // 🚫 Exclure les livreurs sans GPS ou GPS > 60 min (sauf en mode fallback)
+    if (!skipGpsFilter && (gpsAgeMin === null || gpsAgeMin > GPS_EXPIRE_SEUIL_MIN)) {
       raisonsExclusion.push({
         livreur_id: l.id,
         nom: `${l.prenom || ''} ${l.nom || ''}`.trim(),
@@ -429,6 +430,26 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
   // Récupérer les IDs déjà notifiés précédemment
   let dejaNotifies = [];
   try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
+
+  // 🔄 FALLBACK: sur la dernière vague (size 999), ajouter aussi les livreurs sans GPS récent
+  // pour maximiser les chances de trouver un livreur acceptant
+  if (candidats.length > 0 && wave >= gpsConfig.waves.length) {
+    const fallbackResult = await trouverLivreursCandidats(base44, course, exclusions, { skipGpsFilter: true });
+    const fallbackCandidats = (fallbackResult.tous || []).filter(f => !candidats.some(c => c.id === f.id));
+    if (fallbackCandidats.length > 0) {
+      candidats = [...candidats, ...fallbackCandidats];
+      console.log(`[DISPATCH] 📍 +${fallbackCandidats.length} candidats sans GPS ajoutés (dernière vague) pour course ${courseId}`);
+    }
+  }
+
+  if (candidats.length === 0) {
+    // 🔄 FALLBACK: essayer sans le filtre GPS (livreurs avec GPS expiré ou sans GPS)
+    const fallbackResult = await trouverLivreursCandidats(base44, course, exclusions, { skipGpsFilter: true });
+    if (fallbackResult.tous && fallbackResult.tous.length > 0) {
+      candidats = fallbackResult.tous;
+      console.log(`[DISPATCH] 📍 Fallback sans GPS: ${candidats.length} candidats supplémentaires pour course ${courseId}`);
+    }
+  }
 
   if (candidats.length === 0) {
     // 📍 GPS waves: dernière vague épuisée → cycle_epuise
