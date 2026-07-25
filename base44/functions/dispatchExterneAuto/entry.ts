@@ -8,6 +8,16 @@ const CYCLE_EPUISE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 const CONFIG_CACHE = { dispatch: null, gps: null, expires: 0 };
 const CONFIG_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+// ── Cache des livreurs en course (anti-double-proposition) ──
+// TTL court (30s) : suffisamment frais pour éviter les propositions doubles,
+// assez long pour ne pas surcharger l'API à chaque tick de dispatch.
+const LIVREURS_EN_COURSE_CACHE = new Map(); // country_code -> { ids: Set, expires: number }
+const LIVREURS_EN_COURSE_TTL_MS = 30 * 1000; // 30 secondes
+const STATUTS_ACTIFS_COURSE = [
+  'livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere',
+  'passager_embarque', 'pris_en_charge', 'en_livraison',
+];
+
 function generateToken() {
   return crypto.randomUUID().replace(/-/g, '');
 }
@@ -75,6 +85,37 @@ async function chargerConfigDispatch(base44) {
   }
 }
 
+/**
+ * Récupère l'ensemble des IDs de livreurs ayant une course active pour un pays.
+ * Utilise un cache de 30s pour éviter de surcharger l'API à chaque tick de dispatch.
+ */
+async function chargerLivreursEnCourse(base44, countryCode) {
+  if (!countryCode) return new Set();
+
+  const now = Date.now();
+  const cached = LIVREURS_EN_COURSE_CACHE.get(countryCode);
+  if (cached && cached.expires > now) return cached.ids;
+
+  try {
+    // Récupérer les courses récentes du pays (les courses actives sont forcément récentes)
+    const courses = await base44.asServiceRole.entities.CourseExterne.filter(
+      { country_code: countryCode },
+      '-created_date', 100
+    );
+    const ids = new Set(
+      (courses || [])
+        .filter(c => STATUTS_ACTIFS_COURSE.includes(c.statut) && c.livreur_id)
+        .map(c => c.livreur_id)
+    );
+    LIVREURS_EN_COURSE_CACHE.set(countryCode, { ids, expires: now + LIVREURS_EN_COURSE_TTL_MS });
+    console.log(`[DISPATCH] 🛡️ ${ids.size} livreur(s) en course détecté(s) pour ${countryCode} (cache 30s)`);
+    return ids;
+  } catch (err) {
+    console.warn(`[DISPATCH] ⚠️ Impossible de charger les livreurs en course pour ${countryCode}:`, err.message);
+    return new Set();
+  }
+}
+
 async function chargerConfigVaguesGPS(base44) {
   if (CONFIG_CACHE.gps && Date.now() < CONFIG_CACHE.expires) return CONFIG_CACHE.gps;
   try {
@@ -137,9 +178,10 @@ async function trouverLivreursCandidats(base44, course, exclusions = [], options
 
   if (!tousLivreurs || tousLivreurs.length === 0) return [];
 
-  // 🛡️ Le filtre statut: 'disponible' ci-dessus exclut déjà les livreurs en_course.
-  // Pas besoin de télécharger toutes les courses du pays (causait le rate limit).
-  const livreurIdsEnCourse = new Set();
+  // 🛡️ Vérification croisée : exclure les livreurs ayant déjà une course active.
+  // Le filtre statut: 'disponible' exclut la majorité, mais cette vérification
+  // garantit qu'aucun livreur avec un statut mal synchronisé ne reçoive une 2e proposition.
+  const livreurIdsEnCourse = await chargerLivreursEnCourse(base44, course.country_code);
 
   const exclusionSet = new Set(exclusions);
   const now = Date.now();
