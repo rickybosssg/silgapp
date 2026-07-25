@@ -2002,11 +2002,15 @@ Deno.serve(async (req) => {
             const _hasArrivee = !!(um.adresse_arrivee && um.adresse_arrivee.trim()) || um.gps_arrivee_lat != null;
             const _needsContact = _tc === 'expedier' || _tc === 'recevoir';
             const _hasContact = !!(um.contact_telephone && um.contact_telephone.trim()) || um.contact_is_client === true;
+            // ── contact_createur_course : OBLIGATOIRE pour toute course VENUS ──
+            const _createurDigits = (um.contact_createur_course || '').replace(/\D/g, '');
+            const _hasCreateurContact = !!(um.contact_createur_course && um.contact_createur_course.trim()) && _createurDigits.length >= 8 && _createurDigits.length <= 15;
 
             let _missingField = '';
             if (!_hasType) _missingField = 'type_course';
             else if (!_hasDepart) _missingField = 'adresse_depart';
             else if (!_hasArrivee) _missingField = 'adresse_arrivee';
+            else if (!_hasCreateurContact) _missingField = 'contact_createur_course';
             else if (_needsContact && !_hasContact) _missingField = 'contact';
 
             if (_missingField) {
@@ -2019,6 +2023,8 @@ Deno.serve(async (req) => {
                 _askMsg = 'Quel est le lieu exact de récupération ? (indiquez le quartier ou un point de repère précis)';
               } else if (_missingField === 'adresse_arrivee') {
                 _askMsg = 'Quel est le lieu exact de livraison ? (indiquez le quartier ou un point de repère précis)';
+              } else if (_missingField === 'contact_createur_course') {
+                _askMsg = 'Quel est le numéro de téléphone de la personne qui crée cette course et que le livreur devra contacter en priorité ? (Si c\'est votre numéro, indiquez-le moi)';
               } else if (_missingField === 'contact') {
                 const _role = _tc === 'expedier' ? 'destinataire' : 'expéditeur';
                 _askMsg = `Quel est le numéro de téléphone du ${_role} ? (Si vous êtes vous-même le ${_role}, dites-le moi)`;
@@ -2117,6 +2123,7 @@ Deno.serve(async (req) => {
             const _hasArriveeCh = !!(umCheck.adresse_arrivee && umCheck.adresse_arrivee.trim()) || umCheck.gps_arrivee_lat != null;
             const _needsContactCh = _tcCh === 'expedier' || _tcCh === 'recevoir';
             const _hasContactCh = !!(umCheck.contact_telephone && umCheck.contact_telephone.trim()) || umCheck.contact_is_client === true;
+            const _hasCreateurCh = !!(umCheck.contact_createur_course && umCheck.contact_createur_course.trim());
 
             if (!_hasTypeCh) {
               reponseFinale = 'Souhaitez-vous envoyer un colis, recevoir un colis, ou vous déplacer ?';
@@ -2124,6 +2131,8 @@ Deno.serve(async (req) => {
               reponseFinale = 'Quel est le lieu exact de récupération ? (indiquez le quartier ou un point de repère précis)';
             } else if (!_hasArriveeCh) {
               reponseFinale = 'Quel est le lieu exact de livraison ? (indiquez le quartier ou un point de repère précis)';
+            } else if (!_hasCreateurCh) {
+              reponseFinale = 'Quel est le numéro de téléphone de la personne qui crée cette course et que le livreur devra contacter en priorité ? (Si c\'est votre numéro, indiquez-le moi)';
             } else if (_needsContactCh && !_hasContactCh) {
               const _roleCh = _tcCh === 'expedier' ? 'destinataire' : 'expéditeur';
               reponseFinale = `Quel est le numéro de téléphone du ${_roleCh} ? (Si vous êtes vous-même le ${_roleCh}, dites-le moi)`;
@@ -2131,7 +2140,8 @@ Deno.serve(async (req) => {
               // Toutes les infos sont présentes mais GPT n'a pas utilisé creer_course
               // → forcer le récapitulatif et demander confirmation explicite
               const typeLabelCh = { expedier: 'Envoi de colis', recevoir: 'Réception de colis', deplacement: 'Déplacement' }[_tcCh] || _tcCh;
-              reponseFinale = `Récapitulatif de votre demande :\n\n🚚 Type : ${typeLabelCh}\n📍 Départ : ${umCheck.adresse_depart || 'GPS'}\n🎯 Destination : ${umCheck.adresse_arrivee || 'GPS'}\n📞 Contact : ${umCheck.contact_telephone || 'vous-même'}\n\nConfirmez-vous la création de cette course ? Répondez "oui" pour confirmer.`;
+              const _contactDestCh = _tcCh === 'expedier' ? (umCheck.contact_telephone || 'Non renseigné') : _tcCh === 'recevoir' ? (umCheck.contact_telephone || 'Non renseigné') : 'Non renseigné';
+              reponseFinale = `Récapitulatif de votre demande :\n\n🚚 Type : ${typeLabelCh}\n📍 Départ : ${umCheck.adresse_depart || 'GPS'}\n🎯 Destination : ${umCheck.adresse_arrivee || 'GPS'}\n📞 Contact principal — créateur de la course : ${umCheck.contact_createur_course || 'Non renseigné'}\n📞 Contact destinataire : ${_contactDestCh}\n\nConfirmez-vous la création de cette course ? Répondez "oui" pour confirmer.`;
             }
           }
         }

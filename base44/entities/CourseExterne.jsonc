@@ -43,6 +43,10 @@
       "type": "string",
       "description": "Telephone du client"
     },
+    "contact_createur_course": {
+      "type": "string",
+      "description": "Numero de telephone du CREATEUR de la course \u2014 contact principal que le livreur doit contacter en priorite. OBLIGATOIRE pour toute course creee via VENUS. Peut differer du numero WhatsApp entrant (cas: une personne cree une course pour un autre client). Le numero WhatsApp entrant ne peut etre copie ici qu'apres confirmation explicite du client. Ne jamais reutiliser automatiquement un ancien numero."
+    },
     "type_course": {
       "type": "string",
       "enum": [

@@ -383,8 +383,12 @@ export async function creerCourseDepuisMemoire(
   const hasRequiredContact = cd.contact_telephone || cd.contact_is_client;
   const hasDepart = cd.adresse_depart || cd.gps_depart_lat != null;
   const hasArrivee = cd.adresse_arrivee || cd.gps_arrivee_lat != null;
+  // ── contact_createur_course : OBLIGATOIRE pour toute course VENUS ──
+  // Le numéro WhatsApp entrant ne peut être utilisé QUE si le client a confirmé
+  // explicitement (contact_createur_is_sender=true). Ne jamais réutiliser un ancien numéro.
+  const hasCreateurContact = !!(cd.contact_createur_course && cd.contact_createur_course.trim());
 
-  if (!hasDepart || !hasArrivee || !hasRequiredContact) {
+  if (!hasDepart || !hasArrivee || !hasRequiredContact || !hasCreateurContact) {
     return { success: false, error: 'MISSING_INFO' };
   }
 
@@ -406,6 +410,8 @@ export async function creerCourseDepuisMemoire(
     gps_depart_lng: cd.gps_depart_lng,
     gps_arrivee_lat: cd.gps_arrivee_lat,
     gps_arrivee_lng: cd.gps_arrivee_lng,
+    // ── Contact principal — créateur de la course (OBLIGATOIRE) ──
+    contact_createur_course: cd.contact_createur_course,
     // ── Architecture durable : enregistrer le numéro WhatsApp SILGAPP d'origine ──
     // Toutes les notifications de cette course partiront depuis ce numéro.
     // Séparé par pays et par compte WhatsApp/Twilio naturellement (chaque numéro = 1 pays + 1 compte).
@@ -544,6 +550,13 @@ export async function creerCourseDepuisMemoire(
     // Générer la référence unique : SG-YYYYMMDD-XXXXXX
     const reference = genererReferenceCourse(course);
 
+    // ── Contact destinataire (facultatif selon le type de course) ──
+    const contactDestinataire = normalizedType === 'expedier'
+      ? (courseData.destinataire_telephone || '')
+      : normalizedType === 'recevoir'
+        ? (courseData.expediteur_telephone || '')
+        : '';
+
     const message = `📦 Course créée avec succès !
 
 📝 Référence : ${reference}
@@ -551,9 +564,12 @@ export async function creerCourseDepuisMemoire(
 📍 Départ : ${cd.adresse_depart || 'Localisation GPS'}
 🎯 Destination : ${cd.adresse_arrivee || 'Localisation GPS'}
 
+📞 Contact principal — créateur de la course : ${cd.contact_createur_course}
+📞 Contact destinataire : ${contactDestinataire || 'Non renseigné'}
+
 ⏱️ Temps estimé de recherche d'un livreur : moins de 2 minutes.
 
-Je vous informerai dès qu'un livreur aura accepté votre demande. Le livreur vous contactera ensuite pour confirmer les derniers détails et le coût de la livraison.`;
+Je vous informerai dès qu'un livreur aura accepté votre demande. Le livreur contactera en priorité le créateur de la course pour confirmer les derniers détails et le coût de la livraison.`;
 
     // ── Déclencher le dispatch immédiatement (sans attendre l'automatisation programmée) ──
     base44.asServiceRole.functions.invoke('dispatchExterneAuto', {
@@ -991,8 +1007,10 @@ Avant de choisir l'intention, détermine QUI parle:
 ÉTAPE 3 — INFORMATIONS CONNUES: Liste les informations déjà présentes dans la mémoire courte.
 
 ÉTAPE 4 — INFORMATIONS MANQUANTES: Pour l'action voulue, quelles informations manquent ?
-Pour creer_course, requis: type_course, adresse_depart (ou GPS), adresse_arrivee (ou GPS), contact_telephone (ou contact_is_client).
-⚠️ CRITIQUE: Pour type_course="expedier", le contact_telephone est le numéro du DESTINATAIRE. Pour "recevoir", c'est le numéro de l'EXPÉDITEUR. Ce contact est OBLIGATOIRE — sans lui, action=poser_question, JAMAIS creer_course.
+Pour creer_course, requis: type_course, adresse_depart (ou GPS), adresse_arrivee (ou GPS), contact_createur_course (OBLIGATOIRE), ET contact_telephone (ou contact_is_client) si type_course est "expedier" ou "recevoir".
+⚠️ CRITIQUE: contact_createur_course est le numéro de téléphone du CRÉATEUR de la course — la personne que le livreur devra contacter EN PRIORITÉ. Il est OBLIGATOIRE pour CHAQUE nouvelle course, même si le client crée pour lui-même. Ne JAMAIS copier automatiquement le numéro WhatsApp entrant dans ce champ — tu dois TOUJOURS le demander explicitement. Si le client dit "c'est mon numéro" ou "c'est moi", tu peux utiliser le numéro WhatsApp entrant MAIS uniquement après confirmation explicite. Ne JAMAIS réutiliser un ancien numéro d'une course précédente.
+Pour type_course="expedier", le contact_telephone est le numéro du DESTINATAIRE. Pour "recevoir", c'est le numéro de l'EXPÉDITEUR. Ce contact est OBLIGATOIRE — sans lui, action=poser_question, JAMAIS creer_course.
+Le contact du destinataire/expéditeur est FACULTATIF seulement pour type_course="deplacement".
 
 ÉTAPE 5 — ACTION: Quelle action effectuer ?
 - poser_question: Poser UNE SEULE question (la prochaine information manquante)
@@ -1088,6 +1106,22 @@ Champs possibles: client_nom, ville_habituelle, quartier_habituel, langue_prefer
     Si le message est juste "Oui" sans contexte d'annulation clair, choisis intention=clarifier ou action=poser_question pour demander au client ce qu'il souhaite, JAMAIS annuler_course.
 
 21. NOUVELLE COURSE APRÈS FIN: Si le client dit "créons une nouvelle course", "nouvelle course", "je veux une autre course" ou similaire, ET qu'aucune course active n'existe, tu DOIS vider implicitement la mémoire courte et recommencer la collecte depuis zéro. Ne réutilise PAS les adresses/contacts d'une course précédente terminée ou annulée. Choisis action=poser_question pour demander le type de course et les nouvelles adresses.
+
+22. CONTACT CRÉATEUR DE COURSE (RÈGLE OBLIGATOIRE):
+    Le numéro WhatsApp qui écrit le message NE DOIT JAMAIS être automatiquement considéré comme le contact principal de la course. Une personne peut créer une course pour un autre client.
+    Tu DOIS TOUJOURS demander explicitement: "Quel est le numéro de téléphone de la personne qui crée cette course et que le livreur devra contacter en priorité ?"
+    Règles:
+    a) Le champ contact_createur_course est OBLIGATOIRE pour chaque nouveau draft de course.
+    b) Il devient l'unique contact principal affiché au livreur.
+    c) Le numéro WhatsApp entrant ne peut être copié dans ce champ qu'après confirmation explicite du client ("c'est mon numéro", "c'est moi", "utilisez mon numéro").
+    d) Ne JAMAIS réutiliser automatiquement un ancien numéro d'une course précédente.
+    e) Ne JAMAIS confondre: le numéro WhatsApp qui écrit, le créateur de la course, l'expéditeur physique, le destinataire.
+    f) Le contact du destinataire reste facultatif ou secondaire selon le type de course.
+    g) La course ne peut PAS être créée si contact_createur_course est vide ou non confirmé.
+    h) Le récapitulatif DOIT afficher:
+       📞 Contact principal — créateur de la course : [numéro]
+       Puis, si disponible:
+       📞 Contact destinataire : [numéro] ou 📞 Contact destinataire : Non renseigné
 
 ═══ LANGUE OBLIGATOIRE ═══
 TU DOIS TOUJOURS RÉPONDRE EN FRANÇAIS. Ne réponds JAMAIS en anglais. Le client est au Burkina Faso ou en Côte d'Ivoire et parle français. Toutes tes réponses, questions, et reformulations doivent être en français.
@@ -1570,6 +1604,11 @@ export function genererMessageRelance(memoireCourte: any): string {
   if (!hasContact) {
     const typeLabel = memoireCourte.type_course === 'expedier' ? 'destinataire' : 'expéditeur';
     return `Bonjour, j'attends toujours le numéro de téléphone du ${typeLabel} pour finaliser votre demande. Si vous êtes vous-même le ${typeLabel}, indiquez-le moi.`;
+  }
+
+  const hasCreateurContact = memoireCourte.contact_createur_course;
+  if (!hasCreateurContact) {
+    return "Bonjour, j'attends toujours le numéro de téléphone de la personne qui crée cette course et que le livreur devra contacter en priorité. Si c'est votre numéro, indiquez-le moi.";
   }
 
   return "Bonjour, votre demande est prête. Souhaitez-vous confirmer la création de cette course ? Répondez 'oui' pour confirmer.";
