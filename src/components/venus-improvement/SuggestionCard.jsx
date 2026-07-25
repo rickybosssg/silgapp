@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, X, GitMerge, Sparkles, AlertTriangle, Brain, ChevronDown, ChevronUp, History, Target, Gauge, ScrollText, BookOpen, FileText, Workflow, Lightbulb, Library } from 'lucide-react';
+import { Check, X, GitMerge, Sparkles, AlertTriangle, Brain, ChevronDown, ChevronUp, History, Target, Gauge, ScrollText, BookOpen, FileText, Workflow, Lightbulb, Library, MessageSquare } from 'lucide-react';
 
 const STATUT_LABELS = { en_attente: { label: 'En attente', cls: 'bg-gray-100 text-gray-600' }, validee: { label: 'Validée', cls: 'bg-green-100 text-green-700' }, refusee: { label: 'Refusée', cls: 'bg-red-100 text-red-700' }, fusionnee: { label: 'Fusionnée', cls: 'bg-blue-100 text-blue-700' }, amelioree: { label: 'Améliorée', cls: 'bg-violet-100 text-violet-700' } };
 const PRIORITE_LABELS = { critique: { label: 'Critique', cls: 'bg-red-100 text-red-700' }, haute: { label: 'Haute', cls: 'bg-orange-100 text-orange-700' }, normale: { label: 'Normale', cls: 'bg-blue-100 text-blue-700' }, basse: { label: 'Basse', cls: 'bg-gray-100 text-gray-600' } };
@@ -72,6 +72,24 @@ export default function SuggestionCard({ s, onValidate, onImprove, onRefuse, onM
                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full ${m.color} rounded-full`} style={{ width: `${m.val || 0}%` }} /></div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Conversations exemples — vrais messages clients */}
+      {exemples.length > 0 && (
+        <div className="bg-blue-50 rounded-lg p-2.5 border border-blue-100 mb-2">
+          <p className="text-[10px] font-bold text-blue-600 uppercase mb-1.5 flex items-center gap-1">
+            <MessageSquare className="w-3 h-3" /> Messages clients ayant déclenché cette suggestion ({exemples.length})
+          </p>
+          <div className="space-y-1.5 max-h-32 overflow-y-auto">
+            {exemples.slice(0, 5).map((ex, i) => (
+              <div key={i} className="text-[11px] bg-white rounded-md p-2 border border-blue-50">
+                <p className="text-gray-700 italic">« {ex.question || ex.message || '—'} »</p>
+                {ex.date && <p className="text-[9px] text-gray-400 mt-0.5">{new Date(ex.date).toLocaleString('fr-FR')}</p>}
+              </div>
+            ))}
+            {exemples.length > 5 && <p className="text-[10px] text-gray-400 text-center">+{exemples.length - 5} autre(s)...</p>}
           </div>
         </div>
       )}
