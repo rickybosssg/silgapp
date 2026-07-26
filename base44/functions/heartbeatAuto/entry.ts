@@ -27,7 +27,11 @@ Deno.serve(async (req) => {
     } = payload;
 
     const now = new Date().toISOString();
-    const hasGps = !!(latitude && longitude);
+    // ✅ Validation numérique complète — ne pas traiter 0,0 ou valeurs non-finies comme GPS valide
+    const latNum = Number(latitude);
+    const lngNum = Number(longitude);
+    const hasGps = Number.isFinite(latNum) && Number.isFinite(lngNum) &&
+      latNum >= -90 && latNum <= 90 && lngNum >= -180 && lngNum <= 180;
 
     // --- VÉRIFICATION SESSION UNIQUE POUR LES LIVREURS ---
     if (user_type === "livreur" && session_id) {
