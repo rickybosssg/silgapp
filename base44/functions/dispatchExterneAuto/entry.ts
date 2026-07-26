@@ -42,6 +42,24 @@ function normalizeCountryCode(value) {
   return String(value || '').trim().toUpperCase();
 }
 
+/**
+ * Normalise un nom de quartier/ville pour comparaison robuste :
+ * - minuscules
+ * - suppression des accents
+ * - tirets et apostrophes uniformisés (Ouaga 2000 == Ouaga-2000, Patte d'Oie == Patte d'ooie)
+ * - espaces multiples réduits
+ */
+function normalizeNom(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // supprimer les diacritiques
+    .replace(/[''`]/g, '')           // apostrophes variées supprimées
+    .replace(/[-_]/g, ' ')           // tirets/underscores → espace
+    .replace(/\s+/g, ' ')            // espaces multiples → 1
+    .trim();
+}
+
 async function verifierPaysCourseLivreur(base44, course, livreurId, contexte) {
   const livreur = await base44.asServiceRole.entities.Livreur.get(livreurId);
   if (!livreur) {
@@ -268,8 +286,8 @@ async function trouverLivreursCandidats(base44, course, exclusions = [], options
       if (!isNaN(gps.getTime())) gpsAgeMin = (now - gps.getTime()) / 60000;
     }
 
-    // 🚫 Exclure les livreurs sans GPS ou GPS > 60 min (sauf en mode fallback)
-    if (!skipGpsFilter && (gpsAgeMin === null || gpsAgeMin > GPS_EXPIRE_SEUIL_MIN)) {
+    // 🚫 Exclure les livreurs sans GPS ou GPS ≥ 30 min (sauf en mode fallback)
+    if (!skipGpsFilter && (gpsAgeMin === null || gpsAgeMin >= GPS_EXPIRE_SEUIL_MIN)) {
       raisonsExclusion.push({
         livreur_id: l.id,
         nom: `${l.prenom || ''} ${l.nom || ''}`.trim(),
@@ -288,18 +306,19 @@ async function trouverLivreursCandidats(base44, course, exclusions = [], options
 
     // 📍 En mode fallback (skipGpsFilter), ne PAS utiliser la distance GPS si le GPS est périmé
     // → le livreur sera classé par correspondance quartier/ville, pas par distance GPS obsolète
-    const gpsStale = gpsAgeMin === null || gpsAgeMin > GPS_EXPIRE_SEUIL_MIN;
+    const gpsStale = gpsAgeMin === null || gpsAgeMin >= GPS_EXPIRE_SEUIL_MIN;
     let distance = null;
     if (pickupLat && pickupLng && l.latitude && l.longitude && !(skipGpsFilter && gpsStale)) {
       distance = calculerDistance(pickupLat, pickupLng, l.latitude, l.longitude);
     }
 
     // 🏘️ Correspondance quartier/ville pour le tri fallback (GPS périmé)
+    // Normalisation : minuscules, sans accents, tirets/apostrophes uniformisés, espaces réduits
     const quartierMatch = course.quartier_depart && l.quartier
-      ? (l.quartier.toLowerCase() === course.quartier_depart.toLowerCase() ? 0 : 1)
+      ? (normalizeNom(course.quartier_depart) === normalizeNom(l.quartier) ? 0 : 1)
       : 1;
     const villeMatch = course.ville_depart && l.ville
-      ? (l.ville.toLowerCase() === course.ville_depart.toLowerCase() ? 0 : 1)
+      ? (normalizeNom(course.ville_depart) === normalizeNom(l.ville) ? 0 : 1)
       : 1;
 
     candidats.push({ ...l, distance, heartbeatAgeMin, gpsAgeMin, gpsStale, quartierMatch, villeMatch });
@@ -314,12 +333,14 @@ async function trouverLivreursCandidats(base44, course, exclusions = [], options
     if (tierA !== tierB) return tierA - tierB;
 
     // 🏘️ Même tier → si distance GPS nulle (GPS périmé en fallback), trier par quartier puis ville
+    // Tiebreaker : heartbeat (last_seen_at) le plus récent, PAS l'âge du GPS
+    // → privilégie le livreur actuellement connecté à l'app
     if (a.distance === null && b.distance === null) {
       if (a.quartierMatch !== b.quartierMatch) return a.quartierMatch - b.quartierMatch;
       if (a.villeMatch !== b.villeMatch) return a.villeMatch - b.villeMatch;
-      const gpsA = a.gpsAgeMin !== null ? a.gpsAgeMin : 999;
-      const gpsB = b.gpsAgeMin !== null ? b.gpsAgeMin : 999;
-      return gpsA - gpsB;
+      const hbA = a.heartbeatAgeMin !== null ? a.heartbeatAgeMin : 999;
+      const hbB = b.heartbeatAgeMin !== null ? b.heartbeatAgeMin : 999;
+      return hbA - hbB;
     }
     if (a.distance === null) return 1;
     if (b.distance === null) return -1;
