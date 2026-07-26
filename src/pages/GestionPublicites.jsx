@@ -178,16 +178,22 @@ export default function GestionPublicites() {
 
   const handleUpload = async (e) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      toast.error("Aucun fichier sélectionné");
+      return;
+    }
     setUploading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const result = await base44.integrations.Core.UploadFile({ file });
+      const file_url = result?.file_url;
+      if (!file_url) throw new Error("URL de fichier manquante dans la réponse");
       setForm(prev => ({ ...prev, media_url: file_url }));
-      toast.success("Média uploadé ");
+      toast.success("Média uploadé avec succès");
     } catch (err) {
-      toast.error("Erreur upload : " + err.message);
+      toast.error("Erreur upload : " + (err?.message || "Échec de l'upload"));
     } finally {
       setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
