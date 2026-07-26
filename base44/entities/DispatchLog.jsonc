@@ -76,7 +76,8 @@
         "acceptation",
         "refus",
         "expiration",
-        "rattrapage"
+        "rattrapage",
+        "premier_tick_manquant"
       ],
       "description": "Type d'\u00e9v\u00e9nement de dispatch"
     },

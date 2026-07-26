@@ -1318,8 +1318,16 @@ Deno.serve(async (req) => {
       // (vérification auto-annulation 15min uniquement, ne bloque pas les autres courses)
       const cycleEpuiseCourses = courses.filter(c => c.dispatch_status === 'cycle_epuise');
       const allToProcess = [...coursesToProcess, ...cycleEpuiseCourses];
-      if (courses.length > MAX_COURSES_PER_TICK) {
-        console.log(`[DISPATCH] ⚡ ${courses.length} courses à traiter — limitation à ${MAX_COURSES_PER_TICK}/tick pour éviter rate limit`);
+      // 📝 JOURNAL DE SÉLECTION — aucune course ne disparaît silencieusement
+      // Enregistre combien de courses ont été détectées, retenues, ignorées et pourquoi
+      const processedIds = new Set(allToProcess.map(c => c.id));
+      const ignoredCourses = courses.filter(c => !processedIds.has(c.id));
+      console.log(`[DISPATCH] 📋 SÉLECTION: ${courses.length} détectées | ${allToProcess.length} retenues | ${ignoredCourses.length} ignorées`);
+      if (ignoredCourses.length > 0) {
+        console.log(`[DISPATCH] 📋 Ignorées:`, ignoredCourses.map(c => ({
+          id: c.id?.slice(-8), statut: c.statut, dispatch: c.dispatch_status,
+          raison: !isStuck(c) ? 'non_bloquée' : 'limite_max_25',
+        })));
       }
 
       // 📦 Cache config — déjà mis en cache au niveau module (TTL 5 min), ne fait qu'une seule requête
@@ -1328,8 +1336,74 @@ Deno.serve(async (req) => {
         gps: await chargerConfigVaguesGPS(base44),
       };
 
+      // 🛡️ FILET DE SÉCURITÉ — premier_tick_manquant
+      // Détecte les courses en_attente depuis > 2 min SANS aucun DispatchLog.
+      // Ces courses n'ont jamais été prises en charge par le moteur (automatisation
+      // entity ou tick programmé). On les force immédiatement + alerte admin.
+      const PREMIER_TICK_SEUIL_MS = 2 * 60 * 1000; // 2 minutes
+      const coursesEnAttente = courses.filter(c =>
+        c.dispatch_status === 'en_attente' &&
+        c.statut === 'recherche_livreur'
+      );
+      const coursesJamaisTraitees = coursesEnAttente.filter(c => {
+        const ageMs = now.getTime() - new Date(c.created_date).getTime();
+        return ageMs > PREMIER_TICK_SEUIL_MS;
+      });
+
+      if (coursesJamaisTraitees.length > 0) {
+        // Batch query: récupérer les DispatchLogs récents pour ces courses
+        // Si une course a un log, elle a déjà été traitée (même si elle est retombée en en_attente)
+        const recentLogs = await base44.asServiceRole.entities.DispatchLog.filter({}, '-heure', 200);
+        const logCourseIds = new Set(recentLogs.map(l => l.course_id));
+
+        const vraimentJamaisTraitees = coursesJamaisTraitees.filter(c => !logCourseIds.has(c.id));
+
+        for (const course of vraimentJamaisTraitees) {
+          const ageMin = Math.round((now.getTime() - new Date(course.created_date).getTime()) / 60000);
+          console.error(`[DISPATCH] 🚨 PREMIER TICK MANQUANT: Course ${course.id} en_attente depuis ${ageMin}min sans AUCUN DispatchLog — force dispatch`);
+
+          // Log spécifique premier_tick_manquant
+          journaliserDispatch(base44, {
+            course_id: course.id,
+            country_code: course.country_code,
+            vague: 0,
+            vague_avant: 0,
+            vague_apres: 0,
+            evenement: 'premier_tick_manquant',
+            raison_blocage: `en_attente_${ageMin}min_sans_log`,
+            raison_passage: 'filet_securite_premier_tick',
+          });
+
+          // Alerte admin
+          base44.asServiceRole.entities.Notification.create({
+            titre: '🚨 Premier tick manquant — course jamais traitée',
+            message: `Course ${course.client_nom || '?'} (${course.adresse_depart || '?'}) en_attente depuis ${ageMin}min sans aucun DispatchLog. L'automatisation de dispatch ne l'a pas prise en charge. Traitement forcé en cours.`,
+            type: 'alerte_critique_dispatch', course_id: course.id, lue: false,
+          }).catch(() => {});
+
+          // Force dispatch immédiat
+          try {
+            const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
+            resultats.push({ course_id: course.id, wave: 'premier_tick_manquant', ...result });
+          } catch (err) {
+            console.error(`[DISPATCH] ❌ Erreur force dispatch premier_tick ${course.id}:`, err.message);
+            resultats.push({ course_id: course.id, wave: 'premier_tick_manquant', error: err.message });
+          }
+          await new Promise(r => setTimeout(r, 100));
+        }
+      }
+
+      // Recharger allToProcess si des courses premier_tick_manquant ont été traitées
+      // (leur dispatch_status a changé, éviter de les retraiter dans la boucle principale)
+      const premierTickProcessed = new Set(resultats
+        .filter(r => r.wave === 'premier_tick_manquant')
+        .map(r => r.course_id));
+
       for (const course of allToProcess) {
         try {
+          // Skip les courses déjà traitées par le filet premier_tick_manquant
+          if (premierTickProcessed.has(course.id)) continue;
+
           // 🚨 RATTRAPAGE: course bloquée depuis > 2x le délai normal de vague
           // Force-reset et re-dispatch immédiat pour débloquer la course
           const waveTimeoutMs = (cachedConfig.gps.waves[0]?.timeout_sec || 60) * 1000;
