@@ -1182,9 +1182,14 @@ Deno.serve(async (req) => {
         return 0; // conserve l'ordre par created_date (-created_date du filtre)
       };
       // Prioriser les courses VRAIMENT bloquées (en_attente/redispatch/cycle_epuise)
-      // avant celles en "propose" qui attendent juste leur timeout
-      const stuck = courses.filter(c => ['en_attente', 'redispatch', 'cycle_epuise'].includes(c.dispatch_status)).sort(sortByPriority);
-      const waiting = courses.filter(c => !['en_attente', 'redispatch', 'cycle_epuise'].includes(c.dispatch_status)).sort(sortByPriority);
+      // ET les courses "propose" avec timeout expiré (besoin d'avancement de vague immédiat)
+      const isStuck = (c) => {
+        if (['en_attente', 'redispatch', 'cycle_epuise'].includes(c.dispatch_status)) return true;
+        if (c.dispatch_status === 'propose' && c.timeout_expires_at && new Date(c.timeout_expires_at) < now) return true;
+        return false;
+      };
+      const stuck = courses.filter(isStuck).sort(sortByPriority);
+      const waiting = courses.filter(c => !isStuck(c)).sort(sortByPriority);
       const coursesToProcess = [...stuck, ...waiting].slice(0, MAX_COURSES_PER_TICK);
       if (courses.length > MAX_COURSES_PER_TICK) {
         console.log(`[DISPATCH] ⚡ ${courses.length} courses à traiter — limitation à ${MAX_COURSES_PER_TICK}/tick pour éviter rate limit`);
