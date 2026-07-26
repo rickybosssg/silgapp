@@ -1301,7 +1301,9 @@ Deno.serve(async (req) => {
       // Prioriser les courses VRAIMENT bloquées (en_attente/redispatch/cycle_epuise)
       // ET les courses "propose" avec timeout expiré (besoin d'avancement de vague immédiat)
       const isStuck = (c) => {
-        if (['en_attente', 'redispatch', 'cycle_epuise'].includes(c.dispatch_status)) return true;
+        // ✅ cycle_epuise EXCLU du comptage : ces courses attendent la réponse client
+        // et ne doivent pas occuper les slots de traitement au détriment des autres courses
+        if (['en_attente', 'redispatch'].includes(c.dispatch_status)) return true;
         // ✅ Course en 'propose' = bloquée si timeout expiré OU timeout manquant (corrompu)
         if (c.dispatch_status === 'propose') {
           if (!c.timeout_expires_at) return true;
@@ -1310,8 +1312,12 @@ Deno.serve(async (req) => {
         return false;
       };
       const stuck = courses.filter(isStuck).sort(sortByPriority);
-      const waiting = courses.filter(c => !isStuck(c)).sort(sortByPriority);
+      const waiting = courses.filter(c => !isStuck(c) && c.dispatch_status !== 'cycle_epuise').sort(sortByPriority);
       const coursesToProcess = [...stuck, ...waiting].slice(0, MAX_COURSES_PER_TICK);
+      // ✅ cycle_epuise : traitées SANS compter dans MAX_COURSES_PER_TICK
+      // (vérification auto-annulation 15min uniquement, ne bloque pas les autres courses)
+      const cycleEpuiseCourses = courses.filter(c => c.dispatch_status === 'cycle_epuise');
+      const allToProcess = [...coursesToProcess, ...cycleEpuiseCourses];
       if (courses.length > MAX_COURSES_PER_TICK) {
         console.log(`[DISPATCH] ⚡ ${courses.length} courses à traiter — limitation à ${MAX_COURSES_PER_TICK}/tick pour éviter rate limit`);
       }
@@ -1322,7 +1328,7 @@ Deno.serve(async (req) => {
         gps: await chargerConfigVaguesGPS(base44),
       };
 
-      for (const course of coursesToProcess) {
+      for (const course of allToProcess) {
         try {
           // 🚨 RATTRAPAGE: course bloquée depuis > 2x le délai normal de vague
           // Force-reset et re-dispatch immédiat pour débloquer la course
