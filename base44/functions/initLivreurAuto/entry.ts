@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { ensureCodePromo } from '../../shared/codePromoUtils.ts';
 
 /**
  * Initialisation automatique pour NOUVEAU LIVREUR EXTERNE
@@ -59,6 +60,19 @@ Deno.serve(async (req) => {
       });
     } else {
       livreur = livreur[0];
+    }
+
+    // 1b. Créer automatiquement un code promo ambassadeur pour le livreur
+    try {
+      await ensureCodePromo(base44.asServiceRole, {
+        proprietaire_type: 'livreur',
+        proprietaire_id: livreur.id,
+        proprietaire_nom: livreur.nom || livreur.prenom || user.email,
+        proprietaire_email: user.email,
+        country_code: country_code,
+      });
+    } catch (e) {
+      console.error('[initLivreurAuto] Erreur création code promo:', e.message);
     }
 
     // 2. Enregistrer la session device
