@@ -473,7 +473,7 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
     return { locked: true };
   }
   await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-    dispatch_locked_until: new Date(Date.now() + 30 * 1000).toISOString(),
+    dispatch_locked_until: new Date(Date.now() + 10 * 1000).toISOString(),
   });
 
   if (['livreur_en_route', 'colis_recupere', 'en_livraison', 'livree', 'annulee'].includes(course.statut)) {
