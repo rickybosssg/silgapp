@@ -3,9 +3,10 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { PowerOff, Power, AlertTriangle, History, ChevronDown, ChevronUp } from "lucide-react";
+import { PowerOff, Power, AlertTriangle, History, ChevronDown, ChevronUp, MapPin, Navigation } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 
 /**
  * Panel de gestion administrative du statut ON/OFF d'un livreur externe.
@@ -120,13 +121,67 @@ export default function AdminStatutLivreurPanel({ livreur, coursesActives = [] }
         </div>
       </div>
 
-      {/* Avertissement course en cours */}
+      {/* Avertissement course en cours + détails de la mission */}
       {enCourse && !isAdminOff && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
-          <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-amber-700 font-medium">
-             Ce livreur est actuellement en mission active.
-          </p>
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-700 font-medium">
+               Ce livreur est actuellement en mission active.
+            </p>
+          </div>
+          {coursesActives.length > 0 && (
+            <div className="space-y-2 mt-2">
+              {coursesActives.map(course => (
+                <div key={course.id} className="bg-white border border-amber-200 rounded-lg p-2.5 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full uppercase">
+                      {course.statut === "livreur_en_route" ? "En route" :
+                       course.statut === "arrive_prise_en_charge" ? "Arrivé au pickup" :
+                       course.statut === "colis_recupere" ? "Colis récupéré" :
+                       course.statut === "pris_en_charge" ? "Pris en charge" :
+                       course.statut === "en_livraison" ? "En livraison" :
+                       course.statut === "recherche_livreur" ? "Recherche livreur" :
+                       course.statut}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {course.heure_acceptation
+                        ? format(new Date(course.heure_acceptation), "dd/MM HH:mm", { locale: fr })
+                        : format(new Date(course.created_date), "dd/MM HH:mm", { locale: fr })}
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-1.5 text-xs">
+                    <MapPin className="w-3 h-3 text-blue-500 flex-shrink-0 mt-0.5" />
+                    <div className="min-w-0 flex-1">
+                      <span className="text-muted-foreground">Départ: </span>
+                      <span className="font-medium text-foreground">{course.adresse_depart || "N/A"}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-1.5 text-xs">
+                    <Navigation className="w-3 h-3 text-green-500 flex-shrink-0 mt-0.5" />
+                    <div className="min-w-0 flex-1">
+                      <span className="text-muted-foreground">Arrivée: </span>
+                      <span className="font-medium text-foreground">{course.adresse_arrivee || "N/A"}</span>
+                    </div>
+                  </div>
+                  {(course.client_nom || course.contact_createur_course) && (
+                    <div className="text-[10px] text-muted-foreground">
+                      Client: <span className="font-medium text-foreground">{course.client_nom || "N/A"}</span>
+                      {course.contact_createur_course && (
+                        <span> · 📞 {course.contact_createur_course}</span>
+                      )}
+                    </div>
+                  )}
+                  <Link
+                    to={`/admin/dispatch-logs`}
+                    className="text-[10px] text-primary hover:underline font-medium"
+                  >
+                    Voir le suivi →
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
