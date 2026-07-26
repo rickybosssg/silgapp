@@ -3,9 +3,9 @@ import { Navigation, RefreshCw, AlertCircle } from "lucide-react";
 
 /**
  * Indicateur GPS universel pour livreurs et clients
- * GPS récent (<2 min)
- * GPS ancien (2-10 min)
- * GPS perdu (>10 min)
+ * GPS récent (<5 min)
+ * GPS ancien (5-20 min)
+ * GPS perdu (>20 min)
  */
 export default function GPSIndicateur({ indicateur, ageMinutes, onActualiser, loading = false }) {
   const config = {
@@ -13,19 +13,19 @@ export default function GPSIndicateur({ indicateur, ageMinutes, onActualiser, lo
       dot: "bg-green-500",
       badge: "bg-green-100 text-green-700 border-green-200",
       label: "GPS récent",
-      detail: ageMinutes !== null ? `${Math.round(ageMinutes < 1 ? 0 : ageMinutes)} min` : null,
+      detail: ageMinutes !== null ? `il y a ${Math.round(ageMinutes < 1 ? 0 : ageMinutes)} min` : null,
     },
     ancien: {
       dot: "bg-amber-500",
       badge: "bg-amber-100 text-amber-700 border-amber-200",
       label: "GPS ancien",
-      detail: ageMinutes !== null ? `${Math.round(ageMinutes)} min` : null,
+      detail: ageMinutes !== null ? `il y a ${Math.round(ageMinutes)} min` : null,
     },
     perdu: {
       dot: "bg-red-500",
       badge: "bg-red-100 text-red-700 border-red-200",
       label: "GPS perdu",
-      detail: ageMinutes !== null ? `${Math.round(ageMinutes)} min` : null,
+      detail: ageMinutes !== null ? `il y a ${Math.round(ageMinutes)} min` : null,
     },
     null: {
       dot: "bg-gray-400",

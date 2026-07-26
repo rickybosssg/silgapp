@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const now = Date.now();
-    const SEUIL_HORS_LIGNE_MIN = 60;
+    const SEUIL_HORS_LIGNE_MIN = 30;
 
     const livreursDisponibles = await base44.asServiceRole.entities.Livreur.filter({
       type_livreur: 'externe',

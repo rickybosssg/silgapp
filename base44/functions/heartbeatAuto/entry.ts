@@ -19,6 +19,7 @@ Deno.serve(async (req) => {
       user_type,
       latitude,
       longitude,
+      accuracy,
       app_active = true,
       background_active = false,
       device_id,
@@ -26,6 +27,7 @@ Deno.serve(async (req) => {
     } = payload;
 
     const now = new Date().toISOString();
+    const hasGps = !!(latitude && longitude);
 
     // --- VÉRIFICATION SESSION UNIQUE POUR LES LIVREURS ---
     if (user_type === "livreur" && session_id) {
@@ -80,10 +82,10 @@ Deno.serve(async (req) => {
         await base44.asServiceRole.entities.DeviceSession.update(sessions[0].id, {
           last_seen_at: now,
           app_active: app_active,
-          derniere_position_lat: latitude || sessions[0].derniere_position_lat,
-          derniere_position_lng: longitude || sessions[0].derniere_position_lng,
-          derniere_sync_date: latitude && longitude ? now : sessions[0].derniere_sync_date,
-          gps_actif: !!(latitude && longitude),
+          derniere_position_lat: hasGps ? latitude : sessions[0].derniere_position_lat,
+          derniere_position_lng: hasGps ? longitude : sessions[0].derniere_position_lng,
+          derniere_sync_date: hasGps ? now : sessions[0].derniere_sync_date,
+          gps_actif: hasGps,
         });
       }
     }
@@ -105,12 +107,22 @@ Deno.serve(async (req) => {
       if (livreurs && livreurs.length > 0) {
         const livreur = livreurs[0];
         const updateData = {
-          latitude: latitude || livreur.latitude,
-          longitude: longitude || livreur.longitude,
           last_seen_at: now,
           app_active: app_active,
           background_active: background_active,
         };
+
+        // 📍 Ne mettre à jour le GPS que si des coordonnées valides sont reçues.
+        // Cela garantit que derniere_position_date reflète le VRAI moment de réception GPS,
+        // et non un heartbeat sans coordonnées (app en arrière-plan sans GPS).
+        if (hasGps) {
+          updateData.latitude = latitude;
+          updateData.longitude = longitude;
+          updateData.derniere_position_date = now;
+          if (accuracy !== undefined && accuracy !== null) {
+            updateData.gps_accuracy = Number(accuracy);
+          }
+        }
 
         // 🔄 Remontée automatique : si le livreur est hors_ligne (mais pas désactivé par admin,
         // ni mis hors ligne manuellement, ni en course), un heartbeat récent prouve qu'il est
@@ -131,7 +143,7 @@ Deno.serve(async (req) => {
     return Response.json({
       success: true,
       timestamp: now,
-      gps_sync: !!(latitude && longitude),
+      gps_sync: hasGps,
     });
   } catch (error) {
     console.error('[heartbeatAuto] Erreur:', error);

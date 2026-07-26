@@ -112,7 +112,12 @@
     },
     "derniere_position_date": {
       "type": "string",
-      "format": "date-time"
+      "format": "date-time",
+      "description": "Date et heure exactes de la derni\u00e8re mise \u00e0 jour GPS (latitude/longitude). Mis \u00e0 jour par heartbeatAuto \u00e0 chaque r\u00e9ception de coordonn\u00e9es valides."
+    },
+    "gps_accuracy": {
+      "type": "number",
+      "description": "Pr\u00e9cision GPS en m\u00e8tres au moment de la derni\u00e8re position enregistr\u00e9e. Plus c'est bas, plus c'est pr\u00e9cis."
     },
     "courses_du_jour": {
       "type": "number",

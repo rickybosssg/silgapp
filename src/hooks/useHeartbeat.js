@@ -27,6 +27,7 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
         user_type,
         latitude: pos?.latitude || position?.latitude || 0,
         longitude: pos?.longitude || position?.longitude || 0,
+        accuracy: pos?.accuracy || position?.accuracy || undefined,
         app_active: document.visibilityState === "visible",
         background_active: isNative,
         device_id: navigator.userAgent.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 50),

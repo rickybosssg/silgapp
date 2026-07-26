@@ -203,8 +203,22 @@ async function trouverLivreursCandidats(base44, course, exclusions = [], options
   // Tri principal : distance au point de prise en charge.
   // Tiebreaker : si distance < 100m d'écart, privilégier GPS le plus récent.
   const candidats = [];
-  const GPS_EXPIRE_SEUIL_MIN = 60;
+  const GPS_EXPIRE_SEUIL_MIN = 30;
   const TIEBREAKER_DISTANCE_M = 100;
+
+  // 🎯 Classification de fraîcheur GPS pour le tri des candidats
+  // Tier 0 (récent) < 5 min — très fiable
+  // Tier 1 (fiable)  5-10 min — fiable
+  // Tier 2 (acceptable) 10-20 min — acceptable
+  // Tier 3 (faible)  20-30 min — dernier recours avant fallback
+  function gpsFreshnessTier(gpsAgeMin) {
+    if (gpsAgeMin === null) return 4;
+    if (gpsAgeMin < 5) return 0;
+    if (gpsAgeMin < 10) return 1;
+    if (gpsAgeMin < 20) return 2;
+    if (gpsAgeMin < 30) return 3;
+    return 4;
+  }
 
   // 🧠 Résoudre les coordonnées de pickup : GPS > quartier > fallback large
   let pickupLat = course.gps_depart_lat;
@@ -281,8 +295,15 @@ async function trouverLivreursCandidats(base44, course, exclusions = [], options
     candidats.push({ ...l, distance, heartbeatAgeMin, gpsAgeMin });
   });
 
-  // 🎯 Tri : distance d'abord, GPS en tiebreaker si < 100m d'écart
+  // 🎯 Tri : fraîcheur GPS d'abord (tier 0 > 1 > 2 > 3), puis distance, puis GPS en tiebreaker
+  // Un livreur avec GPS récent (3 min) est classé devant un livreur avec GPS ancien (25 min),
+  // même si ce dernier est légèrement plus proche. Au sein du même tier, on trie par distance.
   candidats.sort((a, b) => {
+    const tierA = gpsFreshnessTier(a.gpsAgeMin);
+    const tierB = gpsFreshnessTier(b.gpsAgeMin);
+    if (tierA !== tierB) return tierA - tierB;
+
+    // Même tier → tri par distance
     if (a.distance === null && b.distance === null) {
       const gpsA = a.gpsAgeMin !== null ? a.gpsAgeMin : 999;
       const gpsB = b.gpsAgeMin !== null ? b.gpsAgeMin : 999;
@@ -303,7 +324,7 @@ async function trouverLivreursCandidats(base44, course, exclusions = [], options
   const niveau1 = candidats; // rétro-compatibilité
   const niveau2 = []; // vide
   const niveau3 = []; // vide
-  console.log(`[DISPATCH] 📊 ${tous.length} candidats (exclus: ${raisonsExclusion.length}) — tri par distance, GPS en tiebreaker (< ${TIEBREAKER_DISTANCE_M}m) — pickup: ${pickupSource}`);
+  console.log(`[DISPATCH] 📊 ${tous.length} candidats (exclus: ${raisonsExclusion.length}) — tri par fraîcheur GPS (tiers 0-3), puis distance — pickup: ${pickupSource}`);
   return { tous, niveau1, niveau2, niveau3, pickupSource, raisonsExclusion };
 }
 
