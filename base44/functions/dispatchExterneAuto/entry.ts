@@ -1542,6 +1542,52 @@ Deno.serve(async (req) => {
         await new Promise(r => setTimeout(r, 100));
       }
 
+      // ── FILET DE SÉCURITÉ — corriger les statuts "en_course" fantômes ──
+      // Un livreur peut rester bloqué à "en_course" sans course active si :
+      // - Sa course a été annulée/refusée sans déclencher syncStatutLivreurOnCourse
+      // - Une erreur réseau a interrompu le flux normal de libération
+      // Ce filet tourne à chaque tick et garantit qu'aucun statut fantôme ne persiste.
+      try {
+        const STATUTS_ACTIFS_VERIF = ['livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison', 'arrivee'];
+        const livreursEnCourse = await base44.asServiceRole.entities.Livreur.filter(
+          { type_livreur: 'externe', statut: 'en_course' },
+          '-updated_date', 50
+        );
+
+        if (livreursEnCourse.length > 0) {
+          // Construire l'ensemble des IDs livreurs ayant VRAIMENT une course active
+          // à partir des courses déjà chargées dans ce tick + une requête ciblée
+          const livreurIdsAvecCourseActive = new Set(
+            courses.filter(c => STATUTS_ACTIFS_VERIF.includes(c.statut) && c.livreur_id).map(c => c.livreur_id)
+          );
+
+          // Pour les livreurs "en_course" non trouvés dans courses, vérifier individuellement
+          // (courses ne contient que les statuts recherche_livreur + nouvelle, pas les actives)
+          const livreursAVerifier = livreursEnCourse.filter(l => !livreurIdsAvecCourseActive.has(l.id));
+          if (livreursAVerifier.length > 0) {
+            const recentCoursesForCheck = await base44.asServiceRole.entities.CourseExterne.filter(
+              {}, '-created_date', 200
+            );
+            const activeIds = new Set(
+              recentCoursesForCheck
+                .filter(c => STATUTS_ACTIFS_VERIF.includes(c.statut) && c.livreur_id)
+                .map(c => c.livreur_id)
+            );
+            const livreursFantomes = livreursAVerifier.filter(l => !activeIds.has(l.id));
+            for (const l of livreursFantomes) {
+              const nouveauStatut = l.manual_hors_ligne === true ? 'hors_ligne' : 'disponible';
+              await base44.asServiceRole.entities.Livreur.update(l.id, { statut: nouveauStatut });
+              console.log(`[DISPATCH] 🔄 Filet sécurité: ${l.prenom || ''} ${l.nom || ''} → "${nouveauStatut}" (en_course sans course active)`);
+            }
+            if (livreursFantomes.length > 0) {
+              console.log(`[DISPATCH] 🔄 Filet sécurité: ${livreursFantomes.length} statut(s) fantôme(s) corrigé(s)`);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[DISPATCH] ⚠️ Erreur filet sécurité statut livreur:', err.message);
+      }
+
       // 🚨 Détection des courses bloquées > 10 min (dispatch en panne)
       const stuckCourses = courses.filter(c => {
         if (c.dispatch_status !== 'propose') return false;

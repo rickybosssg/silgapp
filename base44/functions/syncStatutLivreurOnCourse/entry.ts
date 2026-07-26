@@ -14,7 +14,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
  */
 
 const STATUTS_TERMINAUX = ["annulee", "livree", "terminee", "completed"];
-const STATUTS_ACTIFS_LIVREUR = ["livreur_en_route", "colis_recupere", "en_livraison", "pris_en_charge", "arrivee"];
+const STATUTS_ACTIFS_LIVREUR = ["livreur_en_route", "arrive_prise_en_charge", "colis_recupere", "passager_embarque", "pris_en_charge", "en_livraison", "arrivee"];
 
 Deno.serve(async (req) => {
   try {
@@ -135,6 +135,28 @@ Deno.serve(async (req) => {
       } else {
         console.log(`[syncStatutLivreur] Livreur a ${autresCourseActives.length} autre(s) course(s) active(s), pas de libération.`);
         return Response.json({ success: true, skipped: "other_courses_active", count: autresCourseActives.length });
+      }
+    }
+
+    // Cas 1b : livreur_id effacé de la course (redispatch, refus, expiration verrou)
+    // → l'ancien livreur doit être libéré s'il n'a plus d'autre course active
+    const oldLivreurId = old_data?.livreur_id;
+    if (oldLivreurId && !livreurId && oldLivreurId !== livreurId) {
+      const coursesActivesOld = await base44.asServiceRole.entities.CourseExterne.filter(
+        { livreur_id: oldLivreurId },
+        "-created_date", 10
+      );
+      const autresActives = (coursesActivesOld || []).filter(c =>
+        c.id !== course.id && STATUTS_ACTIFS_LIVREUR.includes(c.statut)
+      );
+      if (autresActives.length === 0) {
+        const livreur = await base44.asServiceRole.entities.Livreur.get(oldLivreurId).catch(() => null);
+        if (livreur && livreur.statut === "en_course") {
+          const nouveauStatut = livreur.manual_hors_ligne === true ? "hors_ligne" : "disponible";
+          await base44.asServiceRole.entities.Livreur.update(oldLivreurId, { statut: nouveauStatut });
+          console.log(`[syncStatutLivreur] Livreur ${livreur.prenom} ${livreur.nom} → "${nouveauStatut}" (livreur_id effacé de course ${course.id?.slice(-8)})`);
+          return Response.json({ success: true, action: "livreur_libere_id_cleared", livreur_id: oldLivreurId, nouveau_statut: nouveauStatut });
+        }
       }
     }
 
