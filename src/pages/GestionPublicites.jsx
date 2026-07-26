@@ -183,7 +183,6 @@ export default function GestionPublicites() {
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (fileInputRef.current) fileInputRef.current.value = "";
     setUploading(true);
     try {
       const result = await base44.integrations.Core.UploadFile({ file });
@@ -195,6 +194,7 @@ export default function GestionPublicites() {
       toast.error("Erreur upload : " + (err?.message || "Échec"));
     } finally {
       setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
