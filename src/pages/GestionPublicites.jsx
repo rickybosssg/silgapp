@@ -71,6 +71,7 @@ export default function GestionPublicites() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(defaultForm);
   const [uploading, setUploading] = useState(false);
+  const [uploadDebug, setUploadDebug] = useState("");
   const [filterCible, setFilterCible] = useState("tous_filtres");
   const fileInputRef = useRef(null);
   const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
@@ -182,22 +183,75 @@ export default function GestionPublicites() {
 
   const handleFileChange = async (e) => {
     const rawFile = e.target.files?.[0];
-    if (!rawFile) return;
+    console.log("[UPLOAD DEBUG] Étape 1 — Fichier sélectionné:", {
+      name: rawFile?.name,
+      size: rawFile?.size,
+      type: rawFile?.type,
+      lastModified: rawFile?.lastModified,
+    });
+    if (!rawFile) {
+      console.error("[UPLOAD DEBUG] ÉCHEC Étape 1 — Aucun fichier reçu");
+      setUploadDebug("Échec: aucun fichier reçu");
+      return;
+    }
     setUploading(true);
+    setUploadDebug("Étape 1: fichier sélectionné (" + (rawFile.size / 1024).toFixed(0) + " KB)");
     try {
-      if (rawFile.size === 0) throw new Error("Fichier vide");
+      // Étape 2 — Validation
+      if (rawFile.size === 0) throw new Error("Fichier vide (0 bytes)");
+      console.log("[UPLOAD DEBUG] Étape 2 — Validation OK, size=" + rawFile.size);
 
-      // Passer le fichier original directement — fonctionne sur desktop et mobile
+      // Étape 3 — Appel UploadFile
+      console.log("[UPLOAD DEBUG] Étape 3 — Appel base44.integrations.Core.UploadFile...");
+      setUploadDebug("Étape 3: envoi au stockage...");
       const result = await base44.integrations.Core.UploadFile({ file: rawFile });
+      console.log("[UPLOAD DEBUG] Étape 3 — Réponse reçue:", {
+        type: typeof result,
+        keys: result ? Object.keys(result) : "null",
+        has_file_url: !!(result?.file_url),
+        result_preview: JSON.stringify(result)?.slice(0, 200),
+      });
+
+      // Étape 4 — Extraction URL
       const file_url = result?.file_url;
-      if (!file_url) throw new Error("URL manquante");
-      setForm(prev => ({ ...prev, media_url: file_url }));
+      if (!file_url) {
+        console.error("[UPLOAD DEBUG] ÉCHEC Étape 4 — URL manquante dans la réponse:", result);
+        throw new Error("URL manquante dans la réponse de stockage");
+      }
+      console.log("[UPLOAD DEBUG] Étape 4 — URL extraite:", file_url);
+      setUploadDebug("Étape 4: URL reçue — " + file_url.slice(0, 50) + "...");
+
+      // Étape 5 — Mise à jour du state
+      setForm(prev => {
+        const newForm = { ...prev, media_url: file_url };
+        console.log("[UPLOAD DEBUG] Étape 5 — State mis à jour:", {
+          old_media_url: prev.media_url,
+          new_media_url: newForm.media_url,
+          form_keys: Object.keys(newForm),
+        });
+        return newForm;
+      });
+
+      // Étape 6 — Vérification post-rendu (différé)
+      setTimeout(() => {
+        console.log("[UPLOAD DEBUG] Étape 6 — Vérification post-rendu: form.media_url devrait être défini");
+      }, 100);
+
       toast.success("Média uploadé avec succès");
+      setUploadDebug(" Terminé — URL: " + file_url.slice(0, 40) + "...");
     } catch (err) {
+      console.error("[UPLOAD DEBUG] ÉCHEC GÉNÉRAL:", {
+        message: err?.message,
+        name: err?.name,
+        stack: err?.stack?.slice(0, 300),
+        full_error: err,
+      });
       toast.error("Erreur upload : " + (err?.message || "Échec"));
+      setUploadDebug(" ÉCHEC: " + (err?.message || "Erreur inconnue"));
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
+      console.log("[UPLOAD DEBUG] Finally — uploading=false, input reset");
     }
   };
 
@@ -506,6 +560,11 @@ export default function GestionPublicites() {
                     onChange={handleFileChange}
                     className="hidden"
                   />
+                  {uploadDebug && (
+                    <div className="text-[10px] font-mono bg-gray-900 text-green-400 rounded-lg px-2 py-1.5 break-all">
+                      {uploadDebug}
+                    </div>
+                  )}
                   {form.media_url && (
                     <div className="relative rounded-xl overflow-hidden bg-gray-100">
                       {form.type_media === "image"
