@@ -178,50 +178,54 @@ export default function GestionPublicites() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const pickFromGallery = async () => {
-    setUploading(true);
-    try {
-      const photo = await Camera.getPhoto({
-        quality: 80,
-        resultType: CameraResultType.DataUrl,
-        source: CameraSource.Photos,
-        allowEditing: false,
-      });
-      const mimeType = photo.format === "png" ? "image/png" : "image/jpeg";
-      const fileName = `pub_${Date.now()}.${photo.format || "jpg"}`;
-      const file = await fetch(photo.dataUrl).then(r => r.blob()).then(b => new File([b], fileName, { type: mimeType }));
-      const result = await base44.integrations.Core.UploadFile({ file });
-      const file_url = result?.file_url;
-      if (!file_url) throw new Error("URL de fichier manquante");
-      setForm(prev => ({ ...prev, media_url: file_url }));
-      toast.success("Média uploadé avec succès");
-    } catch (err) {
-      if (err?.message?.includes("cancelled") || err?.message?.includes("User denied")) return;
-      toast.error("Erreur upload : " + (err?.message || "Échec"));
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleUpload = async (e) => {
+  const handleUpload = async () => {
+    // Sur mobile (APK) : utiliser la galerie native Capacitor
     if (Capacitor.isNativePlatform()) {
-      return pickFromGallery();
+      setUploading(true);
+      try {
+        const photo = await Camera.getPhoto({
+          quality: 80,
+          resultType: CameraResultType.DataUrl,
+          source: CameraSource.Photos,
+        });
+        const mimeType = photo.format === "png" ? "image/png" : "image/jpeg";
+        const fileName = `pub_${Date.now()}.${photo.format || "jpg"}`;
+        const blob = await fetch(photo.dataUrl).then(r => r.blob());
+        const file = new File([blob], fileName, { type: mimeType });
+        const result = await base44.integrations.Core.UploadFile({ file });
+        const file_url = result?.file_url;
+        if (!file_url) throw new Error("URL manquante");
+        setForm(prev => ({ ...prev, media_url: file_url }));
+        toast.success("Média uploadé avec succès");
+      } catch (err) {
+        if (err?.message?.includes("cancelled") || err?.message?.includes("User denied")) return;
+        toast.error("Erreur upload : " + (err?.message || "Échec"));
+      } finally {
+        setUploading(false);
+      }
+      return;
     }
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const result = await base44.integrations.Core.UploadFile({ file });
-      const file_url = result?.file_url;
-      if (!file_url) throw new Error("URL de fichier manquante");
-      setForm(prev => ({ ...prev, media_url: file_url }));
-      toast.success("Média uploadé avec succès");
-    } catch (err) {
-      toast.error("Erreur upload : " + (err?.message || "Échec de l'upload"));
-    } finally {
-      setUploading(false);
-      e.target.value = "";
-    }
+    // Sur web : créer un input fichier temporaire
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = form.type_media === "video" ? "video/*" : "image/*";
+    input.onchange = async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      setUploading(true);
+      try {
+        const result = await base44.integrations.Core.UploadFile({ file });
+        const file_url = result?.file_url;
+        if (!file_url) throw new Error("URL manquante");
+        setForm(prev => ({ ...prev, media_url: file_url }));
+        toast.success("Média uploadé avec succès");
+      } catch (err) {
+        toast.error("Erreur upload : " + (err?.message || "Échec"));
+      } finally {
+        setUploading(false);
+      }
+    };
+    input.click();
   };
 
   const handleSubmit = (e) => {
@@ -512,17 +516,15 @@ export default function GestionPublicites() {
               {form.type_media !== "texte" && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <div className={`relative flex-1 flex items-center justify-center gap-2 h-12 rounded-xl border-2 border-dashed transition-all ${uploading ? "border-violet-400 bg-violet-50" : "border-gray-300 hover:border-violet-400 hover:bg-violet-50"}`}>
+                    <button
+                      type="button"
+                      onClick={handleUpload}
+                      disabled={uploading}
+                      className={`flex-1 flex items-center justify-center gap-2 h-12 rounded-xl border-2 border-dashed transition-all ${uploading ? "border-violet-400 bg-violet-50" : "border-gray-300 hover:border-violet-400 hover:bg-violet-50"}`}
+                    >
                       {uploading ? <Loader2 className="w-4 h-4 animate-spin text-violet-600" /> : <Plus className="w-4 h-4 text-gray-400" />}
                       <span className="text-xs font-semibold text-gray-500">{uploading ? "Upload en cours..." : "Uploader un fichier"}</span>
-                      <input
-                        type="file"
-                        className="absolute inset-0 opacity-0 cursor-pointer"
-                        accept={form.type_media === "video" ? "video/*" : "image/*"}
-                        onChange={handleUpload}
-                        disabled={uploading}
-                      />
-                    </div>
+                    </button>
                   </div>
                   {form.media_url && (
                     <div className="relative rounded-xl overflow-hidden bg-gray-100">
