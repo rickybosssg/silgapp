@@ -601,7 +601,17 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
             }
           }
         }
-        throw new Error('OpenAI: reponse vide dans le JSON — fallback vers InvokeLLM');
+        // ── ÉCONOMIE DE CRÉDITS: Au lieu de fallback vers InvokeLLM (coûteux),
+        //    construire une réponse par défaut depuis les données parsées. ──
+        console.warn('[OpenAIEngine] ⚠️ Champ "reponse" vide — construction réponse par défaut (évite fallback InvokeLLM)');
+        parsed.reponse = parsed.reponse || 'Je suis VENUS, l\'assistante SILGAPP. Comment puis-je vous aider ?';
+        parsed.confiance = Math.max(parsed.confiance || 0, 50);
+        parsed._outils_openai = toolsUsed.length > 0 ? toolsUsed.join(',') : 'none';
+        parsed._model_openai = model;
+        parsed._tokens_openai = usage?.total_tokens || 0;
+        parsed._tokens_prompt = usage?.prompt_tokens || 0;
+        parsed._tokens_completion = usage?.completion_tokens || 0;
+        return parsed;
       }
 
       // S'assurer que les outils utilisés sont enregistrés

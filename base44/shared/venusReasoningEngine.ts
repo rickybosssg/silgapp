@@ -31,7 +31,11 @@ import {
 } from './venusToolsEngine.ts';
 import {
   stockerCache,
+  recupererCache,
   detecterSalutation,
+  detecterRaccourciFrequent,
+  detecterRegleMetierDirecte,
+  detecterConnaissanceDirecte,
 } from './venusCache.ts';
 import { genererReferenceCourse } from './venusCourseReference.ts';
 import { isOpenAIEnabled, raisonnerAvecOpenAI, getOpenAIModel } from './venusOpenAIEngine.ts';
@@ -777,9 +781,26 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
     return salutation;
   }
 
-  // ── SIMPLIFICATION: Les bypass (raccourcis, cache, règles métier directes,
-  //    connaissances directes) sont désactivés. GPT traite TOUS les messages.
-  //    Seuls les bypass techniques (sécurité + salutation) restent actifs.
+  // ── ÉCONOMIE DE CRÉDITS: Cache de réponses (0 crédit LLM) ──
+  const cached = recupererCache(input.telephone, input.messageClient, input.memoireCourte);
+  if (cached) {
+    cached.temps_traitement_ms = Date.now() - startTime;
+    cached.decision_moteur = 'cache';
+    cached.openai_appele = false;
+    cached.model_utilise = '';
+    return cached;
+  }
+
+  // ── ÉCONOMIE DE CRÉDITS: Raccourcis questions fréquentes (0 crédit LLM) ──
+  const raccourci = detecterRaccourciFrequent(input.messageClient, input.courseActive);
+  if (raccourci) {
+    raccourci.temps_traitement_ms = Date.now() - startTime;
+    raccourci.decision_moteur = 'raccourci';
+    raccourci.openai_appele = false;
+    raccourci.model_utilise = '';
+    stockerCache(input.telephone, input.messageClient, input.memoireCourte, raccourci);
+    return raccourci;
+  }
 
   // ── Construire l'historique lisible ──
   const historiqueStr = input.historiqueRecent
@@ -888,10 +909,27 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
     console.log(`[ReasoningEngine] 📖 ${businessRuleEntries.length} règles métier chargées`);
   }
 
-  // ── SIMPLIFICATION: Tous les bypasses (raccourcis, cache, règles métier directes,
-  //    connaissances directes, heuristique pré-LLM) sont supprimés.
-  //    GPT traite TOUS les messages. Le RAG et les règles restent dans le prompt
-  //    comme CONTEXTE, mais ne répondent pas à la place de GPT.
+  // ── ÉCONOMIE DE CRÉDITS: Règles métier directes (0 crédit LLM) ──
+  const regleDirecte = detecterRegleMetierDirecte(input.messageClient, businessRuleEntries);
+  if (regleDirecte) {
+    regleDirecte.temps_traitement_ms = Date.now() - startTime;
+    regleDirecte.decision_moteur = 'regle_metier';
+    regleDirecte.openai_appele = false;
+    regleDirecte.model_utilise = '';
+    stockerCache(input.telephone, input.messageClient, input.memoireCourte, regleDirecte);
+    return regleDirecte;
+  }
+
+  // ── ÉCONOMIE DE CRÉDITS: Connaissances directes (0 crédit LLM) ──
+  const connaissanceDirecte = detecterConnaissanceDirecte(input.messageClient, knowledgeEntries);
+  if (connaissanceDirecte) {
+    connaissanceDirecte.temps_traitement_ms = Date.now() - startTime;
+    connaissanceDirecte.decision_moteur = 'connaissance';
+    connaissanceDirecte.openai_appele = false;
+    connaissanceDirecte.model_utilise = '';
+    stockerCache(input.telephone, input.messageClient, input.memoireCourte, connaissanceDirecte);
+    return connaissanceDirecte;
+  }
 
   // ── Construire le prompt de raisonnement (version compactée) ──
   const audioNote = input.isAudioTranscription
