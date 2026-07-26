@@ -1,8 +1,6 @@
 import React, { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Capacitor } from "@capacitor/core";
-import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -178,54 +176,26 @@ export default function GestionPublicites() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleUpload = async () => {
-    // Sur mobile (APK) : utiliser la galerie native Capacitor
-    if (Capacitor.isNativePlatform()) {
-      setUploading(true);
-      try {
-        const photo = await Camera.getPhoto({
-          quality: 80,
-          resultType: CameraResultType.DataUrl,
-          source: CameraSource.Photos,
-        });
-        const mimeType = photo.format === "png" ? "image/png" : "image/jpeg";
-        const fileName = `pub_${Date.now()}.${photo.format || "jpg"}`;
-        const blob = await fetch(photo.dataUrl).then(r => r.blob());
-        const file = new File([blob], fileName, { type: mimeType });
-        const result = await base44.integrations.Core.UploadFile({ file });
-        const file_url = result?.file_url;
-        if (!file_url) throw new Error("URL manquante");
-        setForm(prev => ({ ...prev, media_url: file_url }));
-        toast.success("Média uploadé avec succès");
-      } catch (err) {
-        if (err?.message?.includes("cancelled") || err?.message?.includes("User denied")) return;
-        toast.error("Erreur upload : " + (err?.message || "Échec"));
-      } finally {
-        setUploading(false);
-      }
-      return;
+  const handleUpload = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setUploading(true);
+    try {
+      const result = await base44.integrations.Core.UploadFile({ file });
+      const file_url = result?.file_url;
+      if (!file_url) throw new Error("URL manquante");
+      setForm(prev => ({ ...prev, media_url: file_url }));
+      toast.success("Média uploadé avec succès");
+    } catch (err) {
+      toast.error("Erreur upload : " + (err?.message || "Échec"));
+    } finally {
+      setUploading(false);
     }
-    // Sur web : créer un input fichier temporaire
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = form.type_media === "video" ? "video/*" : "image/*";
-    input.onchange = async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      setUploading(true);
-      try {
-        const result = await base44.integrations.Core.UploadFile({ file });
-        const file_url = result?.file_url;
-        if (!file_url) throw new Error("URL manquante");
-        setForm(prev => ({ ...prev, media_url: file_url }));
-        toast.success("Média uploadé avec succès");
-      } catch (err) {
-        toast.error("Erreur upload : " + (err?.message || "Échec"));
-      } finally {
-        setUploading(false);
-      }
-    };
-    input.click();
   };
 
   const handleSubmit = (e) => {
@@ -526,6 +496,13 @@ export default function GestionPublicites() {
                       <span className="text-xs font-semibold text-gray-500">{uploading ? "Upload en cours..." : "Uploader un fichier"}</span>
                     </button>
                   </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept={form.type_media === "video" ? "video/*" : "image/*"}
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
                   {form.media_url && (
                     <div className="relative rounded-xl overflow-hidden bg-gray-100">
                       {form.type_media === "image"
