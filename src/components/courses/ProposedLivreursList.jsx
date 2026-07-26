@@ -113,10 +113,6 @@ export default function ProposedLivreursList({ course }) {
     );
   }
 
-  if (livreurs.length === 0) {
-    return null;
-  }
-
   const acceptedId = course.livreur_id || course.accepted_by_livreur_id;
 
   const dispatchStatus = course?.dispatch_status;
@@ -133,6 +129,11 @@ export default function ProposedLivreursList({ course }) {
   else if (dispatchStatus === "redispatch") { dispatchLabel = "Re-recherche en cours"; dispatchColor = "text-orange-600"; }
   else if (dispatchStatus === "cycle_epuise") { dispatchLabel = "Tous sollicités"; dispatchColor = "text-red-600"; }
   else if (dispatchStatus === "accepte") { dispatchLabel = "Course acceptée"; dispatchColor = "text-green-600"; }
+
+  // Ne rien afficher si rien à montrer (pas de livreurs, pas en recherche, pas terminal)
+  if (livreurs.length === 0 && !isSearching && !isCycleEpuise && !isTerminal) {
+    return null;
+  }
 
   return (
     <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 space-y-2">
@@ -243,6 +244,7 @@ export default function ProposedLivreursList({ course }) {
           </span>
         </div>
       )}
+      {livreurs.length > 0 && (
       <div className="space-y-1.5">
         {livreurs.map((l, idx) => {
           const isAccepted = acceptedId && String(l.id) === String(acceptedId);
@@ -305,6 +307,7 @@ export default function ProposedLivreursList({ course }) {
           );
         })}
       </div>
+      )}
     </div>
   );
 }
