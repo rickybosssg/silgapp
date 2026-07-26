@@ -286,13 +286,23 @@ async function trouverLivreursCandidats(base44, course, exclusions = [], options
       if (!isNaN(hb.getTime())) heartbeatAgeMin = (now - hb.getTime()) / 60000;
     }
 
-    // distance = null quand ni GPS ni quartier → pas de calcul fictif
+    // 📍 En mode fallback (skipGpsFilter), ne PAS utiliser la distance GPS si le GPS est périmé
+    // → le livreur sera classé par correspondance quartier/ville, pas par distance GPS obsolète
+    const gpsStale = gpsAgeMin === null || gpsAgeMin > GPS_EXPIRE_SEUIL_MIN;
     let distance = null;
-    if (pickupLat && pickupLng && l.latitude && l.longitude) {
+    if (pickupLat && pickupLng && l.latitude && l.longitude && !(skipGpsFilter && gpsStale)) {
       distance = calculerDistance(pickupLat, pickupLng, l.latitude, l.longitude);
     }
 
-    candidats.push({ ...l, distance, heartbeatAgeMin, gpsAgeMin });
+    // 🏘️ Correspondance quartier/ville pour le tri fallback (GPS périmé)
+    const quartierMatch = course.quartier_depart && l.quartier
+      ? (l.quartier.toLowerCase() === course.quartier_depart.toLowerCase() ? 0 : 1)
+      : 1;
+    const villeMatch = course.ville_depart && l.ville
+      ? (l.ville.toLowerCase() === course.ville_depart.toLowerCase() ? 0 : 1)
+      : 1;
+
+    candidats.push({ ...l, distance, heartbeatAgeMin, gpsAgeMin, gpsStale, quartierMatch, villeMatch });
   });
 
   // 🎯 Tri : fraîcheur GPS d'abord (tier 0 > 1 > 2 > 3), puis distance, puis GPS en tiebreaker
@@ -303,8 +313,10 @@ async function trouverLivreursCandidats(base44, course, exclusions = [], options
     const tierB = gpsFreshnessTier(b.gpsAgeMin);
     if (tierA !== tierB) return tierA - tierB;
 
-    // Même tier → tri par distance
+    // 🏘️ Même tier → si distance GPS nulle (GPS périmé en fallback), trier par quartier puis ville
     if (a.distance === null && b.distance === null) {
+      if (a.quartierMatch !== b.quartierMatch) return a.quartierMatch - b.quartierMatch;
+      if (a.villeMatch !== b.villeMatch) return a.villeMatch - b.villeMatch;
       const gpsA = a.gpsAgeMin !== null ? a.gpsAgeMin : 999;
       const gpsB = b.gpsAgeMin !== null ? b.gpsAgeMin : 999;
       return gpsA - gpsB;
