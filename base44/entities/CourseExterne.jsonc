@@ -427,6 +427,16 @@
       "type": "string",
       "description": "JSON array des livreurs ayant refuse, annule ou indique etre occupes pour cette course uniquement"
     },
+    "dispatch_locked_until": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Verrou temporaire anti-traitement concurrent (TTL 30s)"
+    },
+    "dispatch_cycle_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de cycles de dispatch completes (limite anti-boucle infinie)"
+    },
     "whatsapp_expediteur_statut": {
       "type": "string",
       "enum": [

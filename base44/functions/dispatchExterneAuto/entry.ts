@@ -176,7 +176,9 @@ async function trouverLivreursCandidats(base44, course, exclusions = [], options
     bloque_encours: false,
   }, '-last_seen_at', 50);
 
-  if (!tousLivreurs || tousLivreurs.length === 0) return [];
+  if (!tousLivreurs || tousLivreurs.length === 0) {
+    return { tous: [], niveau1: [], niveau2: [], niveau3: [], pickupSource: 'none', raisonsExclusion: [] };
+  }
 
   // 🛡️ Vérification croisée : exclure les livreurs ayant déjà une course active.
   // Le filtre statut: 'disponible' exclut la majorité, mais cette vérification
@@ -410,6 +412,16 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
   }
   if (!course) return { erreur: 'Course introuvable' };
 
+  // 🔒 Verrou temporaire anti-traitement concurrent (TTL 30s)
+  const lockUntilMs = course.dispatch_locked_until ? new Date(course.dispatch_locked_until).getTime() : 0;
+  if (lockUntilMs > Date.now()) {
+    console.log(`[DISPATCH] 🔒 Course ${courseId} verrouillée par un autre tick (expire dans ${Math.round((lockUntilMs - Date.now()) / 1000)}s) — skip`);
+    return { locked: true };
+  }
+  await base44.asServiceRole.entities.CourseExterne.update(courseId, {
+    dispatch_locked_until: new Date(Date.now() + 30 * 1000).toISOString(),
+  });
+
   if (['livreur_en_route', 'colis_recupere', 'en_livraison', 'livree', 'annulee'].includes(course.statut)) {
     return { ignore: true, statut: course.statut };
   }
@@ -509,14 +521,31 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
       return { cycleEpuise: true };
     }
     if (dejaNotifies.length > 0) {
+      const cycleCount = (course.dispatch_cycle_count || 0) + 1;
+      // 🛑 Limite anti-boucle infinie : 3 cycles max puis auto-annulation
+      if (cycleCount > 3) {
+        console.log(`[DISPATCH] 🛑 Course ${courseId} — ${cycleCount - 1} cycles épuisés sans livreur — auto-annulation`);
+        await base44.asServiceRole.entities.CourseExterne.update(courseId, {
+          statut: 'annulee',
+          dispatch_status: 'expire',
+          dispatch_locked_until: null,
+          notes: (course.notes || '') + ' | [AUTO-ANNULÉ] Cycle dispatch épuisé après 3 cycles sans livreur acceptant',
+        });
+        journaliserDispatch(base44, { course_id: courseId, country_code: course.country_code, vague: wave, evenement: 'cycle_epuise' });
+        const messageVenus = `📍 Malgré plusieurs tentatives, aucun livreur n'est disponible pour votre course. Votre course a été annulée. Veuillez réessayer plus tard.`;
+        notifierRedispatchClient({ base44, course, messageVenus, motif: 'auto_annulation' }).catch(err => console.error('[DISPATCH] ❌ VENUS notif auto-annulation:', err.message));
+        return { cycleEpuise: true };
+      }
       // Nouveau cycle immédiat : vider la liste des notifiés, recalculer les disponibilités
       // Les livreurs qui n'ont pas explicitement refusé restent éligibles (dispatch_refused_ids survit au reset)
-      console.log(`[DISPATCH] 🔄 Nouveau cycle — réinitialisation immédiate des notifiés pour course ${courseId}`);
+      console.log(`[DISPATCH] 🔄 Nouveau cycle ${cycleCount}/3 — réinitialisation des notifiés pour course ${courseId}`);
       await base44.asServiceRole.entities.CourseExterne.update(courseId, {
         dispatch_status: 'en_attente',
         dispatch_notified_ids: '[]',
         dispatch_wave_notified_ids: '[]',
         dispatch_wave: 0,
+        dispatch_cycle_count: cycleCount,
+        dispatch_locked_until: null,
         livreur_id: '',
         livreur_nom: '',
       });
@@ -700,6 +729,16 @@ Deno.serve(async (req) => {
       }
       if (!course) return Response.json({ error: 'Course introuvable' }, { status: 404 });
 
+      if (!course.country_code) {
+        console.error(`[DISPATCH] ❌ Course ${course_id} sans country_code — alerte admin`);
+        base44.asServiceRole.entities.Notification.create({
+          titre: '🚨 Course sans pays',
+          message: `Course ${course_id} (${course.adresse_depart || '?'}) n'a pas de country_code. Dispatch impossible.`,
+          type: 'alerte_critique_dispatch', course_id, lue: false,
+        }).catch(() => {});
+        return Response.json({ success: false, error: 'Course sans country_code — dispatch impossible' }, { status: 400 });
+      }
+
       if (!course.gps_depart_lat || !course.gps_depart_lng) {
         console.warn(`[DISPATCH] ⚠️ Course ${course_id} sans GPS`);
       }
@@ -707,6 +746,7 @@ Deno.serve(async (req) => {
       const result = await lancerDispatchMulti(base44, course_id, []);
       if (result.erreur) return Response.json({ error: result.erreur }, { status: 404 });
       if (result.ignore) return Response.json({ success: true, message: `Dispatch ignoré: ${result.statut}` });
+      if (result.locked) return Response.json({ success: true, locked: true, message: 'Course verrouillée par un autre tick' });
       if (result.noLivreur) return Response.json({ success: false, noLivreur: true });
       if (result.en_attente) return Response.json({ success: true, en_attente: true });
       if (result.cycleEpuise) return Response.json({ success: true, cycle_epuise: true });
@@ -1158,13 +1198,13 @@ Deno.serve(async (req) => {
       const filter = { statut: 'recherche_livreur' };
       if (filterCountry) filter.country_code = filterCountry;
 
-      const coursesRecherche = await base44.asServiceRole.entities.CourseExterne.filter(filter, '-created_date', 50);
+      const coursesRecherche = await base44.asServiceRole.entities.CourseExterne.filter(filter, '-created_date', 200);
 
       // ── Courses "nouvelle" avec dispatch en attente (créées par Venus/WhatsApp ou app client) ──
       // Elles doivent être prises en charge par le moteur de dispatch automatique
-      const filterNouvelles = { statut: 'nouvelle', dispatch_status: 'en_attente' };
+      const filterNouvelles = { statut: 'nouvelle' };
       if (filterCountry) filterNouvelles.country_code = filterCountry;
-      const coursesNouvelles = await base44.asServiceRole.entities.CourseExterne.filter(filterNouvelles, '-created_date', 50);
+      const coursesNouvelles = await base44.asServiceRole.entities.CourseExterne.filter(filterNouvelles, '-created_date', 200);
 
       const seenIds = new Set();
       const courses = [...coursesRecherche, ...coursesNouvelles].filter(c => {
@@ -1175,7 +1215,7 @@ Deno.serve(async (req) => {
       const now = new Date();
       const resultats = [];
 
-      const MAX_COURSES_PER_TICK = 10; // Limite anti-rate-limit (augmenté de 4 → 10)
+      const MAX_COURSES_PER_TICK = 25; // Limite anti-rate-limit (augmenté pour couvrir plus de courses)
       // 🎯 PHASE 8 — Tri par priorité : urgente > haute > normal
       // Les courses prioritaires sont traitées en premier à chaque tick
       const PRIORITY_ORDER = { urgente: 0, haute: 1, normal: 2 };
@@ -1234,7 +1274,7 @@ Deno.serve(async (req) => {
           }
 
           // 📌 Courses en attente / redispatch (hors vagues) → relancer
-          if (['en_attente', 'redispatch'].includes(course.dispatch_status)) {
+          if (!course.dispatch_status || ['en_attente', 'redispatch'].includes(course.dispatch_status)) {
             const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
             resultats.push({ course_id: course.id, wave: 'retry', ...result });
             continue;
