@@ -16,6 +16,44 @@
       "default": 0,
       "description": "Num\u00e9ro de vague de dispatch"
     },
+    "vague_avant": {
+      "type": "number",
+      "default": 0,
+      "description": "Num\u00e9ro de vague avant traitement"
+    },
+    "vague_apres": {
+      "type": "number",
+      "default": 0,
+      "description": "Num\u00e9ro de vague apr\u00e8s traitement"
+    },
+    "wave_started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de d\u00e9marrage de la vague"
+    },
+    "wave_expired_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date d'expiration de la vague"
+    },
+    "nombre_deja_consultes": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de livreurs d\u00e9j\u00e0 consult\u00e9s (cumul\u00e9)"
+    },
+    "nombre_nouveaux_notifies": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de nouveaux livreurs notifi\u00e9s dans cette vague"
+    },
+    "raison_passage": {
+      "type": "string",
+      "description": "Raison du passage \u00e0 la vague suivante"
+    },
+    "raison_blocage": {
+      "type": "string",
+      "description": "Raison du blocage si la course n'a pas avanc\u00e9"
+    },
     "pickup_source": {
       "type": "string",
       "enum": [
@@ -37,7 +75,8 @@
         "aucun_livreur",
         "acceptation",
         "refus",
-        "expiration"
+        "expiration",
+        "rattrapage"
       ],
       "description": "Type d'\u00e9v\u00e9nement de dispatch"
     },

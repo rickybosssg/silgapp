@@ -207,6 +207,16 @@
       "type": "number",
       "default": 0
     },
+    "dispatch_wave_started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de d\u00e9marrage de la vague actuelle"
+    },
+    "dispatch_next_wave_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date pr\u00e9vue de d\u00e9marrage de la prochaine vague"
+    },
     "timeout_expires_at": {
       "type": "string",
       "format": "date-time"

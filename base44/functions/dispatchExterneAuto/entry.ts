@@ -660,6 +660,8 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
     // ⚠️ On ne vide pas livreur_nom/livreur_telephone pour préserver la trace du dernier livreur
     heure_sollicitation: new Date().toISOString(),
     timeout_expires_at: timeoutAt,
+    dispatch_wave_started_at: new Date().toISOString(),
+    dispatch_next_wave_at: timeoutAt,
     dispatch_notified_ids: JSON.stringify(tousNotifies),
     dispatch_wave_notified_ids: JSON.stringify(nouveauxNotifiedIds),
   });
@@ -688,6 +690,13 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
     course_id: courseId,
     country_code: course.country_code,
     vague: wave,
+    vague_avant: course.dispatch_wave || 0,
+    vague_apres: wave,
+    wave_started_at: new Date().toISOString(),
+    wave_expired_at: timeoutAt,
+    nombre_deja_consultes: dejaNotifies.length,
+    nombre_nouveaux_notifies: selection.length,
+    raison_passage: wave > (course.dispatch_wave || 0) ? `vague_${course.dispatch_wave || 0}_expiree` : 'premier_lancement',
     pickup_source: pickupSource,
     evenement: 'vague',
     livreurs_selectionnes: selection.map(l => ({
@@ -732,6 +741,14 @@ function journaliserDispatch(base44, data) {
       course_id: data.course_id || '',
       heure: new Date().toISOString(),
       vague: data.vague || 0,
+      vague_avant: data.vague_avant ?? null,
+      vague_apres: data.vague_apres ?? null,
+      wave_started_at: data.wave_started_at || null,
+      wave_expired_at: data.wave_expired_at || null,
+      nombre_deja_consultes: data.nombre_deja_consultes ?? null,
+      nombre_nouveaux_notifies: data.nombre_nouveaux_notifies ?? null,
+      raison_passage: data.raison_passage || '',
+      raison_blocage: data.raison_blocage || '',
       pickup_source: data.pickup_source || '',
       evenement: data.evenement || 'vague',
       country_code: data.country_code || '',
@@ -1277,13 +1294,19 @@ Deno.serve(async (req) => {
         const pa = PRIORITY_ORDER[a.priority] ?? 2;
         const pb = PRIORITY_ORDER[b.priority] ?? 2;
         if (pa !== pb) return pa - pb;
-        return 0; // conserve l'ordre par created_date (-created_date du filtre)
+        // ✅ Prioriser les courses ANCIENNES en premier (plus longtemps bloquées)
+        // Une course ancienne bloquée ne doit jamais être repoussée par les nouvelles
+        return new Date(a.created_date).getTime() - new Date(b.created_date).getTime();
       };
       // Prioriser les courses VRAIMENT bloquées (en_attente/redispatch/cycle_epuise)
       // ET les courses "propose" avec timeout expiré (besoin d'avancement de vague immédiat)
       const isStuck = (c) => {
         if (['en_attente', 'redispatch', 'cycle_epuise'].includes(c.dispatch_status)) return true;
-        if (c.dispatch_status === 'propose' && c.timeout_expires_at && new Date(c.timeout_expires_at) < now) return true;
+        // ✅ Course en 'propose' = bloquée si timeout expiré OU timeout manquant (corrompu)
+        if (c.dispatch_status === 'propose') {
+          if (!c.timeout_expires_at) return true;
+          if (new Date(c.timeout_expires_at) < now) return true;
+        }
         return false;
       };
       const stuck = courses.filter(isStuck).sort(sortByPriority);
@@ -1301,6 +1324,35 @@ Deno.serve(async (req) => {
 
       for (const course of coursesToProcess) {
         try {
+          // 🚨 RATTRAPAGE: course bloquée depuis > 2x le délai normal de vague
+          // Force-reset et re-dispatch immédiat pour débloquer la course
+          const waveTimeoutMs = (cachedConfig.gps.waves[0]?.timeout_sec || 60) * 1000;
+          const stuckDurationMs = now.getTime() - new Date(course.updated_date).getTime();
+          if (stuckDurationMs > waveTimeoutMs * 2 && course.dispatch_status === 'propose' && !course.livreur_id) {
+            console.log(`[DISPATCH] 🚨 RATTRAPAGE: Course ${course.id} bloquée depuis ${Math.round(stuckDurationMs / 60000)}min — force-reset vague`);
+            await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+              dispatch_status: 'redispatch',
+              dispatch_locked_until: null,
+              timeout_expires_at: null,
+            });
+            base44.asServiceRole.entities.Notification.create({
+              titre: '🚨 Course bloquée — rattrapage automatique',
+              message: `Course ${course.client_nom || '?'} (${course.adresse_depart || '?'}) bloquée depuis ${Math.round(stuckDurationMs / 60000)}min — rattrapage automatique déclenché.`,
+              type: 'alerte_critique_dispatch', course_id: course.id, lue: false,
+            }).catch(() => {});
+            journaliserDispatch(base44, {
+              course_id: course.id, country_code: course.country_code,
+              vague: course.dispatch_wave || 0,
+              vague_avant: course.dispatch_wave || 0,
+              vague_apres: course.dispatch_wave || 0,
+              evenement: 'rattrapage',
+              raison_passage: `bloquée_${Math.round(stuckDurationMs / 60000)}min_force_reset`,
+            });
+            const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
+            resultats.push({ course_id: course.id, wave: 'rattrapage', ...result });
+            continue;
+          }
+
           // 🔄 cycle_epuise : VENUS a demandé au client s'il veut relancer.
           // On attend sa réponse (15 min max). Si timeout → auto-annulation.
           if (course.dispatch_status === 'cycle_epuise') {
@@ -1335,7 +1387,8 @@ Deno.serve(async (req) => {
           }
 
           // 🌊/📍 Vagues expirées (propose sans verrou, mode vagues heartbeat ou GPS)
-          const expired = !!(course.timeout_expires_at && new Date(course.timeout_expires_at) < now);
+          // ✅ Traiter null timeout comme expiré (course corrompue ne doit jamais rester bloquée)
+          const expired = !course.timeout_expires_at || new Date(course.timeout_expires_at) < now;
           if (!expired || course.dispatch_status !== 'propose') continue;
 
           // ⏰ Verrou expiré AVEC livreur_id (prix manuel sans réponse client, ou acceptation expirée)
