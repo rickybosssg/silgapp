@@ -463,7 +463,7 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
 
   // 🎯 NOUVELLE LOGIQUE : tous les candidats (GPS ≤ 60 min) triés par distance
   // Les vagues contrôlent uniquement la taille des lots, pas le filtrage GPS
-  let wave = course.dispatch_wave || 1;
+  let wave = course.dispatch_wave || 1; // 0 → 1 au premier lancement (vagues sont 1-indexed)
 
   let candidats = candidatsTous;
 
@@ -1154,13 +1154,13 @@ Deno.serve(async (req) => {
       const filter = { statut: 'recherche_livreur' };
       if (filterCountry) filter.country_code = filterCountry;
 
-      const coursesRecherche = await base44.asServiceRole.entities.CourseExterne.filter(filter, '-created_date', 20);
+      const coursesRecherche = await base44.asServiceRole.entities.CourseExterne.filter(filter, '-created_date', 50);
 
       // ── Courses "nouvelle" avec dispatch en attente (créées par Venus/WhatsApp ou app client) ──
       // Elles doivent être prises en charge par le moteur de dispatch automatique
       const filterNouvelles = { statut: 'nouvelle', dispatch_status: 'en_attente' };
       if (filterCountry) filterNouvelles.country_code = filterCountry;
-      const coursesNouvelles = await base44.asServiceRole.entities.CourseExterne.filter(filterNouvelles, '-created_date', 20);
+      const coursesNouvelles = await base44.asServiceRole.entities.CourseExterne.filter(filterNouvelles, '-created_date', 50);
 
       const seenIds = new Set();
       const courses = [...coursesRecherche, ...coursesNouvelles].filter(c => {
@@ -1171,7 +1171,7 @@ Deno.serve(async (req) => {
       const now = new Date();
       const resultats = [];
 
-      const MAX_COURSES_PER_TICK = 4; // Limite anti-rate-limit stricte
+      const MAX_COURSES_PER_TICK = 10; // Limite anti-rate-limit (augmenté de 4 → 10)
       // 🎯 PHASE 8 — Tri par priorité : urgente > haute > normal
       // Les courses prioritaires sont traitées en premier à chaque tick
       const PRIORITY_ORDER = { urgente: 0, haute: 1, normal: 2 };
@@ -1378,7 +1378,7 @@ Deno.serve(async (req) => {
         ['en_attente', 'redispatch', 'cycle_epuise'].includes(c.dispatch_status)
       );
 
-      const MAX_COURSES_PER_TICK = 4;
+      const MAX_COURSES_PER_TICK = 10;
       const coursesToProcess = aRetenter.slice(0, MAX_COURSES_PER_TICK);
       if (aRetenter.length > MAX_COURSES_PER_TICK) {
         console.log(`[DISPATCH] ⚡ ${aRetenter.length} courses à retenter — limitation à ${MAX_COURSES_PER_TICK}/tick`);

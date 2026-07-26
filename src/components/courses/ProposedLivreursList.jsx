@@ -63,14 +63,11 @@ export default function ProposedLivreursList({ course }) {
     ? Math.max(1, Math.round((expiresTs - sollicitationTs) / 1000))
     : 120;
 
-  // ── Estimation du prochain tick du moteur de dispatch (toutes les 5 min = 300s) ──
-  // Le tick est indépendant du timeout : il tourne sur son propre intervalle.
-  // On estime le reste jusqu'au prochain tick depuis updated_date de la course.
-  const DISPATCH_TICK_SEC = 300;
-  const updatedTs = course?.updated_date ? new Date(course.updated_date).getTime() : null;
-  const nextTickIn = updatedTs
-    ? Math.max(0, DISPATCH_TICK_SEC - (Math.floor((now - updatedTs) / 1000) % DISPATCH_TICK_SEC))
-    : null;
+  // ── Estimation du prochain tick du moteur de dispatch ──
+  // Deux automations tournent toutes les 5 min, décalées de 2.5 min (start_time 00:00 et 00:02).
+  // Fréquence effective : ~2.5 min. On calcule depuis l'horloge (pas updated_date).
+  const TICK_HALF_SEC = 150;
+  const nextTickIn = Math.max(0, TICK_HALF_SEC - (Math.floor(now / 1000) % TICK_HALF_SEC));
 
   useEffect(() => {
     let mounted = true;
