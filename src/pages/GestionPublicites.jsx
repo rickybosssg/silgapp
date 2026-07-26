@@ -183,10 +183,23 @@ export default function GestionPublicites() {
   };
 
   const handleFileChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const rawFile = e.target.files?.[0];
+    if (!rawFile) return;
     setUploading(true);
     try {
+      // Android WebView: le File de <input type="file"> peut avoir un MIME type
+      // vide ou des propriétés incomplètes → on lit en mémoire et on recrée un
+      // File valide avec un type explicite.
+      const isVideo = form.type_media === "video";
+      const mime = rawFile.type || (isVideo ? "video/mp4" : "image/jpeg");
+      const ext = rawFile.name?.split(".").pop()?.toLowerCase() || (isVideo ? "mp4" : "jpg");
+      const fileName = rawFile.name || `upload.${ext}`;
+
+      const buffer = await rawFile.arrayBuffer();
+      const file = new File([buffer], fileName, { type: mime });
+
+      if (file.size === 0) throw new Error("Fichier vide");
+
       const result = await base44.integrations.Core.UploadFile({ file });
       const file_url = result?.file_url;
       if (!file_url) throw new Error("URL manquante");
