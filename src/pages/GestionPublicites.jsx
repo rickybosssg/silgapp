@@ -1,6 +1,8 @@
 import React, { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { Capacitor } from "@capacitor/core";
+import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -176,17 +178,42 @@ export default function GestionPublicites() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) {
-      toast.error("Aucun fichier sélectionné");
-      return;
+  const pickFromGallery = async () => {
+    setUploading(true);
+    try {
+      const photo = await Camera.getPhoto({
+        quality: 80,
+        resultType: CameraResultType.DataUrl,
+        source: CameraSource.Photos,
+        allowEditing: false,
+      });
+      const mimeType = photo.format === "png" ? "image/png" : "image/jpeg";
+      const fileName = `pub_${Date.now()}.${photo.format || "jpg"}`;
+      const file = await fetch(photo.dataUrl).then(r => r.blob()).then(b => new File([b], fileName, { type: mimeType }));
+      const result = await base44.integrations.Core.UploadFile({ file });
+      const file_url = result?.file_url;
+      if (!file_url) throw new Error("URL de fichier manquante");
+      setForm(prev => ({ ...prev, media_url: file_url }));
+      toast.success("Média uploadé avec succès");
+    } catch (err) {
+      if (err?.message?.includes("cancelled") || err?.message?.includes("User denied")) return;
+      toast.error("Erreur upload : " + (err?.message || "Échec"));
+    } finally {
+      setUploading(false);
     }
+  };
+
+  const handleUpload = async (e) => {
+    if (Capacitor.isNativePlatform()) {
+      return pickFromGallery();
+    }
+    const file = e.target.files?.[0];
+    if (!file) return;
     setUploading(true);
     try {
       const result = await base44.integrations.Core.UploadFile({ file });
       const file_url = result?.file_url;
-      if (!file_url) throw new Error("URL de fichier manquante dans la réponse");
+      if (!file_url) throw new Error("URL de fichier manquante");
       setForm(prev => ({ ...prev, media_url: file_url }));
       toast.success("Média uploadé avec succès");
     } catch (err) {
