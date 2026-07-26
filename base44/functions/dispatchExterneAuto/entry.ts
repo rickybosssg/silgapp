@@ -519,14 +519,31 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
       journaliserDispatch(base44, { course_id: courseId, country_code: course.country_code, vague: wave, evenement: 'reset' });
       return { cycleReset: true };
     } else {
-      // Aucun livreur dispo du tout
+      // Aucun livreur dispo du tout — incrémenter la vague pour éviter de rester bloqué à 0
+      const nextWave = wave + 1;
+      if (nextWave > gpsConfig.waves.length) {
+        // Toutes les vagues épuisées sans jamais trouver de livreur → cycle_epuise
+        console.log(`[DISPATCH] 📍 Vagues épuisées sans livreur — cycle_epuise pour course ${courseId}`);
+        const cycleEpuiseDeadline = new Date(Date.now() + CYCLE_EPUISE_TIMEOUT_MS).toISOString();
+        await base44.asServiceRole.entities.CourseExterne.update(courseId, {
+          dispatch_status: 'cycle_epuise',
+          dispatch_wave: gpsConfig.waves.length,
+          timeout_expires_at: cycleEpuiseDeadline,
+        });
+        journaliserDispatch(base44, { course_id: courseId, country_code: course.country_code, vague: wave, evenement: 'cycle_epuise' });
+        // ── Notifier VENUS WhatsApp au client ──
+        const messageVenus = `📍 Nous avons sollicité tous les livreurs disponibles autour de vous, mais aucun n'a accepté votre course pour le moment.\n\nVoulez-vous que je relance la recherche ?\n\nRépondez 'oui' pour relancer ou 'non' pour annuler.`;
+        notifierRedispatchClient({ base44, course, messageVenus, motif: 'cycle_epuise' }).catch(err => console.error('[DISPATCH] ❌ VENUS notif cycle_epuise:', err.message));
+        return { cycleEpuise: true };
+      }
       await base44.asServiceRole.entities.CourseExterne.update(courseId, {
         dispatch_status: 'en_attente',
+        dispatch_wave: nextWave,
         livreur_id: '',
         livreur_nom: '',
       });
-      console.log(`[DISPATCH] ⚠️ Aucun livreur disponible — course ${courseId} en attente`);
-      journaliserDispatch(base44, { course_id: courseId, country_code: course.country_code, vague: wave, evenement: 'aucun_livreur', raisons_exclusion: raisonsExclusion });
+      console.log(`[DISPATCH] ⚠️ Aucun livreur disponible — course ${courseId} en attente (tentative ${nextWave}/${gpsConfig.waves.length})`);
+      journaliserDispatch(base44, { course_id: courseId, country_code: course.country_code, vague: nextWave, evenement: 'aucun_livreur', raisons_exclusion: raisonsExclusion });
       return { noLivreur: true };
     }
   }
