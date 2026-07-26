@@ -484,12 +484,16 @@ async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConf
     }
   }
 
-  if (candidats.length === 0) {
-    // 🔄 FALLBACK: essayer sans le filtre GPS (livreurs avec GPS expiré ou sans GPS)
+  // 🔄 FALLBACK: si pas assez de candidats avec GPS frais pour remplir la vague,
+  // ajouter les livreurs sans GPS récent (GPS expiré ou manquant)
+  const waveIndexFb = Math.min(wave - 1, gpsConfig.waves.length - 1);
+  const waveSizeFb = gpsConfig.waves[waveIndexFb]?.size || 3;
+  if (candidats.length < waveSizeFb && waveSizeFb < 999) {
     const fallbackResult = await trouverLivreursCandidats(base44, course, exclusions, { skipGpsFilter: true });
-    if (fallbackResult.tous && fallbackResult.tous.length > 0) {
-      candidats = fallbackResult.tous;
-      console.log(`[DISPATCH] 📍 Fallback sans GPS: ${candidats.length} candidats supplémentaires pour course ${courseId}`);
+    const fallbackCandidats = (fallbackResult.tous || []).filter(f => !candidats.some(c => c.id === f.id));
+    if (fallbackCandidats.length > 0) {
+      candidats = [...candidats, ...fallbackCandidats];
+      console.log(`[DISPATCH] 📍 +${fallbackCandidats.length} candidats sans GPS frais ajoutés (vague ${wave}, besoin: ${waveSizeFb}) pour course ${courseId}`);
     }
   }
 
