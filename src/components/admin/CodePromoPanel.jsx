@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Tag, ToggleLeft, ToggleRight, Users, TrendingUp, Gift, Trash2, X, ChevronDown } from "lucide-react";
+import { Plus, Tag, ToggleLeft, ToggleRight, Users, TrendingUp, Gift, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 const PAYS_LISTE = [
@@ -338,7 +338,6 @@ function CreateCodeModal({ onClose, onCreated }) {
 
 export default function CodePromoPanel() {
   const [showCreate, setShowCreate] = useState(false);
-  const [expandedId, setExpandedId] = useState(null);
   const qc = useQueryClient();
 
   const { data: codes = [], refetch } = useQuery({
@@ -415,13 +414,8 @@ export default function CodePromoPanel() {
             const pays = getPays(c.country_code);
             const primesCode = getPrimesForCode(c.id);
             return (
-              <Card key={c.id} className={`p-0 border-2 overflow-hidden ${c.actif ? "border-purple-200" : "border-gray-200 opacity-60"}`}>
-                {/* En-tête cliquable — replie/déplie les détails */}
-                <button
-                  type="button"
-                  onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
-                  className="w-full flex items-center justify-between gap-3 p-4 text-left hover:bg-purple-50/50 transition-colors"
-                >
+              <Card key={c.id} className={`p-4 border-2 ${c.actif ? "border-purple-200" : "border-gray-200 opacity-60"}`}>
+                <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       <span className="font-black text-lg text-purple-700 font-mono tracking-widest">{c.code}</span>
@@ -430,52 +424,45 @@ export default function CodePromoPanel() {
                       </Badge>
                       {pays && <span className="text-sm">{pays.emoji} {pays.nom}</span>}
                     </div>
-                    <p className="text-sm font-semibold text-foreground truncate">
+                    <p className="text-sm font-semibold text-foreground">
                       {c.proprietaire_type === "livreur" ? "🏍️" : c.proprietaire_type === "partenaire" ? "🏪" : "👤"} {c.proprietaire_nom}
                     </p>
+                    {c.proprietaire_email && <p className="text-xs text-muted-foreground">{c.proprietaire_email}</p>}
+                    <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1"><Users className="w-3 h-3" />{c.nb_inscrits || 0} inscrits</span>
+                      <span className="flex items-center gap-1"><TrendingUp className="w-3 h-3" />{c.nb_premieres_courses || 0} 1ères courses</span>
+                      <span className="flex items-center gap-1"><Gift className="w-3 h-3" />{(c.total_primes_generees || 0).toLocaleString()} F primes</span>
+                    </div>
                   </div>
-                  <div className="flex gap-1 flex-shrink-0 items-center" onClick={e => e.stopPropagation()}>
+                  <div className="flex gap-1 flex-shrink-0">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleToggle(c)} title={c.actif ? "Désactiver" : "Activer"}>
                       {c.actif ? <ToggleRight className="w-4 h-4 text-green-600" /> : <ToggleLeft className="w-4 h-4 text-gray-400" />}
                     </Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-700" onClick={() => handleDelete(c)}>
                       <Trash2 className="w-4 h-4" />
                     </Button>
-                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedId === c.id ? "rotate-180" : ""}`} />
                   </div>
-                </button>
+                </div>
 
-                {/* Détails dépliables */}
-                {expandedId === c.id && (
-                  <div className="px-4 pb-4 space-y-2 border-t border-purple-100 pt-3">
-                    {c.proprietaire_email && <p className="text-xs text-muted-foreground">📧 {c.proprietaire_email}</p>}
-                    <div className="flex gap-4 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1"><Users className="w-3 h-3" />{c.nb_inscrits || 0} inscrits</span>
-                      <span className="flex items-center gap-1"><TrendingUp className="w-3 h-3" />{c.nb_premieres_courses || 0} 1ères courses</span>
-                      <span className="flex items-center gap-1"><Gift className="w-3 h-3" />{(c.total_primes_generees || 0).toLocaleString()} F primes</span>
-                    </div>
-
-                    {/* Détail primes récentes */}
-                    {primesCode.length > 0 && (
-                      <div className="pt-2 border-t border-dashed space-y-1">
-                        <p className="text-xs font-bold text-gray-600">Primes récentes :</p>
-                        {primesCode.slice(0, 3).map(p => (
-                          <div key={p.id} className="flex items-center justify-between text-xs">
-                            <span className="text-gray-700">👤 {p.client_nouveau_nom}</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-gray-500">{p.prix_course?.toLocaleString()} F</span>
-                              <Badge className={
-                                p.statut === "validee" ? "bg-green-100 text-green-700 text-[10px] py-0" :
-                                p.statut === "annulee" ? "bg-red-100 text-red-700 text-[10px] py-0" :
-                                "bg-yellow-100 text-yellow-700 text-[10px] py-0"
-                              }>
-                                {p.statut === "validee" ? `+${p.prime_proprietaire} F` : p.statut === "annulee" ? "Annulée" : "En attente"}
-                              </Badge>
-                            </div>
-                          </div>
-                        ))}
+                {/* Détail primes récentes */}
+                {primesCode.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-dashed space-y-1">
+                    <p className="text-xs font-bold text-gray-600">Primes récentes :</p>
+                    {primesCode.slice(0, 3).map(p => (
+                      <div key={p.id} className="flex items-center justify-between text-xs">
+                        <span className="text-gray-700">👤 {p.client_nouveau_nom}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-500">{p.prix_course?.toLocaleString()} F</span>
+                          <Badge className={
+                            p.statut === "validee" ? "bg-green-100 text-green-700 text-[10px] py-0" :
+                            p.statut === "annulee" ? "bg-red-100 text-red-700 text-[10px] py-0" :
+                            "bg-yellow-100 text-yellow-700 text-[10px] py-0"
+                          }>
+                            {p.statut === "validee" ? `+${p.prime_proprietaire} F` : p.statut === "annulee" ? "Annulée" : "En attente"}
+                          </Badge>
+                        </div>
                       </div>
-                    )}
+                    ))}
                   </div>
                 )}
               </Card>
