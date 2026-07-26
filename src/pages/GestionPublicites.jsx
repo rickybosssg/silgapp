@@ -177,9 +177,7 @@ export default function GestionPublicites() {
   };
 
   const handleUpload = () => {
-    if (!fileInputRef.current) return;
-    fileInputRef.current.value = "";
-    fileInputRef.current.click();
+    fileInputRef.current?.click();
   };
 
   const handleFileChange = async (e) => {
@@ -516,7 +514,7 @@ export default function GestionPublicites() {
                     type="file"
                     accept={form.type_media === "video" ? "video/*" : "image/*"}
                     onChange={handleFileChange}
-                    className="absolute opacity-0 -left-[9999px] w-px h-px overflow-hidden"
+                    className="hidden"
                   />
                   {form.media_url && (
                     <div className="relative rounded-xl overflow-hidden bg-gray-100">
