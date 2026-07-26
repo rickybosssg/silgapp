@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -72,6 +72,7 @@ export default function GestionPublicites() {
   const [form, setForm] = useState(defaultForm);
   const [uploading, setUploading] = useState(false);
   const [filterCible, setFilterCible] = useState("tous_filtres");
+  const fileInputRef = useRef(null);
   const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry, setSelectedCountry } = useAdminContext();
   const paysActifs = usePaysActifs();
 
@@ -478,11 +479,21 @@ export default function GestionPublicites() {
               {form.type_media !== "texte" && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Label htmlFor="upload-media" className={`flex-1 flex items-center justify-center gap-2 h-12 rounded-xl border-2 border-dashed cursor-pointer transition-all ${uploading ? "border-violet-400 bg-violet-50" : "border-gray-300 hover:border-violet-400 hover:bg-violet-50"}`}>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`flex-1 flex items-center justify-center gap-2 h-12 rounded-xl border-2 border-dashed cursor-pointer transition-all ${uploading ? "border-violet-400 bg-violet-50" : "border-gray-300 hover:border-violet-400 hover:bg-violet-50"}`}
+                    >
                       {uploading ? <Loader2 className="w-4 h-4 animate-spin text-violet-600" /> : <Plus className="w-4 h-4 text-gray-400" />}
                       <span className="text-xs font-semibold text-gray-500">{uploading ? "Upload en cours..." : "Uploader un fichier"}</span>
-                    </Label>
-                    <input id="upload-media" type="file" className="hidden" accept={form.type_media === "video" ? "video/*" : "image/*"} onChange={handleUpload} />
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      className="hidden"
+                      accept={form.type_media === "video" ? "video/*" : "image/*"}
+                      onChange={handleUpload}
+                    />
                   </div>
                   {form.media_url && (
                     <div className="relative rounded-xl overflow-hidden bg-gray-100">
