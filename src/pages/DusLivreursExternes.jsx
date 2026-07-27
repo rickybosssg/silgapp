@@ -243,6 +243,7 @@ export default function DusLivreursExternes() {
     queryFn: () => base44.entities.Boutique.filter(boutiquesFilter, "-created_date", 200),
     initialData: [],
     refetchInterval: 15000,
+    enabled: activeTab === "boutiques",
   });
 
   const { data: restaurants = [] } = useQuery({
@@ -250,6 +251,7 @@ export default function DusLivreursExternes() {
     queryFn: () => base44.entities.Restaurant.filter(restaurantsFilter, "-created_date", 200),
     initialData: [],
     refetchInterval: 15000,
+    enabled: activeTab === "restaurants",
   });
 
   const { data: frais = [], isLoading: fraisLoading } = useQuery({

@@ -22,6 +22,7 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import CodePromoPanel from "@/components/admin/CodePromoPanel";
+import { toast } from "sonner";
 
 export default function Dashboard() {
   const [selectedCourse, setSelectedCourse] = useState(null);
@@ -33,14 +34,14 @@ export default function Dashboard() {
     queryKey: ["courses"],
     queryFn: () => base44.entities.Course.filter({ reseau: "interne" }, "-created_date", 500),
     initialData: [],
-    refetchInterval: 5000,
+    refetchInterval: 10000,
   });
 
   const { data: livreurs = [] } = useQuery({
     queryKey: ["livreurs"],
     queryFn: () => base44.entities.Livreur.filter({ type_livreur: "interne" }),
     initialData: [],
-    refetchInterval: 5000,
+    refetchInterval: 10000,
   });
 
   // Courses du jour = créées aujourd'hui OU encore actives (pas terminées)
@@ -173,7 +174,7 @@ export default function Dashboard() {
             livreur_id: course.livreur_id,
           }).then(() => {
             queryClient.invalidateQueries({ queryKey: ["courses"] });
-          }).catch(err => alert("Erreur : " + err.message));
+          }).catch(err => toast.error("Erreur : " + err.message));
         }}
       />
 

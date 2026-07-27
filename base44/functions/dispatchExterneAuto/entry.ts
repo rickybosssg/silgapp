@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { notifierRedispatchClient } from '../../shared/venusRedispatchNotifier.ts';
 
 // Délai d'attente maximum avant auto-annulation quand le client ne répond pas
@@ -889,15 +889,6 @@ Deno.serve(async (req) => {
         return Response.json({ found: false, cancelled: true });
       }
 
-      // 🚫 Vérifier blocage encours du livreur
-      const livreurCheck = countryGuard.livreur;
-      if (livreurCheck?.bloque_encours) {
-        return Response.json({ 
-          found: false, bloque_encours: true,
-          error: 'Votre plafond d\'encours SILGAPP a été atteint. Veuillez effectuer votre dépôt auprès de SILGAPP afin de réactiver votre compte.',
-        });
-      }
-
       if (course.dispatch_status === 'accepte') {
         // 🔧 CORRECTION : distinguer "j'ai accepté" vs "un autre a accepté"
         if (String(course.livreur_id) === String(livreur_id) || String(course.accepted_by_livreur_id) === String(livreur_id)) {
@@ -939,7 +930,7 @@ Deno.serve(async (req) => {
       const STATUTS_ACTIFS = ['livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison'];
       const coursesActivesLivreur = await base44.asServiceRole.entities.CourseExterne.filter({
         livreur_id: livreur_id,
-      });
+      }, '-created_date', 20);
       const courseActiveExistante = coursesActivesLivreur.find(c =>
         STATUTS_ACTIFS.includes(c.statut) && c.id !== course_id
       );
@@ -1382,8 +1373,13 @@ Deno.serve(async (req) => {
       if (coursesJamaisTraitees.length > 0) {
         // Batch query: récupérer les DispatchLogs récents pour ces courses
         // Si une course a un log, elle a déjà été traitée (même si elle est retombée en en_attente)
-        const recentLogs = await base44.asServiceRole.entities.DispatchLog.filter({}, '-heure', 200);
-        const logCourseIds = new Set(recentLogs.map(l => l.course_id));
+        const logCourseIds = new Set();
+        for (const c of coursesJamaisTraitees) {
+          try {
+            const logs = await base44.asServiceRole.entities.DispatchLog.filter({ course_id: c.id }, '-heure', 1);
+            if (logs.length > 0) logCourseIds.add(c.id);
+          } catch {}
+        }
 
         const vraimentJamaisTraitees = coursesJamaisTraitees.filter(c => !logCourseIds.has(c.id));
 
@@ -1607,14 +1603,17 @@ Deno.serve(async (req) => {
           // (courses ne contient que les statuts recherche_livreur + nouvelle, pas les actives)
           const livreursAVerifier = livreursEnCourse.filter(l => !livreurIdsAvecCourseActive.has(l.id));
           if (livreursAVerifier.length > 0) {
-            const recentCoursesForCheck = await base44.asServiceRole.entities.CourseExterne.filter(
-              {}, '-created_date', 200
-            );
-            const activeIds = new Set(
-              recentCoursesForCheck
-                .filter(c => STATUTS_ACTIFS_VERIF.includes(c.statut) && c.livreur_id)
-                .map(c => c.livreur_id)
-            );
+            const activeIds = new Set();
+            for (const l of livreursAVerifier) {
+              try {
+                const livreurCourses = await base44.asServiceRole.entities.CourseExterne.filter(
+                  { livreur_id: l.id }, '-created_date', 5
+                );
+                if ((livreurCourses || []).some(c => STATUTS_ACTIFS_VERIF.includes(c.statut))) {
+                  activeIds.add(l.id);
+                }
+              } catch {}
+            }
             const livreursFantomes = livreursAVerifier.filter(l => !activeIds.has(l.id));
             for (const l of livreursFantomes) {
               const nouveauStatut = l.manual_hors_ligne === true ? 'hors_ligne' : 'disponible';

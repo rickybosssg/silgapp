@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 
 // Tarifs par pays (fallback si pas de config en DB)
 const TARIFS_PAYS = {
