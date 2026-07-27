@@ -804,19 +804,28 @@ Deno.serve(async (req) => {
       if (!course_id) return Response.json({ error: 'course_id requis' }, { status: 400 });
 
       // 🔄 RETRY — l'automation entity peut se déclencher avant que la course soit
-      // totalement disponible en base (cohérence à terme). On retente 5 fois avec 3s de délai.
+      // totalement disponible en base (cohérence à terme). On retente 3 fois avec 2s de délai.
+      // Si le GET échoue, on utilise body.data (les données de l'événement entity) comme fallback.
       let course;
-      for (let attempt = 1; attempt <= 5; attempt++) {
+      for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
           if (course) break;
         } catch (e) {
-          console.warn(`[DISPATCH] ⚠️ Course ${course_id} tentative ${attempt}/5 échouée: ${e.message}`);
+          console.warn(`[DISPATCH] ⚠️ Course ${course_id} tentative ${attempt}/3 échouée: ${e.message}`);
         }
-        if (attempt < 5) await new Promise(r => setTimeout(r, 3000));
+        if (attempt < 3) await new Promise(r => setTimeout(r, 2000));
+      }
+      // 🛡️ FALLBACK body.data — l'automatisation entity envoie les données de la course
+      // dans le payload. Si le GET échoue (cohérence à terme), on utilise ces données
+      // pour démarrer le dispatch immédiatement sans attendre le tick programmé.
+      if (!course && body.data) {
+        console.log(`[DISPATCH] 🛡️ Course ${course_id} introuvable via GET — utilisation de body.data (entity event)`);
+        course = body.data;
+        course.id = course_id;
       }
       if (!course) {
-        console.warn(`[DISPATCH] ⚠️ Course ${course_id} introuvable après 5 tentatives — ignorée`);
+        console.warn(`[DISPATCH] ⚠️ Course ${course_id} introuvable après 3 tentatives et pas de body.data — ignorée`);
         return Response.json({ success: true, ignore: true, message: 'Course supprimée — ignorée' });
       }
 
