@@ -243,16 +243,28 @@ async function trouverLivreursCandidats(base44, course, exclusions = [], options
   let pickupLng = course.gps_depart_lng;
   let pickupSource = 'gps';
 
-  if ((!pickupLat || !pickupLng) && course.quartier_depart) {
+  // 🔍 Résolution quartier : utiliser quartier_depart s'il existe, SINON essayer adresse_depart
+  const quartierCandidate = course.quartier_depart || course.adresse_depart;
+  if ((!pickupLat || !pickupLng) && quartierCandidate) {
     try {
-      const quartiers = await base44.asServiceRole.entities.Quartier.filter({
-        country_code: course.country_code, nom: course.quartier_depart, actif: true,
+      // Essayer d'abord avec le nom exact
+      let quartiers = await base44.asServiceRole.entities.Quartier.filter({
+        country_code: course.country_code, nom: quartierCandidate, actif: true,
       });
+      // Si pas de match exact, chercher par correspondance normalisée (insensible à la casse/accents)
+      if (!quartiers?.[0]?.latitude) {
+        const allQuartiers = await base44.asServiceRole.entities.Quartier.filter({
+          country_code: course.country_code, actif: true,
+        }, 'nom', 500);
+        const normalized = normalizeNom(quartierCandidate);
+        const match = (allQuartiers || []).find(q => normalizeNom(q.nom) === normalized);
+        if (match?.latitude && match?.longitude) quartiers = [match];
+      }
       if (quartiers?.[0]?.latitude && quartiers[0]?.longitude) {
         pickupLat = quartiers[0].latitude;
         pickupLng = quartiers[0].longitude;
         pickupSource = 'quartier';
-        console.log(`[DISPATCH] 📍 Fallback quartier: ${course.quartier_depart} (${pickupLat}, ${pickupLng})`);
+        console.log(`[DISPATCH] 📍 Fallback quartier: ${quartierCandidate} (${pickupLat}, ${pickupLng})`);
       }
     } catch (_) {}
   }
@@ -792,19 +804,19 @@ Deno.serve(async (req) => {
       if (!course_id) return Response.json({ error: 'course_id requis' }, { status: 400 });
 
       // 🔄 RETRY — l'automation entity peut se déclencher avant que la course soit
-      // totalement disponible en base. On retente 3 fois avec 2s de délai.
+      // totalement disponible en base (cohérence à terme). On retente 5 fois avec 3s de délai.
       let course;
-      for (let attempt = 1; attempt <= 3; attempt++) {
+      for (let attempt = 1; attempt <= 5; attempt++) {
         try {
           course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
           if (course) break;
         } catch (e) {
-          console.warn(`[DISPATCH] ⚠️ Course ${course_id} tentative ${attempt}/3 échouée: ${e.message}`);
+          console.warn(`[DISPATCH] ⚠️ Course ${course_id} tentative ${attempt}/5 échouée: ${e.message}`);
         }
-        if (attempt < 3) await new Promise(r => setTimeout(r, 2000));
+        if (attempt < 5) await new Promise(r => setTimeout(r, 3000));
       }
       if (!course) {
-        console.warn(`[DISPATCH] ⚠️ Course ${course_id} introuvable après 3 tentatives — ignorée`);
+        console.warn(`[DISPATCH] ⚠️ Course ${course_id} introuvable après 5 tentatives — ignorée`);
         return Response.json({ success: true, ignore: true, message: 'Course supprimée — ignorée' });
       }
 
