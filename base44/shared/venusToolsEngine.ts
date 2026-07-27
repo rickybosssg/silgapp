@@ -669,8 +669,8 @@ const INTENTION_PATTERNS: Record<string, string[]> = {
     'il arrive', 'quand', 'ou ca en est',
   ],
   annuler_course: [
-    'annuler', 'annulation', 'je veux annuler', 'stop', 'arrete',
-    'plus besoin',
+    'annuler', 'annule', 'annulation', 'je veux annuler', 'stop', 'arrete',
+    'plus besoin', 'ne veux plus', 'laisse tomber', 'abandonne',
   ],
   contacter_livreur: [
     'contacter', 'appeler', 'parler au', 'joindre', 'numero du livreur',
@@ -683,12 +683,16 @@ const INTENTION_PATTERNS: Record<string, string[]> = {
   ],
   salutation: [
     'bonjour', 'salut', 'bonsoir', 'coucou', 'hello', 'bonne journee',
-    'cc', 'bon apres',
+    'cc', 'bjr', 'bonsoit', 'bon apres',
   ],
 };
 
 export function detecterIntentionRapide(message: string): string {
-  const msg = (message || '').toLowerCase().trim();
+  const msg = (message || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
 
   // Salutation en premier (messages courts)
   if (msg.length < 30) {
@@ -720,7 +724,8 @@ export function detecterIntentionRapide(message: string): string {
   // Création de course (mots-clés d'action)
   if (msg.includes('envoyer') || msg.includes('expedier') || msg.includes('envoi') ||
       msg.includes('recevoir') || msg.includes('reception') ||
-      msg.includes('deplac') || msg.includes('livrer') || msg.includes('livraison')) {
+      msg.includes('deplac') || msg.includes('livrer') || msg.includes('livraison') ||
+      msg.includes('livrason') || msg.includes('livrison')) {
     return 'creer_course';
   }
 

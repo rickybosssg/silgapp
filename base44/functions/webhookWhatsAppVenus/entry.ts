@@ -52,6 +52,15 @@ import {
 import { normalizePhone } from '../../shared/phoneUtils.ts';
 import { loggerMessageVenus, calculateCost } from '../../shared/venusOpenAITracker.ts';
 import { genererExempleApprentissage } from '../../shared/venusLearningPipeline.ts';
+import {
+  confirmCurrentDraft,
+  ensureCourseDraft,
+  isExplicitConfirmation,
+  markDraftRecapPresented,
+  mergeCourseDraft,
+  resetCourseDraft,
+  validateCourseDraft,
+} from '../../shared/venusConversationSafety.ts';
 
 /**
  * Webhook WhatsApp <-> Venus (via Twilio).
@@ -1447,6 +1456,22 @@ Deno.serve(async (req) => {
     // normalizedTel = format canonique DB (226XXXXXXXX sans +) — utilisé pour tout stockage DB
     const telephone = from.replace('whatsapp:', '');
     const countryCode = detecterPaysDepuisTelephone(telephone);
+
+    if (messageSid) {
+      const existingMessages = await base44.asServiceRole.entities.Message.filter(
+        { whatsapp_message_sid: messageSid, source: 'whatsapp' },
+        '-created_date',
+        1,
+      ).catch(() => []);
+      if (existingMessages?.length) {
+        console.warn(`[WebhookVenus] Duplicate MessageSid ignored: ${messageSid}`);
+        return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
+          status: 200,
+          headers: { 'Content-Type': 'text/xml; charset=utf-8' },
+        });
+      }
+    }
+
     const countryConfig = await chargerConfigPays(base44, countryCode);
     const tarifs = {
       nom: countryConfig.nom,
@@ -1641,6 +1666,7 @@ Deno.serve(async (req) => {
       location_lng: longitude,
       source: 'whatsapp',
       whatsapp_message_sid: messageSid,
+      client_message_id: messageSid || undefined,
     });
     console.log(`[WebhookVenus] ✅ ÉTAPE 3 — Message entrant stocké (${messageType}) dans conversation ${conversation.id}`);
 
@@ -1861,6 +1887,9 @@ Deno.serve(async (req) => {
       // ── Charger la mémoire courte ──
       let pendingCourse: any = null;
       try { pendingCourse = conversation.venus_pending_course ? JSON.parse(conversation.venus_pending_course) : null; } catch { pendingCourse = null; }
+      if (pendingCourse && Object.keys(pendingCourse).length > 0) {
+        pendingCourse = ensureCourseDraft(pendingCourse);
+      }
 
       // ── Détection: demande de NOUVELLE course → vider la mémoire stale ──
       // Si le client dit "nouvelle course", "créons une course", "je veux une autre course"
@@ -1882,7 +1911,17 @@ Deno.serve(async (req) => {
         const isNewCourseRequest = NEW_COURSE_KW.some(kw => msgLowerNC.includes(kw));
         if (isNewCourseRequest) {
           console.log(`[WebhookVenus] 🔄 Demande de nouvelle course détectée — vidage de la mémoire courte stale`);
-          pendingCourse = {};
+          pendingCourse = resetCourseDraft();
+          await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+            venus_pending_course: JSON.stringify(pendingCourse),
+          });
+        }
+      }
+
+      if (isExplicitConfirmation(messageEffectif) && pendingCourse?.draft_id) {
+        const confirmedDraft = confirmCurrentDraft(pendingCourse, messageEffectif);
+        if (confirmedDraft.confirmation_draft_id === confirmedDraft.draft_id) {
+          pendingCourse = confirmedDraft;
           await base44.asServiceRole.entities.Conversation.update(conversation.id, {
             venus_pending_course: JSON.stringify(pendingCourse),
           });
@@ -1995,19 +2034,10 @@ Deno.serve(async (req) => {
             // On valide DÉTERMINISTEMENT que tous les champs obligatoires sont présents.
             // Si un champ manque → on surcharge l'action en poser_question et on demande
             // l'info manquante. JAMAIS de création avec des infos incomplètes.
-            const um = { ...(pendingCourse || {}), ...reasoningResult.memoire_courte_update };
-            const _tc = (um.type_course || '').toLowerCase().trim();
-            const _hasType = ['expedier', 'recevoir', 'deplacement'].includes(_tc);
-            const _hasDepart = !!(um.adresse_depart && um.adresse_depart.trim()) || um.gps_depart_lat != null;
-            const _hasArrivee = !!(um.adresse_arrivee && um.adresse_arrivee.trim()) || um.gps_arrivee_lat != null;
-            const _needsContact = _tc === 'expedier' || _tc === 'recevoir';
-            const _hasContact = !!(um.contact_telephone && um.contact_telephone.trim()) || um.contact_is_client === true;
-
-            let _missingField = '';
-            if (!_hasType) _missingField = 'type_course';
-            else if (!_hasDepart) _missingField = 'adresse_depart';
-            else if (!_hasArrivee) _missingField = 'adresse_arrivee';
-            else if (_needsContact && !_hasContact) _missingField = 'contact';
+            let um = mergeCourseDraft(pendingCourse || {}, reasoningResult.memoire_courte_update);
+            const draftValidation = validateCourseDraft(um);
+            const _tc = String(um.type_course || '').toLowerCase().trim();
+            const _missingField = draftValidation.missingField;
 
             if (_missingField) {
               // ── Champ obligatoire manquant → surcharger en poser_question ──
@@ -2020,8 +2050,12 @@ Deno.serve(async (req) => {
               } else if (_missingField === 'adresse_arrivee') {
                 _askMsg = 'Quel est le lieu exact de livraison ? (indiquez le quartier ou un point de repère précis)';
               } else if (_missingField === 'contact') {
-                const _role = _tc === 'expedier' ? 'destinataire' : 'expéditeur';
+                const _role = _tc === 'expedier' ? 'destinataire' : _tc === 'recevoir' ? 'expéditeur' : 'passager';
                 _askMsg = `Quel est le numéro de téléphone du ${_role} ? (Si vous êtes vous-même le ${_role}, dites-le moi)`;
+              } else if (_missingField === 'date_programmee_invalide') {
+                _askMsg = 'Quelle est la date programmée exacte ? Utilisez le format AAAA-MM-JJ.';
+              } else if (_missingField === 'heure_programmee_invalide') {
+                _askMsg = "Quelle est l'heure programmée exacte ? Utilisez le format HH:MM.";
               }
               reasoningResult.action = 'poser_question';
               reponseFinale = _askMsg;
@@ -2030,6 +2064,15 @@ Deno.serve(async (req) => {
                 pendingCourse = um;
                 await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(um) });
               }
+            } else if (!draftValidation.confirmed) {
+              reasoningResult.action = 'poser_question';
+              um = markDraftRecapPresented(um);
+              pendingCourse = um;
+              const typeLabel = { expedier: 'Envoi de colis', recevoir: 'Réception de colis', deplacement: 'Déplacement' }[_tc] || _tc;
+              reponseFinale = `Récapitulatif de votre demande :\n\nType : ${typeLabel}\nDépart : ${um.adresse_depart || 'GPS'}\nDestination : ${um.adresse_arrivee || 'GPS'}\nContact : ${um.contact_telephone || 'vous-même'}\n\nConfirmez-vous la création de cette course ? Répondez "oui" pour confirmer.`;
+              await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+                venus_pending_course: JSON.stringify(um),
+              });
             } else {
               // ── Toutes les infos sont présentes → créer la course ──
               const cr2 = await creerCourseDepuisMemoire(base44, um, countryCode, tarifs, telephone, profileName, conversation.silgapp_from_number);
@@ -2110,12 +2153,11 @@ Deno.serve(async (req) => {
           const ditCreationLancee = PATTERNS_FAUSSE_CREATION.some(p => p.test(reponseFinale));
           if (ditCreationLancee) {
             console.warn(`[WebhookVenus] 🚫 FAUSSE CRÉATION détectée — VENUS dit "création/recherche" mais course NON créée (action=${reasoningResult.action}) — remplacement par question`);
-            const umCheck = { ...(pendingCourse || {}), ...reasoningResult.memoire_courte_update };
+            let umCheck = mergeCourseDraft(pendingCourse || {}, reasoningResult.memoire_courte_update);
             const _tcCh = (umCheck.type_course || '').toLowerCase().trim();
             const _hasTypeCh = ['expedier', 'recevoir', 'deplacement'].includes(_tcCh);
             const _hasDepartCh = !!(umCheck.adresse_depart && umCheck.adresse_depart.trim()) || umCheck.gps_depart_lat != null;
             const _hasArriveeCh = !!(umCheck.adresse_arrivee && umCheck.adresse_arrivee.trim()) || umCheck.gps_arrivee_lat != null;
-            const _needsContactCh = _tcCh === 'expedier' || _tcCh === 'recevoir';
             const _hasContactCh = !!(umCheck.contact_telephone && umCheck.contact_telephone.trim()) || umCheck.contact_is_client === true;
 
             if (!_hasTypeCh) {
@@ -2124,14 +2166,19 @@ Deno.serve(async (req) => {
               reponseFinale = 'Quel est le lieu exact de récupération ? (indiquez le quartier ou un point de repère précis)';
             } else if (!_hasArriveeCh) {
               reponseFinale = 'Quel est le lieu exact de livraison ? (indiquez le quartier ou un point de repère précis)';
-            } else if (_needsContactCh && !_hasContactCh) {
-              const _roleCh = _tcCh === 'expedier' ? 'destinataire' : 'expéditeur';
+            } else if (!_hasContactCh) {
+              const _roleCh = _tcCh === 'expedier' ? 'destinataire' : _tcCh === 'recevoir' ? 'expéditeur' : 'passager';
               reponseFinale = `Quel est le numéro de téléphone du ${_roleCh} ? (Si vous êtes vous-même le ${_roleCh}, dites-le moi)`;
             } else {
               // Toutes les infos sont présentes mais GPT n'a pas utilisé creer_course
               // → forcer le récapitulatif et demander confirmation explicite
               const typeLabelCh = { expedier: 'Envoi de colis', recevoir: 'Réception de colis', deplacement: 'Déplacement' }[_tcCh] || _tcCh;
               reponseFinale = `Récapitulatif de votre demande :\n\n🚚 Type : ${typeLabelCh}\n📍 Départ : ${umCheck.adresse_depart || 'GPS'}\n🎯 Destination : ${umCheck.adresse_arrivee || 'GPS'}\n📞 Contact : ${umCheck.contact_telephone || 'vous-même'}\n\nConfirmez-vous la création de cette course ? Répondez "oui" pour confirmer.`;
+              umCheck = markDraftRecapPresented(umCheck);
+              pendingCourse = umCheck;
+              await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+                venus_pending_course: JSON.stringify(umCheck),
+              });
             }
           }
         }
@@ -2140,7 +2187,10 @@ Deno.serve(async (req) => {
 
         // ── Mettre à jour la mémoire courte ──
         if (reasoningResult.memoire_courte_update && Object.keys(reasoningResult.memoire_courte_update).length > 0) {
-          const up = { ...(pendingCourse || {}), ...reasoningResult.memoire_courte_update };
+          let up = mergeCourseDraft(pendingCourse || {}, reasoningResult.memoire_courte_update);
+          if (/confirmez-vous|répondez\s+["']?oui/i.test(reponseVenus || '')) {
+            up = markDraftRecapPresented(up);
+          }
           await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(up) });
         }
 

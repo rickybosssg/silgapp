@@ -17,6 +17,13 @@ import { clearPersistedToken } from "@/lib/authPersistence";
 import { registerPushToken } from "@/lib/notifications";
 import { usePushTokenRetry } from "@/hooks/usePushTokenRetry";
 
+function returnToRoleSelection() {
+  try {
+    localStorage.setItem("silgapp_force_role_selection", "true");
+  } catch (_) {}
+  window.location.reload();
+}
+
 export default function PartenaireDashboard() {
   const [user, setUser] = useState(null);
   const [tab, setTab] = useState("home");
@@ -179,12 +186,25 @@ export default function PartenaireDashboard() {
 
   const loading = loadingBoutique || loadingRestaurant || loadingPharmacie;
 
-  const handleRetourChoixRole = () => {
-    try {
-      localStorage.setItem("silgapp_force_role_selection", "true");
-    } catch (_) {}
-    window.location.reload();
-  };
+  useEffect(() => {
+    if (!user || loading || hasEtablissement) return undefined;
+
+    let removeListener;
+    import("@capacitor/app")
+      .then(({ App }) => App.addListener("backButton", () => {
+        if (tab.endsWith("_form")) {
+          setTab("home");
+          return;
+        }
+        returnToRoleSelection();
+      }))
+      .then((handle) => {
+        removeListener = () => handle.remove();
+      })
+      .catch(() => {});
+
+    return () => removeListener?.();
+  }, [user, loading, hasEtablissement, tab]);
 
   if (!user || loading) {
     return (
@@ -200,7 +220,7 @@ export default function PartenaireDashboard() {
         <div className="w-full max-w-md space-y-6">
           <button
             type="button"
-            onClick={handleRetourChoixRole}
+            onClick={returnToRoleSelection}
             className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-all"
           >
             <ArrowLeft className="w-4 h-4" />

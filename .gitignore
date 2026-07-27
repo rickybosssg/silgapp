@@ -14,6 +14,7 @@ lerna-debug.log*
 edge-profile*/
 
 node_modules
+test-results/
 dist
 dist-ssr
 *.local
