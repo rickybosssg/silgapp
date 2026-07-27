@@ -19,6 +19,7 @@ export default function SuggestionsTab() {
   const [mergeDialog, setMergeDialog] = useState(null);
   const [analysingId, setAnalysingId] = useState(null);
   const [transformingRagId, setTransformingRagId] = useState(null);
+  const [validatingId, setValidatingId] = useState(null);
 
   const { data: rawData, isLoading } = useQuery({
     queryKey: ['venus-suggestions', statutFilter],
@@ -42,12 +43,14 @@ export default function SuggestionsTab() {
       toast({ title: '⚠ Validation bloquée', description: 'Une hallucination a été détectée. Utilisez « Améliorer » d\'abord.', variant: 'destructive' });
       return;
     }
+    setValidatingId(s.id);
     try {
       const user = await base44.auth.me();
       const finalResponse = s.amelioration_reponse || s.reponse_proposee;
       const finalKeywords = s.amelioration_mots_cles || s.mots_cles || '[]';
       const finalCategory = s.amelioration_categorie || s.categorie || 'questions_generales';
 
+      // 1. Créer la connaissance
       const knowledge = await base44.entities.VenusKnowledge.create({
         titre: s.question_detectee.substring(0, 100),
         categorie: finalCategory,
@@ -60,30 +63,20 @@ export default function SuggestionsTab() {
         version: 1, statut: 'valide',
       });
 
-      // Generate recommendations
-      let recos = [];
-      try {
-        const llmRes = await base44.integrations.Core.InvokeLLM({
-          prompt: `Une nouvelle connaissance SILGAPP vient d'être validée. Question: "${s.question_detectee}" Réponse: "${finalResponse.substring(0, 200)}". Propose 3 recommandations pour enrichir VENUS (nouvelle FAQ, règle métier, scénario, workflow). Réponds en JSON.`,
-          response_json_schema: { type: 'object', properties: { recommandations: { type: 'array', items: { type: 'object', properties: { type: { type: 'string' }, titre: { type: 'string' }, description: { type: 'string' } } } } } },
-        });
-        const result = typeof llmRes === 'string' ? JSON.parse(llmRes) : llmRes;
-        recos = result.recommandations || [];
-      } catch {}
-
+      // 2. Marquer la suggestion comme validée + invalider immédiatement
+      //    → la suggestion disparaît de la liste "En attente" tout de suite
       await base44.entities.VenusSuggestion.update(s.id, {
         statut: 'validee',
         validee_par: user?.email || 'admin',
         validee_at: new Date().toISOString(),
         knowledge_id_cree: knowledge.id,
-        recommandations: JSON.stringify(recos),
       });
 
       toast({ title: '✅ Connaissance créée', description: 'La réponse est maintenant active pour VENUS.' });
       queryClient.invalidateQueries({ queryKey: ['venus-suggestions'] });
       queryClient.invalidateQueries({ queryKey: ['venus-knowledge'] });
 
-      // Indexation RAG automatique
+      // 3. Indexation RAG automatique (après invalidation — non-bloquant pour la liste)
       try {
         const ragRes = await base44.functions.invoke('indexerDocumentVenus', {
           action: 'index_from_suggestion',
@@ -98,8 +91,21 @@ export default function SuggestionsTab() {
       } catch (ragErr) {
         toast({ title: '⚠ RAG échoué', description: 'Connaissance créée mais indexation RAG échouée. Cliquez « Transformer en RAG » pour réessayer.', variant: 'destructive' });
       }
+
+      // 4. Recommandations post-validation (non-bloquantes — la suggestion est déjà hors de la liste)
+      try {
+        const llmRes = await base44.integrations.Core.InvokeLLM({
+          prompt: `Une nouvelle connaissance SILGAPP vient d'être validée. Question: "${s.question_detectee}" Réponse: "${finalResponse.substring(0, 200)}". Propose 3 recommandations pour enrichir VENUS (nouvelle FAQ, règle métier, scénario, workflow). Réponds en JSON.`,
+          response_json_schema: { type: 'object', properties: { recommandations: { type: 'array', items: { type: 'object', properties: { type: { type: 'string' }, titre: { type: 'string' }, description: { type: 'string' } } } } } },
+        });
+        const result = typeof llmRes === 'string' ? JSON.parse(llmRes) : llmRes;
+        const recos = result.recommandations || [];
+        await base44.entities.VenusSuggestion.update(s.id, { recommandations: JSON.stringify(recos) });
+      } catch {}
     } catch (e) {
       toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
+    } finally {
+      setValidatingId(null);
     }
   };
 
@@ -265,6 +271,7 @@ Réponds UNIQUEMENT avec un JSON:`,
               key={s.id}
               s={s}
               onValidate={() => handleValidate(s)}
+              validating={validatingId === s.id}
               onImprove={() => setImproveDialog(s)}
               onRefuse={() => handleRefuse(s)}
               onMerge={() => setMergeDialog(s)}
