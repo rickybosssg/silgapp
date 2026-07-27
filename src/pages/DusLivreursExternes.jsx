@@ -14,9 +14,14 @@ import { useAdminContext } from "@/hooks/useAdminContext.js";
 
 // ── Statut financier simplifié ──
 function statutFinancier(montantDu, montantPaye) {
-  if (montantDu <= 0) return { label: "À jour", color: "bg-green-100 text-green-700", dot: "bg-green-500" };
+  if (montantDu < 0) return { label: "Crédit", color: "bg-blue-100 text-blue-700", dot: "bg-blue-500" };
+  if (montantDu === 0) return { label: "À jour", color: "bg-green-100 text-green-700", dot: "bg-green-500" };
   if (montantPaye > 0) return { label: "Partiel", color: "bg-amber-100 text-amber-700", dot: "bg-amber-500" };
   return { label: "Non payé", color: "bg-red-100 text-red-700", dot: "bg-red-500" };
+}
+
+function formatMontantCredit(montant) {
+  return montant < 0 ? `+${Math.abs(montant).toLocaleString()}` : montant.toLocaleString();
 }
 
 // ── 3 filtres simples au lieu de 7 ──
@@ -32,12 +37,11 @@ function DetailModal({ entry, livreurInfo, onClose, onPaiement, onBloquer, onDeb
   const sf = statutFinancier(entry.montantDu, entry.montantPaye);
   const isBloque = livreurInfo?.actif === false;
   const montantSaisiNum = Number(montantSaisi) || 0;
-  const resteApres = Math.max(0, entry.montantDu - montantSaisiNum);
+  const resteApres = entry.montantDu - montantSaisiNum;
 
   const handleValider = () => {
     const montant = Number(montantSaisi) || entry.montantDu;
     if (!montant || montant <= 0) { toast.error("Montant invalide"); return; }
-    if (montant > entry.montantDu) { toast.error(`Max : ${entry.montantDu.toLocaleString()} F`); return; }
     onPaiement(entry, montant);
     setMontantSaisi("");
   };
@@ -61,15 +65,15 @@ function DetailModal({ entry, livreurInfo, onClose, onPaiement, onBloquer, onDeb
 
         <div className="overflow-y-auto flex-1 p-4 space-y-4">
           {/* Solde principal — carte premium */}
-          <div className={`relative overflow-hidden rounded-2xl p-5 text-center ${entry.montantDu > 0 ? "bg-gradient-to-br from-red-50 to-orange-50" : "bg-gradient-to-br from-green-50 to-emerald-50"}`}>
-            <p className="text-xs text-gray-500 mb-1 font-medium">Reste dû à SILGAPP</p>
-            <p className={`text-4xl font-black tracking-tight ${entry.montantDu > 0 ? "text-red-600" : "text-green-600"}`}>
-              {entry.montantDu.toLocaleString()}<span className="text-lg font-normal ml-1 opacity-70">F</span>
+          <div className={`relative overflow-hidden rounded-2xl p-5 text-center ${entry.montantDu > 0 ? "bg-gradient-to-br from-red-50 to-orange-50" : entry.montantDu < 0 ? "bg-gradient-to-br from-blue-50 to-indigo-50" : "bg-gradient-to-br from-green-50 to-emerald-50"}`}>
+            <p className="text-xs text-gray-500 mb-1 font-medium">{entry.montantDu > 0 ? "Reste dû à SILGAPP" : entry.montantDu < 0 ? "Crédit (avance)" : "Solde à jour"}</p>
+            <p className={`text-4xl font-black tracking-tight ${entry.montantDu > 0 ? "text-red-600" : entry.montantDu < 0 ? "text-blue-600" : "text-green-600"}`}>
+              {formatMontantCredit(entry.montantDu)}<span className="text-lg font-normal ml-1 opacity-70">F</span>
             </p>
             <span className={`inline-block mt-2 text-xs px-3 py-1 rounded-full font-bold ${sf.color}`}>{sf.label}</span>
             {montantSaisiNum > 0 && (
               <p className="text-xs text-gray-400 mt-2">
-                Après paiement : <span className="font-semibold text-gray-600">{resteApres.toLocaleString()} F</span>
+                Après paiement : <span className={`font-semibold ${resteApres < 0 ? "text-blue-600" : "text-gray-600"}`}>{formatMontantCredit(resteApres)} F</span>
               </p>
             )}
           </div>
@@ -353,21 +357,21 @@ export default function DusLivreursExternes() {
   // ── Mutations (inchangées) ──
   const paiementMutation = useMutation({
     mutationFn: async ({ entry, montant }) => {
-      const nouveauSolde = Math.max(0, (entry.montantDu ?? 0) - montant);
-      const impayees = nouveauSolde === 0 ? entry.courses.filter(c => c.statut_paiement_livreur !== "paye").map(c => c.id) : [];
+      const nouveauSolde = (entry.montantDu ?? 0) - montant;
+      const impayees = nouveauSolde <= 0 ? entry.courses.filter(c => c.statut_paiement_livreur !== "paye").map(c => c.id) : [];
       const res = await base44.functions.invoke("updateLivreur", { id: entry.id, data: { encours: nouveauSolde, montant_du_silga: nouveauSolde }, mark_courses_paid: impayees });
       if (res?.data && res.data.success === false) throw new Error(res.data.error || "Échec");
       return { nouveauSolde, montant, entry };
     },
     onMutate: async ({ entry, montant }) => {
-      const nouveauSolde = Math.max(0, (entry.montantDu ?? 0) - montant);
+      const nouveauSolde = (entry.montantDu ?? 0) - montant;
       await queryClient.cancelQueries({ queryKey: ["courses-externes-livrees"] });
       await queryClient.cancelQueries({ queryKey: ["livreurs-externes-all"] });
       const prevCourses = queryClient.getQueryData(["courses-externes-livrees", effectiveCountry]);
       const prevLivreurs = queryClient.getQueryData(["livreurs-externes-all", effectiveCountry]);
       queryClient.setQueryData(["livreurs-externes-all", effectiveCountry], (old) =>
         (old || []).map(l => l.id === entry.id ? { ...l, encours: nouveauSolde, montant_du_silga: nouveauSolde } : l));
-      if (nouveauSolde === 0) {
+      if (nouveauSolde <= 0) {
         queryClient.setQueryData(["courses-externes-livrees", effectiveCountry], (old) =>
           (old || []).map(c => entry.courses.some(ec => ec.id === c.id) ? { ...c, statut_paiement_livreur: "paye" } : c));
       }
@@ -378,9 +382,9 @@ export default function DusLivreursExternes() {
       queryClient.invalidateQueries({ queryKey: ["livreurs-externes-all"] });
       if (detailEntry?.id === entry.id) {
         setDetailEntry({ ...detailEntry, montantDu: nouveauSolde, montantPaye: detailEntry.commissionTotal - nouveauSolde,
-          courses: nouveauSolde === 0 ? detailEntry.courses.map(c => ({ ...c, statut_paiement_livreur: "paye" })) : detailEntry.courses });
+          courses: nouveauSolde <= 0 ? detailEntry.courses.map(c => ({ ...c, statut_paiement_livreur: "paye" })) : detailEntry.courses });
       }
-      toast.success(`Paiement de ${montant.toLocaleString()} F enregistré`);
+      toast.success(`Paiement de ${montant.toLocaleString()} F enregistré${nouveauSolde < 0 ? ` — Crédit de ${Math.abs(nouveauSolde).toLocaleString()} F` : ""}`);
     },
     onError: (err, _v, ctx) => {
       if (ctx?.prevCourses) queryClient.setQueryData(["courses-externes-livrees", effectiveCountry], ctx.prevCourses);
@@ -398,13 +402,13 @@ export default function DusLivreursExternes() {
   // ── Paiement boutique/restaurant (mise à jour directe) ──
   const etablissementPaiementMutation = useMutation({
     mutationFn: async ({ entry, montant }) => {
-      const nouveauSolde = Math.max(0, (entry.montantDu ?? 0) - montant);
+      const nouveauSolde = (entry.montantDu ?? 0) - montant;
       const entityName = entry.entityType === 'boutique' ? 'Boutique' : 'Restaurant';
       await base44.entities[entityName].update(entry.id, { montant_du_silga: nouveauSolde });
       return { nouveauSolde, montant, entry };
     },
     onMutate: async ({ entry, montant }) => {
-      const nouveauSolde = Math.max(0, (entry.montantDu ?? 0) - montant);
+      const nouveauSolde = (entry.montantDu ?? 0) - montant;
       const qKey = entry.entityType === 'boutique' ? ["boutiques-dettes", effectiveCountry] : ["restaurants-dettes", effectiveCountry];
       await queryClient.cancelQueries({ queryKey: qKey });
       const prev = queryClient.getQueryData(qKey);
@@ -417,7 +421,7 @@ export default function DusLivreursExternes() {
       if (detailEntry?.id === entry.id) {
         setDetailEntry({ ...detailEntry, montantDu: nouveauSolde });
       }
-      toast.success(`Paiement de ${montant.toLocaleString()} F enregistré`);
+      toast.success(`Paiement de ${montant.toLocaleString()} F enregistré${nouveauSolde < 0 ? ` — Crédit de ${Math.abs(nouveauSolde).toLocaleString()} F` : ""}`);
     },
     onError: (err, _v, ctx) => {
       if (ctx?.prev) queryClient.setQueryData(ctx.qKey, ctx.prev);
@@ -538,8 +542,8 @@ export default function DusLivreursExternes() {
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-xl font-black text-foreground tracking-tight">{entry.montantDu.toLocaleString()}<span className="text-[10px] font-normal text-gray-400 ml-0.5">F</span></p>
-                        <p className={`text-[10px] font-semibold ${entry.montantDu > 0 ? "text-red-500" : "text-green-500"}`}>{sf.label}</p>
+                        <p className="text-xl font-black text-foreground tracking-tight">{formatMontantCredit(entry.montantDu)}<span className="text-[10px] font-normal text-gray-400 ml-0.5">F</span></p>
+                        <p className={`text-[10px] font-semibold ${entry.montantDu > 0 ? "text-red-500" : entry.montantDu < 0 ? "text-blue-500" : "text-green-500"}`}>{sf.label}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 mt-2 text-[11px]">
