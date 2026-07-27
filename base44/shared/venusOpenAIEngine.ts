@@ -544,9 +544,32 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
             }
           }
         }
-        // Si le retry n'a pas fonctionné (ou non-GPT-5), fallback InvokeLLM
+        // ── ÉCONOMIE DE CRÉDITS: Au lieu de fallback vers InvokeLLM (coûteux),
+        //    construire une réponse par défaut quand OpenAI retourne un content vide. ──
         if (!msg.content || msg.content.trim().length === 0) {
-          throw new Error('OpenAI: réponse vide (content null/empty) — fallback vers InvokeLLM');
+          console.warn('[OpenAIEngine] ⚠️ Content vide — construction réponse par défaut (évite fallback InvokeLLM)');
+          const defaultParsed = {
+            intention: 'autre',
+            contexte: 'general',
+            infos_connues: '{}',
+            infos_manquantes: [],
+            action: 'repondre_info',
+            prochaine_question: '',
+            outils_utilises: toolsUsed,
+            confiance: 40,
+            reponse: "Je suis VENUS, l'assistante SILGAPP. Comment puis-je vous aider avec votre livraison ?",
+            memoire_courte_update: '{}',
+            memoire_longue_update: '{}',
+            business_rule_id: '',
+            knowledge_id: '',
+            document_sources: '',
+          };
+          defaultParsed._outils_openai = toolsUsed.length > 0 ? toolsUsed.join(',') : 'none';
+          defaultParsed._model_openai = model;
+          defaultParsed._tokens_openai = usage?.total_tokens || 0;
+          defaultParsed._tokens_prompt = usage?.prompt_tokens || 0;
+          defaultParsed._tokens_completion = usage?.completion_tokens || 0;
+          return defaultParsed;
         }
       }
       let parsed: any;
@@ -687,9 +710,31 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
 
   const finalData = await finalResponse.json();
   const finalContent = finalData.choices?.[0]?.message?.content || '';
-  // ── Si la réponse finale est aussi vide, lancer une exception pour le fallback InvokeLLM ──
+  // ── ÉCONOMIE DE CRÉDITS: Si la réponse finale est vide, construire une réponse par défaut ──
   if (!finalContent || finalContent.trim().length === 0) {
-    throw new Error('OpenAI: réponse finale vide après max tool rounds — fallback InvokeLLM');
+    console.warn('[OpenAIEngine] ⚠️ Réponse finale vide après max tool rounds — construction réponse par défaut (évite fallback InvokeLLM)');
+    const defaultFinalParsed = {
+      intention: 'autre',
+      contexte: 'general',
+      infos_connues: '{}',
+      infos_manquantes: [],
+      action: 'repondre_info',
+      prochaine_question: '',
+      outils_utilises: toolsUsed,
+      confiance: 40,
+      reponse: "Je suis VENUS, l'assistante SILGAPP. Comment puis-je vous aider avec votre livraison ?",
+      memoire_courte_update: '{}',
+      memoire_longue_update: '{}',
+      business_rule_id: '',
+      knowledge_id: '',
+      document_sources: '',
+    };
+    defaultFinalParsed._outils_openai = toolsUsed.join(',');
+    defaultFinalParsed._model_openai = model;
+    defaultFinalParsed._tokens_openai = finalData.usage?.total_tokens || 0;
+    defaultFinalParsed._tokens_prompt = finalData.usage?.prompt_tokens || 0;
+    defaultFinalParsed._tokens_completion = finalData.usage?.completion_tokens || 0;
+    return defaultFinalParsed;
   }
   let finalParsed: any;
   try { finalParsed = JSON.parse(finalContent); }
