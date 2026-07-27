@@ -40,6 +40,7 @@ Deno.serve(async (req) => {
     await base44.entities.Livreur.update(livreur_id, {
       statut_paiement: "paye",
       montant_paye: montant_silga,
+      encours: Math.max(0, (livreur.encours || 0) - montant_silga),
       heure_paiement: new Date().toISOString(),
       admin_paiement: user.full_name || "Paiement auto",
       montant_du_silga: Math.max(0, (livreur.montant_du_silga || 0) - montant_silga),

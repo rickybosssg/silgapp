@@ -123,15 +123,16 @@ Deno.serve(async (req) => {
       heure_livraison: new Date().toISOString(),
     });
 
-    // Accumuler la commission dans l'encours du livreur (source de vérité unique)
-    // + garder montant_du_silga synchronisé pour rétrocompatibilité
+    // Accumuler la commission dans l'encours du livreur (cumulatif, pour suivi opérationnel)
+    // + incrémenter montant_du_silga (le vrai dû — décrémenté par les paiements admin)
     if (course.livreur_id) {
       const livreur = await base44.asServiceRole.entities.Livreur.get(course.livreur_id);
       if (livreur) {
         const nouvelEncours = (livreur.encours || 0) + commissionSilga;
+        const nouveauDuSilga = (Number(livreur.montant_du_silga) || 0) + commissionSilga;
         await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
           encours: nouvelEncours,
-          montant_du_silga: nouvelEncours,
+          montant_du_silga: nouveauDuSilga,
           statut_paiement: 'non_paye',
         });
       }
