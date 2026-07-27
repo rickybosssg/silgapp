@@ -1246,6 +1246,7 @@ Réponds UNIQUEMENT avec un JSON.`;
         decision_moteur: 'erreur',
         openai_appele: false,
         model_utilise: '',
+        _erreur_detail: `Filtre contenu LLM: ${e.message?.substring(0, 300) || '403/content filter'}`,
       };
     }
 
@@ -1268,6 +1269,7 @@ Réponds UNIQUEMENT avec un JSON.`;
       decision_moteur: 'erreur',
       openai_appele: false,
       model_utilise: '',
+      _erreur_detail: `Erreur raisonnement: ${e.message?.substring(0, 400) || 'Unknown error'}`,
     };
   }
 }
@@ -1353,6 +1355,7 @@ export async function raisonnerVenusAvecOutils(
     action: result.action,
     confiance: result.confiance,
     statut: result.decision_moteur === 'erreur' ? 'erreur' : 'succes',
+    erreur_detail: (result as any)._erreur_detail || (result as any)._erreur_openai || '',
   });
 
   return {
