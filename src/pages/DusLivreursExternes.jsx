@@ -44,6 +44,7 @@ function DetailModal({ entry, livreurInfo, onClose, onPaiement, onBloquer, onDeb
     if (!montant || montant <= 0) { toast.error("Montant invalide"); return; }
     onPaiement(entry, montant);
     setMontantSaisi("");
+    onClose();
   };
 
   return (
