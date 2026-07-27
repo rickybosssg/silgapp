@@ -464,9 +464,17 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
         }),
       });
     } catch (timeoutErr: any) {
-      // Retry unique sur timeout avec un délai plus court
-      if (timeoutErr.message?.includes('timeout')) {
-        console.warn(`[OpenAIEngine] ⚠️ Timeout au premier essai — retry (30s)`);
+      // Retry sur timeout OU erreur réseau transitoire (ECONNRESET, DNS, etc.)
+      const isTimeout = timeoutErr.message?.includes('timeout');
+      const isNetworkErr = !isTimeout && (
+        timeoutErr.message?.includes('fetch') ||
+        timeoutErr.message?.includes('network') ||
+        timeoutErr.message?.includes('connection') ||
+        timeoutErr.name === 'TypeError'
+      );
+      if (isTimeout || isNetworkErr) {
+        console.warn(`[OpenAIEngine] ⚠️ ${isTimeout ? 'Timeout' : 'Erreur réseau'} au premier essai — retry (30s)`);
+        await new Promise(r => setTimeout(r, isNetworkErr ? 500 : 0));
         response = await fetchAvecTimeout(OPENAI_API_URL, {
           method: 'POST',
           headers: {
@@ -491,10 +499,11 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
 
     if (!response.ok) {
       const errText = await response.text();
-      // Retry sur erreur 500 (serveur instable OpenAI)
-      if (response.status >= 500 && round === 0) {
-        console.warn(`[OpenAIEngine] ⚠️ Erreur ${response.status} OpenAI — retry`);
-        await new Promise(r => setTimeout(r, 1000));
+      // Retry sur erreur 500 (serveur instable OpenAI) ou 429 (rate limit)
+      if ((response.status >= 500 || response.status === 429) && round === 0) {
+        const delay = response.status === 429 ? 2000 : 1000;
+        console.warn(`[OpenAIEngine] ⚠️ Erreur ${response.status} OpenAI — retry après ${delay}ms`);
+        await new Promise(r => setTimeout(r, delay));
         continue;
       }
       throw new Error(`OpenAI API ${response.status}: ${errText.substring(0, 300)}`);
