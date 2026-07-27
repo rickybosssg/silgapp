@@ -1612,6 +1612,26 @@ Deno.serve(async (req) => {
       console.log(`[WebhookVenus] ✅ ÉTAPE 2 — Nouvelle conversation créée: ${conversation.id} | venus_active: true`);
     }
 
+    // ═══ ANTI-DOUBLON WEBHOOK — Dédoublonnage par MessageSid ═══
+    // Twilio peut livrer le même webhook plusieurs fois (retries, duplicates).
+    // Si un Message avec le même whatsapp_message_sid existe déjà, on ignore cette requête.
+    if (messageSid) {
+      try {
+        const existingMsg = await base44.asServiceRole.entities.Message.filter({
+          whatsapp_message_sid: messageSid,
+        });
+        if (existingMsg && existingMsg.length > 0) {
+          console.log(`[WebhookVenus] 🛡️ ANTI-DOUBLON — MessageSid ${messageSid} déjà traité — ignorer`);
+          return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
+            status: 200,
+            headers: { 'Content-Type': 'text/xml' },
+          });
+        }
+      } catch (e) {
+        console.warn(`[WebhookVenus] ⚠️ Erreur vérification anti-doublon MessageSid: ${e.message}`);
+      }
+    }
+
     // ── 2. Créer le Message entrant ──
     let messageType = 'text';
     let photoUrl: string | null = null;
@@ -1885,6 +1905,51 @@ Deno.serve(async (req) => {
     // MOTEUR DE RAISONNEMENT ET DE MÉMOIRE VENUS
     // ═══════════════════════════════════════════════════════════════
     let reasoningResult: any = null;
+
+    // ── Confirmation déterministe de création ("Oui" après récapitulatif) ──
+    // Si le client répond "oui" et que tous les champs sont présents dans la mémoire courte,
+    // créer la course directement sans appeler GPT (0 crédit, 100% fiable).
+    if (!reponseVenus) {
+      const CONFIRM_KW_CREATE = ['oui', 'ok', "d'accord", 'd accord', 'je confirme', 'valider', 'confirmer', 'confirme', "c'est bon", 'cest bon', 'ouais', 'ouep'];
+      const msgLowerConf = messageEffectif.toLowerCase().trim();
+      const isConfirmationCreate = msgLowerConf.length <= 30 && CONFIRM_KW_CREATE.some(kw => msgLowerConf === kw || msgLowerConf.startsWith(kw + ' ') || msgLowerConf.endsWith(' ' + kw));
+
+      if (isConfirmationCreate) {
+        let pendingCourseConf: any = null;
+        try { pendingCourseConf = conversation.venus_pending_course ? JSON.parse(conversation.venus_pending_course) : null; } catch { pendingCourseConf = null; }
+
+        // Ne pas intercepter si c'est une modification de course (géré par handleModifierCourse)
+        // ou si la course a déjà été créée
+        if (pendingCourseConf && !pendingCourseConf.modification_mode && !pendingCourseConf.course_created) {
+          const _tcC = (pendingCourseConf.type_course || '').toLowerCase().trim();
+          const _hasTypeC = ['expedier', 'recevoir', 'deplacement'].includes(_tcC);
+          const _hasDepartC = !!(pendingCourseConf.adresse_depart && pendingCourseConf.adresse_depart.trim()) || pendingCourseConf.gps_depart_lat != null;
+          const _hasArriveeC = !!(pendingCourseConf.adresse_arrivee && pendingCourseConf.adresse_arrivee.trim()) || pendingCourseConf.gps_arrivee_lat != null;
+          const _needsContactC = _tcC === 'expedier' || _tcC === 'recevoir';
+          const _hasContactC = !!(pendingCourseConf.contact_telephone && pendingCourseConf.contact_telephone.trim()) || pendingCourseConf.contact_is_client === true;
+          const _createurDigitsC = (pendingCourseConf.contact_createur_course || '').replace(/\D/g, '');
+          const _hasCreateurC = !!(pendingCourseConf.contact_createur_course && pendingCourseConf.contact_createur_course.trim()) && _createurDigitsC.length >= 8 && _createurDigitsC.length <= 15;
+
+          if (_hasTypeC && _hasDepartC && _hasArriveeC && _hasCreateurC && (!_needsContactC || _hasContactC)) {
+            console.log(`[WebhookVenus] ✅ Confirmation déterministe — création directe (0 crédit GPT)`);
+            try {
+              const crConf = await creerCourseDepuisMemoire(base44, pendingCourseConf, countryCode, tarifs, telephone, profileName, conversation.silgapp_from_number);
+              if (crConf.success) {
+                reponseVenus = crConf.message;
+                pendingCourseConf.course_created = true;
+                pendingCourseConf.course_id = crConf.course.id;
+                await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(pendingCourseConf) });
+                console.log(`[WebhookVenus] ✅ Course créée via confirmation déterministe: ${crConf.course.id}`);
+              } else if (crConf.message) {
+                reponseVenus = crConf.message;
+              }
+            } catch (e) {
+              console.error(`[WebhookVenus] Erreur confirmation déterministe: ${e.message}`);
+            }
+          }
+        }
+      }
+    }
 
     if (!reponseVenus) {
       // ── Charger la mémoire courte ──
