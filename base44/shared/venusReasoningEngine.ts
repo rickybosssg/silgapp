@@ -1100,7 +1100,6 @@ Réponds UNIQUEMENT avec un JSON.`;
       llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
         prompt,
         response_json_schema: RAISONNEMENT_SCHEMA,
-        model: 'gpt_5_mini',
       });
       const fallbackTime = Date.now() - tLLMStart;
       console.log(`[ReasoningEngine] ⏱️ LLM (Base44): ${fallbackTime}ms`);
