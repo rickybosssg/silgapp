@@ -1437,31 +1437,41 @@ Deno.serve(async (req) => {
           // Seuil élevé (10 min) pour laisser le code normal d'avancement de vague fonctionner
           // à chaque tick. Le rattrapage n'est qu'un filet de sécurité pour les courses
           // vraiment coincées (tick manqué plusieurs fois de suite).
+          //
+          // ⚠️ ANTI-BOUCLE: Relire la course fraîchement en DB avant le check.
+          // allToProcess est un snapshot stale chargé au début du tick ; si la course
+          // a avancé de vague plus tôt dans ce même tick, course.updated_date et
+          // course.dispatch_status sont obsolètes → le rattrapage se déclenche à tort
+          // et réinitialise la vague, annulant le progrès.
+          let freshCourse = course;
+          try {
+            freshCourse = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+          } catch {}
           const waveTimeoutMs = (cachedConfig.gps.waves[0]?.timeout_sec || 60) * 1000;
-          const stuckDurationMs = now.getTime() - new Date(course.updated_date).getTime();
+          const stuckDurationMs = now.getTime() - new Date(freshCourse.updated_date).getTime();
           const RATTRAPAGE_SEUIL_MS = Math.max(waveTimeoutMs * 2, 10 * 60 * 1000); // min 10 minutes
-          if (stuckDurationMs > RATTRAPAGE_SEUIL_MS && course.dispatch_status === 'propose' && !course.livreur_id) {
-            console.log(`[DISPATCH] 🚨 RATTRAPAGE: Course ${course.id} bloquée depuis ${Math.round(stuckDurationMs / 60000)}min — force-reset vague`);
-            await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+          if (stuckDurationMs > RATTRAPAGE_SEUIL_MS && freshCourse.dispatch_status === 'propose' && !freshCourse.livreur_id) {
+            console.log(`[DISPATCH] 🚨 RATTRAPAGE: Course ${freshCourse.id} bloquée depuis ${Math.round(stuckDurationMs / 60000)}min — force-reset vague`);
+            await base44.asServiceRole.entities.CourseExterne.update(freshCourse.id, {
               dispatch_status: 'redispatch',
               dispatch_locked_until: null,
               timeout_expires_at: null,
             });
             base44.asServiceRole.entities.Notification.create({
               titre: '🚨 Course bloquée — rattrapage automatique',
-              message: `Course ${course.client_nom || '?'} (${course.adresse_depart || '?'}) bloquée depuis ${Math.round(stuckDurationMs / 60000)}min — rattrapage automatique déclenché.`,
-              type: 'alerte_critique_dispatch', course_id: course.id, lue: false,
+              message: `Course ${freshCourse.client_nom || '?'} (${freshCourse.adresse_depart || '?'}) bloquée depuis ${Math.round(stuckDurationMs / 60000)}min — rattrapage automatique déclenché.`,
+              type: 'alerte_critique_dispatch', course_id: freshCourse.id, lue: false,
             }).catch(() => {});
             journaliserDispatch(base44, {
-              course_id: course.id, country_code: course.country_code,
-              vague: course.dispatch_wave || 0,
-              vague_avant: course.dispatch_wave || 0,
-              vague_apres: course.dispatch_wave || 0,
+              course_id: freshCourse.id, country_code: freshCourse.country_code,
+              vague: freshCourse.dispatch_wave || 0,
+              vague_avant: freshCourse.dispatch_wave || 0,
+              vague_apres: freshCourse.dispatch_wave || 0,
               evenement: 'rattrapage',
               raison_passage: `bloquée_${Math.round(stuckDurationMs / 60000)}min_force_reset`,
             });
-            const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
-            resultats.push({ course_id: course.id, wave: 'rattrapage', ...result });
+            const result = await lancerDispatchMulti(base44, freshCourse.id, [], cachedConfig);
+            resultats.push({ course_id: freshCourse.id, wave: 'rattrapage', ...result });
             continue;
           }
 
