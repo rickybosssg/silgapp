@@ -22,7 +22,7 @@ function haversineMeters(lat1, lon1, lat2, lon2) {
  * - gpsActif: boolean
  * - permissionStatut: 'granted' | 'denied' | 'prompt' | 'checking'
  * - ageMinutes: âge en minutes de la dernière position
- * - indicateur: 'recent' (<2min) | 'ancien' (2-10min) | 'perdu' (>10min) | null
+ * - indicateur: 'recent' (<5min) | 'ancien' (5-20min) | 'perdu' (>20min) | null
  * - demanderPermission: () => Promise<boolean>
  * - actualiserPosition: () => Promise<void>
  */
@@ -38,8 +38,8 @@ export function useGPSNatif({ enabled = true, intervalMs = 15000, onPosition } =
 
   // Calcul indicateur GPS
   const indicateur = ageMinutes === null ? null
-    : ageMinutes < 2 ? "recent"
-    : ageMinutes < 10 ? "ancien"
+    : ageMinutes < 5 ? "recent"
+    : ageMinutes < 20 ? "ancien"
     : "perdu";
 
   // Mise à jour de l'âge en temps réel (toutes les 30s)

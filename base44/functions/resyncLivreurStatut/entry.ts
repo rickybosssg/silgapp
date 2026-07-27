@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 // Statuts de course considérés comme "active"
-const STATUTS_ACTIFS = ["livreur_en_route", "colis_recupere", "en_livraison", "recherche_livreur"];
+const STATUTS_ACTIFS = ["livreur_en_route", "arrive_prise_en_charge", "colis_recupere", "passager_embarque", "pris_en_charge", "en_livraison", "arrivee"];
 
 Deno.serve(async (req) => {
   try {

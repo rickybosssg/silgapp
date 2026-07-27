@@ -23,7 +23,8 @@
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const OPENAI_MODEL_DEFAULT = 'gpt-4.1-mini';
 const MAX_TOOL_ROUNDS = 3;
-const OPENAI_TIMEOUT_MS = 30000; // 30s — empêche les appels pendus à 42-58s
+const OPENAI_TIMEOUT_MS = 45000; // 45s — GPT-5 (reasoning model) peut prendre jusqu'à 40s
+const OPENAI_RETRY_TIMEOUT_MS = 30000; // 30s pour le retry (plus court = échec plus rapide si serveur surchargé)
 
 /**
  * Fetch avec timeout via AbortController.
@@ -441,26 +442,61 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const tCallStart = Date.now();
     const isGpt5 = model.startsWith('gpt-5');
-    const response = await fetchAvecTimeout(OPENAI_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        tools: SILGAPP_TOOLS,
-        tool_choice: 'auto',
-        response_format: { type: 'json_object' },
-        temperature: isGpt5 ? 1 : temp,
-        max_completion_tokens: maxTokens,
-        ...(isGpt5 ? { reasoning_effort: 'low' } : {}),
-      }),
-    });
+
+    // ── Retry sur timeout (GPT-5 peut nécessiter plus de temps) ──
+    let response: Response;
+    try {
+      response = await fetchAvecTimeout(OPENAI_API_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          tools: SILGAPP_TOOLS,
+          tool_choice: 'auto',
+          response_format: { type: 'json_object' },
+          temperature: isGpt5 ? 1 : temp,
+          max_completion_tokens: maxTokens,
+          ...(isGpt5 ? { reasoning_effort: 'low' } : {}),
+        }),
+      });
+    } catch (timeoutErr: any) {
+      // Retry unique sur timeout avec un délai plus court
+      if (timeoutErr.message?.includes('timeout')) {
+        console.warn(`[OpenAIEngine] ⚠️ Timeout au premier essai — retry (30s)`);
+        response = await fetchAvecTimeout(OPENAI_API_URL, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            tools: SILGAPP_TOOLS,
+            tool_choice: 'auto',
+            response_format: { type: 'json_object' },
+            temperature: isGpt5 ? 1 : temp,
+            max_completion_tokens: maxTokens,
+            ...(isGpt5 ? { reasoning_effort: 'low' } : {}),
+          }),
+        }, OPENAI_RETRY_TIMEOUT_MS);
+      } else {
+        throw timeoutErr;
+      }
+    }
 
     if (!response.ok) {
       const errText = await response.text();
+      // Retry sur erreur 500 (serveur instable OpenAI)
+      if (response.status >= 500 && round === 0) {
+        console.warn(`[OpenAIEngine] ⚠️ Erreur ${response.status} OpenAI — retry`);
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
       throw new Error(`OpenAI API ${response.status}: ${errText.substring(0, 300)}`);
     }
 
@@ -527,9 +563,55 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
           document_sources: '',
         };
       }
-      // ── Si la reponse est vide dans le JSON parsé, lancer une exception pour le fallback InvokeLLM ──
+      // ── Si la reponse est vide dans le JSON parsé, retry une fois avec instruction explicite ──
       if (!parsed.reponse || (typeof parsed.reponse === 'string' && parsed.reponse.trim().length === 0)) {
-        throw new Error('OpenAI: reponse vide dans le JSON — fallback vers InvokeLLM');
+        if (round === 0) {
+          console.warn('[OpenAIEngine] ⚠️ Champ "reponse" vide — retry avec instruction explicite');
+          const retryResp = await fetchAvecTimeout(OPENAI_API_URL, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model,
+              messages: [
+                ...messages,
+                { role: 'user', content: 'Le champ "reponse" de ton JSON était vide. RÉPONDS À NOUVEAU avec un JSON complet où "reponse" contient un texte non vide (minimum 10 caractères) répondant au client.' },
+              ],
+              response_format: { type: 'json_object' },
+              temperature: isGpt5 ? 1 : temp,
+              max_completion_tokens: maxTokens,
+              ...(isGpt5 ? { reasoning_effort: 'low' } : {}),
+            }),
+          }, OPENAI_RETRY_TIMEOUT_MS);
+          if (retryResp.ok) {
+            const retryData = await retryResp.json();
+            const retryMsg = retryData.choices?.[0]?.message;
+            if (retryMsg?.content && retryMsg.content.trim().length > 0) {
+              try {
+                const retryParsed = JSON.parse(retryMsg.content);
+                if (retryParsed.reponse && retryParsed.reponse.trim().length > 0) {
+                  console.log(`[OpenAIEngine] ✅ Retry reponse vide réussi: ${Date.now() - tCallStart}ms`);
+                  retryParsed._outils_openai = toolsUsed.length > 0 ? toolsUsed.join(',') : 'none';
+                  retryParsed._model_openai = model;
+                  retryParsed._tokens_openai = retryData.usage?.total_tokens || 0;
+                  retryParsed._tokens_prompt = retryData.usage?.prompt_tokens || 0;
+                  retryParsed._tokens_completion = retryData.usage?.completion_tokens || 0;
+                  return retryParsed;
+                }
+              } catch {}
+            }
+          }
+        }
+        // ── ÉCONOMIE DE CRÉDITS: Au lieu de fallback vers InvokeLLM (coûteux),
+        //    construire une réponse par défaut depuis les données parsées. ──
+        console.warn('[OpenAIEngine] ⚠️ Champ "reponse" vide — construction réponse par défaut (évite fallback InvokeLLM)');
+        parsed.reponse = parsed.reponse || 'Je suis VENUS, l\'assistante SILGAPP. Comment puis-je vous aider ?';
+        parsed.confiance = Math.max(parsed.confiance || 0, 50);
+        parsed._outils_openai = toolsUsed.length > 0 ? toolsUsed.join(',') : 'none';
+        parsed._model_openai = model;
+        parsed._tokens_openai = usage?.total_tokens || 0;
+        parsed._tokens_prompt = usage?.prompt_tokens || 0;
+        parsed._tokens_completion = usage?.completion_tokens || 0;
+        return parsed;
       }
 
       // S'assurer que les outils utilisés sont enregistrés

@@ -96,10 +96,16 @@ function isCourseWaitingForLivreur(course, livreurId) {
   if (!isCourseTargetingLivreur(course, livreurId)) return false;
   if (course.manual_price_status === "pending_client_validation") return false;
   if (FINAL_COURSE_STATUSES.has(course.statut)) return false;
-  return (
-    PROPOSED_DISPATCH_STATUSES.has(course.dispatch_status) &&
-    PROPOSED_COURSE_STATUSES.has(course.statut)
-  );
+  if (!PROPOSED_DISPATCH_STATUSES.has(course.dispatch_status)) return false;
+  if (!PROPOSED_COURSE_STATUSES.has(course.statut)) return false;
+  // 🛡️ Ignorer les courses dont le timeout a expiré — le moteur de dispatch
+  // a déjà continué vers d'autres vagues. Sans ce filtre, toutes les anciennes
+  // courses expirées s'affichent en cascade à l'ouverture de l'app.
+  if (course.timeout_expires_at) {
+    const expires = new Date(course.timeout_expires_at);
+    if (!isNaN(expires.getTime()) && expires < new Date()) return false;
+  }
+  return true;
 }
 
 function isCourseOwnedByLivreur(course, livreurId) {
@@ -509,7 +515,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           !FINAL_COURSE_STATUSES.has(course.statut) &&
           course.manual_price_status !== "pending_client_validation" &&
           (!livreurProfil?.country_code || course.country_code === livreurProfil.country_code) &&
-          listIncludesLivreur(course.dispatch_notified_ids, livreurId)
+          listIncludesLivreur(course.dispatch_notified_ids, livreurId) &&
+          // 🛡️ Ignorer les courses expirées (timeout dépassé)
+          (!course.timeout_expires_at || new Date(course.timeout_expires_at) > new Date())
         )) || null;
 
         setCourseProposeeDirecte(

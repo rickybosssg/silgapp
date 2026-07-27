@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { Users, Phone, Clock, CheckCircle2, Timer, RefreshCw, Radio, Zap } from "lucide-react";
+import { Users, Phone, Clock, CheckCircle2, Timer, RefreshCw, Radio, Zap, XCircle, UserCheck } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
@@ -63,14 +63,11 @@ export default function ProposedLivreursList({ course }) {
     ? Math.max(1, Math.round((expiresTs - sollicitationTs) / 1000))
     : 120;
 
-  // ── Estimation du prochain tick du moteur de dispatch (toutes les 5 min = 300s) ──
-  // Le tick est indépendant du timeout : il tourne sur son propre intervalle.
-  // On estime le reste jusqu'au prochain tick depuis updated_date de la course.
-  const DISPATCH_TICK_SEC = 300;
-  const updatedTs = course?.updated_date ? new Date(course.updated_date).getTime() : null;
-  const nextTickIn = updatedTs
-    ? Math.max(0, DISPATCH_TICK_SEC - (Math.floor((now - updatedTs) / 1000) % DISPATCH_TICK_SEC))
-    : null;
+  // ── Estimation du prochain tick du moteur de dispatch ──
+  // Deux automations tournent toutes les 5 min, décalées de 2.5 min (start_time 00:00 et 00:02).
+  // Fréquence effective : ~2.5 min. On calcule depuis l'horloge (pas updated_date).
+  const TICK_HALF_SEC = 150;
+  const nextTickIn = Math.max(0, TICK_HALF_SEC - (Math.floor(now / 1000) % TICK_HALF_SEC));
 
   useEffect(() => {
     let mounted = true;
@@ -113,10 +110,6 @@ export default function ProposedLivreursList({ course }) {
     );
   }
 
-  if (livreurs.length === 0) {
-    return null;
-  }
-
   const acceptedId = course.livreur_id || course.accepted_by_livreur_id;
 
   const dispatchStatus = course?.dispatch_status;
@@ -133,6 +126,11 @@ export default function ProposedLivreursList({ course }) {
   else if (dispatchStatus === "redispatch") { dispatchLabel = "Re-recherche en cours"; dispatchColor = "text-orange-600"; }
   else if (dispatchStatus === "cycle_epuise") { dispatchLabel = "Tous sollicités"; dispatchColor = "text-red-600"; }
   else if (dispatchStatus === "accepte") { dispatchLabel = "Course acceptée"; dispatchColor = "text-green-600"; }
+
+  // Ne rien afficher si rien à montrer (pas de livreurs, pas en recherche, pas terminal)
+  if (livreurs.length === 0 && !isSearching && !isCycleEpuise && !isTerminal) {
+    return null;
+  }
 
   return (
     <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 space-y-2">
@@ -243,6 +241,7 @@ export default function ProposedLivreursList({ course }) {
           </span>
         </div>
       )}
+      {livreurs.length > 0 && (
       <div className="space-y-1.5">
         {livreurs.map((l, idx) => {
           const isAccepted = acceptedId && String(l.id) === String(acceptedId);
@@ -305,6 +304,7 @@ export default function ProposedLivreursList({ course }) {
           );
         })}
       </div>
+      )}
     </div>
   );
 }

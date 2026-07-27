@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { isLibre } from "@/lib/dispatchRules";
 
 export default function ModernMap({
   position,
@@ -650,7 +651,7 @@ export default function ModernMap({
       
       {/* Badge livreurs - meme source que les marqueurs (avec GPS uniquement) */}
       {mapLoaded && (() => {
-        const livreursAffiches = livreursProches.filter(p => (p.vehicule || p.type_vehicule || p.statut) && p.latitude && p.longitude);
+        const livreursAffiches = livreursProches.filter(p => (p.vehicule || p.type_vehicule || p.statut) && p.latitude && p.longitude && isLibre(p));
         if (livreursAffiches.length === 0) return null;
         return (
           <div className="absolute top-4 right-4 z-[1000]">

@@ -465,6 +465,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 { id: "colis_inexistant", label: "Colis inexistant", icon: "" },
                 { id: "client_change_avis", label: "Client a changé d'avis", icon: "" },
                 { id: "colis_interdit", label: "Colis interdit", icon: "" },
+                { id: "désaccord_prix", label: "Désaccord sur le prix", icon: "💰" },
                 { id: "panne_vehicule", label: "Panne du véhicule", icon: "" },
                 { id: "accident", label: "Accident", icon: "" },
                 { id: "autre", label: "Autre", icon: "" },
@@ -672,7 +673,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             // DÉPLACEMENT : afficher le passager comme contact unique
             if (isDeplacement) {
               const contactNom = course.passager_nom || course.client_nom || "Passager";
-              const contactTel = course.passager_telephone || course.client_telephone;
+              const contactTel = course.contact_createur_course || course.passager_telephone || course.client_telephone;
               const contactRole = "Passager";
 
               const handleWhatsApp = () => {
@@ -726,9 +727,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             const contactNom = colisRecupere
               ? (course.destinataire_nom || "Destinataire")
               : (course.expediteur_nom || course.client_nom || "Expéditeur");
-            const contactTel = colisRecupere
+            const contactTel = course.contact_createur_course || (colisRecupere
               ? (course.destinataire_telephone || course.destinataire_phone_normalized)
-              : (course.expediteur_telephone || course.client_telephone);
+              : (course.expediteur_telephone || course.client_telephone));
             const contactRole = colisRecupere ? "Destinataire" : "Expéditeur";
 
             const handleWhatsApp = () => {

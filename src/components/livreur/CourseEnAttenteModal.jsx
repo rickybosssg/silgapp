@@ -321,14 +321,14 @@ export default function CourseEnAttenteModal({
             </div>
             <div className="flex gap-2">
               <a
-                href={`https://wa.me/${course.client_telephone?.replace(/[^0-9]/g, "").replace(/^0+/, "")}`}
+                href={`https://wa.me/${(course.contact_createur_course || course.client_telephone)?.replace(/[^0-9]/g, "").replace(/^0+/, "")}`}
                 target="_blank" rel="noreferrer"
               >
                 <button className="w-11 h-11 rounded-2xl bg-green-50 border border-green-200 flex items-center justify-center">
                   <MessageCircle className="w-5 h-5 text-green-600" />
                 </button>
               </a>
-              <a href={`tel:${course.client_telephone}`}>
+              <a href={`tel:${course.contact_createur_course || course.client_telephone}`}>
                 <button className="w-11 h-11 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center">
                   <Phone className="w-5 h-5 text-blue-600" />
                 </button>

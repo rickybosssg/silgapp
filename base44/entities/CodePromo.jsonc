@@ -4,7 +4,7 @@
   "properties": {
     "code": {
       "type": "string",
-      "description": "Code promo unique (ex: AISSA100)"
+      "description": "Code promo unique (ex: AISS100)"
     },
     "proprietaire_nom": {
       "type": "string",
@@ -22,11 +22,16 @@
       "type": "string",
       "description": "ID Livreur du propri\u00e9taire (si livreur)"
     },
+    "proprietaire_partenaire_id": {
+      "type": "string",
+      "description": "ID du partenaire propri\u00e9taire (boutique, restaurant ou pharmacie)"
+    },
     "proprietaire_type": {
       "type": "string",
       "enum": [
         "client",
-        "livreur"
+        "livreur",
+        "partenaire"
       ],
       "default": "client",
       "description": "Type de propri\u00e9taire du code"

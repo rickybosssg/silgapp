@@ -6,6 +6,7 @@ const MOTIFS_VALIDES = [
   "colis_inexistant",
   "client_change_avis",
   "colis_interdit",
+  "désaccord_prix",
   "panne_vehicule",
   "accident",
   "autre"
@@ -178,6 +179,7 @@ Deno.serve(async (req) => {
           colis_inexistant: "Colis inexistant",
           client_change_avis: "Client a changé d'avis",
           colis_interdit: "Colis interdit",
+          désaccord_prix: "Désaccord sur le prix",
           panne_vehicule: "Panne de véhicule",
           accident: "Accident",
           autre: motif_detail || "Autre",
@@ -203,14 +205,19 @@ Deno.serve(async (req) => {
         }).catch(() => null);
       }
 
+      // ── DÉSACCORD PRIX : Relance immédiate du dispatch sans demander au client ──
+      // Le livreur a annulé pour un motif de prix → on recherche un autre livreur automatiquement.
+      const isDesaccordPrix = motif === "désaccord_prix";
+
       // ── VENUS WHATSAPP : Demander au client s'il veut un autre livreur ──
       // La course est en "recherche_livreur" + "expire" (non traitée par le dispatch auto).
       // Venus envoie un WhatsApp au client pour demander s'il faut rechercher un autre livreur.
       // Si le client répond "oui" → dispatch_status passe à "en_attente" + dispatch relancé.
       // Si le client répond "non" → course annulée définitivement.
       // Fallback : si WhatsApp impossible → auto-dispatch (comportement précédent).
+      // EXCEPTION : désaccord_prix → relance immédiate, pas de question client.
       let whatsappEnvoye = false;
-      if (course.client_telephone) {
+      if (!isDesaccordPrix && course.client_telephone) {
         const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
         const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
         const twilioFromNumber = Deno.env.get('TWILIO_WHATSAPP_FROM') || 'whatsapp:+14155238886';
@@ -222,6 +229,7 @@ Deno.serve(async (req) => {
             colis_inexistant: "Colis inexistant",
             client_change_avis: "Client a changé d'avis",
             colis_interdit: "Colis interdit",
+            désaccord_prix: "Désaccord sur le prix",
             panne_vehicule: "Panne de véhicule",
             accident: "Accident",
             autre: motif_detail || "Autre",

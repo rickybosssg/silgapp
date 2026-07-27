@@ -20,7 +20,7 @@ export default function SuggestionsTab() {
   const [analysingId, setAnalysingId] = useState(null);
   const [transformingRagId, setTransformingRagId] = useState(null);
 
-  const { data: suggestions = [], isLoading } = useQuery({
+  const { data: rawData, isLoading } = useQuery({
     queryKey: ['venus-suggestions', statutFilter],
     queryFn: () => base44.entities.VenusSuggestion.filter(
       statutFilter === 'tous' ? {} : { statut: statutFilter },
@@ -28,6 +28,7 @@ export default function SuggestionsTab() {
     ),
     refetchInterval: 30000,
   });
+  const suggestions = rawData || [];
 
   const filtered = search.trim()
     ? suggestions.filter(s =>
@@ -81,22 +82,31 @@ export default function SuggestionsTab() {
       toast({ title: '✅ Connaissance créée', description: 'La réponse est maintenant active pour VENUS.' });
       queryClient.invalidateQueries({ queryKey: ['venus-suggestions'] });
       queryClient.invalidateQueries({ queryKey: ['venus-knowledge'] });
+
+      // Indexation RAG automatique
+      try {
+        const ragRes = await base44.functions.invoke('indexerDocumentVenus', {
+          action: 'index_from_suggestion',
+          suggestion_id: s.id,
+          auteur: user?.email || 'admin',
+        });
+        if (ragRes.success) {
+          toast({ title: '📚 RAG indexé', description: `${ragRes.chunks?.length || 0} chunk(s) — VENUS peut maintenant retrouver cette réponse.` });
+        } else {
+          toast({ title: '⚠ RAG partiel', description: ragRes.error || 'Indexation RAG échouée — utilisez « Transformer en RAG » manuellement.', variant: 'destructive' });
+        }
+      } catch (ragErr) {
+        toast({ title: '⚠ RAG échoué', description: 'Connaissance créée mais indexation RAG échouée. Cliquez « Transformer en RAG » pour réessayer.', variant: 'destructive' });
+      }
     } catch (e) {
       toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
     }
   };
 
   const handleRefuse = async (s) => {
-    const motif = prompt('Motif du refus:');
-    if (!motif) return;
     try {
-      const user = await base44.auth.me();
-      await base44.entities.VenusSuggestion.update(s.id, {
-        statut: 'refusee',
-        refusee_par: user?.email || 'admin',
-        refusee_motif: motif,
-      });
-      toast({ title: 'Suggestion refusée' });
+      await base44.entities.VenusSuggestion.delete(s.id);
+      toast({ title: '🗑 Suggestion supprimée' });
       queryClient.invalidateQueries({ queryKey: ['venus-suggestions'] });
     } catch (e) {
       toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
@@ -282,10 +292,11 @@ Réponds UNIQUEMENT avec un JSON:`,
 }
 
 function MergeDialog({ suggestion, onClose, onMerge }) {
-  const { data: connaissances = [] } = useQuery({
+  const { data: rawData } = useQuery({
     queryKey: ['venus-knowledge-for-merge'],
     queryFn: () => base44.entities.VenusKnowledge.filter({ statut: 'valide' }, '-created_date', 200),
   });
+  const connaissances = rawData || [];
   const [selected, setSelected] = useState('');
   const [search, setSearch] = useState('');
   const filtered = connaissances.filter(k => k.titre?.toLowerCase().includes(search.toLowerCase()) || k.question?.toLowerCase().includes(search.toLowerCase()));

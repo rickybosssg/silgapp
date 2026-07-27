@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { ensureCodePromo } from '../../shared/codePromoUtils.ts';
 
 /**
  * Initialisation automatique pour NOUVEAU CLIENT
@@ -53,6 +54,19 @@ Deno.serve(async (req) => {
       });
     } else {
       client = client[0];
+    }
+
+    // 1b. Créer automatiquement un code promo ambassadeur pour le client
+    try {
+      await ensureCodePromo(base44.asServiceRole, {
+        proprietaire_type: 'client',
+        proprietaire_id: client.id,
+        proprietaire_nom: client.nom || user.email,
+        proprietaire_email: user.email,
+        country_code: country_code,
+      });
+    } catch (e) {
+      console.error('[initClientAuto] Erreur création code promo:', e.message);
     }
 
     // 2. Enregistrer la session device

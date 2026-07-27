@@ -126,8 +126,8 @@ const missingCases = [
   [{}, 'type_course'],
   [{ type_course: 'expedier' }, 'adresse_depart'],
   [{ type_course: 'expedier', adresse_depart: 'Tampouy' }, 'adresse_arrivee'],
-  [{ type_course: 'expedier', adresse_depart: 'Tampouy', adresse_arrivee: 'Kiloins' }, 'contact'],
-  [{ type_course: 'recevoir', adresse_depart: 'Karpala', adresse_arrivee: 'Pissy' }, 'contact'],
+  [{ type_course: 'expedier', adresse_depart: 'Tampouy', adresse_arrivee: 'Kiloins' }, 'contact_createur_course'],
+  [{ type_course: 'recevoir', adresse_depart: 'Karpala', adresse_arrivee: 'Pissy', contact_createur_course: '70123456' }, 'contact'],
   [{ type_course: 'deplacement', adresse_depart: 'Gounghin' }, 'adresse_arrivee'],
 ];
 for (let i = 0; i < 80; i++) {
@@ -149,6 +149,7 @@ for (let i = 0; i < 80; i++) {
     type_course: type,
     adresse_depart: i % 2 ? 'Tampouy' : 'Karpala',
     adresse_arrivee: i % 2 ? 'Kiloins' : 'Saaba',
+    contact_createur_course: `7612${String(i).padStart(4, '0')}`,
     ...(type === 'deplacement'
       ? { contact_is_client: true }
       : { contact_telephone: `7012${String(i).padStart(4, '0')}` }),
@@ -166,7 +167,7 @@ for (let i = 0; i < 40; i++) {
   const state = makeState();
   processMessage(state, {
     sid: `SM_STALE_A_${i}`, draftId: `draft_stale_${i}`, resetDraft: true,
-    updates: { type_course: 'expedier', adresse_depart: 'Tampouy', adresse_arrivee: 'Saaba', contact_telephone: '70123456' },
+    updates: { type_course: 'expedier', adresse_depart: 'Tampouy', adresse_arrivee: 'Saaba', contact_createur_course: '76123456', contact_telephone: '70123456' },
   });
   processMessage(state, { sid: `SM_STALE_B_${i}`, presentRecap: true });
   processMessage(state, { sid: `SM_STALE_C_${i}`, updates: { adresse_arrivee: 'Karpala' } });
@@ -205,7 +206,7 @@ for (let i = 0; i < 20; i++) {
   const state = makeState();
   processMessage(state, { sid: `SM_SCHED_A_${i}`, draftId: `scheduled_${i}`, resetDraft: true, updates: {
     type_course: 'expedier', adresse_depart: 'Tampouy', adresse_arrivee: 'Kiloins',
-    contact_telephone: '70123456', date_programmee: '2026-08-01', heure_programmee: '15:00',
+    contact_createur_course: '76123456', contact_telephone: '70123456', date_programmee: '2026-08-01', heure_programmee: '15:00',
   } });
   processMessage(state, { sid: `SM_SCHED_B_${i}`, presentRecap: true });
   processMessage(state, { sid: `SM_SCHED_C_${i}`, message: 'ok' });
@@ -224,7 +225,7 @@ for (let i = 0; i < 20; i++) {
   const invalid = invalidSchedules[i % invalidSchedules.length];
   processMessage(state, { sid: `SM_BAD_SCHED_A_${i}`, draftId: `bad_scheduled_${i}`, resetDraft: true, updates: {
     type_course: 'expedier', adresse_depart: 'Tampouy', adresse_arrivee: 'Kiloins',
-    contact_telephone: '70123456', date_programmee: invalid.date_programmee, heure_programmee: invalid.heure_programmee,
+    contact_createur_course: '76123456', contact_telephone: '70123456', date_programmee: invalid.date_programmee, heure_programmee: invalid.heure_programmee,
   } });
   processMessage(state, { sid: `SM_BAD_SCHED_B_${i}`, presentRecap: true });
   processMessage(state, { sid: `SM_BAD_SCHED_C_${i}`, message: 'oui' });

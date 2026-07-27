@@ -255,18 +255,31 @@ export default function DusLivreursExternes() {
     refetchInterval: 30000,
   });
 
+  // ── Définition du "jour" (aujourd'hui, minuit local) ──
+  const startOfToday = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
   // ── Agréger par livreur ──
   const recapLivreurs = useMemo(() => {
     const map = {};
     courses.forEach(c => {
       if (!c.livreur_id) return;
+      const dateLivraison = c.heure_livraison || c.colis_livre_at || c.updated_date;
+      const isToday = dateLivraison ? new Date(dateLivraison) >= startOfToday : false;
       if (!map[c.livreur_id]) {
         const info = livreurs.find(l => l.id === c.livreur_id);
-        map[c.livreur_id] = { id: c.livreur_id, nom: c.livreur_nom || info?.nom || "Inconnu", prenom: info?.prenom || "", telephone: c.livreur_telephone || info?.telephone || "", livreurInfo: info || null, courses: [], montantTotal: 0, commissionTotal: 0, montantPaye: 0, montantDu: 0 };
+        map[c.livreur_id] = { id: c.livreur_id, nom: c.livreur_nom || info?.nom || "Inconnu", prenom: info?.prenom || "", telephone: c.livreur_telephone || info?.telephone || "", livreurInfo: info || null, courses: [], montantTotal: 0, commissionTotal: 0, commissionJour: 0, nbCoursesJour: 0, montantPaye: 0, montantDu: 0 };
       }
       map[c.livreur_id].courses.push(c);
       map[c.livreur_id].montantTotal += (c.prix_final ?? 0);
       map[c.livreur_id].commissionTotal += (c.commission_silga ?? 0);
+      if (isToday) {
+        map[c.livreur_id].commissionJour += (c.commission_silga ?? 0);
+        map[c.livreur_id].nbCoursesJour += 1;
+      }
       if (c.statut_paiement_livreur === "paye") map[c.livreur_id].montantPaye += (c.commission_silga ?? 0);
     });
     // Livreurs avec solde dû > 0 même sans course dans la période
@@ -274,7 +287,7 @@ export default function DusLivreursExternes() {
       if (map[l.id]) return;
       const du = l.montant_du_silga ?? l.encours ?? 0;
       if (du > 0) {
-        map[l.id] = { id: l.id, nom: l.nom || "Inconnu", prenom: l.prenom || "", telephone: l.telephone || "", livreurInfo: l, courses: [], montantTotal: 0, commissionTotal: 0, montantPaye: 0, montantDu: du };
+        map[l.id] = { id: l.id, nom: l.nom || "Inconnu", prenom: l.prenom || "", telephone: l.telephone || "", livreurInfo: l, courses: [], montantTotal: 0, commissionTotal: 0, commissionJour: 0, nbCoursesJour: 0, montantPaye: 0, montantDu: du };
       }
     });
     Object.values(map).forEach(entry => {
@@ -291,10 +304,11 @@ export default function DusLivreursExternes() {
     });
     let result = Object.values(map);
     const totalDuGlobal = result.reduce((s, r) => s + r.montantDu, 0);
+    const totalCommissionJour = result.reduce((s, r) => s + (r.commissionJour || 0), 0);
     if (filtre === "arecouvrer") result = result.filter(r => r.montantDu > 0);
     if (filtre === "ajour") result = result.filter(r => r.montantDu <= 0);
-    return { list: result.sort((a, b) => b.montantDu - a.montantDu), totalDuGlobal };
-  }, [courses, livreurs, filtre]);
+    return { list: result.sort((a, b) => b.montantDu - a.montantDu), totalDuGlobal, totalCommissionJour };
+  }, [courses, livreurs, filtre, startOfToday]);
 
   // ── Recap Boutiques ──
   const recapBoutiques = useMemo(() => {
@@ -467,13 +481,20 @@ export default function DusLivreursExternes() {
           <div className="relative overflow-hidden bg-gradient-to-br from-red-500 via-red-600 to-orange-500 rounded-3xl p-5 text-white shadow-xl shadow-red-500/20">
             <div className="absolute -right-6 -top-6 w-28 h-28 rounded-full bg-white/10" />
             <div className="absolute -right-2 -bottom-8 w-20 h-20 rounded-full bg-white/5" />
-            <div className="relative flex items-center justify-between">
-              <div>
-                <p className="text-xs opacity-80 font-medium">Total dû par les livreurs</p>
-                <p className="text-3xl font-black tracking-tight mt-0.5">{totalDu.toLocaleString()} <span className="text-sm font-normal opacity-80">FCFA</span></p>
+            <div className="relative">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs opacity-80 font-medium">Total dû par les livreurs</p>
+                  <p className="text-3xl font-black tracking-tight mt-0.5">{totalDu.toLocaleString()} <span className="text-sm font-normal opacity-80">FCFA</span></p>
+                </div>
+                <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
+                  <Wallet className="w-6 h-6" />
+                </div>
               </div>
-              <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                <Wallet className="w-6 h-6" />
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/15">
+                <span className="text-[11px] opacity-80 font-medium">Commission du jour :</span>
+                <span className="text-sm font-black">{recapLivreurs.totalCommissionJour.toLocaleString()} FCFA</span>
+                <span className="text-[10px] opacity-60 ml-auto">{format(startOfToday, "EEEE dd MMM yyyy", { locale: fr })}</span>
               </div>
             </div>
           </div>
@@ -520,6 +541,12 @@ export default function DusLivreursExternes() {
                         <p className="text-xl font-black text-foreground tracking-tight">{entry.montantDu.toLocaleString()}<span className="text-[10px] font-normal text-gray-400 ml-0.5">F</span></p>
                         <p className={`text-[10px] font-semibold ${entry.montantDu > 0 ? "text-red-500" : "text-green-500"}`}>{sf.label}</p>
                       </div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2 text-[11px]">
+                      <span className="text-gray-400">Commission du jour :</span>
+                      <span className="font-bold text-green-600">{(entry.commissionJour || 0).toLocaleString()} F</span>
+                      {entry.nbCoursesJour > 0 && <span className="text-gray-400">· {entry.nbCoursesJour} course(s)</span>}
+                      <span className="text-gray-300 ml-auto">{format(startOfToday, "dd/MM", { locale: fr })}</span>
                     </div>
                     <div className="flex gap-2 mt-3">
                       <Button variant="outline" size="sm" className="flex-1 h-9 text-xs rounded-xl font-semibold" onClick={() => setDetailEntry(entry)}>

@@ -29,7 +29,7 @@ export default function AlertsTab() {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState('non_resolues');
 
-  const { data: alertes = [], isLoading } = useQuery({
+  const { data: rawData, isLoading } = useQuery({
     queryKey: ['venus-alertes', filter],
     queryFn: () => base44.entities.VenusImprovementAlert.filter(
       filter === 'toutes' ? {} : filter === 'non_resolues' ? { resolue: false } : { resolue: true },
@@ -37,6 +37,7 @@ export default function AlertsTab() {
     ),
     refetchInterval: 30000,
   });
+  const alertes = rawData || [];
 
   const handleResolve = async (alerteId) => {
     try {

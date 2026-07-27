@@ -11,6 +11,7 @@ const COURSE_FIELDS = [
   'contact_nom',
   'contact_telephone',
   'contact_is_client',
+  'contact_createur_course',
   'date_programmee',
   'heure_programmee',
 ];
@@ -106,6 +107,8 @@ export function validateCourseDraft(draft: VenusCourseDraft | null | undefined):
   const hasDepart = Boolean(String(next.adresse_depart || '').trim()) || next.gps_depart_lat != null;
   const hasArrivee = Boolean(String(next.adresse_arrivee || '').trim()) || next.gps_arrivee_lat != null;
   const hasContact = Boolean(String(next.contact_telephone || '').trim()) || next.contact_is_client === true;
+  const creatorContactDigits = String(next.contact_createur_course || '').replace(/\D/g, '');
+  const hasCreatorContact = creatorContactDigits.length >= 8 && creatorContactDigits.length <= 15;
   const hasSchedule = Boolean(next.date_programmee || next.heure_programmee);
   const validDate = !hasSchedule || /^\d{4}-\d{2}-\d{2}$/.test(String(next.date_programmee || ''));
   const validTime = !hasSchedule || /^([01]\d|2[0-3]):[0-5]\d$/.test(String(next.heure_programmee || ''));
@@ -114,6 +117,7 @@ export function validateCourseDraft(draft: VenusCourseDraft | null | undefined):
   if (!hasType) missingField = 'type_course';
   else if (!hasDepart) missingField = 'adresse_depart';
   else if (!hasArrivee) missingField = 'adresse_arrivee';
+  else if (!hasCreatorContact) missingField = 'contact_createur_course';
   else if (!hasContact) missingField = 'contact';
   else if (!validDate) missingField = 'date_programmee_invalide';
   else if (!validTime) missingField = 'heure_programmee_invalide';

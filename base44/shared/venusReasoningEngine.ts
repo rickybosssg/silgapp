@@ -31,10 +31,14 @@ import {
 } from './venusToolsEngine.ts';
 import {
   stockerCache,
+  recupererCache,
   detecterSalutation,
+  detecterRaccourciFrequent,
+  detecterRegleMetierDirecte,
+  detecterConnaissanceDirecte,
 } from './venusCache.ts';
 import { genererReferenceCourse } from './venusCourseReference.ts';
-import { isOpenAIEnabled, raisonnerAvecOpenAI } from './venusOpenAIEngine.ts';
+import { isOpenAIEnabled, raisonnerAvecOpenAI, getOpenAIModel } from './venusOpenAIEngine.ts';
 import { logOpenAIUsage, loggerMessageVenus, calculateCost } from './venusOpenAITracker.ts';
 
 /**
@@ -383,8 +387,12 @@ export async function creerCourseDepuisMemoire(
   const hasRequiredContact = cd.contact_telephone || cd.contact_is_client;
   const hasDepart = cd.adresse_depart || cd.gps_depart_lat != null;
   const hasArrivee = cd.adresse_arrivee || cd.gps_arrivee_lat != null;
+  // ── contact_createur_course : OBLIGATOIRE pour toute course VENUS ──
+  // Le numéro WhatsApp entrant ne peut être utilisé QUE si le client a confirmé
+  // explicitement (contact_createur_is_sender=true). Ne jamais réutiliser un ancien numéro.
+  const hasCreateurContact = !!(cd.contact_createur_course && cd.contact_createur_course.trim());
 
-  if (!hasDepart || !hasArrivee || !hasRequiredContact) {
+  if (!hasDepart || !hasArrivee || !hasRequiredContact || !hasCreateurContact) {
     return { success: false, error: 'MISSING_INFO' };
   }
 
@@ -406,6 +414,8 @@ export async function creerCourseDepuisMemoire(
     gps_depart_lng: cd.gps_depart_lng,
     gps_arrivee_lat: cd.gps_arrivee_lat,
     gps_arrivee_lng: cd.gps_arrivee_lng,
+    // ── Contact principal — créateur de la course (OBLIGATOIRE) ──
+    contact_createur_course: cd.contact_createur_course,
     // ── Architecture durable : enregistrer le numéro WhatsApp SILGAPP d'origine ──
     // Toutes les notifications de cette course partiront depuis ce numéro.
     // Séparé par pays et par compte WhatsApp/Twilio naturellement (chaque numéro = 1 pays + 1 compte).
@@ -544,6 +554,13 @@ export async function creerCourseDepuisMemoire(
     // Générer la référence unique : SG-YYYYMMDD-XXXXXX
     const reference = genererReferenceCourse(course);
 
+    // ── Contact destinataire (facultatif selon le type de course) ──
+    const contactDestinataire = normalizedType === 'expedier'
+      ? (courseData.destinataire_telephone || '')
+      : normalizedType === 'recevoir'
+        ? (courseData.expediteur_telephone || '')
+        : '';
+
     const message = `📦 Course créée avec succès !
 
 📝 Référence : ${reference}
@@ -551,9 +568,12 @@ export async function creerCourseDepuisMemoire(
 📍 Départ : ${cd.adresse_depart || 'Localisation GPS'}
 🎯 Destination : ${cd.adresse_arrivee || 'Localisation GPS'}
 
+📞 Contact principal — créateur de la course : ${cd.contact_createur_course}
+📞 Contact destinataire : ${contactDestinataire || 'Non renseigné'}
+
 ⏱️ Temps estimé de recherche d'un livreur : moins de 2 minutes.
 
-Je vous informerai dès qu'un livreur aura accepté votre demande. Le livreur vous contactera ensuite pour confirmer les derniers détails et le coût de la livraison.`;
+Je vous informerai dès qu'un livreur aura accepté votre demande. Le livreur contactera en priorité le créateur de la course pour confirmer les derniers détails et le coût de la livraison.`;
 
     // ── Déclencher le dispatch immédiatement (sans attendre l'automatisation programmée) ──
     base44.asServiceRole.functions.invoke('dispatchExterneAuto', {
@@ -761,9 +781,26 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
     return salutation;
   }
 
-  // ── SIMPLIFICATION: Les bypass (raccourcis, cache, règles métier directes,
-  //    connaissances directes) sont désactivés. GPT traite TOUS les messages.
-  //    Seuls les bypass techniques (sécurité + salutation) restent actifs.
+  // ── ÉCONOMIE DE CRÉDITS: Cache de réponses (0 crédit LLM) ──
+  const cached = recupererCache(input.telephone, input.messageClient, input.memoireCourte);
+  if (cached) {
+    cached.temps_traitement_ms = Date.now() - startTime;
+    cached.decision_moteur = 'cache';
+    cached.openai_appele = false;
+    cached.model_utilise = '';
+    return cached;
+  }
+
+  // ── ÉCONOMIE DE CRÉDITS: Raccourcis questions fréquentes (0 crédit LLM) ──
+  const raccourci = detecterRaccourciFrequent(input.messageClient, input.courseActive);
+  if (raccourci) {
+    raccourci.temps_traitement_ms = Date.now() - startTime;
+    raccourci.decision_moteur = 'raccourci';
+    raccourci.openai_appele = false;
+    raccourci.model_utilise = '';
+    stockerCache(input.telephone, input.messageClient, input.memoireCourte, raccourci);
+    return raccourci;
+  }
 
   // ── Construire l'historique lisible ──
   const historiqueStr = input.historiqueRecent
@@ -872,225 +909,140 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
     console.log(`[ReasoningEngine] 📖 ${businessRuleEntries.length} règles métier chargées`);
   }
 
-  // ── SIMPLIFICATION: Tous les bypasses (raccourcis, cache, règles métier directes,
-  //    connaissances directes, heuristique pré-LLM) sont supprimés.
-  //    GPT traite TOUS les messages. Le RAG et les règles restent dans le prompt
-  //    comme CONTEXTE, mais ne répondent pas à la place de GPT.
+  // ── ÉCONOMIE DE CRÉDITS: Règles métier directes (0 crédit LLM) ──
+  const regleDirecte = detecterRegleMetierDirecte(input.messageClient, businessRuleEntries);
+  if (regleDirecte) {
+    regleDirecte.temps_traitement_ms = Date.now() - startTime;
+    regleDirecte.decision_moteur = 'regle_metier';
+    regleDirecte.openai_appele = false;
+    regleDirecte.model_utilise = '';
+    stockerCache(input.telephone, input.messageClient, input.memoireCourte, regleDirecte);
+    return regleDirecte;
+  }
 
-  // ── Construire le prompt de raisonnement ──
+  // ── ÉCONOMIE DE CRÉDITS: Connaissances directes (0 crédit LLM) ──
+  const connaissanceDirecte = detecterConnaissanceDirecte(input.messageClient, knowledgeEntries);
+  if (connaissanceDirecte) {
+    connaissanceDirecte.temps_traitement_ms = Date.now() - startTime;
+    connaissanceDirecte.decision_moteur = 'connaissance';
+    connaissanceDirecte.openai_appele = false;
+    connaissanceDirecte.model_utilise = '';
+    stockerCache(input.telephone, input.messageClient, input.memoireCourte, connaissanceDirecte);
+    return connaissanceDirecte;
+  }
+
+  // ── Construire le prompt de raisonnement (version compactée) ──
   const audioNote = input.isAudioTranscription
-    ? `═══ NOTE: TRANSCRIPTION VOCALE ═══
-Le message ci-dessous a ete transcrit depuis une note vocale et peut contenir des erreurs.
-Noms de quartiers et repères courants à Ouagadougou: Karpala, Pissy, Tampouy, Ouaga 2000, Zone du Bois, Patte d'Oie, Gounghin, Dassasgho, Cissin, Samandin, Wemtenga, Bendogo, Larle, Somgande, Saaba, Tanghin, Kossodo, 1200 Logements, 2000 Logements, Sonabel, Sonatur, Château, Polesgo, Sapone, Dagnoen, Zogona.
-
-IMPORTANT: Identifie d'abord QUI parle avant d'interpréter le message:
-- Un client qui demande un service: "je voudrais envoyer", "je veux livrer", "j'ai besoin d'une livraison"
-- Un livreur qui rapporte son statut: "j'ai fini à", "je suis à", "je m'en vais à", "j'ai récupéré"
-- Quelqu'un qui parle à une autre personne: "tu n'es pas au bureau?", "sors", "appelle-moi"
-
-═══ CONTINUITÉ DE CONVERSATION (TRÈS IMPORTANT) ═══
-Si VENUS a posé une question dans le dernier message de l'historique, le message actuel est probablement LA RÉPONSE à cette question.
-- Si VENUS a demandé un numéro de téléphone et le client donne des chiffres → c'est le contact_telephone, NE PAS recréer une nouvelle course.
-- Si VENUS a demandé le type de course et le client dit "envoi" ou "réception" → c'est le type_course.
-- Si VENUS a demandé une adresse et le client donne un quartier → c'est l'adresse manquante.
-- NE JAMAIS réinterpréter une réponse comme une NOUVELLE demande si des informations sont déjà dans la mémoire courte.
-- NE JAMAIS écraser une adresse déjà connue par une nouvelle adresse extraite du message, SAUF si le client corrige explicitement ("non, c'est pas X c'est Y").`
+    ? `═══ TRANSCRIPTION VOCALE ═══
+Le message peut contenir des erreurs. Quartiers Ouagadougou: Karpala, Pissy, Tampouy, Ouaga 2000, Zone du Bois, Patte d'Oie, Gounghin, Dassasgho, Cissin, Samandin, Wemtenga, Bendogo, Larle, Somgande, Saaba, Tanghin, Kossodo, 1200/2000 Logements, Sonabel, Sonatur, Château, Polesgo, Sapone, Dagnoen, Zogona.`
     : '';
 
-  const prompt = `${localizedSystemPrompt || 'Tu es VENUS, l\'assistante virtuelle SILGAPP. Tu possèdes un MOTEUR DE RAISONNEMENT avancé et une MÉMOIRE INTELLIGENTE.'}
+  const prompt = `${localizedSystemPrompt || 'Tu es VENUS, l\'assistante virtuelle SILGAPP avec un MOTEUR DE RAISONNEMENT avancé.'}
 
 ═══ RÈGLES MÉTIER (Source 0 — PRIORITÉ ABSOLUE) ═══
-Les règles métier ci-dessous sont des principes généraux validés par les administrateurs SILGAPP.
-AVANT de générer ta réponse, vérifie si une règle métier s'applique à la situation actuelle.
-Si une règle s'applique, tu DOIS la respecter avant toute autre considération.
-Mets business_rule_id avec l'ID de la règle appliquée.
+Vérifie si une règle s'applique AVANT de répondre. Si oui, mets business_rule_id = ID de la règle.
 ${businessRulesStr}
 
 ═══ SCÉNARIOS VALIDÉS (Source 4) ═══
 ${scenarioStr}
 
 ═══ CONTEXTE CLIENT ═══
-Téléphone: ${input.telephone}
-Nom: ${input.profileName || input.telephone}
-Pays: ${input.countryCode} (${input.tarifs.nom})
-Tarifs: ${input.tarifs.prix_km} ${input.tarifs.devise}/km, minimum ${input.tarifs.minimum} ${input.tarifs.devise}
+Téléphone: ${input.telephone} | Nom: ${input.profileName || input.telephone}
+Pays: ${input.countryCode} (${input.tarifs.nom}) | Tarifs: ${input.tarifs.prix_km} ${input.tarifs.devise}/km, min ${input.tarifs.minimum} ${input.tarifs.devise}
 
-═══ MÉMOIRE COURTE (informations collectées dans cette conversation) ═══
+═══ MÉMOIRE COURTE ═══
 ${memoireCourteStr}
 
-═══ MÉMOIRE LONGUE (profil et préférences du client) ═══
+═══ MÉMOIRE LONGUE ═══
 ${memoireLongueStr}
 
 ═══ HISTORIQUE RÉCENT ═══
 ${historiqueStr}
 
-═══ COURSE ACTIVE / DERNIÈRE COURSE ═══
+═══ COURSE ACTIVE / DERNIÈRE ═══
 ${courseActiveStr}
-
-⚠️ IMPORTANT: Vérifie le champ "est_active". Si false (statut "livree" ou "annulee"), la course N'EST PLUS ACTIVE. Ne dis JAMAIS qu'une course livrée/annulée est "active". Si le client demande une nouvelle course et qu'est_active=false, tu PEUX créer une nouvelle course.
+⚠️ Vérifie "est_active". Si false (livree/annulee), la course N'EST PLUS ACTIVE. Ne JAMAIS dire qu'une course livrée/annulée est active. Si est_active=false et le client demande une course → tu PEUX créer.
 
 ═══ BASE DE CONNAISSANCES (Source 2) ═══
 ${knowledgeStr}
 
-═══ BIBLIOTHÈQUE DOCUMENTAIRE (Source 3 — Documents officiels SILGAPP) ═══
+═══ BIBLIOTHÈQUE DOCUMENTAIRE (Source 3) ═══
 ${documentStr}
 
-═══ DONNÉES OPÉRATIONNELLES (OUTILS SILGAPP — Source 6 — Données réelles) ═══
-${input.outils_resultats ? formaterOutilsPourPrompt(input.outils_resultats) : 'Aucun outil appelé pour cette intention.'}
+═══ DONNÉES OPÉRATIONNELLES (Source 6) ═══
+${input.outils_resultats ? formaterOutilsPourPrompt(input.outils_resultats) : 'Aucun outil appelé.'}
 
 ═══ ANTI-HALLUCINATION ═══
-Tu DOIS utiliser UNIQUEMENT les données ci-dessus pour répondre aux questions factuelles.
-- Si un outil retourne NON TROUVÉ, dis clairement que tu n\'as pas cette information. N\'INVENTE JAMAIS.
-- Si un client demande le statut d\'une course et qu\'aucune course active n\'est trouvée, dis-le.
-- Si la dernière course a le statut "livree" ou "annulee" (est_active=false), elle N'EST PLUS ACTIVE. N'utilise JAMAIS l'historique de conversation pour affirmer qu'une course est active si la DB dit le contraire.
-- Si un client demande un prix, utilise UNIQUEMENT les tarifs officiels de l\'outil obtenir_tarifs_officiels.
-- Ne JAMAIS inventer un nom de livreur, un statut, un prix, ou une référence de course.
+- Utilise UNIQUEMENT les données ci-dessus. N'INVENTE JAMAIS un statut, prix, nom de livreur ou référence.
+- Si un outil retourne NON TROUVÉ, dis-le clairement.
+- Une course livrée/annulée (est_active=false) n'est JAMAIS active.
 
 ${audioNote}
 
-${input.force_confirmation ? `═══ ⚠️ CONFIRMATION OBLIGATOIRE (AUDIO À FAIBLE CONFIANCE) ═══
-Le message du client provient d'une transcription audio AVEC UNE CONFIANCE FAIBLE. Tu DOIS :
-1. reformuler ce que tu as compris : "Si j'ai bien compris, vous souhaitez..."
-2. NE JAMAIS créer de course directement — choisis action=poser_question
-3. Demander confirmation explicite avant toute action sensible
-4. Si un mot semble incorrect ou ambigu, demande une clarification
-` : `═══ AUDIO CONFIANCE ═══
-Le message provient d'une transcription audio de BONNE qualité. Tu peux agir normalement.
-Si le client répond à une question que tu as posée, utilise sa réponse directement.
-Ne force PAS de reformulation inutile ("Si j'ai bien compris...") si la confiance est bonne.
-`}
+${input.force_confirmation ? `═══ AUDIO FAIBLE CONFIANCE ═══
+Reformule: "Si j'ai bien compris...". NE JAMAIS créer de course directement (action=poser_question). Demande confirmation.` : ''}
 
 ═══ MESSAGE DU CLIENT ═══
 ${input.messageClient}
 
-═══ MOTEUR DE RAISONNEMENT ═══
-Analyse le message du client étape par étape :
+═══ ANALYSE — Qui parle ? ═══
+- CLIENT (veut un service): "je voudrais envoyer", "je veux livrer", "j'ai besoin d'une livraison" → intention=creer_course
+- LIVREUR (rapporte statut): "j'ai fini à", "je suis à", "je pars de", "j'ai récupéré" → intention=signalement_livreur (NE PAS créer de course)
+- HORS CONTEXTE (parle à quelqu'un d'autre): "tu n'es pas au bureau?", "sors", "appelle-moi" → intention=message_hors_contexte (répondre poliment)
 
-ÉTAPE 1 — INTENTION: Que veut réellement le client ?
-- creer_course: Créer une nouvelle course (uniquement si le client demande EXPLICITEMENT à envoyer/recevoir un colis ou se déplacer: "je voudrais envoyer", "je veux livrer", "j'ai besoin d'une livraison")
-- suivre_course: Suivre ou consulter une course existante
-- contacter_livreur: Contacter ou parler au livreur
-- annuler_course: Annuler une course
-- modifier_info: Modifier/corriger une information déjà donnée
-- demander_info: Poser une question informationnelle (tarifs, fonctionnement, etc.)
-- salutation: Bonjour, salut, bonsoir
-- signalement_livreur: Le message vient d'un LIVREUR qui rapporte son statut (ex: "j'ai fini à Karpala", "je suis en route vers", "j'arrive", "je pars de") — ce n'est PAS une demande de course
-- message_hors_contexte: Le message s'adresse à quelqu'un d'autre ou n'est pas une demande SILGAPP (ex: "tu n'es pas au bureau?", "où es-tu?", "appelle-moi", "je suis devant la porte")
-- clarifier: Demande ambiguë nécessitant une clarification
-- autre: Autre chose
+═══ ANALYSE — Intention ═══
+creer_course | suivre_course | contacter_livreur | annuler_course | modifier_info | demander_info | salutation | signalement_livreur | message_hors_contexte | clarifier | autre
+- "Le livreur est où?" / "Il arrive quand?" → suivre_course
+- "Je veux lui parler" → contacter_livreur
+- "C'est combien?" → demander_info
+- Mentionner un quartier seul ≠ demande de course. Ne crée QUE si demande explicite de service.
 
-═══ DISTINGUER UN CLIENT D'UN LIVREUR ═══
-Avant de choisir l'intention, détermine QUI parle:
-- UN CLIENT veut un service: il dit "je voudrais", "je veux", "j'aimerais", "envoyer un colis", "recevoir un colis", "me déplacer", "effectuer une livraison" → intention=creer_course
-- UN LIVREUR rapporte son activité: il dit "j'ai fini à", "je suis à", "je pars de", "je m'en vais à", "j'arrive à", "j'ai livré", "j'ai récupéré le colis" → intention=signalement_livreur (NE PAS créer de course)
-- QUELQU'UN PARLE À UNE AUTRE PERSONNE: le message s'adresse à un "tu" ou "vous" spécifique, demande où est la personne, dit d'appeler, de sortir, etc. → intention=message_hors_contexte (répondre poliment que vous êtes VENUS l'assistante SILGAPP)
+═══ ANALYSE — Contexte ═══
+nouvelle_course | course_en_cours | ancienne_course | paiement | livreur | partenaire | general
 
-ÉTAPE 2 — CONTEXTE: De quoi parle le client ?
-- nouvelle_course / course_en_cours / ancienne_course / paiement / livreur / partenaire / general
+═══ INFOS REQUISES POUR creer_course ═══
+type_course, adresse_depart (ou GPS), adresse_arrivee (ou GPS), contact_createur_course (OBLIGATOIRE), ET contact_telephone si type_course = expedier ou recevoir.
+- contact_createur_course = numéro du CRÉATEUR de la course (contact principal du livreur). OBLIGATOIRE pour chaque course. Ne JAMAIS copier auto le numéro WhatsApp entrant — demander explicitement. Exception: si le client dit "c'est mon numéro"/"c'est moi" → autorisé après confirmation. Ne JAMAIS réutiliser un ancien numéro.
+- Pour "expedier": contact_telephone = DESTINATAIRE. Pour "recevoir": contact_telephone = EXPÉDITEUR. OBLIGATOIRE.
+- Pour "deplacement": contact destinataire FACULTATIF.
+- Nom du destinataire/expéditeur FACULTATIF (seul le téléphone est requis).
 
-ÉTAPE 3 — INFORMATIONS CONNUES: Liste les informations déjà présentes dans la mémoire courte.
+═══ FLUX CRÉATION DE COURSE (STRICT) ═══
+a) Infos manquantes → action=poser_question (UNE SEULE question).
+b) Toutes infos présentes ET récapitulatif pas encore montré → montre récapitulatif COMPLET + "Confirmez-vous la création de cette course ?" (action=poser_question).
+c) Récapitulatif montré + client répond oui/ok/d'accord/je confirme/valider/go → action=creer_course.
+d) Client corrige → mets à jour memoire_courte_update, reviens à (a) ou (b).
+JAMAIS de "all_info_collected" ou "user_confirmed" (ces champs n'existent pas).
+INTERDICTION: Ne JAMAIS dire "je lance la création"/"je crée"/"je valide"/"je finalise" tant que: contact_telephone non collecté ET récapitulatif non présenté ET client n'a pas confirmé.
+Si contact_telephone manquant → action DOIT être poser_question, JAMAIS creer_course.
 
-ÉTAPE 4 — INFORMATIONS MANQUANTES: Pour l'action voulue, quelles informations manquent ?
-Pour creer_course, requis: type_course, adresse_depart (ou GPS), adresse_arrivee (ou GPS), contact_telephone (ou contact_is_client).
-⚠️ CRITIQUE: Pour type_course="expedier", le contact_telephone est le numéro du DESTINATAIRE. Pour "recevoir", c'est le numéro de l'EXPÉDITEUR. Ce contact est OBLIGATOIRE — sans lui, action=poser_question, JAMAIS creer_course.
-
-ÉTAPE 5 — ACTION: Quelle action effectuer ?
-- poser_question: Poser UNE SEULE question (la prochaine information manquante)
-- creer_course: Toutes les infos sont présentes et le client a confirmé → créer la course
-- suivre_course: Donner le statut de la course active
-- contacter_livreur: Fournir le contact du livreur
-- annuler_course: Annuler la course
-- repondre_info: Répondre à une question informationnelle (utilise la base de connaissances si pertinent)
-- clarifier: Demander une clarification
-- saluer: Répondre à une salutation
-- repondre_info: Pour signalement_livreur et message_hors_contexte — répondre poliment sans créer de course
-
-ÉTAPE 6 — PROCHAINE QUESTION: Si action=poser_question, formule UNE SEULE question claire.
-
-ÉTAPE 7 — CONFIANCE: Score 0-100 (100 = très certain, <80 = incertain).
-
-ÉTAPE 8 — RÉPONSE: La réponse à envoyer au client (texte plain, sans markdown, concise, chaleureuse).
-
-ÉTAPE 9 — MÉMOIRE COURTE À METTRE À JOUR: Nouvelles informations collectées ou corrections.
-Inclus uniquement les champs qui ont changé ou qui sont nouveaux.
-Pour type_course, utilise UNIQUEMENT: "expedier", "recevoir", ou "deplacement".
-
-ÉTAPE 10 — MÉMOIRE LONGUE À METTRE À JOUR: Informations persistantes détectées.
-Champs possibles: client_nom, ville_habituelle, quartier_habituel, langue_preferee, type_course_prefere, mode_paiement_prefere, adresse_recuperee, adresse_livraison, destinataire_nom, destinataire_telephone.
+═══ ACTIONS POSSIBLES ═══
+poser_question | creer_course | suivre_course | contacter_livreur | annuler_course | repondre_info | clarifier | saluer
+- signalement_livreur et message_hors_contexte → action=repondre_info
+- signalement_livreur: "Merci pour cette mise à jour ! Bonne continuation !"
+- message_hors_contexte: "Je suis VENUS, l'assistante SILGAPP. Il semble que votre message s'adresse à quelqu'un d'autre. Si vous avez besoin d'une livraison, je suis là pour vous aider !"
 
 ═══ RÈGLES CRITIQUES ═══
+1. ANTI-BOUCLE: Ne JAMAIS redemander une info déjà en mémoire courte.
+2. UNE SEULE question par réponse si action=poser_question.
+3. CORRECTIONS: Si client corrige ("non c'est Y"), mets à jour et confirme.
+4. PAS DE PRIX: Ne JAMAIS inventer un prix. Le livreur confirmera le coût.
+5. SALUTATION simple (Bonjour/Bonsoir/Salut) sans course en cours → accueil chaleureux SANS mentionner de services. Modèle: "Bonjour 👋 Je suis VENUS, l'assistante intelligente de SILGAPP. Comment puis-je vous aider aujourd'hui ?"
+6. CONTINUITÉ: Si VENUS a posé une question, le message actuel est probablement LA RÉPONSE. Ne pas réinterpréter comme nouvelle demande. Ne pas écraser une adresse/type_course déjà connu. Un numéro = contact_telephone, pas nouvelle demande. Ne pas reformuler "Si j'ai bien compris..." si la réponse est directe.
+7. ANTI-FAUX-ANNULATION: "Oui"/"OK"/"D'accord" SEUL ≠ annuler_course. Annulation UNIQUEMENT si mot explicite ("annule", "plus besoin") OU VENUS a posé une question d'annulation et client répond oui.
+8. NOUVELLE COURSE APRÈS FIN: "nouvelle course"/"autre course" sans course active → vide mémoire courte, recommence collecte depuis zéro.
+9. RAG/RÈGLES = CONTEXTE uniquement. C'est TOI qui décides, le RAG ne répond pas à ta place.
+10. Ne JAMAIS confondre: numéro WhatsApp entrant, créateur de course, expéditeur, destinataire.
+11. Récapitulatif DOIT afficher: 📞 Contact principal — créateur : [numéro] + 📞 Contact destinataire : [numéro ou "Non renseigné"]
 
-1. ANTI-BOUCLE: Ne JAMAIS redemander une information déjà présente dans la mémoire courte. Si type_course est connu, ne pas le redemander. Si adresse_depart est connue, ne pas la redemander. etc.
+═══ MÉMOIRE COURTE À METTRE À JOUR ═══
+Uniquement les champs nouveaux/modifiés. type_course: "expedier"|"recevoir"|"deplacement" uniquement.
 
-2. CORRECTIONS: Si le client corrige une information ("finalement ce n'est plus X", "non c'est Y"), mets à jour memoire_courte_update avec la nouvelle valeur et confirme le changement au client.
+═══ MÉMOIRE LONGUE À METTRE À JOUR ═══
+Champs persistants: client_nom, ville_habituelle, quartier_habituel, langue_preferee, type_course_prefere, mode_paiement_prefere, adresse_recuperee, adresse_livraison, destinataire_nom, destinataire_telephone.
 
-3. QUESTIONS IMPLICITES:
-   - "Le livreur est où?" / "Où est le livreur?" → intention=suivre_course, contexte=course_en_cours
-   - "Il arrive quand?" → intention=suivre_course ("il" = le livreur de la course active)
-   - "Je veux lui parler" → intention=contacter_livreur ("lui" = le livreur)
-   - "C'est combien?" / "Ça coûte combien?" → intention=demander_info
-
-4. AMBIGUÏTÉ: Si plusieurs interprétations sont possibles, choisis action=clarifier et pose UNE question de clarification.
-
-5. UNE SEULE QUESTION: Si action=poser_question, la réponse doit contenir UNE SEULE question. Ne jamais demander deux informations en même temps.
-
-6. PAS DE PRIX: Ne JAMAIS inventer ou estimer un prix. Si le client demande le prix, réponds que le livreur confirmera le coût.
-
-7. CRÉATION DE COURSE — FLUX OBLIGATOIRE ET STRICT:
-   a) Si des infos manquent → action=poser_question (DEMANDE UNE SEULE question).
-   b) Si TOUTES les infos sont présentes (type_course + depart + arrivee + contact_telephone) ET que tu n'as PAS encore montré le récapitulatif → montre le récapitulatif COMPLET (incluant le contact destinataire/expéditeur) et demande "Confirmez-vous la création de cette course ?" (action=poser_question).
-   c) Si tu as déjà montré le récapitulatif ET que le client répond par l'affirmative (oui, ok, d'accord, je confirme, valider, go, parfait, exact) → action=creer_course.
-   d) Si tu as montré le récapitulatif ET que le client corrige une info → mets à jour memoire_courte_update et reviens à l'étape (a) ou (b).
-   N'utilise JAMAIS les champs all_info_collected ou user_confirmed — ces décisions appartiennent au serveur, pas à toi.
-
-   ═══ INTERDICTION ABSOLUE ═══
-   Tu n'as PAS le droit de dire "je lance la création", "je crée la course", "je valide", "je lance la recherche de livreur", "je finalise" ou TOUTE phrase similaire indiquant que la course est en cours de création, TANT QUE:
-   - Le contact_telephone du destinataire (pour "expedier") ou de l'expéditeur (pour "recevoir") n'a PAS été collecté ET confirmé par le client, ET
-   - Le récapitulatif complet n'a PAS été présenté au client, ET
-   - Le client n'a PAS répondu par l'affirmative à la question "Confirmez-vous la création de cette course ?"
-
-   Si le client dit "envoie un colis de X vers Y" sans donner le contact du destinataire → tu DOIS demander le contact AVANT de parler de création. Réponse modèle: "Pour un envoi de X vers Y, j'ai besoin du numéro de téléphone du destinataire. Quel est son numéro ?"
-
-   JAMAIS de phrase comme "je lance la création", "je lance la recherche", "je finalise" si infos_manquantes contient "contact_telephone". Si contact_telephone est manquant, action DOIT être poser_question, JAMAIS creer_course.
-
-8. SALUTATION: Si c'est une salutation simple (Bonjour, Bonsoir, Salut, Coucou, Hello) et qu'aucune course n'est en cours, réponds UNIQUEMENT par un accueil chaleureux SANS mentionner de services (PAS de colis, livraison, commande, déplacement, tarif). Réponse modèle: "Bonjour 👋 Je suis VENUS, l'assistante intelligente de SILGAPP. Comment puis-je vous aider aujourd'hui ?"
-
-9. CONTEXTE: Ne mélange jamais une nouvelle demande avec une course en cours. Si le client démarre une nouvelle demande alors qu'une course est en cours, demande clarification.
-
-10. MÉMOIRE LONGUE: Détecte les informations persistantes (ville, quartier, nom, destinataires fréquents) et inclus-les dans memoire_longue_update.
-
-11. RÔLE DU RAG ET DES RÈGLES: Les règles métier, connaissances et documents RAG ci-dessus sont fournis CONTEXTE UNIQUEMENT. Ils t'aident à formuler tes réponses. Tu ne dois JAMAIS laisser une règle ou un document RÉPONDRE À LA PLACE de ton raisonnement. C'est TOI qui comprends, extraits et décides — le RAG est une source d'information, pas un moteur de décision.
-
-12. Pas de création automatique. Pas de all_info_collected. Pas de user_confirmed. Ces champs n'existent pas dans ton raisonnement.
-
-13. Si le client indique "recevoir un colis", le contact à collecter est l'EXPÉDITEUR (celui qui envoie vers le client). Si "envoyer un colis", le contact est le DESTINATAIRE (celui qui reçoit).
-
-14. Le nom du destinataire/expéditeur est FACULTATIF. Seul le téléphone est requis. Si le client n'a pas le nom, mets contact_nom à "" et contact_is_client à false (ou true si le client est lui-même le contact).
-
-15. SIGNALEMENT LIVREUR: Si le message indique clairement que l'expéditeur EST un livreur en train de travailler (ex: "j'ai fini à Karpala", "je m'en vais à la Patte d'Oie pour une livraison", "j'ai récupéré le colis", "je suis en route"), NE CRÉE PAS de course. Réponds: "Merci pour cette mise à jour ! Je note votre progression. Bonne continuation !" avec intention=signalement_livreur et action=repondre_info.
-
-16. MESSAGE HORS CONTEXTE: Si le message s'adresse à quelqu'un d'autre et n'est pas une demande SILGAPP (ex: "tu n'es pas au bureau?", "sors dehors", "je suis devant la porte", "appelle ton numéro"), réponds poliment: "Je suis VENUS, l'assistante SILGAPP. Il semble que votre message s'adresse à quelqu'un d'autre. Si vous avez besoin d'une livraison ou d'un envoi de colis, je suis là pour vous aider !" avec intention=message_hors_contexte et action=repondre_info.
-
-17. MENTION DE LIEUX SANS DEMANDE: Le simple fait de mentionner un quartier (Karpala, Patte d'Oie, etc.) NE signifie PAS que le client veut créer une course. Ne crée une course QUE si le client exprime clairement une demande de service ("je voudrais envoyer", "je veux livrer", "j'ai besoin d'une livraison").
-
-18. CONTINUITÉ DE CONVERSATION (CRITIQUE): Si VENUS a posé une question dans son dernier message, le message actuel est probablement LA RÉPONSE à cette question. Dans ce cas:
-   - Si la mémoire courte a déjà adresse_depart, NE PAS l'écraser avec une nouvelle adresse extraite du message.
-   - Si la mémoire courte a déjà adresse_arrivee, NE PAS l'écraser.
-   - Si la mémoire courte a déjà type_course, NE PAS le redemander.
-   - Un numéro de téléphone dans la réponse = contact_telephone, PAS une nouvelle demande.
-   - NE PAS inclure dans memoire_courte_update les champs qui sont DÉJÀ présents dans la mémoire courte avec la même valeur ou une valeur non vide.
-
-19. RÉPONSE À UNE QUESTION: Si VENUS a demandé "quel est le numéro du destinataire?" et le client répond "70 12 34 56", la réponse est contact_telephone="70123456". L'action doit être poser_question (prochaine info manquante) ou creer_course (si tout est complet). NE JAMAIS reformuler "Si j'ai bien compris vous souhaitez..." dans ce cas.
-
-20. ANTI-FAUX-ANNULATION (CRITIQUE): Un message court comme "Oui", "OK", "Ouais", "D'accord" SEUL ne doit JAMAIS être interprété comme intention=annuler_course. L'annulation ne peut être choisie QUE si:
-    a) Le client utilise un mot d'annulation explicite ("annule", "annuler", "supprime", "stoppe", "arrête", "je veux annuler", "plus besoin"), OU
-    b) VENUS a EXPLICITEMENT posé une question d'annulation dans son dernier message (ex: "Voulez-vous annuler cette course ?") ET le client répond par l'affirmative.
-    Si le message est juste "Oui" sans contexte d'annulation clair, choisis intention=clarifier ou action=poser_question pour demander au client ce qu'il souhaite, JAMAIS annuler_course.
-
-21. NOUVELLE COURSE APRÈS FIN: Si le client dit "créons une nouvelle course", "nouvelle course", "je veux une autre course" ou similaire, ET qu'aucune course active n'existe, tu DOIS vider implicitement la mémoire courte et recommencer la collecte depuis zéro. Ne réutilise PAS les adresses/contacts d'une course précédente terminée ou annulée. Choisis action=poser_question pour demander le type de course et les nouvelles adresses.
-
-═══ LANGUE OBLIGATOIRE ═══
-TU DOIS TOUJOURS RÉPONDRE EN FRANÇAIS. Ne réponds JAMAIS en anglais. Le client est au Burkina Faso ou en Côte d'Ivoire et parle français. Toutes tes réponses, questions, et reformulations doivent être en français.
+═══ LANGUE ═══
+Réponds TOUJOURS en français.
 
 Réponds UNIQUEMENT avec un JSON.`;
 
@@ -1117,7 +1069,7 @@ Réponds UNIQUEMENT avec un JSON.`;
         const openaiTime = Date.now() - tLLMStart;
         console.log(`[ReasoningEngine] ⏱️ OpenAI: ${openaiTime}ms | tools: ${(llmRes as any)?._outils_openai || 'none'} | tokens: ${(llmRes as any)?._tokens_openai || 'N/A'}`);
         logOpenAIUsage(base44, {
-          model: (llmRes as any)?._model_openai || 'gpt-4.1-mini',
+          model: (llmRes as any)?._model_openai || await getOpenAIModel(base44),
           tokens_prompt: (llmRes as any)?._tokens_prompt || 0,
           tokens_completion: (llmRes as any)?._tokens_completion || 0,
           tokens_total: (llmRes as any)?._tokens_openai || 0,
@@ -1132,7 +1084,7 @@ Réponds UNIQUEMENT avec un JSON.`;
         console.warn(`[ReasoningEngine] ⚠️ OpenAI échec (${openaiErr.message}), fallback InvokeLLM`);
         llmRes = null;
         logOpenAIUsage(base44, {
-          model: 'gpt-4.1-mini',
+          model: await getOpenAIModel(base44),
           tokens_prompt: 0, tokens_completion: 0, tokens_total: 0,
           response_time_ms: errTime,
           status: 'error',
@@ -1154,7 +1106,7 @@ Réponds UNIQUEMENT avec un JSON.`;
       console.log(`[ReasoningEngine] ⏱️ LLM (Base44): ${fallbackTime}ms`);
       if (wasOpenAIEnabled) {
         logOpenAIUsage(base44, {
-          model: 'gpt-4.1-mini',
+          model: await getOpenAIModel(base44),
           tokens_prompt: 0, tokens_completion: 0, tokens_total: 0,
           response_time_ms: fallbackTime,
           status: 'fallback',
@@ -1169,6 +1121,13 @@ Réponds UNIQUEMENT avec un JSON.`;
 
     // ── Post-traitement : valider et nettoyer ──
     if (!result.action) result.action = 'repondre_info';
+    // GPT-5 omet parfois le champ intention — utiliser l'heuristique rapide comme fallback
+    if (!result.intention || result.intention === 'undefined') {
+      const intentionRapide = detecterIntentionRapide(input.messageClient);
+      result.intention = intentionRapide || 'autre';
+      console.log(`[ReasoningEngine] ℹ️ Intention LLM vide → fallback heuristique: ${result.intention}`);
+    }
+    if (!result.contexte) result.contexte = 'general';
     if (!result.reponse || (typeof result.reponse === 'string' && result.reponse.trim().length === 0)) {
       console.warn('[ReasoningEngine] ⚠️ LLM a retourné une réponse vide — fallback contextuel');
       result.reponse = "Je n'ai pas bien compris votre demande. Pouvez-vous reformuler ?";
@@ -1570,6 +1529,11 @@ export function genererMessageRelance(memoireCourte: any): string {
   if (!hasContact) {
     const typeLabel = memoireCourte.type_course === 'expedier' ? 'destinataire' : 'expéditeur';
     return `Bonjour, j'attends toujours le numéro de téléphone du ${typeLabel} pour finaliser votre demande. Si vous êtes vous-même le ${typeLabel}, indiquez-le moi.`;
+  }
+
+  const hasCreateurContact = memoireCourte.contact_createur_course;
+  if (!hasCreateurContact) {
+    return "Bonjour, j'attends toujours le numéro de téléphone de la personne qui crée cette course et que le livreur devra contacter en priorité. Si c'est votre numéro, indiquez-le moi.";
   }
 
   return "Bonjour, votre demande est prête. Souhaitez-vous confirmer la création de cette course ? Répondez 'oui' pour confirmer.";

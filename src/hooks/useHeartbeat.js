@@ -23,10 +23,19 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
 
     try {
       const isNative = isNativeMobile();
+      // ✅ Ne plus envoyer 0 quand aucune position — envoyer null / omettre
+      const lat = pos?.latitude ?? position?.latitude ?? null;
+      const lng = pos?.longitude ?? position?.longitude ?? null;
+      const acc = pos?.accuracy ?? position?.accuracy ?? null;
+      const hasValidGps = lat !== null && lng !== null &&
+        Number.isFinite(Number(lat)) && Number.isFinite(Number(lng)) &&
+        Number(lat) >= -90 && Number(lat) <= 90 &&
+        Number(lng) >= -180 && Number(lng) <= 180;
       const payload = {
         user_type,
-        latitude: pos?.latitude || position?.latitude || 0,
-        longitude: pos?.longitude || position?.longitude || 0,
+        ...(hasValidGps
+          ? { latitude: Number(lat), longitude: Number(lng), accuracy: acc != null ? Number(acc) : undefined }
+          : {}),
         app_active: document.visibilityState === "visible",
         background_active: isNative,
         device_id: navigator.userAgent.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 50),
@@ -40,8 +49,11 @@ export function useHeartbeat({ user_type, position, enabled = true, debugLabel =
       }
 
       if (debugLabel) {
+        const latStr = hasValidGps ? Number(lat).toFixed(6) : "null";
+        const lngStr = hasValidGps ? Number(lng).toFixed(6) : "null";
+        const accStr = acc != null ? Number(acc).toFixed(1) + "m" : "n/a";
         console.info(
-          `[${debugLabel}] heartbeatAuto OK lat=${Number(payload.latitude).toFixed(6)} lng=${Number(payload.longitude).toFixed(6)} active=${payload.app_active} background=${payload.background_active}`
+          `[${debugLabel}] heartbeatAuto OK lat=${latStr} lng=${lngStr} acc=${accStr} active=${payload.app_active} background=${payload.background_active}`
         );
       }
     } catch (err) {

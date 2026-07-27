@@ -417,7 +417,7 @@ export default function CodePromoPanel() {
               <Card key={c.id} className={`p-4 border-2 ${c.actif ? "border-purple-200" : "border-gray-200 opacity-60"}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-2">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
                       <span className="font-black text-lg text-purple-700 font-mono tracking-widest">{c.code}</span>
                       <Badge className={c.actif ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-600 border-gray-200"}>
                         {c.actif ? "✅ Actif" : "❌ Inactif"}

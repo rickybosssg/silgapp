@@ -97,6 +97,12 @@
             android:name="com.google.mlkit.vision.codescanner.internal.GmsBarcodeScanningDelegateActivity"
             tools:remove="android:screenOrientation" />
 
+        <activity
+            android:name="com.getcapacitor.camera.CameraActivity"
+            android:label="Camera"
+            android:theme="@style/AppTheme"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

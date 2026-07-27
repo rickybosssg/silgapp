@@ -43,6 +43,10 @@
       "type": "string",
       "description": "Telephone du client"
     },
+    "contact_createur_course": {
+      "type": "string",
+      "description": "Numero de telephone du CREATEUR de la course \u2014 contact principal que le livreur doit contacter en priorite. OBLIGATOIRE pour toute course creee via VENUS. Peut differer du numero WhatsApp entrant (cas: une personne cree une course pour un autre client). Le numero WhatsApp entrant ne peut etre copie ici qu'apres confirmation explicite du client. Ne jamais reutiliser automatiquement un ancien numero."
+    },
     "type_course": {
       "type": "string",
       "enum": [
@@ -202,6 +206,16 @@
     "dispatch_wave": {
       "type": "number",
       "default": 0
+    },
+    "dispatch_wave_started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date de d\u00e9marrage de la vague actuelle"
+    },
+    "dispatch_next_wave_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date pr\u00e9vue de d\u00e9marrage de la prochaine vague"
     },
     "timeout_expires_at": {
       "type": "string",
@@ -422,6 +436,16 @@
     "dispatch_refused_ids": {
       "type": "string",
       "description": "JSON array des livreurs ayant refuse, annule ou indique etre occupes pour cette course uniquement"
+    },
+    "dispatch_locked_until": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Verrou temporaire anti-traitement concurrent (TTL 30s)"
+    },
+    "dispatch_cycle_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de cycles de dispatch completes (limite anti-boucle infinie)"
     },
     "whatsapp_expediteur_statut": {
       "type": "string",

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Plus, MapPin, Package, Truck, Clock, CheckCircle2, XCircle, AlertTriangle, TrendingUp, Users } from "lucide-react";
+import { Plus, MapPin, Package, Truck, Clock, CheckCircle2, XCircle, AlertTriangle, TrendingUp, Users, Tag } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
 import StatCard from "@/components/dashboard/StatCard";
@@ -20,10 +20,13 @@ import CoursesEnPausePanel from "@/components/admin/CoursesEnPausePanel";
 import VenusFloatingButton from "@/components/client/VenusFloatingButton";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import CodePromoPanel from "@/components/admin/CodePromoPanel";
 
 export default function Dashboard() {
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [assignCourse, setAssignCourse] = useState(null);
+  const [showCodePromo, setShowCodePromo] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: courses = [], isLoading } = useQuery({
@@ -144,6 +147,16 @@ export default function Dashboard() {
               <span className="sm:hidden">Externe</span>
             </Button>
           </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowCodePromo(true)}
+            className="flex-1 sm:flex-none gap-1.5 bg-purple-600 text-white hover:bg-purple-700 border-purple-600"
+          >
+            <Tag className="w-4 h-4" />
+            <span className="hidden sm:inline">Codes Promo</span>
+            <span className="sm:hidden">Promo</span>
+          </Button>
 
         </div>
       </div>
@@ -211,6 +224,19 @@ export default function Dashboard() {
 
       {/* Bouton flottant VENUS */}
       <VenusFloatingButton />
+
+      {/* Modal Codes Promo */}
+      <Dialog open={showCodePromo} onOpenChange={setShowCodePromo}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tag className="w-5 h-5 text-purple-600" />
+              Gestion des codes promo
+            </DialogTitle>
+          </DialogHeader>
+          <CodePromoPanel />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

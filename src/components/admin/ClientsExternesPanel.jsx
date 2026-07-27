@@ -345,6 +345,7 @@ export default function ClientsExternesPanel({ countryCode: countryCodeProp }) {
       ? base44.entities.CourseExterne.filter(coursesFilter, "-created_date", 500)
       : base44.entities.CourseExterne.list("-created_date", 500),
     initialData: [],
+    refetchInterval: 15000,
   });
 
   const clientsFiltres = useMemo(() => {

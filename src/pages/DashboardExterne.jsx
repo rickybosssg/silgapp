@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { MapPin, Package, Truck, Clock, CheckCircle2, XCircle, TrendingUp, ArrowLeft, Globe, Users, Zap, ChevronRight, Bell } from "lucide-react";
+import { MapPin, Package, Truck, Clock, CheckCircle2, XCircle, TrendingUp, ArrowLeft, Globe, Users, Zap, ChevronRight, Bell, Tag } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
 import { usePaysActifs } from "@/components/international/CountrySelector.jsx";
@@ -19,6 +19,7 @@ import CodePromoPanel from "@/components/admin/CodePromoPanel";
 import DownloadStatsPanel from "@/components/admin/DownloadStatsPanel";
 import StatDetailModal from "@/components/dashboard/StatDetailModal";
 import AppToggleButton from "@/components/admin/AppToggleButton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 function KpiCard({ label, value, icon: Icon, color, suffix, onClick }) {
   return (
@@ -48,6 +49,7 @@ function KpiCard({ label, value, icon: Icon, color, suffix, onClick }) {
 export default function DashboardExterne() {
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [statModal, setStatModal] = useState(null);
+  const [showCodePromo, setShowCodePromo] = useState(false);
   const { isGlobal, isPays, countryCode: adminCountryCode, selectedCountry } = useAdminContext();
   const paysActifs = usePaysActifs();
   const defaultCountry = paysActifs.length === 1 ? paysActifs[0].code : null;
@@ -224,6 +226,15 @@ export default function DashboardExterne() {
                 </Button>
               </Link>
               <AppToggleButton />
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowCodePromo(true)}
+                className="gap-1.5 text-white/70 hover:text-white hover:bg-white/10 border border-white/10 rounded-xl text-xs"
+              >
+                <Tag className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Codes Promo</span>
+              </Button>
               <Link to="/carte">
                 <Button size="sm" className="gap-1.5 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs shadow-lg shadow-primary/30">
                   <MapPin className="w-3.5 h-3.5" />
@@ -287,11 +298,6 @@ export default function DashboardExterne() {
           <DownloadStatsPanel />
         </div>
 
-        {/* ── CODES PROMO ─────────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm">
-          <CodePromoPanel />
-        </div>
-
         {/* ── ACTIVITÉ ─────────────────────────────────────── */}
         <div>
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-1">Activité en direct</p>
@@ -343,6 +349,19 @@ export default function DashboardExterne() {
         type={statModal?.type}
         data={statModal?.data}
       />
+
+      {/* Modal Codes Promo */}
+      <Dialog open={showCodePromo} onOpenChange={setShowCodePromo}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tag className="w-5 h-5 text-purple-600" />
+              Gestion des codes promo
+            </DialogTitle>
+          </DialogHeader>
+          <CodePromoPanel />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

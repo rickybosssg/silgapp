@@ -9,6 +9,7 @@ const MOTIF_LABELS = {
   colis_inexistant: "Colis inexistant",
   client_change_avis: "Client a changé d'avis",
   colis_interdit: "Colis interdit",
+  désaccord_prix: "Désaccord sur le prix",
   panne_vehicule: "Panne de véhicule",
   accident: "Accident",
   autre: "Autre",

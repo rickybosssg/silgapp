@@ -4,11 +4,12 @@ import { base44 } from '@/api/base44Client';
 import { TrendingUp, TrendingDown, Minus, AlertCircle } from 'lucide-react';
 
 export default function WeaknessesTab() {
-  const { data: faiblesses = [], isLoading } = useQuery({
+  const { data: rawData, isLoading } = useQuery({
     queryKey: ['venus-weaknesses-full'],
     queryFn: () => base44.entities.VenusWeaknessReport.list('score_moyen', 50),
     refetchInterval: 60000,
   });
+  const faiblesses = rawData || [];
 
   if (isLoading) return <p className="text-center text-gray-400 py-8">Chargement...</p>;
 

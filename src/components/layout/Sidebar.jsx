@@ -38,6 +38,7 @@ export const navItems = [
   { path: "/admin/publicites", label: "Publicités", icon: Megaphone },
   { path: "/admin/venus-brain", label: "Cerveau de VENUS", icon: Brain },
   { path: "/admin/venus-intelligence", label: "Centre d'Intelligence VENUS", icon: Brain },
+  { path: "/admin/venus-improvement", label: "Amélioration VENUS", icon: Sparkles },
   { path: "/admin/venus-test-lab", label: "Laboratoire de Test VENUS", icon: FlaskConical },
   { path: "/admin/openai-dashboard", label: "Suivi OpenAI", icon: Cpu },
   { path: "/admin/centre-notifications", label: "Notifications Push", icon: Megaphone },

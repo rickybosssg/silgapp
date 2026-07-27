@@ -20,6 +20,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(SilgappPushPlugin.class);
         registerPlugin(SilgappNativePlugin.class);
+        registerPlugin(com.getcapacitor.camera.Camera.class);
         createDefaultNotificationChannel();
         createUrgentCourseChannel();
         requestBatteryOptimizationExemption();
