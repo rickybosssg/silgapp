@@ -1433,11 +1433,14 @@ Deno.serve(async (req) => {
           // Skip les courses déjà traitées par le filet premier_tick_manquant
           if (premierTickProcessed.has(course.id)) continue;
 
-          // 🚨 RATTRAPAGE: course bloquée depuis > 2x le délai normal de vague
-          // Force-reset et re-dispatch immédiat pour débloquer la course
+          // 🚨 RATTRAPAGE: course bloquée depuis > 10 min sans aucune évolution de vague
+          // Seuil élevé (10 min) pour laisser le code normal d'avancement de vague fonctionner
+          // à chaque tick. Le rattrapage n'est qu'un filet de sécurité pour les courses
+          // vraiment coincées (tick manqué plusieurs fois de suite).
           const waveTimeoutMs = (cachedConfig.gps.waves[0]?.timeout_sec || 60) * 1000;
           const stuckDurationMs = now.getTime() - new Date(course.updated_date).getTime();
-          if (stuckDurationMs > waveTimeoutMs * 2 && course.dispatch_status === 'propose' && !course.livreur_id) {
+          const RATTRAPAGE_SEUIL_MS = Math.max(waveTimeoutMs * 2, 10 * 60 * 1000); // min 10 minutes
+          if (stuckDurationMs > RATTRAPAGE_SEUIL_MS && course.dispatch_status === 'propose' && !course.livreur_id) {
             console.log(`[DISPATCH] 🚨 RATTRAPAGE: Course ${course.id} bloquée depuis ${Math.round(stuckDurationMs / 60000)}min — force-reset vague`);
             await base44.asServiceRole.entities.CourseExterne.update(course.id, {
               dispatch_status: 'redispatch',
