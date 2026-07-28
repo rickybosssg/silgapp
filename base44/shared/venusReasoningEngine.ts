@@ -910,35 +910,25 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
   }
 
   // ── ÉCONOMIE DE CRÉDITS: Règles métier directes (0 crédit LLM) ──
-  // SAUF si une conversation est en cours (mémoire courte non vide) — l'utilisateur
-  // répond probablement à une question de VENUS, ce n'est pas une requête standalone.
-  const hasActiveFlow = input.memoireCourte && Object.keys(input.memoireCourte)
-    .filter(k => k !== 'course_created' && k !== 'course_id')
-    .some(k => input.memoireCourte[k] != null && input.memoireCourte[k] !== '');
+  const regleDirecte = detecterRegleMetierDirecte(input.messageClient, businessRuleEntries);
+  if (regleDirecte) {
+    regleDirecte.temps_traitement_ms = Date.now() - startTime;
+    regleDirecte.decision_moteur = 'regle_metier';
+    regleDirecte.openai_appele = false;
+    regleDirecte.model_utilise = '';
+    stockerCache(input.telephone, input.messageClient, input.memoireCourte, regleDirecte);
+    return regleDirecte;
+  }
 
-  if (!hasActiveFlow) {
-    const regleDirecte = detecterRegleMetierDirecte(input.messageClient, businessRuleEntries);
-    if (regleDirecte) {
-      regleDirecte.temps_traitement_ms = Date.now() - startTime;
-      regleDirecte.decision_moteur = 'regle_metier';
-      regleDirecte.openai_appele = false;
-      regleDirecte.model_utilise = '';
-      stockerCache(input.telephone, input.messageClient, input.memoireCourte, regleDirecte);
-      return regleDirecte;
-    }
-
-    // ── ÉCONOMIE DE CRÉDITS: Connaissances directes (0 crédit LLM) ──
-    const connaissanceDirecte = detecterConnaissanceDirecte(input.messageClient, knowledgeEntries);
-    if (connaissanceDirecte) {
-      connaissanceDirecte.temps_traitement_ms = Date.now() - startTime;
-      connaissanceDirecte.decision_moteur = 'connaissance';
-      connaissanceDirecte.openai_appele = false;
-      connaissanceDirecte.model_utilise = '';
-      stockerCache(input.telephone, input.messageClient, input.memoireCourte, connaissanceDirecte);
-      return connaissanceDirecte;
-    }
-  } else {
-    console.log('[ReasoningEngine] 🔄 Conversation en cours — bypass connaissances/règles ignorés (LLM gère la suite)');
+  // ── ÉCONOMIE DE CRÉDITS: Connaissances directes (0 crédit LLM) ──
+  const connaissanceDirecte = detecterConnaissanceDirecte(input.messageClient, knowledgeEntries);
+  if (connaissanceDirecte) {
+    connaissanceDirecte.temps_traitement_ms = Date.now() - startTime;
+    connaissanceDirecte.decision_moteur = 'connaissance';
+    connaissanceDirecte.openai_appele = false;
+    connaissanceDirecte.model_utilise = '';
+    stockerCache(input.telephone, input.messageClient, input.memoireCourte, connaissanceDirecte);
+    return connaissanceDirecte;
   }
 
   // ── Construire le prompt de raisonnement (version compactée) ──
@@ -996,17 +986,10 @@ Reformule: "Si j'ai bien compris...". NE JAMAIS créer de course directement (ac
 ${input.messageClient}
 
 ═══ ANALYSE — Qui parle ? ═══
-- CLIENT (veut un service): "je voudrais envoyer", "je veux livrer", "j'ai besoin d'une livraison", "envoyer un colis", "expédier un colis", "j'aimerais expedier" → intention=creer_course
-- LIVREUR (rapporte statut): "j'ai fini à", "je suis à", "je pars de", "j'ai récupéré" → intention=signalement_livreur (NE PAS créer de course)
-- HORS CONTEXTE (parle à quelqu'un d'autre): "tu n'es pas au bureau?", "sors", "appelle-moi" → intention=message_hors_contexte (répondre poliment)
+- CLIENT (veut un service): "je voudrais envoyer", "envoyer un colis", "expédier un colis" → intention=creer_course
+- LIVREUR (rapporte statut): "j'ai fini à", "je suis à", "je pars de" → intention=signalement_livreur (NE PAS créer de course)
 
 ═══ ANALYSE — Réponse à une question VENUS ═══
-Si VENUS a posé une question dans son dernier message, le message actuel est LA RÉPONSE:
-- VENUS demande le type → "envoyer un colis" / "expédier" / "recevoir" / "déplacement" = type_course (PAS demander_info)
-- VENUS demande l'adresse → "Patte d'Oie" / "Karpala" = adresse (PAS demander_info)
-- VENUS demande le numéro → "+226..." = contact (PAS demander_info)
-JAMAIS rediriger vers un "service partenaire" ou "contacter le support" quand le client répond à une question de VENUS.
-
 ═══ ANALYSE — Intention ═══
 creer_course | suivre_course | contacter_livreur | annuler_course | modifier_info | demander_info | salutation | signalement_livreur | message_hors_contexte | clarifier | autre
 - "Le livreur est où?" / "Il arrive quand?" → suivre_course
