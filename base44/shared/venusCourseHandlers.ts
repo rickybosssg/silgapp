@@ -14,6 +14,7 @@ import {
   genererRecapModification,
 } from './venusCourseModifierEngine.ts';
 import { trouverCourseActive } from './venusReasoningEngine.ts';
+import { envoyerWhatsAppRaw } from './twilioWhatsApp.ts';
 
 export async function handleConsultationCourse(base44, telephone, userMessage, profileName) {
   const telDigits = telephone.replace(/\D/g, '');
@@ -326,19 +327,8 @@ export async function handleContactLivreur(base44: any, conversation: any, userM
       let tel = livreurTel.replace(/\s+/g, '').replace(/[^\d+]/g, '');
       if (!tel.startsWith('+')) tel = indicatif + tel;
       try {
-        const from = fromNumber.startsWith('whatsapp:') ? fromNumber : `whatsapp:${fromNumber}`;
-        const creds = btoa(`${accountSid}:${authToken}`);
-        const formData = new URLSearchParams();
-        formData.append('From', from);
-        formData.append('To', `whatsapp:${tel}`);
-        formData.append('Body', `💬 *Message de votre client ${profileName || telephone}:*\n\n${userMessage}\n\n_Répondez ici ou dans l'application SILGAPP_`);
-        const resp = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
-          method: 'POST',
-          headers: { Authorization: `Basic ${creds}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: formData.toString(),
-        });
-        const data = await resp.json();
-        whatsappSent = resp.ok && !!data.sid;
+        const result = await envoyerWhatsAppRaw(tel, `💬 *Message de votre client ${profileName || telephone}:*\n\n${userMessage}\n\n_Répondez ici ou dans l'application SILGAPP_`);
+        whatsappSent = result.success;
       } catch (e) { console.error('[WebhookVenus] Erreur WhatsApp livreur:', e.message); }
     }
 

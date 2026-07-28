@@ -3,6 +3,13 @@
 
 export const TWILIO_API_BASE = 'https://api.twilio.com/2010-04-01/Accounts';
 
+const VENUS_DEBUG = Deno.env.get('VENUS_DEBUG') === 'true';
+
+/** Log de débogage VENUS — supprimé en production (sauf VENUS_DEBUG=true) */
+export function venusLog(...args: any[]) {
+  if (VENUS_DEBUG) console.log(...args);
+}
+
 export async function validerSignatureTwilio(url, rawBody, authToken, signatureHeader) {
   if (!signatureHeader) return false;
   try {

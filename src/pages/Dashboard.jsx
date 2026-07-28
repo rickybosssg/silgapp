@@ -32,16 +32,16 @@ export default function Dashboard() {
 
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ["courses"],
-    queryFn: () => base44.entities.Course.filter({ reseau: "interne" }, "-created_date", 500),
+    queryFn: () => base44.entities.Course.filter({ reseau: "interne" }, "-created_date", 200),
     initialData: [],
-    refetchInterval: 10000,
+    refetchInterval: 15000,
   });
 
   const { data: livreurs = [] } = useQuery({
     queryKey: ["livreurs"],
     queryFn: () => base44.entities.Livreur.filter({ type_livreur: "interne" }),
     initialData: [],
-    refetchInterval: 10000,
+    refetchInterval: 15000,
   });
 
   // Courses du jour = créées aujourd'hui OU encore actives (pas terminées)

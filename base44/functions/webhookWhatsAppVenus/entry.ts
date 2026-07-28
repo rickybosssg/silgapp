@@ -31,7 +31,9 @@ import {
   envoyerWhatsAppReply,
   envoyerIndicateurSaisie,
   downloadAndUploadMedia,
+  venusLog,
 } from '../../shared/venusTwilioUtils.ts';
+import { envoyerWhatsAppRaw } from '../../shared/twilioWhatsApp.ts';
 import {
   transcrireAudio,
   transcrireAudioDepuisTwilio,
@@ -146,7 +148,7 @@ Deno.serve(async (req) => {
         console.warn(`[WebhookVenus] ⚠️ Signature échouée mais forme Twilio valide — acceptation par bypass sécurisé`);
         isValid = true;
       }
-      console.log(`[WebhookVenus] 🔐 SIG CHECK | URL: ${fullUrl} | HasSig: ${!!signatureHeader} | Valid: ${isValid} | Bypass: ${isTwilioWebhookShape && !isValid}`);
+      venusLog(`[WebhookVenus] 🔐 SIG CHECK | URL: ${fullUrl} | HasSig: ${!!signatureHeader} | Valid: ${isValid} | Bypass: ${isTwilioWebhookShape && !isValid}`);
       if (!isValid) {
         console.warn(`[WebhookVenus] ⚠️ ÉTAPE 0 — Signature Twilio invalide, requête rejetée`);
         console.warn(`[WebhookVenus] ⚠️ URL utilisée: ${fullUrl} | URL attendue: ${EXPECTED_WEBHOOK_URL}`);
@@ -154,7 +156,7 @@ Deno.serve(async (req) => {
         console.warn(`[WebhookVenus] ⚠️ Body length: ${rawBody.length}`);
         return Response.json({ error: 'Signature Twilio invalide' }, { status: 403 });
       } else {
-        console.log(`[WebhookVenus] ✅ ÉTAPE 0 — Signature Twilio validée`);
+        venusLog(`[WebhookVenus] ✅ ÉTAPE 0 — Signature Twilio validée`);
       }
     }
 
@@ -176,7 +178,7 @@ Deno.serve(async (req) => {
     };
     const normalizedTel = normalizePhone(telephone, countryCode) || telephone.replace(/\D/g, '');
 
-    console.log(`[WebhookVenus] 📥 ÉTAPE 1 — Message reçu de ${telephone} (${profileName || 'N/A'}) | To: ${toRaw || 'N/A'} | Pays: ${countryCode} | Body: "${body}" | Media: ${numMedia} | GPS: ${latitude},${longitude} | Sid: ${messageSid} | FromNumber(réponse): ${fromNumber}`);
+    venusLog(`[WebhookVenus] 📥 ÉTAPE 1 — Message reçu de ${telephone} (${profileName || 'N/A'}) | To: ${toRaw || 'N/A'} | Pays: ${countryCode} | Body: "${body}" | Media: ${numMedia} | GPS: ${latitude},${longitude} | Sid: ${messageSid} | FromNumber(réponse): ${fromNumber}`);
 
     // ── Détection: le sender est-il un livreur répondant à un client ? ──
     // Si le client est en mode "contact_livreur", relaye la réponse du livreur au client
@@ -201,23 +203,9 @@ Deno.serve(async (req) => {
           let clientPending: any = null;
           try { clientPending = clientConv?.venus_pending_course ? JSON.parse(clientConv.venus_pending_course) : null; } catch {}
           if (clientPending?.contact_livreur_mode === true) {
-            console.log(`[WebhookVenus] 🧑‍✈️ Livreur ${livreurCourse.livreur_nom || ''} répond au client ${livreurCourse.client_telephone} — relayage`);
-            const lAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-            const lAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-            const lFromNumber = Deno.env.get('TWILIO_WHATSAPP_FROM') || 'whatsapp:+14155238886';
-            if (lAccountSid && lAuthToken) {
-              const from = lFromNumber.startsWith('whatsapp:') ? lFromNumber : `whatsapp:${lFromNumber}`;
-              const creds = btoa(`${lAccountSid}:${lAuthToken}`);
-              const formData = new URLSearchParams();
-              formData.append('From', from);
-              formData.append('To', `whatsapp:+${(livreurCourse.client_telephone || '').replace(/\D/g, '')}`);
-              formData.append('Body', `💬 *Réponse de votre livreur ${livreurCourse.livreur_nom || ''}:*\n\n${body}`);
-              await fetch(`https://api.twilio.com/2010-04-01/Accounts/${lAccountSid}/Messages.json`, {
-                method: 'POST',
-                headers: { Authorization: `Basic ${creds}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: formData.toString(),
-              });
-            }
+            venusLog(`[WebhookVenus] 🧑‍✈️ Livreur ${livreurCourse.livreur_nom || ''} répond au client ${livreurCourse.client_telephone} — relayage`);
+            const clientTelNorm = `+${(livreurCourse.client_telephone || '').replace(/\D/g, '')}`;
+            await envoyerWhatsAppRaw(clientTelNorm, `💬 *Réponse de votre livreur ${livreurCourse.livreur_nom || ''}:*\n\n${body}`);
             return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
               status: 200,
               headers: { 'Content-Type': 'text/xml' },
@@ -263,7 +251,7 @@ Deno.serve(async (req) => {
       conversation = existingConvs[0];
       // Normaliser le whatsapp_phone au format canonique si nécessaire
       if (conversation.whatsapp_phone !== normalizedTel) {
-        console.log(`[WebhookVenus] 🔧 Normalisation whatsapp_phone: "${conversation.whatsapp_phone}" → "${normalizedTel}"`);
+        venusLog(`[WebhookVenus] 🔧 Normalisation whatsapp_phone: "${conversation.whatsapp_phone}" → "${normalizedTel}"`);
         await base44.asServiceRole.entities.Conversation.update(conversation.id, {
           whatsapp_phone: normalizedTel,
         }).catch(() => null);
@@ -276,7 +264,7 @@ Deno.serve(async (req) => {
         }).catch(() => null);
         conversation.silgapp_from_number = fromNumber;
       }
-      console.log(`[WebhookVenus] ✅ ÉTAPE 2 — Conversation existante trouvée: ${conversation.id} | venus_active: ${conversation.venus_active} | from_number: ${fromNumber}`);
+      venusLog(`[WebhookVenus] ✅ ÉTAPE 2 — Conversation existante trouvée: ${conversation.id} | venus_active: ${conversation.venus_active} | from_number: ${fromNumber}`);
     } else {
       const participants = JSON.stringify([
         { type: 'client', id: normalizedTel, name: profileName || telephone },
@@ -296,7 +284,7 @@ Deno.serve(async (req) => {
         last_sender_name: profileName || telephone,
         last_sender_type: 'client',
       });
-      console.log(`[WebhookVenus] ✅ ÉTAPE 2 — Nouvelle conversation créée: ${conversation.id} | venus_active: true`);
+      venusLog(`[WebhookVenus] ✅ ÉTAPE 2 — Nouvelle conversation créée: ${conversation.id} | venus_active: true`);
     }
 
     // ═══ ANTI-DOUBLON WEBHOOK — Dédoublonnage par MessageSid ═══
@@ -308,7 +296,7 @@ Deno.serve(async (req) => {
           whatsapp_message_sid: messageSid,
         });
         if (existingMsg && existingMsg.length > 0) {
-          console.log(`[WebhookVenus] 🛡️ ANTI-DOUBLON — MessageSid ${messageSid} déjà traité — ignorer`);
+          venusLog(`[WebhookVenus] 🛡️ ANTI-DOUBLON — MessageSid ${messageSid} déjà traité — ignorer`);
           return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
             status: 200,
             headers: { 'Content-Type': 'text/xml' },
@@ -334,7 +322,7 @@ Deno.serve(async (req) => {
     } else if (numMedia > 0) {
       const mediaUrl0 = params.MediaUrl0;
       const contentType0 = params.MediaContentType0 || '';
-      console.log(`[WebhookVenus] 📎 Média détecté | NumMedia: ${numMedia} | MediaUrl0: ${mediaUrl0?.substring(0, 80) || 'N/A'}... | ContentType0: ${contentType0}`);
+      venusLog(`[WebhookVenus] 📎 Média détecté | NumMedia: ${numMedia} | MediaUrl0: ${mediaUrl0?.substring(0, 80) || 'N/A'}... | ContentType0: ${contentType0}`);
       const uploadedUrl = await downloadAndUploadMedia(mediaUrl0, accountSid, authToken, base44, contentType0);
 
       if (contentType0.startsWith('image/')) {
@@ -348,7 +336,7 @@ Deno.serve(async (req) => {
         audioUrl = uploadedUrl;
         // ── Règle stricte: les messages vocaux ne sont plus transcrits ni interprétés ──
         // L'audio est conservé dans la conversation mais VENUS répond avec un message standard
-        console.log(`[WebhookVenus] 🎤 Note vocale reçue de ${telephone} — non transcrite (règle stricte), réponse standard à venir`);
+        venusLog(`[WebhookVenus] 🎤 Note vocale reçue de ${telephone} — non transcrite (règle stricte), réponse standard à venir`);
       } else {
         messageType = 'document';
         documentUrl = uploadedUrl;
@@ -378,7 +366,7 @@ Deno.serve(async (req) => {
       source: 'whatsapp',
       whatsapp_message_sid: messageSid,
     });
-    console.log(`[WebhookVenus] ✅ ÉTAPE 3 — Message entrant stocké (${messageType}) dans conversation ${conversation.id}`);
+    venusLog(`[WebhookVenus] ✅ ÉTAPE 3 — Message entrant stocké (${messageType}) dans conversation ${conversation.id}`);
 
     // ── Mettre à jour la conversation ──
     const lastMsgPreview =
@@ -398,13 +386,13 @@ Deno.serve(async (req) => {
 
     // ── 3. Vérifier si Venus est active ──
     if (conversation.venus_active === false) {
-      console.log(`[WebhookVenus] ⏸️ ÉTAPE 4 — Venus DÉSACTIVÉE pour ${telephone} — admin a pris la main, pas de réponse auto`);
+      venusLog(`[WebhookVenus] ⏸️ ÉTAPE 4 — Venus DÉSACTIVÉE pour ${telephone} — admin a pris la main, pas de réponse auto`);
       return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
         status: 200,
         headers: { 'Content-Type': 'text/xml' },
       });
     }
-    console.log(`[WebhookVenus] ✅ ÉTAPE 4 — Venus active, génération de la réponse...`);
+    venusLog(`[WebhookVenus] ✅ ÉTAPE 4 — Venus active, génération de la réponse...`);
 
     // ── Indicateur de saisie WhatsApp + confirmation de lecture ──
     // Envoie l'indicateur officiel Twilio qui marque le message comme lu
@@ -424,7 +412,7 @@ Deno.serve(async (req) => {
     let reponseVenus = '';
     if (messageType === 'audio') {
       reponseVenus = "Désolée, mon système de compréhension des messages vocaux n'est pas encore suffisamment fiable. Merci de m'écrire votre demande par message texte afin que je puisse vous aider correctement.";
-      console.log(`[WebhookVenus] 🎤 Réponse standard envoyée pour message vocal de ${telephone}`);
+      venusLog(`[WebhookVenus] 🎤 Réponse standard envoyée pour message vocal de ${telephone}`);
     }
 
     // ── 3c. Vérifier le mode maintenance VENUS ──
@@ -432,7 +420,7 @@ Deno.serve(async (req) => {
     if (maintenanceMode.active) {
       const maintenanceMessage = maintenanceMode.message || "Certaines fonctionnalités sont momentanément indisponibles. Nous revenons très vite !";
       reponseVenus = `Bonjour${profileName ? ' ' + profileName : ''} ! ${maintenanceMessage}\n\nPour toute urgence, contactez le support au +226 66 92 51 90.`;
-      console.log(`[WebhookVenus] 🔧 Mode maintenance actif — réponse de maintenance envoyée à ${telephone}`);
+      venusLog(`[WebhookVenus] 🔧 Mode maintenance actif — réponse de maintenance envoyée à ${telephone}`);
     }
 
     // ── 4a. MOTEUR DE WORKFLOWS — Vérifier s'il y a un workflow actif ──
@@ -443,7 +431,7 @@ Deno.serve(async (req) => {
       try {
         const workflowActive = await getExecutionActive(base44, conversation.id);
         if (workflowActive) {
-          console.log(`[WebhookVenus] 🔄 Workflow actif: ${workflowActive.workflow_code} (étape: ${workflowActive.etape_actuelle}) — routage vers le moteur`);
+          venusLog(`[WebhookVenus] 🔄 Workflow actif: ${workflowActive.workflow_code} (étape: ${workflowActive.etape_actuelle}) — routage vers le moteur`);
           const wfResult = await repondreWorkflow(base44, workflowActive.id, body || messageContent, {
             telephone,
             profileName,
@@ -453,10 +441,10 @@ Deno.serve(async (req) => {
           });
           if (wfResult.reponse) {
             reponseVenus = wfResult.reponse;
-            console.log(`[WebhookVenus] ✅ Workflow a répondu (${reponseVenus.length} chars)`);
+            venusLog(`[WebhookVenus] ✅ Workflow a répondu (${reponseVenus.length} chars)`);
           }
           if (wfResult.termine) {
-            console.log(`[WebhookVenus] ✅ Workflow terminé pour ${telephone}`);
+            venusLog(`[WebhookVenus] ✅ Workflow terminé pour ${telephone}`);
           }
         }
       } catch (e) {
@@ -494,8 +482,8 @@ Deno.serve(async (req) => {
         const gating = peutAgirSurAudio(transcriptionData.confidence);
         forceConfirmationAudio = gating.forceConfirmation;
 
-        console.log(`[WebhookVenus] 🎤 ✅ Audio accepté | Confiance: ${transcriptionData.confidence.toFixed(2)} | Force confirmation: ${forceConfirmationAudio} | Texte: "${messageEffectif.substring(0, 100)}"`);
-        console.log(`[WebhookVenus] 🎤 📊 Brut: "${(transcriptionData.texte_brut || '').substring(0, 80)}" → Nettoyé: "${messageEffectif.substring(0, 80)}"`);
+        venusLog(`[WebhookVenus] 🎤 ✅ Audio accepté | Confiance: ${transcriptionData.confidence.toFixed(2)} | Force confirmation: ${forceConfirmationAudio} | Texte: "${messageEffectif.substring(0, 100)}"`);
+        venusLog(`[WebhookVenus] 🎤 📊 Brut: "${(transcriptionData.texte_brut || '').substring(0, 80)}" → Nettoyé: "${messageEffectif.substring(0, 80)}"`);
       }
     }
 
@@ -560,7 +548,7 @@ Deno.serve(async (req) => {
       await base44.asServiceRole.entities.Conversation.update(conversation.id, {
         venus_pending_course: JSON.stringify(pendingCourseLoc),
       });
-      console.log(`[WebhookVenus] 📍 Localisation sauvegardée en attente d'assignation pour ${conversation.id}`);
+      venusLog(`[WebhookVenus] 📍 Localisation sauvegardée en attente d'assignation pour ${conversation.id}`);
       // ── Mettre à jour la variable locale pour que le moteur de raisonnement voie la localisation ──
       conversation.venus_pending_course = JSON.stringify(pendingCourseLoc);
     }
@@ -581,7 +569,7 @@ Deno.serve(async (req) => {
         });
         if (incidentResult) {
           reponseVenus = incidentResult.message_client;
-          console.log(`[WebhookVenus] 🚨 Incident détecté: ${incidentResult.incident?.type_incident} (${incidentResult.incident?.niveau_gravite}) — admin notifié`);
+          venusLog(`[WebhookVenus] 🚨 Incident détecté: ${incidentResult.incident?.type_incident} (${incidentResult.incident?.niveau_gravite}) — admin notifié`);
         }
       } catch (e) {
         console.error('[WebhookVenus] Erreur détection incident:', e.message);
@@ -618,7 +606,7 @@ Deno.serve(async (req) => {
           const _hasCreateurC = !!(pendingCourseConf.contact_createur_course && pendingCourseConf.contact_createur_course.trim()) && _createurDigitsC.length >= 8 && _createurDigitsC.length <= 15;
 
           if (_hasTypeC && _hasDepartC && _hasArriveeC && _hasCreateurC && (!_needsContactC || _hasContactC)) {
-            console.log(`[WebhookVenus] ✅ Confirmation déterministe — création directe (0 crédit GPT)`);
+            venusLog(`[WebhookVenus] ✅ Confirmation déterministe — création directe (0 crédit GPT)`);
             try {
               const crConf = await creerCourseDepuisMemoire(base44, pendingCourseConf, countryCode, tarifs, telephone, profileName, conversation.silgapp_from_number);
               if (crConf.success) {
@@ -626,7 +614,7 @@ Deno.serve(async (req) => {
                 pendingCourseConf.course_created = true;
                 pendingCourseConf.course_id = crConf.course.id;
                 await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(pendingCourseConf) });
-                console.log(`[WebhookVenus] ✅ Course créée via confirmation déterministe: ${crConf.course.id}`);
+                venusLog(`[WebhookVenus] ✅ Course créée via confirmation déterministe: ${crConf.course.id}`);
               } else if (crConf.message) {
                 reponseVenus = crConf.message;
               }
@@ -662,7 +650,7 @@ Deno.serve(async (req) => {
         const msgLowerNC = messageEffectif.toLowerCase().trim();
         const isNewCourseRequest = NEW_COURSE_KW.some(kw => msgLowerNC.includes(kw));
         if (isNewCourseRequest) {
-          console.log(`[WebhookVenus] 🔄 Demande de nouvelle course détectée — vidage de la mémoire courte stale`);
+          venusLog(`[WebhookVenus] 🔄 Demande de nouvelle course détectée — vidage de la mémoire courte stale`);
           pendingCourse = {};
           await base44.asServiceRole.entities.Conversation.update(conversation.id, {
             venus_pending_course: JSON.stringify(pendingCourse),
@@ -688,7 +676,7 @@ Deno.serve(async (req) => {
       const hasPendingNotCreated = pendingCourse && Object.keys(pendingCourse).length > 0 && !pendingCourse.course_created;
 
       if (isAbandonMsg && hasPendingNotCreated) {
-        console.log(`[WebhookVenus] 🗑️ Abandon détecté — vidage mémoire courte (stop relance)`);
+        venusLog(`[WebhookVenus] 🗑️ Abandon détecté — vidage mémoire courte (stop relance)`);
         pendingCourse = {};
         await base44.asServiceRole.entities.Conversation.update(conversation.id, {
           venus_pending_course: JSON.stringify(pendingCourse),
@@ -709,7 +697,7 @@ Deno.serve(async (req) => {
           chargerHistoriqueRecent(base44, conversation.id, 6),
           trouverCourseActive(base44, telephone, countryCode),
         ]);
-        console.log(`[WebhookVenus] ⏱️ Contexte chargé en parallèle: ${Date.now() - tCtxStart}ms`);
+        venusLog(`[WebhookVenus] ⏱️ Contexte chargé en parallèle: ${Date.now() - tCtxStart}ms`);
 
         // ── Appeler le moteur de raisonnement ──
         reasoningResult = await raisonnerVenus(base44, {
@@ -766,7 +754,7 @@ Deno.serve(async (req) => {
           } else if (_dejaCree && !_courseActiveExiste) {
             // ── course_created=true mais aucune course active en DB (course précédente annulée/livrée) ──
             // Le flag est stale → le nettoyer et laisser la création procéder.
-            console.log(`[WebhookVenus] 🧹 Flag course_created stale détecté (aucune course active en DB) — nettoyage + poursuite création`);
+            venusLog(`[WebhookVenus] 🧹 Flag course_created stale détecté (aucune course active en DB) — nettoyage + poursuite création`);
             pendingCourse.course_created = false;
             delete pendingCourse.course_id;
             await base44.asServiceRole.entities.Conversation.update(conversation.id, { venus_pending_course: JSON.stringify(pendingCourse) }).catch(() => {});
@@ -849,7 +837,7 @@ Deno.serve(async (req) => {
             reponseFinale = "Je ne trouve aucune course active à annuler. Si vous souhaitez créer une nouvelle course, dites-le moi ! Pour toute question, contactez le support au +226 66 92 51 90.";
           } else {
             try {
-              console.log(`[WebhookVenus] 🗑️ Annulation demandée pour course ${courseActive.id} (statut actuel: ${courseActive.statut})`);
+              venusLog(`[WebhookVenus] 🗑️ Annulation demandée pour course ${courseActive.id} (statut actuel: ${courseActive.statut})`);
               // 1. Appeler l'API/backend d'annulation
               await base44.asServiceRole.functions.invoke('annulerCourseExterne', {
                 course_id: courseActive.id,
@@ -867,7 +855,7 @@ Deno.serve(async (req) => {
                 for (const n of notifsActives) {
                   await base44.asServiceRole.entities.Notification.update(n.id, { lue: true }).catch(() => null);
                 }
-                console.log(`[WebhookVenus] ✅ Annulation CONFIRMÉE en DB pour course ${courseActive.id} | dispatch: ${courseVerifiee.dispatch_status} | ${notifsActives.length} notifications stoppées`);
+                venusLog(`[WebhookVenus] ✅ Annulation CONFIRMÉE en DB pour course ${courseActive.id} | dispatch: ${courseVerifiee.dispatch_status} | ${notifsActives.length} notifications stoppées`);
                 reponseFinale = `✅ Votre course a été annulée avec succès.\n\n📝 Référence : ${genererReferenceCourse(courseActive)}\n\nSi vous souhaitez créer une nouvelle course, je suis à votre disposition.`;
               } else {
                 // L'annulation n'a pas été confirmée en DB — NE JAMAIS annoncer un succès
@@ -1000,7 +988,7 @@ Deno.serve(async (req) => {
       .replace(/^#{1,6}\s+/gm, '')
       .replace(/`/g, '');
 
-    console.log(`[WebhookVenus] ✅ ÉTAPE 5 — Réponse Venus générée (${reponseVenus.length} chars): "${reponseVenus.substring(0, 100)}..."`);
+    venusLog(`[WebhookVenus] ✅ ÉTAPE 5 — Réponse Venus générée (${reponseVenus.length} chars): "${reponseVenus.substring(0, 100)}..."`);
 
     // 🎤 Phase 16 — Déterminer si on répond en audio ou en texte
     const audioConfig = await chargerConfigAudio(base44);
@@ -1020,18 +1008,18 @@ Deno.serve(async (req) => {
       const MIN_TYPING_DISPLAY_MS = 2500;
       if (elapsed < MIN_TYPING_DISPLAY_MS) {
         const waitMs = MIN_TYPING_DISPLAY_MS - elapsed;
-        console.log(`[WebhookVenus] ⌨️ Attente ${waitMs}ms pour visibilité indicateur de saisie (écoulé: ${elapsed}ms)`);
+        venusLog(`[WebhookVenus] ⌨️ Attente ${waitMs}ms pour visibilité indicateur de saisie (écoulé: ${elapsed}ms)`);
         await new Promise(resolve => setTimeout(resolve, waitMs));
       }
     }
 
-    console.log(`[WebhookVenus] 📤 ÉTAPE 6 — Envoi réponse à ${telephone} via Twilio (from: ${fromNumber}) | mode: ${utiliserAudio ? 'AUDIO' : 'TEXTE'}`);
+    venusLog(`[WebhookVenus] 📤 ÉTAPE 6 — Envoi réponse à ${telephone} via Twilio (from: ${fromNumber}) | mode: ${utiliserAudio ? 'AUDIO' : 'TEXTE'}`);
     if (utiliserAudio) {
       // Envoyer d'abord un court audio TTS, puis le texte en complément (infos importantes)
       const audioResp = await envoyerReponseAudio(base44, telephone, reponseVenus, audioConfig, accountSid, authToken, fromNumber);
       if (audioResp?.ok) {
         audioResponseUrl = audioResp.audio_url;
-        console.log(`[WebhookVenus] ✅ ÉTAPE 6 — Réponse audio envoyée à ${telephone} (url: ${audioResponseUrl?.substring(0, 60)}...)`);
+        venusLog(`[WebhookVenus] ✅ ÉTAPE 6 — Réponse audio envoyée à ${telephone} (url: ${audioResponseUrl?.substring(0, 60)}...)`);
       } else {
         // Fallback texte si l'audio échoue
         console.warn(`[WebhookVenus] ⚠️ ÉTAPE 6 — Audio échoué, fallback texte`);
@@ -1041,7 +1029,7 @@ Deno.serve(async (req) => {
       twilioResult = await envoyerWhatsAppReply(telephone, reponseVenus, accountSid, authToken, fromNumber);
     }
     if (twilioResult) {
-      console.log(`[WebhookVenus] 📤 ÉTAPE 6 — Twilio API response: ok=${twilioResult.ok} | status=${twilioResult.data?.status || 'N/A'} | sid=${twilioResult.data?.sid || 'N/A'} | error=${twilioResult.data?.message || twilioResult.data?.error || 'N/A'}`);
+      venusLog(`[WebhookVenus] 📤 ÉTAPE 6 — Twilio API response: ok=${twilioResult.ok} | status=${twilioResult.data?.status || 'N/A'} | sid=${twilioResult.data?.sid || 'N/A'} | error=${twilioResult.data?.message || twilioResult.data?.error || 'N/A'}`);
     }
     if (twilioResult && !twilioResult.ok) {
       console.error(`[WebhookVenus] ❌ ÉTAPE 6 — Erreur envoi Twilio: ${JSON.stringify(twilioResult.data)}`);
@@ -1067,7 +1055,7 @@ Deno.serve(async (req) => {
       last_sender_type: 'admin',
     });
 
-    console.log(`[WebhookVenus] ✅ ÉTAPE 7 — Flow terminé avec succès pour ${telephone} | Twilio envoi: ${twilioResult?.ok ? 'OK' : (audioResponseUrl ? 'AUDIO OK' : 'ÉCHEC')}`);
+    venusLog(`[WebhookVenus] ✅ ÉTAPE 7 — Flow terminé avec succès pour ${telephone} | Twilio envoi: ${twilioResult?.ok ? 'OK' : (audioResponseUrl ? 'AUDIO OK' : 'ÉCHEC')}`);
 
     // ── 7. Log VenusInteraction (avec Centre d'Apprentissage) ──
     const conversationIdLog = `wa_${telephone.replace(/[^0-9]/g, '')}`;
