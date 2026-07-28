@@ -164,7 +164,9 @@ Deno.serve(async (req) => {
     // telephone = format Twilio brut (+226XXXXXXXX) — utilisé pour les appels API Twilio
     // normalizedTel = format canonique DB (226XXXXXXXX sans +) — utilisé pour tout stockage DB
     const telephone = from.replace('whatsapp:', '');
-    const countryCode = detecterPaysDepuisTelephone(telephone);
+    const detectedCountry = detecterPaysDepuisTelephone(telephone);
+    const paysInconnu = !detectedCountry;
+    const countryCode = detectedCountry || 'BF';
     const countryConfig = await chargerConfigPays(base44, countryCode);
     const tarifs = {
       nom: countryConfig.nom,
@@ -413,6 +415,12 @@ Deno.serve(async (req) => {
     if (messageType === 'audio') {
       reponseVenus = "Désolée, mon système de compréhension des messages vocaux n'est pas encore suffisamment fiable. Merci de m'écrire votre demande par message texte afin que je puisse vous aider correctement.";
       venusLog(`[WebhookVenus] 🎤 Réponse standard envoyée pour message vocal de ${telephone}`);
+    }
+
+    // ── Pays inconnu — demander le pays au client (ne pas assumer BF) ──
+    if (!reponseVenus && paysInconnu) {
+      reponseVenus = `Bienvenue sur SILGAPP ! Je suis VENUS, votre assistante. Je n'ai pas pu identifier votre pays depuis votre numéro. Dans quel pays vous trouvez-vous ? (Burkina Faso, Côte d'Ivoire, Togo, Bénin, Sénégal, Mali, Guinée, Niger, Ghana)`;
+      venusLog(`[WebhookVenus] 🌍 Pays inconnu pour ${telephone} — demande du pays au client`);
     }
 
     // ── 3c. Vérifier le mode maintenance VENUS ──
