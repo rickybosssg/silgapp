@@ -1,5 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { notifierRedispatchClient } from '../../shared/venusRedispatchNotifier.ts';
+import { STATUTS_ACTIFS_COURSE, STATUTS_ACTIFS_VERIF, INDICATIFS, normalizeCommissionPct, chargerConfigPays } from '../../shared/dispatchConstants.ts';
+import { envoyerWhatsAppRaw } from '../../shared/twilioWhatsApp.ts';
 
 // Délai d'attente maximum avant auto-annulation quand le client ne répond pas
 const CYCLE_EPUISE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
@@ -13,29 +15,12 @@ const CONFIG_TTL_MS = 5 * 60 * 1000; // 5 minutes
 // assez long pour ne pas surcharger l'API à chaque tick de dispatch.
 const LIVREURS_EN_COURSE_CACHE = new Map(); // country_code -> { ids: Set, expires: number }
 const LIVREURS_EN_COURSE_TTL_MS = 30 * 1000; // 30 secondes
-const STATUTS_ACTIFS_COURSE = [
-  'livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere',
-  'passager_embarque', 'pris_en_charge', 'en_livraison',
-];
-
 function generateToken() {
   return crypto.randomUUID().replace(/-/g, '');
 }
 
 function generatePIN() {
   return String(Math.floor(1000 + Math.random() * 9000));
-}
-
-function calculerDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-    Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function normalizeCountryCode(value) {
@@ -416,41 +401,23 @@ async function notifierLivreur(base44, courseId, course, livreur, timeoutSec) {
     const waOptInDate = livreur.whatsapp_opt_in_date;
     const waPromise = (async () => {
       try {
-        const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-        const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-        const fromRaw = Deno.env.get('TWILIO_WHATSAPP_FROM') || '';
-        if (!accountSid || !authToken || !fromRaw) return;
-        const INDICATIFS = { BF: '+226', CI: '+225', TG: '+228', BJ: '+229', SN: '+221', ML: '+223', GN: '+224', NE: '+227', GH: '+233' };
+        if (waOptIn === false && !waOptInDate) return;
         const indicatif = INDICATIFS[livreurCountry] || '+226';
         let tel = livreurTel.replace(/\s+/g, '').replace(/[^\d+]/g, '');
         if (!tel.startsWith('+')) tel = indicatif + tel;
 
-        if (waOptIn !== false || waOptInDate) {
-          const fromNumber = fromRaw.startsWith('whatsapp:') ? fromRaw : `whatsapp:${fromRaw}`;
-          const formData = new URLSearchParams();
-          formData.append('From', fromNumber);
-          formData.append('To', `whatsapp:${tel}`);
-          formData.append('Body', `📦 *Nouvelle course disponible !*\nOuvrez SILGAPP pour accepter ou refuser.`);
-
-          const creds = btoa(`${accountSid}:${authToken}`);
-          const resp = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
-            method: 'POST',
-            headers: { 'Authorization': `Basic ${creds}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: formData.toString(),
+        const result = await envoyerWhatsAppRaw(tel, `📦 *Nouvelle course disponible !*\nOuvrez SILGAPP pour accepter ou refuser.`);
+        if (result.success) {
+          await base44.asServiceRole.entities.WhatsAppAlerte.create({
+            livreur_id: livreurId, livreur_telephone: tel,
+            notification_id: courseId, statut: 'sent',
+            twilio_sid: result.sid, heure_envoi: new Date().toISOString(), canal: 'whatsapp',
           });
-          const data = await resp.json();
-          if (resp.ok && data.sid) {
-            await base44.asServiceRole.entities.WhatsAppAlerte.create({
-              livreur_id: livreurId, livreur_telephone: tel,
-              notification_id: courseId, statut: 'sent',
-              twilio_sid: data.sid, heure_envoi: new Date().toISOString(), canal: 'whatsapp',
-            });
-          } else if (data.code === 63015) {
-            await base44.asServiceRole.entities.Livreur.update(livreurId, {
-              whatsapp_opt_in: false, whatsapp_derniere_erreur: '63015',
-              whatsapp_derniere_erreur_date: new Date().toISOString(),
-            });
-          }
+        } else if (result.code === 63015) {
+          await base44.asServiceRole.entities.Livreur.update(livreurId, {
+            whatsapp_opt_in: false, whatsapp_derniere_erreur: '63015',
+            whatsapp_derniere_erreur_date: new Date().toISOString(),
+          });
         }
       } catch (err) { console.error('[DISPATCH] ❌ WhatsApp:', err.message); }
     })();
@@ -927,12 +894,11 @@ Deno.serve(async (req) => {
 
       // 🛡️ Vérification anti-courses multiples : le livreur ne peut pas accepter
       // une nouvelle course s'il en a déjà une active en cours.
-      const STATUTS_ACTIFS = ['livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison'];
       const coursesActivesLivreur = await base44.asServiceRole.entities.CourseExterne.filter({
         livreur_id: livreur_id,
       }, '-created_date', 20);
       const courseActiveExistante = coursesActivesLivreur.find(c =>
-        STATUTS_ACTIFS.includes(c.statut) && c.id !== course_id
+        STATUTS_ACTIFS_COURSE.includes(c.statut) && c.id !== course_id
       );
       if (courseActiveExistante) {
         console.warn(`[DISPATCH] 🚫 Livreur ${livreur_id} a déjà la course ${courseActiveExistante.id} active (${courseActiveExistante.statut}) — acceptation refusée`);
@@ -980,9 +946,9 @@ Deno.serve(async (req) => {
       // Prix minimum dynamique selon le pays
       let PRIX_MIN = 1000; // default FCFA
       try {
-        const countryConfig = await base44.asServiceRole.entities.Country.filter({ code: course.country_code, actif: true });
-        if (countryConfig?.[0]?.prix_minimum) {
-          PRIX_MIN = countryConfig[0].prix_minimum;
+        const countryConfig = await chargerConfigPays(base44, course.country_code);
+        if (countryConfig?.prix_minimum) {
+          PRIX_MIN = countryConfig.prix_minimum;
         }
       } catch (_) { /* fallback 1000 FCFA */ }
       const deviseMin = course.devise || 'FCFA';
@@ -1586,7 +1552,6 @@ Deno.serve(async (req) => {
       // - Une erreur réseau a interrompu le flux normal de libération
       // Ce filet tourne à chaque tick et garantit qu'aucun statut fantôme ne persiste.
       try {
-        const STATUTS_ACTIFS_VERIF = ['livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison', 'arrivee'];
         const livreursEnCourse = await base44.asServiceRole.entities.Livreur.filter(
           { type_livreur: 'externe', statut: 'en_course' },
           '-updated_date', 50
@@ -1697,9 +1662,8 @@ Deno.serve(async (req) => {
 
       // ⚠️ Détection des courses sans aucun livreur disponible (> 5 min de recherche)
       try {
-        const coursesSansLivreur = await base44.asServiceRole.entities.CourseExterne.filter(
-          { statut: 'recherche_livreur', dispatch_status: 'en_attente' },
-          '-created_date', 10
+        const coursesSansLivreur = courses.filter(c =>
+          c.statut === 'recherche_livreur' && c.dispatch_status === 'en_attente'
         );
         for (const course of coursesSansLivreur) {
           const updatedTime = new Date(course.updated_date);
@@ -1779,11 +1743,8 @@ Deno.serve(async (req) => {
         let commissionPct: number | null = null;
         try {
           if (course.country_code) {
-            const countries = await base44.asServiceRole.entities.Country.filter({ code: course.country_code, actif: true });
-            const configured = Number(countries?.[0]?.commission_pct);
-            if (Number.isFinite(configured) && configured >= 0 && configured <= 100) {
-              commissionPct = configured;
-            }
+            const countryConfig = await chargerConfigPays(base44, course.country_code);
+            commissionPct = normalizeCommissionPct(countryConfig?.commission_pct);
           }
         } catch (error) {
           console.error('[dispatchExterneAuto] Lecture commission pays impossible', error);
