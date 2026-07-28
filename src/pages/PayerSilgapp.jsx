@@ -3,9 +3,10 @@ import { useMutation } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, CheckCircle2, Phone, Image as ImageIcon, X, Wallet } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Phone, Wallet } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import PhotoPicker from "@/components/livreur/PhotoPicker";
 
 const NUMERO_DEPOT = "+226 66 92 51 90";
 
@@ -24,7 +25,6 @@ export default function PayerSilgapp({ userType: forcedType }) {
   const [montantDu, setMontantDu] = useState(0);
   const [montantPaye, setMontantPaye] = useState("");
   const [preuveUrl, setPreuveUrl] = useState(null);
-  const [uploading, setUploading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
@@ -116,20 +116,6 @@ export default function PayerSilgapp({ userType: forcedType }) {
     }, 10000);
     return () => clearInterval(interval);
   }, [userInfo, userType]);
-
-  const handleUpload = async (file) => {
-    if (!file) return;
-    setUploading(true);
-    try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      setPreuveUrl(file_url);
-      toast.success("Preuve téléversée");
-    } catch {
-      toast.error("Erreur de téléversement");
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const submitMutation = useMutation({
     mutationFn: async () => {
@@ -265,49 +251,19 @@ export default function PayerSilgapp({ userType: forcedType }) {
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-100 p-4 space-y-3 shadow-sm">
-              <label className="text-sm font-semibold text-slate-700">Photo de la preuve de dépôt</label>
-              {preuveUrl ? (
-                <div className="relative">
-                  <img src={preuveUrl} alt="Preuve" className="w-full rounded-xl max-h-64 object-cover" />
-                  <button
-                    onClick={() => setPreuveUrl(null)}
-                    className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : uploading ? (
-                <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-xl py-8">
-                  <p className="text-sm text-gray-400">Téléversement...</p>
-                </div>
-              ) : (
-                <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl py-8 cursor-pointer hover:border-blue-500 transition-colors">
-                  {uploading ? (
-                    <p className="text-sm text-slate-400">Téléversement...</p>
-                  ) : (
-                    <>
-                      <ImageIcon className="w-8 h-8 text-slate-300 mb-2" />
-                      <p className="text-xs text-slate-400">Cliquer pour ajouter une photo</p>
-                    </>
-                  )}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    onChange={(e) => handleUpload(e.target.files?.[0])}
-                    disabled={uploading}
-                  />
-                </label>
-              )}
+              <PhotoPicker
+                label="Photo de la preuve de dépôt"
+                value={preuveUrl}
+                onChange={setPreuveUrl}
+              />
             </div>
 
             <Button
               className="w-full h-14 text-base font-black rounded-2xl"
-              disabled={!montantPaye || !preuveUrl || submitMutation.isPending || uploading}
+              disabled={!montantPaye || !preuveUrl || submitMutation.isPending}
               onClick={() => submitMutation.mutate()}
             >
-              {submitMutation.isPending ? "Envoi..." : "Envoyer ma preuve"}
+              {submitMutation.isPending ? "Envoi..." : !montantPaye ? "Entrez le montant" : !preuveUrl ? "Ajoutez la preuve" : "Envoyer ma preuve"}
             </Button>
           </div>
         )}
