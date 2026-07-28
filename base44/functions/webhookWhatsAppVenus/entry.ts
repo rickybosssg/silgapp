@@ -654,6 +654,14 @@ Deno.serve(async (req) => {
           'je veux envoyer un colis', 'je voudrais envoyer un colis',
           'je veux envoyer un autre', 'je voudrais envoyer un autre',
           'je voudrais un livreur', 'je veux un livreur',
+          // ── Détection courte : type de course seul = nouvelle demande ──
+          'envoyer un colis', 'expedier un colis', 'expédier un colis',
+          'envoyer un paquet', 'je veux envoyer', 'je voudrais envoyer',
+          'jaimerais expedier', "j'aimerais expedier", 'jaimerais expédier',
+          "j'aimerais expédier", 'je voudrais expedier', 'je voudrais expédier',
+          'recevoir un colis', 'je veux recevoir', 'je voudrais recevoir',
+          'je veux me deplacer', 'je voudrais me deplacer',
+          'je veux me déplacer', 'je voudrais me déplacer',
         ];
         const msgLowerNC = messageEffectif.toLowerCase().trim();
         const isNewCourseRequest = NEW_COURSE_KW.some(kw => msgLowerNC.includes(kw));
