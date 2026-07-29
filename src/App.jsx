@@ -104,6 +104,7 @@ const BugsTracking = lazy(() => import('./pages/BugsTracking.jsx'));
 const PayerSilgapp = lazy(() => import('./pages/PayerSilgapp.jsx'));
 const PaiementsAdmin = lazy(() => import('./pages/PaiementsAdmin.jsx'));
 const DispatchLogs = lazy(() => import('./pages/DispatchLogs.jsx'));
+const LivreursPrioritaires = lazy(() => import('./pages/LivreursPrioritaires.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -406,6 +407,7 @@ function AppContent() {
           <Route path="/admin/commandes-partenaires" element={<AnimatedRoutes><CommandesPartenaires /></AnimatedRoutes>} />
           <Route path="/admin/paiements" element={<AnimatedRoutes><PaiementsAdmin /></AnimatedRoutes>} />
           <Route path="/admin/dispatch-logs" element={<AnimatedRoutes><DispatchLogs /></AnimatedRoutes>} />
+          <Route path="/admin/livreurs-prioritaires" element={<AnimatedRoutes><LivreursPrioritaires /></AnimatedRoutes>} />
           <Route path="/admin/messages" element={<AnimatedRoutes><AdminMessages /></AnimatedRoutes>} />
           <Route path="/admin/whatsapp" element={<AnimatedRoutes><WhatsAppAdmin /></AnimatedRoutes>} />
           <Route path="/admin/venus" element={<AnimatedRoutes><VenusAdminCenter /></AnimatedRoutes>} />
