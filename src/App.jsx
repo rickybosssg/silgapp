@@ -105,6 +105,7 @@ const PayerSilgapp = lazy(() => import('./pages/PayerSilgapp.jsx'));
 const PaiementsAdmin = lazy(() => import('./pages/PaiementsAdmin.jsx'));
 const DispatchLogs = lazy(() => import('./pages/DispatchLogs.jsx'));
 const LivreursPrioritaires = lazy(() => import('./pages/LivreursPrioritaires.jsx'));
+const AdminCourseStandalone = lazy(() => import('./pages/AdminCourseStandalone.jsx'));
 
 function AnimatedRoutes({ children }) {
   // Variables définies DANS la fonction pour éviter init issues
@@ -321,6 +322,18 @@ function AppContent() {
                 onPartenaire={() => setIsPartenaire(true)}
               >
                 <DiagnosticPushComplet />
+              </AuthGate>
+            }
+          />
+          <Route
+            path="/admin/creer-course"
+            element={
+              <AuthGate
+                onLivreur={setLivreurProfil}
+                onClient={() => setIsClient(true)}
+                onPartenaire={() => setIsPartenaire(true)}
+              >
+                <AdminCourseStandalone />
               </AuthGate>
             }
           />
