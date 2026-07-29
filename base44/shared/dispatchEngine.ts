@@ -112,7 +112,10 @@ export async function trouverLivreursCandidats(base44, course, exclusions = [], 
       if (!isNaN(gps.getTime())) gpsAgeMin = (now - gps.getTime()) / 60000;
     }
 
-    if (!skipGpsFilter && (gpsAgeMin === null || gpsAgeMin >= GPS_EXPIRE_SEUIL_MIN)) {
+    // ── Les livreurs prioritaires (priorite_dispatch > 0) ne sont JAMAIS exclus
+    //    pour cause de GPS absent ou expiré. La priorité prime sur le GPS. ──
+    const isPriority = (l.priorite_dispatch || 0) > 0;
+    if (!skipGpsFilter && !isPriority && (gpsAgeMin === null || gpsAgeMin >= GPS_EXPIRE_SEUIL_MIN)) {
       raisonsExclusion.push({
         livreur_id: l.id,
         nom: `${l.prenom || ''} ${l.nom || ''}`.trim(),
