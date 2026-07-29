@@ -310,10 +310,11 @@ export default function DusLivreursExternes() {
       }
     });
     let result = Object.values(map);
-    const totalDuGlobal = result.reduce((s, r) => s + r.montantDu, 0);
     const totalCommissionJour = result.reduce((s, r) => s + (r.commissionJour || 0), 0);
     if (filtre === "arecouvrer") result = result.filter(r => r.montantDu > 0);
     if (filtre === "ajour") result = result.filter(r => r.montantDu <= 0);
+    // Total calculé APRÈS le filtre → correspond à la liste affichée
+    const totalDuGlobal = result.reduce((s, r) => s + r.montantDu, 0);
     return { list: result.sort((a, b) => b.montantDu - a.montantDu), totalDuGlobal, totalCommissionJour };
   }, [courses, livreurs, filtre, startOfToday]);
 
