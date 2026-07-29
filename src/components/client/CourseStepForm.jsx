@@ -16,6 +16,7 @@ import { SILGAPP_COUNTRIES, phoneVariants } from "@/lib/phoneUtils";
 import NombreColisSelector from "@/components/multi-colis/NombreColisSelector";
 import MultiColisFormStep from "@/components/multi-colis/MultiColisFormStep";
 import QuartierSelect from "@/components/client/QuartierSelect";
+import AddressAutocomplete from "@/components/client/AddressAutocomplete";
 
 // Retourne l'indicatif affiché (ex: "+226") selon le pays
 function getDialCode(countryCode) {
@@ -430,7 +431,27 @@ export default function CourseStepForm({
                     </div>
                   </button>
                   <div className="flex items-center gap-3"><div className="flex-1 h-px bg-gray-200" /><span className="text-xs text-gray-400 font-medium">ou saisir manuellement</span><div className="flex-1 h-px bg-gray-200" /></div>
-                  <PremiumInput label="Adresse de prise en charge" required={false} value={formData.adresse_depart} onChange={(e) => setFormData({ ...formData, adresse_depart: e.target.value })} placeholder="Quartier, rue, point de repère... (optionnel)" />
+                  <AddressAutocomplete
+                    label="Adresse de prise en charge"
+                    required={false}
+                    value={formData.adresse_depart}
+                    onChange={(text) => setFormData(prev => ({ ...prev, adresse_depart: text }))}
+                    onSelect={(result) => {
+                      if (!result) return;
+                      setFormData(prev => ({
+                        ...prev,
+                        adresse_depart: result.label,
+                        gps_depart_lat: result.latitude,
+                        gps_depart_lng: result.longitude,
+                        quartier_depart: result.quartier || prev.quartier_depart,
+                        ville_depart: result.ville || prev.ville_depart,
+                      }));
+                    }}
+                    countryCode={activeCountry}
+                    focusLat={savedLat}
+                    focusLng={savedLng}
+                    placeholder="Quartier, rue, point de repère... (optionnel)"
+                  />
                 </>
               )}
             </div>
@@ -568,11 +589,25 @@ export default function CourseStepForm({
                   <div className="flex-1 h-px bg-gray-200" />
                 </div>
 
-                <PremiumInput
+                <AddressAutocomplete
                   label="Adresse de récupération"
                   required={false}
                   value={formData.adresse_depart}
-                  onChange={(e) => setFormData({ ...formData, adresse_depart: e.target.value })}
+                  onChange={(text) => setFormData(prev => ({ ...prev, adresse_depart: text }))}
+                  onSelect={(result) => {
+                    if (!result) return;
+                    setFormData(prev => ({
+                      ...prev,
+                      adresse_depart: result.label,
+                      gps_depart_lat: result.latitude,
+                      gps_depart_lng: result.longitude,
+                      quartier_depart: result.quartier || prev.quartier_depart,
+                      ville_depart: result.ville || prev.ville_depart,
+                    }));
+                  }}
+                  countryCode={activeCountry}
+                  focusLat={savedLat}
+                  focusLng={savedLng}
                   placeholder="Quartier, rue, point de repère... (optionnel)"
                 />
 
@@ -600,12 +635,26 @@ export default function CourseStepForm({
                 <h2 className="text-2xl font-black text-gray-900">Point de destination</h2>
                 <p className="text-sm text-gray-500 mt-1.5">Où déposer le passager ?</p>
               </div>
-              <PremiumInput
+              <AddressAutocomplete
                 label="Adresse de destination"
                 required={false}
                 hint="Indiquez le quartier, la rue ou un point de repère connu."
                 value={formData.adresse_arrivee}
-                onChange={(e) => setFormData({ ...formData, adresse_arrivee: e.target.value })}
+                onChange={(text) => setFormData(prev => ({ ...prev, adresse_arrivee: text }))}
+                onSelect={(result) => {
+                  if (!result) return;
+                  setFormData(prev => ({
+                    ...prev,
+                    adresse_arrivee: result.label,
+                    gps_arrivee_lat: result.latitude,
+                    gps_arrivee_lng: result.longitude,
+                    quartier_arrivee: result.quartier || prev.quartier_arrivee,
+                    ville_arrivee: result.ville || prev.ville_arrivee,
+                  }));
+                }}
+                countryCode={activeCountry}
+                focusLat={savedLat}
+                focusLng={savedLng}
                 placeholder="Quartier, rue, point de repère... (optionnel)"
                 autoFocus
               />
@@ -763,11 +812,25 @@ export default function CourseStepForm({
             </button>
 
             {!(gpsDispo && formData.recuperationGPS) && (
-              <PremiumInput
+              <AddressAutocomplete
                 label="Adresse de récupération"
                 required={false}
                 value={formData.adresse_depart}
-                onChange={(e) => setFormData({ ...formData, adresse_depart: e.target.value })}
+                onChange={(text) => setFormData(prev => ({ ...prev, adresse_depart: text }))}
+                onSelect={(result) => {
+                  if (!result) return;
+                  setFormData(prev => ({
+                    ...prev,
+                    adresse_depart: result.label,
+                    gps_depart_lat: result.latitude,
+                    gps_depart_lng: result.longitude,
+                    quartier_depart: result.quartier || prev.quartier_depart,
+                    ville_depart: result.ville || prev.ville_depart,
+                  }));
+                }}
+                countryCode={activeCountry}
+                focusLat={savedLat}
+                focusLng={savedLng}
                 placeholder="Quartier, rue, point de repère... (optionnel)"
                 autoFocus
               />
@@ -854,12 +917,26 @@ export default function CourseStepForm({
                 </div>
               ) : (
                 <>
-                <PremiumInput
+                <AddressAutocomplete
                   label="Adresse de livraison"
                   required={false}
                   hint="Indiquez le quartier, la rue ou un point de repère connu."
                   value={formData.adresse_arrivee}
-                  onChange={(e) => setFormData({ ...formData, adresse_arrivee: e.target.value })}
+                  onChange={(text) => setFormData(prev => ({ ...prev, adresse_arrivee: text }))}
+                  onSelect={(result) => {
+                    if (!result) return;
+                    setFormData(prev => ({
+                      ...prev,
+                      adresse_arrivee: result.label,
+                      gps_arrivee_lat: result.latitude,
+                      gps_arrivee_lng: result.longitude,
+                      quartier_arrivee: result.quartier || prev.quartier_arrivee,
+                      ville_arrivee: result.ville || prev.ville_arrivee,
+                    }));
+                  }}
+                  countryCode={activeCountry}
+                  focusLat={savedLat}
+                  focusLng={savedLng}
                   placeholder="Quartier, rue, point de repère... (optionnel)"
                   autoFocus
                 />
