@@ -314,7 +314,8 @@ export default function DusLivreursExternes() {
     if (filtre === "arecouvrer") result = result.filter(r => r.montantDu > 0);
     if (filtre === "ajour") result = result.filter(r => r.montantDu <= 0);
     // Total calculé APRÈS le filtre → correspond à la liste affichée
-    const totalDuGlobal = result.reduce((s, r) => s + r.montantDu, 0);
+    // On ne somme que les dettes positives (les crédits négatifs ne réduisent pas le total dû)
+    const totalDuGlobal = result.reduce((s, r) => s + Math.max(0, r.montantDu), 0);
     return { list: result.sort((a, b) => b.montantDu - a.montantDu), totalDuGlobal, totalCommissionJour };
   }, [courses, livreurs, filtre, startOfToday]);
 
