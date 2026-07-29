@@ -550,10 +550,12 @@ export default function DusLivreursExternes() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 mt-2 text-[11px]">
-                      <span className="text-gray-400">Commission du jour :</span>
-                      <span className="font-bold text-green-600">{(entry.commissionJour || 0).toLocaleString()} F</span>
-                      {entry.nbCoursesJour > 0 && <span className="text-gray-400">· {entry.nbCoursesJour} course(s)</span>}
-                      <span className="text-gray-300 ml-auto">{format(startOfToday, "dd/MM", { locale: fr })}</span>
+                      <span className="text-gray-400">Commission due :</span>
+                      <span className="font-bold text-green-600">{(entry.commissionTotal || 0).toLocaleString()} F</span>
+                      {entry.courses.length > 0 && <span className="text-gray-400">· {entry.courses.length} course(s)</span>}
+                      {entry.nbCoursesJour > 0 && (
+                        <span className="text-gray-300 ml-auto">Aujourd'hui : {(entry.commissionJour || 0).toLocaleString()} F</span>
+                      )}
                     </div>
                     <div className="flex gap-2 mt-3">
                       <Button variant="outline" size="sm" className="flex-1 h-9 text-xs rounded-xl font-semibold" onClick={() => setDetailEntry(entry)}>
