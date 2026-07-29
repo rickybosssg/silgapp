@@ -144,7 +144,13 @@ export async function trouverLivreursCandidats(base44, course, exclusions = [], 
     candidats.push({ ...l, distance, heartbeatAgeMin, gpsAgeMin, gpsStale, quartierMatch, villeMatch });
   });
 
+  // ── Tri priorité dispatch : les livreurs avec priorite_dispatch > 0
+  //    sont TOUJOURS notifiés en premier, peu importe la distance ou le GPS. ──
   candidats.sort((a, b) => {
+    const prioA = a.priorite_dispatch || 0;
+    const prioB = b.priorite_dispatch || 0;
+    if (prioA !== prioB) return prioB - prioA;
+
     const tierA = gpsFreshnessTier(a.gpsAgeMin);
     const tierB = gpsFreshnessTier(b.gpsAgeMin);
     if (tierA !== tierB) return tierA - tierB;

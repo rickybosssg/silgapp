@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
-import { Save, Loader2, Users, Clock, Info, Flame, ChevronRight, MapPin } from "lucide-react";
+import { Save, Loader2, Users, Clock, Info, Flame, ChevronRight, MapPin, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import DispatchWaveConfigPanel from "@/components/admin/DispatchWaveConfigPanel";
+import LivreurPriorityPanel from "@/components/admin/LivreurPriorityPanel";
 
 const NB_OPTIONS = [
   { value: "1", label: "1 livreur", desc: "Attribution séquentielle classique" },
@@ -168,6 +169,15 @@ export default function DispatchConfigPanel() {
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
         {saving ? "Sauvegarde..." : "Sauvegarder la configuration"}
       </Button>
+
+      {/* Séparateur livreurs prioritaires */}
+      <div className="border-t border-gray-200 pt-5 mt-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Crown className="w-4 h-4 text-amber-500" />
+          <p className="font-black text-sm text-amber-700">LIVREURS PRIORITAIRES</p>
+        </div>
+        <LivreurPriorityPanel countryCode="BF" />
+      </div>
 
       {/* Séparateur vagues GPS */}
       <div className="border-t border-gray-200 pt-5 mt-5">

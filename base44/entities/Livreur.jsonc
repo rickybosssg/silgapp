@@ -243,6 +243,11 @@
       ],
       "default": "automatic"
     },
+    "priorite_dispatch": {
+      "type": "number",
+      "default": 0,
+      "description": "Niveau de priorit\u00e9 pour le dispatch. 0 = normal (tri par distance/GPS). 1+ = prioritaire (notifi\u00e9 en premier, peu importe la distance). Plus le chiffre est \u00e9lev\u00e9, plus le livreur est prioritaire."
+    },
     "whatsapp_opt_in": {
       "type": "boolean",
       "default": false
