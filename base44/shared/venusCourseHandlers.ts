@@ -442,6 +442,29 @@ export async function handleAnnulationCourse(base44: any, conversation: any, use
 
   if (!shouldCancel) return null;
 
+  // ── Annulation d'une création de course en cours (pending) ──
+  // Si VENUS avait proposé un récapitulatif de course et demandé confirmation,
+  // "annuler" doit abandonner la création en attente, pas chercher une course active en DB.
+  let pendingCourseForCancel: any = null;
+  try {
+    pendingCourseForCancel = conversation.venus_pending_course ? JSON.parse(conversation.venus_pending_course) : null;
+  } catch { pendingCourseForCancel = null; }
+
+  const isPendingCreation =
+    pendingCourseForCancel &&
+    !pendingCourseForCancel.redispatch_pending &&
+    !pendingCourseForCancel.contact_livreur_mode &&
+    !pendingCourseForCancel.modification_mode &&
+    (pendingCourseForCancel.type_course || pendingCourseForCancel.adresse_depart);
+
+  if (isPendingCreation) {
+    await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+      venus_pending_course: '',
+    });
+    console.log(`[WebhookVenus] 🗑️ Création de course en cours annulée par le client (pending cleared) pour ${conversation.id}`);
+    return "D'accord, j'ai annulé la création de votre course. N'hésitez pas si vous souhaitez créer une nouvelle course ou si vous avez besoin d'autre chose.";
+  }
+
   const STATUTS_ACTIFS = ['nouvelle', 'programmee', 'recherche_livreur', 'livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison', 'arrivee'];
 
   let courses = await base44.asServiceRole.entities.CourseExterne.filter(
