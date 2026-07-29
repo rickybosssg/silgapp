@@ -348,26 +348,31 @@ Deno.serve(async (req) => {
     let silgappFromNumber: string | null = course.silgapp_from_number || null;
 
     // ── Niveau 2 : secours via Conversation (anciennes courses sans le champ) ──
+    // ⚠️ La conversation est TOUJOURS recherchée, même si silgapp_from_number est déjà connu,
+    // car elle est nécessaire pour : stocker le message dans l'historique, anti-doublon,
+    // et mettre à jour last_message. Sans cela, les notifications envoyées ne laissent
+    // aucune trace dans la DB et l'anti-doublon est désactivé.
     let conversationForSend: any | null = null;
     let conversationForClient: any | null = null;
-    if (!silgappFromNumber) {
-      try {
-        conversationForSend = await trouverConversationParNumero(numero);
+    try {
+      conversationForSend = await trouverConversationParNumero(numero);
 
-        // Fallback : si le numéro cible n'a pas de conversation (ex: expéditeur ≠ client),
-        // chercher la conversation du client_telephone pour récupérer silgapp_from_number
-        if (!conversationForSend && course.client_telephone && course.client_telephone !== telephone) {
-          const clientNum = normalizePhone(course.client_telephone, course.country_code) || course.client_telephone.replace(/\D/g, '');
-          if (clientNum && clientNum !== numero) {
-            conversationForClient = await trouverConversationParNumero(clientNum);
-            console.log(`[SuiviWhatsApp] 📱 Numéro cible sans conversation — fallback sur conversation client (${clientNum})`);
-          }
+      // Fallback : si le numéro cible n'a pas de conversation (ex: expéditeur ≠ client),
+      // chercher la conversation du client_telephone pour récupérer silgapp_from_number
+      if (!conversationForSend && course.client_telephone && course.client_telephone !== telephone) {
+        const clientNum = normalizePhone(course.client_telephone, course.country_code) || course.client_telephone.replace(/\D/g, '');
+        if (clientNum && clientNum !== numero) {
+          conversationForClient = await trouverConversationParNumero(clientNum);
+          console.log(`[SuiviWhatsApp] 📱 Numéro cible sans conversation — fallback sur conversation client (${clientNum})`);
         }
-
-        silgappFromNumber = conversationForSend?.silgapp_from_number || conversationForClient?.silgapp_from_number || null;
-      } catch (lookupErr) {
-        console.warn(`[SuiviWhatsApp] Recherche conversation (secours) échouée (non bloquant):`, lookupErr?.message);
       }
+
+      // Compléter silgapp_from_number si pas déjà défini par la course
+      if (!silgappFromNumber) {
+        silgappFromNumber = conversationForSend?.silgapp_from_number || conversationForClient?.silgapp_from_number || null;
+      }
+    } catch (lookupErr) {
+      console.warn(`[SuiviWhatsApp] Recherche conversation (secours) échouée (non bloquant):`, lookupErr?.message);
     }
 
     // ── Anti-doublon : vérifier les messages récents ──
