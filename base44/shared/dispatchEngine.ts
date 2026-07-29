@@ -390,6 +390,87 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
     }
   }
 
+  // ═══ VAGUE PRIORITAIRE — les livreurs prioritaires sont notifiés EN PREMIER ═══
+  // Avant toute vague GPS, on notifie TOUS les livreurs prioritaires disponibles.
+  // Une fois leur vague expirée, le dispatch passe aux vagues GPS normales.
+  const priorityCandidats = candidats.filter(l => (l.priorite_dispatch || 0) > 0);
+  const priorityNotYetNotified = priorityCandidats.filter(l => !dejaNotifies.includes(l.id));
+
+  if (priorityNotYetNotified.length > 0) {
+    const pTimeoutSec = (gpsConfig.waves[0]?.timeout_sec || 60);
+    const pTimeoutAt = new Date(Date.now() + pTimeoutSec * 1000).toISOString();
+    const pNouveauxIds = priorityNotYetNotified.map(l => l.id);
+    const pTousNotifies = [...new Set([...dejaNotifies, ...pNouveauxIds])];
+
+    await base44.asServiceRole.entities.CourseExterne.update(courseId, {
+      statut: 'recherche_livreur',
+      dispatch_status: 'propose',
+      dispatch_wave: wave,
+      livreur_id: '',
+      heure_sollicitation: new Date().toISOString(),
+      timeout_expires_at: pTimeoutAt,
+      dispatch_wave_started_at: new Date().toISOString(),
+      dispatch_next_wave_at: pTimeoutAt,
+      dispatch_notified_ids: JSON.stringify(pTousNotifies),
+      dispatch_wave_notified_ids: JSON.stringify(pNouveauxIds),
+    });
+
+    if (wave > 1) {
+      await supprimerNotificationsCourse(base44, courseId);
+      dispatchLog(`[DISPATCH] 🧹 Notifications vague précédente archivées pour course ${courseId} (vague prioritaire)`);
+    }
+
+    for (const l of priorityNotYetNotified) {
+      try {
+        notifierLivreur(base44, courseId, course, l, pTimeoutSec);
+      } catch (err) {
+        console.error(`[DISPATCH] ❌ Erreur notif livreur prioritaire ${l.id}:`, err.message);
+      }
+    }
+
+    dispatchLog(`[DISPATCH] 👑 VAGUE PRIORITAIRE — ${priorityNotYetNotified.length} livreur(s) prioritaire(s) notifié(s) pour course ${courseId} (timeout: ${pTimeoutSec}s)`);
+
+    journaliserDispatch(base44, {
+      course_id: courseId,
+      country_code: course.country_code,
+      vague: wave,
+      vague_avant: course.dispatch_wave || 0,
+      vague_apres: wave,
+      wave_started_at: new Date().toISOString(),
+      wave_expired_at: pTimeoutAt,
+      nombre_deja_consultes: dejaNotifies.length,
+      nombre_nouveaux_notifies: priorityNotYetNotified.length,
+      raison_passage: 'vague_prioritaire',
+      pickup_source: pickupSource,
+      evenement: 'vague',
+      livreurs_selectionnes: priorityNotYetNotified.map(l => ({
+        id: l.id, nom: `${l.prenom || ''} ${l.nom || ''}`.trim(),
+        distance_km: l.distance !== null ? Number(l.distance.toFixed(2)) : null,
+        gps_age_min: l.gpsAgeMin !== null ? Number(l.gpsAgeMin.toFixed(1)) : null,
+        priorite: l.priorite_dispatch || 0,
+      })),
+      ordre_tri_complet: candidats.map(l => ({
+        id: l.id, nom: `${l.prenom || ''} ${l.nom || ''}`.trim(),
+        distance_km: l.distance !== null ? Number(l.distance.toFixed(2)) : null,
+        priorite: l.priorite_dispatch || 0,
+      })),
+      raisons_exclusion: raisonsExclusion,
+      total_candidats: candidats.length,
+      total_exclus: raisonsExclusion.length,
+      timeout_sec: pTimeoutSec,
+    });
+
+    return {
+      propose: true,
+      priority_wave: true,
+      nb_notifies: priorityNotYetNotified.length,
+      total_notifies: pTousNotifies.length,
+      livreurs: priorityNotYetNotified.map(l => ({ id: l.id, nom: `${l.prenom || ''} ${l.nom}`.trim(), distance_km: l.distance?.toFixed(1), priorite: l.priorite_dispatch || 0 })),
+      timeout_sec: pTimeoutSec,
+    };
+  }
+
+  // ═══ VAGUES GPS NORMALES — après épuisement de la vague prioritaire ═══
   let selection, timeoutSec, waveLabel;
   const waveIndex = Math.min(wave - 1, gpsConfig.waves.length - 1);
   const waveCfg = gpsConfig.waves[waveIndex];
