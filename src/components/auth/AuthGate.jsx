@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { base44, detectedToken } from "@/api/base44Client";
 import { APP_PUBLIC_URL, BASE44_APP_ID } from "@/lib/app-params";
-import { ArrowRight, Loader2, Lock, Mail, ShieldCheck, Truck, Store } from "lucide-react";
+import { ArrowRight, Loader2, Lock, Mail, Phone, ShieldCheck, Truck, Store } from "lucide-react";
 import AppMaintenanceGate from "@/components/admin/AppMaintenanceGate";
 import { registerPushToken } from "@/lib/notifications";
 import { persistToken, clearPersistedToken } from "@/lib/authPersistence";
 import RoleSelection from "@/pages/RoleSelection";
 import BlockedLivreurScreen from "@/components/auth/BlockedLivreurScreen";
+import PhoneLoginSection from "@/components/auth/PhoneLoginSection";
 
 const AUTH_TOKEN_KEYS = ["base44_access_token", "access_token", "base44_token", "token"];
 
@@ -226,11 +227,23 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
   const [loginInfo, setLoginInfo] = useState("");
   const [blockedLivreur, setBlockedLivreur] = useState(null);
   const [showSupportChat, setShowSupportChat] = useState(false);
+  const [showPhoneLogin, setShowPhoneLogin] = useState(false);
 
   const handleConfirmedLogout = () => {
     if (!window.confirm("Voulez-vous vraiment vous déconnecter ?")) return;
     clearPersistedToken();
     base44.auth.logout();
+  };
+
+  // ── Connexion par téléphone réussie : sauvegarder le token et relancer l'auth ──
+  const handlePhoneLoginSuccess = (accessToken) => {
+    if (saveAuthToken(accessToken)) {
+      setShowPhoneLogin(false);
+      setState("loading");
+      setAuthRetry((value) => value + 1);
+    } else {
+      setLoginError("Connexion acceptée, mais le token de session est absent.");
+    }
   };
 
   useEffect(() => {
@@ -489,6 +502,7 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
     setAuthMode(mode);
     setLoginError("");
     setLoginInfo("");
+    setShowPhoneLogin(false);
     if (mode === "login" || mode === "register") {
       setLoginForm((form) => ({
         ...form,
@@ -697,6 +711,48 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
               </button>
             ) : null}
           </form>
+
+          {authMode === "login" && !showPhoneLogin && (
+            <>
+              <div className="relative my-1">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-slate-200/60" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-white px-3 font-semibold text-slate-400">OU</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setShowPhoneLogin(true); setLoginError(""); setLoginInfo(""); }}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3.5 font-bold text-[#0b62b5] shadow-sm transition hover:bg-slate-50 active:scale-[0.98]"
+              >
+                <Phone className="w-4 h-4" />
+                Se connecter avec mon numéro de téléphone
+              </button>
+            </>
+          )}
+
+          {authMode === "login" && showPhoneLogin && (
+            <div className="space-y-4">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-slate-200/60" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-white px-3 font-semibold text-slate-400">Connexion par téléphone</span>
+                </div>
+              </div>
+              <PhoneLoginSection onLoginSuccess={handlePhoneLoginSuccess} />
+              <button
+                type="button"
+                onClick={() => { setShowPhoneLogin(false); setLoginError(""); setLoginInfo(""); }}
+                className="w-full text-sm font-semibold text-slate-500 hover:text-slate-700"
+              >
+                ← Retour à la connexion par email
+              </button>
+            </div>
+          )}
 
           {authMode === "reset_request" || authMode === "reset_confirm" ? (
             <button
