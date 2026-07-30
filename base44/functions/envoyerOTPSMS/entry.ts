@@ -1,9 +1,9 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 
 /**
- * ENVOYER OTP WHATSAPP — Twilio Verify (indépendant de VENUS)
+ * ENVOYER OTP SMS — Twilio Verify (indépendant de VENUS)
  *
- * Démarre une vérification Twilio Verify sur le canal WhatsApp.
+ * Démarre une vérification Twilio Verify sur le canal SMS.
  * Utilise TWILIO_VERIFY_SERVICE_SID (préfixe VA) — JAMAIS le Messaging Service
  * SID (MG…) de VENUS. Aucune interaction avec le backend VENUS.
  *
@@ -13,7 +13,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
  */
 Deno.serve(async (req) => {
   const startedAt = Date.now();
-  const log: any = { timestamp: new Date().toISOString(), step: 'envoyerOTPWhatsApp' };
+  const log: any = { timestamp: new Date().toISOString(), step: 'envoyerOTPSMS' };
 
   try {
     const base44 = createClientFromRequest(req);
@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
     const auth = btoa(`${TWILIO_SID}:${TWILIO_TOKEN}`);
     const formData = new URLSearchParams();
     formData.append('To', `+${num}`);
-    formData.append('Channel', 'whatsapp');
+    formData.append('Channel', 'sms');
 
     log.twilio_request = { url, to: `+${num}`, channel: 'whatsapp' };
 

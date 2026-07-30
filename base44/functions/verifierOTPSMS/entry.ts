@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 
 /**
- * VÉRIFIER OTP WHATSAPP — Twilio Verify (indépendant de VENUS)
+ * VÉRIFIER OTP SMS — Twilio Verify (indépendant de VENUS)
  *
  * Vérifie le code OTP saisi par l'utilisateur via l'API Twilio Verify.
  * Utilise TWILIO_VERIFY_SERVICE_SID (préfixe VA) — JAMAIS le Messaging Service
@@ -13,7 +13,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
  */
 Deno.serve(async (req) => {
   const startedAt = Date.now();
-  const log: any = { timestamp: new Date().toISOString(), step: 'verifierOTPWhatsApp' };
+  const log: any = { timestamp: new Date().toISOString(), step: 'verifierOTPSMS' };
 
   try {
     const base44 = createClientFromRequest(req);
@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
       success: false,
       status: twilioData.status || 'unknown',
       error: isPending
-        ? 'Code incorrect. Vérifiez le code reçu sur WhatsApp et réessayez.'
+        ? 'Code incorrect. Vérifiez le code reçu par SMS et réessayez.'
         : (twilioData.message || 'Code OTP invalide ou expiré'),
       error_code: twilioData.code,
       http_status: twilioRes.status,

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Phone, Camera, Upload, MapPin } from "lucide-react";
 import { SILGAPP_COUNTRIES } from "@/lib/phoneUtils";
 import SmartAddressInput from "@/components/location/SmartAddressInput";
-import OTPWhatsAppVerification from "@/components/auth/OTPWhatsAppVerification";
+import OTPSMSVerification from "@/components/auth/OTPSMSVerification";
 
 export default function LivreurRegistrationForm({ user, onComplete }) {
   const [form, setForm] = useState({
@@ -186,10 +186,10 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
           <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-green-500/30">
             <Camera className="w-10 h-10 text-white" />
           </div>
-          <h2 className="text-2xl font-black text-gray-900">Vérification WhatsApp</h2>
+          <h2 className="text-2xl font-black text-gray-900">Vérification par SMS</h2>
           <p className="text-sm text-gray-500 mt-1">Dernière étape avant l'envoi de votre demande</p>
         </div>
-        <OTPWhatsAppVerification
+        <OTPSMSVerification
           telephone={otpTelephone}
           onVerified={submitLivreurRequest}
           onCancel={() => setOtpStep(false)}

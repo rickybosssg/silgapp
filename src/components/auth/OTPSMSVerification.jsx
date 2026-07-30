@@ -1,22 +1,21 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Loader2, MessageCircle, ShieldCheck, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 
 /**
- * OTPWhatsAppVerification — Étape de vérification OTP via WhatsApp (Twilio Verify)
+ * OTPSMSVerification — Étape de vérification OTP par SMS (Twilio Verify)
  *
  * Totalement indépendant de VENUS. Utilise les fonctions backend:
- *   - envoyerOTPWhatsApp (démarre la vérification Twilio Verify)
- *   - verifierOTPWhatsApp (vérifie le code saisi)
+ *   - envoyerOTPSMS (démarre la vérification Twilio Verify)
+ *   - verifierOTPSMS (vérifie le code saisi)
  *
  * Props:
  *   - telephone: string (format international digits, ex: "22655483838")
  *   - onVerified: () => void  (appelé après vérification réussie)
  *   - onCancel: () => void   (retour en arrière)
  */
-export default function OTPWhatsAppVerification({ telephone, onVerified, onCancel }) {
+export default function OTPSMSVerification({ telephone, onVerified, onCancel }) {
   const [code, setCode] = useState(["", "", "", "", "", ""]);
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -43,19 +42,19 @@ export default function OTPWhatsAppVerification({ telephone, onVerified, onCance
   const sendOTP = async (isInitial = false) => {
     setSending(true);
     setError("");
-    setInfo(isInitial ? "Envoi du code WhatsApp en cours…" : "Renvoi du code…");
+    setInfo(isInitial ? "Envoi du code SMS en cours…" : "Renvoi du code…");
     try {
-      const res = await base44.functions.invoke("envoyerOTPWhatsApp", { telephone });
+      const res = await base44.functions.invoke("envoyerOTPSMS", { telephone });
       if (res?.success) {
         setSentAt(new Date());
         setResendCooldown(45);
         setInfo(isInitial
-          ? "Un code à 6 chiffres a été envoyé par WhatsApp. Saisissez-le ci-dessous."
-          : "Un nouveau code a été envoyé par WhatsApp.");
+          ? "Un code à 6 chiffres a été envoyé par SMS. Saisissez-le ci-dessous."
+          : "Un nouveau code a été envoyé par SMS.");
         // Focus sur le premier input
         setTimeout(() => inputsRef.current[0]?.focus(), 100);
       } else {
-        setError(res?.error || "Échec de l'envoi du code WhatsApp.");
+        setError(res?.error || "Échec de l'envoi du code SMS.");
       }
     } catch (err) {
       setError(err?.message || "Erreur lors de l'envoi du code.");
@@ -101,7 +100,7 @@ export default function OTPWhatsAppVerification({ telephone, onVerified, onCance
     setVerifying(true);
     setError("");
     try {
-      const res = await base44.functions.invoke("verifierOTPWhatsApp", {
+      const res = await base44.functions.invoke("verifierOTPSMS", {
         telephone,
         code: codeStr,
       });
@@ -136,7 +135,7 @@ export default function OTPWhatsAppVerification({ telephone, onVerified, onCance
             <MessageCircle className="h-8 w-8 text-green-600" />
           )}
         </div>
-        <h2 className="text-xl font-black text-foreground">Vérification WhatsApp</h2>
+        <h2 className="text-xl font-black text-foreground">Vérification par SMS</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Code envoyé au <span className="font-bold">+{telephone}</span>
         </p>

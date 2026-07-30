@@ -13,7 +13,7 @@ import {
 } from "@/lib/phoneUtils";
 import CountryCodeSelect from "@/components/ui/CountryCodeSelect";
 import SmartAddressInput from "@/components/location/SmartAddressInput";
-import OTPWhatsAppVerification from "@/components/auth/OTPWhatsAppVerification";
+import OTPSMSVerification from "@/components/auth/OTPSMSVerification";
 
 export default function ClientOnboardingForm({ user, onComplete }) {
   const [form, setForm] = useState({
@@ -81,7 +81,7 @@ export default function ClientOnboardingForm({ user, onComplete }) {
   if (otpStep) {
     return (
       <div className="space-y-5">
-        <OTPWhatsAppVerification
+        <OTPSMSVerification
           telephone={otpTelephone}
           onVerified={createClient}
           onCancel={() => setOtpStep(false)}
