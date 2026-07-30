@@ -300,14 +300,15 @@ export default function DusLivreursExternes() {
     Object.values(map).forEach(entry => {
       const info = entry.livreurInfo;
       if (info) {
-        // montant_du_silga est l'ancien solde reporté. Les commissions des courses
-        // livrées non payées (y compris celles du jour) doivent s'AJOUTER à ce solde
-        // pour que la commission du jour soit comptabilisée immédiatement.
-        const ancienSolde = info.montant_du_silga ?? info.encours ?? 0;
+        // VRAIE DETTE = somme des commissions impayées des courses livrées.
+        // Ce montant inclut déjà les commissions du jour (cohérent avec le total).
+        // montant_du_silga n'est qu'un snapshot reporté — potentiellement stale —
+        // on ne l'utilise QUE pour les livreurs sans course livrée (vieille dette migrée).
         const commNonPayees = entry.courses
           .filter(c => c.statut_paiement_livreur !== "paye")
           .reduce((s, c) => s + (c.commission_silga ?? 0), 0);
-        entry.montantDu = ancienSolde + commNonPayees;
+        const ancienSolde = info.montant_du_silga ?? info.encours ?? 0;
+        entry.montantDu = entry.courses.length > 0 ? commNonPayees : ancienSolde;
         entry.montantPaye = Math.max(0, entry.commissionTotal - entry.montantDu);
       } else {
         // Pas d'info livreur — calcul de secours basé sur les courses impayées
