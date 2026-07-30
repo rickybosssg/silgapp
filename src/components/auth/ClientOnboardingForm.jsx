@@ -12,6 +12,7 @@ import {
   phonePlaceholder,
 } from "@/lib/phoneUtils";
 import CountryCodeSelect from "@/components/ui/CountryCodeSelect";
+import OTPWhatsAppVerification from "@/components/auth/OTPWhatsAppVerification";
 
 export default function ClientOnboardingForm({ user, onComplete }) {
   const [form, setForm] = useState({
@@ -24,8 +25,34 @@ export default function ClientOnboardingForm({ user, onComplete }) {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [otpStep, setOtpStep] = useState(false);
+  const [otpTelephone, setOtpTelephone] = useState("");
 
   const selectedCountry = getCountryConfig(form.country_code);
+
+  const createClient = async () => {
+    const localPhone = extractLocalPhone(form.telephone, form.country_code);
+    setLoading(true);
+    try {
+      await base44.entities.ClientExterne.create({
+        nom: form.nom,
+        prenom: form.prenom,
+        telephone: normalizePhone(localPhone, form.country_code),
+        email: user?.email || "",
+        user_email: user?.email || "",
+        country_code: form.country_code,
+        ville: form.ville,
+        quartier: form.quartier,
+        actif: true,
+      });
+      onComplete?.();
+    } catch (err) {
+      setError(err?.message || "Erreur lors de la création du compte client.");
+      setOtpStep(false);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -43,26 +70,25 @@ export default function ClientOnboardingForm({ user, onComplete }) {
       return;
     }
 
-    setLoading(true);
-    try {
-      await base44.entities.ClientExterne.create({
-        nom: form.nom,
-        prenom: form.prenom,
-        telephone: normalizePhone(localPhone, form.country_code),
-        email: user?.email || "",
-        user_email: user?.email || "",
-        country_code: form.country_code,
-        ville: form.ville,
-        quartier: form.quartier,
-        actif: true,
-      });
-      onComplete?.();
-    } catch (err) {
-      setError(err?.message || "Erreur lors de la création du compte client.");
-    } finally {
-      setLoading(false);
-    }
+    // ── Étape OTP WhatsApp (Twilio Verify) avant création ──
+    setOtpTelephone(normalizePhone(localPhone, form.country_code));
+    setOtpStep(true);
   };
+
+  if (otpStep) {
+    return (
+      <div className="space-y-5">
+        <OTPWhatsAppVerification
+          telephone={otpTelephone}
+          onVerified={createClient}
+          onCancel={() => setOtpStep(false)}
+        />
+        {loading && (
+          <p className="text-center text-sm text-muted-foreground">Création du compte…</p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
