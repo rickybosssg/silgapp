@@ -141,6 +141,20 @@ function construireMessage(course, evenement, body = {}) {
         `Pour toute question, contactez le support au +226 66 92 51 90.`,
       ].filter(l => l !== '').join('\n');
 
+    case 'livreur_annule_redispatch':
+      const motifLabel = body.motif_label || 'non spécifié';
+      return [
+        `🔄 Recherche d'un nouveau livreur`,
+        ``,
+        `📝 Référence : ${ref}`,
+        `Votre livreur ${livreurNom} a dû annuler la prise en charge de votre course.`,
+        `Motif : ${motifLabel}.`,
+        ``,
+        `Je recherche immédiatement un autre livreur disponible pour vous. Vous serez notifié dès qu'un nouveau livreur acceptera votre course.`,
+        ``,
+        `Pour toute question, contactez le support au +226 66 92 51 90.`,
+      ].filter(l => l !== '').join('\n');
+
     default:
       const label = STATUT_LABELS[course.statut] || `Statut : ${course.statut}`;
       return `📝 Référence : ${ref}\n\n${label}.`;

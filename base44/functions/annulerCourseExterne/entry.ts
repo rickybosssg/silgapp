@@ -208,6 +208,17 @@ Deno.serve(async (req) => {
           user_type: "client",
           course_id,
         }).catch(() => null);
+
+        // ── Notification WhatsApp via VENUS au client (source: livreur) ──
+        // La cliente communique via WhatsApp avec VENUS ; sans ce message,
+        // elle n'est pas informée de l'annulation et du redispatch en cours.
+        await base44.asServiceRole.functions.invoke('envoyerSuiviWhatsApp', {
+          course_id,
+          evenement: 'livreur_annule_redispatch',
+          motif_label: motifLabel,
+        }).catch((err) => {
+          console.error('[ANNULATION] ❌ Envoi WhatsApp client échoué:', err?.message || String(err));
+        });
       }
 
       // Course remise en dispatch — un nouveau livreur sera notifié automatiquement
