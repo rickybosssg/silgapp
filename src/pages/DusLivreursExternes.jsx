@@ -14,9 +14,14 @@ import { useAdminContext } from "@/hooks/useAdminContext.js";
 
 // ── Statut financier simplifié ──
 function statutFinancier(montantDu, montantPaye) {
-  if (montantDu <= 0) return { label: "À jour", color: "bg-green-100 text-green-700", dot: "bg-green-500" };
+  if (montantDu < 0) return { label: "Crédit", color: "bg-blue-100 text-blue-700", dot: "bg-blue-500" };
+  if (montantDu === 0) return { label: "À jour", color: "bg-green-100 text-green-700", dot: "bg-green-500" };
   if (montantPaye > 0) return { label: "Partiel", color: "bg-amber-100 text-amber-700", dot: "bg-amber-500" };
   return { label: "Non payé", color: "bg-red-100 text-red-700", dot: "bg-red-500" };
+}
+
+function formatMontantCredit(montant) {
+  return montant < 0 ? `+${Math.abs(montant).toLocaleString()}` : montant.toLocaleString();
 }
 
 // ── 3 filtres simples au lieu de 7 ──
@@ -32,14 +37,14 @@ function DetailModal({ entry, livreurInfo, onClose, onPaiement, onBloquer, onDeb
   const sf = statutFinancier(entry.montantDu, entry.montantPaye);
   const isBloque = livreurInfo?.actif === false;
   const montantSaisiNum = Number(montantSaisi) || 0;
-  const resteApres = Math.max(0, entry.montantDu - montantSaisiNum);
+  const resteApres = entry.montantDu - montantSaisiNum;
 
   const handleValider = () => {
     const montant = Number(montantSaisi) || entry.montantDu;
     if (!montant || montant <= 0) { toast.error("Montant invalide"); return; }
-    if (montant > entry.montantDu) { toast.error(`Max : ${entry.montantDu.toLocaleString()} F`); return; }
     onPaiement(entry, montant);
     setMontantSaisi("");
+    onClose();
   };
 
   return (
@@ -61,15 +66,15 @@ function DetailModal({ entry, livreurInfo, onClose, onPaiement, onBloquer, onDeb
 
         <div className="overflow-y-auto flex-1 p-4 space-y-4">
           {/* Solde principal — carte premium */}
-          <div className={`relative overflow-hidden rounded-2xl p-5 text-center ${entry.montantDu > 0 ? "bg-gradient-to-br from-red-50 to-orange-50" : "bg-gradient-to-br from-green-50 to-emerald-50"}`}>
-            <p className="text-xs text-gray-500 mb-1 font-medium">Reste dû à SILGAPP</p>
-            <p className={`text-4xl font-black tracking-tight ${entry.montantDu > 0 ? "text-red-600" : "text-green-600"}`}>
-              {entry.montantDu.toLocaleString()}<span className="text-lg font-normal ml-1 opacity-70">F</span>
+          <div className={`relative overflow-hidden rounded-2xl p-5 text-center ${entry.montantDu > 0 ? "bg-gradient-to-br from-red-50 to-orange-50" : entry.montantDu < 0 ? "bg-gradient-to-br from-blue-50 to-indigo-50" : "bg-gradient-to-br from-green-50 to-emerald-50"}`}>
+            <p className="text-xs text-gray-500 mb-1 font-medium">{entry.montantDu > 0 ? "Reste dû à SILGAPP" : entry.montantDu < 0 ? "Crédit (avance)" : "Solde à jour"}</p>
+            <p className={`text-4xl font-black tracking-tight ${entry.montantDu > 0 ? "text-red-600" : entry.montantDu < 0 ? "text-blue-600" : "text-green-600"}`}>
+              {formatMontantCredit(entry.montantDu)}<span className="text-lg font-normal ml-1 opacity-70">F</span>
             </p>
             <span className={`inline-block mt-2 text-xs px-3 py-1 rounded-full font-bold ${sf.color}`}>{sf.label}</span>
             {montantSaisiNum > 0 && (
               <p className="text-xs text-gray-400 mt-2">
-                Après paiement : <span className="font-semibold text-gray-600">{resteApres.toLocaleString()} F</span>
+                Après paiement : <span className={`font-semibold ${resteApres < 0 ? "text-blue-600" : "text-gray-600"}`}>{formatMontantCredit(resteApres)} F</span>
               </p>
             )}
           </div>
@@ -238,6 +243,7 @@ export default function DusLivreursExternes() {
     queryFn: () => base44.entities.Boutique.filter(boutiquesFilter, "-created_date", 200),
     initialData: [],
     refetchInterval: 15000,
+    enabled: activeTab === "boutiques",
   });
 
   const { data: restaurants = [] } = useQuery({
@@ -245,6 +251,7 @@ export default function DusLivreursExternes() {
     queryFn: () => base44.entities.Restaurant.filter(restaurantsFilter, "-created_date", 200),
     initialData: [],
     refetchInterval: 15000,
+    enabled: activeTab === "restaurants",
   });
 
   const { data: frais = [], isLoading: fraisLoading } = useQuery({
@@ -293,9 +300,15 @@ export default function DusLivreursExternes() {
     Object.values(map).forEach(entry => {
       const info = entry.livreurInfo;
       if (info) {
-        // montant_du_silga est la source de vérité (mis à jour à chaque livraison)
-        // encours est conservé pour rétrocompatibilité mais n'est plus fiable
-        entry.montantDu = info.montant_du_silga ?? info.encours ?? 0;
+        // VRAIE DETTE = somme des commissions impayées des courses livrées.
+        // Ce montant inclut déjà les commissions du jour (cohérent avec le total).
+        // montant_du_silga n'est qu'un snapshot reporté — potentiellement stale —
+        // on ne l'utilise QUE pour les livreurs sans course livrée (vieille dette migrée).
+        const commNonPayees = entry.courses
+          .filter(c => c.statut_paiement_livreur !== "paye")
+          .reduce((s, c) => s + (c.commission_silga ?? 0), 0);
+        const ancienSolde = info.montant_du_silga ?? info.encours ?? 0;
+        entry.montantDu = entry.courses.length > 0 ? commNonPayees : ancienSolde;
         entry.montantPaye = Math.max(0, entry.commissionTotal - entry.montantDu);
       } else {
         // Pas d'info livreur — calcul de secours basé sur les courses impayées
@@ -303,10 +316,12 @@ export default function DusLivreursExternes() {
       }
     });
     let result = Object.values(map);
-    const totalDuGlobal = result.reduce((s, r) => s + r.montantDu, 0);
     const totalCommissionJour = result.reduce((s, r) => s + (r.commissionJour || 0), 0);
     if (filtre === "arecouvrer") result = result.filter(r => r.montantDu > 0);
     if (filtre === "ajour") result = result.filter(r => r.montantDu <= 0);
+    // Total calculé APRÈS le filtre → correspond à la liste affichée
+    // On ne somme que les dettes positives (les crédits négatifs ne réduisent pas le total dû)
+    const totalDuGlobal = result.reduce((s, r) => s + Math.max(0, r.montantDu), 0);
     return { list: result.sort((a, b) => b.montantDu - a.montantDu), totalDuGlobal, totalCommissionJour };
   }, [courses, livreurs, filtre, startOfToday]);
 
@@ -353,21 +368,21 @@ export default function DusLivreursExternes() {
   // ── Mutations (inchangées) ──
   const paiementMutation = useMutation({
     mutationFn: async ({ entry, montant }) => {
-      const nouveauSolde = Math.max(0, (entry.montantDu ?? 0) - montant);
-      const impayees = nouveauSolde === 0 ? entry.courses.filter(c => c.statut_paiement_livreur !== "paye").map(c => c.id) : [];
+      const nouveauSolde = (entry.montantDu ?? 0) - montant;
+      const impayees = nouveauSolde <= 0 ? entry.courses.filter(c => c.statut_paiement_livreur !== "paye").map(c => c.id) : [];
       const res = await base44.functions.invoke("updateLivreur", { id: entry.id, data: { encours: nouveauSolde, montant_du_silga: nouveauSolde }, mark_courses_paid: impayees });
       if (res?.data && res.data.success === false) throw new Error(res.data.error || "Échec");
       return { nouveauSolde, montant, entry };
     },
     onMutate: async ({ entry, montant }) => {
-      const nouveauSolde = Math.max(0, (entry.montantDu ?? 0) - montant);
+      const nouveauSolde = (entry.montantDu ?? 0) - montant;
       await queryClient.cancelQueries({ queryKey: ["courses-externes-livrees"] });
       await queryClient.cancelQueries({ queryKey: ["livreurs-externes-all"] });
       const prevCourses = queryClient.getQueryData(["courses-externes-livrees", effectiveCountry]);
       const prevLivreurs = queryClient.getQueryData(["livreurs-externes-all", effectiveCountry]);
       queryClient.setQueryData(["livreurs-externes-all", effectiveCountry], (old) =>
         (old || []).map(l => l.id === entry.id ? { ...l, encours: nouveauSolde, montant_du_silga: nouveauSolde } : l));
-      if (nouveauSolde === 0) {
+      if (nouveauSolde <= 0) {
         queryClient.setQueryData(["courses-externes-livrees", effectiveCountry], (old) =>
           (old || []).map(c => entry.courses.some(ec => ec.id === c.id) ? { ...c, statut_paiement_livreur: "paye" } : c));
       }
@@ -378,9 +393,9 @@ export default function DusLivreursExternes() {
       queryClient.invalidateQueries({ queryKey: ["livreurs-externes-all"] });
       if (detailEntry?.id === entry.id) {
         setDetailEntry({ ...detailEntry, montantDu: nouveauSolde, montantPaye: detailEntry.commissionTotal - nouveauSolde,
-          courses: nouveauSolde === 0 ? detailEntry.courses.map(c => ({ ...c, statut_paiement_livreur: "paye" })) : detailEntry.courses });
+          courses: nouveauSolde <= 0 ? detailEntry.courses.map(c => ({ ...c, statut_paiement_livreur: "paye" })) : detailEntry.courses });
       }
-      toast.success(`Paiement de ${montant.toLocaleString()} F enregistré`);
+      toast.success(`Paiement de ${montant.toLocaleString()} F enregistré${nouveauSolde < 0 ? ` — Crédit de ${Math.abs(nouveauSolde).toLocaleString()} F` : ""}`);
     },
     onError: (err, _v, ctx) => {
       if (ctx?.prevCourses) queryClient.setQueryData(["courses-externes-livrees", effectiveCountry], ctx.prevCourses);
@@ -398,13 +413,13 @@ export default function DusLivreursExternes() {
   // ── Paiement boutique/restaurant (mise à jour directe) ──
   const etablissementPaiementMutation = useMutation({
     mutationFn: async ({ entry, montant }) => {
-      const nouveauSolde = Math.max(0, (entry.montantDu ?? 0) - montant);
+      const nouveauSolde = (entry.montantDu ?? 0) - montant;
       const entityName = entry.entityType === 'boutique' ? 'Boutique' : 'Restaurant';
       await base44.entities[entityName].update(entry.id, { montant_du_silga: nouveauSolde });
       return { nouveauSolde, montant, entry };
     },
     onMutate: async ({ entry, montant }) => {
-      const nouveauSolde = Math.max(0, (entry.montantDu ?? 0) - montant);
+      const nouveauSolde = (entry.montantDu ?? 0) - montant;
       const qKey = entry.entityType === 'boutique' ? ["boutiques-dettes", effectiveCountry] : ["restaurants-dettes", effectiveCountry];
       await queryClient.cancelQueries({ queryKey: qKey });
       const prev = queryClient.getQueryData(qKey);
@@ -417,7 +432,7 @@ export default function DusLivreursExternes() {
       if (detailEntry?.id === entry.id) {
         setDetailEntry({ ...detailEntry, montantDu: nouveauSolde });
       }
-      toast.success(`Paiement de ${montant.toLocaleString()} F enregistré`);
+      toast.success(`Paiement de ${montant.toLocaleString()} F enregistré${nouveauSolde < 0 ? ` — Crédit de ${Math.abs(nouveauSolde).toLocaleString()} F` : ""}`);
     },
     onError: (err, _v, ctx) => {
       if (ctx?.prev) queryClient.setQueryData(ctx.qKey, ctx.prev);
@@ -538,15 +553,17 @@ export default function DusLivreursExternes() {
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-xl font-black text-foreground tracking-tight">{entry.montantDu.toLocaleString()}<span className="text-[10px] font-normal text-gray-400 ml-0.5">F</span></p>
-                        <p className={`text-[10px] font-semibold ${entry.montantDu > 0 ? "text-red-500" : "text-green-500"}`}>{sf.label}</p>
+                        <p className="text-xl font-black text-foreground tracking-tight">{formatMontantCredit(entry.montantDu)}<span className="text-[10px] font-normal text-gray-400 ml-0.5">F</span></p>
+                        <p className={`text-[10px] font-semibold ${entry.montantDu > 0 ? "text-red-500" : entry.montantDu < 0 ? "text-blue-500" : "text-green-500"}`}>{sf.label}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 mt-2 text-[11px]">
-                      <span className="text-gray-400">Commission du jour :</span>
-                      <span className="font-bold text-green-600">{(entry.commissionJour || 0).toLocaleString()} F</span>
-                      {entry.nbCoursesJour > 0 && <span className="text-gray-400">· {entry.nbCoursesJour} course(s)</span>}
-                      <span className="text-gray-300 ml-auto">{format(startOfToday, "dd/MM", { locale: fr })}</span>
+                      <span className="text-gray-400">Commission due :</span>
+                      <span className="font-bold text-green-600">{(entry.commissionTotal || 0).toLocaleString()} F</span>
+                      {entry.courses.length > 0 && <span className="text-gray-400">· {entry.courses.length} course(s)</span>}
+                      {entry.nbCoursesJour > 0 && (
+                        <span className="text-gray-300 ml-auto">Aujourd'hui : {(entry.commissionJour || 0).toLocaleString()} F</span>
+                      )}
                     </div>
                     <div className="flex gap-2 mt-3">
                       <Button variant="outline" size="sm" className="flex-1 h-9 text-xs rounded-xl font-semibold" onClick={() => setDetailEntry(entry)}>

@@ -85,10 +85,7 @@ export default function DashboardExterne() {
     staleTime: 45000,
   });
 
-  const coursesFiltrees = useMemo(
-    () => effectiveCountry ? courses.filter(c => (c.country_code || "BF") === effectiveCountry) : courses,
-    [courses, effectiveCountry]
-  );
+  const coursesFiltrees = courses;
 
   const todayCourses = useMemo(
     () => coursesFiltrees.filter(c =>

@@ -281,10 +281,16 @@ export default function PayerSilgapp({ userType: forcedType }) {
 
             <Button
               className="w-full h-14 text-base font-black rounded-2xl"
-              disabled={!montantPaye || !preuveUrl || submitMutation.isPending || Number(montantPaye) > montantDu}
+              disabled={Number(montantPaye) <= 0 || !preuveUrl || submitMutation.isPending}
               onClick={() => submitMutation.mutate()}
             >
-              {submitMutation.isPending ? "Envoi..." : "Envoyer ma preuve"}
+              {submitMutation.isPending
+                ? "Envoi..."
+                : Number(montantPaye) <= 0
+                  ? "Entrez le montant"
+                  : !preuveUrl
+                    ? "Ajoutez la preuve"
+                    : "Envoyer ma preuve"}
             </Button>
           </div>
         )}

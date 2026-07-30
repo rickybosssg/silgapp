@@ -10,6 +10,7 @@ import { useAdminContext } from "@/hooks/useAdminContext";
 import { useAdminCourseWindows } from "@/context/AdminCourseWindowsContext";
 import SmartAddressInput from "@/components/location/SmartAddressInput";
 import MapPickerModal from "@/components/admin/MapPickerModal";
+import CourseWindowStack from "@/components/admin/CourseWindowStack";
 
 function generarQRData() {
   const pickupQrToken = crypto.randomUUID().replace(/-/g, "");
@@ -485,6 +486,9 @@ export default function AdminCourseForm() {
           La course sera automatiquement proposée aux livreurs disponibles
         </p>
       </div>
+
+      {/* Panneau des courses actives — affiche le statut en temps réel après validation */}
+      <CourseWindowStack />
 
       {/* Modals de sélection GPS */}
       <MapPickerModal

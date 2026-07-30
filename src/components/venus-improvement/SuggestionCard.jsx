@@ -1,13 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, X, GitMerge, Sparkles, AlertTriangle, Brain, ChevronDown, ChevronUp, History, Target, Gauge, ScrollText, BookOpen, FileText, Workflow, Lightbulb, Library, MessageSquare } from 'lucide-react';
+import { Check, X, GitMerge, Sparkles, AlertTriangle, Brain, ChevronDown, ChevronUp, History, Target, Gauge, ScrollText, BookOpen, FileText, Workflow, Lightbulb, Library, MessageSquare, Loader2 } from 'lucide-react';
 
 const STATUT_LABELS = { en_attente: { label: 'En attente', cls: 'bg-gray-100 text-gray-600' }, validee: { label: 'Validée', cls: 'bg-green-100 text-green-700' }, refusee: { label: 'Refusée', cls: 'bg-red-100 text-red-700' }, fusionnee: { label: 'Fusionnée', cls: 'bg-blue-100 text-blue-700' }, amelioree: { label: 'Améliorée', cls: 'bg-violet-100 text-violet-700' } };
 const PRIORITE_LABELS = { critique: { label: 'Critique', cls: 'bg-red-100 text-red-700' }, haute: { label: 'Haute', cls: 'bg-orange-100 text-orange-700' }, normale: { label: 'Normale', cls: 'bg-blue-100 text-blue-700' }, basse: { label: 'Basse', cls: 'bg-gray-100 text-gray-600' } };
 const parse = (s, f) => { try { const r = JSON.parse(s); return r ?? (f || []); } catch { return f || []; } };
 
-export default function SuggestionCard({ s, onValidate, onImprove, onRefuse, onMerge, onAnalyse, onTransformRag, analysing, transformingRag }) {
+export default function SuggestionCard({ s, onValidate, validating, onImprove, onRefuse, onMerge, onAnalyse, onTransformRag, analysing, transformingRag }) {
   const [showWhy, setShowWhy] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
@@ -216,8 +216,8 @@ export default function SuggestionCard({ s, onValidate, onImprove, onRefuse, onM
       {/* Actions */}
       {s.statut === 'en_attente' && (
         <div className="flex items-center gap-2 flex-wrap">
-          <Button size="sm" onClick={onValidate} disabled={s.hallucination_detectee} className="bg-green-600 hover:bg-green-700 disabled:opacity-40">
-            <Check className="w-4 h-4 mr-1" /> Valider
+          <Button size="sm" onClick={onValidate} disabled={s.hallucination_detectee || validating} className="bg-green-600 hover:bg-green-700 disabled:opacity-40">
+            {validating ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Check className="w-4 h-4 mr-1" />} {validating ? 'Validation...' : 'Valider'}
           </Button>
           <Button size="sm" variant="outline" onClick={onImprove} className="border-violet-200 text-violet-700 hover:bg-violet-50">
             <Sparkles className="w-4 h-4 mr-1" /> Améliorer

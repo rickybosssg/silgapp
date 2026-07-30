@@ -107,11 +107,14 @@ export async function logOpenAIUsage(
     tokens_completion: number;
     tokens_total: number;
     response_time_ms: number;
-    status: 'success' | 'fallback' | 'error';
+    status: 'success' | 'success_retry' | 'fallback' | 'error' | 'empty_response' | 'total_failure';
     error_message?: string;
     conversation_id?: string;
     telephone?: string;
     tools_used?: string;
+    raw_response?: string;
+    http_status?: number;
+    retry_count?: number;
   }
 ): Promise<void> {
   try {
@@ -130,6 +133,9 @@ export async function logOpenAIUsage(
       response_time_ms: data.response_time_ms || 0,
       status: data.status,
       error_message: (data.error_message || '').substring(0, 500),
+      raw_response: (data.raw_response || '').substring(0, 3000),
+      http_status: data.http_status ?? 0,
+      retry_count: data.retry_count ?? 0,
       conversation_id: data.conversation_id || '',
       telephone: data.telephone || '',
       tools_used: data.tools_used || '',

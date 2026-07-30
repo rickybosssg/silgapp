@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, X, Save, CheckCircle, XCircle, PauseCircle, MapPin, Phone, Mail, Wallet, Store, UtensilsCrossed, Pill, Calendar, Percent, User } from "lucide-react";
+import BoutiqueProductsSection from "./BoutiqueProductsSection.jsx";
 
 const PAYS_NOMS = {
   BF: "Burkina Faso", CI: "Côte d'Ivoire", TG: "Togo", BJ: "Bénin", SN: "Sénégal",
@@ -162,6 +163,11 @@ export default function PartenaireDetailDialog({ open, etablissement, type, onCl
               </div>
             )}
           </section>
+
+          {/* Articles de la boutique (validation produits par l'admin) */}
+          {type === "boutique" && etablissement.id && (
+            <BoutiqueProductsSection boutiqueId={etablissement.id} />
+          )}
 
           {/* Commission */}
           <section>

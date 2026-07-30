@@ -1,771 +1,9 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { notifierRedispatchClient } from '../../shared/venusRedispatchNotifier.ts';
-
-// Délai d'attente maximum avant auto-annulation quand le client ne répond pas
-const CYCLE_EPUISE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
-
-// ── Cache module-level avec TTL pour les configs (évite de recharger à chaque tick) ──
-const CONFIG_CACHE = { dispatch: null, gps: null, expires: 0 };
-const CONFIG_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
-// ── Cache des livreurs en course (anti-double-proposition) ──
-// TTL court (30s) : suffisamment frais pour éviter les propositions doubles,
-// assez long pour ne pas surcharger l'API à chaque tick de dispatch.
-const LIVREURS_EN_COURSE_CACHE = new Map(); // country_code -> { ids: Set, expires: number }
-const LIVREURS_EN_COURSE_TTL_MS = 30 * 1000; // 30 secondes
-const STATUTS_ACTIFS_COURSE = [
-  'livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere',
-  'passager_embarque', 'pris_en_charge', 'en_livraison',
-];
-
-function generateToken() {
-  return crypto.randomUUID().replace(/-/g, '');
-}
-
-function generatePIN() {
-  return String(Math.floor(1000 + Math.random() * 9000));
-}
-
-function calculerDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-    Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function normalizeCountryCode(value) {
-  return String(value || '').trim().toUpperCase();
-}
-
-/**
- * Normalise un nom de quartier/ville pour comparaison robuste :
- * - minuscules
- * - suppression des accents
- * - tirets et apostrophes uniformisés (Ouaga 2000 == Ouaga-2000, Patte d'Oie == Patte d'ooie)
- * - espaces multiples réduits
- */
-function normalizeNom(value) {
-  return String(value || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // supprimer les diacritiques
-    .replace(/[''`]/g, '')           // apostrophes variées supprimées
-    .replace(/[-_]/g, ' ')           // tirets/underscores → espace
-    .replace(/\s+/g, ' ')            // espaces multiples → 1
-    .trim();
-}
-
-async function verifierPaysCourseLivreur(base44, course, livreurId, contexte) {
-  const livreur = await base44.asServiceRole.entities.Livreur.get(livreurId);
-  if (!livreur) {
-    return { ok: false, status: 404, response: { success: false, found: false, error: 'Livreur introuvable' } };
-  }
-  const courseCountry = normalizeCountryCode(course?.country_code);
-  const livreurCountry = normalizeCountryCode(livreur.country_code);
-  if (!courseCountry || !livreurCountry || courseCountry !== livreurCountry) {
-    console.error('[DISPATCH][COUNTRY_MISMATCH_BLOCKED]', { contexte, course_id: course?.id, livreur_id: livreurId, course_country_code: courseCountry || 'ABSENT', livreur_country_code: livreurCountry || 'ABSENT' });
-    return { ok: false, status: 403, response: { success: false, found: false, error: 'country_mismatch', blocked_reason: 'country_mismatch' } };
-  }
-  return { ok: true, livreur, courseCountry, livreurCountry };
-}
-
-function reponseDejaPrise(reason, course, details = {}) {
-  return {
-    success: false, accepted: false, reason: 'already_taken', already_taken: true,
-    error: 'Cette course a deja ete prise par un autre livreur',
-    dispatch_status: course?.dispatch_status || '',
-    existing_livreur_id: course?.livreur_id || '',
-    accepted_by_livreur_id: course?.accepted_by_livreur_id || course?.livreur_id || '',
-    details: reason, ...details,
-  };
-}
-
-async function chargerConfigDispatch(base44) {
-  if (CONFIG_CACHE.dispatch && Date.now() < CONFIG_CACHE.expires) return CONFIG_CACHE.dispatch;
-  try {
-    const configs = await base44.asServiceRole.entities.AppConfig.filter({});
-    const nbConfig = configs.find(c => c.cle === 'DISPATCH_NB_LIVREURS');
-    const timeoutConfig = configs.find(c => c.cle === 'DISPATCH_TIMEOUT_SEC');
-    const nb = nbConfig ? (nbConfig.valeur === 'tous' ? 999 : parseInt(nbConfig.valeur, 10) || 3) : 3;
-    const timeout = timeoutConfig ? (parseInt(timeoutConfig.valeur, 10) || 60) : 60;
-    const result = { nb, timeout };
-    CONFIG_CACHE.dispatch = result;
-    CONFIG_CACHE.expires = Date.now() + CONFIG_TTL_MS;
-    return result;
-  } catch (err) {
-    console.warn('[DISPATCH] ⚠️ Impossible de charger config dispatch, valeurs par défaut utilisées:', err.message);
-    return { nb: 3, timeout: 120 };
-  }
-}
-
-/**
- * Récupère l'ensemble des IDs de livreurs ayant une course active pour un pays.
- * Utilise un cache de 30s pour éviter de surcharger l'API à chaque tick de dispatch.
- */
-async function chargerLivreursEnCourse(base44, countryCode) {
-  if (!countryCode) return new Set();
-
-  const now = Date.now();
-  const cached = LIVREURS_EN_COURSE_CACHE.get(countryCode);
-  if (cached && cached.expires > now) return cached.ids;
-
-  try {
-    // Récupérer les courses récentes du pays (les courses actives sont forcément récentes)
-    const courses = await base44.asServiceRole.entities.CourseExterne.filter(
-      { country_code: countryCode },
-      '-created_date', 100
-    );
-    const ids = new Set(
-      (courses || [])
-        .filter(c => STATUTS_ACTIFS_COURSE.includes(c.statut) && c.livreur_id)
-        .map(c => c.livreur_id)
-    );
-    LIVREURS_EN_COURSE_CACHE.set(countryCode, { ids, expires: now + LIVREURS_EN_COURSE_TTL_MS });
-    console.log(`[DISPATCH] 🛡️ ${ids.size} livreur(s) en course détecté(s) pour ${countryCode} (cache 30s)`);
-    return ids;
-  } catch (err) {
-    console.warn(`[DISPATCH] ⚠️ Impossible de charger les livreurs en course pour ${countryCode}:`, err.message);
-    return new Set();
-  }
-}
-
-async function chargerConfigVaguesGPS(base44) {
-  if (CONFIG_CACHE.gps && Date.now() < CONFIG_CACHE.expires) return CONFIG_CACHE.gps;
-  try {
-    const configs = await base44.asServiceRole.entities.DispatchWaveConfig.filter({});
-    const cfg = configs[0];
-    if (!cfg) {
-      return {
-        gps_waves_enabled: true,
-        waves: [
-          { size: 3, timeout_sec: 60 },
-          { size: 5, timeout_sec: 60 },
-          { size: 999, timeout_sec: 60 },
-        ],
-      };
-    }
-    const waves = JSON.parse(cfg.waves_json || '[]');
-    const result = {
-      gps_waves_enabled: cfg.gps_waves_enabled !== false,
-      waves: waves.length > 0 ? waves : [
-        { size: 3, timeout_sec: 60 },
-        { size: 5, timeout_sec: 60 },
-        { size: 999, timeout_sec: 60 },
-      ],
-    };
-    CONFIG_CACHE.gps = result;
-    CONFIG_CACHE.expires = Date.now() + CONFIG_TTL_MS;
-    return result;
-  } catch (err) {
-    console.warn('[DISPATCH] ⚠️ Impossible de charger config vagues GPS, défaut utilisé:', err.message);
-    return {
-      gps_waves_enabled: true,
-      waves: [
-        { size: 3, timeout_sec: 60 },
-        { size: 5, timeout_sec: 60 },
-        { size: 999, timeout_sec: 60 },
-      ],
-    };
-  }
-}
-
-/**
- * Trouve les livreurs candidats classés par priorité.
- * @param {Array} exclusions - IDs des livreurs déjà notifiés (à exclure totalement de ce cycle)
- */
-async function trouverLivreursCandidats(base44, course, exclusions = [], options = {}) {
-  const { skipGpsFilter = false } = options;
-  if (!course.country_code) {
-    console.error(`[DISPATCH] ❌ BLOQUÉ — course ${course.id} sans country_code`);
-    return { tous: [], niveau1: [], niveau2: [], niveau3: [], pickupSource: 'none' };
-  }
-
-  const tousLivreurs = await base44.asServiceRole.entities.Livreur.filter({
-    type_livreur: 'externe',
-    validation: 'valide',
-    actif: true,
-    statut: 'disponible',
-    country_code: course.country_code,
-    bloque_encours: false,
-  }, '-last_seen_at', 50);
-
-  if (!tousLivreurs || tousLivreurs.length === 0) {
-    return { tous: [], niveau1: [], niveau2: [], niveau3: [], pickupSource: 'none', raisonsExclusion: [] };
-  }
-
-  // 🛡️ Vérification croisée : exclure les livreurs ayant déjà une course active.
-  // Le filtre statut: 'disponible' exclut la majorité, mais cette vérification
-  // garantit qu'aucun livreur avec un statut mal synchronisé ne reçoive une 2e proposition.
-  const livreurIdsEnCourse = await chargerLivreursEnCourse(base44, course.country_code);
-
-  const exclusionSet = new Set(exclusions);
-  const now = Date.now();
-  const raisonsExclusion = [];
-
-  const eligibles = tousLivreurs.filter(l => {
-    const nomComplet = `${l.prenom || ''} ${l.nom || ''}`.trim();
-    if (!skipGpsFilter && (!l.latitude || !l.longitude)) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'sans_gps' }); return false; }
-    if (exclusionSet.has(l.id)) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'deja_notifie_ou_refuse' }); return false; }
-    if (livreurIdsEnCourse.has(l.id)) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'en_course' }); return false; }
-    if (l.admin_hors_ligne === true) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'admin_hors_ligne' }); return false; }
-    return true;
-  });
-
-  // 🎯 NOUVELLE LOGIQUE : proximité d'abord, GPS en second
-  // Tous les livreurs avec GPS ≤ 60 min sont éligibles.
-  // Tri principal : distance au point de prise en charge.
-  // Tiebreaker : si distance < 100m d'écart, privilégier GPS le plus récent.
-  const candidats = [];
-  const GPS_EXPIRE_SEUIL_MIN = 30;
-  const TIEBREAKER_DISTANCE_M = 100;
-
-  // 🎯 Classification de fraîcheur GPS pour le tri des candidats
-  // Tier 0 (récent) < 5 min — très fiable
-  // Tier 1 (fiable)  5-10 min — fiable
-  // Tier 2 (acceptable) 10-20 min — acceptable
-  // Tier 3 (faible)  20-30 min — dernier recours avant fallback
-  function gpsFreshnessTier(gpsAgeMin) {
-    if (gpsAgeMin === null) return 4;
-    if (gpsAgeMin < 5) return 0;
-    if (gpsAgeMin < 10) return 1;
-    if (gpsAgeMin < 20) return 2;
-    if (gpsAgeMin < 30) return 3;
-    return 4;
-  }
-
-  // 🧠 Résoudre les coordonnées de pickup : GPS > quartier > fallback large
-  let pickupLat = course.gps_depart_lat;
-  let pickupLng = course.gps_depart_lng;
-  let pickupSource = 'gps';
-
-  if ((!pickupLat || !pickupLng) && course.quartier_depart) {
-    try {
-      const quartiers = await base44.asServiceRole.entities.Quartier.filter({
-        country_code: course.country_code, nom: course.quartier_depart, actif: true,
-      });
-      if (quartiers?.[0]?.latitude && quartiers[0]?.longitude) {
-        pickupLat = quartiers[0].latitude;
-        pickupLng = quartiers[0].longitude;
-        pickupSource = 'quartier';
-        console.log(`[DISPATCH] 📍 Fallback quartier: ${course.quartier_depart} (${pickupLat}, ${pickupLng})`);
-      }
-    } catch (_) {}
-  }
-
-  // 🏙️ Fallback ville : si toujours pas de coordonnées, utiliser un quartier de la même ville
-  if ((!pickupLat || !pickupLng) && course.ville_depart) {
-    try {
-      const quartiersVille = await base44.asServiceRole.entities.Quartier.filter({
-        country_code: course.country_code, ville: course.ville_depart, actif: true,
-      });
-      if (quartiersVille?.[0]?.latitude && quartiersVille[0]?.longitude) {
-        pickupLat = quartiersVille[0].latitude;
-        pickupLng = quartiersVille[0].longitude;
-        pickupSource = 'ville';
-        console.log(`[DISPATCH] 📍 Fallback ville: ${course.ville_depart} (${pickupLat}, ${pickupLng})`);
-      }
-    } catch (_) {}
-  }
-
-  // Ni GPS ni quartier ni ville → marquer explicitement (tri par fraîcheur GPS uniquement)
-  if ((!pickupLat || !pickupLng) && pickupSource === 'gps') {
-    pickupSource = 'none';
-  }
-
-  eligibles.forEach(l => {
-    // 📡 Calculer l'âge du GPS du livreur
-    const gpsDate = l.derniere_position_date || l.last_seen_at;
-    let gpsAgeMin = null;
-    if (gpsDate) {
-      const gps = new Date(gpsDate);
-      if (!isNaN(gps.getTime())) gpsAgeMin = (now - gps.getTime()) / 60000;
-    }
-
-    // 🚫 Exclure les livreurs sans GPS ou GPS ≥ 30 min (sauf en mode fallback)
-    if (!skipGpsFilter && (gpsAgeMin === null || gpsAgeMin >= GPS_EXPIRE_SEUIL_MIN)) {
-      raisonsExclusion.push({
-        livreur_id: l.id,
-        nom: `${l.prenom || ''} ${l.nom || ''}`.trim(),
-        raison: gpsAgeMin === null ? 'gps_absent' : `gps_expire_${Math.round(gpsAgeMin)}min`,
-      });
-      return;
-    }
-
-    // Heartbeat pour le canal de notification (push vs WhatsApp)
-    const hbDate = l.last_seen_at;
-    let heartbeatAgeMin = null;
-    if (hbDate) {
-      const hb = new Date(hbDate);
-      if (!isNaN(hb.getTime())) heartbeatAgeMin = (now - hb.getTime()) / 60000;
-    }
-
-    // 📍 En mode fallback (skipGpsFilter), ne PAS utiliser la distance GPS si le GPS est périmé
-    // → le livreur sera classé par correspondance quartier/ville, pas par distance GPS obsolète
-    const gpsStale = gpsAgeMin === null || gpsAgeMin >= GPS_EXPIRE_SEUIL_MIN;
-    let distance = null;
-    if (pickupLat && pickupLng && l.latitude && l.longitude && !(skipGpsFilter && gpsStale)) {
-      distance = calculerDistance(pickupLat, pickupLng, l.latitude, l.longitude);
-    }
-
-    // 🏘️ Correspondance quartier/ville pour le tri fallback (GPS périmé)
-    // Normalisation : minuscules, sans accents, tirets/apostrophes uniformisés, espaces réduits
-    const quartierMatch = course.quartier_depart && l.quartier
-      ? (normalizeNom(course.quartier_depart) === normalizeNom(l.quartier) ? 0 : 1)
-      : 1;
-    const villeMatch = course.ville_depart && l.ville
-      ? (normalizeNom(course.ville_depart) === normalizeNom(l.ville) ? 0 : 1)
-      : 1;
-
-    candidats.push({ ...l, distance, heartbeatAgeMin, gpsAgeMin, gpsStale, quartierMatch, villeMatch });
-  });
-
-  // 🎯 Tri : fraîcheur GPS d'abord (tier 0 > 1 > 2 > 3), puis distance, puis GPS en tiebreaker
-  // Un livreur avec GPS récent (3 min) est classé devant un livreur avec GPS ancien (25 min),
-  // même si ce dernier est légèrement plus proche. Au sein du même tier, on trie par distance.
-  candidats.sort((a, b) => {
-    const tierA = gpsFreshnessTier(a.gpsAgeMin);
-    const tierB = gpsFreshnessTier(b.gpsAgeMin);
-    if (tierA !== tierB) return tierA - tierB;
-
-    // 🏘️ Même tier → si distance GPS nulle (GPS périmé en fallback), trier par quartier puis ville
-    // Tiebreaker : heartbeat (last_seen_at) le plus récent, PAS l'âge du GPS
-    // → privilégie le livreur actuellement connecté à l'app
-    if (a.distance === null && b.distance === null) {
-      if (a.quartierMatch !== b.quartierMatch) return a.quartierMatch - b.quartierMatch;
-      if (a.villeMatch !== b.villeMatch) return a.villeMatch - b.villeMatch;
-      const hbA = a.heartbeatAgeMin !== null ? a.heartbeatAgeMin : 999;
-      const hbB = b.heartbeatAgeMin !== null ? b.heartbeatAgeMin : 999;
-      return hbA - hbB;
-    }
-    if (a.distance === null) return 1;
-    if (b.distance === null) return -1;
-    // Si moins de 100m d'écart → privilégier le GPS le plus récent
-    if (Math.abs(a.distance - b.distance) < TIEBREAKER_DISTANCE_M) {
-      const gpsA = a.gpsAgeMin !== null ? a.gpsAgeMin : 999;
-      const gpsB = b.gpsAgeMin !== null ? b.gpsAgeMin : 999;
-      return gpsA - gpsB;
-    }
-    return a.distance - b.distance;
-  });
-
-  const tous = candidats;
-  const niveau1 = candidats; // rétro-compatibilité
-  const niveau2 = []; // vide
-  const niveau3 = []; // vide
-  console.log(`[DISPATCH] 📊 ${tous.length} candidats (exclus: ${raisonsExclusion.length}) — tri par fraîcheur GPS (tiers 0-3), puis distance — pickup: ${pickupSource}`);
-  return { tous, niveau1, niveau2, niveau3, pickupSource, raisonsExclusion };
-}
-
-async function notifierLivreur(base44, courseId, course, livreur, timeoutSec) {
-  if (!livreur.user_email) return;
-
-  // 🛡️ ANTI-DOUBLON — vérifié via dispatch_notified_ids sur la course (déjà chargée)
-  // Plus besoin de requêter la BDD à chaque livreur — dispatch_notified_ids garantit
-  // qu'un livreur déjà notifié ne le sera pas deux fois dans le même cycle.
-  // Le reset de cycle vide dispatch_notified_ids, permettant une re-notification.
-
-  const distanceSafe = livreur.distance ? Number(livreur.distance).toFixed(1) : '?';
-  const titre = '🚨 Nouvelle course disponible !';
-  const message = `Course à ${distanceSafe}km — ${course.adresse_depart} → ${course.adresse_arrivee || '?'}`;
-
-  const heartbeatAgeMin = livreur.heartbeatAgeMin;
-  // N'envoyer WhatsApp que si le livreur n'a ni app ouverte ni foreground service actif
-  const appOrBgActive = (livreur.app_active === true || livreur.background_active === true);
-  const appActive = heartbeatAgeMin !== null && heartbeatAgeMin < 5 && appOrBgActive;
-
-  // ⚡ FIRE-AND-FORGET — les notifications sont envoyées en arrière-plan sans bloquer
-  // le moteur de dispatch. Chaque appel (BDD + FCM + WhatsApp) peut prendre 2-5s ;
-  // en les rendant non-bloquants, le dispatch reste sous 120s même avec 4 courses × 7 livreurs.
-  const livreurEmail = livreur.user_email;
-  const livreurId = livreur.id;
-  const livreurTel = livreur.telephone;
-  const livreurCountry = livreur.country_code;
-
-  // Notification BDD — non-bloquante
-  base44.asServiceRole.entities.Notification.create({
-    titre, message, type: 'nouvelle_course',
-    course_id: courseId, destinataire_email: livreurEmail, lue: false,
-  }).catch(err => console.error('[DISPATCH] ❌ Notif BDD:', err.message));
-
-  // Push FCM — non-bloquant
-  base44.functions.invoke('envoiNotificationPush', {
-    destinataire_email: livreurEmail, livreur_id: livreurId,
-    titre, message, type: 'nouvelle_course', course_id: courseId,
-  }).catch(err => console.error('[DISPATCH] ❌ Push Firebase:', err.message));
-
-  if (!appActive && livreurTel) {
-    // ⚡ WhatsApp — non-bloquant (fetch Twilio + BDD en arrière-plan)
-    const waOptIn = livreur.whatsapp_opt_in;
-    const waOptInDate = livreur.whatsapp_opt_in_date;
-    const waPromise = (async () => {
-      try {
-        const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-        const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-        const fromRaw = Deno.env.get('TWILIO_WHATSAPP_FROM') || '';
-        if (!accountSid || !authToken || !fromRaw) return;
-        const INDICATIFS = { BF: '+226', CI: '+225', TG: '+228', BJ: '+229', SN: '+221', ML: '+223', GN: '+224', NE: '+227', GH: '+233' };
-        const indicatif = INDICATIFS[livreurCountry] || '+226';
-        let tel = livreurTel.replace(/\s+/g, '').replace(/[^\d+]/g, '');
-        if (!tel.startsWith('+')) tel = indicatif + tel;
-
-        if (waOptIn !== false || waOptInDate) {
-          const fromNumber = fromRaw.startsWith('whatsapp:') ? fromRaw : `whatsapp:${fromRaw}`;
-          const formData = new URLSearchParams();
-          formData.append('From', fromNumber);
-          formData.append('To', `whatsapp:${tel}`);
-          formData.append('Body', `📦 *Nouvelle course disponible !*\nOuvrez SILGAPP pour accepter ou refuser.`);
-
-          const creds = btoa(`${accountSid}:${authToken}`);
-          const resp = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
-            method: 'POST',
-            headers: { 'Authorization': `Basic ${creds}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: formData.toString(),
-          });
-          const data = await resp.json();
-          if (resp.ok && data.sid) {
-            await base44.asServiceRole.entities.WhatsAppAlerte.create({
-              livreur_id: livreurId, livreur_telephone: tel,
-              notification_id: courseId, statut: 'sent',
-              twilio_sid: data.sid, heure_envoi: new Date().toISOString(), canal: 'whatsapp',
-            });
-          } else if (data.code === 63015) {
-            await base44.asServiceRole.entities.Livreur.update(livreurId, {
-              whatsapp_opt_in: false, whatsapp_derniere_erreur: '63015',
-              whatsapp_derniere_erreur_date: new Date().toISOString(),
-            });
-          }
-        }
-      } catch (err) { console.error('[DISPATCH] ❌ WhatsApp:', err.message); }
-    })();
-    waPromise.catch(() => {});
-  }
-
-  console.log(`[DISPATCH] 📤 Notifié: ${livreur.nom} (${distanceSafe}km, HB: ${heartbeatAgeMin?.toFixed(1) || '?'}min)`);
-}
-
-/**
- * DISPATCH MULTI-LIVREURS (NOUVELLE VERSION — 100% AUTOMATIQUE)
- *
- * - Sélectionne les X meilleurs candidats hors exclusions (livreurs déjà notifiés)
- * - Accumule les IDs notifiés dans dispatch_notified_ids (concaténation, pas remplacement)
- * - Si 0 candidat restant et déjà eu des notifs → cycle_epuise (attente 2 min puis reset)
- * - Si 0 candidat et jamais eu de notif → en_attente
- */
-async function lancerDispatchMulti(base44, courseId, exclusions = [], cachedConfig = null) {
-  let course;
-  try {
-    course = await base44.asServiceRole.entities.CourseExterne.get(courseId);
-  } catch (e) {
-    console.warn(`[DISPATCH] ⚠️ Course ${courseId} introuvable (supprimée?) — ignorée`);
-    return { erreur: 'Course introuvable', ignore: true };
-  }
-  if (!course) return { erreur: 'Course introuvable' };
-
-  // 🔒 Verrou temporaire anti-traitement concurrent (TTL 30s)
-  const lockUntilMs = course.dispatch_locked_until ? new Date(course.dispatch_locked_until).getTime() : 0;
-  if (lockUntilMs > Date.now()) {
-    console.log(`[DISPATCH] 🔒 Course ${courseId} verrouillée par un autre tick (expire dans ${Math.round((lockUntilMs - Date.now()) / 1000)}s) — skip`);
-    return { locked: true };
-  }
-  await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-    dispatch_locked_until: new Date(Date.now() + 10 * 1000).toISOString(),
-  });
-
-  if (['livreur_en_route', 'colis_recupere', 'en_livraison', 'livree', 'annulee'].includes(course.statut)) {
-    return { ignore: true, statut: course.statut };
-  }
-
-  // 🎯 RECALCUL DYNAMIQUE à chaque vague (style Uber Eats / Glovo / DoorDash)
-  // À chaque appel, trouverLivreursCandidats refait une requête DB fraîche :
-  //   - Positions GPS actuelles ( recalcul des distances )
-  //   - Statut de disponibilité ( exclusion des indisponibles / en course )
-  //   - Ajout automatique des nouveaux livreurs devenus disponibles
-  //
-  // Seuls les livreurs ayant EXPLICITEMENT refusé (dispatch_refused_ids) sont exclus
-  // de façon permanente. Les livreurs déjà notifiés mais non refusés RESTENT éligibles :
-  // si leur position GPS actuelle les place encore parmi les meilleurs, ils peuvent être
-  // re-notifiés. Le classement est toujours calculé à l'instant T, jamais réutilisé.
-  let dejaRefuses = [];
-  try { dejaRefuses = JSON.parse(course.dispatch_refused_ids || '[]'); } catch {}
-  exclusions = [...new Set([...exclusions, ...dejaRefuses])];
-
-  const waveNum = course.dispatch_wave || 0;
-  console.log(`[DISPATCH] 🔄 Vague ${waveNum + 1} — recalcul dynamique des candidats (GPS, distances, statut) pour course ${courseId}`);
-
-  // Si un livreur détient le verrou actif → attendre
-  if (course.dispatch_status === 'propose' && course.livreur_id && course.timeout_expires_at) {
-    const expires = new Date(course.timeout_expires_at);
-    if (expires > new Date()) {
-      const remaining = Math.round((expires - Date.now()) / 1000);
-      console.log(`[DISPATCH] ⏳ Verrou actif sur course ${courseId} (livreur ${course.livreur_id}), expire dans ${remaining}s`);
-      return { en_attente: true, remaining };
-    }
-  }
-
-  // 🛡️ Garde anti-double-traitement : course en vague active non expirée → ne pas retraiter
-  if (course.dispatch_status === 'propose' && !course.livreur_id && course.timeout_expires_at) {
-    const expires = new Date(course.timeout_expires_at);
-    if (expires > new Date()) {
-      const remaining = Math.round((expires - Date.now()) / 1000);
-      console.log(`[DISPATCH] 🛡️ Vague active sur course ${courseId} (${remaining}s restantes) — pas de retraitement`);
-      return { en_attente: true, remaining, wave_active: true };
-    }
-  }
-
-  const config = cachedConfig?.dispatch || await chargerConfigDispatch(base44);
-  console.log(`[DISPATCH] ⚙️ Config: ${config.nb} livreurs, ${config.timeout}s`);
-
-  // Trouver les meilleurs candidats hors exclusions (tous les déjà notifiés)
-  const resultat = await trouverLivreursCandidats(base44, course, exclusions);
-  const { tous: candidatsTous, niveau1, niveau2, niveau3, pickupSource, raisonsExclusion } = resultat;
-
-  // 🧠 Charger la config vagues GPS (utiliser le cache si disponible)
-  const gpsConfig = cachedConfig?.gps || await chargerConfigVaguesGPS(base44);
-
-  // 🎯 NOUVELLE LOGIQUE : tous les candidats (GPS ≤ 60 min) triés par distance
-  // Les vagues contrôlent uniquement la taille des lots, pas le filtrage GPS
-  let wave = course.dispatch_wave || 1; // 0 → 1 au premier lancement (vagues sont 1-indexed)
-
-  let candidats = candidatsTous;
-
-  console.log(`[DISPATCH] 📍 Vague ${wave}/${gpsConfig.waves.length} — ${candidats.length} candidats triés par distance`);
-
-  // Récupérer les IDs déjà notifiés précédemment
-  let dejaNotifies = [];
-  try { dejaNotifies = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
-
-  // 🔄 FALLBACK: sur la dernière vague (size 999), ajouter aussi les livreurs sans GPS récent
-  // pour maximiser les chances de trouver un livreur acceptant
-  if (candidats.length > 0 && wave >= gpsConfig.waves.length) {
-    const fallbackResult = await trouverLivreursCandidats(base44, course, exclusions, { skipGpsFilter: true });
-    const fallbackCandidats = (fallbackResult.tous || []).filter(f => !candidats.some(c => c.id === f.id));
-    if (fallbackCandidats.length > 0) {
-      candidats = [...candidats, ...fallbackCandidats];
-      console.log(`[DISPATCH] 📍 +${fallbackCandidats.length} candidats sans GPS ajoutés (dernière vague) pour course ${courseId}`);
-    }
-  }
-
-  // 🔄 FALLBACK: si pas assez de candidats avec GPS frais pour remplir la vague,
-  // ajouter les livreurs sans GPS récent (GPS expiré ou manquant)
-  const waveIndexFb = Math.min(wave - 1, gpsConfig.waves.length - 1);
-  const waveSizeFb = gpsConfig.waves[waveIndexFb]?.size || 3;
-  if (candidats.length < waveSizeFb && waveSizeFb < 999) {
-    const fallbackResult = await trouverLivreursCandidats(base44, course, exclusions, { skipGpsFilter: true });
-    const fallbackCandidats = (fallbackResult.tous || []).filter(f => !candidats.some(c => c.id === f.id));
-    if (fallbackCandidats.length > 0) {
-      candidats = [...candidats, ...fallbackCandidats];
-      console.log(`[DISPATCH] 📍 +${fallbackCandidats.length} candidats sans GPS frais ajoutés (vague ${wave}, besoin: ${waveSizeFb}) pour course ${courseId}`);
-    }
-  }
-
-  if (candidats.length === 0) {
-    // 📍 GPS waves: dernière vague épuisée → cycle_epuise
-    if (wave > gpsConfig.waves.length) {
-      console.log(`[DISPATCH] 📍 Vague GPS ${wave} épuisée (dernière: ${gpsConfig.waves.length}) — cycle_epuise pour course ${courseId}`);
-      await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-        dispatch_status: 'cycle_epuise',
-        dispatch_wave: gpsConfig.waves.length,
-      });
-      journaliserDispatch(base44, { course_id: courseId, country_code: course.country_code, vague: wave, evenement: 'cycle_epuise' });
-      return { cycleEpuise: true };
-    }
-    if (dejaNotifies.length > 0) {
-      const cycleCount = (course.dispatch_cycle_count || 0) + 1;
-      // 🛑 Limite anti-boucle infinie : 3 cycles max puis auto-annulation
-      if (cycleCount > 3) {
-        console.log(`[DISPATCH] 🛑 Course ${courseId} — ${cycleCount - 1} cycles épuisés sans livreur — auto-annulation`);
-        await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-          statut: 'annulee',
-          dispatch_status: 'expire',
-          dispatch_locked_until: null,
-          notes: (course.notes || '') + ' | [AUTO-ANNULÉ] Cycle dispatch épuisé après 3 cycles sans livreur acceptant',
-        });
-        journaliserDispatch(base44, { course_id: courseId, country_code: course.country_code, vague: wave, evenement: 'cycle_epuise' });
-        const messageVenus = `📍 Malgré plusieurs tentatives, aucun livreur n'est disponible pour votre course. Votre course a été annulée. Veuillez réessayer plus tard.`;
-        notifierRedispatchClient({ base44, course, messageVenus, motif: 'auto_annulation' }).catch(err => console.error('[DISPATCH] ❌ VENUS notif auto-annulation:', err.message));
-        return { cycleEpuise: true };
-      }
-      // Nouveau cycle immédiat : vider la liste des notifiés, recalculer les disponibilités
-      // Les livreurs qui n'ont pas explicitement refusé restent éligibles (dispatch_refused_ids survit au reset)
-      console.log(`[DISPATCH] 🔄 Nouveau cycle ${cycleCount}/3 — réinitialisation des notifiés pour course ${courseId}`);
-      await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-        dispatch_status: 'en_attente',
-        dispatch_notified_ids: '[]',
-        dispatch_wave_notified_ids: '[]',
-        dispatch_wave: 0,
-        dispatch_cycle_count: cycleCount,
-        dispatch_locked_until: null,
-        livreur_id: '',
-        livreur_nom: '',
-      });
-      journaliserDispatch(base44, { course_id: courseId, country_code: course.country_code, vague: wave, evenement: 'reset' });
-      return { cycleReset: true };
-    } else {
-      // Aucun livreur dispo du tout — incrémenter la vague pour éviter de rester bloqué à 0
-      const nextWave = wave + 1;
-      if (nextWave > gpsConfig.waves.length) {
-        // Toutes les vagues épuisées sans jamais trouver de livreur → cycle_epuise
-        console.log(`[DISPATCH] 📍 Vagues épuisées sans livreur — cycle_epuise pour course ${courseId}`);
-        const cycleEpuiseDeadline = new Date(Date.now() + CYCLE_EPUISE_TIMEOUT_MS).toISOString();
-        await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-          dispatch_status: 'cycle_epuise',
-          dispatch_wave: gpsConfig.waves.length,
-          timeout_expires_at: cycleEpuiseDeadline,
-        });
-        journaliserDispatch(base44, { course_id: courseId, country_code: course.country_code, vague: wave, evenement: 'cycle_epuise' });
-        // ── Notifier VENUS WhatsApp au client ──
-        const messageVenus = `📍 Nous avons sollicité tous les livreurs disponibles autour de vous, mais aucun n'a accepté votre course pour le moment.\n\nVoulez-vous que je relance la recherche ?\n\nRépondez 'oui' pour relancer ou 'non' pour annuler.`;
-        notifierRedispatchClient({ base44, course, messageVenus, motif: 'cycle_epuise' }).catch(err => console.error('[DISPATCH] ❌ VENUS notif cycle_epuise:', err.message));
-        return { cycleEpuise: true };
-      }
-      await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-        dispatch_status: 'en_attente',
-        dispatch_wave: nextWave,
-        livreur_id: '',
-        livreur_nom: '',
-      });
-      console.log(`[DISPATCH] ⚠️ Aucun livreur disponible — course ${courseId} en attente (tentative ${nextWave}/${gpsConfig.waves.length})`);
-      journaliserDispatch(base44, { course_id: courseId, country_code: course.country_code, vague: nextWave, evenement: 'aucun_livreur', raisons_exclusion: raisonsExclusion });
-      return { noLivreur: true };
-    }
-  }
-
-  // Sélectionner les X meilleurs selon la vague
-  let selection, timeoutSec, waveLabel;
-  const waveIndex = Math.min(wave - 1, gpsConfig.waves.length - 1); // 0-based, clampé
-  const waveCfg = gpsConfig.waves[waveIndex];
-  const maxSize = waveCfg.size >= 999 ? candidats.length : waveCfg.size;
-  selection = candidats.slice(0, maxSize);
-  timeoutSec = waveCfg.timeout_sec;
-  waveLabel = `GPS vague ${wave}/${gpsConfig.waves.length}`;
-  console.log(`[DISPATCH] 🎯 ${waveLabel} — ${selection.length}/${candidats.length} livreurs pour course ${courseId}`);
-
-  const timeoutAt = new Date(Date.now() + timeoutSec * 1000).toISOString();
-  const nouveauxNotifiedIds = selection.map(l => l.id);
-
-  // ACCUMULER les IDs notifiés (concaténer + dédoublonner)
-  const tousNotifies = [...new Set([...dejaNotifies, ...nouveauxNotifiedIds])];
-  const totalNotifies = tousNotifies.length;
-
-  await base44.asServiceRole.entities.CourseExterne.update(courseId, {
-    statut: 'recherche_livreur',
-    dispatch_status: 'propose',
-    dispatch_wave: wave, // 0 = mode normal, 1/2/3 = vague en cours
-    livreur_id: '',
-    // ⚠️ On ne vide pas livreur_nom/livreur_telephone pour préserver la trace du dernier livreur
-    heure_sollicitation: new Date().toISOString(),
-    timeout_expires_at: timeoutAt,
-    dispatch_wave_started_at: new Date().toISOString(),
-    dispatch_next_wave_at: timeoutAt,
-    dispatch_notified_ids: JSON.stringify(tousNotifies),
-    dispatch_wave_notified_ids: JSON.stringify(nouveauxNotifiedIds),
-  });
-
-  // 🧹 Nettoyer les notifications de la vague précédente avant la nouvelle vague
-  // Seulement si on avance dans les vagues (wave > 1) — évite de supprimer en N1
-  if (wave > 1) {
-    await supprimerNotificationsCourse(base44, courseId);
-    console.log(`[DISPATCH] 🧹 Notifications vague précédente archivées pour course ${courseId} (vague ${wave})`);
-  }
-
-  // ⚡ Notifications fire-and-forget — notifierLivreur ne bloque plus (tous les appels
-  // BDD/FCM/WhatsApp sont non-awaités). La boucle complète prend <100ms même pour 7 livreurs.
-  for (const l of selection) {
-    try {
-      notifierLivreur(base44, courseId, course, l, timeoutSec);
-    } catch (err) {
-      console.error(`[DISPATCH] ❌ Erreur notif livreur ${l.id}:`, err.message);
-    }
-  }
-
-  console.log(`[DISPATCH] ✅ ${selection.length} livreur(s) notifiés (total cumulé: ${totalNotifies}) pour course ${courseId}, timeout: ${timeoutSec}s`);
-
-  // 📝 Journalisation détaillée (fire-and-forget, non-bloquant)
-  journaliserDispatch(base44, {
-    course_id: courseId,
-    country_code: course.country_code,
-    vague: wave,
-    vague_avant: course.dispatch_wave || 0,
-    vague_apres: wave,
-    wave_started_at: new Date().toISOString(),
-    wave_expired_at: timeoutAt,
-    nombre_deja_consultes: dejaNotifies.length,
-    nombre_nouveaux_notifies: selection.length,
-    raison_passage: wave > (course.dispatch_wave || 0) ? `vague_${course.dispatch_wave || 0}_expiree` : 'premier_lancement',
-    pickup_source: pickupSource,
-    evenement: 'vague',
-    livreurs_selectionnes: selection.map(l => ({
-      id: l.id, nom: `${l.prenom || ''} ${l.nom || ''}`.trim(),
-      distance_km: l.distance !== null ? Number(l.distance.toFixed(2)) : null,
-      gps_age_min: l.gpsAgeMin !== null ? Number(l.gpsAgeMin.toFixed(1)) : null,
-    })),
-    ordre_tri_complet: candidats.map(l => ({
-      id: l.id, nom: `${l.prenom || ''} ${l.nom || ''}`.trim(),
-      distance_km: l.distance !== null ? Number(l.distance.toFixed(2)) : null,
-      gps_age_min: l.gpsAgeMin !== null ? Number(l.gpsAgeMin.toFixed(1)) : null,
-    })),
-    raisons_exclusion: raisonsExclusion,
-    total_candidats: candidats.length,
-    total_exclus: raisonsExclusion.length,
-    timeout_sec: timeoutSec,
-  });
-
-  return {
-    propose: true,
-    nb_notifies: selection.length,
-    total_notifies: totalNotifies,
-    livreurs: selection.map(l => ({ id: l.id, nom: `${l.prenom || ''} ${l.nom}`.trim(), distance_km: l.distance?.toFixed(1) })),
-    timeout_sec: timeoutSec,
-  };
-}
-
-async function supprimerNotificationsCourse(base44, courseId) {
-  try {
-    await base44.asServiceRole.entities.Notification.updateMany(
-      { course_id: courseId, type: 'nouvelle_course', lue: false },
-      { $set: { lue: true } }
-    );
-  } catch (err) { console.warn('[DISPATCH] ⚠️ Erreur archivage:', err.message); }
-}
-
-// ── Journalisation détaillée du dispatch (visible par les administrateurs) ──
-// Fire-and-forget : ne bloque jamais le moteur de dispatch
-function journaliserDispatch(base44, data) {
-  try {
-    base44.asServiceRole.entities.DispatchLog.create({
-      course_id: data.course_id || '',
-      heure: new Date().toISOString(),
-      vague: data.vague || 0,
-      vague_avant: data.vague_avant ?? null,
-      vague_apres: data.vague_apres ?? null,
-      wave_started_at: data.wave_started_at || null,
-      wave_expired_at: data.wave_expired_at || null,
-      nombre_deja_consultes: data.nombre_deja_consultes ?? null,
-      nombre_nouveaux_notifies: data.nombre_nouveaux_notifies ?? null,
-      raison_passage: data.raison_passage || '',
-      raison_blocage: data.raison_blocage || '',
-      pickup_source: data.pickup_source || '',
-      evenement: data.evenement || 'vague',
-      country_code: data.country_code || '',
-      total_candidats: data.total_candidats || 0,
-      total_exclus: data.total_exclus || 0,
-      timeout_sec: data.timeout_sec || 0,
-      livreurs_selectionnes: data.livreurs_selectionnes ? JSON.stringify(data.livreurs_selectionnes) : '',
-      ordre_tri: data.ordre_tri_complet ? JSON.stringify(data.ordre_tri_complet) : '',
-      raisons_exclusion: data.raisons_exclusion ? JSON.stringify(data.raisons_exclusion) : '',
-      livreur_acceptant_id: data.livreur_acceptant_id || '',
-      livreur_acceptant_nom: data.livreur_acceptant_nom || '',
-      temps_avant_acceptation_sec: data.temps_avant_acceptation_sec ?? null,
-    }).catch(err => console.error('[DISPATCH] ❌ Erreur journalisation:', err.message));
-  } catch (err) {
-    console.error('[DISPATCH] ❌ Erreur journalisation (init):', err.message);
-  }
-}
+import { STATUTS_ACTIFS_COURSE, STATUTS_ACTIFS_VERIF, normalizeCommissionPct, chargerConfigPays } from '../../shared/dispatchConstants.ts';
+import { verifierPaysCourseLivreur, reponseDejaPrise, generateToken, generatePIN, supprimerNotificationsCourse, journaliserDispatch } from '../../shared/dispatchUtils.ts';
+import { chargerConfigDispatch, chargerConfigVaguesGPS, CYCLE_EPUISE_TIMEOUT_MS } from '../../shared/dispatchConfig.ts';
+import { lancerDispatchMulti } from '../../shared/dispatchEngine.ts';
 
 // ============================================================================
 // HANDLER PRINCIPAL
@@ -792,7 +30,8 @@ Deno.serve(async (req) => {
       if (!course_id) return Response.json({ error: 'course_id requis' }, { status: 400 });
 
       // 🔄 RETRY — l'automation entity peut se déclencher avant que la course soit
-      // totalement disponible en base. On retente 3 fois avec 2s de délai.
+      // totalement disponible en base (cohérence à terme). On retente 3 fois avec 2s de délai.
+      // Si le GET échoue, on utilise body.data (les données de l'événement entity) comme fallback.
       let course;
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
@@ -803,8 +42,16 @@ Deno.serve(async (req) => {
         }
         if (attempt < 3) await new Promise(r => setTimeout(r, 2000));
       }
+      // 🛡️ FALLBACK body.data — l'automatisation entity envoie les données de la course
+      // dans le payload. Si le GET échoue (cohérence à terme), on utilise ces données
+      // pour démarrer le dispatch immédiatement sans attendre le tick programmé.
+      if (!course && body.data) {
+        console.log(`[DISPATCH] 🛡️ Course ${course_id} introuvable via GET — utilisation de body.data (entity event)`);
+        course = body.data;
+        course.id = course_id;
+      }
       if (!course) {
-        console.warn(`[DISPATCH] ⚠️ Course ${course_id} introuvable après 3 tentatives — ignorée`);
+        console.warn(`[DISPATCH] ⚠️ Course ${course_id} introuvable après 3 tentatives et pas de body.data — ignorée`);
         return Response.json({ success: true, ignore: true, message: 'Course supprimée — ignorée' });
       }
 
@@ -868,15 +115,6 @@ Deno.serve(async (req) => {
         return Response.json({ found: false, cancelled: true });
       }
 
-      // 🚫 Vérifier blocage encours du livreur
-      const livreurCheck = countryGuard.livreur;
-      if (livreurCheck?.bloque_encours) {
-        return Response.json({ 
-          found: false, bloque_encours: true,
-          error: 'Votre plafond d\'encours SILGAPP a été atteint. Veuillez effectuer votre dépôt auprès de SILGAPP afin de réactiver votre compte.',
-        });
-      }
-
       if (course.dispatch_status === 'accepte') {
         // 🔧 CORRECTION : distinguer "j'ai accepté" vs "un autre a accepté"
         if (String(course.livreur_id) === String(livreur_id) || String(course.accepted_by_livreur_id) === String(livreur_id)) {
@@ -915,12 +153,11 @@ Deno.serve(async (req) => {
 
       // 🛡️ Vérification anti-courses multiples : le livreur ne peut pas accepter
       // une nouvelle course s'il en a déjà une active en cours.
-      const STATUTS_ACTIFS = ['livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison'];
       const coursesActivesLivreur = await base44.asServiceRole.entities.CourseExterne.filter({
         livreur_id: livreur_id,
-      });
+      }, '-created_date', 20);
       const courseActiveExistante = coursesActivesLivreur.find(c =>
-        STATUTS_ACTIFS.includes(c.statut) && c.id !== course_id
+        STATUTS_ACTIFS_COURSE.includes(c.statut) && c.id !== course_id
       );
       if (courseActiveExistante) {
         console.warn(`[DISPATCH] 🚫 Livreur ${livreur_id} a déjà la course ${courseActiveExistante.id} active (${courseActiveExistante.statut}) — acceptation refusée`);
@@ -968,9 +205,9 @@ Deno.serve(async (req) => {
       // Prix minimum dynamique selon le pays
       let PRIX_MIN = 1000; // default FCFA
       try {
-        const countryConfig = await base44.asServiceRole.entities.Country.filter({ code: course.country_code, actif: true });
-        if (countryConfig?.[0]?.prix_minimum) {
-          PRIX_MIN = countryConfig[0].prix_minimum;
+        const countryConfig = await chargerConfigPays(base44, course.country_code);
+        if (countryConfig?.prix_minimum) {
+          PRIX_MIN = countryConfig.prix_minimum;
         }
       } catch (_) { /* fallback 1000 FCFA */ }
       const deviseMin = course.devise || 'FCFA';
@@ -1077,6 +314,35 @@ Deno.serve(async (req) => {
         await base44.asServiceRole.entities.Livreur.update(livreur_id, { statut: 'en_course' });
         await supprimerNotificationsCourse(base44, course_id);
         console.log(`[DISPATCH] 🎉 Course ${course_id} verrouillée (auto) par ${livreur_id}`);
+
+        // ── Message automatique : Code de récupération pour courses administratives ──
+        // Uniquement pour les courses admin (source='admin'). Envoie le code de
+        // récupération (pickup_code_4_digits) dans la messagerie interne de la course,
+        // visible par le livreur assigné et l'admin. Clé idempotente par (course_id, livreur_id)
+        // pour éviter les doublons et permettre un nouveau message si réassignation.
+        if (course.source === 'admin' && pickupPIN) {
+          const idempotencyKey = `pickup-code-${course_id}-${livreur_id}`;
+          try {
+            const existing = await base44.asServiceRole.entities.Message.filter({
+              client_message_id: idempotencyKey,
+            });
+            if (!existing || existing.length === 0) {
+              await base44.asServiceRole.entities.Message.create({
+                course_id: course_id,
+                sender_type: 'admin',
+                sender_id: 'silgapp_system',
+                sender_name: 'SILGAPP',
+                message_type: 'text',
+                content: `🔑 Code de récupération : ${pickupPIN}\n\nUtiliser ce code pour récupérer le Colis`,
+                source: 'app',
+                client_message_id: idempotencyKey,
+              });
+              console.log(`[DISPATCH] 🔑 Message code de récupération créé pour course admin ${course_id} (livreur ${livreur_id})`);
+            }
+          } catch (err) {
+            console.error(`[DISPATCH] ⚠️ Erreur création message code récupération:`, err?.message || String(err));
+          }
+        }
 
         // ── Phase 9 + QR/PIN : Suivi WhatsApp automatique avec QR Code et Code PIN ──
         // Détecter si c'est une réaffectation (livreur précédent a annulé)
@@ -1361,8 +627,13 @@ Deno.serve(async (req) => {
       if (coursesJamaisTraitees.length > 0) {
         // Batch query: récupérer les DispatchLogs récents pour ces courses
         // Si une course a un log, elle a déjà été traitée (même si elle est retombée en en_attente)
-        const recentLogs = await base44.asServiceRole.entities.DispatchLog.filter({}, '-heure', 200);
-        const logCourseIds = new Set(recentLogs.map(l => l.course_id));
+        const logCourseIds = new Set();
+        for (const c of coursesJamaisTraitees) {
+          try {
+            const logs = await base44.asServiceRole.entities.DispatchLog.filter({ course_id: c.id }, '-heure', 1);
+            if (logs.length > 0) logCourseIds.add(c.id);
+          } catch {}
+        }
 
         const vraimentJamaisTraitees = coursesJamaisTraitees.filter(c => !logCourseIds.has(c.id));
 
@@ -1412,32 +683,45 @@ Deno.serve(async (req) => {
           // Skip les courses déjà traitées par le filet premier_tick_manquant
           if (premierTickProcessed.has(course.id)) continue;
 
-          // 🚨 RATTRAPAGE: course bloquée depuis > 2x le délai normal de vague
-          // Force-reset et re-dispatch immédiat pour débloquer la course
+          // 🚨 RATTRAPAGE: course bloquée depuis > 10 min sans aucune évolution de vague
+          // Seuil élevé (10 min) pour laisser le code normal d'avancement de vague fonctionner
+          // à chaque tick. Le rattrapage n'est qu'un filet de sécurité pour les courses
+          // vraiment coincées (tick manqué plusieurs fois de suite).
+          //
+          // ⚠️ ANTI-BOUCLE: Relire la course fraîchement en DB avant le check.
+          // allToProcess est un snapshot stale chargé au début du tick ; si la course
+          // a avancé de vague plus tôt dans ce même tick, course.updated_date et
+          // course.dispatch_status sont obsolètes → le rattrapage se déclenche à tort
+          // et réinitialise la vague, annulant le progrès.
+          let freshCourse = course;
+          try {
+            freshCourse = await base44.asServiceRole.entities.CourseExterne.get(course.id);
+          } catch {}
           const waveTimeoutMs = (cachedConfig.gps.waves[0]?.timeout_sec || 60) * 1000;
-          const stuckDurationMs = now.getTime() - new Date(course.updated_date).getTime();
-          if (stuckDurationMs > waveTimeoutMs * 2 && course.dispatch_status === 'propose' && !course.livreur_id) {
-            console.log(`[DISPATCH] 🚨 RATTRAPAGE: Course ${course.id} bloquée depuis ${Math.round(stuckDurationMs / 60000)}min — force-reset vague`);
-            await base44.asServiceRole.entities.CourseExterne.update(course.id, {
+          const stuckDurationMs = now.getTime() - new Date(freshCourse.updated_date).getTime();
+          const RATTRAPAGE_SEUIL_MS = Math.max(waveTimeoutMs * 2, 10 * 60 * 1000); // min 10 minutes
+          if (stuckDurationMs > RATTRAPAGE_SEUIL_MS && freshCourse.dispatch_status === 'propose' && !freshCourse.livreur_id) {
+            console.log(`[DISPATCH] 🚨 RATTRAPAGE: Course ${freshCourse.id} bloquée depuis ${Math.round(stuckDurationMs / 60000)}min — force-reset vague`);
+            await base44.asServiceRole.entities.CourseExterne.update(freshCourse.id, {
               dispatch_status: 'redispatch',
               dispatch_locked_until: null,
               timeout_expires_at: null,
             });
             base44.asServiceRole.entities.Notification.create({
               titre: '🚨 Course bloquée — rattrapage automatique',
-              message: `Course ${course.client_nom || '?'} (${course.adresse_depart || '?'}) bloquée depuis ${Math.round(stuckDurationMs / 60000)}min — rattrapage automatique déclenché.`,
-              type: 'alerte_critique_dispatch', course_id: course.id, lue: false,
+              message: `Course ${freshCourse.client_nom || '?'} (${freshCourse.adresse_depart || '?'}) bloquée depuis ${Math.round(stuckDurationMs / 60000)}min — rattrapage automatique déclenché.`,
+              type: 'alerte_critique_dispatch', course_id: freshCourse.id, lue: false,
             }).catch(() => {});
             journaliserDispatch(base44, {
-              course_id: course.id, country_code: course.country_code,
-              vague: course.dispatch_wave || 0,
-              vague_avant: course.dispatch_wave || 0,
-              vague_apres: course.dispatch_wave || 0,
+              course_id: freshCourse.id, country_code: freshCourse.country_code,
+              vague: freshCourse.dispatch_wave || 0,
+              vague_avant: freshCourse.dispatch_wave || 0,
+              vague_apres: freshCourse.dispatch_wave || 0,
               evenement: 'rattrapage',
               raison_passage: `bloquée_${Math.round(stuckDurationMs / 60000)}min_force_reset`,
             });
-            const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
-            resultats.push({ course_id: course.id, wave: 'rattrapage', ...result });
+            const result = await lancerDispatchMulti(base44, freshCourse.id, [], cachedConfig);
+            resultats.push({ course_id: freshCourse.id, wave: 'rattrapage', ...result });
             continue;
           }
 
@@ -1556,7 +840,6 @@ Deno.serve(async (req) => {
       // - Une erreur réseau a interrompu le flux normal de libération
       // Ce filet tourne à chaque tick et garantit qu'aucun statut fantôme ne persiste.
       try {
-        const STATUTS_ACTIFS_VERIF = ['livreur_en_route', 'arrive_prise_en_charge', 'colis_recupere', 'passager_embarque', 'pris_en_charge', 'en_livraison', 'arrivee'];
         const livreursEnCourse = await base44.asServiceRole.entities.Livreur.filter(
           { type_livreur: 'externe', statut: 'en_course' },
           '-updated_date', 50
@@ -1573,14 +856,17 @@ Deno.serve(async (req) => {
           // (courses ne contient que les statuts recherche_livreur + nouvelle, pas les actives)
           const livreursAVerifier = livreursEnCourse.filter(l => !livreurIdsAvecCourseActive.has(l.id));
           if (livreursAVerifier.length > 0) {
-            const recentCoursesForCheck = await base44.asServiceRole.entities.CourseExterne.filter(
-              {}, '-created_date', 200
-            );
-            const activeIds = new Set(
-              recentCoursesForCheck
-                .filter(c => STATUTS_ACTIFS_VERIF.includes(c.statut) && c.livreur_id)
-                .map(c => c.livreur_id)
-            );
+            const activeIds = new Set();
+            for (const l of livreursAVerifier) {
+              try {
+                const livreurCourses = await base44.asServiceRole.entities.CourseExterne.filter(
+                  { livreur_id: l.id }, '-created_date', 5
+                );
+                if ((livreurCourses || []).some(c => STATUTS_ACTIFS_VERIF.includes(c.statut))) {
+                  activeIds.add(l.id);
+                }
+              } catch {}
+            }
             const livreursFantomes = livreursAVerifier.filter(l => !activeIds.has(l.id));
             for (const l of livreursFantomes) {
               const nouveauStatut = l.manual_hors_ligne === true ? 'hors_ligne' : 'disponible';
@@ -1594,6 +880,48 @@ Deno.serve(async (req) => {
         }
       } catch (err) {
         console.warn('[DISPATCH] ⚠️ Erreur filet sécurité statut livreur:', err.message);
+      }
+
+      // ── FILET DE SÉCURITÉ — livreurs "disponible" avec GPS périmé (> 2h) ──
+      // Un livreur peut rester marqué "disponible" alors que son GPS n'a pas été
+      // mis à jour depuis des heures (app fermée, batterie morte, réseau coupé).
+      // Ces livreurs fantômes faussent les compteurs et encombrent les requêtes
+      // de dispatch. On les bascule en "hors_ligne" automatiquement.
+      // Seuil: 2 heures (assez large pour tolérer les coupures temporaires).
+      // Exception: on ne touche pas aux livreurs qui se sont mis hors ligne
+      // manuellement (manual_hors_ligne=true) — ils sont déjà gérés correctement.
+      try {
+        const GPS_STALE_SEUIL_MS = 2 * 60 * 60 * 1000; // 2 heures
+        const nowMs = now.getTime();
+        const livreursDispo = await base44.asServiceRole.entities.Livreur.filter(
+          { type_livreur: 'externe', statut: 'disponible' },
+          '-updated_date', 100
+        );
+
+        const livreursFantomesGPS = livreursDispo.filter(l => {
+          if (l.manual_hors_ligne === true) return false; // déjà géré manuellement
+          const gpsDate = l.derniere_position_date || l.last_seen_at;
+          if (!gpsDate) return true; // aucun GPS jamais enregistré → fantôme
+          const gpsMs = new Date(gpsDate).getTime();
+          if (isNaN(gpsMs)) return true;
+          return (nowMs - gpsMs) > GPS_STALE_SEUIL_MS;
+        });
+
+        if (livreursFantomesGPS.length > 0) {
+          const ids = livreursFantomesGPS.map(l => l.id);
+          await base44.asServiceRole.entities.Livreur.updateMany(
+            { statut: 'disponible', manual_hors_ligne: { $ne: true }, id: { $in: ids } },
+            { $set: { statut: 'hors_ligne' } }
+          );
+          console.log(`[DISPATCH] 📍 Filet sécurité GPS: ${livreursFantomesGPS.length} livreur(s) "disponible" avec GPS périmé > 2h → basculé(s) en "hors_ligne"`);
+          for (const l of livreursFantomesGPS) {
+            const gpsDate = l.derniere_position_date || l.last_seen_at;
+            const ageH = gpsDate ? Math.round((nowMs - new Date(gpsDate).getTime()) / 3600000) : 'jamais';
+            console.log(`[DISPATCH] 📍 → ${l.prenom || ''} ${l.nom || ''} (GPS: ${ageH}h)`);
+          }
+        }
+      } catch (err) {
+        console.warn('[DISPATCH] ⚠️ Erreur filet sécurité GPS livreur:', err.message);
       }
 
       // 🚨 Détection des courses bloquées > 10 min (dispatch en panne)
@@ -1622,9 +950,8 @@ Deno.serve(async (req) => {
 
       // ⚠️ Détection des courses sans aucun livreur disponible (> 5 min de recherche)
       try {
-        const coursesSansLivreur = await base44.asServiceRole.entities.CourseExterne.filter(
-          { statut: 'recherche_livreur', dispatch_status: 'en_attente' },
-          '-created_date', 10
+        const coursesSansLivreur = courses.filter(c =>
+          c.statut === 'recherche_livreur' && c.dispatch_status === 'en_attente'
         );
         for (const course of coursesSansLivreur) {
           const updatedTime = new Date(course.updated_date);
@@ -1704,11 +1031,8 @@ Deno.serve(async (req) => {
         let commissionPct: number | null = null;
         try {
           if (course.country_code) {
-            const countries = await base44.asServiceRole.entities.Country.filter({ code: course.country_code, actif: true });
-            const configured = Number(countries?.[0]?.commission_pct);
-            if (Number.isFinite(configured) && configured >= 0 && configured <= 100) {
-              commissionPct = configured;
-            }
+            const countryConfig = await chargerConfigPays(base44, course.country_code);
+            commissionPct = normalizeCommissionPct(countryConfig?.commission_pct);
           }
         } catch (error) {
           console.error('[dispatchExterneAuto] Lecture commission pays impossible', error);

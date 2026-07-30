@@ -262,7 +262,21 @@ export default function AuthGate({ children, onLivreur, onClient, onPartenaire }
         return;
       }
 
-      // 1. Admin → dashboard admin
+      // 1. Agent de saisie → accès LIMITÉ au formulaire de création de course uniquement
+      //    Pas de dashboard admin, pas de sélection de réseau.
+      //    L'employé est redirigé vers /admin/creer-course s'il n'y est pas déjà.
+      if (user.silgapp_role === "agent_saisie") {
+        const currentPath = window.location.pathname;
+        if (!currentPath.startsWith("/admin/creer-course")) {
+          window.location.replace("/admin/creer-course");
+          return;
+        }
+        // Déjà sur la bonne page → afficher le contenu (children = AdminCourseStandalone)
+        setState("admin");
+        return;
+      }
+
+      // 2. Admin → dashboard admin
       if (user.role === "admin") {
         registerPushToken(null, {
           email: user.email,

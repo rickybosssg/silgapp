@@ -1,4 +1,6 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { haversineKm } from '../../shared/geoUtils.ts';
+import { normalizeCommissionPct, chargerConfigPays } from '../../shared/dispatchConstants.ts';
 
 // Tarifs par pays (fallback si pas de config en DB)
 const TARIFS_PAYS = {
@@ -13,24 +15,8 @@ const TARIFS_PAYS = {
   GH: { prix_par_km: 2, prix_minimum: 10, devise: "GHS" },
 };
 
-function normalizeCommissionPct(value) {
-  const pct = Number(value);
-  if (!Number.isFinite(pct) || pct < 0 || pct > 100) return null;
-  return pct;
-}
-
-function calculerDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-    Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
+// calculerDistance → importé de geoUtils (haversineKm)
+// normalizeCommissionPct → importé de dispatchConstants
 
 Deno.serve(async (req) => {
   try {
@@ -66,9 +52,8 @@ Deno.serve(async (req) => {
     let tarif = TARIFS_PAYS[countryCode] || TARIFS_PAYS["BF"];
     let commissionPct = null;
     try {
-      const countriesDB = await base44.asServiceRole.entities.Country.filter({ code: countryCode, actif: true });
-      if (countriesDB?.[0]) {
-        const c = countriesDB[0];
+      const c = await chargerConfigPays(base44, countryCode);
+      if (c) {
         tarif = {
           prix_par_km: c.prix_par_km || tarif.prix_par_km,
           prix_minimum: c.prix_minimum || tarif.prix_minimum,
@@ -101,7 +86,7 @@ Deno.serve(async (req) => {
       }, { status: 400 });
     }
 
-    const distanceReelle = calculerDistance(lat1, lng1, lat2, lng2);
+    const distanceReelle = haversineKm(lat1, lng1, lat2, lng2) ?? 0;
 
     // Calculer le prix final selon les tarifs du pays
     // Règle : prix minimum global SILGAPP = 1 000 F CFA (s'applique dans tous les pays FCFA)
@@ -123,15 +108,16 @@ Deno.serve(async (req) => {
       heure_livraison: new Date().toISOString(),
     });
 
-    // Accumuler la commission dans l'encours du livreur (source de vérité unique)
-    // + garder montant_du_silga synchronisé pour rétrocompatibilité
+    // Accumuler la commission dans l'encours du livreur (cumulatif, pour suivi opérationnel)
+    // + incrémenter montant_du_silga (le vrai dû — décrémenté par les paiements admin)
     if (course.livreur_id) {
       const livreur = await base44.asServiceRole.entities.Livreur.get(course.livreur_id);
       if (livreur) {
         const nouvelEncours = (livreur.encours || 0) + commissionSilga;
+        const nouveauDuSilga = (Number(livreur.montant_du_silga) || 0) + commissionSilga;
         await base44.asServiceRole.entities.Livreur.update(course.livreur_id, {
           encours: nouvelEncours,
-          montant_du_silga: nouvelEncours,
+          montant_du_silga: nouveauDuSilga,
           statut_paiement: 'non_paye',
         });
       }

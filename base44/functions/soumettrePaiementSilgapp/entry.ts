@@ -17,10 +17,7 @@ Deno.serve(async (req) => {
       if (existing?.[0]) return Response.json({ success: true, paiement: existing[0], duplicate: true });
     }
 
-    // Le montant payé ne peut pas dépasser le montant dû
-    if (montant_du && montant_paye > montant_du) {
-      return Response.json({ success: false, error: `Le montant payé (${montant_paye} F) ne peut pas dépasser le montant dû (${montant_du} F)` }, { status: 400 });
-    }
+    // L'utilisateur peut payer plus que sa dette (avance/crédit) — pas de plafond ici
 
     const paiement = await base44.asServiceRole.entities.PaiementSilgapp.create({
       user_email: user.email,

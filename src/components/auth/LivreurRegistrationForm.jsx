@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Phone, Camera, Upload, MapPin } from "lucide-react";
 import { SILGAPP_COUNTRIES } from "@/lib/phoneUtils";
 import SmartAddressInput from "@/components/location/SmartAddressInput";
+import OTPWhatsAppVerification from "@/components/auth/OTPWhatsAppVerification";
 
 export default function LivreurRegistrationForm({ user, onComplete }) {
   const [form, setForm] = useState({
@@ -22,6 +23,8 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [uploadProgress, setUploadProgress] = useState("");
+  const [otpStep, setOtpStep] = useState(false);
+  const [otpTelephone, setOtpTelephone] = useState("");
 
   // Compression image avant upload (max 800px, JPEG 0.7)
   const compressImage = (file) => {
@@ -89,6 +92,15 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
       return;
     }
 
+    // ── Étape OTP WhatsApp (Twilio Verify) avant uploads/création ──
+    const dial = selectedCountry ? selectedCountry.dial : "226";
+    const fullTel = String(dial).replace(/\D/g, "") + String(form.telephone).replace(/\D/g, "");
+    setOtpTelephone(fullTel);
+    setOtpStep(true);
+  };
+
+  const submitLivreurRequest = async () => {
+    setError("");
     setLoading(true);
     try {
       // Upload SÉQUENTIEL (pas Promise.all) — évite la surcharge et les timeouts
@@ -119,6 +131,7 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
       onComplete?.();
     } catch (err) {
       setError(err?.message || "Erreur lors de l'envoi de la demande.");
+      setOtpStep(false);
     } finally {
       setLoading(false);
       setUploadProgress("");
@@ -165,6 +178,30 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
       </div>
     );
   };
+
+  if (otpStep) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-green-500/30">
+            <Camera className="w-10 h-10 text-white" />
+          </div>
+          <h2 className="text-2xl font-black text-gray-900">Vérification WhatsApp</h2>
+          <p className="text-sm text-gray-500 mt-1">Dernière étape avant l'envoi de votre demande</p>
+        </div>
+        <OTPWhatsAppVerification
+          telephone={otpTelephone}
+          onVerified={submitLivreurRequest}
+          onCancel={() => setOtpStep(false)}
+        />
+        {(loading || uploadProgress) && (
+          <p className="text-center text-sm text-gray-500">
+            {uploadProgress || "Envoi de la demande…"}
+          </p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">

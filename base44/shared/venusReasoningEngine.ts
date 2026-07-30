@@ -773,7 +773,20 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
     };
   }
 
+  // ── BYPASS HEURISTIQUES: Si VENUS a une course en cours de collecte,
+  //    ne pas intercepter les réponses du client avec cache/connaissances/raccourcis.
+  //    Le message doit aller au LLM pour comprendre le contexte de la conversation.
+  //    Sinon, "Numéro de récupération du colis 55231259" déclenche une connaissance
+  //    sur la "récupération de colis" au lieu d'être reconnu comme réponse à la
+  //    question de VENUS ("peux-tu me donner le numéro du destinataire?"). ──
+  const _mc = input.memoireCourte || {};
+  const hasActiveFlow = !_mc.course_created && !_mc.modification_mode && (
+    _mc.type_course || _mc.adresse_depart || _mc.adresse_arrivee ||
+    _mc.contact_telephone || _mc.contact_createur_course || _mc.contact_nom
+  );
+
   // ── ÉCONOMIE DE CRÉDITS: Court-circuit salutation (0 crédit LLM) ──
+  // Les salutations sont toujours autorisées même en cours de flow.
   const salutation = detecterSalutation(input.messageClient);
   if (salutation) {
     salutation.temps_traitement_ms = Date.now() - startTime;
@@ -782,24 +795,27 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
   }
 
   // ── ÉCONOMIE DE CRÉDITS: Cache de réponses (0 crédit LLM) ──
-  const cached = recupererCache(input.telephone, input.messageClient, input.memoireCourte);
-  if (cached) {
-    cached.temps_traitement_ms = Date.now() - startTime;
-    cached.decision_moteur = 'cache';
-    cached.openai_appele = false;
-    cached.model_utilise = '';
-    return cached;
-  }
+  // SKIP si course en cours de collecte — le client répond à une question de VENUS.
+  if (!hasActiveFlow) {
+    const cached = recupererCache(input.telephone, input.messageClient, input.memoireCourte);
+    if (cached) {
+      cached.temps_traitement_ms = Date.now() - startTime;
+      cached.decision_moteur = 'cache';
+      cached.openai_appele = false;
+      cached.model_utilise = '';
+      return cached;
+    }
 
-  // ── ÉCONOMIE DE CRÉDITS: Raccourcis questions fréquentes (0 crédit LLM) ──
-  const raccourci = detecterRaccourciFrequent(input.messageClient, input.courseActive);
-  if (raccourci) {
-    raccourci.temps_traitement_ms = Date.now() - startTime;
-    raccourci.decision_moteur = 'raccourci';
-    raccourci.openai_appele = false;
-    raccourci.model_utilise = '';
-    stockerCache(input.telephone, input.messageClient, input.memoireCourte, raccourci);
-    return raccourci;
+    // ── ÉCONOMIE DE CRÉDITS: Raccourcis questions fréquentes (0 crédit LLM) ──
+    const raccourci = detecterRaccourciFrequent(input.messageClient, input.courseActive);
+    if (raccourci) {
+      raccourci.temps_traitement_ms = Date.now() - startTime;
+      raccourci.decision_moteur = 'raccourci';
+      raccourci.openai_appele = false;
+      raccourci.model_utilise = '';
+      stockerCache(input.telephone, input.messageClient, input.memoireCourte, raccourci);
+      return raccourci;
+    }
   }
 
   // ── Construire l'historique lisible ──
@@ -910,25 +926,28 @@ export async function raisonnerVenus(base44: any, input: ReasoningInput): Promis
   }
 
   // ── ÉCONOMIE DE CRÉDITS: Règles métier directes (0 crédit LLM) ──
-  const regleDirecte = detecterRegleMetierDirecte(input.messageClient, businessRuleEntries);
-  if (regleDirecte) {
-    regleDirecte.temps_traitement_ms = Date.now() - startTime;
-    regleDirecte.decision_moteur = 'regle_metier';
-    regleDirecte.openai_appele = false;
-    regleDirecte.model_utilise = '';
-    stockerCache(input.telephone, input.messageClient, input.memoireCourte, regleDirecte);
-    return regleDirecte;
-  }
+  // SKIP si course en cours de collecte — le client répond à une question de VENUS.
+  if (!hasActiveFlow) {
+    const regleDirecte = detecterRegleMetierDirecte(input.messageClient, businessRuleEntries);
+    if (regleDirecte) {
+      regleDirecte.temps_traitement_ms = Date.now() - startTime;
+      regleDirecte.decision_moteur = 'regle_metier';
+      regleDirecte.openai_appele = false;
+      regleDirecte.model_utilise = '';
+      stockerCache(input.telephone, input.messageClient, input.memoireCourte, regleDirecte);
+      return regleDirecte;
+    }
 
-  // ── ÉCONOMIE DE CRÉDITS: Connaissances directes (0 crédit LLM) ──
-  const connaissanceDirecte = detecterConnaissanceDirecte(input.messageClient, knowledgeEntries);
-  if (connaissanceDirecte) {
-    connaissanceDirecte.temps_traitement_ms = Date.now() - startTime;
-    connaissanceDirecte.decision_moteur = 'connaissance';
-    connaissanceDirecte.openai_appele = false;
-    connaissanceDirecte.model_utilise = '';
-    stockerCache(input.telephone, input.messageClient, input.memoireCourte, connaissanceDirecte);
-    return connaissanceDirecte;
+    // ── ÉCONOMIE DE CRÉDITS: Connaissances directes (0 crédit LLM) ──
+    const connaissanceDirecte = detecterConnaissanceDirecte(input.messageClient, knowledgeEntries);
+    if (connaissanceDirecte) {
+      connaissanceDirecte.temps_traitement_ms = Date.now() - startTime;
+      connaissanceDirecte.decision_moteur = 'connaissance';
+      connaissanceDirecte.openai_appele = false;
+      connaissanceDirecte.model_utilise = '';
+      stockerCache(input.telephone, input.messageClient, input.memoireCourte, connaissanceDirecte);
+      return connaissanceDirecte;
+    }
   }
 
   // ── Construire le prompt de raisonnement (version compactée) ──
@@ -986,10 +1005,10 @@ Reformule: "Si j'ai bien compris...". NE JAMAIS créer de course directement (ac
 ${input.messageClient}
 
 ═══ ANALYSE — Qui parle ? ═══
-- CLIENT (veut un service): "je voudrais envoyer", "je veux livrer", "j'ai besoin d'une livraison" → intention=creer_course
-- LIVREUR (rapporte statut): "j'ai fini à", "je suis à", "je pars de", "j'ai récupéré" → intention=signalement_livreur (NE PAS créer de course)
-- HORS CONTEXTE (parle à quelqu'un d'autre): "tu n'es pas au bureau?", "sors", "appelle-moi" → intention=message_hors_contexte (répondre poliment)
+- CLIENT (veut un service): "je voudrais envoyer", "envoyer un colis", "expédier un colis" → intention=creer_course
+- LIVREUR (rapporte statut): "j'ai fini à", "je suis à", "je pars de" → intention=signalement_livreur (NE PAS créer de course)
 
+═══ ANALYSE — Réponse à une question VENUS ═══
 ═══ ANALYSE — Intention ═══
 creer_course | suivre_course | contacter_livreur | annuler_course | modifier_info | demander_info | salutation | signalement_livreur | message_hors_contexte | clarifier | autre
 - "Le livreur est où?" / "Il arrive quand?" → suivre_course
@@ -1100,7 +1119,6 @@ Réponds UNIQUEMENT avec un JSON.`;
       llmRes = await base44.asServiceRole.integrations.Core.InvokeLLM({
         prompt,
         response_json_schema: RAISONNEMENT_SCHEMA,
-        model: 'gpt_5_mini',
       });
       const fallbackTime = Date.now() - tLLMStart;
       console.log(`[ReasoningEngine] ⏱️ LLM (Base44): ${fallbackTime}ms`);
@@ -1246,6 +1264,7 @@ Réponds UNIQUEMENT avec un JSON.`;
         decision_moteur: 'erreur',
         openai_appele: false,
         model_utilise: '',
+        _erreur_detail: `Filtre contenu LLM: ${e.message?.substring(0, 300) || '403/content filter'}`,
       };
     }
 
@@ -1268,6 +1287,7 @@ Réponds UNIQUEMENT avec un JSON.`;
       decision_moteur: 'erreur',
       openai_appele: false,
       model_utilise: '',
+      _erreur_detail: `Erreur raisonnement: ${e.message?.substring(0, 400) || 'Unknown error'}`,
     };
   }
 }
@@ -1353,6 +1373,7 @@ export async function raisonnerVenusAvecOutils(
     action: result.action,
     confiance: result.confiance,
     statut: result.decision_moteur === 'erreur' ? 'erreur' : 'succes',
+    erreur_detail: (result as any)._erreur_detail || (result as any)._erreur_openai || '',
   });
 
   return {

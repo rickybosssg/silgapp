@@ -80,21 +80,25 @@ Deno.serve(async (req) => {
     const now = new Date().toISOString();
 
     if (source === "livreur") {
-      // ── ANNULATION LIVREUR : course retourne au dispatch ──────────
-      // ⚠️ Le livreur qui a annulé est EXCLU de cette course précise
-      // (ajouté dans dispatch_notified_ids) mais reste disponible pour les autres.
-      const exclusionsLivreur = livreurId ? JSON.stringify([livreurId]) : '[]';
+      // ── ANNULATION LIVREUR : course remise en "nouvelle" pour redispatch ──
+      // Le livreur qui a annulé est EXCLU définitivement de cette course précise
+      // (dispatch_refused_ids) mais reste disponible pour les autres courses.
+      let refusedIds = [];
+      try { refusedIds = JSON.parse(course.dispatch_refused_ids || '[]'); } catch {}
+      if (livreurId && !refusedIds.includes(livreurId)) refusedIds.push(livreurId);
       const resetData = {
-        statut: "recherche_livreur",
-        dispatch_status: "expire", // ← En attente de décision client (Venus demande via WhatsApp)
+        statut: "nouvelle",
+        dispatch_status: "en_attente",
         dispatch_wave: 0,
         livreur_id: null,
-        // ⚠️ On GARDE livreur_nom et livreur_telephone pour tracer qui a annulé
+        livreur_nom: "",
+        livreur_telephone: "",
         livreur_photo_url: null,
         livreur_vehicule: null,
         livreur_note_moyenne: 0,
         livreur_nombre_avis: 0,
-        dispatch_notified_ids: exclusionsLivreur, // ⚠️ livreur annulant EXCLU de cette course
+        dispatch_notified_ids: "[]",
+        dispatch_refused_ids: JSON.stringify(refusedIds), // ⚠️ livreur annulant EXCLU définitivement
         heure_acceptation: null,
         heure_recuperation: null,
         heure_livraison: null,
@@ -104,7 +108,9 @@ Deno.serve(async (req) => {
         pickup_confirmed_at: null,
         delivery_confirmed_by: null,
         delivery_confirmed_at: null,
-        notes: (course.notes || "") + ` | [ANNULÉ LIVREUR] ${motif || "non spécifié"}`,
+        accepted_by_livreur_id: null,
+        accepted_at: null,
+        notes: (course.notes || "") + ` | [ANNULÉ LIVREUR → REMISE EN DISPATCH] ${motif || "non spécifié"}`,
       };
 
       // Nettoyer prix manuel si applicable
@@ -147,17 +153,17 @@ Deno.serve(async (req) => {
           ville: course.ville_depart || "",
           date_annulation: now,
           course_redispatch: true,
-          admin_notifie: false,
+          admin_notifie: true,
         }).catch(() => null);
       }
 
-      // ── Notification admin ───────────────────────────────────────
+      // ── Notification admin (modal — alerte_critique_dispatch pour déclencher le SystemAlertModal) ──
       await asService.entities.Notification.create({
-        titre: " Course remise en dispatch",
-        message: `Le livreur a annulé la course #${course_id.slice(-8)}. Motif: ${motif || "non spécifié"}. La course est retournée dans le circuit de dispatch.`,
-        type: "course_redispatch",
+        titre: "🔄 Course annulée par le livreur — remise en dispatch",
+        message: `Le livreur ${course.livreur_nom || "?"} a annulé la course #${course_id.slice(-8)} (${course.adresse_depart || "?"} → ${course.adresse_arrivee || "?"}). Motif: ${motif || "non spécifié"}. ${motif_detail ? `Détail: ${motif_detail}.` : ""} La course a été remise en statut "nouvelle" et sera redispatchée à un autre livreur (l'annulant est exclu).`,
+        type: "alerte_critique_dispatch",
         course_id,
-        destinataire_email: "admin", // tous les admins
+        destinataire_email: "admin",
         lue: false,
       }).catch(() => null);
 
@@ -186,123 +192,36 @@ Deno.serve(async (req) => {
         }[motif] || motif || "non spécifié";
 
         await asService.entities.Notification.create({
-          titre: " Votre livreur a annulé",
-          message: `Le livreur a annulé votre course. Motif: ${motifLabel}. Nous recherchons un nouveau livreur...`,
-          type: "course_refusee",
+          titre: "🔄 Recherche d'un nouveau livreur",
+          message: `Votre livreur a annulé la course (motif: ${motifLabel}). Nous recherchons immédiatement un autre livreur pour prendre en charge votre demande.`,
+          type: "course_modifiee",
           course_id,
           destinataire_email: clientEmail,
           lue: false,
         }).catch(() => null);
 
-        // Push notification au client
         await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
-          titre: " Votre livreur a annulé",
-          message: `Motif: ${motifLabel}. Nous recherchons un nouveau livreur...`,
-          type: "course_refusee",
+          titre: "🔄 Recherche d'un nouveau livreur",
+          message: `Votre livreur a annulé (motif: ${motifLabel}). Nous cherchons un autre livreur.`,
+          type: "course_modifiee",
           destinataire_email: clientEmail,
           user_type: "client",
           course_id,
         }).catch(() => null);
-      }
 
-      // ── DÉSACCORD PRIX : Relance immédiate du dispatch sans demander au client ──
-      // Le livreur a annulé pour un motif de prix → on recherche un autre livreur automatiquement.
-      const isDesaccordPrix = motif === "désaccord_prix";
-
-      // ── VENUS WHATSAPP : Demander au client s'il veut un autre livreur ──
-      // La course est en "recherche_livreur" + "expire" (non traitée par le dispatch auto).
-      // Venus envoie un WhatsApp au client pour demander s'il faut rechercher un autre livreur.
-      // Si le client répond "oui" → dispatch_status passe à "en_attente" + dispatch relancé.
-      // Si le client répond "non" → course annulée définitivement.
-      // Fallback : si WhatsApp impossible → auto-dispatch (comportement précédent).
-      // EXCEPTION : désaccord_prix → relance immédiate, pas de question client.
-      let whatsappEnvoye = false;
-      if (!isDesaccordPrix && course.client_telephone) {
-        const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-        const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-        const twilioFromNumber = Deno.env.get('TWILIO_WHATSAPP_FROM') || 'whatsapp:+14155238886';
-
-        if (twilioAccountSid && twilioAuthToken) {
-          const motifText = {
-            client_injoignable: "Client injoignable",
-            mauvaise_adresse: "Mauvaise adresse",
-            colis_inexistant: "Colis inexistant",
-            client_change_avis: "Client a changé d'avis",
-            colis_interdit: "Colis interdit",
-            désaccord_prix: "Désaccord sur le prix",
-            panne_vehicule: "Panne de véhicule",
-            accident: "Accident",
-            autre: motif_detail || "Autre",
-          }[motif] || motif || "non spécifié";
-
-          const messageVenus = `🔄 Votre livreur a annulé la course.\n\nMotif: ${motifText}\n\nVoulez-vous que je recherche un autre livreur ?\n\nRépondez 'oui' pour relancer la recherche ou 'non' pour annuler définitivement.`;
-
-          try {
-            const to = course.client_telephone.startsWith('whatsapp:') ? course.client_telephone : `whatsapp:${course.client_telephone}`;
-            const from = twilioFromNumber.startsWith('whatsapp:') ? twilioFromNumber : `whatsapp:${twilioFromNumber}`;
-            const creds = btoa(`${twilioAccountSid}:${twilioAuthToken}`);
-            const formData = new URLSearchParams();
-            formData.append('From', from);
-            formData.append('To', to);
-            formData.append('Body', messageVenus);
-            const resp = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`, {
-              method: 'POST',
-              headers: { Authorization: `Basic ${creds}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: formData.toString(),
-            });
-            const data = await resp.json();
-            whatsappEnvoye = resp.ok && !!data.sid;
-
-            if (whatsappEnvoye) {
-              // Mettre à jour la conversation avec le flag redispatch_pending
-              const convs = await asService.entities.Conversation.filter({ whatsapp_phone: course.client_telephone });
-              if (convs?.[0]) {
-                let pending = {};
-                try { pending = convs[0].venus_pending_course ? JSON.parse(convs[0].venus_pending_course) : {}; } catch {}
-                // Nettoyer le mode contact_livreur si actif (le livreur a annulé)
-                delete pending.contact_livreur_mode;
-                delete pending.contact_livreur_course_id;
-                delete pending.contact_livreur_livreur_id;
-                delete pending.contact_livreur_livreur_tel;
-                // Activer le flag redispatch
-                pending.redispatch_pending = true;
-                pending.redispatch_course_id = course_id;
-                pending.redispatch_motif = motifText;
-                await asService.entities.Conversation.update(convs[0].id, {
-                  venus_pending_course: JSON.stringify(pending),
-                });
-                // Stocker le message Venus dans l'entité Message
-                await asService.entities.Message.create({
-                  conversation_id: convs[0].id,
-                  sender_type: 'admin',
-                  sender_id: 'venus',
-                  sender_name: 'VENUS',
-                  message_type: 'text',
-                  content: messageVenus,
-                  source: 'whatsapp',
-                }).catch(() => null);
-              }
-              console.log(`[ANNULATION] ✅ WhatsApp Venus envoyé au client ${course.client_telephone} — en attente de décision`);
-            }
-          } catch (e) {
-            console.error('[ANNULATION] Erreur envoi WhatsApp Venus:', e.message);
-          }
-        }
-      }
-
-      // Fallback : si WhatsApp non envoyé → auto-dispatch (comportement précédent)
-      if (!whatsappEnvoye) {
-        console.log(`[ANNULATION] ⚠️ WhatsApp non envoyé — fallback auto-dispatch pour course ${course_id}`);
-        await asService.entities.CourseExterne.update(course_id, { dispatch_status: 'en_attente' });
-        base44.asServiceRole.functions.invoke('dispatchExterneAuto', {
-          action: 'lancer_recherche_auto',
+        // ── Notification WhatsApp via VENUS au client (source: livreur) ──
+        // La cliente communique via WhatsApp avec VENUS ; sans ce message,
+        // elle n'est pas informée de l'annulation et du redispatch en cours.
+        await base44.asServiceRole.functions.invoke('envoyerSuiviWhatsApp', {
           course_id,
-        }).then((res) => {
-          console.log(`[ANNULATION] ✅ Dispatch relancé (fallback) — ${res?.data?.nb_notifies || 0} livreur(s) notifié(s)`);
+          evenement: 'livreur_annule_redispatch',
+          motif_label: motifLabel,
         }).catch((err) => {
-          console.error(`[ANNULATION] ❌ Erreur relance dispatch: ${err?.message || err}`);
+          console.error('[ANNULATION] ❌ Envoi WhatsApp client échoué:', err?.message || String(err));
         });
       }
+
+      // Course remise en dispatch — un nouveau livreur sera notifié automatiquement
 
     } else {
       // ── ANNULATION ADMIN : course définitivement annulée ──────────
@@ -339,9 +258,7 @@ Deno.serve(async (req) => {
       course_id,
       livreur_libere: livreurLibere,
       course_redispatch: courseRedispatch,
-      message: source === "livreur"
-        ? "Course remise en dispatch — nouveau livreur recherché"
-        : "Course annulée définitivement",
+      message: "Course annulée définitivement",
     });
 
   } catch (error) {
