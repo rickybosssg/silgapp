@@ -258,13 +258,34 @@ export default function PayerSilgapp({ userType: forcedType }) {
               />
             </div>
 
-            <Button
-              className="w-full h-14 text-base font-black rounded-2xl"
-              disabled={!montantPaye || !preuveUrl || submitMutation.isPending}
-              onClick={() => submitMutation.mutate()}
-            >
-              {submitMutation.isPending ? "Envoi..." : !montantPaye ? "Entrez le montant" : !preuveUrl ? "Ajoutez la preuve" : "Envoyer ma preuve"}
-            </Button>
+            {(() => {
+              const montantNum = Number(montantPaye) || 0;
+              const montantInvalide = montantPaye !== "" && (montantNum <= 0 || montantNum > montantDu);
+              return (
+                <>
+                  {montantInvalide && (
+                    <p className="text-xs text-red-500 font-medium -mb-1">
+                      {montantNum <= 0 ? "Le montant doit être supérieur à 0" : `Le montant ne peut pas dépasser ${montantDu.toLocaleString()} F`}
+                    </p>
+                  )}
+                  <Button
+                    className="w-full h-14 text-base font-black rounded-2xl"
+                    disabled={montantNum <= 0 || montantNum > montantDu || !preuveUrl || submitMutation.isPending}
+                    onClick={() => submitMutation.mutate()}
+                  >
+                    {submitMutation.isPending
+                      ? "Envoi..."
+                      : montantNum <= 0
+                        ? "Entrez le montant"
+                        : montantNum > montantDu
+                          ? "Montant trop élevé"
+                          : !preuveUrl
+                            ? "Ajoutez la preuve"
+                            : "Envoyer ma preuve"}
+                  </Button>
+                </>
+              );
+            })()}
           </div>
         )}
       </div>
