@@ -120,13 +120,16 @@ Deno.serve(async (req) => {
     // ── Envoyer OTP via Twilio Verify (canal SMS exclusivement) ──
     const TWILIO_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
     const TWILIO_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
-    const VERIFY_SID = Deno.env.get('TWILIO_VERIFY_SERVICE_SID');
+    // Service Verify dédié SMS (canal SMS activé) — fallback sur le service WhatsApp si non configuré
+    const VERIFY_SID = Deno.env.get('TWILIO_VERIFY_SMS_SERVICE_SID') || Deno.env.get('TWILIO_VERIFY_SERVICE_SID');
 
     if (!TWILIO_SID || !TWILIO_TOKEN || !VERIFY_SID) {
       log.erreur = 'Secrets Twilio Verify manquants';
+      log.using_sms_service = !!Deno.env.get('TWILIO_VERIFY_SMS_SERVICE_SID');
       console.log('[LOGIN-OTP-SMS]', JSON.stringify(log));
       return Response.json({ success: false, error: 'Configuration Twilio Verify manquante.' }, { status: 500 });
     }
+    log.verify_sid_used = VERIFY_SID;
 
     const url = `https://verify.twilio.com/v2/Services/${VERIFY_SID}/Verifications`;
     const auth = btoa(`${TWILIO_SID}:${TWILIO_TOKEN}`);

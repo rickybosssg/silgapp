@@ -51,7 +51,8 @@ Deno.serve(async (req) => {
     // ── Secrets ──
     const TWILIO_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
     const TWILIO_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
-    const VERIFY_SID = Deno.env.get('TWILIO_VERIFY_SERVICE_SID');
+    // Service Verify dédié SMS (canal SMS activé) — fallback sur le service WhatsApp si non configuré
+    const VERIFY_SID = Deno.env.get('TWILIO_VERIFY_SMS_SERVICE_SID') || Deno.env.get('TWILIO_VERIFY_SERVICE_SID');
 
     if (!TWILIO_SID || !TWILIO_TOKEN || !VERIFY_SID) {
       return Response.json({ success: false, error: 'Configuration Twilio Verify manquante.' }, { status: 500 });

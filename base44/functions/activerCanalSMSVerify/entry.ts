@@ -1,12 +1,23 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 
 /**
- * Activer le canal SMS sur le service Twilio Verify.
+ * Créer un service Twilio Verify dédié au login par SMS.
  *
- * Le service Verify (VA…) a peut-être été configuré uniquement pour WhatsApp.
- * Cette fonction active le canal SMS pour permettre la connexion par OTP SMS.
+ * Le service Verify existant ("SILGAPP WhatsApp OTP") a le canal SMS désactivé
+ * (erreur 60223). L'API Twilio ne permet pas de réactiver le canal SMS sur un
+ * service existant — il faut créer un NOUVEAU service. Par défaut, un nouveau
+ * service Verify a SMS activé.
  *
- * Admin only. Ne touche pas à VENUS (Messaging Services, WhatsApp Sender, webhook).
+ * Cette fonction:
+ *   1. Crée un nouveau service "SILGAPP SMS Login"
+ *   2. Teste un envoi SMS vers un numéro de test (numéro ValiDate Twilio)
+ *   3. Retourne le SID du nouveau service
+ *
+ * L'admin doit ensuite mettre à jour le secret TWILIO_VERIFY_SMS_SERVICE_SID
+ * avec le SID retourné, puis les fonctions loginOTPSMS / verifierOTPSMSLogin
+ * l'utiliseront automatiquement.
+ *
+ * Admin only. Ne touche pas à VENUS ni au service WhatsApp OTP existant.
  */
 Deno.serve(async (req) => {
   try {
@@ -17,10 +28,9 @@ Deno.serve(async (req) => {
 
     const TWILIO_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
     const TWILIO_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
-    const VERIFY_SID = Deno.env.get('TWILIO_VERIFY_SERVICE_SID');
 
-    if (!TWILIO_SID || !TWILIO_TOKEN || !VERIFY_SID) {
-      return Response.json({ error: 'Secrets Twilio Verify manquants' }, { status: 500 });
+    if (!TWILIO_SID || !TWILIO_TOKEN) {
+      return Response.json({ error: 'Secrets Twilio manquants' }, { status: 500 });
     }
 
     const auth = btoa(`${TWILIO_SID}:${TWILIO_TOKEN}`);
@@ -29,78 +39,73 @@ Deno.serve(async (req) => {
       'Content-Type': 'application/x-www-form-urlencoded',
     };
 
-    // ── 1. Lire la config actuelle ──
-    const getResp = await fetch(`https://verify.twilio.com/v2/Services/${VERIFY_SID}`, { headers });
-    const getConfig = await getResp.json();
+    // ── 1. Lister les services existants pour éviter les doublons ──
+    const listResp = await fetch('https://verify.twilio.com/v2/Services?PageSize=50', { headers });
+    const listData = await listResp.json();
+    const existing = (listData.services || []).find(
+      (s: any) => s.friendlyName === 'SILGAPP SMS Login'
+    );
 
-    const rapport: any = {
-      service_sid: VERIFY_SID,
-      friendly_name: getConfig.friendly_name,
-      raw_config: getConfig,
-      channel_keys: Object.keys(getConfig).filter(k =>
-        k.toLowerCase().includes('sms') ||
-        k.toLowerCase().includes('voice') ||
-        k.toLowerCase().includes('channel') ||
-        k.toLowerCase().includes('whatsapp') ||
-        k.toLowerCase().includes('email')
-      ),
-      config_avant: {
-        sms_enabled: getConfig.sms?.enabled ?? getConfig.sms_enabled,
-        voice_enabled: getConfig.voice?.enabled ?? getConfig.voice_enabled,
-        whatsapp_enabled: getConfig.whatsapp?.enabled ?? getConfig.whatsapp_enabled,
-      },
-    };
+    let newSid: string;
+    let created = false;
 
-    // ── 2. Forcer l'activation du canal SMS via l'API Twilio Verify ──
-    // Twilio error 60223 = "Delivery channel disabled: SMS"
-    // Solution : activer le canal SMS dans les paramètres du service Verify
-    const formData = new URLSearchParams();
-    formData.append('Sms.Enabled', 'true');
-
-    const updateResp = await fetch(`https://verify.twilio.com/v2/Services/${VERIFY_SID}`, {
-      method: 'POST',
-      headers,
-      body: formData.toString(),
-    });
-    const updateData = await updateResp.json();
-
-    if (updateResp.ok) {
-      rapport.sms_active = true;
-      rapport.config_apres = {
-        sms: updateData.sms,
-        skip_sms_to_landlines: updateData.skip_sms_to_landlines,
-      };
+    if (existing) {
+      newSid = existing.sid;
     } else {
-      rapport.erreur_activation = updateData.message || JSON.stringify(updateData);
-      rapport.update_http_status = updateResp.status;
+      // ── 2. Créer le nouveau service SMS ──
+      const createResp = await fetch('https://verify.twilio.com/v2/Services', {
+        method: 'POST',
+        headers,
+        body: new URLSearchParams({
+          FriendlyName: 'SILGAPP SMS Login',
+          CodeLength: '6',
+          LookupEnabled: 'true',
+        }).toString(),
+      });
+      const createData = await createResp.json();
 
-      // Essai alternatif : créer une Messaging Configuration SMS
-      try {
-        const mcFormData = new URLSearchParams();
-        mcFormData.append('MessagingServiceSid', getConfig.whatsapp?.msg_service_sid || '');
-
-        const mcResp = await fetch(
-          `https://verify.twilio.com/v2/Services/${VERIFY_SID}/MessagingConfigurations`,
-          {
-            method: 'POST',
-            headers,
-            body: mcFormData.toString(),
-          }
+      if (!createResp.ok) {
+        return Response.json(
+          { error: 'Création service échouée', details: createData.message || createData },
+          { status: 500 }
         );
-        const mcData = await mcResp.json();
-        rapport.messaging_config_attempt = {
-          http_status: mcResp.status,
-          success: mcResp.ok,
-          data: mcData.message ? { error: mcData.message } : { ok: true },
-        };
-      } catch (mcErr) {
-        rapport.messaging_config_error = mcErr.message;
       }
+      newSid = createData.sid;
+      created = true;
     }
 
-    // ── 3. Vérification finale : tester un envoi vers un numéro test sandbox ──
-    // Ne pas envoyer de vrai SMS — juste confirmer que le service répond
-    rapport.ready = rapport.sms_active === true;
+    // ── 3. Tester l'envoi SMS vers un numéro test Twilio (sandbox) ──
+    // Numéro de test Twilio +1 (501) 555-1234 ne déclenche pas de vrai SMS
+    const testResp = await fetch(
+      `https://verify.twilio.com/v2/Services/${newSid}/Verifications`,
+      {
+        method: 'POST',
+        headers,
+        body: new URLSearchParams({
+          To: '+15015551234',
+          Channel: 'sms',
+        }).toString(),
+      }
+    );
+    const testData = await testResp.json();
+
+    const rapport: any = {
+      success: true,
+      new_service_sid: newSid,
+      created,
+      message: created
+        ? 'Nouveau service SMS créé avec succès.'
+        : 'Service SMS existant récupéré.',
+      sms_test: {
+        http_status: testResp.status,
+        status: testData.status,
+        sid: testData.sid,
+        channel: testData.channel,
+        error: testData.message || null,
+        error_code: testData.code || null,
+      },
+      next_step: `Mettre à jour le secret TWILIO_VERIFY_SMS_SERVICE_SID avec: ${newSid}`,
+    };
 
     return Response.json(rapport);
   } catch (error) {
