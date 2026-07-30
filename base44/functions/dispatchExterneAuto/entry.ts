@@ -333,7 +333,7 @@ Deno.serve(async (req) => {
                 sender_id: 'silgapp_system',
                 sender_name: 'SILGAPP',
                 message_type: 'text',
-                content: `🔑 Code de récupération : ${pickupPIN}\n\nPrésentez ce code au point de récupération du colis.`,
+                content: `🔑 Code de récupération : ${pickupPIN}\n\nUtiliser ce code pour récupérer le Colis`,
                 source: 'app',
                 client_message_id: idempotencyKey,
               });
