@@ -315,6 +315,35 @@ Deno.serve(async (req) => {
         await supprimerNotificationsCourse(base44, course_id);
         console.log(`[DISPATCH] 🎉 Course ${course_id} verrouillée (auto) par ${livreur_id}`);
 
+        // ── Message automatique : Code de récupération pour courses administratives ──
+        // Uniquement pour les courses admin (source='admin'). Envoie le code de
+        // récupération (pickup_code_4_digits) dans la messagerie interne de la course,
+        // visible par le livreur assigné et l'admin. Clé idempotente par (course_id, livreur_id)
+        // pour éviter les doublons et permettre un nouveau message si réassignation.
+        if (course.source === 'admin' && pickupPIN) {
+          const idempotencyKey = `pickup-code-${course_id}-${livreur_id}`;
+          try {
+            const existing = await base44.asServiceRole.entities.Message.filter({
+              client_message_id: idempotencyKey,
+            });
+            if (!existing || existing.length === 0) {
+              await base44.asServiceRole.entities.Message.create({
+                course_id: course_id,
+                sender_type: 'admin',
+                sender_id: 'silgapp_system',
+                sender_name: 'SILGAPP',
+                message_type: 'text',
+                content: `🔑 Code de récupération : ${pickupPIN}\n\nPrésentez ce code au point de récupération du colis.`,
+                source: 'app',
+                client_message_id: idempotencyKey,
+              });
+              console.log(`[DISPATCH] 🔑 Message code de récupération créé pour course admin ${course_id} (livreur ${livreur_id})`);
+            }
+          } catch (err) {
+            console.error(`[DISPATCH] ⚠️ Erreur création message code récupération:`, err?.message || String(err));
+          }
+        }
+
         // ── Phase 9 + QR/PIN : Suivi WhatsApp automatique avec QR Code et Code PIN ──
         // Détecter si c'est une réaffectation (livreur précédent a annulé)
         const isRedispatch = !!(course.dispatch_refused_ids && course.dispatch_refused_ids !== '[]')
