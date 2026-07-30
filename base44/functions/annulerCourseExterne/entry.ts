@@ -80,21 +80,25 @@ Deno.serve(async (req) => {
     const now = new Date().toISOString();
 
     if (source === "livreur") {
-      // ── ANNULATION LIVREUR : course retourne au dispatch ──────────
-      // ⚠️ Le livreur qui a annulé est EXCLU de cette course précise
-      // (ajouté dans dispatch_notified_ids) mais reste disponible pour les autres.
-      const exclusionsLivreur = livreurId ? JSON.stringify([livreurId]) : '[]';
+      // ── ANNULATION LIVREUR : course remise en "nouvelle" pour redispatch ──
+      // Le livreur qui a annulé est EXCLU définitivement de cette course précise
+      // (dispatch_refused_ids) mais reste disponible pour les autres courses.
+      let refusedIds = [];
+      try { refusedIds = JSON.parse(course.dispatch_refused_ids || '[]'); } catch {}
+      if (livreurId && !refusedIds.includes(livreurId)) refusedIds.push(livreurId);
       const resetData = {
-        statut: "annulee",
-        dispatch_status: "expire",
+        statut: "nouvelle",
+        dispatch_status: "en_attente",
         dispatch_wave: 0,
         livreur_id: null,
-        // ⚠️ On GARDE livreur_nom et livreur_telephone pour tracer qui a annulé
+        livreur_nom: "",
+        livreur_telephone: "",
         livreur_photo_url: null,
         livreur_vehicule: null,
         livreur_note_moyenne: 0,
         livreur_nombre_avis: 0,
-        dispatch_notified_ids: exclusionsLivreur, // ⚠️ livreur annulant EXCLU de cette course
+        dispatch_notified_ids: "[]",
+        dispatch_refused_ids: JSON.stringify(refusedIds), // ⚠️ livreur annulant EXCLU définitivement
         heure_acceptation: null,
         heure_recuperation: null,
         heure_livraison: null,
@@ -104,7 +108,9 @@ Deno.serve(async (req) => {
         pickup_confirmed_at: null,
         delivery_confirmed_by: null,
         delivery_confirmed_at: null,
-        notes: (course.notes || "") + ` | [ANNULÉ LIVREUR] ${motif || "non spécifié"}`,
+        accepted_by_livreur_id: null,
+        accepted_at: null,
+        notes: (course.notes || "") + ` | [ANNULÉ LIVREUR → REMISE EN DISPATCH] ${motif || "non spécifié"}`,
       };
 
       // Nettoyer prix manuel si applicable
@@ -115,7 +121,7 @@ Deno.serve(async (req) => {
       }
 
       await asService.entities.CourseExterne.update(course_id, resetData);
-      courseRedispatch = false;
+      courseRedispatch = true;
 
       // Archiver toutes les notifications 'nouvelle_course' pour cette course
       // pour que les livreurs ne voient plus une course qui est retournée en dispatch
@@ -146,15 +152,15 @@ Deno.serve(async (req) => {
           country_code: course.country_code || "",
           ville: course.ville_depart || "",
           date_annulation: now,
-          course_redispatch: false,
+          course_redispatch: true,
           admin_notifie: true,
         }).catch(() => null);
       }
 
       // ── Notification admin (modal — alerte_critique_dispatch pour déclencher le SystemAlertModal) ──
       await asService.entities.Notification.create({
-        titre: "🚨 Course annulée par le livreur",
-        message: `Le livreur ${course.livreur_nom || "?"} a annulé la course #${course_id.slice(-8)} (${course.adresse_depart || "?"} → ${course.adresse_arrivee || "?"}). Motif: ${motif || "non spécifié"}. ${motif_detail ? `Détail: ${motif_detail}.` : ""} La course a été annulée définitivement.`,
+        titre: "🔄 Course annulée par le livreur — remise en dispatch",
+        message: `Le livreur ${course.livreur_nom || "?"} a annulé la course #${course_id.slice(-8)} (${course.adresse_depart || "?"} → ${course.adresse_arrivee || "?"}). Motif: ${motif || "non spécifié"}. ${motif_detail ? `Détail: ${motif_detail}.` : ""} La course a été remise en statut "nouvelle" et sera redispatchée à un autre livreur (l'annulant est exclu).`,
         type: "alerte_critique_dispatch",
         course_id,
         destinataire_email: "admin",
@@ -186,25 +192,25 @@ Deno.serve(async (req) => {
         }[motif] || motif || "non spécifié";
 
         await asService.entities.Notification.create({
-          titre: "❌ Course annulée",
-          message: `Votre course a été annulée par le livreur. Motif: ${motifLabel}.`,
-          type: "course_annulee",
+          titre: "🔄 Recherche d'un nouveau livreur",
+          message: `Votre livreur a annulé la course (motif: ${motifLabel}). Nous recherchons immédiatement un autre livreur pour prendre en charge votre demande.`,
+          type: "course_modifiee",
           course_id,
           destinataire_email: clientEmail,
           lue: false,
         }).catch(() => null);
 
         await base44.asServiceRole.functions.invoke('envoiNotificationPush', {
-          titre: "❌ Course annulée",
-          message: `Votre livreur a annulé. Motif: ${motifLabel}.`,
-          type: "course_annulee",
+          titre: "🔄 Recherche d'un nouveau livreur",
+          message: `Votre livreur a annulé (motif: ${motifLabel}). Nous cherchons un autre livreur.`,
+          type: "course_modifiee",
           destinataire_email: clientEmail,
           user_type: "client",
           course_id,
         }).catch(() => null);
       }
 
-      // Course annulée définitivement — pas de redispatch, pas de WhatsApp
+      // Course remise en dispatch — un nouveau livreur sera notifié automatiquement
 
     } else {
       // ── ANNULATION ADMIN : course définitivement annulée ──────────
