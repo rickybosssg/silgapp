@@ -300,9 +300,14 @@ export default function DusLivreursExternes() {
     Object.values(map).forEach(entry => {
       const info = entry.livreurInfo;
       if (info) {
-        // montant_du_silga est la source de vérité (mis à jour à chaque livraison)
-        // encours est conservé pour rétrocompatibilité mais n'est plus fiable
-        entry.montantDu = info.montant_du_silga ?? info.encours ?? 0;
+        // montant_du_silga est l'ancien solde reporté. Les commissions des courses
+        // livrées non payées (y compris celles du jour) doivent s'AJOUTER à ce solde
+        // pour que la commission du jour soit comptabilisée immédiatement.
+        const ancienSolde = info.montant_du_silga ?? info.encours ?? 0;
+        const commNonPayees = entry.courses
+          .filter(c => c.statut_paiement_livreur !== "paye")
+          .reduce((s, c) => s + (c.commission_silga ?? 0), 0);
+        entry.montantDu = ancienSolde + commNonPayees;
         entry.montantPaye = Math.max(0, entry.commissionTotal - entry.montantDu);
       } else {
         // Pas d'info livreur — calcul de secours basé sur les courses impayées
