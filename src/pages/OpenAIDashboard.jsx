@@ -69,6 +69,70 @@ const DECISION_LABELS = {
   erreur: { label: 'Erreur', color: 'bg-red-100 text-red-700' },
 };
 
+// ── Statuts détaillés VenusOpenAIUsage (nouveau système de traçabilité) ──
+const STATUS_LABELS = {
+  success: { label: 'Succès OpenAI', color: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' },
+  success_retry: { label: 'Succès après retry', color: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500' },
+  fallback: { label: 'Fallback Base44 réussi', color: 'bg-orange-100 text-orange-700', dot: 'bg-orange-500' },
+  error: { label: 'Erreur API OpenAI', color: 'bg-red-100 text-red-700', dot: 'bg-red-500' },
+  empty_response: { label: 'Réponse OpenAI vide', color: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' },
+  total_failure: { label: 'Échec total', color: 'bg-rose-100 text-rose-700', dot: 'bg-rose-500' },
+};
+
+// ── Ligne d'erreur avec toggle "voir réponse brute" (hook au niveau du composant) ──
+function ErrorRow({ err }) {
+  const [showRaw, setShowRaw] = useState(false);
+  const sl = STATUS_LABELS[err.status] || { label: err.status || 'Inconnu', color: 'bg-slate-100 text-slate-700', dot: 'bg-slate-400' };
+  return (
+    <div className="px-5 py-3">
+      <div className="flex items-start gap-3">
+        <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${sl.dot}`} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${sl.color}`}>
+              {sl.label}
+            </span>
+            <span className="text-xs text-slate-400">
+              {err.date ? new Date(err.date).toLocaleString('fr-FR') : 'N/A'}
+            </span>
+            {err.response_time_ms > 0 && <span className="text-xs text-slate-400">{err.response_time_ms}ms</span>}
+            {err.http_status > 0 && (
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${err.http_status >= 500 ? 'bg-red-100 text-red-700' : err.http_status === 429 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                HTTP {err.http_status}
+              </span>
+            )}
+            {err.retry_count > 0 && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+                {err.retry_count} retry{err.retry_count > 1 ? 's' : ''}
+              </span>
+            )}
+            {err.model_used && (
+              <span className="text-[10px] text-slate-500 font-mono">{err.model_used}</span>
+            )}
+          </div>
+          <p className="text-sm text-slate-700 truncate">{err.error || 'Pas de détail'}</p>
+          {err.telephone && <p className="text-xs text-slate-400 mt-0.5">Client: {err.telephone}</p>}
+          {err.raw_response && (
+            <div className="mt-1">
+              <button
+                onClick={() => setShowRaw(!showRaw)}
+                className="text-[10px] text-indigo-600 hover:text-indigo-800 font-medium"
+              >
+                {showRaw ? '▾ Masquer' : '▸ Voir réponse brute (PII masquée)'}
+              </button>
+              {showRaw && (
+                <pre className="mt-1 text-[10px] text-slate-600 bg-slate-50 border border-slate-200 rounded p-2 overflow-x-auto max-h-32 whitespace-pre-wrap break-all">
+                  {err.raw_response}
+                </pre>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function OpenAIDashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -243,11 +307,16 @@ export default function OpenAIDashboard() {
             Performance OpenAI — Aujourd'hui
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            <StatCard icon={Zap} label="Appels OpenAI" value={today.calls || 0} sublabel={`${today.success || 0} réussis`} color="indigo" />
-            <StatCard icon={Clock} label="Temps moyen" value={`${today.avg_response_ms || 0}ms`} sublabel="par appel" color="blue" />
+            <StatCard icon={Zap} label="Appels OpenAI" value={today.calls || 0} sublabel={`${today.success || 0} réussis du 1er coup`} color="indigo" />
+            <StatCard icon={RefreshCw} label="Succès après retry" value={today.success_retry || 0} sublabel={`${today.total_retries || 0} retries effectués`} color="blue" />
+            <StatCard icon={Clock} label="Temps moyen" value={`${today.avg_response_ms || 0}ms`} sublabel="par appel (toutes tentatives)" color="blue" />
             <StatCard icon={DollarSign} label="Coût aujourd'hui" value={`$${(today.cost_usd || 0).toFixed(4)}`} sublabel={`${(today.total_tokens || 0).toLocaleString()} tokens`} color="green" />
+            <StatCard icon={AlertTriangle} label="Réponses vides" value={today.empty_response || 0} sublabel="OpenAI → contenu vide" color="amber" />
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-3">
             <StatCard icon={AlertTriangle} label="Bascules fallback" value={today.fallbacks || 0} sublabel="vers Base44" color="amber" />
-            <StatCard icon={XCircle} label="Erreurs OpenAI" value={today.errors || 0} sublabel="timeouts, quota..." color="red" />
+            <StatCard icon={XCircle} label="Erreurs API OpenAI" value={today.errors || 0} sublabel="timeouts, 500, quota..." color="red" />
+            <StatCard icon={XCircle} label="Échecs totaux" value={today.total_failure || 0} sublabel="OpenAI + fallback échoués" color="red" />
           </div>
         </div>
 
@@ -258,11 +327,16 @@ export default function OpenAIDashboard() {
             Ce mois-ci
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            <StatCard icon={Zap} label="Appels OpenAI" value={month.calls || 0} sublabel={`${month.success || 0} réussis`} color="indigo" />
-            <StatCard icon={Clock} label="Temps moyen" value={`${month.avg_response_ms || 0}ms`} sublabel="par appel" color="blue" />
+            <StatCard icon={Zap} label="Appels OpenAI" value={month.calls || 0} sublabel={`${month.success || 0} réussis du 1er coup`} color="indigo" />
+            <StatCard icon={RefreshCw} label="Succès après retry" value={month.success_retry || 0} sublabel={`${month.total_retries || 0} retries effectués`} color="blue" />
+            <StatCard icon={Clock} label="Temps moyen" value={`${month.avg_response_ms || 0}ms`} sublabel="par appel (toutes tentatives)" color="blue" />
             <StatCard icon={DollarSign} label="Coût mensuel" value={`$${(month.cost_usd || 0).toFixed(4)}`} sublabel={`${(month.total_tokens || 0).toLocaleString()} tokens`} color="green" />
+            <StatCard icon={AlertTriangle} label="Réponses vides" value={month.empty_response || 0} sublabel="OpenAI → contenu vide" color="amber" />
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-3">
             <StatCard icon={AlertTriangle} label="Bascules fallback" value={month.fallbacks || 0} sublabel="vers Base44" color="amber" />
-            <StatCard icon={XCircle} label="Erreurs OpenAI" value={month.errors || 0} sublabel="échecs API" color="red" />
+            <StatCard icon={XCircle} label="Erreurs API OpenAI" value={month.errors || 0} sublabel="échecs API" color="red" />
+            <StatCard icon={XCircle} label="Échecs totaux" value={month.total_failure || 0} sublabel="OpenAI + fallback échoués" color="red" />
           </div>
         </div>
 
@@ -391,7 +465,7 @@ export default function OpenAIDashboard() {
           )}
         </div>
 
-        {/* ═══ Section 6: Erreurs récentes ═══ */}
+        {/* ═══ Section 6: Erreurs & bascules récentes ═══ */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
           <div className="px-5 py-4 border-b border-slate-200">
             <h2 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
@@ -402,22 +476,7 @@ export default function OpenAIDashboard() {
           <div className="divide-y divide-slate-100">
             {stats?.recent_errors?.length > 0 ? (
               stats.recent_errors.map((err, i) => (
-                <div key={i} className="px-5 py-3 flex items-start gap-3">
-                  <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${err.status === 'error' ? 'bg-red-500' : 'bg-amber-500'}`} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className={`text-xs font-semibold ${err.status === 'error' ? 'text-red-600' : 'text-amber-600'}`}>
-                        {err.status === 'error' ? 'ERREUR' : 'FALLBACK'}
-                      </span>
-                      <span className="text-xs text-slate-400">
-                        {err.date ? new Date(err.date).toLocaleString('fr-FR') : 'N/A'}
-                      </span>
-                      {err.response_time_ms > 0 && <span className="text-xs text-slate-400">{err.response_time_ms}ms</span>}
-                    </div>
-                    <p className="text-sm text-slate-700 truncate">{err.error || 'Pas de détail'}</p>
-                    {err.telephone && <p className="text-xs text-slate-400 mt-0.5">Client: {err.telephone}</p>}
-                  </div>
-                </div>
+                <ErrorRow key={i} err={err} />
               ))
             ) : (
               <div className="px-5 py-8 text-center text-sm text-slate-400">

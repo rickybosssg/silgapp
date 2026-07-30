@@ -20,11 +20,12 @@
  * ═══════════════════════════════════════════════════════════════════
  */
 
+import { appelerOpenAIAvecRetry, masquerPII, extraireContenuOpenAI, OPENAI_TIMEOUT_MS, OPENAI_RETRY_TIMEOUT_MS } from './venusOpenAIClient.ts';
+import { logOpenAIUsage } from './venusOpenAITracker.ts';
+
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const OPENAI_MODEL_DEFAULT = 'gpt-4.1-mini';
-const MAX_TOOL_ROUNDS = 3;
-const OPENAI_TIMEOUT_MS = 45000; // 45s — GPT-5 (reasoning model) peut prendre jusqu'à 40s
-const OPENAI_RETRY_TIMEOUT_MS = 30000; // 30s pour le retry (plus court = échec plus rapide si serveur surchargé)
+const MAX_TOOL_ROUNDS = 2; // Réduit de 3 → 2 pour limiter la latence (18-55s → <15s)
 
 /**
  * Fetch avec timeout via AbortController.
@@ -443,134 +444,90 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
     const tCallStart = Date.now();
     const isGpt5 = model.startsWith('gpt-5');
 
-    // ── Retry sur timeout (GPT-5 peut nécessiter plus de temps) ──
-    let response: Response;
-    try {
-      response = await fetchAvecTimeout(OPENAI_API_URL, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model,
-          messages,
-          tools: SILGAPP_TOOLS,
-          tool_choice: 'auto',
-          response_format: { type: 'json_object' },
-          temperature: isGpt5 ? 1 : temp,
-          max_completion_tokens: maxTokens,
-          ...(isGpt5 ? { reasoning_effort: 'low' } : {}),
-        }),
-      });
-    } catch (timeoutErr: any) {
-      // Retry sur timeout OU erreur réseau transitoire (ECONNRESET, DNS, etc.)
-      const isTimeout = timeoutErr.message?.includes('timeout');
-      const isNetworkErr = !isTimeout && (
-        timeoutErr.message?.includes('fetch') ||
-        timeoutErr.message?.includes('network') ||
-        timeoutErr.message?.includes('connection') ||
-        timeoutErr.name === 'TypeError'
-      );
-      if (isTimeout || isNetworkErr) {
-        console.warn(`[OpenAIEngine] ⚠️ ${isTimeout ? 'Timeout' : 'Erreur réseau'} au premier essai — retry (30s)`);
-        await new Promise(r => setTimeout(r, isNetworkErr ? 500 : 0));
-        response = await fetchAvecTimeout(OPENAI_API_URL, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model,
-            messages,
-            tools: SILGAPP_TOOLS,
-            tool_choice: 'auto',
-            response_format: { type: 'json_object' },
-            temperature: isGpt5 ? 1 : temp,
-            max_completion_tokens: maxTokens,
-            ...(isGpt5 ? { reasoning_effort: 'low' } : {}),
-          }),
-        }, OPENAI_RETRY_TIMEOUT_MS);
-      } else {
-        throw timeoutErr;
-      }
+    // ── Appel OpenAI via client robuste (retries 1s/2s + parsing multi-format) ──
+    const callResult = await appelerOpenAIAvecRetry(apiKey, {
+      model,
+      messages,
+      tools: SILGAPP_TOOLS,
+      tool_choice: 'auto',
+      response_format: { type: 'json_object' },
+      temperature: isGpt5 ? 1 : temp,
+      max_completion_tokens: maxTokens,
+      ...(isGpt5 ? { reasoning_effort: 'low' } : {}),
+    }, { bumpReasoningOnRetry: true, telephone: ctx.telephone });
+
+    if (!callResult.success) {
+      // Logger l'échec avec réponse brute masquée pour diagnostic admin
+      logOpenAIUsage(base44, {
+        model,
+        tokens_prompt: callResult.tokens.prompt,
+        tokens_completion: callResult.tokens.completion,
+        tokens_total: callResult.tokens.total,
+        response_time_ms: callResult.responseTimeMs,
+        status: callResult.errorKind === 'empty' ? 'empty_response' : 'error',
+        error_message: callResult.errorMessage,
+        raw_response: masquerPII(JSON.stringify(callResult.rawResponse || {})),
+        http_status: callResult.httpStatus,
+        retry_count: callResult.retryCount,
+        telephone: ctx.telephone,
+      }).catch(() => {});
+      throw new Error(callResult.errorMessage || 'OpenAI: échec API');
     }
 
-    if (!response.ok) {
-      const errText = await response.text();
-      // Retry sur erreur 500 (serveur instable OpenAI) ou 429 (rate limit)
-      if ((response.status >= 500 || response.status === 429) && round === 0) {
-        const delay = response.status === 429 ? 2000 : 1000;
-        console.warn(`[OpenAIEngine] ⚠️ Erreur ${response.status} OpenAI — retry après ${delay}ms`);
-        await new Promise(r => setTimeout(r, delay));
-        continue;
-      }
-      throw new Error(`OpenAI API ${response.status}: ${errText.substring(0, 300)}`);
+    // Logger le succès (avec info retry si applicable)
+    if (callResult.retryCount > 0) {
+      logOpenAIUsage(base44, {
+        model,
+        tokens_prompt: callResult.tokens.prompt,
+        tokens_completion: callResult.tokens.completion,
+        tokens_total: callResult.tokens.total,
+        response_time_ms: callResult.responseTimeMs,
+        status: 'success_retry',
+        retry_count: callResult.retryCount,
+        http_status: callResult.httpStatus,
+        telephone: ctx.telephone,
+        tools_used: toolsUsed.length > 0 ? toolsUsed.join(',') : '',
+      }).catch(() => {});
     }
 
-    const data = await response.json();
+    const data = callResult.rawResponse;
     const msg = data.choices?.[0]?.message;
 
-    if (!msg) throw new Error('OpenAI: réponse vide');
+    if (!msg) throw new Error('OpenAI: message manquant dans la réponse');
 
     const usage = data.usage;
-    console.log(`[OpenAIEngine] ⏱️ Tour ${round + 1}: ${Date.now() - tCallStart}ms | tokens: ${usage?.total_tokens || 'N/A'} | tool_calls: ${msg.tool_calls?.length || 0}`);
+    msg.content = callResult.content; // Utiliser le contenu extrait robustement (multi-format)
+    console.log(`[OpenAIEngine] ⏱️ Tour ${round + 1}: ${Date.now() - tCallStart}ms | tokens: ${usage?.total_tokens || callResult.tokens.total || 'N/A'} | tool_calls: ${msg.tool_calls?.length || 0} | retries: ${callResult.retryCount}`);
 
     // ── Si aucun tool_call → réponse finale JSON ──
     if (!msg.tool_calls || msg.tool_calls.length === 0) {
       const content = msg.content || '';
-      // ── GPT-5 peut retourner un content vide (reasoning tokens uniquement).
-      //    Avant de fallback vers InvokeLLM, retry une fois avec reasoning_effort='medium'. ──
+      // ── Le client robuste a déjà effectué les retries (incl. reasoning_effort bump).
+      //    Si le content est TOUJOURS vide, construire une réponse par défaut. ──
       if (!content || content.trim().length === 0) {
-        if (isGpt5 && round === 0) {
-          console.warn('[OpenAIEngine] ⚠️ GPT-5 content vide — retry avec reasoning_effort=medium');
-          const retryResp = await fetchAvecTimeout(OPENAI_API_URL, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              model, messages, tools: SILGAPP_TOOLS, tool_choice: 'auto',
-              response_format: { type: 'json_object' },
-              temperature: 1, max_completion_tokens: maxTokens,
-              reasoning_effort: 'medium',
-            }),
-          });
-          if (retryResp.ok) {
-            const retryData = await retryResp.json();
-            const retryMsg = retryData.choices?.[0]?.message;
-            if (retryMsg?.content && retryMsg.content.trim().length > 0) {
-              console.log(`[OpenAIEngine] ✅ Retry medium réussi: ${Date.now() - tCallStart}ms`);
-              msg.content = retryMsg.content;
-            }
-          }
-        }
-        // ── ÉCONOMIE DE CRÉDITS: Au lieu de fallback vers InvokeLLM (coûteux),
-        //    construire une réponse par défaut quand OpenAI retourne un content vide. ──
-        if (!msg.content || msg.content.trim().length === 0) {
-          console.warn('[OpenAIEngine] ⚠️ Content vide — construction réponse par défaut (évite fallback InvokeLLM)');
-          const defaultParsed = {
-            intention: 'autre',
-            contexte: 'general',
-            infos_connues: '{}',
-            infos_manquantes: [],
-            action: 'repondre_info',
-            prochaine_question: '',
-            outils_utilises: toolsUsed,
-            confiance: 40,
-            reponse: "Je suis VENUS, l'assistante SILGAPP. Comment puis-je vous aider avec votre livraison ?",
-            memoire_courte_update: '{}',
-            memoire_longue_update: '{}',
-            business_rule_id: '',
-            knowledge_id: '',
-            document_sources: '',
-          };
-          defaultParsed._outils_openai = toolsUsed.length > 0 ? toolsUsed.join(',') : 'none';
-          defaultParsed._model_openai = model;
-          defaultParsed._tokens_openai = usage?.total_tokens || 0;
-          defaultParsed._tokens_prompt = usage?.prompt_tokens || 0;
-          defaultParsed._tokens_completion = usage?.completion_tokens || 0;
-          return defaultParsed;
-        }
+        console.warn('[OpenAIEngine] ⚠️ Content vide — construction réponse par défaut (évite fallback InvokeLLM)');
+        const defaultParsed = {
+          intention: 'autre',
+          contexte: 'general',
+          infos_connues: '{}',
+          infos_manquantes: [],
+          action: 'repondre_info',
+          prochaine_question: '',
+          outils_utilises: toolsUsed,
+          confiance: 40,
+          reponse: "Je suis VENUS, l'assistante SILGAPP. Comment puis-je vous aider avec votre livraison ?",
+          memoire_courte_update: '{}',
+          memoire_longue_update: '{}',
+          business_rule_id: '',
+          knowledge_id: '',
+          document_sources: '',
+        };
+        defaultParsed._outils_openai = toolsUsed.length > 0 ? toolsUsed.join(',') : 'none';
+        defaultParsed._model_openai = model;
+        defaultParsed._tokens_openai = usage?.total_tokens || callResult.tokens.total || 0;
+        defaultParsed._tokens_prompt = usage?.prompt_tokens || callResult.tokens.prompt || 0;
+        defaultParsed._tokens_completion = usage?.completion_tokens || callResult.tokens.completion || 0;
+        return defaultParsed;
       }
       let parsed: any;
       const finalContent = msg.content || content;
@@ -687,29 +644,37 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
   // Max rounds atteint — forcer une réponse JSON sans outils
   console.warn('[OpenAIEngine] ⚠️ Max tool rounds atteint — forçage réponse finale');
   const isGpt5Final = model.startsWith('gpt-5');
-  const finalResponse = await fetchAvecTimeout(OPENAI_API_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-        model,
-        messages: [
-          ...messages,
-        { role: 'system', content: 'Tu as utilisé le maximum d\'outils. Réponds MAINTENANT avec le JSON final, sans appeler d\'autres outils.' },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: isGpt5Final ? 1 : 0.3,
-      max_completion_tokens: 1500,
-      ...(isGpt5Final ? { reasoning_effort: 'low' } : {}),
-    }),
-  });
+  const finalCallResult = await appelerOpenAIAvecRetry(apiKey, {
+    model,
+    messages: [
+      ...messages,
+      { role: 'system', content: 'Tu as utilisé le maximum d\'outils. Réponds MAINTENANT avec le JSON final, sans appeler d\'autres outils.' },
+    ],
+    response_format: { type: 'json_object' },
+    temperature: isGpt5Final ? 1 : 0.3,
+    max_completion_tokens: 1500,
+    ...(isGpt5Final ? { reasoning_effort: 'low' } : {}),
+  }, { bumpReasoningOnRetry: true, telephone: ctx.telephone });
 
-  if (!finalResponse.ok) throw new Error('OpenAI: échec réponse finale');
+  if (!finalCallResult.success) {
+    logOpenAIUsage(base44, {
+      model,
+      tokens_prompt: finalCallResult.tokens.prompt,
+      tokens_completion: finalCallResult.tokens.completion,
+      tokens_total: finalCallResult.tokens.total,
+      response_time_ms: finalCallResult.responseTimeMs,
+      status: 'error',
+      error_message: finalCallResult.errorMessage,
+      raw_response: masquerPII(JSON.stringify(finalCallResult.rawResponse || {})),
+      http_status: finalCallResult.httpStatus,
+      retry_count: finalCallResult.retryCount,
+      telephone: ctx.telephone,
+    }).catch(() => {});
+    throw new Error('OpenAI: échec réponse finale');
+  }
 
-  const finalData = await finalResponse.json();
-  const finalContent = finalData.choices?.[0]?.message?.content || '';
+  const finalData = finalCallResult.rawResponse;
+  const finalContent = finalCallResult.content;
   // ── ÉCONOMIE DE CRÉDITS: Si la réponse finale est vide, construire une réponse par défaut ──
   if (!finalContent || finalContent.trim().length === 0) {
     console.warn('[OpenAIEngine] ⚠️ Réponse finale vide après max tool rounds — construction réponse par défaut (évite fallback InvokeLLM)');
@@ -731,9 +696,9 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
     };
     defaultFinalParsed._outils_openai = toolsUsed.join(',');
     defaultFinalParsed._model_openai = model;
-    defaultFinalParsed._tokens_openai = finalData.usage?.total_tokens || 0;
-    defaultFinalParsed._tokens_prompt = finalData.usage?.prompt_tokens || 0;
-    defaultFinalParsed._tokens_completion = finalData.usage?.completion_tokens || 0;
+    defaultFinalParsed._tokens_openai = finalCallResult.tokens.total || finalData.usage?.total_tokens || 0;
+    defaultFinalParsed._tokens_prompt = finalCallResult.tokens.prompt || finalData.usage?.prompt_tokens || 0;
+    defaultFinalParsed._tokens_completion = finalCallResult.tokens.completion || finalData.usage?.completion_tokens || 0;
     return defaultFinalParsed;
   }
   let finalParsed: any;
@@ -749,8 +714,8 @@ Réponds UNIQUEMENT avec un JSON conforme au schéma de raisonnement.`
   }
   finalParsed._outils_openai = toolsUsed.join(',');
   finalParsed._model_openai = model;
-  finalParsed._tokens_openai = finalData.usage?.total_tokens || 0;
-  finalParsed._tokens_prompt = finalData.usage?.prompt_tokens || 0;
-  finalParsed._tokens_completion = finalData.usage?.completion_tokens || 0;
+  finalParsed._tokens_openai = finalCallResult.tokens.total || finalData.usage?.total_tokens || 0;
+  finalParsed._tokens_prompt = finalCallResult.tokens.prompt || finalData.usage?.prompt_tokens || 0;
+  finalParsed._tokens_completion = finalCallResult.tokens.completion || finalData.usage?.completion_tokens || 0;
   return finalParsed;
 }

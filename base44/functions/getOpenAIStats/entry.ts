@@ -43,14 +43,19 @@ Deno.serve(async (req) => {
       const date = new Date(r.date_appel || r.created_date);
       if (date >= todayStart) todayRecords.push(r);
       if (date >= monthStart) monthRecords.push(r);
-      if ((r.status === 'error' || r.status === 'fallback') && recentErrors.length < 10) {
+      // Inclure tous les statuts non-success pour le diagnostic admin
+      if (r.status !== 'success' && recentErrors.length < 15) {
         recentErrors.push({
           date: r.date_appel,
           status: r.status,
           error: r.error_message || '',
           telephone: r.telephone || '',
-          model: r.model_used,
-          response_time_ms: r.response_time_ms,
+          model_used: r.model_used,
+          model: r.model_used, // rétrocompatibilité
+          response_time_ms: r.response_time_ms || 0,
+          raw_response: (r.raw_response || '').substring(0, 3000),
+          http_status: r.http_status || 0,
+          retry_count: r.retry_count || 0,
         });
       }
     }
@@ -59,18 +64,26 @@ Deno.serve(async (req) => {
     const aggregate = (recs: any[]) => {
       const calls = recs.length;
       const successCount = recs.filter(r => r.status === 'success').length;
+      const successRetryCount = recs.filter(r => r.status === 'success_retry').length;
       const fallbackCount = recs.filter(r => r.status === 'fallback').length;
       const errorCount = recs.filter(r => r.status === 'error').length;
+      const emptyCount = recs.filter(r => r.status === 'empty_response').length;
+      const totalFailureCount = recs.filter(r => r.status === 'total_failure').length;
       const totalTime = recs.reduce((sum, r) => sum + (r.response_time_ms || 0), 0);
       const totalCost = recs.reduce((sum, r) => sum + (r.cost_usd || 0), 0);
       const totalTokens = recs.reduce((sum, r) => sum + (r.tokens_total || 0), 0);
       const promptTokens = recs.reduce((sum, r) => sum + (r.tokens_prompt || 0), 0);
       const completionTokens = recs.reduce((sum, r) => sum + (r.tokens_completion || 0), 0);
+      const totalRetries = recs.reduce((sum, r) => sum + (r.retry_count || 0), 0);
       return {
         calls,
         success: successCount,
+        success_retry: successRetryCount,
         fallbacks: fallbackCount,
         errors: errorCount,
+        empty_response: emptyCount,
+        total_failure: totalFailureCount,
+        total_retries: totalRetries,
         avg_response_ms: calls > 0 ? Math.round(totalTime / calls) : 0,
         cost_usd: Math.round(totalCost * 10000) / 10000,
         total_tokens: totalTokens,

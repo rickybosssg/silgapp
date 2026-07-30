@@ -9,7 +9,7 @@
     },
     "model_used": {
       "type": "string",
-      "description": "Mod\u00e8le OpenAI utilis\u00e9 (ex: gpt-4.1-mini)"
+      "description": "Mod\u00e8le OpenAI utilis\u00e9 (ex: gpt-4.1-mini, gpt-5)"
     },
     "tokens_prompt": {
       "type": "number",
@@ -40,15 +40,31 @@
       "type": "string",
       "enum": [
         "success",
+        "success_retry",
         "fallback",
-        "error"
+        "error",
+        "empty_response",
+        "total_failure"
       ],
       "default": "success",
-      "description": "Statut: success, fallback (vers Base44 InvokeLLM), error"
+      "description": "Statut d\u00e9taill\u00e9: success=OpenAI r\u00e9ussi du 1er coup, success_retry=OpenAI r\u00e9ussi apr\u00e8s retry(s), fallback=Base44 InvokeLLM utilis\u00e9, error=erreur API OpenAI, empty_response=OpenAI a retourn\u00e9 une r\u00e9ponse vide, total_failure=OpenAI+fallback ont \u00e9chou\u00e9"
     },
     "error_message": {
       "type": "string",
       "description": "Message d'erreur si status=error ou fallback"
+    },
+    "raw_response": {
+      "type": "string",
+      "description": "R\u00e9ponse JSON brute d'OpenAI (PII masqu\u00e9e) pour diagnostic admin. Stock\u00e9e sur erreur/r\u00e9ponse vide."
+    },
+    "http_status": {
+      "type": "number",
+      "description": "Code HTTP de la r\u00e9ponse OpenAI (0 si timeout/r\u00e9seau)"
+    },
+    "retry_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Nombre de retries effectu\u00e9s avant succ\u00e8s/\u00e9chec (0=1er essai, 1=2e essai, etc.)"
     },
     "conversation_id": {
       "type": "string",
