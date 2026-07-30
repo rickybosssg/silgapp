@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, CheckCircle2, Clock, Image as ImageIcon, Phone, X, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock, FileText, Phone, X, XCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -31,6 +31,7 @@ const FILTRES = [
 function PaiementCard({ paiement, onTraiter, onRefuser, isPending }) {
   const [showProof, setShowProof] = useState(false);
   const isPendingPayment = paiement.statut === "en_attente";
+  const isPdf = paiement.preuve_type === "application/pdf" || /\.pdf(?:$|\?)/i.test(paiement.preuve_url || "");
 
   return (
     <div className={`bg-white rounded-2xl border p-4 shadow-sm ${isPendingPayment ? "border-orange-200" : "border-slate-100"}`}>
@@ -88,9 +89,21 @@ function PaiementCard({ paiement, onTraiter, onRefuser, isPending }) {
       </div>
 
       {paiement.preuve_url && (
-        <button onClick={() => setShowProof(true)} className="w-full mb-3">
-          <img src={paiement.preuve_url} alt="Preuve" className="w-full rounded-xl max-h-40 object-cover" />
-        </button>
+        isPdf ? (
+          <a
+            href={paiement.preuve_url}
+            target="_blank"
+            rel="noreferrer"
+            className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 p-4 text-sm font-bold text-red-700"
+          >
+            <FileText className="h-5 w-5" />
+            Ouvrir la preuve PDF
+          </a>
+        ) : (
+          <button onClick={() => setShowProof(true)} className="w-full mb-3">
+            <img src={paiement.preuve_url} alt="Preuve" className="w-full rounded-xl max-h-40 object-cover" />
+          </button>
+        )
       )}
 
       {isPendingPayment && (
@@ -104,7 +117,7 @@ function PaiementCard({ paiement, onTraiter, onRefuser, isPending }) {
         </div>
       )}
 
-      {showProof && (
+      {showProof && !isPdf && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setShowProof(false)}>
           <div className="relative max-w-md w-full">
             <button onClick={() => setShowProof(false)} className="absolute -top-10 right-0 text-white">

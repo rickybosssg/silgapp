@@ -7,6 +7,7 @@ import PhotoPicker from "./PhotoPicker";
 import LivreurPhotoUploader from "./LivreurPhotoUploader";
 import { base44 } from "@/api/base44Client";
 import { SILGAPP_COUNTRIES, getCountryLabel } from "@/lib/phoneUtils";
+import SmartAddressInput from "@/components/location/SmartAddressInput";
 
 export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
   const countryCode = livreurProfil?.country_code || "BF";
@@ -106,7 +107,6 @@ export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
       {[
         { key: "nom", label: "Nom *", placeholder: "Ex: Ouédraogo" },
         { key: "prenom", label: "Prénom *", placeholder: "Ex: Ibrahim" },
-        { key: "quartier", label: "Quartier *", placeholder: "Ex: Wemtenga" },
         { key: "numero_plaque", label: "N° de plaque", placeholder: "Ex: 12AB3456" },
       ].map(({ key, label, placeholder }) => (
         <div key={key}>
@@ -119,6 +119,16 @@ export default function LivreurMesInfosModal({ livreurProfil, onSave }) {
           />
         </div>
       ))}
+
+      <SmartAddressInput
+        countryCode={countryCode}
+        value={form.quartier}
+        label="Quartier *"
+        required
+        placeholder="Commencez par le nom du quartier..."
+        inputClassName="h-12 rounded-xl text-sm"
+        onChange={(text, location) => setF("quartier", location?.quartier || location?.label || text)}
+      />
 
       {/* Téléphone */}
       <div>

@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, MapPin, Send, Loader2, Sparkles, Navigation, Check } from "lucide-react";
+import { ArrowLeft, Send, Loader2, Sparkles, Navigation, Check } from "lucide-react";
 import { useAdminContext } from "@/hooks/useAdminContext";
 import { useAdminCourseWindows } from "@/context/AdminCourseWindowsContext";
-import QuartierSelect from "@/components/client/QuartierSelect";
+import SmartAddressInput from "@/components/location/SmartAddressInput";
 import MapPickerModal from "@/components/admin/MapPickerModal";
 
 function generarQRData() {
@@ -300,32 +300,28 @@ export default function AdminCourseForm() {
                 </span>
               )}
             </div>
-            <div className="relative">
-              <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500" />
-              <Input
-                value={adresseDepart}
-                onChange={e => setAdresseDepart(e.target.value)}
-                placeholder="Ex: Ouaga 2000, face à la mairie"
-                className="rounded-xl h-12 pl-10 pr-28 bg-emerald-50/40 border-emerald-100 text-sm focus:ring-emerald-300 focus:border-emerald-300"
-              />
-              <button
-                type="button"
-                onClick={() => setMapModal('depart')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500 text-white text-[11px] font-semibold hover:bg-emerald-600 transition-colors shadow-sm shadow-emerald-200"
-              >
-                <Navigation className="w-3.5 h-3.5" />
-                Localiser
-              </button>
-            </div>
+            <SmartAddressInput
+              countryCode={countryCode}
+              value={adresseDepart}
+              onChange={(text, location) => {
+                setAdresseDepart(text);
+                if (location?.quartier) setQuartierDepart(location.quartier);
+                if (Number.isFinite(Number(location?.latitude)) && Number.isFinite(Number(location?.longitude))) {
+                  setGpsDepart({ lat: Number(location.latitude), lng: Number(location.longitude) });
+                }
+              }}
+              placeholder="Quartier, rue, boutique, pharmacie..."
+              inputClassName="h-12 rounded-xl border-emerald-100 bg-emerald-50/40 text-sm focus:border-emerald-300 focus:ring-emerald-100"
+            />
+            <button
+              type="button"
+              onClick={() => setMapModal("depart")}
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-2 text-xs font-bold text-white shadow-sm shadow-emerald-200 transition-colors hover:bg-emerald-600"
+            >
+              <Navigation className="w-3.5 h-3.5" />
+              Choisir précisément sur la carte
+            </button>
           </div>
-
-          <QuartierSelect
-            countryCode={countryCode}
-            value={quartierDepart}
-            onChange={setQuartierDepart}
-            placeholder="Quartier de récupération..."
-            label="Quartier de récupération"
-          />
 
           <div>
             <div className="flex items-center justify-between mb-1.5">
@@ -338,32 +334,28 @@ export default function AdminCourseForm() {
                 </span>
               )}
             </div>
-            <div className="relative">
-              <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-500" />
-              <Input
-                value={adresseArrivee}
-                onChange={e => setAdresseArrivee(e.target.value)}
-                placeholder="Ex: Gounghin, derrière le marché"
-                className="rounded-xl h-12 pl-10 pr-28 bg-rose-50/40 border-rose-100 text-sm focus:ring-rose-300 focus:border-rose-300"
-              />
-              <button
-                type="button"
-                onClick={() => setMapModal('arrivee')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-500 text-white text-[11px] font-semibold hover:bg-rose-600 transition-colors shadow-sm shadow-rose-200"
-              >
-                <Navigation className="w-3.5 h-3.5" />
-                Localiser
-              </button>
-            </div>
+            <SmartAddressInput
+              countryCode={countryCode}
+              value={adresseArrivee}
+              onChange={(text, location) => {
+                setAdresseArrivee(text);
+                if (location?.quartier) setQuartierArrivee(location.quartier);
+                if (Number.isFinite(Number(location?.latitude)) && Number.isFinite(Number(location?.longitude))) {
+                  setGpsArrivee({ lat: Number(location.latitude), lng: Number(location.longitude) });
+                }
+              }}
+              placeholder="Quartier, rue, restaurant, pharmacie..."
+              inputClassName="h-12 rounded-xl border-rose-100 bg-rose-50/40 text-sm focus:border-rose-300 focus:ring-rose-100"
+            />
+            <button
+              type="button"
+              onClick={() => setMapModal("arrivee")}
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl bg-rose-500 px-3 py-2 text-xs font-bold text-white shadow-sm shadow-rose-200 transition-colors hover:bg-rose-600"
+            >
+              <Navigation className="w-3.5 h-3.5" />
+              Choisir précisément sur la carte
+            </button>
           </div>
-
-          <QuartierSelect
-            countryCode={countryCode}
-            value={quartierArrivee}
-            onChange={setQuartierArrivee}
-            placeholder="Quartier de livraison..."
-            label="Quartier de livraison"
-          />
 
           {typeCourse !== "deplacement" && (
             <div>

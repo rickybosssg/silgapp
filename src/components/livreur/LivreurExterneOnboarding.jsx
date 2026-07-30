@@ -5,6 +5,7 @@ import { Check } from "lucide-react";
 import { SILGAPP_COUNTRIES, normalizePhone } from "@/lib/phoneUtils";
 import { requestNativeAppPermissions } from "@/lib/nativePermissions";
 import CountryCodeSelect from "@/components/ui/CountryCodeSelect";
+import SmartAddressInput from "@/components/location/SmartAddressInput";
 
 // ─── Helpers téléphone (délègue à phoneUtils) ─────────────────────────────────
 export function normaliserTelephone(tel, countryCode = "BF") {
@@ -145,7 +146,6 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
         {[
           { key: "nom", label: "Nom *", placeholder: "Ex: Ouédraogo" },
           { key: "prenom", label: "Prénom *", placeholder: "Ex: Ibrahim" },
-          { key: "quartier", label: "Quartier de résidence *", placeholder: "Ex: Wemtenga" },
         ].map(({ key, label, placeholder }) => (
           <div key={key}>
             <label className="block text-xs font-bold text-gray-300 mb-1 uppercase tracking-wide">{label}</label>
@@ -167,6 +167,17 @@ function FormulaireProfilLivreur({ livreurProfil, gpsData, onTermine }) {
             dark
           />
         </div>
+
+        <SmartAddressInput
+          countryCode={countryCode}
+          value={form.quartier}
+          label="Quartier de résidence *"
+          required
+          placeholder={countryCode ? "Commencez par le nom du quartier..." : "Choisissez d'abord votre pays"}
+          inputClassName="border-zinc-600 bg-zinc-800 text-white placeholder:text-zinc-500 focus:border-blue-500 focus:bg-zinc-800 focus:ring-blue-950"
+          labelClassName="text-gray-300"
+          onChange={(text, location) => setF("quartier", location?.quartier || location?.label || text)}
+        />
 
         {/* Téléphone */}
         <div>

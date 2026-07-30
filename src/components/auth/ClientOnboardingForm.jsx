@@ -12,6 +12,7 @@ import {
   phonePlaceholder,
 } from "@/lib/phoneUtils";
 import CountryCodeSelect from "@/components/ui/CountryCodeSelect";
+import SmartAddressInput from "@/components/location/SmartAddressInput";
 
 export default function ClientOnboardingForm({ user, onComplete }) {
   const [form, setForm] = useState({
@@ -54,6 +55,8 @@ export default function ClientOnboardingForm({ user, onComplete }) {
         country_code: form.country_code,
         ville: form.ville,
         quartier: form.quartier,
+        latitude: form.latitude || null,
+        longitude: form.longitude || null,
         actif: true,
       });
       onComplete?.();
@@ -149,15 +152,23 @@ export default function ClientOnboardingForm({ user, onComplete }) {
         />
       </div>
 
-      <div className="space-y-1.5">
-        <Label className="text-sm font-semibold">Quartier / Adresse</Label>
-        <Input
-          value={form.quartier}
-          onChange={(e) => setForm({ ...form, quartier: e.target.value })}
-          placeholder="Quartier ou adresse"
-          className="h-12 rounded-xl"
-        />
-      </div>
+      <SmartAddressInput
+        countryCode={form.country_code}
+        value={form.quartier}
+        label="Quartier / Adresse"
+        placeholder="Commencez par le nom du quartier..."
+        inputClassName="h-12 rounded-xl text-sm"
+        onChange={(text, location) =>
+          setForm((previous) => ({
+            ...previous,
+            quartier: location?.quartier || location?.label || text,
+            ville: location?.ville || previous.ville,
+            ...(location && Number.isFinite(Number(location.latitude)) && Number.isFinite(Number(location.longitude))
+              ? { latitude: Number(location.latitude), longitude: Number(location.longitude) }
+              : {}),
+          }))
+        }
+      />
 
       {error && (
         <p className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">

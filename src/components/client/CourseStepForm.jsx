@@ -15,7 +15,7 @@ import ContactPickerButton from "@/components/client/ContactPickerButton";
 import { SILGAPP_COUNTRIES, phoneVariants } from "@/lib/phoneUtils";
 import NombreColisSelector from "@/components/multi-colis/NombreColisSelector";
 import MultiColisFormStep from "@/components/multi-colis/MultiColisFormStep";
-import QuartierSelect from "@/components/client/QuartierSelect";
+import SmartAddressInput from "@/components/location/SmartAddressInput";
 
 // Retourne l'indicatif affiché (ex: "+226") selon le pays
 function getDialCode(countryCode) {
@@ -104,6 +104,23 @@ export default function CourseStepForm({
   const [destinataireFound, setDestinataireFound] = useState(null);
   const [verifying, setVerifying] = useState(false);
   const progress = ((step + 1) / totalSteps) * 100;
+
+  const updateAddress = (side, text, location) => {
+    const isDeparture = side === "depart";
+    setFormData((previous) => ({
+      ...previous,
+      [isDeparture ? "adresse_depart" : "adresse_arrivee"]: text,
+      [isDeparture ? "quartier_depart" : "quartier_arrivee"]:
+        location?.quartier || (location ? location.label : text),
+      ...(location && Number.isFinite(Number(location.latitude)) && Number.isFinite(Number(location.longitude))
+        ? {
+            [isDeparture ? "gps_depart_lat" : "gps_arrivee_lat"]: Number(location.latitude),
+            [isDeparture ? "gps_depart_lng" : "gps_arrivee_lng"]: Number(location.longitude),
+            [isDeparture ? "recuperationGPS" : "livraisonGPS"]: true,
+          }
+        : {}),
+    }));
+  };
 
   // Auto-activer GPS expéditeur si disponible (flux "recevoir")
   // IMPORTANT : désactivé pour éviter boucle React #185
@@ -430,7 +447,13 @@ export default function CourseStepForm({
                     </div>
                   </button>
                   <div className="flex items-center gap-3"><div className="flex-1 h-px bg-gray-200" /><span className="text-xs text-gray-400 font-medium">ou saisir manuellement</span><div className="flex-1 h-px bg-gray-200" /></div>
-                  <PremiumInput label="Adresse de prise en charge" required={false} value={formData.adresse_depart} onChange={(e) => setFormData({ ...formData, adresse_depart: e.target.value })} placeholder="Quartier, rue, point de repère... (optionnel)" />
+                  <SmartAddressInput
+                    countryCode={activeCountry}
+                    label="Adresse de prise en charge"
+                    value={formData.adresse_depart}
+                    onChange={(text, location) => updateAddress("depart", text, location)}
+                    placeholder="Quartier, rue, boutique, pharmacie..."
+                  />
                 </>
               )}
             </div>
@@ -568,20 +591,12 @@ export default function CourseStepForm({
                   <div className="flex-1 h-px bg-gray-200" />
                 </div>
 
-                <PremiumInput
-                  label="Adresse de récupération"
-                  required={false}
-                  value={formData.adresse_depart}
-                  onChange={(e) => setFormData({ ...formData, adresse_depart: e.target.value })}
-                  placeholder="Quartier, rue, point de repère... (optionnel)"
-                />
-
-                <QuartierSelect
+                <SmartAddressInput
                   countryCode={activeCountry}
-                  value={formData.quartier_depart || ""}
-                  onChange={(quartier) => setFormData({ ...formData, quartier_depart: quartier })}
-                  placeholder="Sélectionnez votre quartier..."
-                  label="Quartier de récupération"
+                  label="Adresse de récupération"
+                  value={formData.adresse_depart}
+                  onChange={(text, location) => updateAddress("depart", text, location)}
+                  placeholder="Quartier, rue, boutique, pharmacie..."
                 />
               </>
             )}
@@ -600,13 +615,13 @@ export default function CourseStepForm({
                 <h2 className="text-2xl font-black text-gray-900">Point de destination</h2>
                 <p className="text-sm text-gray-500 mt-1.5">Où déposer le passager ?</p>
               </div>
-              <PremiumInput
+              <SmartAddressInput
+                countryCode={activeCountry}
                 label="Adresse de destination"
-                required={false}
                 hint="Indiquez le quartier, la rue ou un point de repère connu."
                 value={formData.adresse_arrivee}
-                onChange={(e) => setFormData({ ...formData, adresse_arrivee: e.target.value })}
-                placeholder="Quartier, rue, point de repère... (optionnel)"
+                onChange={(text, location) => updateAddress("arrivee", text, location)}
+                placeholder="Quartier, rue, restaurant, pharmacie..."
                 autoFocus
               />
               <button type="button" onClick={gpsHandlers?.onGetGPSArrivee} disabled={gpsLoading?.arrivee} className="w-full rounded-3xl bg-gradient-to-r from-sky-500 to-blue-700 text-white font-bold text-base shadow-xl shadow-sky-200 active:scale-[0.98] transition-all overflow-hidden disabled:opacity-75 disabled:cursor-wait">
@@ -763,12 +778,12 @@ export default function CourseStepForm({
             </button>
 
             {!(gpsDispo && formData.recuperationGPS) && (
-              <PremiumInput
+              <SmartAddressInput
+                countryCode={activeCountry}
                 label="Adresse de récupération"
-                required={false}
                 value={formData.adresse_depart}
-                onChange={(e) => setFormData({ ...formData, adresse_depart: e.target.value })}
-                placeholder="Quartier, rue, point de repère... (optionnel)"
+                onChange={(text, location) => updateAddress("depart", text, location)}
+                placeholder="Quartier, rue, boutique, pharmacie..."
                 autoFocus
               />
             )}
@@ -854,22 +869,14 @@ export default function CourseStepForm({
                 </div>
               ) : (
                 <>
-                <PremiumInput
+                <SmartAddressInput
+                  countryCode={activeCountry}
                   label="Adresse de livraison"
-                  required={false}
                   hint="Indiquez le quartier, la rue ou un point de repère connu."
                   value={formData.adresse_arrivee}
-                  onChange={(e) => setFormData({ ...formData, adresse_arrivee: e.target.value })}
-                  placeholder="Quartier, rue, point de repère... (optionnel)"
+                  onChange={(text, location) => updateAddress("arrivee", text, location)}
+                  placeholder="Quartier, rue, restaurant, pharmacie..."
                   autoFocus
-                />
-
-                <QuartierSelect
-                  countryCode={activeCountry}
-                  value={formData.quartier_arrivee || ""}
-                  onChange={(quartier) => setFormData({ ...formData, quartier_arrivee: quartier })}
-                  placeholder="Sélectionnez le quartier de livraison..."
-                  label="Quartier de livraison"
                 />
                 </>
               )}

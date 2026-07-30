@@ -51,7 +51,15 @@
     },
     "preuve_url": {
       "type": "string",
-      "description": "Photo de la preuve de depot"
+      "description": "Image ou PDF de la preuve de depot"
+    },
+    "preuve_type": {
+      "type": "string",
+      "description": "Type MIME de la preuve de depot"
+    },
+    "request_id": {
+      "type": "string",
+      "description": "Identifiant idempotent unique de la soumission"
     },
     "statut": {
       "type": "string",

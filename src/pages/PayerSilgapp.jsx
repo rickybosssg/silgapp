@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,9 @@ export default function PayerSilgapp({ userType: forcedType }) {
   const [montantDu, setMontantDu] = useState(0);
   const [montantPaye, setMontantPaye] = useState("");
   const [preuveUrl, setPreuveUrl] = useState(null);
+  const [preuveType, setPreuveType] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const requestIdRef = useRef(crypto.randomUUID());
 
   useEffect(() => {
     const init = async () => {
@@ -135,6 +137,8 @@ export default function PayerSilgapp({ userType: forcedType }) {
         montant_du: montantDu,
         montant_paye: Number(montantPaye),
         preuve_url: preuveUrl,
+        preuve_type: preuveType || "image",
+        request_id: requestIdRef.current,
         country_code: userInfo.country_code,
       });
       if (res?.data?.success === false) throw new Error(res.data.error);
@@ -266,7 +270,11 @@ export default function PayerSilgapp({ userType: forcedType }) {
                 <PhotoPicker
                   label="Choisissez la source de la preuve"
                   value={preuveUrl}
-                  onChange={setPreuveUrl}
+                  allowPdf
+                  onChange={(url, metadata) => {
+                    setPreuveUrl(url);
+                    setPreuveType(metadata?.type || "image");
+                  }}
                 />
               )}
             </div>

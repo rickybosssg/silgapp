@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Upload, Save, X, AlertTriangle, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import PartenaireLocalisation from "@/components/partenaire/PartenaireLocalisation";
+import SmartAddressInput from "@/components/location/SmartAddressInput";
 
 const PAYS = [
   { code: "BF", nom: "Burkina Faso", emoji: "🇧🇫", digits: 8 }, { code: "CI", nom: "Côte d'Ivoire", emoji: "🇨🇮", digits: 10 },
@@ -223,10 +224,24 @@ export default function EtablissementForm({ type, existing, partenaireId, userEm
               <Input value={form.ville || ""} onChange={e => set("ville", e.target.value)} placeholder="Ex: Ouagadougou" className="mt-1.5 h-12 rounded-xl text-sm" />
             </div>
           </div>
-          <div>
-            <Label className="text-xs font-semibold text-gray-600">Quartier</Label>
-            <Input value={form.quartier || ""} onChange={e => set("quartier", e.target.value)} placeholder="Ex: Wemtenga" className="mt-1.5 h-12 rounded-xl text-sm" />
-          </div>
+          <SmartAddressInput
+            countryCode={form.pays_code}
+            value={form.adresse || form.quartier || ""}
+            label="Quartier / Adresse"
+            placeholder="Quartier, rue ou structure connue..."
+            inputClassName="h-12 rounded-xl text-sm"
+            onChange={(text, location) =>
+              setForm((previous) => ({
+                ...previous,
+                adresse: text,
+                quartier: location?.quartier || location?.label || text,
+                ville: location?.ville || previous.ville,
+                ...(location && Number.isFinite(Number(location.latitude)) && Number.isFinite(Number(location.longitude))
+                  ? { latitude: Number(location.latitude), longitude: Number(location.longitude) }
+                  : {}),
+              }))
+            }
+          />
 
           {/* Localisation GPS fixe */}
           <div className="rounded-2xl border border-blue-100 bg-blue-50/30 p-4 space-y-2">

@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2, Phone, Camera, Upload, MapPin } from "lucide-react";
 import { SILGAPP_COUNTRIES } from "@/lib/phoneUtils";
+import SmartAddressInput from "@/components/location/SmartAddressInput";
 
 export default function LivreurRegistrationForm({ user, onComplete }) {
   const [form, setForm] = useState({
@@ -234,10 +235,20 @@ export default function LivreurRegistrationForm({ user, onComplete }) {
             <Label className="text-xs font-semibold text-gray-600 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> Ville</Label>
             <Input value={form.ville} onChange={e => setForm({ ...form, ville: e.target.value })} placeholder="Ex: Ouagadougou" className="mt-1.5 h-12 rounded-xl text-sm" />
           </div>
-          <div>
-            <Label className="text-xs font-semibold text-gray-600">Quartier</Label>
-            <Input value={form.quartier} onChange={e => setForm({ ...form, quartier: e.target.value })} placeholder="Ex: Wemtenga" className="mt-1.5 h-12 rounded-xl text-sm" />
-          </div>
+          <SmartAddressInput
+            countryCode={form.country_code}
+            value={form.quartier}
+            label="Quartier"
+            placeholder="Commencez par le nom du quartier..."
+            inputClassName="h-12 rounded-xl text-sm"
+            onChange={(text, location) =>
+              setForm((previous) => ({
+                ...previous,
+                quartier: location?.quartier || location?.label || text,
+                ville: location?.ville || previous.ville,
+              }))
+            }
+          />
         </div>
       </section>
 
