@@ -409,8 +409,8 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
                   disabled={updateMutation.isPending}
                   onClick={() => setConfirmAnnulation(true)}
                 >
-                  <XCircle className="w-4 h-4 mr-2" />
-                  Annuler la course
+                  <KeyRound className="w-4 h-4 mr-2" />
+                  Utiliser ce code pour récupérer le colis
                 </Button>
               ) : (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3 space-y-2">
