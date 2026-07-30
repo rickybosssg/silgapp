@@ -25,6 +25,7 @@ export async function trouverLivreursCandidats(base44, course, exclusions = [], 
     statut: 'disponible',
     country_code: course.country_code,
     bloque_encours: false,
+    manual_hors_ligne: { $ne: true },
   }, '-last_seen_at', 50);
 
   if (!tousLivreurs || tousLivreurs.length === 0) {
@@ -43,6 +44,7 @@ export async function trouverLivreursCandidats(base44, course, exclusions = [], 
     if (exclusionSet.has(l.id)) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'deja_notifie_ou_refuse' }); return false; }
     if (livreurIdsEnCourse.has(l.id)) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'en_course' }); return false; }
     if (l.admin_hors_ligne === true) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'admin_hors_ligne' }); return false; }
+    if (l.manual_hors_ligne === true) { raisonsExclusion.push({ livreur_id: l.id, nom: nomComplet, raison: 'manual_hors_ligne' }); return false; }
     return true;
   });
 

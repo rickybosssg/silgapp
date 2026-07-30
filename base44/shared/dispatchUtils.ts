@@ -27,6 +27,8 @@ export function normalizeNom(value) {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[''`]/g, '')
     .replace(/[-_]/g, ' ')
+    .replace(/([a-z])(?=\d)/g, '$1 ')  // insère espace entre lettre et chiffre (OUAGA2000 → ouaga 2000)
+    .replace(/(\d)(?=[a-z])/g, '$1 ')  // insère espace entre chiffre et lettre (10logements → 10 logements)
     .replace(/\s+/g, ' ')
     .trim();
 }
