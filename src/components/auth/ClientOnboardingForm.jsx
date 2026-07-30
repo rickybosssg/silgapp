@@ -13,7 +13,6 @@ import {
 } from "@/lib/phoneUtils";
 import CountryCodeSelect from "@/components/ui/CountryCodeSelect";
 import SmartAddressInput from "@/components/location/SmartAddressInput";
-import OTPSMSVerification from "@/components/auth/OTPSMSVerification";
 
 export default function ClientOnboardingForm({ user, onComplete }) {
   const [form, setForm] = useState({
@@ -26,8 +25,6 @@ export default function ClientOnboardingForm({ user, onComplete }) {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [otpStep, setOtpStep] = useState(false);
-  const [otpTelephone, setOtpTelephone] = useState("");
 
   const selectedCountry = getCountryConfig(form.country_code);
 
@@ -51,7 +48,6 @@ export default function ClientOnboardingForm({ user, onComplete }) {
       onComplete?.();
     } catch (err) {
       setError(err?.message || "Erreur lors de la création du compte client.");
-      setOtpStep(false);
     } finally {
       setLoading(false);
     }
@@ -73,25 +69,8 @@ export default function ClientOnboardingForm({ user, onComplete }) {
       return;
     }
 
-    // Vérifier le numéro WhatsApp avant de créer le profil.
-    setOtpTelephone(normalizePhone(localPhone, form.country_code));
-    setOtpStep(true);
+    await createClient();
   };
-
-  if (otpStep) {
-    return (
-      <div className="space-y-5">
-        <OTPSMSVerification
-          telephone={otpTelephone}
-          onVerified={createClient}
-          onCancel={() => setOtpStep(false)}
-        />
-        {loading && (
-          <p className="text-center text-sm text-muted-foreground">Création du compte…</p>
-        )}
-      </div>
-    );
-  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
