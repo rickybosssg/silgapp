@@ -20,11 +20,11 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(SilgappPushPlugin.class);
         registerPlugin(SilgappNativePlugin.class);
-        registerPlugin(com.getcapacitor.camera.Camera.class);
         createDefaultNotificationChannel();
         createUrgentCourseChannel();
         requestBatteryOptimizationExemption();
         super.onCreate(savedInstanceState);
+        bridge.getWebView().setWebChromeClient(new SilgappWebChromeClient(bridge));
         SilgappPushPlugin.handleNotificationIntent(getIntent(), "launch");
         SilgappFirebaseMessagingService.stopUrgentCourseAlert();
     }
