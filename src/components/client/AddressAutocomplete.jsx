@@ -90,8 +90,12 @@ export default function AddressAutocomplete({
       const searchResults = res?.results || [];
       setResults(searchResults);
       setShowDropdown(true);
-      searchCache.set(cacheKey, { results: searchResults, timestamp: Date.now() });
-      cleanCache();
+      // Ne JAMAIS cacher un résultat vide — une panne transitoire d'ORS ou une
+      // frappe partielle ne doit pas bloquer la recherche pendant 10 minutes.
+      if (searchResults.length > 0) {
+        searchCache.set(cacheKey, { results: searchResults, timestamp: Date.now() });
+        cleanCache();
+      }
     } catch (err) {
       console.error("[AddressAutocomplete] Erreur:", err.message);
       setResults([]);

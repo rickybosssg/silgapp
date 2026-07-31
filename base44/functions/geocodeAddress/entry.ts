@@ -113,8 +113,11 @@ Deno.serve(async (req) => {
       };
     });
 
-    // Mettre en cache
-    geocodeCache.set(cacheKey, { results, timestamp: now });
+    // Mettre en cache — uniquement les résultats non vides pour éviter qu'une
+    // panne transitoire d'ORS n'empoisonne le cache pendant 10 minutes.
+    if (results.length > 0) {
+      geocodeCache.set(cacheKey, { results, timestamp: now });
+    }
 
     return Response.json({ results });
   } catch (error) {

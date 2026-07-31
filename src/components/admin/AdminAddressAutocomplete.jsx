@@ -64,7 +64,11 @@ export default function AdminAddressAutocomplete({
       const searchResults = res?.results || [];
       setResults(searchResults);
       setShowDropdown(true);
-      searchCache.set(cacheKey, { results: searchResults, timestamp: Date.now() });
+      // Ne JAMAIS cacher un résultat vide — une panne transitoire d'ORS ou une
+      // frappe partielle ne doit pas bloquer la recherche pendant 10 minutes.
+      if (searchResults.length > 0) {
+        searchCache.set(cacheKey, { results: searchResults, timestamp: Date.now() });
+      }
     } catch (err) {
       console.error("[AdminAddressAutocomplete] Erreur:", err.message);
       setResults([]);
