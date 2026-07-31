@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, MapPin, Send, Loader2, Sparkles, Navigation, Check } from "lucide-react";
+import { ArrowLeft, Send, Loader2, Sparkles, Navigation, Check } from "lucide-react";
 import { useAdminContext } from "@/hooks/useAdminContext";
 import { useAdminCourseWindows } from "@/context/AdminCourseWindowsContext";
 import QuartierSelect from "@/components/client/QuartierSelect";
+import AdminAddressAutocomplete from "@/components/admin/AdminAddressAutocomplete";
 import MapPickerModal from "@/components/admin/MapPickerModal";
 import CourseWindowStack from "@/components/admin/CourseWindowStack";
 
@@ -301,14 +302,20 @@ export default function AdminCourseForm() {
                 </span>
               )}
             </div>
-            <div className="relative">
-              <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500" />
-              <Input
-                value={adresseDepart}
-                onChange={e => setAdresseDepart(e.target.value)}
-                placeholder="Ex: Ouaga 2000, face à la mairie"
-                className="rounded-xl h-12 pl-10 pr-28 bg-emerald-50/40 border-emerald-100 text-sm focus:ring-emerald-300 focus:border-emerald-300"
-              />
+            <AdminAddressAutocomplete
+              value={adresseDepart}
+              onChange={setAdresseDepart}
+              onSelect={(r) => {
+                if (r?.latitude && r?.longitude) {
+                  setGpsDepart({ lat: r.latitude, lng: r.longitude });
+                  if (r.quartier) setQuartierDepart(r.quartier);
+                }
+              }}
+              countryCode={countryCode}
+              placeholder="Ex: Ouaga 2000, face à la mairie"
+              iconColor="text-emerald-500"
+              inputClassName="rounded-xl h-12 pl-10 pr-28 bg-emerald-50/40 border-emerald-100 text-sm focus:ring-emerald-300 focus:border-emerald-300"
+            >
               <button
                 type="button"
                 onClick={() => setMapModal('depart')}
@@ -317,7 +324,7 @@ export default function AdminCourseForm() {
                 <Navigation className="w-3.5 h-3.5" />
                 Localiser
               </button>
-            </div>
+            </AdminAddressAutocomplete>
           </div>
 
           <QuartierSelect
@@ -339,14 +346,20 @@ export default function AdminCourseForm() {
                 </span>
               )}
             </div>
-            <div className="relative">
-              <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-500" />
-              <Input
-                value={adresseArrivee}
-                onChange={e => setAdresseArrivee(e.target.value)}
-                placeholder="Ex: Gounghin, derrière le marché"
-                className="rounded-xl h-12 pl-10 pr-28 bg-rose-50/40 border-rose-100 text-sm focus:ring-rose-300 focus:border-rose-300"
-              />
+            <AdminAddressAutocomplete
+              value={adresseArrivee}
+              onChange={setAdresseArrivee}
+              onSelect={(r) => {
+                if (r?.latitude && r?.longitude) {
+                  setGpsArrivee({ lat: r.latitude, lng: r.longitude });
+                  if (r.quartier) setQuartierArrivee(r.quartier);
+                }
+              }}
+              countryCode={countryCode}
+              placeholder="Ex: Gounghin, derrière le marché"
+              iconColor="text-rose-500"
+              inputClassName="rounded-xl h-12 pl-10 pr-28 bg-rose-50/40 border-rose-100 text-sm focus:ring-rose-300 focus:border-rose-300"
+            >
               <button
                 type="button"
                 onClick={() => setMapModal('arrivee')}
@@ -355,7 +368,7 @@ export default function AdminCourseForm() {
                 <Navigation className="w-3.5 h-3.5" />
                 Localiser
               </button>
-            </div>
+            </AdminAddressAutocomplete>
           </div>
 
           <QuartierSelect
