@@ -315,12 +315,13 @@ Deno.serve(async (req) => {
         await supprimerNotificationsCourse(base44, course_id);
         console.log(`[DISPATCH] 🎉 Course ${course_id} verrouillée (auto) par ${livreur_id}`);
 
-        // ── Message automatique : Code de récupération pour courses administratives ──
-        // Uniquement pour les courses admin (source='admin'). Envoie le code de
-        // récupération (pickup_code_4_digits) dans la messagerie interne de la course,
-        // visible par le livreur assigné et l'admin. Clé idempotente par (course_id, livreur_id)
-        // pour éviter les doublons et permettre un nouveau message si réassignation.
-        if (course.source === 'admin' && pickupPIN) {
+        // ── Message automatique : Code de récupération pour courses admin ET VENUS ──
+        // Envoie le code de récupération (pickup_code_4_digits) dans la messagerie
+        // interne de la course, visible par le livreur assigné et l'admin.
+        // Concerné : courses admin (source='admin') et courses créées par VENUS
+        // (created_by_venus=true). Clé idempotente par (course_id, livreur_id) pour
+        // éviter les doublons et permettre un nouveau message si réassignation.
+        if ((course.source === 'admin' || course.created_by_venus === true) && pickupPIN) {
           const idempotencyKey = `pickup-code-${course_id}-${livreur_id}`;
           try {
             const existing = await base44.asServiceRole.entities.Message.filter({
