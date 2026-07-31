@@ -799,8 +799,18 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     [livreesToday]
   );
 
-  // montant_du_silga est la source de verite, incrementee a chaque livraison et remise a 0 quand l admin enregistre un paiement.
-  const montantDuSilga = livreurProfil?.montant_du_silga ?? 0;
+  // ── Montant total dû (source de vérité) ───────────────────────────────────
+  // Calculé à partir des commissions impayées des courses livrées (même logique
+  // que la page admin "Dû Utilisateur"), plutôt que le champ dénormalisé
+  // montant_du_silga qui peut être stale. On retient le max des deux pour ne
+  // jamais sous-estimer une dette si des courses anciennes ne sont pas chargées.
+  const totalDuReel = useMemo(() =>
+    mesCourses
+      .filter(c => c.statut === "livree" && c.statut_paiement_livreur !== "paye" && sameLivreurId(c.livreur_id, livreurProfil?.id))
+      .reduce((s, c) => s + (c.commission_silga ?? 0), 0),
+    [mesCourses, livreurProfil?.id]
+  );
+  const montantDuSilga = Math.max(totalDuReel, livreurProfil?.montant_du_silga ?? 0);
 
   // ─── isEnLigne ────────────────────────────────────────────────────────────
   const isEnLigne = livreurProfil ? livreurProfil.statut !== "hors_ligne" : false;
@@ -1433,7 +1443,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                   <div>
                     <p className="text-sm font-bold text-gray-900">Payer SILGAPP</p>
                     <p className="text-xs text-gray-500">
-                      {montantDuSilga > 0 ? `Du : ${montantDuSilga.toLocaleString()} FCFA` : "Aucun du pour le moment"}
+                      {montantDuSilga > 0 ? `Total dû : ${montantDuSilga.toLocaleString()} FCFA` : "Aucun dû pour le moment"}
                     </p>
                   </div>
                 </div>

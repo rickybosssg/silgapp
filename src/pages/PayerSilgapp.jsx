@@ -44,7 +44,17 @@ export default function PayerSilgapp({ userType: forcedType }) {
             telephone: livreurs[0].telephone,
             country_code: livreurs[0].country_code,
           });
-          setMontantDu(livreurs[0].montant_du_silga || 0);
+          // ── Total dû réel : somme des commissions impayées des courses livrées
+          //    (même logique que la page admin "Dû Utilisateur"), avec le champ
+          //    dénormalisé montant_du_silga comme plancher pour les vieilles dettes.
+          const livrees = await base44.entities.CourseExterne.filter({
+            livreur_id: livreurs[0].id,
+            statut: "livree",
+          }, "-heure_livraison", 200).catch(() => []);
+          const commImpayees = (livrees || [])
+            .filter(c => c.statut_paiement_livreur !== "paye")
+            .reduce((s, c) => s + (c.commission_silga ?? 0), 0);
+          setMontantDu(Math.max(commImpayees, livreurs[0].montant_du_silga || 0));
           return;
         }
 
@@ -98,7 +108,13 @@ export default function PayerSilgapp({ userType: forcedType }) {
       try {
         if (userType === "livreur") {
           const l = await base44.entities.Livreur.filter({ id: userInfo.id });
-          if (l?.[0]) setMontantDu(l[0].montant_du_silga || 0);
+          const livrees = await base44.entities.CourseExterne.filter({
+            livreur_id: userInfo.id, statut: "livree",
+          }, "-heure_livraison", 200).catch(() => []);
+          const commImpayees = (livrees || [])
+            .filter(c => c.statut_paiement_livreur !== "paye")
+            .reduce((s, c) => s + (c.commission_silga ?? 0), 0);
+          if (l?.[0]) setMontantDu(Math.max(commImpayees, l[0].montant_du_silga || 0));
         } else if (userType === "client") {
           const frais = await base44.entities.FraisAnnulation.filter({ client_id: userInfo.id });
           const impaye = (frais || []).filter((f) => f.statut_paiement !== "paye").reduce((s, f) => s + (f.montant || 0), 0);
