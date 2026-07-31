@@ -31,6 +31,7 @@ export default function AdminAddressAutocomplete({
   inputClassName = "",
   children, // bouton Localiser
 }) {
+  const [query, setQuery] = useState(value || "");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -38,6 +39,11 @@ export default function AdminAddressAutocomplete({
   const debounceRef = useRef(null);
   const containerRef = useRef(null);
   const lastRequestIdRef = useRef(0);
+
+  // Sync externe → interne (quand le parent change value, ex. après sélection)
+  useEffect(() => {
+    setQuery(value || "");
+  }, [value]);
 
   // Recherche debounced
   const performSearch = useCallback(async (searchQuery) => {
@@ -82,18 +88,26 @@ export default function AdminAddressAutocomplete({
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (value && value.trim().length >= 2) {
+    if (query && query.trim().length >= 2) {
       setLoading(true);
-      debounceRef.current = setTimeout(() => performSearch(value), 300);
+      debounceRef.current = setTimeout(() => performSearch(query), 300);
     } else {
       setResults([]);
       setShowDropdown(false);
       setLoading(false);
     }
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [value, performSearch]);
+  }, [query, performSearch]);
+
+  const handleInputChange = (e) => {
+    const newQuery = e.target.value;
+    setQuery(newQuery);
+    onChange?.(newQuery);
+    setHighlightIndex(-1);
+  };
 
   const handleSelect = (result) => {
+    setQuery(result.label || result.name);
     onChange?.(result.label || result.name);
     onSelect?.(result);
     setShowDropdown(false);
@@ -135,8 +149,8 @@ export default function AdminAddressAutocomplete({
         <Loader2 className="absolute right-24 top-1/2 -translate-y-1/2 w-3.5 h-3.5 z-10 animate-spin text-gray-400" />
       )}
       <Input
-        value={value}
-        onChange={e => onChange?.(e.target.value)}
+        value={query}
+        onChange={handleInputChange}
         onKeyDown={handleKeyDown}
         onFocus={() => results.length > 0 && setShowDropdown(true)}
         placeholder={placeholder}
@@ -175,10 +189,10 @@ export default function AdminAddressAutocomplete({
       )}
 
       {/* Aucun résultat */}
-      {showDropdown && !loading && results.length === 0 && value && value.trim().length >= 2 && (
+      {showDropdown && !loading && results.length === 0 && query && query.trim().length >= 2 && (
         <div className="absolute z-50 mt-1 w-full bg-white rounded-2xl border-2 border-gray-100 shadow-2xl px-4 py-3">
           <p className="text-sm text-gray-400">
-            Aucun lieu trouvé pour « {value.trim()} ». Saisissez l'adresse manuellement.
+            Aucun lieu trouvé pour « {query.trim()} ». Saisissez l'adresse manuellement.
           </p>
         </div>
       )}
