@@ -70,7 +70,8 @@ export default function AdminAddressAutocomplete({
         country_code: countryCode,
       });
       if (requestId !== lastRequestIdRef.current) return;
-      const searchResults = res?.results || [];
+      // invoke() retourne la réponse axios brute — les données sont dans res.data
+      const searchResults = res?.data?.results || res?.results || [];
       setResults(searchResults);
       setShowDropdown(true);
       // Ne JAMAIS cacher un résultat vide — une panne transitoire d'ORS ou une
