@@ -48,7 +48,10 @@ export default function AdminAddressAutocomplete({
     }
     const cacheKey = `${searchQuery.trim().toLowerCase()}_${countryCode}`;
     const cached = searchCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    // On n'utilise le cache que s'il contient des résultats. Un cache vide
+    // (hérité d'une panne transitoire ORS avant le correctif) est ignoré pour
+    // forcer une nouvelle recherche.
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS && cached.results.length > 0) {
       setResults(cached.results);
       setLoading(false);
       setShowDropdown(true);
