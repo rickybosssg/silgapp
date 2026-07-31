@@ -741,14 +741,15 @@ Deno.serve(async (req) => {
               continue;
             }
 
-            // Délai de 15 min dépassé sans réponse client — auto-annulation
-            console.log(`[DISPATCH] ⏰ Cycle épuisé + 15min sans réponse pour course ${course.id} — auto-annulation`);
+            // Délai de 15 min dépassé sans réponse client — mise en attente (suspend le dispatch)
+            // L'admin doit repasser la course en 'nouvelle' pour relancer le dispatch.
+            console.log(`[DISPATCH] ⏰ Cycle épuisé + 15min sans réponse pour course ${course.id} — mise en attente`);
             await base44.asServiceRole.entities.CourseExterne.update(course.id, {
-              statut: 'annulee',
-              dispatch_status: 'expire',
-              notes: (course.notes || '') + ' | [AUTO-ANNULÉ] Cycle dispatch épuisé, client sans réponse sous 15 min',
+              statut: 'en_attente',
+              dispatch_status: 'en_attente',
+              notes: (course.notes || '') + ' | [EN ATTENTE] Cycle dispatch épuisé, client sans réponse sous 15 min',
             });
-            resultats.push({ course_id: course.id, wave: 'cycle_epuise_auto_cancel' });
+            resultats.push({ course_id: course.id, wave: 'cycle_epuise_en_attente' });
             continue;
           }
 
