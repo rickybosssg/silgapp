@@ -11,6 +11,7 @@ import { cleanAddress } from "@/lib/addressUtils";
 // Statuts externes traduits lisiblement — couleurs distinctes par étape
 const STATUT_EXTERNE_LABELS = {
   nouvelle: "🔵 Nouvelle",
+  en_attente: "⏸ En attente",
   recherche_livreur: "🔍 Recherche livreur",
   livreur_en_route: "🟡 En route vers l'expéditeur",
   client_contacte: "📞 Client contacté",
@@ -34,6 +35,7 @@ function CourseItemExterne({ course, onView }) {
     en_livraison: "bg-pink-400 text-black border-pink-500",
     recherche_livreur: "bg-red-500 text-white font-bold border-red-600",
     nouvelle: "bg-blue-100 text-blue-700 border-blue-200",
+    en_attente: "bg-amber-100 text-amber-800 border-amber-300 font-semibold",
   }[course.statut] || "bg-gray-100 text-gray-600 border-gray-200";
 
   const addrDepart = cleanAddress(course.adresse_depart, course.gps_depart_lat, course.gps_depart_lng);

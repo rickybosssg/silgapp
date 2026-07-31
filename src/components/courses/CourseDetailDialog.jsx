@@ -24,7 +24,7 @@ const STATUTS_INTERNE = [
 ];
 
 const STATUTS_EXTERNE = [
-  "nouvelle", "recherche_livreur", "livreur_en_route", "arrive_prise_en_charge",
+  "nouvelle", "en_attente", "recherche_livreur", "livreur_en_route", "arrive_prise_en_charge",
   "colis_recupere", "passager_embarque", "en_livraison", "livree", "annulee"
 ];
 

@@ -16,6 +16,7 @@ import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgress
 const STATUT_FILTRES = [
   { key: "tous", label: "Toutes" },
   { key: "nouvelle", label: "Nouvelles" },
+  { key: "en_attente", label: "En attente" },
   { key: "en_cours", label: "En cours" },
   { key: "livree", label: "Livrées" },
   { key: "annulee", label: "Annulées" },
@@ -52,6 +53,7 @@ export default function ToutesCoursesExternes() {
     }
     if (filtreActif === "tous") return filtered;
     if (filtreActif === "nouvelle") return filtered.filter(c => c.statut === "nouvelle");
+    if (filtreActif === "en_attente") return filtered.filter(c => c.statut === "en_attente");
     if (filtreActif === "en_cours") return filtered.filter(c => ["recherche_livreur", "livreur_en_route", "client_contacte", "en_route_expediteur", "colis_recupere", "en_livraison", "arrive_prise_en_charge", "passager_embarque"].includes(c.statut));
     if (filtreActif === "livree") return filtered.filter(c => c.statut === "livree");
     if (filtreActif === "annulee") return filtered.filter(c => c.statut === "annulee");

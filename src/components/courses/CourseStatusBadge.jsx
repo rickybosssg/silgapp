@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 
 const statusConfig = {
   nouvelle: { label: "Nouvelle", className: "bg-blue-100 text-blue-700 border-blue-200" },
+  en_attente: { label: "En attente", className: "bg-amber-100 text-amber-800 border-amber-300 font-semibold" },
   en_attente_livreur: { label: "En attente livreur", className: "bg-yellow-100 text-yellow-700 border-yellow-200" },
   acceptee: { label: "Acceptée", className: "bg-emerald-100 text-emerald-700 border-emerald-200" },
   en_route_recuperation: { label: "En route vers l'expéditeur", className: "bg-yellow-400 text-black border-yellow-500" },

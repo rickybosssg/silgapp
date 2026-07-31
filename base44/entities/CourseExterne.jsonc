@@ -177,6 +177,7 @@
       "type": "string",
       "enum": [
         "nouvelle",
+        "en_attente",
         "programmee",
         "recherche_livreur",
         "livreur_en_route",
@@ -192,7 +193,7 @@
         "annulee"
       ],
       "default": "nouvelle",
-      "description": "Statut de la course. client_contacte et en_route_expediteur sont specifiques au workflow des courses administratives (source=admin, colis) : etapes intermediaires entre l'acceptation et le depart vers l'expediteur."
+      "description": "Statut de la course. en_attente = course suspendue (dispatch NON declenche) \u2014 l'admin doit la repasser en 'nouvelle' pour lancer le dispatch. client_contacte et en_route_expediteur sont specifiques au workflow des courses administratives (source=admin, colis) : etapes intermediaires entre l'acceptation et le depart vers l'expediteur."
     },
     "dispatch_status": {
       "type": "string",

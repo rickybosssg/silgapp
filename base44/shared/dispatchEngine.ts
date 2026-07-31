@@ -264,7 +264,7 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
     dispatch_locked_until: new Date(Date.now() + 10 * 1000).toISOString(),
   });
 
-  if (['livreur_en_route', 'colis_recupere', 'en_livraison', 'livree', 'annulee'].includes(course.statut)) {
+  if (['livreur_en_route', 'colis_recupere', 'en_livraison', 'livree', 'annulee', 'en_attente'].includes(course.statut)) {
     return { ignore: true, statut: course.statut };
   }
 
