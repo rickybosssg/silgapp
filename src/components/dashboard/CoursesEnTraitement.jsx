@@ -13,6 +13,8 @@ const STATUT_EXTERNE_LABELS = {
   nouvelle: "🔵 Nouvelle",
   recherche_livreur: "🔍 Recherche livreur",
   livreur_en_route: "🟡 En route vers l'expéditeur",
+  client_contacte: "📞 Client contacté",
+  en_route_expediteur: "🟡 En route vers l'expéditeur",
   colis_recupere: "🟠 Colis récupéré",
   en_livraison: "🌸 En route vers le destinataire",
   livree: "🟢 Livré",
@@ -21,9 +23,13 @@ const STATUT_EXTERNE_LABELS = {
 
 function CourseItemExterne({ course, onView }) {
   const expediteur = course.expediteur_nom || course.client_nom || "Client";
-  const statutLabel = STATUT_EXTERNE_LABELS[course.statut] || course.statut;
+  const statutLabel = (course.source === "admin" && course.statut === "livreur_en_route")
+    ? "✅ Course acceptée"
+    : (STATUT_EXTERNE_LABELS[course.statut] || course.statut);
   const statutColor = {
     livreur_en_route: "bg-yellow-400 text-black border-yellow-500",
+    client_contacte: "bg-indigo-400 text-white border-indigo-500",
+    en_route_expediteur: "bg-yellow-400 text-black border-yellow-500",
     colis_recupere: "bg-green-500 text-black border-green-600",
     en_livraison: "bg-pink-400 text-black border-pink-500",
     recherche_livreur: "bg-red-500 text-white font-bold border-red-600",

@@ -135,7 +135,7 @@ export default function DashboardExterne() {
 
   // IDs des livreurs avec une course réellement active (pour les compteurs précis)
   const livreurIdsEnCourseReelle = useMemo(() => {
-    const STATUTS_OCCUPE = ["livreur_en_route", "colis_recupere", "en_livraison"];
+    const STATUTS_OCCUPE = ["livreur_en_route", "client_contacte", "en_route_expediteur", "colis_recupere", "en_livraison"];
     return new Set(coursesEnTraitement.filter(c => STATUTS_OCCUPE.includes(c.statut) && c.livreur_id).map(c => c.livreur_id));
   }, [coursesEnTraitement]);
 

@@ -24,6 +24,8 @@ const STATUS_TO_STEP = {
   nouvelle: 0,
   recherche_livreur: 1,
   livreur_en_route: 2,
+  client_contacte: 2,
+  en_route_expediteur: 2,
   arrive_prise_en_charge: 2,
   colis_recupere: 3,
   passager_embarque: 3,

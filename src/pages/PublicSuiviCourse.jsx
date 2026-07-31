@@ -288,6 +288,8 @@ export default function PublicSuiviCourse() {
     nouvelle: "Course créée",
     recherche_livreur: "Recherche de livreur",
     livreur_en_route: "Livreur en route",
+    client_contacte: "Livreur en route",
+    en_route_expediteur: "Livreur en route",
     arrive_prise_en_charge: "Arrivé prise en charge",
     colis_recupere: "Colis récupéré",
     passager_embarque: "Passager embarqué",
@@ -300,6 +302,8 @@ export default function PublicSuiviCourse() {
     nouvelle: "bg-gray-100 text-gray-800",
     recherche_livreur: "bg-yellow-100 text-yellow-800",
     livreur_en_route: "bg-blue-100 text-blue-800",
+    client_contacte: "bg-blue-100 text-blue-800",
+    en_route_expediteur: "bg-blue-100 text-blue-800",
     colis_recupere: "bg-purple-100 text-purple-800",
     en_livraison: "bg-orange-100 text-orange-800",
     livree: "bg-green-100 text-green-800",
@@ -338,7 +342,7 @@ export default function PublicSuiviCourse() {
   const isFinalPrix = isDelivered && course.prix_final > 0;
   const prixBrut = isFinalPrix ? course.prix_final : (distCourse ? Math.round(distCourse * 100) : (course.prix_estimate || 0));
   const prixAffiche = prixBrut > 0 ? Math.max(prixBrut, PRIX_MIN) : 0;
-  const showEtaCards = ["livreur_en_route", "colis_recupere", "en_livraison", "livree"].includes(course.statut);
+  const showEtaCards = ["livreur_en_route", "en_route_expediteur", "colis_recupere", "en_livraison", "livree"].includes(course.statut);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white py-8 px-4">
@@ -376,7 +380,8 @@ export default function PublicSuiviCourse() {
               { key: "livree", label: "Colis livré", icon: CheckCircle2 }
             ].map((step, idx) => {
               const steps = ["nouvelle", "recherche_livreur", "livreur_en_route", "colis_recupere", "en_livraison", "livree"];
-              const currentIndex = steps.indexOf(course.statut);
+              const progressionStatut = ["client_contacte", "en_route_expediteur"].includes(course.statut) ? "livreur_en_route" : course.statut;
+              const currentIndex = steps.indexOf(progressionStatut);
               const stepIndex = steps.indexOf(step.key);
               const isCompleted = stepIndex <= currentIndex && course.statut !== "annulee";
               const StepIcon = step.icon;
@@ -493,7 +498,7 @@ export default function PublicSuiviCourse() {
         )}
 
         {/* QR Code de récupération - pour le statut livreur_en_route */}
-        {course.livreur_id && course.statut === "livreur_en_route" && (
+        {course.livreur_id && ["livreur_en_route", "en_route_expediteur"].includes(course.statut) && (
           <Card className="p-6 border-2 border-dashed border-amber-300 bg-amber-50">
             <div className="flex items-center gap-2 mb-3">
               <QrCode className="w-6 h-6 text-amber-600" />

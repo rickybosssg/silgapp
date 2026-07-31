@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { MapPin, Phone, Package, Check, X, AlertTriangle, ChevronRight, QrCode, Clock, Ruler } from "lucide-react";
+import { MapPin, Phone, Navigation, Package, Check, X, AlertTriangle, ChevronRight, QrCode, Clock, Ruler } from "lucide-react";
 import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
 import MultiColisLivreurView from "@/components/multi-colis/MultiColisLivreurView";
 import { Input } from "@/components/ui/input";
@@ -160,6 +160,11 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const effectiveStatut = optimisticStatut || course.statut;
   const isDeplacement = course.type_course === "deplacement";
   const isPartnerCourse = !!(course.commande_boutique_id || course.commande_restaurant_id);
+  // ── Course administrative (colis) : étape « Client contacté » avant le départ vers l'expéditeur ──
+  const isAdminColisCourse = course.source === "admin" && !isDeplacement && !isPartnerCourse;
+  const isClientContactePhase = isAdminColisCourse && effectiveStatut === "livreur_en_route";
+  const isEnRouteExpediteurPending = isAdminColisCourse && effectiveStatut === "client_contacte";
+  const adminPreTrip = isClientContactePhase || isEnRouteExpediteurPending;
   const { data: countryCommissionRows = [] } = useQuery({
     queryKey: ["country-commission", course.country_code],
     queryFn: () => base44.entities.Country.filter({ code: course.country_code, actif: true }),
@@ -344,6 +349,27 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     onMettrePause?.(course, pauseMotif);
     setShowPauseModal(false);
     setPauseMotif("");
+  };
+
+  // ── Workflow administratif : « Client contacté » puis « En route vers l'expéditeur » ──
+  const handleClientContacte = async () => {
+    const now = new Date().toISOString();
+    updateOptimisticStatut("client_contacte", { heure_contact_client: now });
+    await base44.entities.CourseExterne.update(course.id, {
+      statut: "client_contacte",
+      heure_contact_client: now,
+    }).catch(() => null);
+    queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+    toast.success("Client contacté. Vous pouvez maintenant démarrer votre trajet.");
+  };
+
+  const handleDemarrerTrajet = async () => {
+    updateOptimisticStatut("en_route_expediteur", {});
+    await base44.entities.CourseExterne.update(course.id, {
+      statut: "en_route_expediteur",
+    }).catch(() => null);
+    queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+    toast.success("Bon trajet ! En route vers l'expéditeur.");
   };
 
   // Annulation livreur (unifiée colis + déplacement)
@@ -664,7 +690,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           <ProgressBar statut={effectiveStatut} isDeplacement={isDeplacement} />
 
           {/* Badge ETA temps réel */}
-          {!colisLivre && (
+          {!colisLivre && !adminPreTrip && (
             <ETABadge course={course} colisRecupere={colisRecupere} />
           )}
 
@@ -922,8 +948,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             />
           )}
 
-          {/* Navigation GPS — affiché si coordonnées GPS disponibles */}
-          {!colisLivre && (
+          {/* Navigation GPS — affiché si coordonnées GPS disponibles (masqué pendant le pré-trajet admin) */}
+          {!colisLivre && !adminPreTrip && (
             !colisRecupere ? (
               // CORRECTION AUDIT : NavigationGPS relit le GPS de l'expéditeur toutes les 5s via ClientExterne
               // destLat/destLng sont les coords fixes enregistrées à la création (fallback)
@@ -1102,7 +1128,31 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               )}
 
               {!colisRecupere ? (
-                isExterne ? (
+                adminPreTrip ? (
+                  /* ── COURSE ADMINISTRATIVE : « Client contacté » puis « En route vers l'expéditeur » ── */
+                  <div className="space-y-3">
+                    {isClientContactePhase && (
+                      <button
+                        className="w-full h-14 rounded-2xl bg-gradient-to-b from-indigo-500 to-indigo-700 text-white font-black text-base shadow-lg shadow-indigo-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                        onClick={handleClientContacte}
+                        disabled={isPending}
+                      >
+                        <Phone className="w-6 h-6" />
+                        J'ai contacté le client
+                      </button>
+                    )}
+                    {isEnRouteExpediteurPending && (
+                      <button
+                        className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                        onClick={handleDemarrerTrajet}
+                        disabled={isPending}
+                      >
+                        <Navigation className="w-6 h-6" />
+                        En route vers l'expéditeur
+                      </button>
+                    )}
+                  </div>
+                ) : isExterne ? (
                   /* ── EXTERNE multi-colis : bouton simple sans QR ── */
                   /* ── EXTERNE colis unique : Scanner QR pour récupérer ── */
                   course.is_multi_colis ? (
