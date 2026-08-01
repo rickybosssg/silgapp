@@ -14,6 +14,7 @@ import { isClientEligibleCarte } from "@/lib/dispatchRules.js";
 import { calculateLivreurCounters, calculateClientCounters } from "@/lib/livreurCounters.js";
 import CoursesEnTraitement from "@/components/dashboard/CoursesEnTraitement";
 import CoursesTerminees from "@/components/dashboard/CoursesTerminees";
+import DispatchHealthPanel from "@/components/dashboard/DispatchHealthPanel";
 import CourseDetailDialog from "@/components/courses/CourseDetailDialog";
 import CodePromoPanel from "@/components/admin/CodePromoPanel";
 
@@ -289,6 +290,9 @@ export default function DashboardExterne() {
           <KpiCard label="CA du jour" value={stats.ca > 999 ? `${Math.round(stats.ca/1000)}k` : stats.ca} suffix={stats.ca <= 999 ? "F" : "F"} icon={TrendingUp} color="bg-gradient-to-br from-cyan-500 to-blue-500" onClick={() => setStatModal({ type: "ca", data: coursesTerminees.filter(c => c.statut === "livree") })} />
           <KpiCard label="Disponibles" value={stats.libres} icon={Truck} color="bg-gradient-to-br from-primary to-red-600" onClick={() => setStatModal({ type: "livreurs_dispo", data: livreursEnLigne.filter(l => l.statut === "disponible") })} />
         </div>
+
+        {/* ── SANTÉ DU DISPATCH ──────────────────────────── */}
+        <DispatchHealthPanel courses={courses} livreurs={livreurs} />
 
         {/* ── ACTIVITÉ ─────────────────────────────────────── */}
         <div>
