@@ -884,48 +884,6 @@ Deno.serve(async (req) => {
         console.warn('[DISPATCH] ⚠️ Erreur filet sécurité statut livreur:', err.message);
       }
 
-      // ── FILET DE SÉCURITÉ — livreurs "disponible" avec GPS périmé (> 2h) ──
-      // Un livreur peut rester marqué "disponible" alors que son GPS n'a pas été
-      // mis à jour depuis des heures (app fermée, batterie morte, réseau coupé).
-      // Ces livreurs fantômes faussent les compteurs et encombrent les requêtes
-      // de dispatch. On les bascule en "hors_ligne" automatiquement.
-      // Seuil: 2 heures (assez large pour tolérer les coupures temporaires).
-      // Exception: on ne touche pas aux livreurs qui se sont mis hors ligne
-      // manuellement (manual_hors_ligne=true) — ils sont déjà gérés correctement.
-      try {
-        const GPS_STALE_SEUIL_MS = 2 * 60 * 60 * 1000; // 2 heures
-        const nowMs = now.getTime();
-        const livreursDispo = await base44.asServiceRole.entities.Livreur.filter(
-          { type_livreur: 'externe', statut: 'disponible' },
-          '-updated_date', 100
-        );
-
-        const livreursFantomesGPS = livreursDispo.filter(l => {
-          if (l.manual_hors_ligne === true) return false; // déjà géré manuellement
-          const gpsDate = l.derniere_position_date || l.last_seen_at;
-          if (!gpsDate) return true; // aucun GPS jamais enregistré → fantôme
-          const gpsMs = new Date(gpsDate).getTime();
-          if (isNaN(gpsMs)) return true;
-          return (nowMs - gpsMs) > GPS_STALE_SEUIL_MS;
-        });
-
-        if (livreursFantomesGPS.length > 0) {
-          const ids = livreursFantomesGPS.map(l => l.id);
-          await base44.asServiceRole.entities.Livreur.updateMany(
-            { statut: 'disponible', manual_hors_ligne: { $ne: true }, id: { $in: ids } },
-            { $set: { statut: 'hors_ligne' } }
-          );
-          console.log(`[DISPATCH] 📍 Filet sécurité GPS: ${livreursFantomesGPS.length} livreur(s) "disponible" avec GPS périmé > 2h → basculé(s) en "hors_ligne"`);
-          for (const l of livreursFantomesGPS) {
-            const gpsDate = l.derniere_position_date || l.last_seen_at;
-            const ageH = gpsDate ? Math.round((nowMs - new Date(gpsDate).getTime()) / 3600000) : 'jamais';
-            console.log(`[DISPATCH] 📍 → ${l.prenom || ''} ${l.nom || ''} (GPS: ${ageH}h)`);
-          }
-        }
-      } catch (err) {
-        console.warn('[DISPATCH] ⚠️ Erreur filet sécurité GPS livreur:', err.message);
-      }
-
       // 🚨 Détection des courses bloquées > 10 min (dispatch en panne)
       const stuckCourses = courses.filter(c => {
         if (c.dispatch_status !== 'propose') return false;
