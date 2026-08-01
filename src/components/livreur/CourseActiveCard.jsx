@@ -378,6 +378,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       toast.error("Veuillez sélectionner un motif");
       return;
     }
+    if (!motifAnnulationDetail.trim()) {
+      toast.error("Veuillez décrire le motif de l'annulation");
+      return;
+    }
     setShowAnnulerCourse(false);
 
     // Optimistic UI : retirer immédiatement la course de l'affichage
@@ -538,7 +542,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               <button
                 className="h-12 rounded-2xl bg-red-500 hover:bg-red-600 text-white font-bold text-sm disabled:opacity-50"
                 onClick={handleAnnulerCourseLivreur}
-                disabled={!motifAnnulationLivreur || isPending}
+                disabled={!motifAnnulationLivreur || !motifAnnulationDetail.trim() || isPending}
               >
                 Annuler la course
               </button>
