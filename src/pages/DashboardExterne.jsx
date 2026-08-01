@@ -15,6 +15,7 @@ import { calculateLivreurCounters, calculateClientCounters } from "@/lib/livreur
 import CoursesEnTraitement from "@/components/dashboard/CoursesEnTraitement";
 import CoursesTerminees from "@/components/dashboard/CoursesTerminees";
 import DispatchHealthPanel from "@/components/dashboard/DispatchHealthPanel";
+import VenusActivityPanel from "@/components/dashboard/VenusActivityPanel";
 import CourseDetailDialog from "@/components/courses/CourseDetailDialog";
 import CodePromoPanel from "@/components/admin/CodePromoPanel";
 
@@ -293,6 +294,9 @@ export default function DashboardExterne() {
 
         {/* ── SANTÉ DU DISPATCH ──────────────────────────── */}
         <DispatchHealthPanel courses={courses} livreurs={livreurs} />
+
+        {/* ── ACTIVITÉ VENUS ────────────────────────────── */}
+        <VenusActivityPanel courses={courses} countryCode={effectiveCountry} />
 
         {/* ── ACTIVITÉ ─────────────────────────────────────── */}
         <div>
