@@ -2,7 +2,7 @@
 import { STATUTS_ACTIFS_COURSE } from './dispatchConstants.ts';
 import { dispatchLog } from './dispatchUtils.ts';
 
-export const CYCLE_EPUISE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+export const CYCLE_EPUISE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
 const CONFIG_CACHE: { dispatch: any; gps: any; expires: number } = { dispatch: null, gps: null, expires: 0 };
 const CONFIG_TTL_MS = 5 * 60 * 1000; // 5 minutes
