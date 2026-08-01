@@ -272,10 +272,13 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     setGpsActif(false);
     try { localStorage.removeItem("silgapp_livreur_session_id"); } catch {}
 
-    // Forcer le livreur hors ligne
+    // ⚠️ Ne PAS forcer statut hors_ligne ici — cela viole la règle du contrôle
+    // manuel et bloque le livreur en hors_ligne si l'autre appareil est aussi
+    // inactif. La session expirée est gérée côté UI uniquement.
+    // L'autre appareil (celui qui a pris la main) gère déjà le statut via
+    // gestionSessionLivreur (disponible) ou le toggle manuel.
     if (livreurProfil?.id) {
       saveLivreur(livreurProfil.id, {
-        statut: "hors_ligne",
         app_active: false
       }).catch(() => null);
     }
