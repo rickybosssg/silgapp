@@ -16,7 +16,7 @@ import CoursesEnTraitement from "@/components/dashboard/CoursesEnTraitement";
 import CoursesTerminees from "@/components/dashboard/CoursesTerminees";
 import CourseDetailDialog from "@/components/courses/CourseDetailDialog";
 import CodePromoPanel from "@/components/admin/CodePromoPanel";
-import DownloadStatsPanel from "@/components/admin/DownloadStatsPanel";
+
 import StatDetailModal from "@/components/dashboard/StatDetailModal";
 import AppToggleButton from "@/components/admin/AppToggleButton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -288,11 +288,6 @@ export default function DashboardExterne() {
           <KpiCard label="Annulées" value={stats.annulees} icon={XCircle} color="bg-gradient-to-br from-rose-500 to-red-600" onClick={() => setStatModal({ type: "annulees", data: coursesTerminees.filter(c => c.statut === "annulee") })} />
           <KpiCard label="CA du jour" value={stats.ca > 999 ? `${Math.round(stats.ca/1000)}k` : stats.ca} suffix={stats.ca <= 999 ? "F" : "F"} icon={TrendingUp} color="bg-gradient-to-br from-cyan-500 to-blue-500" onClick={() => setStatModal({ type: "ca", data: coursesTerminees.filter(c => c.statut === "livree") })} />
           <KpiCard label="Disponibles" value={stats.libres} icon={Truck} color="bg-gradient-to-br from-primary to-red-600" onClick={() => setStatModal({ type: "livreurs_dispo", data: livreursEnLigne.filter(l => l.statut === "disponible") })} />
-        </div>
-
-        {/* ── TÉLÉCHARGEMENTS ─────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-          <DownloadStatsPanel />
         </div>
 
         {/* ── ACTIVITÉ ─────────────────────────────────────── */}
