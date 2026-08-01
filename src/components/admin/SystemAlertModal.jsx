@@ -97,6 +97,22 @@ export default function SystemAlertModal() {
                 </div>
               </div>
 
+              {/* ── Explication du livreur (extraite du message) ── */}
+              {(() => {
+                const msg = alert.message || "";
+                const match = msg.match(/Détail:\s*(.+?)(?:\.?\s+La course a été|$)/i);
+                const detail = match ? match[1].trim().replace(/\.$/, "") : null;
+                if (!detail) return null;
+                return (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                    <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide mb-1">
+                       Explication du livreur
+                    </p>
+                    <p className="text-sm text-amber-900 font-semibold leading-relaxed">{detail}</p>
+                  </div>
+                );
+              })()}
+
               {alert.course_id && (
                 <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-500">
                   Course ID : <span className="font-mono">{alert.course_id.slice(-12)}</span>

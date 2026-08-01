@@ -23,6 +23,17 @@ Deno.serve(async (req) => {
       return Response.json({ error: "course_id requis" }, { status: 400 });
     }
 
+    // ── Validation : motif_detail OBLIGATOIRE pour les annulations livreur ──
+    // Sans cette explication, l'admin ne peut pas comprendre le motif réel.
+    if (source === "livreur") {
+      if (!motif_detail || !String(motif_detail).trim()) {
+        return Response.json({
+          error: "Le détail du motif est obligatoire pour annuler la course",
+          field: "motif_detail",
+        }, { status: 400 });
+      }
+    }
+
     // ── Récupérer la course ───────────────────────────────────────────
     const course = await asService.entities.CourseExterne.get(course_id);
     if (!course) {
