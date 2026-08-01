@@ -389,7 +389,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       const res = await base44.functions.invoke("annulerCourseExterne", {
         course_id: course.id,
         motif: motifAnnulationLivreur,
-        motif_detail: motifAnnulationLivreur === "autre" ? motifAnnulationDetail : "",
+        motif_detail: motifAnnulationDetail.trim(),
         source: "livreur",
       });
 
@@ -510,13 +510,19 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 </button>
               ))}
             </div>
-            {motifAnnulationLivreur === "autre" && (
-              <textarea
-                placeholder="Précisez le motif..."
-                value={motifAnnulationDetail}
-                onChange={(e) => setMotifAnnulationDetail(e.target.value)}
-                className="w-full h-16 rounded-xl border-2 border-gray-200 p-3 text-sm resize-none focus:border-red-400 focus:outline-none"
-              />
+            {motifAnnulationLivreur && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-600">
+                  Décrivez le motif de l'annulation{" "}
+                  <span className="text-gray-400 font-normal">(envoyé à l'admin)</span>
+                </label>
+                <textarea
+                  placeholder="Expliquez ce qui s'est passé..."
+                  value={motifAnnulationDetail}
+                  onChange={(e) => setMotifAnnulationDetail(e.target.value)}
+                  className="w-full h-20 rounded-xl border-2 border-gray-200 p-3 text-sm resize-none focus:border-red-400 focus:outline-none"
+                />
+              </div>
             )}
             <div className="grid grid-cols-2 gap-3 pt-2">
               <button
@@ -548,7 +554,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           livreurId={livreurId}
           livreurNom={livreurNom}
           motif={motifAnnulationLivreur}
-          motifDetail={motifAnnulationLivreur === "autre" ? motifAnnulationDetail : ""}
+          motifDetail={motifAnnulationDetail.trim()}
           onClose={() => {
             setShowAnnulationChat(false);
             setMotifAnnulationLivreur("");

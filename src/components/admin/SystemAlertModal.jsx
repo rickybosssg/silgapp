@@ -78,8 +78,9 @@ export default function SystemAlertModal() {
                   </p>
                 </div>
                 <button
-                  onClick={handleDismiss}
-                  className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition shrink-0"
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDismiss(); }}
+                  className="w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition shrink-0"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -117,15 +118,17 @@ export default function SystemAlertModal() {
               <div className="flex gap-2 pt-1">
                 {alerts.length > 1 && (
                   <button
-                    onClick={handleDismissAll}
-                    className="flex-1 h-11 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition"
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDismissAll(); }}
+                    className="flex-1 h-12 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition"
                   >
                     Tout ignorer ({alerts.length})
                   </button>
                 )}
                 <button
-                  onClick={handleDismiss}
-                  className="flex-1 h-11 rounded-xl bg-gradient-to-br from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white text-sm font-bold transition shadow-md shadow-red-500/20"
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDismiss(); }}
+                  className="flex-1 h-12 rounded-xl bg-gradient-to-br from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white text-sm font-bold transition shadow-md shadow-red-500/20 active:scale-95"
                 >
                   J'ai compris
                 </button>

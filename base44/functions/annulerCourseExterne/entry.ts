@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
           type_course: course.type_course === "deplacement" ? "deplacement" : "colis",
           statut_course_avant: course.statut,
           motif,
-          motif_detail: motif === "autre" ? (motif_detail || "") : "",
+          motif_detail: motif_detail || "",
           country_code: course.country_code || "",
           ville: course.ville_depart || "",
           date_annulation: now,
