@@ -6,6 +6,7 @@ import { AlertTriangle, Check, Truck, X, Wallet, ChevronRight } from "lucide-rea
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
+import { useGPSNatif } from "@/hooks/useGPSNatif";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 
@@ -289,9 +290,22 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     });
   };
 
+  // ── GPS natif robuste (remplace le polling navigator.geolocation brut) ──
+  const gpsPositionRef = useRef(null);
+  const { position: gpsPosition, gpsActif: gpsHookActif, permissionStatut, indicateur: gpsIndicateur, ageMinutes: gpsAge, demanderPermission, actualiserPosition } = useGPSNatif({
+    enabled: onboardingTermine && !sessionExpired && livreurProfil?.statut !== "hors_ligne",
+    intervalMs: 10000,
+    onPosition: (pos) => { gpsPositionRef.current = pos; },
+  });
+
+  // Sync gpsActif depuis le hook natif
+  useEffect(() => {
+    if (gpsHookActif && !gpsActif) setGpsActif(true);
+  }, [gpsHookActif, gpsActif]);
+
   const { syncHeartbeat } = useHeartbeat({
     user_type: "livreur",
-    position: livreurProfil?.latitude && livreurProfil?.longitude ? { latitude: livreurProfil.latitude, longitude: livreurProfil.longitude } : null,
+    position: gpsPosition || (livreurProfil?.latitude && livreurProfil?.longitude ? { latitude: livreurProfil.latitude, longitude: livreurProfil.longitude } : null),
     enabled: onboardingTermine && gpsActif && !sessionExpired,
     debugLabel: "LivreurExterneGPS",
     session_id: sessionId,
@@ -847,50 +861,61 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   };
 
   // ─── GPS ──────────────────────────────────────────────────────────────────
-  const handleActiverGPS = () => {
-    if (!navigator.geolocation) {
-      toast.error("GPS non disponible sur cet appareil");
+  // GPS maintenant géré par useGPSNatif (hook robuste avec fallback précision).
+  // handleActiverGPS reste pour le bouton manuel de secours.
+  const handleActiverGPS = async () => {
+    const granted = await demanderPermission();
+    if (!granted) {
+      setGpsActif(false);
+      toast.error("Permission GPS refusée – obligatoire pour recevoir des courses");
       return;
     }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setGpsActif(true);
-        saveLivreur(livreurProfil.id, {
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          derniere_position_date: new Date().toISOString(),
-          last_seen_at: new Date().toISOString(),
-          app_active: true,
-        }).then(() => {
-          queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
-          toast.success("GPS activé");
-        }).catch(() => toast.error("Position GPS non enregistrée"));
-      },
-      () => { setGpsActif(false); toast.error("Permission GPS refusée – obligatoire"); },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+    const pos = await actualiserPosition();
+    if (pos) {
+      setGpsActif(true);
+      saveLivreur(livreurProfil.id, {
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        derniere_position_date: new Date().toISOString(),
+        last_seen_at: new Date().toISOString(),
+        app_active: true,
+        gps_accuracy: pos.accuracy || null,
+      }).then(() => {
+        queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+        toast.success("GPS activé");
+      }).catch(() => toast.error("Position GPS non enregistrée"));
+    } else {
+      toast.error("Impossible d'obtenir votre position. Vérifiez que le GPS de votre téléphone est activé.");
+    }
   };
 
-  // GPS tracking périodique (15s)
+  // ── Auto-activation GPS au démarrage (si livreur en ligne) ──
   useEffect(() => {
-    if (!livreurId || livreurProfil?.statut === "hors_ligne" || !gpsActif) return;
-    const interval = setInterval(() => {
-      navigator.geolocation?.getCurrentPosition(
-        (pos) => {
-          saveLivreur(livreurId, {
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-            derniere_position_date: new Date().toISOString(),
-            last_seen_at: new Date().toISOString(),
-            app_active: true,
-          }).catch(() => null);
-        },
-        (error) => console.warn("[LivreurExterneApp] GPS update skipped:", error?.message),
-        { enableHighAccuracy: true }
-      );
-    }, 15000);
-    return () => clearInterval(interval);
-  }, [livreurId, livreurProfil?.statut, gpsActif]);
+    if (!onboardingTermine || sessionExpired) return;
+    if (livreurProfil?.statut === "hors_ligne") return;
+    if (gpsActif) return;
+    // Tenter l'auto-activation après 2s (laisser le temps au hook natif de s'initialiser)
+    const timer = setTimeout(async () => {
+      const granted = await demanderPermission();
+      if (granted) {
+        const pos = await actualiserPosition();
+        if (pos) {
+          setGpsActif(true);
+          if (livreurProfil?.id) {
+            saveLivreur(livreurProfil.id, {
+              latitude: pos.latitude,
+              longitude: pos.longitude,
+              derniere_position_date: new Date().toISOString(),
+              last_seen_at: new Date().toISOString(),
+              app_active: true,
+              gps_accuracy: pos.accuracy || null,
+            }).catch(() => null);
+          }
+        }
+      }
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [onboardingTermine, sessionExpired, livreurProfil?.statut, livreurProfil?.id, gpsActif]);
 
   // ─── Mutations courses ────────────────────────────────────────────────────
   const updateCourseMutation = useMutation({
