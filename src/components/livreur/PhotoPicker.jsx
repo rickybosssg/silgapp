@@ -27,8 +27,14 @@ export default function PhotoPicker({ label, value, onChange, darkMode = false }
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       onChange(file_url);
-    } catch {
-      toast.error("Erreur lors de l'envoi de la photo. Réessayez.");
+    } catch (err) {
+      const is402 = err?.message?.includes("402") || err?.status === 402;
+      toast.error(
+        is402
+          ? "Service d'envoi temporairement indisponible. Réessayez dans quelques minutes ou contactez le support."
+          : "Erreur lors de l'envoi de la photo. Réessayez.",
+        { duration: 6000 }
+      );
     } finally {
       setUploading(false);
     }
