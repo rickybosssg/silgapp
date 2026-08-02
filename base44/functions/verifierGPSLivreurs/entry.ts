@@ -27,7 +27,7 @@ export default async function (req: Request): Promise<Response> {
     const now = Date.now();
     const SEUIL_GPS_STALE_MIN = 5;
     const SEUIL_GPS_PERDU_MIN = 20;
-    const DELAI_ENTRE_ALERTES_MS = 10 * 60 * 1000; // 10 min entre chaque alerte
+    const DELAI_ENTRE_ALERTES_MS = 30 * 60 * 1000; // 30 min entre chaque alerte
 
     // ── Récupérer tous les livreurs disponibles ──
     const livreurs = await base44.asServiceRole.entities.Livreur.filter({
@@ -89,37 +89,33 @@ export default async function (req: Request): Promise<Response> {
 
       if (gpsAgeMin >= SEUIL_GPS_PERDU_MIN) {
         gpsPerdu++;
+        // Alerte push — uniquement pour GPS perdu (>20 min), max 1 fois / 30 min
+        const lastAlert = livreur.encours_alerte_at ? new Date(livreur.encours_alerte_at).getTime() : 0;
+        if (now - lastAlert > DELAI_ENTRE_ALERTES_MS && livreur.user_email) {
+          waitUntil(
+            base44.asServiceRole.functions.invoke('envoiNotificationPush', {
+              destinataire_email: livreur.user_email,
+              livreur_id: livreur.id,
+              titre: '📍 GPS perdu — rouvrez l\'app',
+              message: `Votre position GPS date de ${Math.round(gpsAgeMin)} min. Rouvrez SILGAPP pour rester visible et recevoir des courses.`,
+              type: 'livreur_hors_ligne',
+            }).catch(() => null)
+          );
+          waitUntil(
+            base44.asServiceRole.entities.Livreur.update(livreur.id, {
+              encours_alerte_at: new Date().toISOString(),
+            }).catch(() => null)
+          );
+          alertsEnvoyees++;
+          detailsAlertes.push({
+            id: livreur.id,
+            nom: `${livreur.prenom || ''} ${livreur.nom || ''}`,
+            raison: `gps_perdu_${Math.round(gpsAgeMin)}min`,
+            gpsAgeMin: Math.round(gpsAgeMin),
+          });
+        }
       } else {
         gpsStale++;
-      }
-
-      // Alerte push (une seule fois par 10 min)
-      const lastAlert = livreur.encours_alerte_at ? new Date(livreur.encours_alerte_at).getTime() : 0;
-      if (now - lastAlert > DELAI_ENTRE_ALERTES_MS && livreur.user_email) {
-        const niveau = gpsAgeMin >= SEUIL_GPS_PERDU_MIN ? 'perdu' : 'ancien';
-        waitUntil(
-          base44.asServiceRole.functions.invoke('envoiNotificationPush', {
-            destinataire_email: livreur.user_email,
-            livreur_id: livreur.id,
-            titre: niveau === 'perdu' ? '📍 GPS perdu — rouvrez l\'app' : '📍 GPS à actualiser',
-            message: gpsAgeMin >= SEUIL_GPS_PERDU_MIN
-              ? `Votre position GPS date de ${Math.round(gpsAgeMin)} min. Rouvrez SILGAPP pour rester visible et recevoir des courses.`
-              : `Votre position GPS date de ${Math.round(gpsAgeMin)} min. Actualisez votre position pour rester prioritaire dans le dispatch.`,
-            type: 'livreur_hors_ligne',
-          }).catch(() => null)
-        );
-        waitUntil(
-          base44.asServiceRole.entities.Livreur.update(livreur.id, {
-            encours_alerte_at: new Date().toISOString(),
-          }).catch(() => null)
-        );
-        alertsEnvoyees++;
-        detailsAlertes.push({
-          id: livreur.id,
-          nom: `${livreur.prenom || ''} ${livreur.nom || ''}`,
-          raison: niveau === 'perdu' ? `gps_perdu_${Math.round(gpsAgeMin)}min` : `gps_stale_${Math.round(gpsAgeMin)}min`,
-          gpsAgeMin: Math.round(gpsAgeMin),
-        });
       }
     }
 
