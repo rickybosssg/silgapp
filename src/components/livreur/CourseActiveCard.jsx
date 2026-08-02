@@ -768,9 +768,24 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               : (course.expediteur_telephone || course.client_telephone));
             const contactRole = colisRecupere ? "Destinataire" : "Expéditeur";
 
-            // ── Courses admin : le clic sur Appeler/WhatsApp déclenche « Client contacté » ──
-            const triggerClientContacte = () => {
-              if (isClientContactePhase) handleClientContacte();
+            // ── Courses admin : le clic sur Appeler/WhatsApp déclenche « Client contacté »
+            //    puis passe automatiquement à « En route vers l'expéditeur » (étapes combinées) ──
+            const triggerClientContacte = async () => {
+              if (!isClientContactePhase) return;
+              const now = new Date().toISOString();
+              // Étape 1 : Client contacté (avec timestamp)
+              updateOptimisticStatut("client_contacte", { heure_contact_client: now });
+              await base44.entities.CourseExterne.update(course.id, {
+                statut: "client_contacte",
+                heure_contact_client: now,
+              }).catch(() => null);
+              // Étape 2 : En route vers l'expéditeur (automatique)
+              updateOptimisticStatut("en_route_expediteur", { heure_contact_client: now });
+              await base44.entities.CourseExterne.update(course.id, {
+                statut: "en_route_expediteur",
+              }).catch(() => null);
+              queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+              toast.success("Client contacté — en route vers l'expéditeur !");
             };
 
             const handleWhatsApp = () => {
@@ -1163,8 +1178,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     )}
                   </div>
                 ) : isExterne ? (
-                  /* ── EXTERNE multi-colis : bouton simple sans QR ── */
-                  /* ── EXTERNE colis unique : Scanner QR pour récupérer ── */
+                  /* ── EXTERNE colis : Scanner QR pour récupérer ── */
                   course.is_multi_colis ? (
                     <button
                       className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
