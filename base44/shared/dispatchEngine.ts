@@ -336,6 +336,13 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
       await base44.asServiceRole.entities.CourseExterne.update(courseId, {
         dispatch_status: 'cycle_epuise',
         dispatch_wave: gpsConfig.waves.length,
+        livreur_id: '',
+        livreur_nom: '',
+        livreur_telephone: '',
+        livreur_photo_url: '',
+        livreur_vehicule: '',
+        livreur_note_moyenne: 0,
+        livreur_nombre_avis: 0,
       });
       journaliserDispatch(base44, { course_id: courseId, country_code: course.country_code, vague: wave, evenement: 'cycle_epuise' });
       return { cycleEpuise: true };
@@ -348,6 +355,13 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
           statut: 'annulee',
           dispatch_status: 'expire',
           dispatch_locked_until: null,
+          livreur_id: '',
+          livreur_nom: '',
+          livreur_telephone: '',
+          livreur_photo_url: '',
+          livreur_vehicule: '',
+          livreur_note_moyenne: 0,
+          livreur_nombre_avis: 0,
           notes: (course.notes || '') + ' | [AUTO-ANNULÉ] Cycle dispatch épuisé après 3 cycles sans livreur acceptant',
         });
         journaliserDispatch(base44, { course_id: courseId, country_code: course.country_code, vague: wave, evenement: 'cycle_epuise' });
@@ -377,6 +391,13 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
           dispatch_status: 'cycle_epuise',
           dispatch_wave: gpsConfig.waves.length,
           timeout_expires_at: cycleEpuiseDeadline,
+          livreur_id: '',
+          livreur_nom: '',
+          livreur_telephone: '',
+          livreur_photo_url: '',
+          livreur_vehicule: '',
+          livreur_note_moyenne: 0,
+          livreur_nombre_avis: 0,
         });
         journaliserDispatch(base44, { course_id: courseId, country_code: course.country_code, vague: wave, evenement: 'cycle_epuise' });
         const messageVenus = `📍 Nous avons sollicité tous les livreurs disponibles autour de vous, mais aucun n'a accepté votre course pour le moment.\n\nVoulez-vous que je relance la recherche ?\n\nRépondez 'oui' pour relancer ou 'non' pour annuler.`;
@@ -412,6 +433,12 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
       dispatch_status: 'propose',
       dispatch_wave: wave,
       livreur_id: '',
+      livreur_nom: '',
+      livreur_telephone: '',
+      livreur_photo_url: '',
+      livreur_vehicule: '',
+      livreur_note_moyenne: 0,
+      livreur_nombre_avis: 0,
       heure_sollicitation: new Date().toISOString(),
       timeout_expires_at: pTimeoutAt,
       dispatch_wave_started_at: new Date().toISOString(),
@@ -496,6 +523,12 @@ export async function lancerDispatchMulti(base44, courseId, exclusions = [], cac
     dispatch_status: 'propose',
     dispatch_wave: wave,
     livreur_id: '',
+    livreur_nom: '',
+    livreur_telephone: '',
+    livreur_photo_url: '',
+    livreur_vehicule: '',
+    livreur_note_moyenne: 0,
+    livreur_nombre_avis: 0,
     heure_sollicitation: new Date().toISOString(),
     timeout_expires_at: timeoutAt,
     dispatch_wave_started_at: new Date().toISOString(),

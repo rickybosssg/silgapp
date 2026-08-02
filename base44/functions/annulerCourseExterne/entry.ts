@@ -241,6 +241,13 @@ Deno.serve(async (req) => {
       const annulData = {
         statut: "annulee",
         date_annulation: now,
+        livreur_id: "",
+        livreur_nom: "",
+        livreur_telephone: "",
+        livreur_photo_url: "",
+        livreur_vehicule: "",
+        livreur_note_moyenne: 0,
+        livreur_nombre_avis: 0,
         notes: (course.notes || "") + ` | [ANNULÉ ADMIN] ${motif || ""}`,
       };
 
