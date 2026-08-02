@@ -1151,16 +1151,6 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 adminPreTrip ? (
                   /* ── COURSE ADMINISTRATIVE : « Client contacté » puis « En route vers l'expéditeur » ── */
                   <div className="space-y-3">
-                    {isClientContactePhase && (
-                      <button
-                        className="w-full h-14 rounded-2xl bg-gradient-to-b from-indigo-500 to-indigo-700 text-white font-black text-base shadow-lg shadow-indigo-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                        onClick={handleClientContacte}
-                        disabled={isPending}
-                      >
-                        <Phone className="w-6 h-6" />
-                        J'ai contacté le client
-                      </button>
-                    )}
                     {isEnRouteExpediteurPending && (
                       <button
                         className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
