@@ -1,5 +1,5 @@
-import React from "react";
-import { MapPin, TrendingUp, Users } from "lucide-react";
+import React, { useState } from "react";
+import { MapPin, TrendingUp, Users, X, Flame } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import HeatmapInsights from "./HeatmapInsights";
 
@@ -8,9 +8,33 @@ import HeatmapInsights from "./HeatmapInsights";
  * Permet de basculer entre : Standard, Demande clients, Couverture livreurs
  */
 export default function HeatmapControls({ mode, onModeChange, clients = [], livreurs = [], courses = [] }) {
+  const [visible, setVisible] = useState(true);
+
+  if (!visible) {
+    return (
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => setVisible(true)}
+        className="bg-white shadow-lg border border-gray-200 text-xs gap-1"
+      >
+        <Flame className="w-3 h-3" /> Cartes thermiques
+      </Button>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-2 bg-white rounded-lg shadow-lg border border-gray-200 p-2 min-w-[200px]">
-      <p className="text-xs font-semibold text-gray-700 px-1">Cartes thermiques</p>
+      <div className="flex items-center justify-between px-1">
+        <p className="text-xs font-semibold text-gray-700">Cartes thermiques</p>
+        <button
+          onClick={() => setVisible(false)}
+          className="text-gray-400 hover:text-gray-600 transition-colors"
+          title="Masquer"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
 
       {/* Mode standard */}
       <Button
