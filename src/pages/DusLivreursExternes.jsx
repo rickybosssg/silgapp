@@ -556,7 +556,7 @@ export default function DusLivreursExternes() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 mt-2 text-[11px]">
-                      <span className="text-gray-400">Commission due :</span>
+                      <span className="text-gray-400">Commission générée :</span>
                       <span className="font-bold text-green-600">{(entry.commissionTotal || 0).toLocaleString()} F</span>
                       {entry.courses.length > 0 && <span className="text-gray-400">· {entry.courses.length} course(s)</span>}
                       {entry.nbCoursesJour > 0 && (
