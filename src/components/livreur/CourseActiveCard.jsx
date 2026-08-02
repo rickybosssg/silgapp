@@ -92,6 +92,13 @@ const STEPS = [
   { key: "livree", label: "Livré", icon: "" },
 ];
 
+const ADMIN_COLIS_STEPS = [
+  { key: "acceptee", label: "Accepté", icon: "" },
+  { key: "client_contacte", label: "Contacté", icon: "" },
+  { key: "colis_recupere", label: "Récupérer", icon: "" },
+  { key: "livree", label: "Livré", icon: "" },
+];
+
 const DEPLACEMENT_STEPS = [
   { key: "acceptee", label: "Accepté", icon: "" },
   { key: "pris_en_charge", label: "Pris en charge", icon: "" },
@@ -99,8 +106,8 @@ const DEPLACEMENT_STEPS = [
   { key: "termine", label: "Terminé", icon: "" },
 ];
 
-function ProgressBar({ statut, isDeplacement }) {
-  const steps = isDeplacement ? DEPLACEMENT_STEPS : STEPS;
+function ProgressBar({ statut, isDeplacement, isAdminColis }) {
+  const steps = isDeplacement ? DEPLACEMENT_STEPS : (isAdminColis ? ADMIN_COLIS_STEPS : STEPS);
   const idx = steps.findIndex(s => s.key === statut);
   const current = idx === -1 ? 0 : (statut === "livree" && isDeplacement ? steps.length - 1 : idx);
 
@@ -697,7 +704,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
         <div className="p-5 space-y-4">
           {/* Barre de progression */}
-          <ProgressBar statut={effectiveStatut} isDeplacement={isDeplacement} />
+          <ProgressBar statut={effectiveStatut} isDeplacement={isDeplacement} isAdminColis={isAdminColisCourse} />
 
           {/* Badge ETA temps réel */}
           {!colisLivre && !adminPreTrip && (
