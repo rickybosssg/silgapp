@@ -29,8 +29,41 @@ Deno.serve(async (req) => {
         const livreurs = await base44.asServiceRole.entities.Livreur.filter({ id: paiement.user_id });
         if (livreurs?.[0]) {
           const livreur = livreurs[0];
-          const nouveauSolde = Math.max(0, (livreur.montant_du_silga || 0) - paiement.montant_paye);
-          const nouvelEncours = Math.max(0, (livreur.encours || 0) - paiement.montant_paye);
+
+          // ── Marquer les courses livrées impayées comme payées (anciennes d'abord) ──
+          // Le solde affiché au livreur est calculé depuis les courses impayées,
+          // il faut donc les solder pour que le solde se mette à jour.
+          const coursesImpayees = await base44.asServiceRole.entities.CourseExterne.filter(
+            { livreur_id: livreur.id, statut: 'livree', statut_paiement_livreur: 'non_paye' },
+            'heure_livraison', 200
+          );
+
+          let reste = paiement.montant_paye;
+          const coursesAPayer = [];
+          for (const c of (coursesImpayees || [])) {
+            if (reste <= 0) break;
+            const comm = c.commission_silga ?? 0;
+            coursesAPayer.push(c.id);
+            reste -= comm; // peut être négatif = surplus
+          }
+
+          // Marquer les courses sélectionnées comme payées (bulk)
+          if (coursesAPayer.length > 0) {
+            await base44.asServiceRole.entities.CourseExterne.updateMany(
+              { id: { $in: coursesAPayer } },
+              { $set: { statut_paiement_livreur: 'paye', heure_paiement: new Date().toISOString(), admin_paiement: user.email } }
+            );
+          }
+
+          // Recalculer le VRAI solde dû = somme des commissions encore impayées
+          const coursesRestantesImpayees = await base44.asServiceRole.entities.CourseExterne.filter(
+            { livreur_id: livreur.id, statut: 'livree', statut_paiement_livreur: 'non_paye' },
+            null, 200
+          );
+          const nouveauSoldeReel = (coursesRestantesImpayees || []).reduce((s, c) => s + (c.commission_silga ?? 0), 0);
+
+          // encours suit la même logique (réduit du paiement, floor à 0)
+          const nouvelEncours = Math.max(0, nouveauSoldeReel);
 
           // Récupérer le seuil du pays pour savoir si on peut débloquer
           const countries = await base44.asServiceRole.entities.Country.filter({ code: livreur.country_code, actif: true });
@@ -40,8 +73,10 @@ Deno.serve(async (req) => {
           const peutDebloquer = nouvelEncours < seuil;
 
           const updateData = {
-            montant_du_silga: nouveauSolde,
+            montant_du_silga: nouveauSoldeReel,
             encours: nouvelEncours,
+            statut_paiement: nouveauSoldeReel <= 0 ? 'paye' : 'non_paye',
+            montant_paye: (livreur.montant_paye || 0) + paiement.montant_paye,
             dernier_paiement_date: new Date().toISOString(),
           };
 
@@ -67,7 +102,7 @@ Deno.serve(async (req) => {
               seuil_applicable: seuil,
               pourcentage_atteint: seuil > 0 ? Math.round((nouvelEncours / seuil) * 100) : 0,
               action_par: user.email,
-              commentaire: `Paiement de ${paiement.montant_paye} FCFA validé`,
+              commentaire: `Paiement de ${paiement.montant_paye} FCFA validé (${coursesAPayer.length} course(s) soldée(s))`,
               date_action: new Date().toISOString(),
             });
           } catch (_) {}
