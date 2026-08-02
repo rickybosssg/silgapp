@@ -768,7 +768,13 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               : (course.expediteur_telephone || course.client_telephone));
             const contactRole = colisRecupere ? "Destinataire" : "Expéditeur";
 
+            // ── Courses admin : le clic sur Appeler/WhatsApp déclenche « Client contacté » ──
+            const triggerClientContacte = () => {
+              if (isClientContactePhase) handleClientContacte();
+            };
+
             const handleWhatsApp = () => {
+              triggerClientContacte();
               // Normalisation multi-pays : si le numéro a déjà un indicatif international (10+ chiffres), ok
               // Sinon on laisse le numéro tel quel — wa.me gère les numéros locaux avec indicatif
               let num = (contactTel || "").replace(/\D/g, "");
@@ -808,7 +814,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                     <p className="text-xs text-gray-500 truncate">{contactTel || "—"}</p>
                   </div>
                   <div className="flex gap-2 shrink-0">
-                    <a href={`tel:${contactTel}`} className="flex flex-col items-center gap-0.5">
+                    <a href={`tel:${contactTel}`} className="flex flex-col items-center gap-0.5" onClick={triggerClientContacte}>
                       <div className={cn(
                         "w-12 h-12 rounded-2xl border-2 flex items-center justify-center shadow-sm",
                         "bg-blue-100 border-blue-300"
