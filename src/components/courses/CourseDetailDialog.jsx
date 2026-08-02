@@ -38,6 +38,7 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
   const [confirmAnnulation, setConfirmAnnulation] = React.useState(false);
   const [adminEmail, setAdminEmail] = React.useState("");
   const [reattributing, setReattributing] = React.useState(false);
+  const [relaunching, setRelaunching] = React.useState(false);
   const countryMismatch = reseau === "externe" && isPays && course?.country_code && course.country_code !== adminCountryCode;
 
   React.useEffect(() => {
@@ -143,6 +144,39 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
       toast.error("Erreur : " + (error?.message || "réattribution impossible"));
     } finally {
       setReattributing(false);
+    }
+  };
+
+  const handleRelancerVague0 = async () => {
+    setRelaunching(true);
+    try {
+      await base44.entities.CourseExterne.update(course.id, {
+        statut: "nouvelle",
+        dispatch_status: "en_attente",
+        dispatch_wave: 0,
+        dispatch_cycle_count: 0,
+        dispatch_notified_ids: "[]",
+        dispatch_wave_notified_ids: "[]",
+        dispatch_refused_ids: "[]",
+        dispatch_locked_until: null,
+        timeout_expires_at: null,
+        livreur_id: "",
+        livreur_nom: "",
+        livreur_telephone: "",
+        livreur_photo_url: "",
+        livreur_vehicule: "",
+        livreur_note_moyenne: 0,
+        livreur_nombre_avis: 0,
+      });
+      // Déclencher le dispatch immédiatement
+      await base44.functions.invoke("dispatchExterneAuto", {}).catch(() => null);
+      toast.success("Course relancée depuis la vague 0");
+      queryClient.invalidateQueries();
+      onClose();
+    } catch (error) {
+      toast.error("Erreur : " + (error?.message || "relance impossible"));
+    } finally {
+      setRelaunching(false);
     }
   };
 
@@ -357,6 +391,25 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
           {course.notes && (
             <div className="text-sm text-muted-foreground bg-muted/30 p-3 rounded-lg">
               {course.notes}
+            </div>
+          )}
+
+          {/* Relance depuis la vague 0 — visible quand le cycle dispatch est épuisé */}
+          {reseau === "externe" && course.dispatch_status === "cycle_epuise" && (
+            <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-3 space-y-2">
+              <p className="text-xs font-bold text-amber-700 flex items-center gap-1.5">
+                <RotateCcw className="w-3.5 h-3.5" />
+                Cycle dispatch épuisé
+              </p>
+              <Button
+                variant="outline"
+                className="w-full border-amber-400 text-amber-700 hover:bg-amber-100 font-bold"
+                disabled={relaunching || updateMutation.isPending}
+                onClick={handleRelancerVague0}
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                {relaunching ? "Relance en cours..." : "Relancer depuis la vague 0"}
+              </Button>
             </div>
           )}
 
