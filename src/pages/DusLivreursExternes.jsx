@@ -505,7 +505,7 @@ export default function DusLivreursExternes() {
                 </div>
               </div>
               <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/15">
-                <span className="text-[11px] opacity-80 font-medium">Commission du jour :</span>
+                <span className="text-[11px] opacity-80 font-medium">Commission générée :</span>
                 <span className="text-sm font-black">{recapLivreurs.totalCommissionJour.toLocaleString()} FCFA</span>
                 <span className="text-[10px] opacity-60 ml-auto">{format(startOfToday, "EEEE dd MMM yyyy", { locale: fr })}</span>
               </div>
