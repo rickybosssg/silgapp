@@ -769,7 +769,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             const contactRole = colisRecupere ? "Destinataire" : "Expéditeur";
 
             // ── Courses admin : le clic sur Appeler/WhatsApp déclenche « Client contacté »
-            //    puis passe automatiquement à « En route vers l'expéditeur » (étapes combinées) ──
+            //    puis 60s plus tard passe automatiquement à « En route vers l'expéditeur » ──
             const triggerClientContacte = async () => {
               if (!isClientContactePhase) return;
               const now = new Date().toISOString();
@@ -779,13 +779,17 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 statut: "client_contacte",
                 heure_contact_client: now,
               }).catch(() => null);
-              // Étape 2 : En route vers l'expéditeur (automatique)
-              updateOptimisticStatut("en_route_expediteur", { heure_contact_client: now });
-              await base44.entities.CourseExterne.update(course.id, {
-                statut: "en_route_expediteur",
-              }).catch(() => null);
               queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
-              toast.success("Client contacté — en route vers l'expéditeur !");
+              toast.success("Client contacté. Démarrage automatique dans 60s…");
+              // Étape 2 : En route vers l'expéditeur (automatique après 60s)
+              setTimeout(async () => {
+                updateOptimisticStatut("en_route_expediteur", {});
+                await base44.entities.CourseExterne.update(course.id, {
+                  statut: "en_route_expediteur",
+                }).catch(() => null);
+                queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+                toast.success("En route vers l'expéditeur !");
+              }, 60000);
             };
 
             const handleWhatsApp = () => {
