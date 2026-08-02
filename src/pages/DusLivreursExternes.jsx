@@ -305,8 +305,8 @@ export default function DusLivreursExternes() {
         const commNonPayees = entry.courses
           .filter(c => c.statut_paiement_livreur !== "paye")
           .reduce((s, c) => s + (c.commission_silga ?? 0), 0);
-        const ancienSolde = info.montant_du_silga ?? info.encours ?? 0;
-        entry.montantDu = entry.courses.length > 0 ? commNonPayees : ancienSolde;
+        const storedDebt = info.encours || info.montant_du_silga || 0;
+        entry.montantDu = Math.max(commNonPayees, storedDebt);
         entry.montantPaye = Math.max(0, entry.commissionTotal - entry.montantDu);
       } else {
         // Pas d'info livreur — calcul de secours basé sur les courses impayées
