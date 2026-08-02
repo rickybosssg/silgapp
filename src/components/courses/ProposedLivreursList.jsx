@@ -215,7 +215,7 @@ export default function ProposedLivreursList({ course }) {
                 <p className="text-[11px] font-semibold text-gray-600">Prochain tick de relance</p>
                 <p className="text-[10px] text-gray-400">
                   {isExpired
-                    ? `Vague #${(course?.dispatch_wave || 0) + 1} lancée au prochain tick`
+                    ? `Relance de la recherche au prochain tick`
                     : `Moteur dispatch — vérification auto`}
                 </p>
               </div>
