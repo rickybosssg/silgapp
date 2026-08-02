@@ -54,15 +54,23 @@ export default function CarteLivreurClient({ livreurLat, livreurLng, livreurNom,
       maxZoom: 19
     }).addTo(map);
 
-    // Marqueur livreur (position live) — design moderne type Uber
+    // Marqueur livreur (position live) — bonhomme sur scooter, design moderne
     const livreurIcon = L.divIcon({
-      html: '<div style="position:relative;width:40px;height:40px;">' +
+      html: '<div style="position:relative;width:44px;height:44px;">' +
         '<div style="position:absolute;inset:0;border-radius:50%;background:rgba(220,38,38,0.2);animation:pulse 2s infinite;"></div>' +
-        '<div style="position:absolute;top:6px;left:6px;width:28px;height:28px;border-radius:50%;background:#dc2626;border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-size:14px;">🛵</div>' +
+        '<div style="position:absolute;top:4px;left:4px;width:36px;height:36px;border-radius:50%;background:#dc2626;border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;">' +
+        '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+        '<circle cx="5.5" cy="17.5" r="3.5" fill="white" stroke="white"/>' +
+        '<circle cx="18.5" cy="17.5" r="3.5" fill="white" stroke="white"/>' +
+        '<path d="M5.5 17.5 L9 17.5 L10 14 L15 14 L18.5 17.5" stroke="white" stroke-width="2" fill="none"/>' +
+        '<path d="M10 14 L11 10 L14 10 L15 14" stroke="white" stroke-width="2" fill="none"/>' +
+        '<circle cx="12.5" cy="7" r="2.5" fill="white" stroke="white"/>' +
+        '</svg>' +
+        '</div>' +
         '</div>' +
         '<style>@keyframes pulse{0%{transform:scale(0.8);opacity:0.7}70%{transform:scale(1.3);opacity:0}100%{transform:scale(0.8);opacity:0}}</style>',
-      iconSize: [40, 40],
-      iconAnchor: [20, 20],
+      iconSize: [44, 44],
+      iconAnchor: [22, 22],
       className: 'livreur-marker-anim',
     });
     L.marker([livreurLat, livreurLng], { icon: livreurIcon }).addTo(map).bindPopup(`<div style="font-weight:bold;font-size:13px">${livreurNom || 'Livreur'}<div><div style="font-size:11px;color:#666">Position en temps réel</div>`);
