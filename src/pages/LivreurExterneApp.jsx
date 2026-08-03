@@ -722,7 +722,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       if (c.statut === "annulee") return false;
 
       // Statuts explicitement actifs
-      if (["livreur_en_route", "colis_recupere", "en_livraison", "acceptee"].includes(c.statut)) return true;
+      // Inclut les statuts du workflow administratif (client_contacte, en_route_expediteur)
+      // qui sont des étapes intermédiaires entre l'acceptation et la récupération du colis.
+      if (["livreur_en_route", "colis_recupere", "en_livraison", "acceptee", "client_contacte", "en_route_expediteur"].includes(c.statut)) return true;
 
       // Déplacement : statuts intermédiaires pris_en_charge et arrivee
       if (c.type_course === "deplacement" && ["pris_en_charge", "arrivee"].includes(c.statut)) return true;
