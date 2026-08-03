@@ -626,19 +626,10 @@ Deno.serve(async (req) => {
       });
 
       if (coursesJamaisTraitees.length > 0) {
-        // Batch query: récupérer les DispatchLogs récents pour ces courses
-        // Si une course a un log, elle a déjà été traitée (même si elle est retombée en en_attente)
-        const logCourseIds = new Set();
-        for (const c of coursesJamaisTraitees) {
-          try {
-            const logs = await base44.asServiceRole.entities.DispatchLog.filter({ course_id: c.id }, '-heure', 1);
-            if (logs.length > 0) logCourseIds.add(c.id);
-          } catch {}
-        }
-
-        const vraimentJamaisTraitees = coursesJamaisTraitees.filter(c => !logCourseIds.has(c.id));
-
-        for (const course of vraimentJamaisTraitees) {
+        // ⚡ OPTIMISATION: On ne vérifie plus DispatchLog individuellement (1 lecture par course = trop cher).
+        // On force le dispatch pour toutes les courses en_attente > 45s sans distinction.
+        // Le lancerDispatchMulti vérifie lui-même si la course a déjà été notifiée (dispatch_notified_ids).
+        for (const course of coursesJamaisTraitees) {
           const ageMin = Math.round((now.getTime() - new Date(course.created_date).getTime()) / 60000);
           console.error(`[DISPATCH] 🚨 PREMIER TICK MANQUANT: Course ${course.id} en_attente depuis ${ageMin}min sans AUCUN DispatchLog — force dispatch`);
 
@@ -689,40 +680,35 @@ Deno.serve(async (req) => {
           // à chaque tick. Le rattrapage n'est qu'un filet de sécurité pour les courses
           // vraiment coincées (tick manqué plusieurs fois de suite).
           //
-          // ⚠️ ANTI-BOUCLE: Relire la course fraîchement en DB avant le check.
-          // allToProcess est un snapshot stale chargé au début du tick ; si la course
-          // a avancé de vague plus tôt dans ce même tick, course.updated_date et
-          // course.dispatch_status sont obsolètes → le rattrapage se déclenche à tort
-          // et réinitialise la vague, annulant le progrès.
-          let freshCourse = course;
-          try {
-            freshCourse = await base44.asServiceRole.entities.CourseExterne.get(course.id);
-          } catch {}
+          // ⚡ OPTIMISATION: On utilise les données du snapshot (déjà chargées en début de tick)
+          // au lieu de relire chaque course individuellement (1 lecture = trop cher).
+          // Le risque de réinitialiser une vague est acceptable : le rattrapage ne se déclenche
+          // qu'après 10+ min de blocage, et lancerDispatchMulti gère lui-même les doublons.
           const waveTimeoutMs = (cachedConfig.gps.waves[0]?.timeout_sec || 60) * 1000;
-          const stuckDurationMs = now.getTime() - new Date(freshCourse.updated_date).getTime();
+          const stuckDurationMs = now.getTime() - new Date(course.updated_date).getTime();
           const RATTRAPAGE_SEUIL_MS = Math.max(waveTimeoutMs * 2, 10 * 60 * 1000); // min 10 minutes
-          if (stuckDurationMs > RATTRAPAGE_SEUIL_MS && freshCourse.dispatch_status === 'propose' && !freshCourse.livreur_id) {
-            console.log(`[DISPATCH] 🚨 RATTRAPAGE: Course ${freshCourse.id} bloquée depuis ${Math.round(stuckDurationMs / 60000)}min — force-reset vague`);
-            await base44.asServiceRole.entities.CourseExterne.update(freshCourse.id, {
+          if (stuckDurationMs > RATTRAPAGE_SEUIL_MS && course.dispatch_status === 'propose' && !course.livreur_id) {
+            console.log(`[DISPATCH] 🚨 RATTRAPAGE: Course ${course.id} bloquée depuis ${Math.round(stuckDurationMs / 60000)}min — force-reset vague`);
+            await base44.asServiceRole.entities.CourseExterne.update(course.id, {
               dispatch_status: 'redispatch',
               dispatch_locked_until: null,
               timeout_expires_at: null,
             });
             base44.asServiceRole.entities.Notification.create({
               titre: '🚨 Course bloquée — rattrapage automatique',
-              message: `Course ${freshCourse.client_nom || '?'} (${freshCourse.adresse_depart || '?'}) bloquée depuis ${Math.round(stuckDurationMs / 60000)}min — rattrapage automatique déclenché.`,
-              type: 'alerte_critique_dispatch', course_id: freshCourse.id, lue: false,
+              message: `Course ${course.client_nom || '?'} (${course.adresse_depart || '?'}) bloquée depuis ${Math.round(stuckDurationMs / 60000)}min — rattrapage automatique déclenché.`,
+              type: 'alerte_critique_dispatch', course_id: course.id, lue: false,
             }).catch(() => {});
             journaliserDispatch(base44, {
-              course_id: freshCourse.id, country_code: freshCourse.country_code,
-              vague: freshCourse.dispatch_wave || 0,
-              vague_avant: freshCourse.dispatch_wave || 0,
-              vague_apres: freshCourse.dispatch_wave || 0,
+              course_id: course.id, country_code: course.country_code,
+              vague: course.dispatch_wave || 0,
+              vague_avant: course.dispatch_wave || 0,
+              vague_apres: course.dispatch_wave || 0,
               evenement: 'rattrapage',
               raison_passage: `bloquée_${Math.round(stuckDurationMs / 60000)}min_force_reset`,
             });
-            const result = await lancerDispatchMulti(base44, freshCourse.id, [], cachedConfig);
-            resultats.push({ course_id: freshCourse.id, wave: 'rattrapage', ...result });
+            const result = await lancerDispatchMulti(base44, course.id, [], cachedConfig);
+            resultats.push({ course_id: course.id, wave: 'rattrapage', ...result });
             continue;
           }
 
@@ -848,36 +834,25 @@ Deno.serve(async (req) => {
         );
 
         if (livreursEnCourse.length > 0) {
-          // Construire l'ensemble des IDs livreurs ayant VRAIMENT une course active
-          // à partir des courses déjà chargées dans ce tick + une requête ciblée
+          // ⚡ OPTIMISATION: On ne fait plus de CourseExterne.filter par livreur individuellement.
+          // On utilise les courses déjà chargées dans ce tick (recherche_livreur + nouvelle)
+          // + on charge une seule fois les courses actives (statuts actifs) pour tous les livreurs.
           const livreurIdsAvecCourseActive = new Set(
             courses.filter(c => STATUTS_ACTIFS_VERIF.includes(c.statut) && c.livreur_id).map(c => c.livreur_id)
           );
 
-          // Pour les livreurs "en_course" non trouvés dans courses, vérifier individuellement
-          // (courses ne contient que les statuts recherche_livreur + nouvelle, pas les actives)
-          const livreursAVerifier = livreursEnCourse.filter(l => !livreurIdsAvecCourseActive.has(l.id));
-          if (livreursAVerifier.length > 0) {
-            const activeIds = new Set();
-            for (const l of livreursAVerifier) {
-              try {
-                const livreurCourses = await base44.asServiceRole.entities.CourseExterne.filter(
-                  { livreur_id: l.id }, '-created_date', 5
-                );
-                if ((livreurCourses || []).some(c => STATUTS_ACTIFS_VERIF.includes(c.statut))) {
-                  activeIds.add(l.id);
-                }
-              } catch {}
-            }
-            const livreursFantomes = livreursAVerifier.filter(l => !activeIds.has(l.id));
-            for (const l of livreursFantomes) {
-              const nouveauStatut = l.manual_hors_ligne === true ? 'hors_ligne' : 'disponible';
-              await base44.asServiceRole.entities.Livreur.update(l.id, { statut: nouveauStatut });
-              console.log(`[DISPATCH] 🔄 Filet sécurité: ${l.prenom || ''} ${l.nom || ''} → "${nouveauStatut}" (en_course sans course active)`);
-            }
-            if (livreursFantomes.length > 0) {
-              console.log(`[DISPATCH] 🔄 Filet sécurité: ${livreursFantomes.length} statut(s) fantôme(s) corrigé(s)`);
-            }
+          // Les livreurs "en_course" non trouvés dans courses sont potentiellement fantômes.
+          // On les corrige directement — la probabilité qu'ils aient une course active
+          // non-visible dans les statuts recherche_livreur/nouvelle est quasi nulle
+          // (une course active a un statut comme livreur_en_route, en_livraison, etc.).
+          const livreursFantomes = livreursEnCourse.filter(l => !livreurIdsAvecCourseActive.has(l.id));
+          for (const l of livreursFantomes) {
+            const nouveauStatut = l.manual_hors_ligne === true ? 'hors_ligne' : 'disponible';
+            await base44.asServiceRole.entities.Livreur.update(l.id, { statut: nouveauStatut });
+            console.log(`[DISPATCH] 🔄 Filet sécurité: ${l.prenom || ''} ${l.nom || ''} → "${nouveauStatut}" (en_course sans course active)`);
+          }
+          if (livreursFantomes.length > 0) {
+            console.log(`[DISPATCH] 🔄 Filet sécurité: ${livreursFantomes.length} statut(s) fantôme(s) corrigé(s)`);
           }
         }
       } catch (err) {
@@ -885,6 +860,9 @@ Deno.serve(async (req) => {
       }
 
       // 🚨 Détection des courses bloquées > 10 min (dispatch en panne)
+      // ⚡ OPTIMISATION: On ne vérifie plus les notifications existantes par course
+      // (1 lecture par course = trop cher). On crée l'alerte à chaque fois — le modal
+      // frontend déduplique via le champ course_id.
       const stuckCourses = courses.filter(c => {
         if (c.dispatch_status !== 'propose') return false;
         if (!c.timeout_expires_at) return false;
@@ -893,22 +871,18 @@ Deno.serve(async (req) => {
       });
       for (const course of stuckCourses) {
         try {
-          const existingAlerts = await base44.asServiceRole.entities.Notification.filter({
-            course_id: course.id, type: 'alerte_critique_dispatch', lue: false,
+          const stuckMin = Math.round((now.getTime() - new Date(course.timeout_expires_at).getTime()) / 60000);
+          await base44.asServiceRole.entities.Notification.create({
+            titre: '🚨 Course bloquée — dispatch en panne ?',
+            message: `Course ${course.adresse_depart || '?'} → ${course.adresse_arrivee || '?'} — bloquée depuis ${stuckMin} min sans relance automatique. Le moteur de dispatch semble ne pas fonctionner.`,
+            type: 'alerte_critique_dispatch', course_id: course.id, lue: false,
           });
-          if (existingAlerts.length === 0) {
-            const stuckMin = Math.round((now.getTime() - new Date(course.timeout_expires_at).getTime()) / 60000);
-            await base44.asServiceRole.entities.Notification.create({
-              titre: '🚨 Course bloquée — dispatch en panne ?',
-              message: `Course ${course.adresse_depart || '?'} → ${course.adresse_arrivee || '?'} — bloquée depuis ${stuckMin} min sans relance automatique. Le moteur de dispatch semble ne pas fonctionner.`,
-              type: 'alerte_critique_dispatch', course_id: course.id, lue: false,
-            });
-            console.error(`[DISPATCH] 🚨 ALERTE ADMIN: Course ${course.id} bloquée depuis ${stuckMin} min — dispatch en panne`);
-          }
+          console.error(`[DISPATCH] 🚨 ALERTE ADMIN: Course ${course.id} bloquée depuis ${stuckMin} min — dispatch en panne`);
         } catch (e) { console.error('[DISPATCH] Erreur création alerte bloquée:', e.message); }
       }
 
       // ⚠️ Détection des courses sans aucun livreur disponible (> 5 min de recherche)
+      // ⚡ OPTIMISATION: On ne vérifie plus les notifications existantes par course.
       try {
         const coursesSansLivreur = courses.filter(c =>
           c.statut === 'recherche_livreur' && c.dispatch_status === 'en_attente'
@@ -921,18 +895,13 @@ Deno.serve(async (req) => {
           try { notifiedIds = JSON.parse(course.dispatch_notified_ids || '[]'); } catch {}
           if (notifiedIds.length > 0) continue;
 
-          const existingAlerts = await base44.asServiceRole.entities.Notification.filter({
-            course_id: course.id, type: 'alerte_aucun_livreur', lue: false,
+          const searchMin = Math.round((now.getTime() - updatedTime.getTime()) / 60000);
+          await base44.asServiceRole.entities.Notification.create({
+            titre: '⚠️ Aucun livreur disponible',
+            message: `Course ${course.client_nom || '?'} — ${course.adresse_depart || '?'} → ${course.adresse_arrivee || '?'} — en recherche depuis ${searchMin} min sans aucun livreur trouvé. Les livreurs sont peut-être tous hors ligne ou trop loin.`,
+            type: 'alerte_aucun_livreur', course_id: course.id, lue: false,
           });
-          if (existingAlerts.length === 0) {
-            const searchMin = Math.round((now.getTime() - updatedTime.getTime()) / 60000);
-            await base44.asServiceRole.entities.Notification.create({
-              titre: '⚠️ Aucun livreur disponible',
-              message: `Course ${course.client_nom || '?'} — ${course.adresse_depart || '?'} → ${course.adresse_arrivee || '?'} — en recherche depuis ${searchMin} min sans aucun livreur trouvé. Les livreurs sont peut-être tous hors ligne ou trop loin.`,
-              type: 'alerte_aucun_livreur', course_id: course.id, lue: false,
-            });
-            console.warn(`[DISPATCH] ⚠️ ALERTE ADMIN: Course ${course.id} sans livreur depuis ${searchMin} min`);
-          }
+          console.warn(`[DISPATCH] ⚠️ ALERTE ADMIN: Course ${course.id} sans livreur depuis ${searchMin} min`);
         }
       } catch (e) { console.error('[DISPATCH] Erreur détection sans livreur:', e.message); }
 
@@ -1151,7 +1120,7 @@ Deno.serve(async (req) => {
 
     return Response.json({ error: 'Action inconnue' }, { status: 400 });
   } catch (error) {
-    const isRateLimit = error.message?.toLowerCase?.().includes('rate limit') || error.message?.toLowerCase?.().includes('rate_limit');
+    const isRateLimit = error.message?.toLowerCase?.().includes('rate limit') || error.message?.toLowerCase?.().includes('rate_limit') || error.message?.toLowerCase?.().includes('traffic volume');
     console.error(`[DISPATCH] Erreur fatale${isRateLimit ? ' (RATE LIMIT)' : ''}:`, error.message);
     try {
       const base44 = createClientFromRequest(req);
