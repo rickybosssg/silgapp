@@ -12,6 +12,29 @@ export default function WhatsAppAdmin() {
       .catch(() => setUser(null));
   }, []);
 
+  // Marquer toutes les conversations WhatsApp comme lues à l'ouverture
+  useEffect(() => {
+    if (!user) return;
+    const markAllRead = async () => {
+      try {
+        const all = await base44.entities.Conversation.list("-last_message_date", 200);
+        const waConvs = (all || []).filter(c => c.source === "whatsapp");
+        const now = new Date().toISOString();
+        await Promise.all(
+          waConvs
+            .filter(c => {
+              if (c.last_sender_type === "admin") return false;
+              if (!c.last_message_date) return false;
+              if (!c.admin_last_read_date) return true;
+              return new Date(c.last_message_date) > new Date(c.admin_last_read_date);
+            })
+            .map(c => base44.entities.Conversation.update(c.id, { admin_last_read_date: now }).catch(() => null))
+        );
+      } catch (_) {}
+    };
+    markAllRead();
+  }, [user]);
+
   if (!user) {
     return (
       <div className="flex items-center justify-center h-full py-20">
