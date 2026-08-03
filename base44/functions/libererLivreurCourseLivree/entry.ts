@@ -77,6 +77,14 @@ Deno.serve(async (req) => {
 
       console.log(`[libererLivreurCourseLivree] Livreur ${course.livreur_nom} remis à "${nouveauStatut}" (heartbeat: ${Math.round(heartbeatAge)}min)`);
 
+      // ── Vérifier l'encours du livreur après libération ──
+      // S'assure que la commission de cette course est comptabilisée dans l'encours
+      try {
+        await base44.functions.invoke('verifierEncoursLivreur', { course_id });
+      } catch (encoursErr) {
+        console.error('[libererLivreurCourseLivree] verifierEncoursLivreur error:', encoursErr?.message || encoursErr);
+      }
+
       return Response.json({
         success: true,
         message: 'Livreur libéré avec succès',

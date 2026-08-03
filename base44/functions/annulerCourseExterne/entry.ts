@@ -91,6 +91,42 @@ Deno.serve(async (req) => {
     const now = new Date().toISOString();
 
     if (source === "livreur") {
+      // ── ANNULATION LIVREUR APRÈS PRISE EN CHARGE : vérifier si des frais s'appliquent ──
+      // Si le livreur a déjà récupéré le colis (statut ≥ colis_recupere), des frais
+      // d'annulation peuvent s'appliquer pour compenser le client et SILGAPP.
+      const statutsApresPriseEnCharge = ["colis_recupere", "passager_embarque", "pris_en_charge", "en_livraison", "arrivee"];
+      if (statutsApresPriseEnCharge.includes(course.statut)) {
+        try {
+          const livreurPourFrais = await asService.entities.Livreur.get(livreurId).catch(() => null);
+          // Résoudre le client (expéditeur ou destinataire)
+          let clientId = course.expediteur_client_id || course.destinataire_client_id || "";
+          let clientNom = course.expediteur_nom || course.destinataire_nom || course.client_nom || "";
+          let clientTel = course.expediteur_telephone || course.destinataire_telephone || course.client_telephone || "";
+          if (!clientId && course.expediteur_client_id) {
+            const c = await asService.entities.ClientExterne.get(course.expediteur_client_id).catch(() => null);
+            if (c) { clientId = c.id; clientNom = c.nom || clientNom; clientTel = c.telephone || clientTel; }
+          }
+          if (livreurPourFrais && clientId && clientTel) {
+            await asService.entities.FraisAnnulation.create({
+              course_id,
+              client_id: clientId,
+              client_nom: clientNom,
+              client_telephone: clientTel,
+              livreur_id: livreurId,
+              livreur_nom: `${livreurPourFrais.prenom || ""} ${livreurPourFrais.nom || ""}`.trim(),
+              montant: 500,
+              country_code: course.country_code || "",
+              statut_paiement: "impaye",
+              raison: `Annulation livreur après prise en charge — ${motif || "non_specifie"}`,
+              date_annulation: now,
+            }).catch(() => null);
+            console.log(`[ANNULATION] Frais d'annulation créés pour livreur ${livreurId} — course ${course_id} (statut: ${course.statut})`);
+          }
+        } catch (fraisErr) {
+          console.error('[ANNULATION] Erreur création frais:', fraisErr?.message);
+        }
+      }
+
       // ── ANNULATION LIVREUR : course mise en "en_attente" (dispatch SUSPENDU) ──
       // Le dispatch n'est PAS relancé automatiquement. L'admin doit repasser
       // manuellement la course en "nouvelle" pour relancer la recherche.
