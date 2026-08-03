@@ -90,10 +90,16 @@ function AppLayoutInner({ reseau }) {
         const user = await base44.auth.me();
         if (!user) return;
         const all = await base44.entities.Conversation.list("-last_message_date", 100);
+        // Filtrer UNIQUEMENT les conversations où l'admin connecté est participant
+        // (pas toutes les conversations avec un admin quelconque)
         const mine = (all || []).filter(c => {
           try {
             const parts = JSON.parse(c.participants || "[]");
-            return parts.some(p => p.type === "admin");
+            return parts.some(p => {
+              if (p.type !== "admin") return false;
+              const ids = [p.id, p.user_id, p.email].filter(Boolean).map(String);
+              return ids.includes(String(user.id)) || (user.email && ids.includes(String(user.email)));
+            });
           } catch { return false; }
         });
         const unread = mine.filter(c => {
