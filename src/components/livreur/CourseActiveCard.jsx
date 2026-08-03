@@ -768,10 +768,14 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             }
 
             const contactNom = colisRecupere
-              ? (course.destinataire_nom || "Destinataire")
+              ? (course.destinataire_nom || course.client_nom || "Destinataire")
               : (course.expediteur_nom || course.client_nom || "Expéditeur");
+            // ── Fallback robuste : s'assurer qu'un numéro est TOUJOURS affiché ──
+            // 1. contact_createur_course (contact principal, surtout VENUS/admin)
+            // 2. Phase récupération : expediteur_telephone → client_telephone
+            // 3. Phase livraison : destinataire_telephone → destinataire_phone_normalized → client_telephone
             const contactTel = course.contact_createur_course || (colisRecupere
-              ? (course.destinataire_telephone || course.destinataire_phone_normalized)
+              ? (course.destinataire_telephone || course.destinataire_phone_normalized || course.client_telephone)
               : (course.expediteur_telephone || course.client_telephone));
             const contactRole = colisRecupere ? "Destinataire" : "Expéditeur";
 

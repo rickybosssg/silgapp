@@ -141,6 +141,31 @@ export default function AdminCourseForm() {
         clientNom: clientNom.trim(),
       };
 
+      // ── Mapping automatique des téléphones selon le type de course ──
+      // Pour que le livreur ait toujours un numéro de contact valide :
+      // - "expedier" : le client EST l'expéditeur
+      // - "recevoir" : le client EST le destinataire
+      // - "deplacement" : le client EST le passager
+      const clientTel = clientTelephone.trim();
+      const expedTel = expediteurTelephone.trim();
+      const destinTel = destinataireTelephone.trim();
+
+      let finalExpediteurTel = expedTel;
+      let finalDestinataireTel = destinTel;
+      let finalExpediteurNom = expediteurNom.trim();
+      let finalDestinataireNom = destinataireNom.trim();
+
+      if (typeCourse === "expedier") {
+        if (!finalExpediteurTel) finalExpediteurTel = clientTel;
+        if (!finalExpediteurNom) finalExpediteurNom = clientNom.trim();
+      } else if (typeCourse === "recevoir") {
+        if (!finalDestinataireTel) finalDestinataireTel = clientTel;
+        if (!finalDestinataireNom) finalDestinataireNom = clientNom.trim();
+      }
+
+      // contact_createur_course = contact principal pour le livreur (téléphone du client)
+      const contactCreateurCourse = clientTel;
+
       const courseData = {
         country_code: countryCode,
         source: "admin",
@@ -154,11 +179,12 @@ export default function AdminCourseForm() {
         gps_arrivee_lat: gpsArrivee?.lat || null,
         gps_arrivee_lng: gpsArrivee?.lng || null,
         client_nom: clientNom.trim() || "Client",
-        client_telephone: clientTelephone.trim() || "",
-        expediteur_nom: expediteurNom.trim() || null,
-        expediteur_telephone: expediteurTelephone.trim() || null,
-        destinataire_nom: destinataireNom.trim() || null,
-        destinataire_telephone: destinataireTelephone.trim() || null,
+        client_telephone: clientTel,
+        contact_createur_course: contactCreateurCourse,
+        expediteur_nom: finalExpediteurNom || null,
+        expediteur_telephone: finalExpediteurTel || null,
+        destinataire_nom: finalDestinataireNom || null,
+        destinataire_telephone: finalDestinataireTel || null,
         type_colis: typeCourse === "deplacement" ? "autre" : typeColis,
         notes: notes.trim() || null,
         statut: "recherche_livreur",
