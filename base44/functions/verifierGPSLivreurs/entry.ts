@@ -25,6 +25,17 @@ export default async function (req: Request): Promise<Response> {
     }
 
     const now = Date.now();
+
+    // ── Restriction horaire : notifications uniquement entre 08h00 et 21h00 ──
+    const currentHour = new Date().getHours();
+    if (currentHour < 8 || currentHour >= 21) {
+      return Response.json({
+        success: true,
+        message: 'Notifications GPS désactivées (hors plage 08h-21h)',
+        stats: { total: 0, skipped: true, currentHour },
+      });
+    }
+
     const SEUIL_GPS_STALE_MIN = 5;
     const SEUIL_GPS_PERDU_MIN = 20;
     const DELAI_ENTRE_ALERTES_MS = 30 * 60 * 1000; // 30 min entre chaque alerte
