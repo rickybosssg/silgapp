@@ -27,8 +27,8 @@ function CourseItem({ course, onView }) {
         </div>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
-        {(course.prix_reel || course.prix) > 0 && (
-          <span className="text-xs font-bold text-green-700">{(course.prix_reel || course.prix).toLocaleString()} F</span>
+        {course.prix_final > 0 && (
+          <span className="text-xs font-bold text-green-700">{course.prix_final.toLocaleString()} F</span>
         )}
         {course.distance_reelle_km ? (
           <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-cyan-700 bg-cyan-50 rounded-full px-1.5 py-0.5">
