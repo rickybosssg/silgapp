@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { base44 } from "@/api/base44Client";
@@ -7,10 +7,14 @@ import { MapPin } from "lucide-react";
 /**
  * QuartierSelect — dropdown de quartiers filtré par pays, avec saisie libre.
  *
+ * Quand un quartier connu est sélectionné (dropdown ou saisie manuelle),
+ * on récupère automatiquement ses coordonnées GPS via onGpsSelect.
+ *
  * Props:
  * - countryCode (string): code pays pour filtrer les quartiers
  * - value (string): valeur actuelle
- * - onChange (function): callback avec le nom du quartier sélectionné/saisi
+ * - onChange (function): callback avec le nom du quartier
+ * - onGpsSelect (function): callback optionnel avec {lat, lng} quand un quartier connu est matché
  * - placeholder (string): placeholder du champ
  * - label (string): label optionnel
  * - required (boolean): champ requis (default false)
@@ -19,6 +23,7 @@ export default function QuartierSelect({
   countryCode,
   value = "",
   onChange,
+  onGpsSelect,
   placeholder = "Sélectionnez un quartier...",
   label = "Quartier",
   required = false,
@@ -26,13 +31,14 @@ export default function QuartierSelect({
   const [quartiers, setQuartiers] = useState([]);
   const [customValue, setCustomValue] = useState("");
   const [isCustom, setIsCustom] = useState(false);
+  const lookupTimeout = useRef(null);
 
   // Charger les quartiers filtrés par pays
   useEffect(() => {
     if (!countryCode) { setQuartiers([]); return; }
     let cancelled = false;
     base44.entities.Quartier
-      .filter({ country_code: countryCode, actif: true }, "nom", 200)
+      .filter({ country_code: countryCode, actif: true }, "nom", 500)
       .then((data) => {
         if (!cancelled) setQuartiers(data || []);
       })
@@ -50,21 +56,47 @@ export default function QuartierSelect({
     if (!exists && value.length > 0) setCustomValue(value);
   }, [value, quartiers]);
 
+  // ── Auto-remplir le GPS quand un quartier connu est matché ──
+  // Fonctionne que ce soit par sélection dropdown ou saisie manuelle.
+  const tryAutoFillGps = (nom) => {
+    if (!nom || !onGpsSelect) return;
+    const match = quartiers.find(
+      (q) => q.nom.toLowerCase() === nom.trim().toLowerCase() && q.latitude && q.longitude
+    );
+    if (match) {
+      onGpsSelect({ lat: match.latitude, lng: match.longitude });
+    }
+  };
+
   const handleSelect = (nom) => {
     if (nom === "__custom__") {
       setIsCustom(true);
       setCustomValue("");
       onChange("");
+      if (onGpsSelect) onGpsSelect(null); // reset GPS quand on passe en saisie libre
     } else {
       setIsCustom(false);
       onChange(nom);
+      tryAutoFillGps(nom);
     }
   };
 
   const handleCustomChange = (e) => {
-    setCustomValue(e.target.value);
-    onChange(e.target.value);
+    const val = e.target.value;
+    setCustomValue(val);
+    onChange(val);
+
+    // Debounce: si le nom tapé correspond à un quartier connu, auto-remplir le GPS
+    if (lookupTimeout.current) clearTimeout(lookupTimeout.current);
+    lookupTimeout.current = setTimeout(() => {
+      tryAutoFillGps(val);
+    }, 400);
   };
+
+  // Cleanup du timeout au démontage
+  useEffect(() => {
+    return () => { if (lookupTimeout.current) clearTimeout(lookupTimeout.current); };
+  }, []);
 
   return (
     <div className="space-y-2">
@@ -110,7 +142,7 @@ export default function QuartierSelect({
           />
           <button
             type="button"
-            onClick={() => { setIsCustom(false); onChange(""); }}
+            onClick={() => { setIsCustom(false); onChange(""); if (onGpsSelect) onGpsSelect(null); }}
             className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-primary font-bold bg-primary/5 px-2 py-1 rounded-lg"
           >
             Liste

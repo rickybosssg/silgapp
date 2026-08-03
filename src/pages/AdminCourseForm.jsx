@@ -331,6 +331,13 @@ export default function AdminCourseForm() {
             countryCode={countryCode}
             value={quartierDepart}
             onChange={setQuartierDepart}
+            onGpsSelect={(gps) => {
+              if (gps) {
+                setGpsDepart(gps);
+              } else if (!adresseDepart) {
+                setGpsDepart(null);
+              }
+            }}
             placeholder="Quartier de récupération..."
             label="Quartier de récupération"
           />
@@ -375,6 +382,13 @@ export default function AdminCourseForm() {
             countryCode={countryCode}
             value={quartierArrivee}
             onChange={setQuartierArrivee}
+            onGpsSelect={(gps) => {
+              if (gps) {
+                setGpsArrivee(gps);
+              } else if (!adresseArrivee) {
+                setGpsArrivee(null);
+              }
+            }}
             placeholder="Quartier de livraison..."
             label="Quartier de livraison"
           />
