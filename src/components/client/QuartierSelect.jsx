@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { base44 } from "@/api/base44Client";
-import { MapPin } from "lucide-react";
+import { MapPin, Search, X } from "lucide-react";
 
 /**
- * QuartierSelect — dropdown de quartiers filtré par pays, avec saisie libre.
+ * QuartierSelect — champ de recherche avec suggestions en temps réel.
  *
- * Quand un quartier connu est sélectionné (dropdown ou saisie manuelle),
- * on récupère automatiquement ses coordonnées GPS via onGpsSelect.
+ * L'admin tape le nom d'un quartier et une liste filtrée apparaît.
+ * Quand un quartier connu est sélectionné, son GPS est auto-rempli.
  *
  * Props:
  * - countryCode (string): code pays pour filtrer les quartiers
@@ -24,14 +23,15 @@ export default function QuartierSelect({
   value = "",
   onChange,
   onGpsSelect,
-  placeholder = "Sélectionnez un quartier...",
+  placeholder = "Tapez le nom d'un quartier...",
   label = "Quartier",
   required = false,
 }) {
   const [quartiers, setQuartiers] = useState([]);
-  const [customValue, setCustomValue] = useState("");
-  const [isCustom, setIsCustom] = useState(false);
-  const lookupTimeout = useRef(null);
+  const [query, setQuery] = useState(value || "");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [highlightIndex, setHighlightIndex] = useState(-1);
+  const containerRef = useRef(null);
 
   // Charger les quartiers filtrés par pays
   useEffect(() => {
@@ -46,18 +46,32 @@ export default function QuartierSelect({
     return () => { cancelled = true; };
   }, [countryCode]);
 
-  // Détecter si la valeur actuelle est dans la liste
+  // Sync la valeur externe vers l'input
   useEffect(() => {
-    if (!value || value === "__custom__") { setIsCustom(false); return; }
-    const exists = quartiers.some(
-      (q) => q.nom.toLowerCase() === value.toLowerCase()
-    );
-    setIsCustom(!exists && value.length > 0);
-    if (!exists && value.length > 0) setCustomValue(value);
-  }, [value, quartiers]);
+    setQuery(value || "");
+  }, [value]);
+
+  // Fermer les suggestions au clic extérieur
+  useEffect(() => {
+    const handler = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // ── Suggestions filtrées par la requête ──
+  const suggestions = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return quartiers.slice(0, 50);
+    return quartiers
+      .filter((qu) => qu.nom.toLowerCase().includes(q))
+      .slice(0, 50);
+  }, [query, quartiers]);
 
   // ── Auto-remplir le GPS quand un quartier connu est matché ──
-  // Fonctionne que ce soit par sélection dropdown ou saisie manuelle.
   const tryAutoFillGps = (nom) => {
     if (!nom || !onGpsSelect) return;
     const match = quartiers.find(
@@ -69,34 +83,44 @@ export default function QuartierSelect({
   };
 
   const handleSelect = (nom) => {
-    if (nom === "__custom__") {
-      setIsCustom(true);
-      setCustomValue("");
-      onChange("");
-      if (onGpsSelect) onGpsSelect(null); // reset GPS quand on passe en saisie libre
-    } else {
-      setIsCustom(false);
-      onChange(nom);
-      tryAutoFillGps(nom);
+    setQuery(nom);
+    setShowSuggestions(false);
+    setHighlightIndex(-1);
+    onChange(nom);
+    tryAutoFillGps(nom);
+  };
+
+  const handleChange = (e) => {
+    const val = e.target.value;
+    setQuery(val);
+    setShowSuggestions(true);
+    setHighlightIndex(-1);
+    onChange(val);
+    tryAutoFillGps(val);
+  };
+
+  const handleKeyDown = (e) => {
+    if (!showSuggestions || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightIndex((prev) => (prev + 1) % suggestions.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightIndex((prev) => (prev <= 0 ? suggestions.length - 1 : prev - 1));
+    } else if (e.key === "Enter" && highlightIndex >= 0) {
+      e.preventDefault();
+      handleSelect(suggestions[highlightIndex].nom);
+    } else if (e.key === "Escape") {
+      setShowSuggestions(false);
     }
   };
 
-  const handleCustomChange = (e) => {
-    const val = e.target.value;
-    setCustomValue(val);
-    onChange(val);
-
-    // Debounce: si le nom tapé correspond à un quartier connu, auto-remplir le GPS
-    if (lookupTimeout.current) clearTimeout(lookupTimeout.current);
-    lookupTimeout.current = setTimeout(() => {
-      tryAutoFillGps(val);
-    }, 400);
+  const handleClear = () => {
+    setQuery("");
+    setShowSuggestions(false);
+    onChange("");
+    if (onGpsSelect) onGpsSelect(null);
   };
-
-  // Cleanup du timeout au démontage
-  useEffect(() => {
-    return () => { if (lookupTimeout.current) clearTimeout(lookupTimeout.current); };
-  }, []);
 
   return (
     <div className="space-y-2">
@@ -108,47 +132,57 @@ export default function QuartierSelect({
         </p>
       )}
 
-      {!isCustom ? (
-        <Select value={value || ""} onValueChange={handleSelect}>
-          <SelectTrigger className="rounded-xl h-12 bg-gray-50 border-gray-200 text-sm">
-            <SelectValue placeholder={placeholder}>
-              {value ? (
-                <span className="flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                  {value}
-                </span>
-              ) : null}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {quartiers.map((q) => (
-              <SelectItem key={q.id} value={q.nom}>
-                 {q.nom}
-              </SelectItem>
-            ))}
-            <SelectItem value="__custom__" className="text-primary font-semibold">
-               Autre quartier (saisie libre)...
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      ) : (
-        <div className="relative">
-          <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-          <Input
-            value={customValue}
-            onChange={handleCustomChange}
-            placeholder="Saisissez le nom du quartier..."
-            className="rounded-xl h-12 pl-10 bg-gray-50 border-gray-200 text-sm"
-          />
+      <div className="relative" ref={containerRef}>
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+        <Input
+          value={query}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          onFocus={() => setShowSuggestions(true)}
+          placeholder={placeholder}
+          autoComplete="off"
+          className="rounded-xl h-12 pl-10 pr-9 bg-gray-50 border-gray-200 text-sm"
+        />
+        {query && (
           <button
             type="button"
-            onClick={() => { setIsCustom(false); onChange(""); if (onGpsSelect) onGpsSelect(null); }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-primary font-bold bg-primary/5 px-2 py-1 rounded-lg"
+            onClick={handleClear}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
           >
-            Liste
+            <X className="w-4 h-4" />
           </button>
-        </div>
-      )}
+        )}
+
+        {showSuggestions && suggestions.length > 0 && (
+          <div className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto rounded-xl bg-white border border-gray-200 shadow-lg">
+            {suggestions.map((q, idx) => (
+              <button
+                key={q.id || idx}
+                type="button"
+                onClick={() => handleSelect(q.nom)}
+                onMouseEnter={() => setHighlightIndex(idx)}
+                className={`flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm transition-colors ${
+                  idx === highlightIndex
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-gray-700 hover:bg-gray-50"
+                } ${idx > 0 ? "border-t border-gray-50" : ""}`}
+              >
+                <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                <span>{q.nom}</span>
+                {q.ville && (
+                  <span className="text-[10px] text-gray-400 ml-auto">{q.ville}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {showSuggestions && query.trim() && suggestions.length === 0 && (
+          <div className="absolute z-50 mt-1 w-full rounded-xl bg-white border border-gray-200 shadow-lg px-4 py-3 text-sm text-gray-400">
+            Aucun quartier trouvé. Vous pouvez utiliser « {query} » tel quel.
+          </div>
+        )}
+      </div>
     </div>
   );
 }
