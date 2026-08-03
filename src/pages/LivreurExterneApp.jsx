@@ -6,6 +6,7 @@ import { AlertTriangle, Check, Truck, X, Wallet, ChevronRight } from "lucide-rea
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
+import { useGPSNatif } from "@/hooks/useGPSNatif";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import PullToRefreshIndicator from "@/components/ui/PullToRefreshIndicator";
 
@@ -272,10 +273,13 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     setGpsActif(false);
     try { localStorage.removeItem("silgapp_livreur_session_id"); } catch {}
 
-    // Forcer le livreur hors ligne
+    // ⚠️ Ne PAS forcer statut hors_ligne ici — cela viole la règle du contrôle
+    // manuel et bloque le livreur en hors_ligne si l'autre appareil est aussi
+    // inactif. La session expirée est gérée côté UI uniquement.
+    // L'autre appareil (celui qui a pris la main) gère déjà le statut via
+    // gestionSessionLivreur (disponible) ou le toggle manuel.
     if (livreurProfil?.id) {
       saveLivreur(livreurProfil.id, {
-        statut: "hors_ligne",
         app_active: false
       }).catch(() => null);
     }
@@ -286,9 +290,22 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     });
   };
 
+  // ── GPS natif robuste (remplace le polling navigator.geolocation brut) ──
+  const gpsPositionRef = useRef(null);
+  const { position: gpsPosition, gpsActif: gpsHookActif, permissionStatut, indicateur: gpsIndicateur, ageMinutes: gpsAge, demanderPermission, actualiserPosition } = useGPSNatif({
+    enabled: onboardingTermine && !sessionExpired && livreurProfil?.statut !== "hors_ligne",
+    intervalMs: 10000,
+    onPosition: (pos) => { gpsPositionRef.current = pos; },
+  });
+
+  // Sync gpsActif depuis le hook natif
+  useEffect(() => {
+    if (gpsHookActif && !gpsActif) setGpsActif(true);
+  }, [gpsHookActif, gpsActif]);
+
   const { syncHeartbeat } = useHeartbeat({
     user_type: "livreur",
-    position: livreurProfil?.latitude && livreurProfil?.longitude ? { latitude: livreurProfil.latitude, longitude: livreurProfil.longitude } : null,
+    position: gpsPosition || (livreurProfil?.latitude && livreurProfil?.longitude ? { latitude: livreurProfil.latitude, longitude: livreurProfil.longitude } : null),
     enabled: onboardingTermine && gpsActif && !sessionExpired,
     debugLabel: "LivreurExterneGPS",
     session_id: sessionId,
@@ -705,7 +722,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       if (c.statut === "annulee") return false;
 
       // Statuts explicitement actifs
-      if (["livreur_en_route", "colis_recupere", "en_livraison", "acceptee"].includes(c.statut)) return true;
+      // Inclut les statuts du workflow administratif (client_contacte, en_route_expediteur)
+      // qui sont des étapes intermédiaires entre l'acceptation et la récupération du colis.
+      if (["livreur_en_route", "colis_recupere", "en_livraison", "acceptee", "client_contacte", "en_route_expediteur"].includes(c.statut)) return true;
 
       // Déplacement : statuts intermédiaires pris_en_charge et arrivee
       if (c.type_course === "deplacement" && ["pris_en_charge", "arrivee"].includes(c.statut)) return true;
@@ -799,8 +818,18 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
     [livreesToday]
   );
 
-  // montant_du_silga est la source de verite, incrementee a chaque livraison et remise a 0 quand l admin enregistre un paiement.
-  const montantDuSilga = livreurProfil?.montant_du_silga ?? 0;
+  // ── Montant total dû (source de vérité) ───────────────────────────────────
+  // Calculé à partir des commissions impayées des courses livrées (même logique
+  // que la page admin "Dû Utilisateur"), plutôt que le champ dénormalisé
+  // montant_du_silga qui peut être stale. On retient le max des deux pour ne
+  // jamais sous-estimer une dette si des courses anciennes ne sont pas chargées.
+  const totalDuReel = useMemo(() =>
+    mesCourses
+      .filter(c => c.statut === "livree" && c.statut_paiement_livreur !== "paye" && sameLivreurId(c.livreur_id, livreurProfil?.id))
+      .reduce((s, c) => s + (c.commission_silga ?? 0), 0),
+    [mesCourses, livreurProfil?.id]
+  );
+  const montantDuSilga = Math.max(totalDuReel, livreurProfil?.montant_du_silga ?? 0);
 
   // ─── isEnLigne ────────────────────────────────────────────────────────────
   const isEnLigne = livreurProfil ? livreurProfil.statut !== "hors_ligne" : false;
@@ -834,50 +863,61 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   };
 
   // ─── GPS ──────────────────────────────────────────────────────────────────
-  const handleActiverGPS = () => {
-    if (!navigator.geolocation) {
-      toast.error("GPS non disponible sur cet appareil");
+  // GPS maintenant géré par useGPSNatif (hook robuste avec fallback précision).
+  // handleActiverGPS reste pour le bouton manuel de secours.
+  const handleActiverGPS = async () => {
+    const granted = await demanderPermission();
+    if (!granted) {
+      setGpsActif(false);
+      toast.error("Permission GPS refusée – obligatoire pour recevoir des courses");
       return;
     }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setGpsActif(true);
-        saveLivreur(livreurProfil.id, {
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          derniere_position_date: new Date().toISOString(),
-          last_seen_at: new Date().toISOString(),
-          app_active: true,
-        }).then(() => {
-          queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
-          toast.success("GPS activé");
-        }).catch(() => toast.error("Position GPS non enregistrée"));
-      },
-      () => { setGpsActif(false); toast.error("Permission GPS refusée – obligatoire"); },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+    const pos = await actualiserPosition();
+    if (pos) {
+      setGpsActif(true);
+      saveLivreur(livreurProfil.id, {
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        derniere_position_date: new Date().toISOString(),
+        last_seen_at: new Date().toISOString(),
+        app_active: true,
+        gps_accuracy: pos.accuracy || null,
+      }).then(() => {
+        queryClient.invalidateQueries({ queryKey: ["livreur-externe-profil"] });
+        toast.success("GPS activé");
+      }).catch(() => toast.error("Position GPS non enregistrée"));
+    } else {
+      toast.error("Impossible d'obtenir votre position. Vérifiez que le GPS de votre téléphone est activé.");
+    }
   };
 
-  // GPS tracking périodique (15s)
+  // ── Auto-activation GPS au démarrage (si livreur en ligne) ──
   useEffect(() => {
-    if (!livreurId || livreurProfil?.statut === "hors_ligne" || !gpsActif) return;
-    const interval = setInterval(() => {
-      navigator.geolocation?.getCurrentPosition(
-        (pos) => {
-          saveLivreur(livreurId, {
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-            derniere_position_date: new Date().toISOString(),
-            last_seen_at: new Date().toISOString(),
-            app_active: true,
-          }).catch(() => null);
-        },
-        (error) => console.warn("[LivreurExterneApp] GPS update skipped:", error?.message),
-        { enableHighAccuracy: true }
-      );
-    }, 15000);
-    return () => clearInterval(interval);
-  }, [livreurId, livreurProfil?.statut, gpsActif]);
+    if (!onboardingTermine || sessionExpired) return;
+    if (livreurProfil?.statut === "hors_ligne") return;
+    if (gpsActif) return;
+    // Tenter l'auto-activation après 2s (laisser le temps au hook natif de s'initialiser)
+    const timer = setTimeout(async () => {
+      const granted = await demanderPermission();
+      if (granted) {
+        const pos = await actualiserPosition();
+        if (pos) {
+          setGpsActif(true);
+          if (livreurProfil?.id) {
+            saveLivreur(livreurProfil.id, {
+              latitude: pos.latitude,
+              longitude: pos.longitude,
+              derniere_position_date: new Date().toISOString(),
+              last_seen_at: new Date().toISOString(),
+              app_active: true,
+              gps_accuracy: pos.accuracy || null,
+            }).catch(() => null);
+          }
+        }
+      }
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [onboardingTermine, sessionExpired, livreurProfil?.statut, livreurProfil?.id, gpsActif]);
 
   // ─── Mutations courses ────────────────────────────────────────────────────
   const updateCourseMutation = useMutation({
@@ -1108,6 +1148,27 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         return;
       }
 
+      // ── Calculer la distance réelle si manquante ──
+      // Privilégier la distance tarifaire (adresse) car le GPS livreur peut
+      // ne pas avoir bougé (PIN secours, GPS figé).
+      const distUpdate = {};
+      if (!course.distance_reelle_km || course.distance_reelle_km === 0) {
+        let dist = null;
+        if (course.gps_depart_lat && course.gps_depart_lng && course.gps_arrivee_lat && course.gps_arrivee_lng) {
+          dist = calculerDistance(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng);
+        }
+        if (!dist || dist < 0.1) {
+          const lat1 = course.latitude_recuperation ?? course.gps_depart_lat;
+          const lng1 = course.longitude_recuperation ?? course.gps_depart_lng;
+          const lat2 = course.latitude_livraison ?? course.latitude_arrivee_livraison ?? course.gps_arrivee_lat;
+          const lng2 = course.longitude_livraison ?? course.longitude_arrivee_livraison ?? course.gps_arrivee_lng;
+          if (lat1 && lng1 && lat2 && lng2) {
+            dist = calculerDistance(lat1, lng1, lat2, lng2);
+          }
+        }
+        if (dist && dist >= 0.1) distUpdate.distance_reelle_km = Number(dist.toFixed(2));
+      }
+
       await updateCourseMutation.mutateAsync({
         id: course.id,
         data: {
@@ -1116,6 +1177,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           prix_final: montantSaisi,
           commission_silga: split.commission_silga,
           montant_livreur: split.montant_livreur,
+          ...distUpdate,
         },
       });
       await verifierEncoursApresCourse(course.id);
@@ -1433,7 +1495,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                   <div>
                     <p className="text-sm font-bold text-gray-900">Payer SILGAPP</p>
                     <p className="text-xs text-gray-500">
-                      {montantDuSilga > 0 ? `Du : ${montantDuSilga.toLocaleString()} FCFA` : "Aucun du pour le moment"}
+                      {montantDuSilga > 0 ? `Total dû : ${montantDuSilga.toLocaleString()} FCFA` : "Aucun dû pour le moment"}
                     </p>
                   </div>
                 </div>

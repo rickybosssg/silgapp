@@ -53,62 +53,65 @@ export default function QRCodeDisplay({ course, type }) {
   }
 
   return (
-    <Card className="p-5 border-2 border-dashed border-primary/30">
-      <div className="flex items-center gap-2 mb-4">
-        {isPickup ? (
-          <>
-            <Package className="w-5 h-5 text-primary" />
-            <h3 className="font-bold text-base">Code de récupération</h3>
-          </>
-        ) : (
-          <>
-            <Truck className="w-5 h-5 text-accent" />
-            <h3 className="font-bold text-base">Code de livraison</h3>
-          </>
-        )}
-        <Badge variant="outline" className="ml-auto text-xs text-green-700 border-green-300">Actif</Badge>
-      </div>
-
-      <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
-         Présentez ce QR code ou donnez le code à 4 chiffres au livreur pour confirmer{" "}
-        {isPickup ? "la récupération du colis" : "la livraison"}.
-      </p>
-
-      {/* QR Code */}
-      <div className="bg-white p-4 rounded-2xl border-2 border-gray-100 mb-4 flex flex-col items-center">
-        <QRCodeSVG
-          value={qrToken}
-          size={180}
-          level="H"
-          includeMargin={true}
-        />
-        <p className="text-[10px] text-center text-muted-foreground mt-2">
-          Scannez avec l'app SILGAPP livreur
-        </p>
-      </div>
-
-      {/* Code PIN */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-        <p className="text-xs font-bold text-blue-900 mb-2 uppercase tracking-wide">
-          Code de secours
-        </p>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex-1 text-center bg-white rounded-xl py-3 px-4 border-2 border-blue-200">
-            <span className="text-3xl font-black text-blue-900 tracking-[0.4em]">{code4}</span>
-          </div>
-          <button
-            className="w-11 h-11 rounded-xl bg-blue-100 border border-blue-200 flex items-center justify-center"
-            onClick={() => {
-              navigator.clipboard.writeText(code4);
-              toast.success("Code copié !");
-            }}
-          >
-            <Copy className="w-4 h-4 text-blue-700" />
-          </button>
+    <Card className="overflow-hidden border border-slate-200 shadow-md rounded-2xl">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-slate-900 to-slate-800 px-4 py-3 flex items-center gap-2">
+        <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${isPickup ? "bg-red-500" : "bg-accent"}`}>
+          {isPickup ? <Package className="w-4 h-4 text-white" /> : <Truck className="w-4 h-4 text-white" />}
         </div>
-        <p className="text-xs text-blue-700 mt-2">
-          Si le scan QR ne fonctionne pas, donnez ce code au livreur
+        <div className="flex-1">
+          <h3 className="font-bold text-white text-sm leading-tight">{isPickup ? "Code de récupération" : "Code de livraison"}</h3>
+          <p className="text-white/50 text-[10px] leading-tight">
+            {isPickup ? "Le livreur arrive bientôt" : "Bientôt livré"}
+          </p>
+        </div>
+        <Badge variant="outline" className="text-xs text-green-700 border-green-300 bg-green-50">Actif</Badge>
+      </div>
+
+      <div className="p-4">
+        <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+          Présentez ce QR code ou donnez le code à 4 chiffres au livreur pour confirmer{" "}
+          {isPickup ? "la récupération du colis" : "la livraison"}.
         </p>
+
+        {/* QR Code */}
+        <div className="bg-gradient-to-br from-slate-50 to-slate-100 p-4 rounded-xl mb-3 flex flex-col items-center">
+          <div className="bg-white p-3 rounded-xl shadow-sm">
+            <QRCodeSVG
+              value={qrToken}
+              size={160}
+              level="H"
+              includeMargin={true}
+            />
+          </div>
+          <p className="text-[10px] text-center text-slate-400 mt-2 font-medium">
+            Scannez avec l'app SILGAPP livreur
+          </p>
+        </div>
+
+        {/* Code PIN */}
+        <div className="bg-slate-900 rounded-xl p-3">
+          <p className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">
+            Code de secours
+          </p>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1 text-center bg-slate-800 rounded-lg py-2.5 px-4">
+              <span className="text-2xl font-black text-white tracking-[0.4em]">{code4}</span>
+            </div>
+            <button
+              className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center active:scale-95 transition-transform"
+              onClick={() => {
+                navigator.clipboard.writeText(code4);
+                toast.success("Code copié !");
+              }}
+            >
+              <Copy className="w-4 h-4 text-slate-300" />
+            </button>
+          </div>
+          <p className="text-[10px] text-slate-400 mt-2">
+            Si le scan QR ne fonctionne pas, donnez ce code au livreur
+          </p>
+        </div>
       </div>
     </Card>
   );

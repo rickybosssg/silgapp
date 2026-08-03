@@ -1,16 +1,25 @@
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import MessagesPage from "@/components/chat/MessagesPage";
 import { Loader2 } from "lucide-react";
 
 export default function AdminMessages() {
   const [user, setUser] = useState(null);
+  const [searchParams] = useSearchParams();
+  const [initialConvId, setInitialConvId] = useState(null);
 
   useEffect(() => {
     base44.auth.me()
       .then(u => setUser(u))
       .catch(() => setUser(null));
   }, []);
+
+  // Si l'URL contient ?conv=<id>, pré-sélectionner cette conversation
+  useEffect(() => {
+    const convId = searchParams.get("conv");
+    if (convId) setInitialConvId(convId);
+  }, [searchParams]);
 
   if (!user) {
     return (
@@ -26,6 +35,7 @@ export default function AdminMessages() {
         myType="admin"
         myId={user.email}
         myName={user.full_name || user.email}
+        initialConversationId={initialConvId}
       />
     </div>
   );

@@ -289,13 +289,11 @@ export default function DusLivreursExternes() {
       }
       if (c.statut_paiement_livreur === "paye") map[c.livreur_id].montantPaye += (c.commission_silga ?? 0);
     });
-    // Livreurs avec solde dû > 0 même sans course dans la période
+    // Inclure TOUS les livreurs — ceux sans course livrée et sans dette
+    // doivent apparaître dans le filtre "À jour" (montantDu = 0)
     livreurs.forEach(l => {
       if (map[l.id]) return;
-      const du = l.montant_du_silga ?? l.encours ?? 0;
-      if (du > 0) {
-        map[l.id] = { id: l.id, nom: l.nom || "Inconnu", prenom: l.prenom || "", telephone: l.telephone || "", livreurInfo: l, courses: [], montantTotal: 0, commissionTotal: 0, commissionJour: 0, nbCoursesJour: 0, montantPaye: 0, montantDu: du };
-      }
+      map[l.id] = { id: l.id, nom: l.nom || "Inconnu", prenom: l.prenom || "", telephone: l.telephone || "", livreurInfo: l, courses: [], montantTotal: 0, commissionTotal: 0, commissionJour: 0, nbCoursesJour: 0, montantPaye: 0, montantDu: 0 };
     });
     Object.values(map).forEach(entry => {
       const info = entry.livreurInfo;
@@ -307,8 +305,8 @@ export default function DusLivreursExternes() {
         const commNonPayees = entry.courses
           .filter(c => c.statut_paiement_livreur !== "paye")
           .reduce((s, c) => s + (c.commission_silga ?? 0), 0);
-        const ancienSolde = info.montant_du_silga ?? info.encours ?? 0;
-        entry.montantDu = entry.courses.length > 0 ? commNonPayees : ancienSolde;
+        const storedDebt = info.encours || info.montant_du_silga || 0;
+        entry.montantDu = Math.max(commNonPayees, storedDebt);
         entry.montantPaye = Math.max(0, entry.commissionTotal - entry.montantDu);
       } else {
         // Pas d'info livreur — calcul de secours basé sur les courses impayées
@@ -558,7 +556,7 @@ export default function DusLivreursExternes() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 mt-2 text-[11px]">
-                      <span className="text-gray-400">Commission due :</span>
+                      <span className="text-gray-400">Commission générée :</span>
                       <span className="font-bold text-green-600">{(entry.commissionTotal || 0).toLocaleString()} F</span>
                       {entry.courses.length > 0 && <span className="text-gray-400">· {entry.courses.length} course(s)</span>}
                       {entry.nbCoursesJour > 0 && (

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Outlet } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
+import { playNotificationSound } from "@/hooks/useSonEtVibration";
 import Sidebar from "./Sidebar";
 import MobileNav from "./MobileNav";
 import DemandesLivreursPopup from "@/components/admin/DemandesLivreursPopup";
@@ -31,11 +32,16 @@ function AppLayoutInner({ reseau }) {
   const [paiementCount, setPaiementCount] = useState(0);
   const [messageCount, setMessageCount] = useState(0);
   const [livreursBloquesCount, setLivreursBloquesCount] = useState(0);
+  const prevMessageCountRef = useRef(0);
 
   useEffect(() => {
     const fetchNotifs = async () => {
       try {
-        const data = await base44.entities.Notification.filter({ lue: false });
+        const user = await base44.auth.me();
+        if (!user) { setNotifCount(0); return; }
+        // Filtrer par destinataire_email pour ne compter QUE les notifications
+        // de l'admin connecté (sinon on compte celles de tous les utilisateurs)
+        const data = await base44.entities.Notification.filter({ lue: false, destinataire_email: user.email });
         setNotifCount((data || []).length);
       } catch (_) {}
     };
@@ -84,10 +90,16 @@ function AppLayoutInner({ reseau }) {
         const user = await base44.auth.me();
         if (!user) return;
         const all = await base44.entities.Conversation.list("-last_message_date", 100);
+        // Filtrer UNIQUEMENT les conversations où l'admin connecté est participant
+        // (pas toutes les conversations avec un admin quelconque)
         const mine = (all || []).filter(c => {
           try {
             const parts = JSON.parse(c.participants || "[]");
-            return parts.some(p => p.type === "admin");
+            return parts.some(p => {
+              if (p.type !== "admin") return false;
+              const ids = [p.id, p.user_id, p.email].filter(Boolean).map(String);
+              return ids.includes(String(user.id)) || (user.email && ids.includes(String(user.email)));
+            });
           } catch { return false; }
         });
         const unread = mine.filter(c => {
@@ -96,7 +108,11 @@ function AppLayoutInner({ reseau }) {
           if (!c.admin_last_read_date) return true;
           return new Date(c.last_message_date) > new Date(c.admin_last_read_date);
         });
-        setMessageCount(unread.length);
+        setMessageCount(prev => {
+          const next = unread.length;
+          if (next > prev) playNotificationSound();
+          return next;
+        });
       } catch (_) {}
     };
     fetchMessages();
@@ -131,7 +147,7 @@ function AppLayoutInner({ reseau }) {
 
       {/* Mobile layout */}
       <div className="lg:hidden">
-        <MobileNav notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} neoCount={neoCount} reseau={reseau} />
+        <MobileNav notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} neoCount={neoCount} messageCount={messageCount} reseau={reseau} />
         <main className="pt-[calc(3.5rem+max(env(safe-area-inset-top),28px))] pb-16 min-h-screen bg-slate-50">
           <Outlet />
         </main>

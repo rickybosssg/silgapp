@@ -4,11 +4,14 @@ import { cn } from "@/lib/utils";
 
 const statusConfig = {
   nouvelle: { label: "Nouvelle", className: "bg-blue-100 text-blue-700 border-blue-200" },
+  en_attente: { label: "En attente", className: "bg-amber-100 text-amber-800 border-amber-300 font-semibold" },
   en_attente_livreur: { label: "En attente livreur", className: "bg-yellow-100 text-yellow-700 border-yellow-200" },
   acceptee: { label: "Acceptée", className: "bg-emerald-100 text-emerald-700 border-emerald-200" },
   en_route_recuperation: { label: "En route vers l'expéditeur", className: "bg-yellow-400 text-black border-yellow-500" },
   recherche_livreur: { label: "Recherche livreur", className: "bg-red-500 text-white font-bold border-red-600" },
   livreur_en_route: { label: "En route vers l'expéditeur", className: "bg-yellow-400 text-black border-yellow-500" },
+  client_contacte: { label: "Client contacté", className: "bg-indigo-400 text-white border-indigo-500" },
+  en_route_expediteur: { label: "En route vers l'expéditeur", className: "bg-yellow-400 text-black border-yellow-500" },
   arrive_prise_en_charge: { label: "Arrivé chez l'expéditeur", className: "bg-cyan-500 text-white border-cyan-600" },
   colis_recupere: { label: "Colis récupéré", className: "bg-green-500 text-black border-green-600" },
   passager_embarque: { label: "Passager embarqué", className: "bg-teal-500 text-white border-teal-600" },
@@ -19,7 +22,7 @@ const statusConfig = {
   annulee: { label: "Annulé", className: "bg-red-600 text-white font-bold border-red-700" },
 };
 
-export default function CourseStatusBadge({ statut, dispatchStatus }) {
+export default function CourseStatusBadge({ statut, dispatchStatus, courseSource }) {
   if (dispatchStatus === "propose") {
     return (
       <Badge variant="outline" className={cn("text-[11px] font-bold border", "bg-red-500 text-white border-red-600")}>
@@ -28,7 +31,12 @@ export default function CourseStatusBadge({ statut, dispatchStatus }) {
     );
   }
 
-  const config = statusConfig[statut] || { label: statut, className: "bg-muted text-muted-foreground" };
+  const isAdmin = courseSource === "admin";
+  let config = statusConfig[statut] || { label: statut, className: "bg-muted text-muted-foreground" };
+  // Course administrative : « Course acceptée » avant que le livreur ne contacte le client
+  if (isAdmin && statut === "livreur_en_route") {
+    config = { label: "Course acceptée", className: "bg-emerald-100 text-emerald-700 border-emerald-200" };
+  }
   return (
     <Badge variant="outline" className={cn("text-[11px] font-medium border", config.className)}>
       {config.label}

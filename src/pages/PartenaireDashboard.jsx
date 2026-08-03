@@ -138,10 +138,11 @@ export default function PartenaireDashboard() {
   });
   const [newMsgModal, setNewMsgModal] = useState(null);
 
-  // Conversations non lues = dernier message pas envoyé par le partenaire
+  // Conversations non lues = dernier message pas envoyé par le partenaire ET pas encore vues
   const unreadConversations = allConversations.filter(c => {
     if (!c.last_message) return false;
-    return c.last_sender_name !== etablissement?.nom;
+    if (c.last_sender_name === etablissement?.nom) return false;
+    return !seenConvIds.includes(c.id);
   });
   const unreadCount = unreadConversations.length;
 

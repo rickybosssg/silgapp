@@ -44,13 +44,18 @@ export function normalizePhone(phone: string | null | undefined, countryCode: st
     }
   }
 
-  // 2. Format local avec 0 initial (ex: "070123456" BF → "22670123456")
+  // 2. Format local avec 0 initial
+  //    Cas A : le 0 fait partie du numéro (CI "0712346285", len 10 → "2250712346285")
+  //    Cas B : le 0 est un préfixe de trunk (BF "070123456" → "70123456", len 8 → "22670123456")
   if (n.startsWith("0")) {
     const withoutZero = n.slice(1);
     const countries = countryCode
       ? [...SILGAPP_COUNTRIES.filter(c => c.code === countryCode), ...SILGAPP_COUNTRIES.filter(c => c.code !== countryCode)]
       : SILGAPP_COUNTRIES;
     for (const { dial, len } of countries) {
+      if (n.length === len) {
+        return dial + n;
+      }
       if (withoutZero.length === len) {
         return dial + withoutZero;
       }
@@ -95,6 +100,9 @@ export function phoneVariants(phone: string | null | undefined): string[] {
       break;
     }
   }
+
+  // Forme avec "+" (la base SILGAPP stocke les numéros au format +international, ex: "+22664044654")
+  variants.add(`+${n}`);
 
   return [...variants];
 }

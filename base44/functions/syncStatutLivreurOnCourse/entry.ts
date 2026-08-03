@@ -14,7 +14,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
  */
 
 const STATUTS_TERMINAUX = ["annulee", "livree", "terminee", "completed"];
-const STATUTS_ACTIFS_LIVREUR = ["livreur_en_route", "arrive_prise_en_charge", "colis_recupere", "passager_embarque", "pris_en_charge", "en_livraison", "arrivee"];
+const STATUTS_ACTIFS_LIVREUR = ["livreur_en_route", "client_contacte", "en_route_expediteur", "arrive_prise_en_charge", "colis_recupere", "passager_embarque", "pris_en_charge", "en_livraison", "arrivee"];
 
 Deno.serve(async (req) => {
   try {

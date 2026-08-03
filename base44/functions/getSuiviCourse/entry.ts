@@ -18,7 +18,8 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const payload = await req.json();
-    const { token } = payload;
+    // Accepter token ou tracking_token (rétrocompatibilité)
+    const token = payload?.token || payload?.tracking_token;
 
     if (!token) {
       return Response.json({ error: 'token_manquant' }, { status: 400, headers: corsHeaders });

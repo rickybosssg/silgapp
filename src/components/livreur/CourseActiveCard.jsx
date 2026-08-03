@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { MapPin, Phone, Package, Check, X, AlertTriangle, ChevronRight, QrCode, Clock, Ruler } from "lucide-react";
+import { MapPin, Phone, Navigation, Package, Check, X, AlertTriangle, ChevronRight, QrCode, Clock, Ruler } from "lucide-react";
 import MultiColisProgressBadge from "@/components/multi-colis/MultiColisProgressBadge";
 import MultiColisLivreurView from "@/components/multi-colis/MultiColisLivreurView";
 import { Input } from "@/components/ui/input";
@@ -92,6 +92,13 @@ const STEPS = [
   { key: "livree", label: "Livré", icon: "" },
 ];
 
+const ADMIN_COLIS_STEPS = [
+  { key: "acceptee", label: "Accepté", icon: "" },
+  { key: "client_contacte", label: "Contacté", icon: "" },
+  { key: "colis_recupere", label: "Récupérer", icon: "" },
+  { key: "livree", label: "Livré", icon: "" },
+];
+
 const DEPLACEMENT_STEPS = [
   { key: "acceptee", label: "Accepté", icon: "" },
   { key: "pris_en_charge", label: "Pris en charge", icon: "" },
@@ -99,8 +106,8 @@ const DEPLACEMENT_STEPS = [
   { key: "termine", label: "Terminé", icon: "" },
 ];
 
-function ProgressBar({ statut, isDeplacement }) {
-  const steps = isDeplacement ? DEPLACEMENT_STEPS : STEPS;
+function ProgressBar({ statut, isDeplacement, isAdminColis }) {
+  const steps = isDeplacement ? DEPLACEMENT_STEPS : (isAdminColis ? ADMIN_COLIS_STEPS : STEPS);
   const idx = steps.findIndex(s => s.key === statut);
   const current = idx === -1 ? 0 : (statut === "livree" && isDeplacement ? steps.length - 1 : idx);
 
@@ -160,6 +167,11 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
   const effectiveStatut = optimisticStatut || course.statut;
   const isDeplacement = course.type_course === "deplacement";
   const isPartnerCourse = !!(course.commande_boutique_id || course.commande_restaurant_id);
+  // ── Course administrative (colis) : étape « Client contacté » avant le départ vers l'expéditeur ──
+  const isAdminColisCourse = course.source === "admin" && !isDeplacement && !isPartnerCourse;
+  const isClientContactePhase = isAdminColisCourse && effectiveStatut === "livreur_en_route";
+  const isEnRouteExpediteurPending = isAdminColisCourse && effectiveStatut === "client_contacte";
+  const adminPreTrip = isClientContactePhase || isEnRouteExpediteurPending;
   const { data: countryCommissionRows = [] } = useQuery({
     queryKey: ["country-commission", course.country_code],
     queryFn: () => base44.entities.Country.filter({ code: course.country_code, actif: true }),
@@ -346,10 +358,35 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
     setPauseMotif("");
   };
 
+  // ── Workflow administratif : « Client contacté » puis « En route vers l'expéditeur » ──
+  const handleClientContacte = async () => {
+    const now = new Date().toISOString();
+    updateOptimisticStatut("client_contacte", { heure_contact_client: now });
+    await base44.entities.CourseExterne.update(course.id, {
+      statut: "client_contacte",
+      heure_contact_client: now,
+    }).catch(() => null);
+    queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+    toast.success("Client contacté. Vous pouvez maintenant démarrer votre trajet.");
+  };
+
+  const handleDemarrerTrajet = async () => {
+    updateOptimisticStatut("en_route_expediteur", {});
+    await base44.entities.CourseExterne.update(course.id, {
+      statut: "en_route_expediteur",
+    }).catch(() => null);
+    queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+    toast.success("Bon trajet ! En route vers l'expéditeur.");
+  };
+
   // Annulation livreur (unifiée colis + déplacement)
   const handleAnnulerCourseLivreur = async () => {
     if (!motifAnnulationLivreur) {
       toast.error("Veuillez sélectionner un motif");
+      return;
+    }
+    if (!motifAnnulationDetail.trim()) {
+      toast.error("Veuillez décrire le motif de l'annulation");
       return;
     }
     setShowAnnulerCourse(false);
@@ -363,7 +400,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       const res = await base44.functions.invoke("annulerCourseExterne", {
         course_id: course.id,
         motif: motifAnnulationLivreur,
-        motif_detail: motifAnnulationLivreur === "autre" ? motifAnnulationDetail : "",
+        motif_detail: motifAnnulationDetail.trim(),
         source: "livreur",
       });
 
@@ -484,13 +521,19 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
                 </button>
               ))}
             </div>
-            {motifAnnulationLivreur === "autre" && (
-              <textarea
-                placeholder="Précisez le motif..."
-                value={motifAnnulationDetail}
-                onChange={(e) => setMotifAnnulationDetail(e.target.value)}
-                className="w-full h-16 rounded-xl border-2 border-gray-200 p-3 text-sm resize-none focus:border-red-400 focus:outline-none"
-              />
+            {motifAnnulationLivreur && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-600">
+                  Décrivez le motif de l'annulation{" "}
+                  <span className="text-gray-400 font-normal">(envoyé à l'admin)</span>
+                </label>
+                <textarea
+                  placeholder="Expliquez ce qui s'est passé..."
+                  value={motifAnnulationDetail}
+                  onChange={(e) => setMotifAnnulationDetail(e.target.value)}
+                  className="w-full h-20 rounded-xl border-2 border-gray-200 p-3 text-sm resize-none focus:border-red-400 focus:outline-none"
+                />
+              </div>
             )}
             <div className="grid grid-cols-2 gap-3 pt-2">
               <button
@@ -506,7 +549,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               <button
                 className="h-12 rounded-2xl bg-red-500 hover:bg-red-600 text-white font-bold text-sm disabled:opacity-50"
                 onClick={handleAnnulerCourseLivreur}
-                disabled={!motifAnnulationLivreur || isPending}
+                disabled={!motifAnnulationLivreur || !motifAnnulationDetail.trim() || isPending}
               >
                 Annuler la course
               </button>
@@ -522,7 +565,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
           livreurId={livreurId}
           livreurNom={livreurNom}
           motif={motifAnnulationLivreur}
-          motifDetail={motifAnnulationLivreur === "autre" ? motifAnnulationDetail : ""}
+          motifDetail={motifAnnulationDetail.trim()}
           onClose={() => {
             setShowAnnulationChat(false);
             setMotifAnnulationLivreur("");
@@ -661,10 +704,10 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
         <div className="p-5 space-y-4">
           {/* Barre de progression */}
-          <ProgressBar statut={effectiveStatut} isDeplacement={isDeplacement} />
+          <ProgressBar statut={effectiveStatut} isDeplacement={isDeplacement} isAdminColis={isAdminColisCourse} />
 
           {/* Badge ETA temps réel */}
-          {!colisLivre && (
+          {!colisLivre && !adminPreTrip && (
             <ETABadge course={course} colisRecupere={colisRecupere} />
           )}
 
@@ -725,14 +768,44 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             }
 
             const contactNom = colisRecupere
-              ? (course.destinataire_nom || "Destinataire")
+              ? (course.destinataire_nom || course.client_nom || "Destinataire")
               : (course.expediteur_nom || course.client_nom || "Expéditeur");
+            // ── Fallback robuste : s'assurer qu'un numéro est TOUJOURS affiché ──
+            // 1. contact_createur_course (contact principal, surtout VENUS/admin)
+            // 2. Phase récupération : expediteur_telephone → client_telephone
+            // 3. Phase livraison : destinataire_telephone → destinataire_phone_normalized → client_telephone
             const contactTel = course.contact_createur_course || (colisRecupere
-              ? (course.destinataire_telephone || course.destinataire_phone_normalized)
+              ? (course.destinataire_telephone || course.destinataire_phone_normalized || course.client_telephone)
               : (course.expediteur_telephone || course.client_telephone));
             const contactRole = colisRecupere ? "Destinataire" : "Expéditeur";
 
+            // ── Courses admin : le clic sur Appeler/WhatsApp déclenche « Client contacté »
+            //    puis 60s plus tard passe automatiquement à « En route vers l'expéditeur » ──
+            const triggerClientContacte = () => {
+              if (!isClientContactePhase) return;
+              const now = new Date().toISOString();
+              // Étape 1 : Client contacté (avec timestamp) — fire-and-forget pour ne pas
+              // être interrompu par l'ouverture du dialer/WhatsApp
+              updateOptimisticStatut("client_contacte", { heure_contact_client: now });
+              base44.entities.CourseExterne.update(course.id, {
+                statut: "client_contacte",
+                heure_contact_client: now,
+              }).catch(() => null);
+              queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+              toast.success("Client contacté. Démarrage automatique dans 60s…");
+              // Étape 2 : En route vers l'expéditeur (automatique après 60s)
+              setTimeout(() => {
+                updateOptimisticStatut("en_route_expediteur", {});
+                base44.entities.CourseExterne.update(course.id, {
+                  statut: "en_route_expediteur",
+                }).catch(() => null);
+                queryClient.invalidateQueries({ queryKey: ["mes-courses-externes"] });
+                toast.success("En route vers l'expéditeur !");
+              }, 60000);
+            };
+
             const handleWhatsApp = () => {
+              triggerClientContacte();
               // Normalisation multi-pays : si le numéro a déjà un indicatif international (10+ chiffres), ok
               // Sinon on laisse le numéro tel quel — wa.me gère les numéros locaux avec indicatif
               let num = (contactTel || "").replace(/\D/g, "");
@@ -762,33 +835,37 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
             return (
               <div className={cn(
-                "flex items-center justify-between rounded-2xl p-3 transition-all",
+                "rounded-2xl p-3 transition-all",
                 colisRecupere ? "bg-green-50 border border-green-200" : "bg-gray-50"
               )}>
-                <div>
-                  <p className="text-[10px] text-gray-600 font-semibold uppercase">{contactRole}</p>
-                  <p className="font-black text-gray-900 text-base">{contactNom}</p>
-                  <p className="text-xs text-gray-500">{contactTel}</p>
-                </div>
-                <div className="flex gap-2">
-                  <a href={`tel:${contactTel}`}>
-                    <div className={cn(
-                      "w-11 h-11 rounded-2xl border flex items-center justify-center",
-                      colisRecupere ? "bg-blue-50 border-blue-200" : "bg-blue-50 border-blue-100"
-                    )}>
-                      <Phone className="w-5 h-5 text-blue-600" />
-                    </div>
-                  </a>
-                  <button onClick={handleWhatsApp}>
-                    <div className={cn(
-                      "w-11 h-11 rounded-2xl border flex items-center justify-center",
-                      colisRecupere ? "bg-green-100 border-green-300" : "bg-green-50 border-green-100"
-                    )}>
-                      <svg viewBox="0 0 24 24" className="w-5 h-5 fill-green-600" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                      </svg>
-                    </div>
-                  </button>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] text-gray-600 font-semibold uppercase">{contactRole}</p>
+                    <p className="font-black text-gray-900 text-base truncate">{contactNom}</p>
+                    <p className="text-xs text-gray-500 truncate">{contactTel || "—"}</p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <a href={`tel:${contactTel}`} className="flex flex-col items-center gap-0.5" onClick={triggerClientContacte}>
+                      <div className={cn(
+                        "w-12 h-12 rounded-2xl border-2 flex items-center justify-center shadow-sm",
+                        "bg-blue-100 border-blue-300"
+                      )}>
+                        <Phone className="w-6 h-6 text-blue-700" />
+                      </div>
+                      <span className="text-[9px] font-bold text-blue-700">Appeler</span>
+                    </a>
+                    <button onClick={handleWhatsApp} className="flex flex-col items-center gap-0.5">
+                      <div className={cn(
+                        "w-12 h-12 rounded-2xl border-2 flex items-center justify-center shadow-sm",
+                        "bg-green-100 border-green-300"
+                      )}>
+                        <svg viewBox="0 0 24 24" className="w-6 h-6 fill-green-700" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                        </svg>
+                      </div>
+                      <span className="text-[9px] font-bold text-green-700">WhatsApp</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -922,8 +999,8 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             />
           )}
 
-          {/* Navigation GPS — affiché si coordonnées GPS disponibles */}
-          {!colisLivre && (
+          {/* Navigation GPS — affiché si coordonnées GPS disponibles (masqué pendant le pré-trajet admin) */}
+          {!colisLivre && !adminPreTrip && (
             !colisRecupere ? (
               // CORRECTION AUDIT : NavigationGPS relit le GPS de l'expéditeur toutes les 5s via ClientExterne
               // destLat/destLng sont les coords fixes enregistrées à la création (fallback)
@@ -1102,9 +1179,22 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
               )}
 
               {!colisRecupere ? (
-                isExterne ? (
-                  /* ── EXTERNE multi-colis : bouton simple sans QR ── */
-                  /* ── EXTERNE colis unique : Scanner QR pour récupérer ── */
+                adminPreTrip ? (
+                  /* ── COURSE ADMINISTRATIVE : « Client contacté » puis « En route vers l'expéditeur » ── */
+                  <div className="space-y-3">
+                    {isEnRouteExpediteurPending && (
+                      <button
+                        className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                        onClick={handleDemarrerTrajet}
+                        disabled={isPending}
+                      >
+                        <Navigation className="w-6 h-6" />
+                        En route vers l'expéditeur
+                      </button>
+                    )}
+                  </div>
+                ) : isExterne ? (
+                  /* ── EXTERNE colis : Scanner QR pour récupérer ── */
                   course.is_multi_colis ? (
                     <button
                       className="w-full h-14 rounded-2xl bg-gradient-to-b from-amber-500 to-amber-600 text-white font-black text-base shadow-lg shadow-amber-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"

@@ -177,9 +177,12 @@
       "type": "string",
       "enum": [
         "nouvelle",
+        "en_attente",
         "programmee",
         "recherche_livreur",
         "livreur_en_route",
+        "client_contacte",
+        "en_route_expediteur",
         "arrive_prise_en_charge",
         "colis_recupere",
         "passager_embarque",
@@ -189,7 +192,8 @@
         "livree",
         "annulee"
       ],
-      "default": "nouvelle"
+      "default": "nouvelle",
+      "description": "Statut de la course. en_attente = course suspendue (dispatch NON declenche) \u2014 l'admin doit la repasser en 'nouvelle' pour lancer le dispatch. client_contacte et en_route_expediteur sont specifiques au workflow des courses administratives (source=admin, colis) : etapes intermediaires entre l'acceptation et le depart vers l'expediteur."
     },
     "dispatch_status": {
       "type": "string",
@@ -257,6 +261,11 @@
     "heure_acceptation": {
       "type": "string",
       "format": "date-time"
+    },
+    "heure_contact_client": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date/heure \u00e0 laquelle le livreur a confirm\u00e9 avoir contact\u00e9 le client (\u00e9tape \u00ab Client contact\u00e9 \u00bb du workflow administratif). Renseign\u00e9 uniquement pour les courses administratives."
     },
     "heure_prise_en_charge": {
       "type": "string",

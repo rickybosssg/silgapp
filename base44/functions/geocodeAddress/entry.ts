@@ -6,6 +6,7 @@ import { haversineKm } from "../../shared/geoUtils.ts";
 // Utilisé par le composant AddressAutocomplete partout dans SILGAPP.
 
 const ORS_AUTOCOMPLETE_URL = "https://api.openrouteservice.org/geocode/autocomplete";
+const ORS_SEARCH_URL = "https://api.openrouteservice.org/geocode/search";
 const ORS_TIMEOUT_MS = 6000;
 
 // Cache server-side (persiste dans l'isolate Deno)
@@ -113,10 +114,95 @@ Deno.serve(async (req) => {
       };
     });
 
-    // Mettre en cache
-    geocodeCache.set(cacheKey, { results, timestamp: now });
+    // Mettre en cache — uniquement les résultats non vides pour éviter qu'une
+    // panne transitoire d'ORS n'empoisonne le cache pendant 10 minutes.
+    if (results.length > 0) {
+      geocodeCache.set(cacheKey, { results, timestamp: now });
+      return Response.json({ results });
+    }
 
-    return Response.json({ results });
+    // ── Deuxième tentative : ORS geocode/search (recherche plein texte) ──
+    // L'autocomplete est basé sur le préfixe et peut rater des quartiers
+    // spécifiques (ex: "Nagrin"). Le endpoint /search fait une recherche
+    // plein texte plus permissive.
+    try {
+      const searchParams = new URLSearchParams({ text: query.trim(), size: '5' });
+      if (countryAlpha3) searchParams.set('boundary.country', countryAlpha3);
+      if (focus_lat && focus_lng) {
+        searchParams.set('focus.point.lat', String(focus_lat));
+        searchParams.set('focus.point.lon', String(focus_lng));
+      }
+
+      const searchController = new AbortController();
+      const searchTimeoutId = setTimeout(() => searchController.abort(), ORS_TIMEOUT_MS);
+      const searchResponse = await fetch(`${ORS_SEARCH_URL}?${searchParams}`, {
+        headers: { "Authorization": Deno.env.get("ORS_API_KEY") },
+        signal: searchController.signal,
+      });
+      clearTimeout(searchTimeoutId);
+
+      if (searchResponse.ok) {
+        const searchData = await searchResponse.json();
+        const searchResults = (searchData.features || []).map((f: any) => {
+          const props = f.properties || {};
+          const coords = f.geometry?.coordinates || [];
+          return {
+            name: props.name || props.label || '',
+            label: props.label || props.name || '',
+            quartier: props.neighbourhood || props.borough || props.locality || '',
+            ville: props.locality || props.county || props.region || '',
+            pays: props.country_a || country_code || '',
+            latitude: coords[1],
+            longitude: coords[0],
+            distance: (focus_lat && focus_lng && coords[1] && coords[0])
+              ? Number(haversineKm(focus_lat, focus_lng, coords[1], coords[0]).toFixed(1))
+              : null,
+          };
+        });
+
+        if (searchResults.length > 0) {
+          geocodeCache.set(cacheKey, { results: searchResults, timestamp: now });
+          return Response.json({ results: searchResults, search: true });
+        }
+      }
+    } catch (_) {
+      // Silencieux — on continue vers le fallback Quartiers
+    }
+
+    // ── Fallback : rechercher dans la base Quartiers si ORS ne retourne rien ──
+    // (ex: "Ouaga 2000" n'est pas reconnu par ORS mais existe en base)
+    try {
+      const quartiers = await base44.asServiceRole.entities.Quartier.filter({
+        country_code: country_code || undefined,
+        actif: true,
+      }, "nom", 500);
+
+      const q = query.trim().toLowerCase();
+      const matchingQuartiers = (quartiers || []).filter((qu: any) =>
+        qu.nom?.toLowerCase().includes(q)
+      ).slice(0, 5);
+
+      const fallbackResults = matchingQuartiers.map((qu: any) => ({
+        name: qu.nom,
+        label: qu.nom,
+        quartier: qu.nom,
+        ville: qu.ville || '',
+        pays: country_code || '',
+        latitude: qu.latitude,
+        longitude: qu.longitude,
+        distance: (focus_lat && focus_lng && qu.latitude && qu.longitude)
+          ? Number(haversineKm(focus_lat, focus_lng, qu.latitude, qu.longitude).toFixed(1))
+          : null,
+      }));
+
+      if (fallbackResults.length > 0) {
+        geocodeCache.set(cacheKey, { results: fallbackResults, timestamp: now });
+      }
+
+      return Response.json({ results: fallbackResults, fallback: true });
+    } catch (_) {
+      return Response.json({ results: [] });
+    }
   } catch (error) {
     if (error.name === 'AbortError') {
       return Response.json({ results: [], error: "Timeout ORS (6s)" });

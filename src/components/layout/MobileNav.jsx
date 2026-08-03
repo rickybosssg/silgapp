@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, X, LogOut, Bell, ChevronDown, Check } from "lucide-react";
+import { Menu, X, LogOut, Bell, ChevronDown, Check, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { clearPersistedToken } from "@/lib/authPersistence";
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +28,7 @@ function restoreScrollPosition(pathname) {
   } catch (_) { return 0; }
 }
 
-export default function MobileNav({ notificationCount = 0, demandesCount = 0, partenaireDemandesCount = 0, neoCount = 0, reseau }) {
+export default function MobileNav({ notificationCount = 0, demandesCount = 0, partenaireDemandesCount = 0, neoCount = 0, messageCount = 0, reseau }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -111,6 +111,14 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
               <Bell className="w-5 h-5 text-muted-foreground" />
               <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center">
                 {notificationCount > 9 ? '9+' : notificationCount}
+              </span>
+            </Link>
+          )}
+          {messageCount > 0 && (
+            <Link to="/admin/messages" className="relative">
+              <MessageCircle className="w-5 h-5 text-muted-foreground" />
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center animate-pulse">
+                {messageCount > 9 ? '9+' : messageCount}
               </span>
             </Link>
           )}
@@ -220,6 +228,11 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
                         {neoCount}
                       </Badge>
                     )}
+                    {item.path === "/admin/messages" && messageCount > 0 && (
+                      <Badge className="bg-red-500 text-white text-xs">
+                        {messageCount}
+                      </Badge>
+                    )}
                   </Link>
                 );
               })}
@@ -289,9 +302,9 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
           >
             <div className="w-10 h-6 flex items-center justify-center rounded-full relative">
               <Menu className="w-5 h-5" />
-              {(notificationCount > 0 || demandesCount > 0 || partenaireDemandesCount > 0) && (
+              {(notificationCount > 0 || demandesCount > 0 || partenaireDemandesCount > 0 || messageCount > 0) && (
                 <span className="absolute -top-1 right-0 w-3.5 h-3.5 rounded-full bg-destructive text-destructive-foreground text-[8px] font-bold flex items-center justify-center">
-                  {((notificationCount || 0) + (demandesCount || 0) + (partenaireDemandesCount || 0)) > 9 ? '9+' : (notificationCount || 0) + (demandesCount || 0) + (partenaireDemandesCount || 0)}
+                  {((notificationCount || 0) + (demandesCount || 0) + (partenaireDemandesCount || 0) + (messageCount || 0)) > 9 ? '9+' : (notificationCount || 0) + (demandesCount || 0) + (partenaireDemandesCount || 0) + (messageCount || 0)}
                 </span>
               )}
             </div>

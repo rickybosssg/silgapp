@@ -40,22 +40,6 @@ export function calculateLivreurCounters(livreurs) {
   const libres = livreurs.filter(l => isLibre(l));
   const enCourse = livreurs.filter(l => isEnCourse(l));
 
-  // Diagnostic pour débogage
-  console.log(" calculateLivreurCounters:", {
-    total: livreurs.length,
-    libres_count: libres.length,
-    libres_ids: libres.map(l => l.id.slice(-8)),
-    enCourse_count: enCourse.length,
-    details: libres.map(l => ({
-      id: l.id.slice(-8),
-      nom: `${l.prenom} ${l.nom}`,
-      statut: l.statut,
-      isON: isON(l),
-      isAppActive: isAppActive(l),
-      hasValidGPS: hasValidGPS(l),
-    })),
-  });
-
   return {
     total: livreurs.length,
     libres,                                // TOUS dispatchables (GPS ≤ 60 min)

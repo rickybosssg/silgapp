@@ -11,7 +11,9 @@ import CourseStatusBadge from "./CourseStatusBadge";
 import UrgenceBadge from "./UrgenceBadge";
 import MultiColisAdminView from "./MultiColisAdminView";
 import ProposedLivreursList from "./ProposedLivreursList";
+import ManualAssignLivreurDialog from "./ManualAssignLivreurDialog";
 import ChatWindow from "@/components/chat/ChatWindow";
+import { UserPlus } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { genererReferenceCourse } from "@/lib/courseReference";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -24,7 +26,7 @@ const STATUTS_INTERNE = [
 ];
 
 const STATUTS_EXTERNE = [
-  "nouvelle", "recherche_livreur", "livreur_en_route", "arrive_prise_en_charge",
+  "nouvelle", "en_attente", "recherche_livreur", "livreur_en_route", "arrive_prise_en_charge",
   "colis_recupere", "passager_embarque", "en_livraison", "livree", "annulee"
 ];
 
@@ -38,6 +40,8 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
   const [confirmAnnulation, setConfirmAnnulation] = React.useState(false);
   const [adminEmail, setAdminEmail] = React.useState("");
   const [reattributing, setReattributing] = React.useState(false);
+  const [relaunching, setRelaunching] = React.useState(false);
+  const [showManualAssign, setShowManualAssign] = React.useState(false);
   const countryMismatch = reseau === "externe" && isPays && course?.country_code && course.country_code !== adminCountryCode;
 
   React.useEffect(() => {
@@ -146,6 +150,39 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
     }
   };
 
+  const handleRelancerVague0 = async () => {
+    setRelaunching(true);
+    try {
+      await base44.entities.CourseExterne.update(course.id, {
+        statut: "nouvelle",
+        dispatch_status: "en_attente",
+        dispatch_wave: 0,
+        dispatch_cycle_count: 0,
+        dispatch_notified_ids: "[]",
+        dispatch_wave_notified_ids: "[]",
+        dispatch_refused_ids: "[]",
+        dispatch_locked_until: null,
+        timeout_expires_at: null,
+        livreur_id: "",
+        livreur_nom: "",
+        livreur_telephone: "",
+        livreur_photo_url: "",
+        livreur_vehicule: "",
+        livreur_note_moyenne: 0,
+        livreur_nombre_avis: 0,
+      });
+      // Déclencher le dispatch immédiatement
+      await base44.functions.invoke("dispatchExterneAuto", {}).catch(() => null);
+      toast.success("Course relancée depuis la vague 0");
+      queryClient.invalidateQueries();
+      onClose();
+    } catch (error) {
+      toast.error("Erreur : " + (error?.message || "relance impossible"));
+    } finally {
+      setRelaunching(false);
+    }
+  };
+
   const handleStatusUpdate = () => {
     const updateData = { statut: newStatut };
     if (newStatut === "livree") {
@@ -173,8 +210,8 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
               </span>
             )}
             <CourseStatusBadge statut={course.statut} />
-            {course.urgence && <UrgenceBadge urgence={course.urgence} />}
-            {course.prix && <span className="text-sm font-bold">{course.prix.toLocaleString()} FCFA</span>}
+            {course.priority && course.priority !== "normal" && <UrgenceBadge urgence={course.priority} />}
+            {course.prix_final && <span className="text-sm font-bold">{course.prix_final.toLocaleString()} FCFA</span>}
             {course.delivery_confirmed_by === 'pin_secours' && (
               <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">🔑 PIN secours</span>
             )}
@@ -256,47 +293,46 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
           </div>
 
           {/* GPS tracking info */}
-          {(course.distance_km || course.duree_livraison_minutes || course.colis_recupere_at) && (
+          {(course.distance_reelle_km || course.colis_recupere_at) && (
             <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 space-y-3">
               <div className="flex items-center gap-2 mb-2">
                 <Navigation className="w-4 h-4 text-blue-600" />
                 <p className="text-xs font-bold text-blue-700 uppercase">Suivi GPS</p>
               </div>
               
-              {course.distance_km && (
+              {course.distance_reelle_km && (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <MapPin className="w-3 h-3 text-blue-600" />
                     <span className="text-xs text-blue-600 font-semibold">Distance</span>
                   </div>
-                  <span className="text-sm font-black text-blue-700">{course.distance_km.toFixed(2)} km</span>
-                  {course.gps_distance_type && (
-                    <span className="text-[10px] text-blue-400 uppercase font-bold">({course.gps_distance_type})</span>
-                  )}
+                  <span className="text-sm font-black text-blue-700">{course.distance_reelle_km.toFixed(2)} km</span>
                 </div>
               )}
 
-              {course.duree_livraison_minutes && (
+              {course.heure_recuperation && course.heure_livraison && (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Clock className="w-3 h-3 text-purple-600" />
                     <span className="text-xs text-purple-600 font-semibold">Durée</span>
                   </div>
-                  <span className="text-sm font-black text-purple-700">{course.duree_livraison_minutes} min</span>
+                  <span className="text-sm font-black text-purple-700">
+                    {Math.round((new Date(course.heure_livraison).getTime() - new Date(course.heure_recuperation).getTime()) / 60000)} min
+                  </span>
                 </div>
               )}
 
-              {(course.latitude_depart_livraison || course.colis_recupere_at) && (
+              {(course.latitude_recuperation || course.colis_recupere_at) && (
                 <div className="pt-2 border-t border-blue-200">
                   <p className="text-[10px] text-blue-400 font-semibold uppercase mb-1">Départ livraison</p>
-                  {course.latitude_depart_livraison && (
+                  {course.latitude_recuperation && (
                     <p className="text-xs font-medium text-blue-700">
-                      {course.latitude_depart_livraison.toFixed(6)}, {course.longitude_depart_livraison?.toFixed(6)}
+                      {course.latitude_recuperation.toFixed(6)}, {course.longitude_recuperation?.toFixed(6)}
                     </p>
                   )}
-                  {course.colis_recupere_at && (
+                  {course.heure_recuperation && (
                     <p className="text-[10px] text-blue-400 mt-0.5">
-                      {format(new Date(course.colis_recupere_at), "HH:mm:ss")}
+                      {format(new Date(course.heure_recuperation), "HH:mm:ss")}
                     </p>
                   )}
                 </div>
@@ -358,6 +394,46 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
             <div className="text-sm text-muted-foreground bg-muted/30 p-3 rounded-lg">
               {course.notes}
             </div>
+          )}
+
+          {/* Relance depuis la vague 0 — visible quand le cycle dispatch est épuisé */}
+          {reseau === "externe" && course.dispatch_status === "cycle_epuise" && (
+            <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-3 space-y-2">
+              <p className="text-xs font-bold text-amber-700 flex items-center gap-1.5">
+                <RotateCcw className="w-3.5 h-3.5" />
+                Cycle dispatch épuisé
+              </p>
+              <Button
+                variant="outline"
+                className="w-full border-amber-400 text-amber-700 hover:bg-amber-100 font-bold"
+                disabled={relaunching || updateMutation.isPending}
+                onClick={handleRelancerVague0}
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                {relaunching ? "Relance en cours..." : "Relancer depuis la vague 0"}
+              </Button>
+            </div>
+          )}
+
+          {/* Assignation manuelle par l'admin */}
+          {reseau === "externe" && course.statut !== "livree" && course.statut !== "annulee" && (
+            <Button
+              variant="outline"
+              className="w-full border-primary/30 text-primary hover:bg-primary/5 font-bold"
+              onClick={() => setShowManualAssign(true)}
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              Assigner manuellement un livreur
+            </Button>
+          )}
+
+          {showManualAssign && (
+            <ManualAssignLivreurDialog
+              course={course}
+              open={showManualAssign}
+              onClose={() => setShowManualAssign(false)}
+              reseau={reseau}
+            />
           )}
 
           {/* Livreurs proposés (dispatch externe) */}

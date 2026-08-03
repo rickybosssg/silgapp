@@ -686,7 +686,7 @@ Deno.serve(async (req) => {
         await base44.asServiceRole.entities.Conversation.update(conversation.id, {
           venus_pending_course: JSON.stringify(pendingCourse),
         });
-        reponseVenus = `Entendu — je laisse tomber la création de la livraison. Aucune course n'a été créée. Si tu veux la relancer plus tard, dis-le-moi et je m'en occupe. Besoin d'autre chose ? Pour assistance, tu peux appeler le support au +226 66 92 51 90.`;
+        reponseVenus = `Entendu — je laisse tomber la création de la livraison. Aucune course n'a été créée. Si vous voulez la relancer plus tard, dites-le-moi et je m'en occupe. Besoin d'autre chose ? Pour assistance, vous pouvez appeler le support au +226 66 92 51 90.`;
       }
 
       // ── SIMPLIFICATION: Le bypass de confirmation déterministe est supprimé.

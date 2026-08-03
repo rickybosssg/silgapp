@@ -1,8 +1,9 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { Bell, Check, CheckCheck, BellOff } from "lucide-react";
+import { Bell, Check, CheckCheck, BellOff, MessageCircle, Truck } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -25,10 +26,49 @@ function prettifyType(type) {
 
 export default function Notifications() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  // Ouvrir la conversation liée à une notification de message
+  const openConversation = async (notif) => {
+    if (!notif.course_id) return;
+    try {
+      const course = await base44.entities.CourseExterne.get(notif.course_id);
+      if (course?.conversation_id) {
+        navigate(`/admin/messages?conv=${course.conversation_id}`);
+        if (!notif.lue) markReadMutation.mutate(notif.id);
+        return;
+      }
+    } catch (_) {}
+    // Fallback : ouvrir la page messages sans conversation pré-sélectionnée
+    navigate("/admin/messages");
+    if (!notif.lue) markReadMutation.mutate(notif.id);
+  };
+
+  // Ouvrir la course liée à une notification
+  const openCourse = (notif) => {
+    if (!notif.course_id) return;
+    navigate("/courses");
+    if (!notif.lue) markReadMutation.mutate(notif.id);
+  };
+
+  const handleNotifClick = (notif) => {
+    if (notif.type === "message_client") {
+      openConversation(notif);
+    } else if (notif.course_id) {
+      openCourse(notif);
+    } else if (!notif.lue) {
+      markReadMutation.mutate(notif.id);
+    }
+  };
 
   const { data: notificationsRaw = [], isLoading } = useQuery({
     queryKey: ["notifications"],
-    queryFn: () => base44.entities.Notification.list("-created_date", 100),
+    queryFn: async () => {
+      const user = await base44.auth.me();
+      if (!user) return [];
+      // Ne récupérer QUE les notifications adressées à l'admin connecté
+      return base44.entities.Notification.filter({ destinataire_email: user.email }, "-created_date", 100);
+    },
     initialData: [],
   });
 
@@ -167,7 +207,10 @@ export default function Notifications() {
           return (
             <div
               key={notif.id}
-              className={`rounded-2xl border p-4 transition-all ${isUnread ? "border-primary/20 bg-primary/5" : "border-gray-100 bg-white"}`}
+              onClick={() => handleNotifClick(notif)}
+              className={`rounded-2xl border p-4 transition-all cursor-pointer hover:shadow-md ${
+                isUnread ? "border-primary/20 bg-primary/5" : "border-gray-100 bg-white"
+              } ${notif.type === "message_client" || notif.course_id ? "hover:border-primary/30" : ""}`}
             >
               <div className="flex items-start gap-3">
                 {/* Dot indicateur */}
@@ -178,6 +221,12 @@ export default function Notifications() {
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${config.color}`}>
                       {config.label}
                     </span>
+                    {(notif.type === "message_client" || notif.course_id) && (
+                      <span className="text-[10px] text-primary flex items-center gap-0.5">
+                        {notif.type === "message_client" ? <MessageCircle className="w-3 h-3" /> : <Truck className="w-3 h-3" />}
+                        Ouvrir
+                      </span>
+                    )}
                     {groupCount > 1 && (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
                         ×{groupCount}

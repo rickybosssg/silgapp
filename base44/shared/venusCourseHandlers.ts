@@ -586,9 +586,38 @@ export async function handlePrixManuelResponse(base44: any, conversation: any, u
     });
 
     if (isOui) {
-      const prix = Number(courseEnAttente.manual_price || 0);
+      // ── Extraction du montant de la contre-offre depuis les messages récents de VENUS ──
+      // Si VENUS a proposé une contre-offre (ex: "Tu proposes 1 500 FCFA"), on utilise
+      // ce montant au lieu de manual_price qui contient encore le prix initial du livreur.
+      let prix = Number(courseEnAttente.manual_price || 0);
+      try {
+        const venusMsgs = await base44.asServiceRole.entities.Message.filter(
+          { conversation_id: conversation.id, sender_type: 'admin', source: 'whatsapp' },
+          '-created_date', 5
+        ).catch(() => []);
+        for (const m of venusMsgs || []) {
+          const content = (m.content || '').toLowerCase();
+          // Chercher "tu proposes X FCFA" ou "vous proposez X fcfa" ou "contre-offre de X"
+          const match = content.match(/(?:proposes?|proposez|contre[-\s]?offre de)\s*[:\s]*(\d[\d\s.]*)\s*(?:fcfa|f\b)/i);
+          if (match) {
+            const extracted = Number(match[1].replace(/\s/g, '').replace(/\./g, ''));
+            if (extracted > 0 && extracted !== prix) {
+              console.log(`[WebhookVenus] 💰 Contre-offre détectée: ${extracted} FCFA (au lieu de ${prix} FCFA)`);
+              prix = extracted;
+              // Mettre à jour manual_price avec le montant de la contre-offre
+              await base44.asServiceRole.entities.CourseExterne.update(courseEnAttente.id, {
+                manual_price: extracted,
+              });
+            }
+            break;
+          }
+        }
+      } catch (e) {
+        console.warn(`[WebhookVenus] 💰 Erreur extraction contre-offre:`, e.message);
+      }
+
       const devise = courseEnAttente.devise || 'FCFA';
-      console.log(`[WebhookVenus] 💰 ✅ Prix accepté pour course ${courseEnAttente.id}`);
+      console.log(`[WebhookVenus] 💰 ✅ Prix accepté pour course ${courseEnAttente.id} — montant final: ${prix} FCFA`);
 
       let trackingLink = courseEnAttente.tracking_link || '';
       if (!trackingLink) {

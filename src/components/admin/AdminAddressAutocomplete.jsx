@@ -1,39 +1,31 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { base44 } from "@/api/base44Client";
-import { MapPin, Search, Loader2, Plus, X } from "lucide-react";
+import { MapPin, Search, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 /**
- * Champ de saisie d'adresse client avec suggestions de quartiers en temps réel.
+ * Champ de saisie d'adresse admin avec suggestions de quartiers en temps réel.
  *
- * Comportement identique à AdminAddressAutocomplete :
- * - Suggestions de quartiers filtrés par pays (countryCode)
- * - Auto-remplissage du GPS (latitude/longitude) à la sélection
- * - Création automatique d'un nouveau quartier si introuvable (géocodage via geocodeAddress)
- * - Fallback sur la base Quartiers si ORS ne retourne rien
- * - Navigation clavier (flèches, Entrée, Échap)
+ * Quand l'admin tape du texte, une liste de quartiers correspondants apparaît.
+ * Sélectionner un quartier remplit l'adresse + le GPS automatiquement.
  *
  * Props:
- * - value, onChange, onSelect(result: { latitude, longitude, quartier, ville, label } | null)
+ * - value, onChange
+ * - onSelect(result): appelé avec { latitude, longitude, quartier, label } quand un quartier est sélectionné
  * - countryCode: code pays pour filtrer les quartiers
- * - focusLat, focusLng: coordonnées de focalisation (ignorées — conservées pour compat)
- * - placeholder, label, required, hint, className, autoFocus
+ * - placeholder, iconColor, inputClassName
+ * - children: bouton « Localiser » positionné à droite par le parent
  */
-export default function AddressAutocomplete({
+export default function AdminAddressAutocomplete({
   value,
   onChange,
   onSelect,
   countryCode = "BF",
-  focusLat: _focusLat,
-  focusLng: _focusLng,
   placeholder = "Saisissez l'adresse...",
-  label,
-  required = false,
-  hint,
-  className = "",
-  autoFocus = false,
+  iconColor = "text-emerald-500",
+  inputClassName = "",
+  children,
 }) {
   const [quartiers, setQuartiers] = useState([]);
   const [query, setQuery] = useState(value || "");
@@ -83,7 +75,7 @@ export default function AddressAutocomplete({
     if (!nomQuartier || nomQuartier.length < 3) return;
     setCreating(true);
     try {
-      // 1. Géocoder le quartier via geocodeAddress (ORS + fallback base Quartiers)
+      // 1. Géocoder le quartier via geocodeAddress
       const res = await base44.functions.invoke("geocodeAddress", {
         query: nomQuartier,
         country_code: countryCode,
@@ -98,6 +90,7 @@ export default function AddressAutocomplete({
         lat = first.latitude;
         lng = first.longitude;
         ville = first.quartier || first.ville || first.label || null;
+        // Extraire le nom de la ville du label si pas explicite
         if (!ville && first.label) {
           const parts = first.label.split(",");
           ville = parts.length > 1 ? parts[parts.length - 1].trim() : parts[0].trim();
@@ -105,6 +98,7 @@ export default function AddressAutocomplete({
       }
 
       if (!lat || !lng) {
+        // Pas de résultat de géocodage — utiliser le nom saisi sans GPS
         onChange?.(nomQuartier);
         setShowSuggestions(false);
         toast?.error?.(`Quartier « ${nomQuartier} » non trouvé par le géocodeur`);
@@ -134,7 +128,6 @@ export default function AddressAutocomplete({
           latitude: lat,
           longitude: lng,
           quartier: nomQuartier,
-          ville: ville || "",
           label: nomQuartier,
         });
       }
@@ -157,7 +150,6 @@ export default function AddressAutocomplete({
         latitude: qu.latitude,
         longitude: qu.longitude,
         quartier: qu.nom,
-        ville: qu.ville || "",
         label: qu.nom,
       });
     }
@@ -169,13 +161,6 @@ export default function AddressAutocomplete({
     setShowSuggestions(true);
     setHighlightIndex(-1);
     onChange?.(newQuery);
-  };
-
-  const handleClear = () => {
-    setQuery("");
-    onChange?.("");
-    onSelect?.(null);
-    setShowSuggestions(false);
   };
 
   const handleKeyDown = (e) => {
@@ -195,87 +180,64 @@ export default function AddressAutocomplete({
   };
 
   return (
-    <div className="space-y-2" ref={containerRef}>
-      {label && (
-        <Label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-          {label}
-          {required && <span className="text-red-500">*</span>}
-          {!required && <span className="text-xs text-gray-400 font-normal">(optionnel)</span>}
-        </Label>
-      )}
-      <div className="relative">
-        <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
-          <Search className="w-4 h-4 text-gray-400" />
+    <div className="relative" ref={containerRef}>
+      <Search className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 z-10 ${iconColor}`} />
+      <Input
+        value={query}
+        onChange={handleInputChange}
+        onKeyDown={handleKeyDown}
+        onFocus={() => { if (query.trim()) setShowSuggestions(true); }}
+        placeholder={placeholder}
+        autoComplete="off"
+        className={inputClassName}
+      />
+      {children}
+
+      {showSuggestions && suggestions.length > 0 && (
+        <div className="absolute z-50 mt-1 w-full max-h-56 overflow-y-auto rounded-xl bg-white border border-gray-200 shadow-lg">
+          {suggestions.map((q, idx) => (
+            <button
+              key={q.id || idx}
+              type="button"
+              onClick={() => handleSelect(q)}
+              onMouseEnter={() => setHighlightIndex(idx)}
+              className={`flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm transition-colors ${
+                idx === highlightIndex
+                  ? "bg-primary/10 text-primary font-medium"
+                  : "text-gray-700 hover:bg-gray-50"
+              } ${idx > 0 ? "border-t border-gray-50" : ""}`}
+            >
+              <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              <span>{q.nom}</span>
+              {q.ville && (
+                <span className="text-[10px] text-gray-400 ml-auto">{q.ville}</span>
+              )}
+            </button>
+          ))}
         </div>
-        <Input
-          type="text"
-          value={query}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          onFocus={() => { if (query.trim()) setShowSuggestions(true); }}
-          placeholder={placeholder}
-          autoFocus={autoFocus}
-          autoComplete="off"
-          className={`h-14 rounded-2xl border-2 border-gray-200 bg-gray-50 focus:bg-white focus:border-primary pl-10 ${query ? "pr-10" : ""} text-base font-medium shadow-sm transition-all ${className}`}
-        />
-        {query && (
-          <button
-            type="button"
-            onClick={handleClear}
-            className="absolute right-3 top-1/2 -translate-y-1/2 z-10 p-1 rounded-full hover:bg-gray-100 transition-colors"
-          >
-            <X className="w-4 h-4 text-gray-400" />
-          </button>
-        )}
+      )}
 
-        {/* Suggestions de quartiers */}
-        {showSuggestions && suggestions.length > 0 && (
-          <div className="absolute z-50 mt-1 w-full max-h-56 overflow-y-auto rounded-xl bg-white border border-gray-200 shadow-lg">
-            {suggestions.map((q, idx) => (
-              <button
-                key={q.id || idx}
-                type="button"
-                onClick={() => handleSelect(q)}
-                onMouseEnter={() => setHighlightIndex(idx)}
-                className={`flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm transition-colors ${
-                  idx === highlightIndex
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "text-gray-700 hover:bg-gray-50"
-                } ${idx > 0 ? "border-t border-gray-50" : ""}`}
-              >
-                <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                <span>{q.nom}</span>
-                {q.ville && (
-                  <span className="text-[10px] text-gray-400 ml-auto">{q.ville}</span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
+      {/* Création d'un nouveau quartier s'il n'existe pas en base */}
+      {showSuggestions && suggestions.length === 0 && query.trim().length >= 3 && !creating && (
+        <button
+          type="button"
+          onClick={handleCreateQuartier}
+          className="absolute z-50 mt-1 w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left rounded-xl bg-white border border-primary/30 shadow-lg hover:bg-primary/5 transition-colors"
+        >
+          <Plus className="w-4 h-4 text-primary shrink-0" />
+          <span className="text-gray-700">
+            Créer « <span className="font-medium text-primary">{query.trim()}</span> » et rechercher ses coordonnées
+          </span>
+        </button>
+      )}
 
-        {/* Création d'un nouveau quartier s'il n'existe pas en base */}
-        {showSuggestions && suggestions.length === 0 && query.trim().length >= 3 && !creating && (
-          <button
-            type="button"
-            onClick={handleCreateQuartier}
-            className="absolute z-50 mt-1 w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left rounded-xl bg-white border border-primary/30 shadow-lg hover:bg-primary/5 transition-colors"
-          >
-            <Plus className="w-4 h-4 text-primary shrink-0" />
-            <span className="text-gray-700">
-              Créer « <span className="font-medium text-primary">{query.trim()}</span> » et rechercher ses coordonnées
-            </span>
-          </button>
-        )}
-
-        {/* Loading pendant la création */}
-        {creating && (
-          <div className="absolute z-50 mt-1 w-full flex items-center gap-2 px-4 py-2.5 text-sm rounded-xl bg-white border border-primary/30 shadow-lg">
-            <Loader2 className="w-4 h-4 text-primary animate-spin shrink-0" />
-            <span className="text-gray-600">Recherche des coordonnées…</span>
-          </div>
-        )}
-      </div>
-      {hint && <p className="text-xs text-gray-400 pl-1">{hint}</p>}
+      {/* Loading pendant la création */}
+      {creating && (
+        <div className="absolute z-50 mt-1 w-full flex items-center gap-2 px-4 py-2.5 text-sm rounded-xl bg-white border border-primary/30 shadow-lg">
+          <Loader2 className="w-4 h-4 text-primary animate-spin shrink-0" />
+          <span className="text-gray-600">Recherche des coordonnées…</span>
+        </div>
+      )}
     </div>
   );
 }

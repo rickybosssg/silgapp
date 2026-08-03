@@ -20,7 +20,7 @@ export default function HeatmapLayer({
   const [insufficientData, setInsufficientData] = useState(false);
 
   useEffect(() => {
-    if (!map || !window.L) return;
+    if (!map || typeof window === 'undefined' || !window.L) return;
 
     // Nettoyer l'ancienne heatmap
     if (heatmapRef.current) {

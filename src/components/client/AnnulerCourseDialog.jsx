@@ -43,6 +43,7 @@ const MOTIFS = [
 export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, clientId }) {
   const [step, setStep] = useState("info");
   const [motif, setMotif] = useState(null);
+  const [motifDetail, setMotifDetail] = useState("");
   const [loading, setLoading] = useState(false);
   const [analysing, setAnalysing] = useState(false);
   const [situation, setSituation] = useState(null); // null = en cours d'analyse
@@ -51,6 +52,7 @@ export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, 
     if (!open || !course) return;
     setStep("info");
     setMotif(null);
+    setMotifDetail("");
     setSituation(null);
     analyserSituation();
   }, [open, course?.id]);
@@ -124,12 +126,15 @@ export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, 
 
   const handleConfirmer = async () => {
     if (!motif) { toast.error("Veuillez sélectionner un motif"); return; }
+    if (motif === "autre" && !motifDetail.trim()) { toast.error("Veuillez préciser le motif"); return; }
     setLoading(true);
     try {
+      const motifLabel = MOTIFS.find(m => m.id === motif)?.label || motif;
+      const motifText = motif === "autre" ? `${motifLabel}: ${motifDetail.trim()}` : motifLabel;
       // 1. Annuler la course
       await base44.entities.CourseExterne.update(course.id, {
         statut: "annulee",
-        notes: `Annulée par le client. Motif: ${motif}${situation?.type === "payant" ? ` | Frais: ${situation.montant} ${course.devise || "FCFA"}` : ""}`,
+        notes: `Annulée par le client. Motif: ${motifText}${situation?.type === "payant" ? ` | Frais: ${situation.montant} ${course.devise || "FCFA"}` : ""}`,
       });
 
       // 2. Si frais → créer l'enregistrement FraisAnnulation
@@ -302,6 +307,19 @@ export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, 
                         </button>
                       ))}
                     </div>
+
+                    {motif === "autre" && (
+                      <div>
+                        <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Précisez le motif *</label>
+                        <textarea
+                          value={motifDetail}
+                          onChange={e => setMotifDetail(e.target.value)}
+                          placeholder="Décrivez la raison de l'annulation..."
+                          rows={2}
+                          className="flex w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        />
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -329,7 +347,7 @@ export default function AnnulerCourseDialog({ course, open, onClose, onSuccess, 
             <button
               type="button"
               onClick={handleConfirmer}
-              disabled={loading || !motif}
+              disabled={loading || !motif || (motif === "autre" && !motifDetail.trim())}
               className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-red-600 hover:bg-red-700 text-white h-9 px-4 transition-colors disabled:opacity-50 disabled:cursor-not-allowed gap-2"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}

@@ -64,18 +64,26 @@ export function useGPSNatif({ enabled = true, intervalMs = 15000, onPosition } =
     }
   };
 
-  // Seuil de précision GPS — rejette les lectures imprécises (> 100m)
-  const ACCURACY_THRESHOLD = 100;
+  // Seuil de précision GPS — assoupli à 200m pour zones à couverture faible (Ouaga)
+  const ACCURACY_THRESHOLD = 200;
   // Distance minimale (mètres) pour mettre à jour — évite le bruit GPS
   const MIN_DISTANCE_M = 10;
+  // Délai maximum (ms) sans position avant d'accepter n'importe quelle précision
+  const FALLBACK_DELAY_MS = 60000;
   const lastPosRef = useRef(null);
+  const lastValidPosTimeRef = useRef(null);
 
-  // Mise à jour de la position interne (avec filtrage précision + distance)
+  // Mise à jour de la position interne (avec filtrage précision + distance + fallback)
   const applyPosition = useCallback((coords) => {
     const accuracy = coords.accuracy || null;
+    const now = Date.now();
+    const timeSinceLastPos = lastValidPosTimeRef.current ? now - lastValidPosTimeRef.current : Infinity;
 
-    // Rejeter les positions trop imprécises
-    if (accuracy && accuracy > ACCURACY_THRESHOLD) {
+    // Mode fallback : après 60s sans position valide, accepter n'importe quelle précision
+    const inFallbackMode = timeSinceLastPos > FALLBACK_DELAY_MS;
+
+    // Rejeter les positions trop imprécises (sauf en mode fallback)
+    if (!inFallbackMode && accuracy && accuracy > ACCURACY_THRESHOLD) {
       return null;
     }
 
@@ -103,9 +111,10 @@ export function useGPSNatif({ enabled = true, intervalMs = 15000, onPosition } =
     }
 
     lastPosRef.current = pos;
+    lastValidPosTimeRef.current = now;
     setPosition(pos);
     setGpsActif(true);
-    lastPositionTimeRef.current = Date.now();
+    lastPositionTimeRef.current = now;
     setAgeMinutes(0);
     if (onPosition) onPosition(pos);
     return pos;

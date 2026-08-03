@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Badge } from "@/components/ui/badge";
@@ -319,6 +319,7 @@ function ClientDetailModal({ client, courses, migrationEnCours, onClose, onBloqu
 export default function ClientsExternesPanel({ countryCode: countryCodeProp }) {
   const [recherche, setRecherche] = useState("");
   const [filtreStatut, setFiltreStatut] = useState("tous");
+  const [page, setPage] = useState(1);
   const [clientDetail, setClientDetail] = useState(null);
   const [migrationEnCours, setMigrationEnCours] = useState(null);
   const [suppressionEnCours, setSuppressionEnCours] = useState(null);
@@ -368,6 +369,18 @@ export default function ClientsExternesPanel({ countryCode: countryCodeProp }) {
     }
     return result;
   }, [clients, recherche, filtreStatut]);
+
+  // ── Pagination ──
+  const ITEMS_PER_PAGE = 20;
+  const totalPages = Math.ceil(clientsFiltres.length / ITEMS_PER_PAGE);
+  const currentPage = Math.min(page, totalPages || 1);
+  const clientsPagines = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return clientsFiltres.slice(start, start + ITEMS_PER_PAGE);
+  }, [clientsFiltres, currentPage]);
+
+  // Réinitialiser la page quand les filtres changent
+  useEffect(() => { setPage(1); }, [recherche, filtreStatut, effectiveCountry]);
 
   const handleBloquer = async (client) => {
     await base44.entities.ClientExterne.update(client.id, { actif: client.actif === false ? true : false });
@@ -514,6 +527,37 @@ export default function ClientsExternesPanel({ countryCode: countryCodeProp }) {
         </p>
       )}
 
+      {/* Compteur résultats */}
+      <div className="flex items-center justify-between -mt-2">
+        <p className="text-xs text-muted-foreground">
+          {clientsFiltres.length} client{clientsFiltres.length > 1 ? "s" : ""}
+          {totalPages > 1 && ` · Page ${currentPage}/${totalPages}`}
+        </p>
+        {totalPages > 1 && (
+          <div className="flex items-center gap-1">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 px-2 text-xs"
+              disabled={currentPage <= 1}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+            >
+              ←
+            </Button>
+            <span className="text-xs font-medium text-gray-500 px-1">{currentPage}/{totalPages}</span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 px-2 text-xs"
+              disabled={currentPage >= totalPages}
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            >
+              →
+            </Button>
+          </div>
+        )}
+      </div>
+
       {/* Liste clients */}
       <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
         {clientsFiltres.length === 0 ? (
@@ -525,7 +569,7 @@ export default function ClientsExternesPanel({ countryCode: countryCodeProp }) {
             {recherche && <p className="text-xs mt-1 opacity-60">Essayez un autre terme de recherche</p>}
           </div>
         ) : (
-          clientsFiltres.map(client => {
+          clientsPagines.map(client => {
             const stats = getCourseStats(client);
             const couleur = getCouleurAvatar(client.nom);
             const initiales = getInitiales(client.nom, client.prenom);

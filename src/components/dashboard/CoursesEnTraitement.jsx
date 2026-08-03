@@ -11,8 +11,11 @@ import { cleanAddress } from "@/lib/addressUtils";
 // Statuts externes traduits lisiblement — couleurs distinctes par étape
 const STATUT_EXTERNE_LABELS = {
   nouvelle: "🔵 Nouvelle",
+  en_attente: "⏸ En attente",
   recherche_livreur: "🔍 Recherche livreur",
   livreur_en_route: "🟡 En route vers l'expéditeur",
+  client_contacte: "📞 Client contacté",
+  en_route_expediteur: "🟡 En route vers l'expéditeur",
   colis_recupere: "🟠 Colis récupéré",
   en_livraison: "🌸 En route vers le destinataire",
   livree: "🟢 Livré",
@@ -21,13 +24,18 @@ const STATUT_EXTERNE_LABELS = {
 
 function CourseItemExterne({ course, onView }) {
   const expediteur = course.expediteur_nom || course.client_nom || "Client";
-  const statutLabel = STATUT_EXTERNE_LABELS[course.statut] || course.statut;
+  const statutLabel = (course.source === "admin" && course.statut === "livreur_en_route")
+    ? "✅ Course acceptée"
+    : (STATUT_EXTERNE_LABELS[course.statut] || course.statut);
   const statutColor = {
     livreur_en_route: "bg-yellow-400 text-black border-yellow-500",
+    client_contacte: "bg-indigo-400 text-white border-indigo-500",
+    en_route_expediteur: "bg-yellow-400 text-black border-yellow-500",
     colis_recupere: "bg-green-500 text-black border-green-600",
     en_livraison: "bg-pink-400 text-black border-pink-500",
     recherche_livreur: "bg-red-500 text-white font-bold border-red-600",
     nouvelle: "bg-blue-100 text-blue-700 border-blue-200",
+    en_attente: "bg-amber-100 text-amber-800 border-amber-300 font-semibold",
   }[course.statut] || "bg-gray-100 text-gray-600 border-gray-200";
 
   const addrDepart = cleanAddress(course.adresse_depart, course.gps_depart_lat, course.gps_depart_lng);

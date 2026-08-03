@@ -1278,7 +1278,16 @@ Réponds UNIQUEMENT avec un JSON.`;
       prochaine_question: '',
       outils_utilises: [],
       confiance: 0,
-      reponse: "Je suis VENUS, votre assistante SILGAPP. Comment puis-je vous aider ?",
+      reponse: (() => {
+        // ── Fallback contextuel : ne pas envoyer un welcome générique si une course
+        //    est active (évite le « reset » perçu par le client quand un message en
+        //    retard est traité après création de la course).
+        const ca = input.courseActive;
+        if (ca && ca.id) {
+          return `Je suis VENUS, votre assistante SILGAPP. Votre course (réf: ${(ca.id || '').slice(-6).toUpperCase()}) est en cours. Le livreur ${ca.livreur_nom ? ca.livreur_nom : 'est en cours de recherche'}. Avez-vous une question sur cette course ou souhaitez-vous autre chose ?`;
+        }
+        return "Je suis VENUS, votre assistante SILGAPP. Comment puis-je vous aider ?";
+      })(),
       memoire_courte_update: {},
       memoire_longue_update: {},
       business_rule_id: undefined,

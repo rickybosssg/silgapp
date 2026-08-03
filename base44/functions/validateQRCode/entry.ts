@@ -26,7 +26,13 @@ Deno.serve(async (req) => {
 
     if (!course_id) return Response.json({ error: 'course_id requis' }, { status: 400 });
 
-    const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+    let course;
+    try {
+      course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+    } catch (_) {
+      // get() lance une erreur si l'enregistrement n'existe pas → retourner 404, pas 500
+      return Response.json({ error: 'Course non trouvée' }, { status: 404 });
+    }
     if (!course) return Response.json({ error: 'Course non trouvée' }, { status: 404 });
 
     // ── Génération manuelle (legacy / admin) ────────────────────────────────
@@ -155,7 +161,18 @@ Deno.serve(async (req) => {
       // Le prix est saisi par le livreur dans l'app après scan/PIN livraison.
       // Ne PAS mettre le livreur disponible — il doit d'abord saisir le montant.
       if (course.pricing_mode === "admin_manuel" || course.source === "admin") {
-        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+        // ── Calculer la distance réelle pour les courses admin aussi ──
+        // Privilégier la distance tarifaire (adresse) car le GPS livreur peut ne pas avoir bougé
+        const latRecupAdmin = course.latitude_recuperation;
+        const lngRecupAdmin = course.longitude_recuperation;
+        let distAdmin = null;
+        if (course.gps_depart_lat && course.gps_depart_lng && course.gps_arrivee_lat && course.gps_arrivee_lng) {
+          distAdmin = haversine(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng);
+        } else if (latRecupAdmin && lngRecupAdmin && latitude && longitude) {
+          distAdmin = haversine(latRecupAdmin, lngRecupAdmin, latitude, longitude);
+        }
+
+        const adminUpdateData = {
           statut: 'livree',
           heure_livraison: now,
           latitude_livraison: latitude || null,
@@ -166,7 +183,12 @@ Deno.serve(async (req) => {
           longitude_arrivee_livraison: longitude || null,
           colis_livre_at: now,
           // PRIX NON CALCULÉ — saisi par le livreur côté app
-        });
+        };
+        if (distAdmin != null) {
+          adminUpdateData.distance_reelle_km = Math.max(Number(distAdmin) || 0, 0.01);
+        }
+
+        await base44.asServiceRole.entities.CourseExterne.update(course_id, adminUpdateData);
 
         return Response.json({
           success: true,
@@ -176,6 +198,7 @@ Deno.serve(async (req) => {
             heure_livraison: now,
             latitude_livraison: latitude || null,
             longitude_livraison: longitude || null,
+            distance_reelle_km: adminUpdateData.distance_reelle_km || null,
           },
         });
       }
@@ -207,9 +230,14 @@ Deno.serve(async (req) => {
       const lngLivr = longitude;
 
       // Distance réelle livreur (pour stats uniquement)
-      const distReelle = (latRecup && lngRecup && latLivr && lngLivr)
+      // Si le trajet livreur est < 0.1 km (GPS n'a pas bougé, ex: PIN secours),
+      // on retombe sur la distance tarifaire (adresse départ → arrivée)
+      let distReelle = (latRecup && lngRecup && latLivr && lngLivr)
         ? haversine(latRecup, lngRecup, latLivr, lngLivr)
         : null;
+      if (distReelle !== null && distReelle < 0.1) {
+        distReelle = null; // trop petit → fallback sur distTarifaire
+      }
 
       // Distance tarifaire = GPS départ course → GPS arrivée course (expéditeur → destinataire)
       const latDepart = course.gps_depart_lat;
@@ -256,12 +284,11 @@ Deno.serve(async (req) => {
         updateData.commission_silga = commission;
         updateData.montant_livreur = montantLivreur;
 
-        // Distance réelle pour stats uniquement (pas pour le calcul du prix)
-        if (distReelle != null) {
+        // Distance réelle pour stats — privilégier distTarifaire (adresse) si distReelle indispo
+        if (distTarifaire != null) {
+          updateData.distance_reelle_km = Math.max(Number(distTarifaire) || 0, 0.01);
+        } else if (distReelle != null) {
           updateData.distance_reelle_km = Math.max(Number(distReelle) || 0, 0.01);
-        } else if (latDepart && lngDepart && latArrivee && lngArrivee) {
-          const dist = haversine(latDepart, lngDepart, latArrivee, lngArrivee);
-          updateData.distance_reelle_km = Math.max(Number(dist) || 0, 0.01);
         }
 
         updateData.latitude_arrivee_livraison = latitude;
@@ -282,7 +309,9 @@ Deno.serve(async (req) => {
         const commission = Math.round(prixFinal * (commissionPct / 100));
         const montantLivreur = prixFinal - commission;
         // distance_reelle_km = trajet réel livreur (stats), ou distance course si pas de GPS récup
-        updateData.distance_reelle_km = distReelle != null ? Math.max(Number(distReelle) || 0, 0.01) : distArrondie;
+        // Privilégier distTarifaire (adresse) si distReelle trop petit ou null
+        updateData.distance_reelle_km = distTarifaire != null ? Math.max(Number(distTarifaire) || 0, 0.01)
+          : (distReelle != null ? Math.max(Number(distReelle) || 0, 0.01) : distArrondie);
         updateData.prix_final = prixFinal;
         updateData.commission_silga = commission;
         updateData.montant_livreur = montantLivreur;
@@ -293,7 +322,11 @@ Deno.serve(async (req) => {
         updateData.prix_final = PRIX_MINIMUM_GLOBAL;
         updateData.commission_silga = Math.round(PRIX_MINIMUM_GLOBAL * (commissionPct / 100));
         updateData.montant_livreur = PRIX_MINIMUM_GLOBAL - updateData.commission_silga;
-        if (distReelle != null) updateData.distance_reelle_km = Math.max(Number(distReelle) || 0, 0.01);
+        if (distTarifaire != null) {
+          updateData.distance_reelle_km = Math.max(Number(distTarifaire) || 0, 0.01);
+        } else if (distReelle != null) {
+          updateData.distance_reelle_km = Math.max(Number(distReelle) || 0, 0.01);
+        }
       }
 
       await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);

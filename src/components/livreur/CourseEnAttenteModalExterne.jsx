@@ -30,7 +30,7 @@ export default function CourseEnAttenteModalExterne({
   onRefuser,
   onExpire,
   pricingMode = "automatic", // "automatic" | "manual"
-  alertDurationSeconds = 60,
+  alertDurationSeconds = 300,
   alertIntervalSeconds = 5,
 }) {
   useUrgentCourseAlert(true, {
@@ -358,23 +358,14 @@ export default function CourseEnAttenteModalExterne({
           </div>
         </div>
 
-        {/* Timer */}
+        {/* Barre de progression (sans timer affiché) */}
         <div className="bg-gray-100 h-2 relative">
           <div
             className={`h-full transition-all duration-1000 ${
-              tempsRestant <= 10 ? 'bg-red-500' : tempsRestant <= 30 ? 'bg-amber-500' : 'bg-green-500'
+              tempsRestant <= 30 ? 'bg-red-500' : tempsRestant <= 60 ? 'bg-amber-500' : 'bg-green-500'
             }`}
             style={{ width: `${(tempsRestant / alertDurationSeconds) * 100}%` }}
           />
-        </div>
-
-        <div className="px-5 py-2 bg-gray-50 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Clock className={`w-4 h-4 ${tempsRestant <= 10 ? 'text-red-500 animate-pulse' : 'text-gray-600'}`} />
-            <span className={`text-sm font-bold ${tempsRestant <= 10 ? 'text-red-500' : 'text-gray-600'}`}>
-              {tempsRestant}s restantes
-            </span>
-          </div>
         </div>
 
         <div className="p-5 space-y-4">

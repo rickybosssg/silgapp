@@ -54,7 +54,7 @@ export default function SystemAlertModal() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
         >
           <motion.div
             initial={{ scale: 0.92, opacity: 0, y: 20 }}
@@ -78,8 +78,9 @@ export default function SystemAlertModal() {
                   </p>
                 </div>
                 <button
-                  onClick={handleDismiss}
-                  className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition shrink-0"
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDismiss(); }}
+                  className="w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition shrink-0"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -95,6 +96,22 @@ export default function SystemAlertModal() {
                   <p className="text-sm text-gray-600 mt-1 leading-relaxed">{alert.message}</p>
                 </div>
               </div>
+
+              {/* ── Explication du livreur (extraite du message) ── */}
+              {(() => {
+                const msg = alert.message || "";
+                const match = msg.match(/Détail:\s*(.+?)(?:\.?\s+La course a été|$)/i);
+                const detail = match ? match[1].trim().replace(/\.$/, "") : null;
+                if (!detail) return null;
+                return (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                    <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide mb-1">
+                       Explication du livreur
+                    </p>
+                    <p className="text-sm text-amber-900 font-semibold leading-relaxed">{detail}</p>
+                  </div>
+                );
+              })()}
 
               {alert.course_id && (
                 <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-500">
@@ -117,15 +134,17 @@ export default function SystemAlertModal() {
               <div className="flex gap-2 pt-1">
                 {alerts.length > 1 && (
                   <button
-                    onClick={handleDismissAll}
-                    className="flex-1 h-11 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition"
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDismissAll(); }}
+                    className="flex-1 h-12 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold transition"
                   >
                     Tout ignorer ({alerts.length})
                   </button>
                 )}
                 <button
-                  onClick={handleDismiss}
-                  className="flex-1 h-11 rounded-xl bg-gradient-to-br from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white text-sm font-bold transition shadow-md shadow-red-500/20"
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDismiss(); }}
+                  className="flex-1 h-12 rounded-xl bg-gradient-to-br from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white text-sm font-bold transition shadow-md shadow-red-500/20 active:scale-95"
                 >
                   J'ai compris
                 </button>

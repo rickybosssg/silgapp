@@ -36,8 +36,14 @@ export default function PhotoPicker({ label, value, onChange, darkMode = false, 
       if (!file_url) throw new Error("URL de fichier absente");
       setUploadedType(file.type);
       onChange(file_url, { type: file.type, name: file.name });
-    } catch {
-      toast.error("Erreur lors de l'envoi du fichier. Réessayez.");
+    } catch (err) {
+      const is402 = err?.message?.includes("402") || err?.status === 402;
+      toast.error(
+        is402
+          ? "Service d'envoi temporairement indisponible. Réessayez dans quelques minutes ou contactez le support."
+          : "Erreur lors de l'envoi du fichier. Réessayez.",
+        { duration: 6000 }
+      );
     } finally {
       setUploading(false);
     }

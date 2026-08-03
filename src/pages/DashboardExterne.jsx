@@ -14,9 +14,11 @@ import { isClientEligibleCarte } from "@/lib/dispatchRules.js";
 import { calculateLivreurCounters, calculateClientCounters } from "@/lib/livreurCounters.js";
 import CoursesEnTraitement from "@/components/dashboard/CoursesEnTraitement";
 import CoursesTerminees from "@/components/dashboard/CoursesTerminees";
+import DispatchHealthPanel from "@/components/dashboard/DispatchHealthPanel";
+import VenusActivityPanel from "@/components/dashboard/VenusActivityPanel";
 import CourseDetailDialog from "@/components/courses/CourseDetailDialog";
 import CodePromoPanel from "@/components/admin/CodePromoPanel";
-import DownloadStatsPanel from "@/components/admin/DownloadStatsPanel";
+
 import StatDetailModal from "@/components/dashboard/StatDetailModal";
 import AppToggleButton from "@/components/admin/AppToggleButton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -135,7 +137,7 @@ export default function DashboardExterne() {
 
   // IDs des livreurs avec une course réellement active (pour les compteurs précis)
   const livreurIdsEnCourseReelle = useMemo(() => {
-    const STATUTS_OCCUPE = ["livreur_en_route", "colis_recupere", "en_livraison"];
+    const STATUTS_OCCUPE = ["livreur_en_route", "client_contacte", "en_route_expediteur", "colis_recupere", "en_livraison"];
     return new Set(coursesEnTraitement.filter(c => STATUTS_OCCUPE.includes(c.statut) && c.livreur_id).map(c => c.livreur_id));
   }, [coursesEnTraitement]);
 
@@ -290,10 +292,11 @@ export default function DashboardExterne() {
           <KpiCard label="Disponibles" value={stats.libres} icon={Truck} color="bg-gradient-to-br from-primary to-red-600" onClick={() => setStatModal({ type: "livreurs_dispo", data: livreursEnLigne.filter(l => l.statut === "disponible") })} />
         </div>
 
-        {/* ── TÉLÉCHARGEMENTS ─────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
-          <DownloadStatsPanel />
-        </div>
+        {/* ── SANTÉ DU DISPATCH ──────────────────────────── */}
+        <DispatchHealthPanel courses={courses} livreurs={livreurs} />
+
+        {/* ── ACTIVITÉ VENUS ────────────────────────────── */}
+        <VenusActivityPanel courses={courses} countryCode={effectiveCountry} />
 
         {/* ── ACTIVITÉ ─────────────────────────────────────── */}
         <div>

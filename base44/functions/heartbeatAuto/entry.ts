@@ -141,6 +141,34 @@ Deno.serve(async (req) => {
         }
 
         await base44.asServiceRole.entities.Livreur.update(livreur.id, updateData);
+
+        // ── Alerte GPS stale : si le livreur est disponible mais n'envoie pas
+        //    de GPS valide depuis >5 min, lui envoyer une push notification pour
+        //    lui demander de rouvrir l'app. Évite les "ghost livreurs" visibles
+        //    en admin mais invisibles au dispatch (GPS expiré). ──
+        if (livreur.statut === 'disponible' && !hasGps && livreur.user_email) {
+          const lastGpsDate = livreur.derniere_position_date || livreur.last_seen_at;
+          if (lastGpsDate) {
+            const gpsAgeMin = (Date.now() - new Date(lastGpsDate).getTime()) / 60000;
+            if (gpsAgeMin >= 5 && gpsAgeMin < 60) {
+              // Une seule alerte par 10 min (éviter le spam)
+              const lastAlert = livreur.encours_alerte_at ? new Date(livreur.encours_alerte_at).getTime() : 0;
+              if (Date.now() - lastAlert > 600000) {
+                await base44.asServiceRole.entities.Livreur.update(livreur.id, {
+                  encours_alerte_at: now,
+                }).catch(() => null);
+                base44.asServiceRole.functions.invoke('envoiNotificationPush', {
+                  destinataire_email: livreur.user_email,
+                  livreur_id: livreur.id,
+                  titre: '📍 GPS indisponible',
+                  message: 'Votre position GPS n\'est plus à jour. Rouvrez l\'application SILGAPP pour rester visible et recevoir des courses.',
+                  type: 'livreur_hors_ligne',
+                }).catch((err) => console.error('[heartbeatAuto] ❌ Push GPS alert:', err.message));
+                console.log(`[heartbeatAuto] 📍 Alerte GPS stale envoyée à ${livreur.prenom || ''} ${livreur.nom || ''} (GPS: ${Math.round(gpsAgeMin)}min)`);
+              }
+            }
+          }
+        }
       }
     }
 
