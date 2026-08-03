@@ -11,7 +11,9 @@ import CourseStatusBadge from "./CourseStatusBadge";
 import UrgenceBadge from "./UrgenceBadge";
 import MultiColisAdminView from "./MultiColisAdminView";
 import ProposedLivreursList from "./ProposedLivreursList";
+import ManualAssignLivreurDialog from "./ManualAssignLivreurDialog";
 import ChatWindow from "@/components/chat/ChatWindow";
+import { UserPlus } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { genererReferenceCourse } from "@/lib/courseReference";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -39,6 +41,7 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
   const [adminEmail, setAdminEmail] = React.useState("");
   const [reattributing, setReattributing] = React.useState(false);
   const [relaunching, setRelaunching] = React.useState(false);
+  const [showManualAssign, setShowManualAssign] = React.useState(false);
   const countryMismatch = reseau === "externe" && isPays && course?.country_code && course.country_code !== adminCountryCode;
 
   React.useEffect(() => {
@@ -410,6 +413,27 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
                 {relaunching ? "Relance en cours..." : "Relancer depuis la vague 0"}
               </Button>
             </div>
+          )}
+
+          {/* Assignation manuelle par l'admin */}
+          {reseau === "externe" && course.statut !== "livree" && course.statut !== "annulee" && (
+            <Button
+              variant="outline"
+              className="w-full border-primary/30 text-primary hover:bg-primary/5 font-bold"
+              onClick={() => setShowManualAssign(true)}
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              Assigner manuellement un livreur
+            </Button>
+          )}
+
+          {showManualAssign && (
+            <ManualAssignLivreurDialog
+              course={course}
+              open={showManualAssign}
+              onClose={() => setShowManualAssign(false)}
+              reseau={reseau}
+            />
           )}
 
           {/* Livreurs proposés (dispatch externe) */}
