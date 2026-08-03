@@ -48,20 +48,30 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── Calculer la distance réelle si manquante ──
-    if (!course.distance_reelle_km || course.distance_reelle_km === 0) {
-      const lat1 = course.latitude_recuperation ?? course.gps_depart_lat;
-      const lng1 = course.longitude_recuperation ?? course.gps_depart_lng;
-      const lat2 = course.latitude_livraison ?? course.latitude_arrivee_livraison ?? course.gps_arrivee_lat;
-      const lng2 = course.longitude_livraison ?? course.longitude_arrivee_livraison ?? course.gps_arrivee_lng;
-
-      if (isValidCoord(lat1, lng1) && isValidCoord(lat2, lng2)) {
-        const distKm = haversineKm(lat1, lng1, lat2, lng2);
-        if (distKm && distKm > 0) {
-          await base44.entities.CourseExterne.update(course_id, { distance_reelle_km: Number(distKm.toFixed(2)) });
-          course.distance_reelle_km = Number(distKm.toFixed(2));
-          console.log(`[libererLivreurCourseLivree] Distance calculée: ${distKm.toFixed(2)} km pour course ${course_id}`);
+    // ── Calculer la distance réelle si manquante ou trop petite ──
+    // Privilégier la distance tarifaire (adresse départ → arrivée) car le GPS
+    // livreur peut ne pas avoir bougé (PIN secours, GPS figé).
+    if (!course.distance_reelle_km || course.distance_reelle_km < 0.1) {
+      // 1. Distance tarifaire (adresse)
+      let distKm = null;
+      if (isValidCoord(course.gps_depart_lat, course.gps_depart_lng) && isValidCoord(course.gps_arrivee_lat, course.gps_arrivee_lng)) {
+        distKm = haversineKm(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng);
+      }
+      // 2. Fallback: GPS livreur (récupération → livraison)
+      if (!distKm || distKm < 0.1) {
+        const lat1 = course.latitude_recuperation ?? course.gps_depart_lat;
+        const lng1 = course.longitude_recuperation ?? course.gps_depart_lng;
+        const lat2 = course.latitude_livraison ?? course.latitude_arrivee_livraison ?? course.gps_arrivee_lat;
+        const lng2 = course.longitude_livraison ?? course.longitude_arrivee_livraison ?? course.gps_arrivee_lng;
+        if (isValidCoord(lat1, lng1) && isValidCoord(lat2, lng2)) {
+          distKm = haversineKm(lat1, lng1, lat2, lng2);
         }
+      }
+
+      if (distKm && distKm >= 0.1) {
+        await base44.entities.CourseExterne.update(course_id, { distance_reelle_km: Number(distKm.toFixed(2)) });
+        course.distance_reelle_km = Number(distKm.toFixed(2));
+        console.log(`[libererLivreurCourseLivree] Distance calculée: ${distKm.toFixed(2)} km pour course ${course_id}`);
       }
     }
 

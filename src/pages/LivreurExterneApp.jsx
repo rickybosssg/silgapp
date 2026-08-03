@@ -1147,16 +1147,24 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       }
 
       // ── Calculer la distance réelle si manquante ──
+      // Privilégier la distance tarifaire (adresse) car le GPS livreur peut
+      // ne pas avoir bougé (PIN secours, GPS figé).
       const distUpdate = {};
       if (!course.distance_reelle_km || course.distance_reelle_km === 0) {
-        const lat1 = course.latitude_recuperation ?? course.gps_depart_lat;
-        const lng1 = course.longitude_recuperation ?? course.gps_depart_lng;
-        const lat2 = course.latitude_livraison ?? course.latitude_arrivee_livraison ?? course.gps_arrivee_lat;
-        const lng2 = course.longitude_livraison ?? course.longitude_arrivee_livraison ?? course.gps_arrivee_lng;
-        if (lat1 && lng1 && lat2 && lng2) {
-          const dist = calculerDistance(lat1, lng1, lat2, lng2);
-          if (dist && dist > 0) distUpdate.distance_reelle_km = Number(dist.toFixed(2));
+        let dist = null;
+        if (course.gps_depart_lat && course.gps_depart_lng && course.gps_arrivee_lat && course.gps_arrivee_lng) {
+          dist = calculerDistance(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng);
         }
+        if (!dist || dist < 0.1) {
+          const lat1 = course.latitude_recuperation ?? course.gps_depart_lat;
+          const lng1 = course.longitude_recuperation ?? course.gps_depart_lng;
+          const lat2 = course.latitude_livraison ?? course.latitude_arrivee_livraison ?? course.gps_arrivee_lat;
+          const lng2 = course.longitude_livraison ?? course.longitude_arrivee_livraison ?? course.gps_arrivee_lng;
+          if (lat1 && lng1 && lat2 && lng2) {
+            dist = calculerDistance(lat1, lng1, lat2, lng2);
+          }
+        }
+        if (dist && dist >= 0.1) distUpdate.distance_reelle_km = Number(dist.toFixed(2));
       }
 
       await updateCourseMutation.mutateAsync({
