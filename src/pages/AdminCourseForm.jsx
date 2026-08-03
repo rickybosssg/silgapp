@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import { ArrowLeft, Send, Loader2, Sparkles, Navigation, Check } from "lucide-react";
 import { useAdminContext } from "@/hooks/useAdminContext";
 import { useAdminCourseWindows } from "@/context/AdminCourseWindowsContext";
-import QuartierSelect from "@/components/client/QuartierSelect";
 import AdminAddressAutocomplete from "@/components/admin/AdminAddressAutocomplete";
 import MapPickerModal from "@/components/admin/MapPickerModal";
 import CourseWindowStack from "@/components/admin/CourseWindowStack";
@@ -327,21 +326,6 @@ export default function AdminCourseForm() {
             </AdminAddressAutocomplete>
           </div>
 
-          <QuartierSelect
-            countryCode={countryCode}
-            value={quartierDepart}
-            onChange={setQuartierDepart}
-            onGpsSelect={(gps) => {
-              if (gps) {
-                setGpsDepart(gps);
-              } else if (!adresseDepart) {
-                setGpsDepart(null);
-              }
-            }}
-            placeholder="Quartier de récupération..."
-            label="Quartier de récupération"
-          />
-
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <p className="text-xs font-semibold text-gray-600 flex items-center gap-1.5">
@@ -377,21 +361,6 @@ export default function AdminCourseForm() {
               </button>
             </AdminAddressAutocomplete>
           </div>
-
-          <QuartierSelect
-            countryCode={countryCode}
-            value={quartierArrivee}
-            onChange={setQuartierArrivee}
-            onGpsSelect={(gps) => {
-              if (gps) {
-                setGpsArrivee(gps);
-              } else if (!adresseArrivee) {
-                setGpsArrivee(null);
-              }
-            }}
-            placeholder="Quartier de livraison..."
-            label="Quartier de livraison"
-          />
 
           {typeCourse !== "deplacement" && (
             <div>
