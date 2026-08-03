@@ -35,7 +35,11 @@ function AppLayoutInner({ reseau }) {
   useEffect(() => {
     const fetchNotifs = async () => {
       try {
-        const data = await base44.entities.Notification.filter({ lue: false });
+        const user = await base44.auth.me();
+        if (!user) { setNotifCount(0); return; }
+        // Filtrer par destinataire_email pour ne compter QUE les notifications
+        // de l'admin connecté (sinon on compte celles de tous les utilisateurs)
+        const data = await base44.entities.Notification.filter({ lue: false, destinataire_email: user.email });
         setNotifCount((data || []).length);
       } catch (_) {}
     };
