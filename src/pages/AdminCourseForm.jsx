@@ -334,7 +334,7 @@ export default function AdminCourseForm() {
                 countryCode={countryCode}
                 placeholder="Ex: Ouaga 2000, face à la mairie"
                 iconColor="text-emerald-500"
-                inputClassName="rounded-xl h-12 pl-10 pr-28 bg-emerald-50/30 border-emerald-100/50 text-sm focus:ring-emerald-300/50 focus:border-emerald-300"
+                inputClassName="rounded-xl h-12 pl-10 pr-28 bg-blue-50 border-blue-200/60 text-sm focus:ring-blue-300/50 focus:border-blue-400"
               >
                 <button
                   type="button"
@@ -372,7 +372,7 @@ export default function AdminCourseForm() {
                 countryCode={countryCode}
                 placeholder="Ex: Gounghin, derrière le marché"
                 iconColor="text-rose-500"
-                inputClassName="rounded-xl h-12 pl-10 pr-28 bg-rose-50/30 border-rose-100/50 text-sm focus:ring-rose-300/50 focus:border-rose-300"
+                inputClassName="rounded-xl h-12 pl-10 pr-28 bg-rose-50 border-rose-200/60 text-sm focus:ring-rose-300/50 focus:border-rose-400"
               >
                 <button
                   type="button"
