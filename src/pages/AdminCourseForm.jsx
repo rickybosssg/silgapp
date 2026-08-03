@@ -421,7 +421,7 @@ export default function AdminCourseForm() {
                 value={clientNom}
                 onChange={e => setClientNom(e.target.value)}
                 placeholder="Nom"
-                className="rounded-xl h-11 bg-sky-50/30 border-sky-100/50 text-sm focus:ring-sky-300/50 focus:border-sky-300"
+                className="rounded-xl h-11 bg-blue-50 border-blue-200/60 text-sm focus:ring-blue-300/50 focus:border-blue-400"
               />
             </div>
             <div>
@@ -430,7 +430,7 @@ export default function AdminCourseForm() {
                 value={clientTelephone}
                 onChange={e => setClientTelephone(e.target.value)}
                 placeholder="+226 XX XX XX XX"
-                className="rounded-xl h-11 bg-sky-50/30 border-sky-100/50 text-sm focus:ring-sky-300/50 focus:border-sky-300"
+                className="rounded-xl h-11 bg-blue-50 border-blue-200/60 text-sm focus:ring-blue-300/50 focus:border-blue-400"
               />
             </div>
           </div>
@@ -464,7 +464,7 @@ export default function AdminCourseForm() {
                   value={destinataireNom}
                   onChange={e => setDestinataireNom(e.target.value)}
                   placeholder="Nom destinataire"
-                  className="rounded-xl h-11 bg-teal-50/30 border-teal-100/50 text-sm focus:ring-teal-300/50 focus:border-teal-300"
+                  className="rounded-xl h-11 bg-rose-50 border-rose-200/60 text-sm focus:ring-rose-300/50 focus:border-rose-400"
                 />
               </div>
               <div>
@@ -473,7 +473,7 @@ export default function AdminCourseForm() {
                   value={destinataireTelephone}
                   onChange={e => setDestinataireTelephone(e.target.value)}
                   placeholder="+226 XX XX XX XX"
-                  className="rounded-xl h-11 bg-teal-50/30 border-teal-100/50 text-sm focus:ring-teal-300/50 focus:border-teal-300"
+                  className="rounded-xl h-11 bg-rose-50 border-rose-200/60 text-sm focus:ring-rose-300/50 focus:border-rose-400"
                 />
               </div>
             </div>
