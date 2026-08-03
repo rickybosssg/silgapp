@@ -28,7 +28,12 @@ export default function Notifications() {
 
   const { data: notificationsRaw = [], isLoading } = useQuery({
     queryKey: ["notifications"],
-    queryFn: () => base44.entities.Notification.list("-created_date", 100),
+    queryFn: async () => {
+      const user = await base44.auth.me();
+      if (!user) return [];
+      // Ne récupérer QUE les notifications adressées à l'admin connecté
+      return base44.entities.Notification.filter({ destinataire_email: user.email }, "-created_date", 100);
+    },
     initialData: [],
   });
 
