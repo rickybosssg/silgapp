@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Outlet } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
+import { playNotificationSound } from "@/hooks/useSonEtVibration";
 import Sidebar from "./Sidebar";
 import MobileNav from "./MobileNav";
 import DemandesLivreursPopup from "@/components/admin/DemandesLivreursPopup";
@@ -31,6 +32,7 @@ function AppLayoutInner({ reseau }) {
   const [paiementCount, setPaiementCount] = useState(0);
   const [messageCount, setMessageCount] = useState(0);
   const [livreursBloquesCount, setLivreursBloquesCount] = useState(0);
+  const prevMessageCountRef = useRef(0);
 
   useEffect(() => {
     const fetchNotifs = async () => {
@@ -100,7 +102,11 @@ function AppLayoutInner({ reseau }) {
           if (!c.admin_last_read_date) return true;
           return new Date(c.last_message_date) > new Date(c.admin_last_read_date);
         });
-        setMessageCount(unread.length);
+        setMessageCount(prev => {
+          const next = unread.length;
+          if (next > prev) playNotificationSound();
+          return next;
+        });
       } catch (_) {}
     };
     fetchMessages();
@@ -135,7 +141,7 @@ function AppLayoutInner({ reseau }) {
 
       {/* Mobile layout */}
       <div className="lg:hidden">
-        <MobileNav notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} neoCount={neoCount} reseau={reseau} />
+        <MobileNav notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} neoCount={neoCount} messageCount={messageCount} reseau={reseau} />
         <main className="pt-[calc(3.5rem+max(env(safe-area-inset-top),28px))] pb-16 min-h-screen bg-slate-50">
           <Outlet />
         </main>
