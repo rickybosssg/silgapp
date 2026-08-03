@@ -35,6 +35,15 @@ const participantBelongsToMe = (participant, myType, myId) => {
   return ids.includes(String(myId));
 };
 
+function getInitials(name) {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+}
+
 function ConversationItem({ conv, myType, myId, active, onClick }) {
   const [otherParticipant, setOtherParticipant] = useState(null);
 
@@ -47,6 +56,8 @@ function ConversationItem({ conv, myType, myId, active, onClick }) {
   }, [conv, myType, myId]);
 
   const roleKey = normalizeParticipantType(otherParticipant?.type) || (conv.group_type === "group" ? "group" : "client");
+  const displayName = conv.title || otherParticipant?.name || "Discussion";
+  const initials = getInitials(displayName);
 
   // Détermine si la conversation est non lue
   const isUnread = useMemo(() => {
@@ -59,54 +70,86 @@ function ConversationItem({ conv, myType, myId, active, onClick }) {
     return false;
   }, [conv.last_message_date, conv.last_sender_type, conv.admin_last_read_date, myType]);
 
+  // Couleurs par rôle
+  const avatarColors = roleKey === "livreur" ? "from-blue-500 to-blue-700" :
+    roleKey === "admin" ? "from-amber-500 to-amber-600" :
+    roleKey === "partenaire" ? "from-purple-500 to-purple-600" :
+    roleKey === "group" ? "from-violet-500 to-violet-600" : "from-emerald-500 to-emerald-600";
+
+  const AvatarIcon = roleKey === "livreur" ? Truck :
+    roleKey === "admin" ? Shield :
+    roleKey === "partenaire" ? Store :
+    roleKey === "group" ? Users : User;
+
   return (
     <button
       onClick={() => onClick(conv)}
       className={cn(
-        "w-full flex items-center gap-3 p-3 rounded-2xl transition-all text-left group",
+        "relative w-full flex items-center gap-3 p-3 rounded-2xl transition-all duration-200 text-left group",
         active
-          ? "bg-primary/10 border border-primary/20 shadow-sm"
+          ? "bg-primary/8 border border-primary/25 shadow-md shadow-primary/5"
           : isUnread
-            ? "bg-red-50/40 border border-red-100 hover:bg-red-50/70 hover:border-red-200"
-            : "hover:bg-gray-50 border border-transparent"
+            ? "bg-red-50/60 border border-red-200/60 hover:bg-red-50 hover:border-red-300 hover:shadow-sm"
+            : "bg-white border border-gray-100 hover:bg-gray-50/80 hover:border-gray-200 hover:shadow-sm"
       )}
     >
+      {/* Avatar avec initiales + icône overlay */}
       <div className="relative flex-shrink-0">
         <div className={cn(
-          "w-11 h-11 rounded-full flex items-center justify-center text-white shadow-sm",
-          roleKey === "livreur" ? "bg-gradient-to-br from-blue-500 to-blue-600" :
-          roleKey === "admin" ? "bg-gradient-to-br from-amber-500 to-amber-600" :
-          roleKey === "partenaire" ? "bg-gradient-to-br from-purple-500 to-purple-600" :
-          roleKey === "group" ? "bg-gradient-to-br from-violet-500 to-violet-600" : "bg-gradient-to-br from-emerald-500 to-emerald-600"
+          "w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-sm bg-gradient-to-br",
+          avatarColors
         )}>
-          {roleKey === "livreur" ? <Truck className="w-4 h-4" /> :
-           roleKey === "admin" ? <Shield className="w-4 h-4" /> :
-           roleKey === "partenaire" ? <Store className="w-4 h-4" /> :
-           roleKey === "group" ? <Users className="w-4 h-4" /> :
-           <User className="w-4 h-4" />}
+          <span className="text-[13px] font-black tracking-tight">{initials}</span>
         </div>
+        {/* Petit badge rôle en bas à droite */}
+        <div className={cn(
+          "absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm bg-gradient-to-br",
+          avatarColors
+        )}>
+          <AvatarIcon className="w-2.5 h-2.5 text-white" />
+        </div>
+        {/* Point rouge non-lu */}
         {isUnread && (
-          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-white animate-pulse" />
+          <span className="absolute -top-1 -left-1 w-4 h-4 rounded-full bg-red-500 border-2 border-white flex items-center justify-center">
+            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+          </span>
         )}
       </div>
+
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
-          <p className={cn("text-sm truncate", isUnread ? "font-extrabold text-gray-900" : "font-semibold text-gray-800")}>
-            {conv.title || otherParticipant?.name || "Discussion"}
+          <p className={cn(
+            "text-sm truncate transition-colors",
+            isUnread ? "font-extrabold text-gray-900" : "font-semibold text-gray-700 group-hover:text-gray-900"
+          )}>
+            {displayName}
           </p>
           {conv.last_message_date && (
-            <span className={cn("text-[10px] flex-shrink-0", isUnread ? "text-red-500 font-bold" : "text-gray-400")}>
+            <span className={cn(
+              "text-[10px] flex-shrink-0 tabular-nums",
+              isUnread ? "text-red-500 font-bold" : "text-gray-400"
+            )}>
               {format(new Date(conv.last_message_date), "HH:mm", { locale: fr })}
             </span>
           )}
         </div>
-        <p className={cn("text-xs truncate mt-0.5", isUnread ? "font-semibold text-gray-600" : "text-gray-400")}>
-          {conv.last_sender_name ? (
-            <><span className="font-medium">{conv.last_sender_name}</span>: </>
-          ) : null}
-          {conv.last_message || "Nouvelle conversation"}
+        <p className={cn(
+          "text-xs truncate mt-0.5 flex items-center gap-1",
+          isUnread ? "font-semibold text-gray-600" : "text-gray-400"
+        )}>
+          {conv.last_sender_name && (
+            <span className={cn("font-semibold", isUnread ? "text-gray-700" : "text-gray-500")}>
+              {conv.last_sender_name}:
+            </span>
+          )}
+          <span className="truncate">{conv.last_message || "Nouvelle conversation"}</span>
         </p>
       </div>
+
+      {/* Barre verticale non-lu */}
+      {isUnread && (
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r-full bg-red-500" />
+      )}
     </button>
   );
 }
@@ -340,25 +383,31 @@ export default function MessagesPage({ myType, myId, myName, onBack, initialConv
   }
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-b from-gray-50 to-white">
+    <div className="flex flex-col h-full bg-gradient-to-b from-slate-50 via-gray-50/50 to-white">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-4 bg-white/80 backdrop-blur-sm border-b border-gray-100">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between px-4 py-3.5 bg-white/90 backdrop-blur-lg border-b border-gray-100 shadow-sm">
+        <div className="flex items-center gap-2.5">
           {onBack && (
-            <button onClick={onBack} className="text-gray-500 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+            <button onClick={onBack} className="text-gray-400 hover:text-gray-700 p-1.5 rounded-xl hover:bg-gray-100 transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </button>
           )}
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
-              <MessageCircle className="w-4 h-4 text-white" />
+          <div className="flex items-center gap-2.5">
+            <div className="relative w-9 h-9 rounded-2xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-md shadow-red-200/50">
+              <MessageCircle className="w-4.5 h-4.5 text-white" />
+              <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-400 border-2 border-white" />
             </div>
-            <h2 className="text-lg font-extrabold text-gray-900">Messages</h2>
+            <div>
+              <h2 className="text-base font-black text-gray-900 leading-tight tracking-tight">Messages</h2>
+              <p className="text-[10px] text-gray-400 font-medium leading-tight">
+                {conversations.length} conversation{conversations.length > 1 ? "s" : ""}
+              </p>
+            </div>
           </div>
         </div>
         <Button
           size="sm"
-          className="rounded-full gap-1.5 h-8 text-xs shadow-sm"
+          className="rounded-full gap-1.5 h-9 px-3.5 text-xs shadow-md shadow-red-200/40 font-bold"
           onClick={() => setShowNewConv(true)}
         >
           <UserPlus className="w-3.5 h-3.5" />
@@ -367,22 +416,27 @@ export default function MessagesPage({ myType, myId, myName, onBack, initialConv
       </div>
 
       {/* Conversations list */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
         {loading && (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center">
+              <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+            </div>
+            <p className="text-xs text-gray-400 font-medium">Chargement des conversations...</p>
           </div>
         )}
         {!loading && conversations.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 text-center px-8">
-            <MessageCircle className="w-12 h-12 text-gray-300 mb-4" />
-            <p className="text-sm font-semibold text-gray-500 mb-2">Aucune conversation</p>
-            <p className="text-xs text-gray-400 mb-4">
+          <div className="flex flex-col items-center justify-center py-16 text-center px-8">
+            <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center mb-4 shadow-sm">
+              <MessageCircle className="w-8 h-8 text-gray-300" />
+            </div>
+            <p className="text-sm font-bold text-gray-600 mb-1">Aucune conversation</p>
+            <p className="text-xs text-gray-400 mb-5">
               Discutez avec les livreurs et clients SILGAPP
             </p>
             <Button
               size="sm"
-              className="rounded-full gap-1.5"
+              className="rounded-full gap-1.5 shadow-md"
               onClick={() => setShowNewConv(true)}
             >
               <UserPlus className="w-3.5 h-3.5" />
