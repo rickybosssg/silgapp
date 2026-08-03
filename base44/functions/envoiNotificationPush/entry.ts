@@ -409,7 +409,7 @@ Deno.serve(async (req) => {
       course_id: String(course_id || ''),
       notification_id: String(notification.id),
       click_action: ANDROID_CLICK_ACTION,
-      alert_duration_seconds: String(alert_duration_seconds || 60),
+      alert_duration_seconds: String(alert_duration_seconds || 300),
       alert_interval_seconds: String(alert_interval_seconds || 5),
     };
 

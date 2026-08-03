@@ -17,7 +17,7 @@ export async function chargerConfigDispatch(base44) {
     const nbConfig = configs.find((c: any) => c.cle === 'DISPATCH_NB_LIVREURS');
     const timeoutConfig = configs.find((c: any) => c.cle === 'DISPATCH_TIMEOUT_SEC');
     const nb = nbConfig ? (nbConfig.valeur === 'tous' ? 999 : parseInt(nbConfig.valeur, 10) || 3) : 3;
-    const timeout = timeoutConfig ? (parseInt(timeoutConfig.valeur, 10) || 60) : 60;
+    const timeout = timeoutConfig ? (parseInt(timeoutConfig.valeur, 10) || 300) : 300;
     const result = { nb, timeout };
     CONFIG_CACHE.dispatch = result;
     CONFIG_CACHE.expires = Date.now() + CONFIG_TTL_MS;
@@ -61,9 +61,9 @@ export async function chargerConfigVaguesGPS(base44) {
       return {
         gps_waves_enabled: true,
         waves: [
-          { size: 3, timeout_sec: 60 },
-          { size: 5, timeout_sec: 60 },
-          { size: 999, timeout_sec: 60 },
+          { size: 3, timeout_sec: 300 },
+          { size: 5, timeout_sec: 300 },
+          { size: 999, timeout_sec: 300 },
         ],
       };
     }
@@ -71,9 +71,9 @@ export async function chargerConfigVaguesGPS(base44) {
     const result = {
       gps_waves_enabled: cfg.gps_waves_enabled !== false,
       waves: waves.length > 0 ? waves : [
-        { size: 3, timeout_sec: 60 },
-        { size: 5, timeout_sec: 60 },
-        { size: 999, timeout_sec: 60 },
+        { size: 3, timeout_sec: 300 },
+        { size: 5, timeout_sec: 300 },
+        { size: 999, timeout_sec: 300 },
       ],
     };
     CONFIG_CACHE.gps = result;
@@ -84,9 +84,9 @@ export async function chargerConfigVaguesGPS(base44) {
     return {
       gps_waves_enabled: true,
       waves: [
-        { size: 3, timeout_sec: 60 },
-        { size: 5, timeout_sec: 60 },
-        { size: 999, timeout_sec: 60 },
+        { size: 3, timeout_sec: 300 },
+        { size: 5, timeout_sec: 300 },
+        { size: 999, timeout_sec: 300 },
       ],
     };
   }

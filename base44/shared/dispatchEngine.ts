@@ -209,6 +209,7 @@ export async function notifierLivreur(base44, courseId, course, livreur, timeout
   base44.functions.invoke('envoiNotificationPush', {
     destinataire_email: livreurEmail, livreur_id: livreurId,
     titre, message, type: 'nouvelle_course', course_id: courseId,
+    alert_duration_seconds: timeoutSec, alert_interval_seconds: 5,
   }).catch(err => console.error('[DISPATCH] ❌ Push Firebase:', err.message));
 
   if (!appActive && livreurTel) {

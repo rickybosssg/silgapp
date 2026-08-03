@@ -79,7 +79,7 @@ export default function CourseEnAttenteModal({
   useVibration(true);
   const [showRaison, setShowRaison] = useState(false);
   const [raison, setRaison] = useState("");
-  const [tempsRestant, setTempsRestant] = useState(90);
+  const [tempsRestant, setTempsRestant] = useState(300);
   const [courseDejaPrise, setCourseDejaPrise] = useState(false);
   const [courseExpiree, setCourseExpiree] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -289,27 +289,14 @@ export default function CourseEnAttenteModal({
           </div>
         </div>
 
-        {/* Barre de progression timer */}
+        {/* Barre de progression (sans timer affiché) */}
         <div className="bg-gray-100 h-2 relative">
           <div
             className={`h-full transition-all duration-1000 ${
-              tempsRestant <= 10 ? 'bg-red-500' : tempsRestant <= 30 ? 'bg-amber-500' : 'bg-green-500'
+              tempsRestant <= 30 ? 'bg-red-500' : tempsRestant <= 60 ? 'bg-amber-500' : 'bg-green-500'
             }`}
-            style={{ width: `${(tempsRestant / 90) * 100}%` }}
+            style={{ width: `${(tempsRestant / 300) * 100}%` }}
           />
-        </div>
-
-        {/* Timer */}
-        <div className="px-5 py-2 bg-gray-50 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Clock className={`w-4 h-4 ${tempsRestant <= 10 ? 'text-red-500 animate-pulse' : 'text-gray-400'}`} />
-            <span className={`text-sm font-bold ${tempsRestant <= 10 ? 'text-red-500' : 'text-gray-600'}`}>
-              {tempsRestant}s restantes
-            </span>
-          </div>
-          <span className="text-xs text-gray-400">
-            {tempsRestant <= 10 ? ' Dépêchez-vous !' : tempsRestant <= 30 ? '⏰ Temps limité' : '⏱ 90s pour accepter'}
-          </span>
         </div>
 
         <div className="p-5 space-y-4">
