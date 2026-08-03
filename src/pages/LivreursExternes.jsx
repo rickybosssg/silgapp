@@ -600,6 +600,10 @@ export default function LivreursExternes() {
             const enMission = isEnCourse(livreur);
             const appActive = isAppActive(livreur);
             const encoursReel = livreur.encours || 0;
+            const coursesLivreur = coursesAll.filter(c => c.livreur_id === livreur.id);
+            const kmParcourus = coursesLivreur
+              .filter(c => c.statut === "livree")
+              .reduce((sum, c) => sum + (c.distance_reelle_km || 0), 0);
 
             return (
               <div
@@ -679,6 +683,11 @@ export default function LivreursExternes() {
                     {livreur.code_identification && (
                       <span className="text-[10px] font-mono font-semibold text-gray-500 bg-gray-100 rounded-full px-2 py-0.5">
                         #{livreur.code_identification}
+                      </span>
+                    )}
+                    {kmParcourus > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-cyan-700 bg-cyan-100 rounded-full px-2 py-0.5">
+                        <MapPin className="w-2.5 h-2.5" />{kmParcourus.toFixed(1)} km
                       </span>
                     )}
                   </div>
