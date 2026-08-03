@@ -30,6 +30,11 @@ function CourseItem({ course, onView }) {
         {(course.prix_reel || course.prix) > 0 && (
           <span className="text-xs font-bold text-green-700">{(course.prix_reel || course.prix).toLocaleString()} F</span>
         )}
+        {course.distance_reelle_km ? (
+          <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-cyan-700 bg-cyan-50 rounded-full px-1.5 py-0.5">
+            <MapPin className="w-2.5 h-2.5" />{Number(course.distance_reelle_km).toFixed(1)} km
+          </span>
+        ) : null}
         <span className="text-[10px] text-muted-foreground">
           {format(new Date(course.heure_livraison || course.created_date), "HH:mm")}
         </span>
