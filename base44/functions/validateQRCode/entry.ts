@@ -161,7 +161,17 @@ Deno.serve(async (req) => {
       // Le prix est saisi par le livreur dans l'app après scan/PIN livraison.
       // Ne PAS mettre le livreur disponible — il doit d'abord saisir le montant.
       if (course.pricing_mode === "admin_manuel" || course.source === "admin") {
-        await base44.asServiceRole.entities.CourseExterne.update(course_id, {
+        // ── Calculer la distance réelle pour les courses admin aussi ──
+        const latRecupAdmin = course.latitude_recuperation;
+        const lngRecupAdmin = course.longitude_recuperation;
+        let distAdmin = null;
+        if (latRecupAdmin && lngRecupAdmin && latitude && longitude) {
+          distAdmin = haversine(latRecupAdmin, lngRecupAdmin, latitude, longitude);
+        } else if (course.gps_depart_lat && course.gps_depart_lng && course.gps_arrivee_lat && course.gps_arrivee_lng) {
+          distAdmin = haversine(course.gps_depart_lat, course.gps_depart_lng, course.gps_arrivee_lat, course.gps_arrivee_lng);
+        }
+
+        const adminUpdateData = {
           statut: 'livree',
           heure_livraison: now,
           latitude_livraison: latitude || null,
@@ -172,7 +182,12 @@ Deno.serve(async (req) => {
           longitude_arrivee_livraison: longitude || null,
           colis_livre_at: now,
           // PRIX NON CALCULÉ — saisi par le livreur côté app
-        });
+        };
+        if (distAdmin != null) {
+          adminUpdateData.distance_reelle_km = Math.max(Number(distAdmin) || 0, 0.01);
+        }
+
+        await base44.asServiceRole.entities.CourseExterne.update(course_id, adminUpdateData);
 
         return Response.json({
           success: true,
@@ -182,6 +197,7 @@ Deno.serve(async (req) => {
             heure_livraison: now,
             latitude_livraison: latitude || null,
             longitude_livraison: longitude || null,
+            distance_reelle_km: adminUpdateData.distance_reelle_km || null,
           },
         });
       }
@@ -299,7 +315,11 @@ Deno.serve(async (req) => {
         updateData.prix_final = PRIX_MINIMUM_GLOBAL;
         updateData.commission_silga = Math.round(PRIX_MINIMUM_GLOBAL * (commissionPct / 100));
         updateData.montant_livreur = PRIX_MINIMUM_GLOBAL - updateData.commission_silga;
-        if (distReelle != null) updateData.distance_reelle_km = Math.max(Number(distReelle) || 0, 0.01);
+        if (distReelle != null) {
+          updateData.distance_reelle_km = Math.max(Number(distReelle) || 0, 0.01);
+        } else if (latDepart && lngDepart && latArrivee && lngArrivee) {
+          updateData.distance_reelle_km = Math.max(Number(haversine(latDepart, lngDepart, latArrivee, lngArrivee)) || 0, 0.01);
+        }
       }
 
       await base44.asServiceRole.entities.CourseExterne.update(course_id, updateData);

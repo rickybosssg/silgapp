@@ -1146,6 +1146,19 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
         return;
       }
 
+      // ── Calculer la distance réelle si manquante ──
+      const distUpdate = {};
+      if (!course.distance_reelle_km || course.distance_reelle_km === 0) {
+        const lat1 = course.latitude_recuperation ?? course.gps_depart_lat;
+        const lng1 = course.longitude_recuperation ?? course.gps_depart_lng;
+        const lat2 = course.latitude_livraison ?? course.latitude_arrivee_livraison ?? course.gps_arrivee_lat;
+        const lng2 = course.longitude_livraison ?? course.longitude_arrivee_livraison ?? course.gps_arrivee_lng;
+        if (lat1 && lng1 && lat2 && lng2) {
+          const dist = calculerDistance(lat1, lng1, lat2, lng2);
+          if (dist && dist > 0) distUpdate.distance_reelle_km = Number(dist.toFixed(2));
+        }
+      }
+
       await updateCourseMutation.mutateAsync({
         id: course.id,
         data: {
@@ -1154,6 +1167,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
           prix_final: montantSaisi,
           commission_silga: split.commission_silga,
           montant_livreur: split.montant_livreur,
+          ...distUpdate,
         },
       });
       await verifierEncoursApresCourse(course.id);
