@@ -26,7 +26,13 @@ Deno.serve(async (req) => {
 
     if (!course_id) return Response.json({ error: 'course_id requis' }, { status: 400 });
 
-    const course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+    let course;
+    try {
+      course = await base44.asServiceRole.entities.CourseExterne.get(course_id);
+    } catch (_) {
+      // get() lance une erreur si l'enregistrement n'existe pas → retourner 404, pas 500
+      return Response.json({ error: 'Course non trouvée' }, { status: 404 });
+    }
     if (!course) return Response.json({ error: 'Course non trouvée' }, { status: 404 });
 
     // ── Génération manuelle (legacy / admin) ────────────────────────────────

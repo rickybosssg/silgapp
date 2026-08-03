@@ -41,13 +41,20 @@ export default function CarteLivreurClient({ livreurLat, livreurLng, livreurNom,
   useEffect(() => {
     if (!mapLoaded || !livreurLat || !livreurLng) return;
 
-    const container = document.getElementById(`client-map-${livreurLat}`);
+    const container = document.getElementById('client-map-container');
     if (!container) return;
 
     const L = window.L;
     if (!L) return;
 
+    // Détruire l'ancienne carte si elle existe (évite le flicker sur Android)
+    if (container._leaflet_map) {
+      container._leaflet_map.remove();
+      container._leaflet_map = null;
+    }
+
     const map = L.map(container, { zoomControl: false, attributionControl: true }).setView([livreurLat, livreurLng], 14);
+    container._leaflet_map = map;
     L.control.zoom({ position: 'topleft' }).addTo(map);
     L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
       attribution: '&copy; OpenStreetMap',
@@ -101,7 +108,10 @@ export default function CarteLivreurClient({ livreurLat, livreurLng, livreurNom,
     if (arriveeLat && arriveeLng) bounds.push([arriveeLat, arriveeLng]);
     if (bounds.length > 1) map.fitBounds(bounds, { padding: [30, 30] });
 
-    return () => { map.remove(); };
+    return () => {
+      map.remove();
+      if (container._leaflet_map) container._leaflet_map = null;
+    };
   }, [mapLoaded, livreurLat, livreurLng]);
 
   if (!livreurLat || !livreurLng) return null;
@@ -122,7 +132,7 @@ export default function CarteLivreurClient({ livreurLat, livreurLng, livreurNom,
           LIVE
         </span>
       </div>
-      <div id={`client-map-${livreurLat}`} className="h-56 w-full bg-slate-100 rounded-b-2xl overflow-hidden">
+      <div id="client-map-container" className="h-56 w-full bg-slate-100 rounded-b-2xl overflow-hidden">
         {!mapLoaded && (
           <div className="h-full flex items-center justify-center">
             <Loader2 className="w-6 h-6 animate-spin text-gray-400" />

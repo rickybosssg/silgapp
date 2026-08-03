@@ -117,9 +117,43 @@ Deno.serve(async (req) => {
     // panne transitoire d'ORS n'empoisonne le cache pendant 10 minutes.
     if (results.length > 0) {
       geocodeCache.set(cacheKey, { results, timestamp: now });
+      return Response.json({ results });
     }
 
-    return Response.json({ results });
+    // ── Fallback : rechercher dans la base Quartiers si ORS ne retourne rien ──
+    // (ex: "Ouaga 2000" n'est pas reconnu par ORS mais existe en base)
+    try {
+      const quartiers = await base44.asServiceRole.entities.Quartier.filter({
+        country_code: country_code || undefined,
+        actif: true,
+      }, "nom", 500);
+
+      const q = query.trim().toLowerCase();
+      const matchingQuartiers = (quartiers || []).filter((qu: any) =>
+        qu.nom?.toLowerCase().includes(q)
+      ).slice(0, 5);
+
+      const fallbackResults = matchingQuartiers.map((qu: any) => ({
+        name: qu.nom,
+        label: qu.nom,
+        quartier: qu.nom,
+        ville: qu.ville || '',
+        pays: country_code || '',
+        latitude: qu.latitude,
+        longitude: qu.longitude,
+        distance: (focus_lat && focus_lng && qu.latitude && qu.longitude)
+          ? Number(haversineKm(focus_lat, focus_lng, qu.latitude, qu.longitude).toFixed(1))
+          : null,
+      }));
+
+      if (fallbackResults.length > 0) {
+        geocodeCache.set(cacheKey, { results: fallbackResults, timestamp: now });
+      }
+
+      return Response.json({ results: fallbackResults, fallback: true });
+    } catch (_) {
+      return Response.json({ results: [] });
+    }
   } catch (error) {
     if (error.name === 'AbortError') {
       return Response.json({ results: [], error: "Timeout ORS (6s)" });

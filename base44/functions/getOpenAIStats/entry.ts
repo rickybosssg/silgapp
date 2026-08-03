@@ -136,6 +136,10 @@ Deno.serve(async (req) => {
       erreur_detail: m.erreur_detail || '',
     }));
 
+    // Calculer les agrégats une seule fois (évite les appels multiples)
+    const todayAgg = aggregate(todayRecords);
+    const monthAgg = aggregate(monthRecords);
+
     return Response.json({
       current_model,
       openai_enabled,
@@ -143,13 +147,13 @@ Deno.serve(async (req) => {
       budget: {
         daily_budget,
         monthly_budget,
-        today_cost: aggregate(todayRecords).cost_usd,
-        month_cost: aggregate(monthRecords).cost_usd,
-        daily_pct: daily_budget > 0 ? Math.round((aggregate(todayRecords).cost_usd / daily_budget) * 100) : 0,
-        monthly_pct: monthly_budget > 0 ? Math.round((aggregate(monthRecords).cost_usd / monthly_budget) * 100) : 0,
+        today_cost: todayAgg.cost_usd,
+        month_cost: monthAgg.cost_usd,
+        daily_pct: daily_budget > 0 ? Math.round((todayAgg.cost_usd / daily_budget) * 100) : 0,
+        monthly_pct: monthly_budget > 0 ? Math.round((monthAgg.cost_usd / monthly_budget) * 100) : 0,
       },
-      today: aggregate(todayRecords),
-      month: aggregate(monthRecords),
+      today: todayAgg,
+      month: monthAgg,
       recent_errors: recentErrors,
       message_stats_today,
       message_stats_recent,

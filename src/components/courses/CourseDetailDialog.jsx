@@ -207,8 +207,8 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
               </span>
             )}
             <CourseStatusBadge statut={course.statut} />
-            {course.urgence && <UrgenceBadge urgence={course.urgence} />}
-            {course.prix && <span className="text-sm font-bold">{course.prix.toLocaleString()} FCFA</span>}
+            {course.priority && course.priority !== "normal" && <UrgenceBadge urgence={course.priority} />}
+            {course.prix_final && <span className="text-sm font-bold">{course.prix_final.toLocaleString()} FCFA</span>}
             {course.delivery_confirmed_by === 'pin_secours' && (
               <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">🔑 PIN secours</span>
             )}
@@ -290,47 +290,46 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
           </div>
 
           {/* GPS tracking info */}
-          {(course.distance_km || course.duree_livraison_minutes || course.colis_recupere_at) && (
+          {(course.distance_reelle_km || course.colis_recupere_at) && (
             <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 space-y-3">
               <div className="flex items-center gap-2 mb-2">
                 <Navigation className="w-4 h-4 text-blue-600" />
                 <p className="text-xs font-bold text-blue-700 uppercase">Suivi GPS</p>
               </div>
               
-              {course.distance_km && (
+              {course.distance_reelle_km && (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <MapPin className="w-3 h-3 text-blue-600" />
                     <span className="text-xs text-blue-600 font-semibold">Distance</span>
                   </div>
-                  <span className="text-sm font-black text-blue-700">{course.distance_km.toFixed(2)} km</span>
-                  {course.gps_distance_type && (
-                    <span className="text-[10px] text-blue-400 uppercase font-bold">({course.gps_distance_type})</span>
-                  )}
+                  <span className="text-sm font-black text-blue-700">{course.distance_reelle_km.toFixed(2)} km</span>
                 </div>
               )}
 
-              {course.duree_livraison_minutes && (
+              {course.heure_recuperation && course.heure_livraison && (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Clock className="w-3 h-3 text-purple-600" />
                     <span className="text-xs text-purple-600 font-semibold">Durée</span>
                   </div>
-                  <span className="text-sm font-black text-purple-700">{course.duree_livraison_minutes} min</span>
+                  <span className="text-sm font-black text-purple-700">
+                    {Math.round((new Date(course.heure_livraison).getTime() - new Date(course.heure_recuperation).getTime()) / 60000)} min
+                  </span>
                 </div>
               )}
 
-              {(course.latitude_depart_livraison || course.colis_recupere_at) && (
+              {(course.latitude_recuperation || course.colis_recupere_at) && (
                 <div className="pt-2 border-t border-blue-200">
                   <p className="text-[10px] text-blue-400 font-semibold uppercase mb-1">Départ livraison</p>
-                  {course.latitude_depart_livraison && (
+                  {course.latitude_recuperation && (
                     <p className="text-xs font-medium text-blue-700">
-                      {course.latitude_depart_livraison.toFixed(6)}, {course.longitude_depart_livraison?.toFixed(6)}
+                      {course.latitude_recuperation.toFixed(6)}, {course.longitude_recuperation?.toFixed(6)}
                     </p>
                   )}
-                  {course.colis_recupere_at && (
+                  {course.heure_recuperation && (
                     <p className="text-[10px] text-blue-400 mt-0.5">
-                      {format(new Date(course.colis_recupere_at), "HH:mm:ss")}
+                      {format(new Date(course.heure_recuperation), "HH:mm:ss")}
                     </p>
                   )}
                 </div>
