@@ -56,10 +56,7 @@ export default function PayerSilgapp({ userType: forcedType }) {
           const commImpayees = (livrees || [])
             .filter(c => c.statut_paiement_livreur !== "paye")
             .reduce((s, c) => s + (c.commission_silga ?? 0), 0);
-          // VRAIE DETTE = commissions impayées des courses livrées.
-          // montant_du_silga n'est qu'un snapshot potentiellement stale —
-          // on ne l'utilise QUE pour les vieille dettes migrées (sans course livrée).
-          setMontantDu((livrees?.length || 0) > 0 ? commImpayees : (livreurs[0].montant_du_silga || 0));
+          setMontantDu(commImpayees);
           return;
         }
 
@@ -119,7 +116,7 @@ export default function PayerSilgapp({ userType: forcedType }) {
           const commImpayees = (livrees || [])
             .filter(c => c.statut_paiement_livreur !== "paye")
             .reduce((s, c) => s + (c.commission_silga ?? 0), 0);
-          if (l?.[0]) setMontantDu((livrees?.length || 0) > 0 ? commImpayees : (l[0].montant_du_silga || 0));
+          if (l?.[0]) setMontantDu(commImpayees);
         } else if (userType === "client") {
           const frais = await base44.entities.FraisAnnulation.filter({ client_id: userInfo.id });
           const impaye = (frais || []).filter((f) => f.statut_paiement !== "paye").reduce((s, f) => s + (f.montant || 0), 0);

@@ -32,6 +32,8 @@ function AppLayoutInner({ reseau }) {
   const [paiementCount, setPaiementCount] = useState(0);
   const [messageCount, setMessageCount] = useState(0);
   const [livreursBloquesCount, setLivreursBloquesCount] = useState(0);
+  const [whatsappMessageCount, setWhatsappMessageCount] = useState(0);
+  const prevWhatsappCountRef = useRef(0);
   const prevMessageCountRef = useRef(0);
 
   useEffect(() => {
@@ -116,12 +118,30 @@ function AppLayoutInner({ reseau }) {
       } catch (_) {}
     };
     fetchMessages();
+    const fetchWhatsAppMessages = async () => {
+      try {
+        const all = await base44.entities.Conversation.list("-last_message_date", 200);
+        const waConvs = (all || []).filter(c => c.source === "whatsapp");
+        const unread = waConvs.filter(c => {
+          if (c.last_sender_type === "admin") return false;
+          if (!c.last_message_date) return false;
+          if (!c.admin_last_read_date) return true;
+          return new Date(c.last_message_date) > new Date(c.admin_last_read_date);
+        });
+        setWhatsappMessageCount(prev => {
+          const next = unread.length;
+          if (next > prev) playNotificationSound();
+          return next;
+        });
+      } catch (_) {}
+    };
+    fetchWhatsAppMessages();
     // Subscription temps réel sur les conversations et messages
-    const unsubConv = base44.entities.Conversation.subscribe(() => { fetchMessages(); });
+    const unsubConv = base44.entities.Conversation.subscribe(() => { fetchMessages(); fetchWhatsAppMessages(); });
     const unsubMsg = base44.entities.Message.subscribe((event) => {
-      if (event.type === "create") fetchMessages();
+      if (event.type === "create") { fetchMessages(); fetchWhatsAppMessages(); }
     });
-    const iv = setInterval(() => { fetchNotifs(); fetchDemandes(); fetchPartenaireDemandes(); fetchNeoCount(); fetchPaiements(); fetchLivreursBloques(); fetchMessages(); }, 30000);
+    const iv = setInterval(() => { fetchNotifs(); fetchDemandes(); fetchPartenaireDemandes(); fetchNeoCount(); fetchPaiements(); fetchLivreursBloques(); fetchMessages(); fetchWhatsAppMessages(); }, 30000);
     return () => { clearInterval(iv); unsubConv?.(); unsubMsg?.(); };
   }, []);
 
@@ -139,7 +159,7 @@ function AppLayoutInner({ reseau }) {
       <CourseWindowStack />
 
       <div className="hidden lg:flex min-h-screen">
-        <Sidebar notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} neoCount={neoCount} paiementCount={paiementCount} messageCount={messageCount} livreursBloquesCount={livreursBloquesCount} reseau={reseau} />
+        <Sidebar notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} neoCount={neoCount} paiementCount={paiementCount} messageCount={messageCount} livreursBloquesCount={livreursBloquesCount} whatsappMessageCount={whatsappMessageCount} reseau={reseau} />
         <main className={`flex-1 min-h-screen overflow-x-hidden bg-slate-50 transition-all ${hasWindows ? "lg:mr-96" : ""}`}>
           <Outlet />
         </main>

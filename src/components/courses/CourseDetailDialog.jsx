@@ -16,9 +16,10 @@ import ChatWindow from "@/components/chat/ChatWindow";
 import { UserPlus } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { genererReferenceCourse } from "@/lib/courseReference";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAdminContext } from "@/hooks/useAdminContext.js";
+import { MessageSquareWarning } from "lucide-react";
 
 const STATUTS_INTERNE = [
   "nouvelle", "en_attente_livreur", "acceptee", "en_route_recuperation",
@@ -47,6 +48,17 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
   React.useEffect(() => {
     base44.auth.me().then(u => setAdminEmail(u?.email || "")).catch(() => {});
   }, []);
+
+  // Récupérer la raison d'annulation du livreur si la course a été annulée par un livreur
+  const { data: annulationLivreur } = useQuery({
+    queryKey: ["annulationLivreur", course?.id],
+    queryFn: async () => {
+      if (!course?.id) return null;
+      const results = await base44.entities.AnnulationLivreur.filter({ course_id: course.id });
+      return results?.[0] || null;
+    },
+    enabled: !!course?.id && reseau === "externe" && course?.statut === "annulee",
+  });
 
   React.useEffect(() => {
     setNewStatut(course?.statut || "");
@@ -385,6 +397,27 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
                   <span className="text-xl font-black text-green-800 tracking-widest">{course.delivery_code_4_digits}</span>
                   <Copy className="w-3 h-3 text-green-400" />
                 </button>
+              )}
+            </div>
+          )}
+
+          {/* Raison d'annulation du livreur */}
+          {annulationLivreur && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1">
+              <p className="text-xs font-bold text-red-700 flex items-center gap-1.5 uppercase">
+                <MessageSquareWarning className="w-3.5 h-3.5" />
+                Raison de l'annulation — {annulationLivreur.livreur_nom || "Livreur"}
+              </p>
+              <p className="text-sm text-red-800 font-medium capitalize">
+                {annulationLivreur.motif?.replace(/_/g, " ") || "Non précisé"}
+              </p>
+              {annulationLivreur.motif_detail && (
+                <p className="text-sm text-red-600 italic">« {annulationLivreur.motif_detail} »</p>
+              )}
+              {annulationLivreur.date_annulation && (
+                <p className="text-[10px] text-red-400">
+                  {format(new Date(annulationLivreur.date_annulation), "dd/MM/yyyy à HH:mm", { locale: fr })}
+                </p>
               )}
             </div>
           )}

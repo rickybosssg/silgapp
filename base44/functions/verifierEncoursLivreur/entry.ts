@@ -99,12 +99,19 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, skipped: true, reason: 'commission_nulle' });
     }
 
-    // Accumuler l'encours
-    const encoursAvant = livreur.encours || 0;
-    const nouvelEncours = encoursAvant + commission;
+    // ── Recalculer l'encours RÉEL depuis les courses livrées non payées ──
+    //    Au lieu d'accumuler dans un snapshot qui peut se désynchroniser,
+    //    on recalcule à chaque fois la somme des commissions impayées.
+    const livrees = await base44.asServiceRole.entities.CourseExterne.filter({
+      livreur_id: livreurId, statut: 'livree',
+    });
+    const encoursAvant = livrees
+      .filter(c => c.statut_paiement_livreur !== 'paye')
+      .reduce((s, c) => s + (c.commission_silga || 0), 0);
+    const nouvelEncours = encoursAvant; // déjà inclut la commission de cette course
 
     // Pourcentage du seuil atteint
-    const pourcentage = Math.round((nouvelEncours / seuil) * 100);
+    const pourcentage = seuil > 0 ? Math.round((nouvelEncours / seuil) * 100) : 0;
 
     console.log(`[ENCOURS] Livreur ${livreurId} (${livreur.nom}): ${nouvelEncours} (${pourcentage}% du seuil ${seuil} ${devise})`);
 
@@ -397,19 +404,49 @@ async function handleGetBloques(base44, body) {
     };
   }
 
-  const enriched = bloques.map(l => ({
-    id: l.id,
-    nom: `${l.prenom || ''} ${l.nom || ''}`.trim(),
-    telephone: l.telephone,
-    country_code: l.country_code,
-    encours: l.encours || 0,
-    seuil: seuilsParPays[l.country_code]?.seuil || 5000,
-    devise: seuilsParPays[l.country_code]?.devise || 'FCFA',
-    bloque_at: l.encours_bloque_at,
-    pourcentage: seuilsParPays[l.country_code]
-      ? Math.round(((l.encours || 0) / (seuilsParPays[l.country_code].seuil || 1)) * 100)
-      : 0,
-  }));
+  // ── Recalculer l'encours RÉEL pour chaque livreur bloqué ──
+  //    Si la dette réelle est sous le seuil, débloquer automatiquement
+  const enriched = [];
+  const now = new Date().toISOString();
+  for (const l of bloques) {
+    const seuil = seuilsParPays[l.country_code]?.seuil || 5000;
+    const devise = seuilsParPays[l.country_code]?.devise || 'FCFA';
+
+    // Recalculer depuis les courses livrées non payées
+    const livrees = await base44.asServiceRole.entities.CourseExterne.filter({
+      livreur_id: l.id, statut: 'livree',
+    });
+    const encoursReel = livrees
+      .filter(c => c.statut_paiement_livreur !== 'paye')
+      .reduce((s, c) => s + (c.commission_silga || 0), 0);
+
+    // Auto-déblocage si la dette réelle est sous le seuil
+    if (encoursReel < seuil) {
+      await base44.asServiceRole.entities.Livreur.update(l.id, {
+        encours: encoursReel,
+        montant_du_silga: encoursReel,
+        bloque_encours: false,
+        encours_bloque_at: null,
+        admin_hors_ligne: false,
+        admin_statut_log: 'Auto-déblocage — encours réel recalculé sous le seuil',
+        statut: 'hors_ligne',
+      });
+      console.log(`[ENCOURS] AUTO-DEBLOCAGE: ${l.id} — encours réel ${encoursReel} < seuil ${seuil}`);
+      continue; // ne pas afficher dans la liste des bloqués
+    }
+
+    enriched.push({
+      id: l.id,
+      nom: `${l.prenom || ''} ${l.nom || ''}`.trim(),
+      telephone: l.telephone,
+      country_code: l.country_code,
+      encours: encoursReel,
+      seuil,
+      devise,
+      bloque_at: l.encours_bloque_at,
+      pourcentage: seuil > 0 ? Math.round((encoursReel / seuil) * 100) : 0,
+    });
+  }
 
   return Response.json({ success: true, bloques: enriched });
 }

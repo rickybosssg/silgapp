@@ -820,16 +820,15 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
   // ── Montant total dû (source de vérité) ───────────────────────────────────
   // Calculé à partir des commissions impayées des courses livrées (même logique
-  // que la page admin "Dû Utilisateur"), plutôt que le champ dénormalisé
-  // montant_du_silga qui peut être stale. On retient le max des deux pour ne
-  // jamais sous-estimer une dette si des courses anciennes ne sont pas chargées.
-  const totalDuReel = useMemo(() =>
+  // que la page admin "Dû Utilisateur"). mesCourses contient déjà toutes les
+  // courses du livreur (via getAllCoursesForLivreur), donc pas besoin de fallback
+  // sur le snapshot montant_du_silga qui peut être stale.
+  const montantDuSilga = useMemo(() =>
     mesCourses
       .filter(c => c.statut === "livree" && c.statut_paiement_livreur !== "paye" && sameLivreurId(c.livreur_id, livreurProfil?.id))
       .reduce((s, c) => s + (c.commission_silga ?? 0), 0),
     [mesCourses, livreurProfil?.id]
   );
-  const montantDuSilga = Math.max(totalDuReel, livreurProfil?.montant_du_silga ?? 0);
 
   // ─── isEnLigne ────────────────────────────────────────────────────────────
   const isEnLigne = livreurProfil ? livreurProfil.statut !== "hors_ligne" : false;
