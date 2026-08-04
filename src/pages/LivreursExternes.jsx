@@ -59,7 +59,11 @@ function ProfilLivreurModal({ livreur, courses, onClose, onAction }) {
   const coursesActives = courses.filter(c => !["livree", "annulee"].includes(c.statut));
   const montantTotal = coursesLivrees.reduce((s, c) => s + (c.prix_final || 0), 0);
   const montantDu = livreur.montant_du_silga || 0;
-  const encoursReel = livreur.encours || 0;
+  // ── Encours RÉEL = somme des commissions impayées des courses livrées
+  //    (même logique que la page "Dû Utilisateur" et PayerSilgapp)
+  const encoursReel = coursesLivrees
+    .filter(c => c.statut_paiement_livreur !== "paye")
+    .reduce((s, c) => s + (c.commission_silga || 0), 0);
   const resteAPayerSilga = Math.max(0, encoursReel);
 
   return (

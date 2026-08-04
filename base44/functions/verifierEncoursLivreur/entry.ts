@@ -99,12 +99,19 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, skipped: true, reason: 'commission_nulle' });
     }
 
-    // Accumuler l'encours
-    const encoursAvant = livreur.encours || 0;
-    const nouvelEncours = encoursAvant + commission;
+    // ── Recalculer l'encours RÉEL depuis les courses livrées non payées ──
+    //    Au lieu d'accumuler dans un snapshot qui peut se désynchroniser,
+    //    on recalcule à chaque fois la somme des commissions impayées.
+    const livrees = await base44.asServiceRole.entities.CourseExterne.filter({
+      livreur_id: livreurId, statut: 'livree',
+    });
+    const encoursAvant = livrees
+      .filter(c => c.statut_paiement_livreur !== 'paye')
+      .reduce((s, c) => s + (c.commission_silga || 0), 0);
+    const nouvelEncours = encoursAvant; // déjà inclut la commission de cette course
 
     // Pourcentage du seuil atteint
-    const pourcentage = Math.round((nouvelEncours / seuil) * 100);
+    const pourcentage = seuil > 0 ? Math.round((nouvelEncours / seuil) * 100) : 0;
 
     console.log(`[ENCOURS] Livreur ${livreurId} (${livreur.nom}): ${nouvelEncours} (${pourcentage}% du seuil ${seuil} ${devise})`);
 
