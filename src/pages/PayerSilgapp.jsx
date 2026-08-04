@@ -54,12 +54,7 @@ export default function PayerSilgapp({ userType: forcedType }) {
           const commImpayees = (livrees || [])
             .filter(c => c.statut_paiement_livreur !== "paye")
             .reduce((s, c) => s + (c.commission_silga ?? 0), 0);
-          // ── Cohérence avec l'admin (DusLivreursExternes) :
-          //    Math.max(commissions impayées réelles, dette stockée sur la fiche livreur).
-          //    On tient compte des vieilles dettes migrées (encours / montant_du_silga)
-          //    qui peuvent être supérieures aux commissions impayées actuelles.
-          const storedDebt = livreurs[0].encours || livreurs[0].montant_du_silga || 0;
-          setMontantDu(Math.max(commImpayees, storedDebt));
+          setMontantDu(commImpayees);
           return;
         }
 
@@ -119,10 +114,7 @@ export default function PayerSilgapp({ userType: forcedType }) {
           const commImpayees = (livrees || [])
             .filter(c => c.statut_paiement_livreur !== "paye")
             .reduce((s, c) => s + (c.commission_silga ?? 0), 0);
-          if (l?.[0]) {
-            const storedDebt = l[0].encours || l[0].montant_du_silga || 0;
-            setMontantDu(Math.max(commImpayees, storedDebt));
-          }
+          if (l?.[0]) setMontantDu(commImpayees);
         } else if (userType === "client") {
           const frais = await base44.entities.FraisAnnulation.filter({ client_id: userInfo.id });
           const impaye = (frais || []).filter((f) => f.statut_paiement !== "paye").reduce((s, f) => s + (f.montant || 0), 0);
