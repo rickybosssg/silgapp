@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { base44 } from "@/api/base44Client";
 import { getNativeCurrentPosition, scanNativeQrCode } from "@/lib/nativeAndroid";
+import { normalizeFourDigitPin } from "@/lib/livreurCourseState";
 
 export default function QRScannerModal({ course, type, onSuccess, onClose, livreurLat, livreurLng }) {
   const [mode, setMode] = useState("camera");
@@ -11,8 +12,13 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
   const [scanning, setScanning] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [result, setResult] = useState(null); // "success" | "error"
+  const [errorMessage, setErrorMessage] = useState("");
   const [showBackupPinConfirm, setShowBackupPinConfirm] = useState(false); // confirmation avant PIN 0000
-  const isPartnerCourse = !!(course?.commande_boutique_id || course?.commande_restaurant_id);
+  const isPartnerCourse = !!(
+    course?.commande_boutique_id ||
+    course?.commande_restaurant_id ||
+    course?.pharmacie_id
+  );
   const isPickup = type === "pickup";
   const title = isPickup
     ? (isPartnerCourse ? "Recuperation chez le partenaire" : "Scanner pour recuperer")
@@ -36,7 +42,7 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
 
   const getValidationGps = async () => {
     const fallback = lastKnownGps();
-    const timeoutMs = fallback ? 2500 : 5000;
+    const timeoutMs = fallback ? 3000 : 12000;
     const timeoutGps = new Promise((resolve) => {
       setTimeout(() => resolve(fallback), timeoutMs);
     });
@@ -71,14 +77,24 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
 
   const verifyCode = async (value, method) => {
     if (verifying) return;
+    const submittedValue = method === "manual_code" ? normalizeFourDigitPin(value) : String(value || "").trim();
+    if (method === "manual_code" && submittedValue.length !== 4) {
+      toast.error("Entrez exactement 4 chiffres");
+      return;
+    }
     setVerifying(true);
+    setErrorMessage("");
     const startedAt = Date.now();
     try {
       const gpsStartedAt = Date.now();
       const gps = await getValidationGps();
       const gpsMs = Date.now() - gpsStartedAt;
       if (!gps?.latitude || !gps?.longitude) {
-        toast.error("GPS requis pour valider cette etape. Activez la localisation et reessayez.");
+        const message = "Position GPS indisponible. Restez à l'extérieur ou près d'une fenêtre, puis réessayez.";
+        setErrorMessage(message);
+        setResult("error");
+        toast.error(message);
+        setTimeout(() => setResult(null), 2500);
         return;
       }
 
@@ -86,7 +102,7 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
       const res = await base44.functions.invoke("validateQRCode", {
         course_id: course.id,
         type,
-        value,
+        value: submittedValue,
         method,
         latitude: gps.latitude,
         longitude: gps.longitude,
@@ -102,6 +118,7 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
 
       const data = res?.data;
       if (data?.success) {
+        setErrorMessage("");
         setResult("success");
         const gpsData = type === "pickup"
           ? {
@@ -122,13 +139,18 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
         };
         setTimeout(() => onSuccess(courseData), 700);
       } else {
+        const message = data?.error || "Ce code ne correspond pas à cette course";
+        setErrorMessage(message);
         setResult("error");
-        if (data?.error) toast.error(data.error);
+        toast.error(message);
         setTimeout(() => setResult(null), 1600);
       }
     } catch (err) {
       console.error("Erreur validation QR:", err);
+      const message = "Validation impossible pour le moment. Vérifiez le réseau puis réessayez : le code reste valable.";
+      setErrorMessage(message);
       setResult("error");
+      toast.error(message);
       setTimeout(() => setResult(null), 1600);
     } finally {
       setVerifying(false);
@@ -136,16 +158,17 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
   };
 
   const handleCodeManuel = async () => {
-    if (code4.length !== 4) {
+    const normalizedCode = normalizeFourDigitPin(code4);
+    if (normalizedCode.length !== 4) {
       toast.error("Entrez un code a 4 chiffres");
       return;
     }
     // ── PIN SECOURS : confirmation préalable pour la livraison ──
-    if (type === "delivery" && code4 === "0000") {
+    if (type === "delivery" && normalizedCode === "0000") {
       setShowBackupPinConfirm(true);
       return;
     }
-    await verifyCode(code4, "manual_code");
+    await verifyCode(normalizedCode, "manual_code");
   };
 
   return (
@@ -184,7 +207,7 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
               <XCircle className="w-10 h-10 text-red-500" />
             </div>
             <p className="text-xl font-black text-red-600">Code invalide</p>
-            <p className="text-sm text-gray-500">Ce code ne correspond pas a cette course</p>
+            <p className="text-sm text-gray-500">{errorMessage || "Ce code ne correspond pas à cette course"}</p>
           </div>
         )}
 
@@ -239,13 +262,14 @@ export default function QRScannerModal({ course, type, onSuccess, onClose, livre
                   </p>
                 </div>
                 <Input
-                  type="number"
+                  type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
                   maxLength={4}
+                  autoComplete="one-time-code"
                   placeholder="0000"
                   value={code4}
-                  onChange={(e) => setCode4(e.target.value.slice(0, 4))}
+                  onChange={(e) => setCode4(normalizeFourDigitPin(e.target.value))}
                   className="text-center text-4xl font-black h-20 rounded-2xl border-2 border-gray-200 focus:border-primary tracking-[0.5em]"
                   autoFocus
                 />

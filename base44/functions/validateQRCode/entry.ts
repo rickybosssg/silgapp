@@ -65,8 +65,15 @@ Deno.serve(async (req) => {
       }
 
       const isPickup = type === 'pickup';
-      const isPartnerCourse = !!(course.commande_boutique_id || course.commande_restaurant_id);
-      const scannedValue = String(value || '').trim();
+      const isPartnerCourse = !!(
+        course.commande_boutique_id ||
+        course.commande_restaurant_id ||
+        course.pharmacie_id
+      );
+      const rawScannedValue = String(value ?? '').trim();
+      const scannedValue = method === 'manual_code'
+        ? rawScannedValue.normalize('NFKC').replace(/\D/g, '').slice(0, 4)
+        : rawScannedValue;
 
       // Vérifier que les codes existent
       const expectedQR = isPickup ? course.pickup_qr_token : course.delivery_qr_token;
@@ -89,7 +96,12 @@ Deno.serve(async (req) => {
           blocked_reason: 'wrong_step_code',
         });
       }
-      if (method === 'manual_code' && oppositePIN && scannedValue === String(oppositePIN).trim()) {
+      const normalizedExpectedPIN = String(expectedPIN ?? '').normalize('NFKC').replace(/\D/g, '').slice(0, 4);
+      const normalizedOppositePIN = String(oppositePIN ?? '').normalize('NFKC').replace(/\D/g, '').slice(0, 4);
+      if (method === 'manual_code' && scannedValue.length !== 4) {
+        return Response.json({ success: false, error: 'Le PIN doit contenir exactement 4 chiffres' });
+      }
+      if (method === 'manual_code' && normalizedOppositePIN && scannedValue === normalizedOppositePIN) {
         return Response.json({
           success: false,
           error: isPickup
@@ -111,26 +123,40 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Vérifier si déjà confirmé
-      const alreadyConfirmed = isPickup ? course.pickup_confirmed_at : course.delivery_confirmed_at;
-      if (alreadyConfirmed) {
-        return Response.json({ success: false, error: 'Ce code a déjà été utilisé' });
-      }
-
-      // ── GPS OBLIGATOIRE — bloquer si coordonnées absentes ou invalides ──
-      const latOk = latitude && !isNaN(Number(latitude)) && Number(latitude) !== 0;
-      const lngOk = longitude && !isNaN(Number(longitude)) && Number(longitude) !== 0;
-      if (!latOk || !lngOk) {
-        return Response.json({ success: false, error: 'GPS requis pour valider cette étape — coordonnées manquantes' });
-      }
-
       // ── PIN SECOURS 0000 (livraison uniquement) ──────────────────────
       const isBackupPin = !isPickup && method === 'manual_code' && scannedValue === '0000';
 
       // Vérifier la valeur (sauf PIN secours qui bypass)
-      const isValid = isBackupPin || (method === 'qr' ? scannedValue === String(expectedQR).trim() : scannedValue === String(expectedPIN).trim());
+      const isValid = isBackupPin || (method === 'qr' ? scannedValue === String(expectedQR).trim() : scannedValue === normalizedExpectedPIN);
       if (!isValid) {
         return Response.json({ success: false, error: 'Code invalide' });
+      }
+
+      // Une réponse réseau peut être perdue après une validation réussie. Un nouvel essai
+      // avec le même code doit confirmer l'état existant au lieu d'afficher un faux échec.
+      const alreadyConfirmed = isPickup ? course.pickup_confirmed_at : course.delivery_confirmed_at;
+      if (alreadyConfirmed) {
+        return Response.json({
+          success: true,
+          already_confirmed: true,
+          message: isPickup ? 'Récupération déjà confirmée.' : 'Livraison déjà confirmée.',
+          course: {
+            statut: course.statut,
+            heure_recuperation: course.heure_recuperation || null,
+            heure_livraison: course.heure_livraison || null,
+            prix_final: course.prix_final || null,
+            distance_reelle_km: course.distance_reelle_km || null,
+            montant_livreur: course.montant_livreur || null,
+            commission_silga: course.commission_silga || null,
+          },
+        });
+      }
+
+      // ── GPS OBLIGATOIRE — bloquer si coordonnées absentes ou invalides ──
+      const latOk = latitude != null && !isNaN(Number(latitude)) && Number(latitude) !== 0;
+      const lngOk = longitude != null && !isNaN(Number(longitude)) && Number(longitude) !== 0;
+      if (!latOk || !lngOk) {
+        return Response.json({ success: false, error: 'GPS requis pour valider cette étape — coordonnées manquantes' });
       }
 
       // ── PICKUP validé ──
@@ -333,18 +359,23 @@ Deno.serve(async (req) => {
 
       // Mettre à jour le livreur : montant_du_silga + courses_du_jour + statut
       if (course.livreur_id) {
-        const livreur = await base44.asServiceRole.entities.Livreur.get(course.livreur_id);
-        if (livreur) {
-          const livreurUpdate = {
-            statut: livreur.bloque_encours ? 'hors_ligne' : 'disponible',
-            ...(livreur.bloque_encours ? { admin_hors_ligne: true } : {}),
-          };
-          if (updateData.commission_silga) {
-            livreurUpdate.montant_du_silga = (Number(livreur.montant_du_silga) || 0) + updateData.commission_silga;
+        try {
+          const livreur = await base44.asServiceRole.entities.Livreur.get(course.livreur_id);
+          if (livreur) {
+            const livreurUpdate = {
+              statut: livreur.bloque_encours ? 'hors_ligne' : 'disponible',
+              ...(livreur.bloque_encours ? { admin_hors_ligne: true } : {}),
+            };
+            if (updateData.commission_silga) {
+              livreurUpdate.montant_du_silga = (Number(livreur.montant_du_silga) || 0) + updateData.commission_silga;
+            }
+            // Incrémenter courses_du_jour
+            livreurUpdate.courses_du_jour = (Number(livreur.courses_du_jour) || 0) + 1;
+            await base44.asServiceRole.entities.Livreur.update(course.livreur_id, livreurUpdate);
           }
-          // Incrémenter courses_du_jour
-          livreurUpdate.courses_du_jour = (Number(livreur.courses_du_jour) || 0) + 1;
-          await base44.asServiceRole.entities.Livreur.update(course.livreur_id, livreurUpdate);
+        } catch (livreurError) {
+          // La course est déjà validée : ne jamais transformer ce succès en faux échec PIN.
+          console.error('[validateQRCode][UPDATE_LIVREUR_AFTER_DELIVERY]', livreurError?.message || livreurError);
         }
       }
 

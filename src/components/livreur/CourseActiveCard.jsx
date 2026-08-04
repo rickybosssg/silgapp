@@ -166,7 +166,11 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
 
   const effectiveStatut = optimisticStatut || course.statut;
   const isDeplacement = course.type_course === "deplacement";
-  const isPartnerCourse = !!(course.commande_boutique_id || course.commande_restaurant_id);
+  const isPartnerCourse = !!(
+    course.commande_boutique_id ||
+    course.commande_restaurant_id ||
+    course.pharmacie_id
+  );
   // ── Course administrative (colis) : étape « Client contacté » avant le départ vers l'expéditeur ──
   const isAdminColisCourse = course.source === "admin" && !isDeplacement && !isPartnerCourse;
   const isClientContactePhase = isAdminColisCourse && effectiveStatut === "livreur_en_route";
@@ -230,7 +234,9 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
       (old || []).map(c => c.id === course.id ? { ...c, statut: newStatut, ...courseData } : c)
     );
   };
-  const colisRecupere = effectiveStatut === "colis_recupere" || effectiveStatut === "en_livraison" || (isDeplacement && effectiveStatut === "pris_en_charge");
+  const colisRecupere = effectiveStatut === "colis_recupere" ||
+    effectiveStatut === "en_livraison" ||
+    (isDeplacement && ["passager_embarque", "pris_en_charge"].includes(effectiveStatut));
   const colisLivre = course.statut === "livree";
 
   const handleConfirmerLivraison = () => {
@@ -1040,7 +1046,7 @@ export default function CourseActiveCard({ course, onColisRecupere, onColisLivre
             if (!isDeplacement) return null;
 
             const deplacementStatut = effectiveStatut;
-            const isPrisEnCharge = deplacementStatut === "pris_en_charge";
+            const isPrisEnCharge = ["passager_embarque", "pris_en_charge"].includes(deplacementStatut);
             const isArrivee = deplacementStatut === "arrivee";
             const isTermine = deplacementStatut === "livree";
 

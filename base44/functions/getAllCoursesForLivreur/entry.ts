@@ -1,6 +1,18 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 const normalizeCountry = (value) => String(value || '').trim().toUpperCase();
+const sameId = (value, expected) => value != null && expected != null && String(value) === String(expected);
+
+function includesLivreur(value, livreurId) {
+  if (!value || !livreurId) return false;
+  if (Array.isArray(value)) return value.some((id) => sameId(id, livreurId));
+  if (typeof value !== 'string') return false;
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) return parsed.some((id) => sameId(id, livreurId));
+  } catch (_) {}
+  return value.split(/[,\s]+/).some((id) => sameId(id, livreurId));
+}
 
 Deno.serve(async (req) => {
   try {
@@ -65,14 +77,16 @@ Deno.serve(async (req) => {
       if (normalizeCountry(c.country_code) !== effectiveCountry) return false;
 
       // 1. Courses deja acceptees.
-      if (c.livreur_id === livreur_id) return true;
+      if (
+        sameId(c.livreur_id, livreur_id) ||
+        sameId(c.accepted_by_livreur_id, livreur_id) ||
+        sameId(c.proposed_by_livreur_id, livreur_id) ||
+        sameId(c.proposed_livreur_id, livreur_id)
+      ) return true;
 
       // 2. Courses en dispatch multi-livreur.
-      if (c.dispatch_status === 'propose' && !c.livreur_id && c.dispatch_notified_ids) {
-        try {
-          const notifiedIds = JSON.parse(c.dispatch_notified_ids);
-          if (notifiedIds.includes(livreur_id)) return true;
-        } catch (_) {}
+      if (c.dispatch_status === 'propose' && !c.livreur_id && includesLivreur(c.dispatch_notified_ids, livreur_id)) {
+        return true;
       }
 
       return false;
