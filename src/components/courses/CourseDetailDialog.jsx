@@ -57,7 +57,7 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
       const results = await base44.entities.AnnulationLivreur.filter({ course_id: course.id });
       return results?.[0] || null;
     },
-    enabled: !!course?.id && reseau === "externe" && course?.statut === "annulee",
+    enabled: !!course?.id && reseau === "externe" && ["annulee", "en_attente", "nouvelle", "recherche_livreur"].includes(course?.statut),
   });
 
   React.useEffect(() => {
