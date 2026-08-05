@@ -257,9 +257,9 @@ function GeneralChatWindow({ conversationId, myType, myId, myName, onBack }) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#16191d]">
+    <div className="flex flex-col h-full bg-[#007AFF]">
       {/* Header */}
-      <div className="flex items-center gap-2 p-3 bg-[#0f1216] text-white">
+      <div className="flex items-center gap-2 p-3 bg-[#0051B5] text-white">
         <button onClick={onBack} className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -268,7 +268,7 @@ function GeneralChatWindow({ conversationId, myType, myId, myName, onBack }) {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-3 bg-[#16191d]">
+      <div className="flex-1 overflow-y-auto p-3 bg-[#007AFF]">
         {messages.length === 0 && (
           <div className="flex items-center justify-center h-full">
             <p className="text-xs text-gray-400 text-center">
@@ -287,7 +287,7 @@ function GeneralChatWindow({ conversationId, myType, myId, myName, onBack }) {
       </div>
 
       {/* Barre de saisie — bouton Envoyer toujours visible */}
-      <div className="p-2.5 bg-[#1f2429] border-t border-white/10 flex items-end gap-1.5 safe-area-bottom shadow-[0_-8px_24px_rgba(0,0,0,0.2)]">
+      <div className="p-2.5 bg-[#0066D6] border-t border-white/10 flex items-end gap-1.5 safe-area-bottom shadow-[0_-8px_24px_rgba(0,0,0,0.2)]">
         <AudioRecorder
           onSend={(data) => sendMessage(data)}
           disabled={sending}
@@ -306,7 +306,7 @@ function GeneralChatWindow({ conversationId, myType, myId, myName, onBack }) {
           placeholder="Votre message..."
           disabled={sending}
           rows={2}
-          className="flex-1 min-h-14 max-h-32 min-w-0 resize-none rounded-2xl border border-white/10 bg-[#16191d] px-4 py-3 text-[15px] font-medium leading-5 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#00a86b]/40 focus:border-[#00a86b]/40"
+          className="flex-1 min-h-14 max-h-32 min-w-0 resize-none rounded-2xl border border-white/10 bg-[#007AFF] px-4 py-3 text-[15px] font-medium leading-5 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#00a86b]/40 focus:border-[#00a86b]/40"
         />
         <Button
           onClick={handleSend}

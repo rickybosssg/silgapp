@@ -146,7 +146,7 @@ function AppLayoutInner({ reseau }) {
   }, []);
 
   return (
-    <div className="min-h-screen text-white" style={{ backgroundColor: '#16191d' }}>
+    <div className="min-h-screen text-white" style={{ backgroundColor: '#007AFF' }}>
       {/* Desktop layout */}
       {/* Popup automatique demandes livreurs */}
       <DemandesLivreursPopup />
@@ -160,7 +160,7 @@ function AppLayoutInner({ reseau }) {
 
       <div className="hidden lg:flex min-h-screen">
         <Sidebar notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} neoCount={neoCount} paiementCount={paiementCount} messageCount={messageCount} livreursBloquesCount={livreursBloquesCount} whatsappMessageCount={whatsappMessageCount} reseau={reseau} />
-        <main className={`flex-1 min-h-screen overflow-x-hidden transition-all ${hasWindows ? "lg:mr-96" : ""}`} style={{ backgroundColor: '#16191d' }}>
+        <main className={`flex-1 min-h-screen overflow-x-hidden transition-all ${hasWindows ? "lg:mr-96" : ""}`} style={{ backgroundColor: '#007AFF' }}>
           <Outlet />
         </main>
       </div>
@@ -168,7 +168,7 @@ function AppLayoutInner({ reseau }) {
       {/* Mobile layout */}
       <div className="lg:hidden">
         <MobileNav notificationCount={notifCount} demandesCount={demandesCount} partenaireDemandesCount={partenaireDemandesCount} neoCount={neoCount} messageCount={messageCount} reseau={reseau} />
-        <main className="pt-[calc(3.5rem+max(env(safe-area-inset-top),28px))] pb-16 min-h-screen" style={{ backgroundColor: '#16191d' }}>
+        <main className="pt-[calc(3.5rem+max(env(safe-area-inset-top),28px))] pb-16 min-h-screen" style={{ backgroundColor: '#007AFF' }}>
           <Outlet />
         </main>
       </div>

@@ -7,11 +7,11 @@
 @layer base {
   :root {
     --font-inter: 'Inter', sans-serif;
-    --background: 215 18% 24%;
-    --foreground: 0 0% 95%;
-    --card: 215 18% 28%;
-    --card-foreground: 0 0% 95%;
-    --popover: 215 18% 28%;
+    --background: 211 100% 50%;
+    --foreground: 0 0% 100%;
+    --card: 211 100% 42%;
+    --card-foreground: 0 0% 100%;
+    --popover: 211 100% 42%;
     --popover-foreground: 0 0% 95%;
     --primary: 211 100% 50%;
     --primary-foreground: 0 0% 100%;
@@ -43,11 +43,11 @@
   }
 
   .dark {
-    --background: 0 0% 6%;
-    --foreground: 0 0% 95%;
-    --card: 0 0% 10%;
-    --card-foreground: 0 0% 95%;
-    --popover: 0 0% 10%;
+    --background: 211 100% 50%;
+    --foreground: 0 0% 100%;
+    --card: 211 100% 42%;
+    --card-foreground: 0 0% 100%;
+    --popover: 211 100% 42%;
     --popover-foreground: 0 0% 95%;
     --primary: 211 100% 50%;
     --primary-foreground: 0 0% 100%;

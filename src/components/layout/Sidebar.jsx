@@ -73,7 +73,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
     <aside className={cn(
       "h-screen flex flex-col transition-all duration-300 sticky top-0 shadow-xl shadow-black/20 border-r border-white/8",
       collapsed ? "w-[68px]" : "w-60"
-    )} style={{ backgroundColor: '#16191d' }}>
+    )} style={{ backgroundColor: '#007AFF' }}>
       {/* Logo */}
       <div className={cn(
         "h-16 flex items-center border-b border-white/8 flex-shrink-0 overflow-hidden",
