@@ -1301,7 +1301,7 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-blue-50/40 to-white dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+    <div className="min-h-screen bg-[#16191d] text-white">
       <PullToRefreshIndicator pulling={pulling} refreshing={refreshing} />
       <AlertesLivreurModal
         livreurId={livreurProfil?.id}
@@ -1357,16 +1357,16 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
       )}
 
       {/* ── Navigation sticky en haut ──────────────── */}
-      <div className="sticky top-0 z-30 bg-white/80 dark:bg-slate-950/85 backdrop-blur-xl px-4 pt-3 pb-2 border-b border-blue-100/70 dark:border-slate-800">
-        <div className="max-w-lg mx-auto flex gap-1 bg-white/95 dark:bg-slate-900 rounded-2xl p-1 shadow-sm border border-blue-100 dark:border-slate-700">
+      <div className="sticky top-0 z-30 bg-[#16191d]/95 backdrop-blur-xl px-4 pt-3 pb-2 border-b border-white/8">
+        <div className="max-w-lg mx-auto flex gap-1 bg-[#1f2429] rounded-2xl p-1 shadow-sm border border-white/8">
           {TABS.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                 activeTab === tab.id
-                  ? "bg-gradient-to-br from-blue-800 to-sky-600 text-white shadow-md shadow-blue-200"
-                  : "text-gray-500 dark:text-gray-600 hover:text-gray-700 dark:hover:text-gray-500"
+                  ? "bg-[#00a86b] text-white shadow-md shadow-green-500/20"
+                  : "text-white/50 hover:text-white/80"
               }`}
             >
               <span>{tab.emoji}</span>
@@ -1405,9 +1405,9 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             />
 
             {isEnLigne && !livreurVisible && (
-              <div className="rounded-2xl bg-amber-50 border border-amber-100 px-4 py-3 flex items-center gap-3">
+              <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 flex items-center gap-3">
                 <span className="text-xl flex-shrink-0"></span>
-                <p className="text-sm text-amber-700 font-semibold leading-tight">
+                <p className="text-sm text-amber-400 font-semibold leading-tight">
                   Activez votre GPS pour être visible sur la carte
                 </p>
               </div>
@@ -1483,22 +1483,22 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
 
             <Link to="/payer-silgapp">
               <div className={`rounded-2xl border p-3.5 flex items-center justify-between shadow-sm active:scale-[0.98] transition ${
-                montantDuSilga > 0 ? "bg-orange-50 border-orange-200" : "bg-white border-blue-100"
+                montantDuSilga > 0 ? "bg-orange-500/10 border-orange-500/20" : "bg-[#1f2429] border-white/8"
               }`}>
                 <div className="flex items-center gap-3">
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                    montantDuSilga > 0 ? "bg-orange-100" : "bg-blue-50"
+                    montantDuSilga > 0 ? "bg-orange-500/15" : "bg-white/5"
                   }`}>
-                    <Wallet className={`w-5 h-5 ${montantDuSilga > 0 ? "text-orange-600" : "text-blue-700"}`} />
+                    <Wallet className={`w-5 h-5 ${montantDuSilga > 0 ? "text-orange-400" : "text-[#00a86b]"}`} />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-gray-900">Payer SILGAPP</p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-sm font-bold text-white">Payer SILGAPP</p>
+                    <p className="text-xs text-white/50">
                       {montantDuSilga > 0 ? `Total dû : ${montantDuSilga.toLocaleString()} FCFA` : "Aucun dû pour le moment"}
                     </p>
                   </div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-gray-300" />
+                <ChevronRight className="w-4 h-4 text-white/30" />
               </div>
             </Link>
 
@@ -1526,14 +1526,14 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
             {coursesActives.length === 0 && isEnLigne && <EmptyStateAttente />}
 
             {sessionExpired ? (
-              <div className="rounded-2xl bg-red-600 text-white p-5 text-center space-y-2 shadow-lg">
+              <div className="rounded-2xl bg-red-500/15 border border-red-500/30 text-red-400 p-5 text-center space-y-2 shadow-lg">
                 <p className="text-2xl"></p>
                 <p className="font-black text-base">Session expirée</p>
-                <p className="text-white/80 text-xs leading-relaxed">
+                <p className="text-red-400/80 text-xs leading-relaxed">
                   Vous avez été déconnecté car une autre session a été ouverte sur un autre appareil.
                 </p>
                 <button
-                  className="mt-3 w-full h-11 rounded-xl bg-white text-red-700 font-black text-sm active:scale-95 transition-all"
+                  className="mt-3 w-full h-11 rounded-xl bg-red-500 text-white font-black text-sm active:scale-95 transition-all"
                   onClick={() => {
                     try { localStorage.removeItem("silgapp_livreur_session_id"); } catch {}
                     { clearPersistedToken(); base44.auth.logout(); };
@@ -1544,20 +1544,20 @@ export default function LivreurExterneApp({ livreurProfil: initialProfil }) {
                 </button>
               </div>
             ) : !isEnLigne && livreurProfil?.bloque_encours ? (
-              <div className="rounded-2xl bg-red-600 text-white p-5 text-center space-y-2 shadow-lg">
+              <div className="rounded-2xl bg-red-500/15 border border-red-500/30 text-red-400 p-5 text-center space-y-2 shadow-lg">
                 <p className="text-2xl"></p>
                 <p className="font-black text-base">Compte bloqué</p>
-                <p className="text-white/80 text-xs leading-relaxed">
+                <p className="text-red-400/80 text-xs leading-relaxed">
                   Votre plafond d'encours SILGAPP a été atteint. Veuillez effectuer votre dépôt auprès de SILGAPP afin de réactiver votre compte.
                 </p>
                 {livreurProfil?.encours > 0 && (
-                  <p className="text-white/60 text-[10px]">
+                  <p className="text-red-400/60 text-[10px]">
                     Encours actuel : {livreurProfil.encours.toLocaleString()} {livreurProfil.country_code ? "FCFA" : "FCFA"}
                   </p>
                 )}
               </div>
             ) : !isEnLigne && (
-              <div className="rounded-2xl bg-slate-800 text-white p-5 text-center space-y-2 shadow-lg">
+              <div className="rounded-2xl bg-[#1f2429] border border-white/8 text-white p-5 text-center space-y-2 shadow-lg">
                 <p className="text-2xl"></p>
                 <p className="font-black text-base">Vous êtes hors ligne</p>
                 <p className="text-white/60 text-xs">Appuyez sur <strong>Activer</strong> dans le header pour recevoir des courses</p>
