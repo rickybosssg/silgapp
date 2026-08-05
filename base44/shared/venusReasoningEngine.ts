@@ -649,19 +649,80 @@ function extraireInfosDepuisMessage(message: string): Record<string, any> {
   }
 
   // Adresses — chercher des noms de quartiers connus
+  // Patterns de départ: "depuis X", "au depart de X", "je suis à X", "de X"
+  // Patterns d'arrivée: "vers X", "pour X", "à destination de X", "à X"
+  // Format multi-lignes: "De X\nà Y" ou "De X à Y"
+  const lignes = msg.split(/[\n.]/).map((l: string) => l.trim()).filter(Boolean);
+
   for (const q of QUARTIERS_OUAGA) {
     if (msg.includes(q)) {
       const isJeSuisA = msg.includes('je suis à ' + q) || msg.includes('je suis a ' + q);
       const isDepuis = msg.includes('depuis ' + q) || msg.includes('au depart de ' + q);
-      const isVersArrivee = msg.includes('vers ' + q) || msg.includes('pour ' + q) || msg.includes('a destination de ' + q);
-      const hasPlainA = msg.includes('à ' + q) || msg.includes('a ' + q);
+      const isDeDepart = msg.includes('de ' + q) && !msg.includes('vers ' + q);
+      const isVersArrivee = msg.includes('vers ' + q) || msg.includes('a destination de ' + q);
+      // "à X" comme arrivée (mais pas "je suis à" qui est un départ)
+      const hasPlainA = (msg.includes('à ' + q) || msg.includes('a ' + q)) && !isJeSuisA;
 
       if (isJeSuisA || isDepuis) {
         if (!updates.adresse_depart) updates.adresse_depart = q.charAt(0).toUpperCase() + q.slice(1);
+      } else if (isDeDepart && !updates.adresse_depart) {
+        // "De pissy" au début d'une ligne = départ
+        updates.adresse_depart = q.charAt(0).toUpperCase() + q.slice(1);
       } else if (isVersArrivee || hasPlainA) {
         if (!updates.adresse_arrivee) updates.adresse_arrivee = q.charAt(0).toUpperCase() + q.slice(1);
       } else if (!updates.adresse_arrivee && !updates.adresse_depart) {
         updates.adresse_arrivee = q.charAt(0).toUpperCase() + q.slice(1);
+      }
+    }
+  }
+
+  // ── Extraction multi-lignes: "De X à Y" ou "De X\nà Y" ──
+  // Gère les messages comme: "Pour expédier un repas. De pissy à cissin. 11h30"
+  if (!updates.adresse_depart || !updates.adresse_arrivee) {
+    for (const ligne of lignes) {
+      // Pattern: "de <quartier> à <quartier>" ou "de <quartier> a <quartier>"
+      const matchTrajet = ligne.match(/\bde\s+([a-zàâäéèêëïîôöùûüç\s]+?)\s+à\s+([a-zàâäéèêëïîôöùûüç\s]+)/i) ||
+                          ligne.match(/\bde\s+([a-zàâäéèêëïîôöùûüç\s]+?)\s+a\s+([a-zàâäéèêëïîôöùûüç\s]+)/i);
+      if (matchTrajet) {
+        const depRaw = matchTrajet[1].trim().toLowerCase();
+        const arrRaw = matchTrajet[2].trim().toLowerCase();
+        // Vérifier si ce sont des quartiers connus ou des noms libres
+        if (!updates.adresse_depart) {
+          const depMatch = QUARTIERS_OUAGA.find(q => depRaw.includes(q));
+          if (depMatch) {
+            updates.adresse_depart = depMatch.charAt(0).toUpperCase() + depMatch.slice(1);
+          } else if (depRaw.length >= 3 && depRaw.length <= 30) {
+            updates.adresse_depart = depRaw.charAt(0).toUpperCase() + depRaw.slice(1);
+          }
+        }
+        if (!updates.adresse_arrivee) {
+          const arrMatch = QUARTIERS_OUAGA.find(q => arrRaw.includes(q));
+          if (arrMatch) {
+            updates.adresse_arrivee = arrMatch.charAt(0).toUpperCase() + arrMatch.slice(1);
+          } else if (arrRaw.length >= 3 && arrRaw.length <= 30) {
+            updates.adresse_arrivee = arrRaw.charAt(0).toUpperCase() + arrRaw.slice(1);
+          }
+        }
+        break; // Premier match suffit
+      }
+    }
+  }
+
+  // ── Extraction heure souhaitée ──
+  if (!updates.date_souhaitee) {
+    const heureMatch = msg.match(/\b(\d{1,2})\s*[hH:](\d{0,2})\b/);
+    if (heureMatch) {
+      const heure = parseInt(heureMatch[1]);
+      const minute = heureMatch[2] ? parseInt(heureMatch[2]) : 0;
+      if (heure >= 0 && heure <= 23 && minute >= 0 && minute <= 59) {
+        const now = new Date();
+        const dateRdv = new Date(now);
+        dateRdv.setHours(heure, minute, 0, 0);
+        // Si l'heure est déjà passée aujourd'hui, programmer pour demain
+        if (dateRdv <= now) {
+          dateRdv.setDate(dateRdv.getDate() + 1);
+        }
+        updates.date_souhaitee = dateRdv.toISOString();
       }
     }
   }
@@ -1279,6 +1340,61 @@ Réponds UNIQUEMENT avec un JSON.`;
       };
     }
 
+    // ── DERNIER RECOURS : Extraction heuristique + création de course ──
+    // Quand le LLM échoue (timeout, rate limit, erreur réseau), on essaie de
+    // sauver la conversation en extrayant les infos du message avec des
+    // heuristiques. Si on a assez d'infos (type + départ + arrivée), on crée
+    // la course directement. Sinon, on retourne le fallback contextuel.
+    try {
+      const infosHeuristiques = extraireInfosDepuisMessage(input.messageClient);
+      const memoireFusionnee = { ...(input.memoireCourte || {}), ...infosHeuristiques };
+      // Auto-remplir contact_createur_course
+      if (!memoireFusionnee.contact_createur_course) {
+        memoireFusionnee.contact_createur_course = input.telephone;
+      }
+      // Pour "expedier", le client est souvent le destinataire lui-même
+      if (memoireFusionnee.type_course === 'expedier' && !memoireFusionnee.contact_telephone) {
+        memoireFusionnee.contact_is_client = true;
+      }
+
+      const hasType = !!memoireFusionnee.type_course;
+      const hasDepart = !!memoireFusionnee.adresse_depart;
+      const hasArrivee = !!memoireFusionnee.adresse_arrivee;
+
+      if (hasType && hasDepart && hasArrivee) {
+        console.log(`[ReasoningEngine] 🔄 Fallback heuristique: type=${memoireFusionnee.type_course} depart=${memoireFusionnee.adresse_depart} arrivee=${memoireFusionnee.adresse_arrivee}`);
+        const courseResult = await creerCourseDepuisMemoire(
+          base44, memoireFusionnee, input.countryCode, input.tarifs,
+          input.telephone, input.profileName
+        );
+        if (courseResult.success) {
+          console.log(`[ReasoningEngine] ✅ Course créée via fallback heuristique (LLM avait échoué)`);
+          return {
+            intention: 'creer_course',
+            contexte: 'nouvelle_course',
+            infos_connues: memoireFusionnee,
+            infos_manquantes: [],
+            action: 'creer_course',
+            prochaine_question: '',
+            outils_utilises: ['heuristic_fallback:create_course'],
+            confiance: 60,
+            reponse: courseResult.message || 'Course créée avec succès !',
+            memoire_courte_update: { course_created: true, ...infosHeuristiques },
+            memoire_longue_update: {},
+            business_rule_id: undefined,
+            document_sources: undefined,
+            temps_traitement_ms: Date.now() - startTime,
+            decision_moteur: 'fallback_heuristique',
+            openai_appele: openaiWasAttempted,
+            model_utilise: openaiWasAttempted ? 'heuristic_fallback' : '',
+            _erreur_detail: `LLM échec: ${e.message?.substring(0, 300) || 'Unknown'} → fallback heuristique réussi`,
+          };
+        }
+      }
+    } catch (heuristicErr: any) {
+      console.warn(`[ReasoningEngine] Fallback heuristique échoué: ${heuristicErr?.message}`);
+    }
+
     // Erreur LLM générique — fallback standard
     return {
       intention: 'autre',
@@ -1305,7 +1421,7 @@ Réponds UNIQUEMENT avec un JSON.`;
       document_sources: undefined,
       temps_traitement_ms: Date.now() - startTime,
       decision_moteur: 'erreur',
-      openai_appele: false,
+      openai_appele: openaiWasAttempted,
       model_utilise: '',
       _erreur_detail: `Erreur raisonnement: ${e.message?.substring(0, 400) || 'Unknown error'}`,
     };
