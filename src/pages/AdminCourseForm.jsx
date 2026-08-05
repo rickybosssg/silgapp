@@ -315,7 +315,7 @@ export default function AdminCourseForm() {
           <div>
             <p className="text-[11px] font-semibold text-gray-500 mb-1.5">Pays de destination</p>
             <Select value={countryCode} onValueChange={setCountryCode}>
-              <SelectTrigger className="rounded-xl h-12 bg-blue-50/40 border-blue-100/50 text-sm font-medium focus:ring-blue-300/50">
+              <SelectTrigger className="rounded-xl h-12 bg-blue-50/40 border-blue-100/50 text-sm font-medium text-slate-900 focus:ring-blue-300/50">
                 <SelectValue>
                   {selectedPays ? `${selectedPays.drapeau}  ${selectedPays.nom}` : "Choisir un pays"}
                 </SelectValue>
@@ -416,7 +416,7 @@ export default function AdminCourseForm() {
             <div>
               <p className="text-[11px] font-semibold text-gray-500 mb-1.5">Type de colis</p>
               <Select value={typeColis} onValueChange={setTypeColis}>
-                <SelectTrigger className="rounded-xl h-12 bg-violet-50/30 border-violet-100/50 text-sm font-medium focus:ring-violet-300/50">
+                <SelectTrigger className="rounded-xl h-12 bg-violet-50/30 border-violet-100/50 text-sm font-medium text-slate-900 focus:ring-violet-300/50">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
