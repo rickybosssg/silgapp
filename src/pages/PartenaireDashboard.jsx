@@ -189,7 +189,7 @@ export default function PartenaireDashboard() {
 
   if (!user || loading) {
     return (
-      <div className="min-h-screen bg-[#007AFF] flex items-center justify-center">
+      <div className="min-h-screen bg-[#0A1F3D] flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-[#007AFF]" />
       </div>
     );
@@ -197,7 +197,7 @@ export default function PartenaireDashboard() {
 
   if (!hasEtablissement) {
     return (
-      <div className="min-h-screen bg-[#007AFF] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#0A1F3D] flex items-center justify-center p-6">
         <div className="w-full max-w-md space-y-6">
           <button
             type="button"
@@ -268,7 +268,7 @@ export default function PartenaireDashboard() {
   // ── Bloquer l'accès si l'établissement n'est pas validé ──
   if (etablissement && etablissement.validation === "en_attente") {
     return (
-      <div className="min-h-screen bg-[#007AFF] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#0A1F3D] flex items-center justify-center p-6">
         <div className="text-center space-y-4 max-w-sm">
           <div className="w-20 h-20 rounded-3xl bg-amber-500/15 flex items-center justify-center mx-auto">
             <Clock className="w-10 h-10 text-amber-400" />
@@ -299,7 +299,7 @@ export default function PartenaireDashboard() {
 
   if (etablissement && (etablissement.validation === "refuse" || etablissement.validation === "suspendu")) {
     return (
-      <div className="min-h-screen bg-[#007AFF] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[#0A1F3D] flex items-center justify-center p-6">
         <div className="text-center space-y-4 max-w-sm">
           <div className="w-20 h-20 rounded-3xl bg-red-500/15 flex items-center justify-center mx-auto">
             <XCircle className="w-10 h-10 text-red-400" />
@@ -329,9 +329,9 @@ export default function PartenaireDashboard() {
     : commandes.filter(c => !["livree", "annulee"].includes(c.statut)).length;
 
   return (
-    <div className="min-h-screen bg-[#007AFF] pb-20">
+    <div className="min-h-screen bg-[#0A1F3D] pb-20">
       {/* ── En-tête premium ── */}
-      <div className="bg-gradient-to-br from-[#007AFF] via-[#1f2429] to-[#007AFF] text-white px-4 py-4 sticky top-0 z-20 shadow-lg border-b-2 border-[#007AFF]/30">
+      <div className="bg-gradient-to-br from-[#0A1F3D] via-[#1f2429] to-[#0A1F3D] text-white px-4 py-4 sticky top-0 z-20 shadow-lg border-b-2 border-[#0A1F3D]/30">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center overflow-hidden flex-shrink-0">

@@ -80,7 +80,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
   return (
     <>
       {/* ===== MOBILE HEADER ===== */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 border-b border-white/8 z-40 flex items-center justify-between px-4 shadow-sm safe-area-top" style={{ minHeight: '3.5rem', backgroundColor: '#007AFF' }}>
+      <header className="lg:hidden fixed top-0 left-0 right-0 border-b border-white/8 z-40 flex items-center justify-between px-4 shadow-sm safe-area-top" style={{ minHeight: '3.5rem', backgroundColor: '#0A1F3D' }}>
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-[#007AFF] flex items-center justify-center shadow-sm">
             <span className="text-white font-black text-sm">S</span>
@@ -254,7 +254,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
       )}
 
       {/* ===== MOBILE BOTTOM TAB BAR ===== */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 border-t border-white/8 z-40 safe-area-bottom" style={{ backgroundColor: '#007AFF' }}>
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 border-t border-white/8 z-40 safe-area-bottom" style={{ backgroundColor: '#0A1F3D' }}>
         <div className="flex items-stretch justify-around">
           {allNavItems.filter(item => bottomTabPaths.includes(item.path)).map((item) => {
             const isActive = location.pathname === item.path;
