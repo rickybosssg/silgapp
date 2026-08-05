@@ -387,9 +387,11 @@ export async function creerCourseDepuisMemoire(
   const hasRequiredContact = cd.contact_telephone || cd.contact_is_client;
   const hasDepart = cd.adresse_depart || cd.gps_depart_lat != null;
   const hasArrivee = cd.adresse_arrivee || cd.gps_arrivee_lat != null;
-  // ── contact_createur_course : OBLIGATOIRE pour toute course VENUS ──
-  // Le numéro WhatsApp entrant ne peut être utilisé QUE si le client a confirmé
-  // explicitement (contact_createur_is_sender=true). Ne jamais réutiliser un ancien numéro.
+  // ── contact_createur_course : AUTO = numéro WhatsApp du client ──
+  // Le client qui écrit sur WhatsApp EST le créateur de la course. Pas besoin de demander.
+  if (!cd.contact_createur_course || !cd.contact_createur_course.trim()) {
+    cd.contact_createur_course = telephone;
+  }
   const hasCreateurContact = !!(cd.contact_createur_course && cd.contact_createur_course.trim());
 
   if (!hasDepart || !hasArrivee || !hasRequiredContact || !hasCreateurContact) {
@@ -1020,19 +1022,22 @@ creer_course | suivre_course | contacter_livreur | annuler_course | modifier_inf
 nouvelle_course | course_en_cours | ancienne_course | paiement | livreur | partenaire | general
 
 ═══ INFOS REQUISES POUR creer_course ═══
-type_course, adresse_depart (ou GPS), adresse_arrivee (ou GPS), contact_createur_course (OBLIGATOIRE), ET contact_telephone si type_course = expedier ou recevoir.
-- contact_createur_course = numéro du CRÉATEUR de la course (contact principal du livreur). OBLIGATOIRE pour chaque course. Ne JAMAIS copier auto le numéro WhatsApp entrant — demander explicitement. Exception: si le client dit "c'est mon numéro"/"c'est moi" → autorisé après confirmation. Ne JAMAIS réutiliser un ancien numéro.
-- Pour "expedier": contact_telephone = DESTINATAIRE. Pour "recevoir": contact_telephone = EXPÉDITEUR. OBLIGATOIRE.
+type_course, adresse_depart (ou GPS), adresse_arrivee (ou GPS), ET contact_telephone si type_course = expedier ou recevoir.
+- contact_createur_course = numéro du CRÉATEUR de la course = le numéro WhatsApp du client (${input.telephone}). Il est AUTOMATIQUEMENT utilisé. NE JAMAIS demander ce numéro au client.
+- Pour "expedier": contact_telephone = DESTINATAIRE (numéro qui recevra le colis). OBLIGATOIRE.
+- Pour "recevoir": contact_telephone = EXPÉDITEUR (numéro qui envoie le colis). OBLIGATOIRE.
 - Pour "deplacement": contact destinataire FACULTATIF.
 - Nom du destinataire/expéditeur FACULTATIF (seul le téléphone est requis).
+- Si le client donne plusieurs numéros pour le destinataire, utilise le PREMIER comme contact principal. Ne demande PAS lequel choisir.
 
-═══ FLUX CRÉATION DE COURSE (STRICT) ═══
+═══ FLUX CRÉATION DE COURSE (STRICT — SIMPLIFIÉ) ═══
 a) Infos manquantes → action=poser_question (UNE SEULE question).
-b) Toutes infos présentes ET récapitulatif pas encore montré → montre récapitulatif COMPLET + "Confirmez-vous la création de cette course ?" (action=poser_question).
+b) Toutes infos présentes ET récapitulatif pas encore montré → montre récapitulatif SIMPLE + "Je lance la recherche d'un livreur. Confirmez ? (oui)" (action=poser_question).
 c) Récapitulatif montré + client répond oui/ok/d'accord/je confirme/valider/go → action=creer_course.
 d) Client corrige → mets à jour memoire_courte_update, reviens à (a) ou (b).
 JAMAIS de "all_info_collected" ou "user_confirmed" (ces champs n'existent pas).
-INTERDICTION: Ne JAMAIS dire "je lance la création"/"je crée"/"je valide"/"je finalise" tant que: contact_telephone non collecté ET récapitulatif non présenté ET client n'a pas confirmé.
+IMPORTANT: Le flux doit être le PLUS COURT possible. Max 4 questions: type → départ → arrivée → (destinataire si expedier). Puis confirmation directe.
+Ne JAMAIS demander le numéro du créateur (auto = WhatsApp). Ne JAMAIS demander "quel numéro comme principal".
 Si contact_telephone manquant → action DOIT être poser_question, JAMAIS creer_course.
 
 ═══ ACTIONS POSSIBLES ═══
@@ -1180,9 +1185,17 @@ Réponds UNIQUEMENT avec un JSON.`;
         llmUpdateFiltered[k] = v;
       }
     }
+    // ── AUTO-REMPLIR contact_createur_course avec le numéro WhatsApp ──
+    // Le client qui écrit sur WhatsApp EST le créateur de la course. Pas besoin de demander.
+    if (!llmUpdateFiltered.contact_createur_course && !mergedMemoireCourte.contact_createur_course) {
+      llmUpdateFiltered.contact_createur_course = input.telephone;
+    }
     result.memoire_courte_update = llmUpdateFiltered;
     // Fusionner infos_connues avec la mémoire existante
     result.infos_connues = { ...mergedMemoireCourte, ...(result.infos_connues || {}) };
+    if (!result.infos_connues.contact_createur_course) {
+      result.infos_connues.contact_createur_course = input.telephone;
+    }
 
     // Valider le business_rule_id
     if (result.business_rule_id && businessRuleEntries.length > 0) {
