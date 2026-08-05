@@ -360,7 +360,7 @@ export default function AdminCourseForm() {
                 countryCode={countryCode}
                 placeholder="Ex: Ouaga 2000, face à la mairie"
                 iconColor="text-emerald-500"
-                inputClassName="rounded-xl h-12 pl-10 pr-28 bg-blue-50 border-blue-200/60 text-sm focus:ring-blue-300/50 focus:border-blue-400"
+                inputClassName="rounded-xl h-12 pl-10 pr-28 bg-blue-50 border-blue-200/60 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-blue-300/50 focus:border-blue-400"
               >
                 <button
                   type="button"
@@ -398,7 +398,7 @@ export default function AdminCourseForm() {
                 countryCode={countryCode}
                 placeholder="Ex: Gounghin, derrière le marché"
                 iconColor="text-rose-500"
-                inputClassName="rounded-xl h-12 pl-10 pr-28 bg-rose-50 border-rose-200/60 text-sm focus:ring-rose-300/50 focus:border-rose-400"
+                inputClassName="rounded-xl h-12 pl-10 pr-28 bg-rose-50 border-rose-200/60 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-rose-300/50 focus:border-rose-400"
               >
                 <button
                   type="button"
@@ -447,7 +447,7 @@ export default function AdminCourseForm() {
                 value={clientNom}
                 onChange={e => setClientNom(e.target.value)}
                 placeholder="Nom"
-                className="rounded-xl h-11 bg-blue-50 border-blue-200/60 text-sm focus:ring-blue-300/50 focus:border-blue-400"
+                className="rounded-xl h-11 bg-blue-50 border-blue-200/60 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-blue-300/50 focus:border-blue-400"
               />
             </div>
             <div>
@@ -456,7 +456,7 @@ export default function AdminCourseForm() {
                 value={clientTelephone}
                 onChange={e => setClientTelephone(e.target.value)}
                 placeholder="+226 XX XX XX XX"
-                className="rounded-xl h-11 bg-blue-50 border-blue-200/60 text-sm focus:ring-blue-300/50 focus:border-blue-400"
+                className="rounded-xl h-11 bg-blue-50 border-blue-200/60 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-blue-300/50 focus:border-blue-400"
               />
             </div>
           </div>
@@ -469,7 +469,7 @@ export default function AdminCourseForm() {
                   value={expediteurNom}
                   onChange={e => setExpediteurNom(e.target.value)}
                   placeholder="Nom expéditeur"
-                  className="rounded-xl h-11 bg-amber-50/30 border-amber-100/50 text-sm focus:ring-amber-300/50 focus:border-amber-300"
+                  className="rounded-xl h-11 bg-amber-50/30 border-amber-100/50 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-amber-300/50 focus:border-amber-300"
                 />
               </div>
               <div>
@@ -478,7 +478,7 @@ export default function AdminCourseForm() {
                   value={expediteurTelephone}
                   onChange={e => setExpediteurTelephone(e.target.value)}
                   placeholder="+226 XX XX XX XX"
-                  className="rounded-xl h-11 bg-amber-50/30 border-amber-100/50 text-sm focus:ring-amber-300/50 focus:border-amber-300"
+                  className="rounded-xl h-11 bg-amber-50/30 border-amber-100/50 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-amber-300/50 focus:border-amber-300"
                 />
               </div>
             </div>
@@ -490,7 +490,7 @@ export default function AdminCourseForm() {
                   value={destinataireNom}
                   onChange={e => setDestinataireNom(e.target.value)}
                   placeholder="Nom destinataire"
-                  className="rounded-xl h-11 bg-rose-50 border-rose-200/60 text-sm focus:ring-rose-300/50 focus:border-rose-400"
+                  className="rounded-xl h-11 bg-rose-50 border-rose-200/60 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-rose-300/50 focus:border-rose-400"
                 />
               </div>
               <div>
@@ -499,7 +499,7 @@ export default function AdminCourseForm() {
                   value={destinataireTelephone}
                   onChange={e => setDestinataireTelephone(e.target.value)}
                   placeholder="+226 XX XX XX XX"
-                  className="rounded-xl h-11 bg-rose-50 border-rose-200/60 text-sm focus:ring-rose-300/50 focus:border-rose-400"
+                  className="rounded-xl h-11 bg-rose-50 border-rose-200/60 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-rose-300/50 focus:border-rose-400"
                 />
               </div>
             </div>
@@ -511,7 +511,7 @@ export default function AdminCourseForm() {
               value={notes}
               onChange={e => setNotes(e.target.value)}
               placeholder="Instructions particulières..."
-              className="rounded-xl h-11 bg-gray-50/50 border-gray-200/50 text-sm focus:ring-gray-300/50"
+              className="rounded-xl h-11 bg-gray-50/50 border-gray-200/50 text-sm text-slate-900 placeholder:text-slate-400 focus:ring-gray-300/50"
             />
           </div>
         </div>
