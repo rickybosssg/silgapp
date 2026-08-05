@@ -196,11 +196,16 @@ function MessageBubble({ msg }) {
         "max-w-[75%] rounded-2xl px-3 py-2",
         isMine
           ? isVenus ? "bg-blue-100 text-blue-900" : "bg-green-600 text-white"
-          : "bg-white border border-gray-200 text-gray-900"
+          : "bg-[#2a2f35] border border-white/10 text-gray-100"
       )}>
         {isMine && (
           <p className={cn("text-[10px] font-bold mb-0.5", isVenus ? "text-blue-600" : "text-green-100")}>
             {isVenus ? "🤖 VENUS" : "👤 Admin"}
+          </p>
+        )}
+        {!isMine && msg.sender_type === "client" && (
+          <p className="text-[10px] font-bold mb-0.5 text-gray-400">
+            {msg.sender_name || "Client"}
           </p>
         )}
         {msg.message_type === "text" && (
@@ -230,7 +235,7 @@ function MessageBubble({ msg }) {
             <MapPin className="w-4 h-4" /> {msg.location_lat?.toFixed(5)}, {msg.location_lng?.toFixed(5)}
           </a>
         )}
-        <p className={cn("text-[10px] mt-1 text-right", isMine ? (isVenus ? "text-blue-400" : "text-green-100") : "text-gray-400")}>
+        <p className={cn("text-[10px] mt-1 text-right", isMine ? (isVenus ? "text-blue-400" : "text-green-100") : "text-gray-500")}>
           {msg.created_date && format(new Date(msg.created_date), "HH:mm", { locale: fr })}
         </p>
       </div>
