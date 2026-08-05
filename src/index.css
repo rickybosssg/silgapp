@@ -184,59 +184,66 @@
   }
 
   /* ── Override global : bg-white et bg-slate-50 → thème sombre SilgaMoney ── */
-  /* Sauf écran auth et composants explicites en clair */
-  .bg-white:not(.silgapp-auth-screen *):not(.force-light) {
+  /* Sauf écran auth et composants explicites en clair (force-light) */
+  /* :not(.force-light *) exclut aussi tous les descendants d'un conteneur force-light */
+  .bg-white:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
     background-color: hsl(215 18% 28%) !important;
   }
-  .bg-slate-50:not(.silgapp-auth-screen *):not(.force-light) {
+  .bg-slate-50:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
     background-color: hsl(215 18% 24%) !important;
   }
-  .bg-gray-50:not(.silgapp-auth-screen *):not(.force-light) {
+  .bg-gray-50:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
     background-color: hsl(215 18% 24%) !important;
   }
-  .bg-gray-100:not(.silgapp-auth-screen *):not(.force-light) {
+  .bg-gray-100:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
     background-color: hsl(215 18% 30%) !important;
   }
 
   /* Textes gris foncé → clairs pour fond sombre */
-  .text-slate-800:not(.silgapp-auth-screen *):not(.force-light) {
+  .text-slate-900:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
+    color: #f8fafc !important;
+  }
+  .text-slate-800:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
     color: #f1f5f9 !important;
   }
-  .text-slate-700:not(.silgapp-auth-screen *):not(.force-light) {
+  .text-slate-700:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
     color: #e2e8f0 !important;
   }
-  .text-slate-600:not(.silgapp-auth-screen *):not(.force-light) {
+  .text-slate-600:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
     color: #cbd5e1 !important;
   }
-  .text-slate-500:not(.silgapp-auth-screen *):not(.force-light) {
+  .text-slate-500:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
     color: #94a3b8 !important;
   }
-  .text-slate-400:not(.silgapp-auth-screen *):not(.force-light) {
+  .text-slate-400:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
     color: #64748b !important;
   }
-  .text-gray-800:not(.silgapp-auth-screen *):not(.force-light) {
+  .text-gray-900:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
+    color: #f8fafc !important;
+  }
+  .text-gray-800:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
     color: #f1f5f9 !important;
   }
-  .text-gray-700:not(.silgapp-auth-screen *):not(.force-light) {
+  .text-gray-700:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
     color: #e2e8f0 !important;
   }
-  .text-gray-600:not(.silgapp-auth-screen *):not(.force-light) {
+  .text-gray-600:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
     color: #cbd5e1 !important;
   }
-  .text-gray-500:not(.silgapp-auth-screen *):not(.force-light) {
+  .text-gray-500:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
     color: #94a3b8 !important;
   }
-  .text-gray-400:not(.silgapp-auth-screen *):not(.force-light) {
+  .text-gray-400:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
     color: #64748b !important;
   }
 
   /* Borders clairs → sombres */
-  .border-slate-200:not(.silgapp-auth-screen *):not(.force-light),
-  .border-slate-100:not(.silgapp-auth-screen *):not(.force-light) {
+  .border-slate-200:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light),
+  .border-slate-100:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
     border-color: hsl(0 0% 20%) !important;
   }
-  .border-gray-200:not(.silgapp-auth-screen *):not(.force-light),
-  .border-gray-100:not(.silgapp-auth-screen *):not(.force-light) {
+  .border-gray-200:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light),
+  .border-gray-100:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
     border-color: hsl(0 0% 20%) !important;
   }
 
