@@ -42,7 +42,7 @@ function CourseItemExterne({ course, onView }) {
   const addrArrivee = cleanAddress(course.adresse_arrivee, course.gps_arrivee_lat, course.gps_arrivee_lng);
 
   return (
-    <Card className="p-4 hover:shadow-md transition-all border-l-4 border-l-blue-400 space-y-2.5 bg-[#1f2429] border-white/8">
+    <Card className="p-4 hover:shadow-md transition-all border-l-4 border-l-blue-400 space-y-2.5 bg-[#2a2f36] border-white/8">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0 space-y-2">
           {/* Nom client — agrandi et en gras */}
@@ -106,7 +106,7 @@ function CourseItemInterne({ course, onView }) {
   const addrArrivee = cleanAddress(course.adresse_arrivee);
   
   return (
-    <Card className={`p-4 hover:shadow-md transition-all space-y-2.5 bg-[#1f2429] border-white/8 ${isDispatchAuto ? 'border-l-4 border-l-amber-400 bg-amber-500/5' : ''}`}>
+    <Card className={`p-4 hover:shadow-md transition-all space-y-2.5 bg-[#2a2f36] border-white/8 ${isDispatchAuto ? 'border-l-4 border-l-amber-400 bg-amber-500/5' : ''}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-center gap-2 flex-wrap">
@@ -164,7 +164,7 @@ function CourseItemInterne({ course, onView }) {
 
 export default function CoursesEnTraitement({ courses, onView, isExterne = false }) {
   return (
-    <Card className="p-0 overflow-hidden bg-[#1f2429] border-white/8">
+    <Card className="p-0 overflow-hidden bg-[#2a2f36] border-white/8">
       <div className="px-4 pt-4 pb-3 border-b border-white/8 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
