@@ -542,6 +542,7 @@ export default function LivreursExternes() {
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Rechercher par nom, téléphone, quartier ou code..."
           className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-white/10 bg-[#1f2429] text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+          style={{ color: '#ffffff', WebkitTextFillColor: '#ffffff', caretColor: '#ffffff' }}
         />
         {searchQuery && (
           <button
