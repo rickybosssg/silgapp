@@ -257,9 +257,9 @@ function GeneralChatWindow({ conversationId, myType, myId, myName, onBack }) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-50">
+    <div className="flex flex-col h-full bg-[#16191d]">
       {/* Header */}
-      <div className="flex items-center gap-2 p-3 bg-slate-950 text-white">
+      <div className="flex items-center gap-2 p-3 bg-[#0f1216] text-white">
         <button onClick={onBack} className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -268,7 +268,7 @@ function GeneralChatWindow({ conversationId, myType, myId, myName, onBack }) {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-3 bg-gradient-to-b from-slate-50 to-white">
+      <div className="flex-1 overflow-y-auto p-3 bg-[#16191d]">
         {messages.length === 0 && (
           <div className="flex items-center justify-center h-full">
             <p className="text-xs text-gray-400 text-center">
@@ -287,7 +287,7 @@ function GeneralChatWindow({ conversationId, myType, myId, myName, onBack }) {
       </div>
 
       {/* Barre de saisie — bouton Envoyer toujours visible */}
-      <div className="p-2.5 bg-white border-t border-slate-200 flex items-end gap-1.5 safe-area-bottom shadow-[0_-8px_24px_rgba(15,23,42,0.06)]">
+      <div className="p-2.5 bg-[#1f2429] border-t border-white/10 flex items-end gap-1.5 safe-area-bottom shadow-[0_-8px_24px_rgba(0,0,0,0.2)]">
         <AudioRecorder
           onSend={(data) => sendMessage(data)}
           disabled={sending}
@@ -295,7 +295,7 @@ function GeneralChatWindow({ conversationId, myType, myId, myName, onBack }) {
         />
         <label className="cursor-pointer flex-shrink-0">
           <input type="file" accept="image/*" onChange={handlePhotoSend} className="hidden" disabled={sending || uploadingPhoto} />
-          <div className="h-10 w-10 rounded-full flex items-center justify-center text-gray-500 hover:text-primary hover:bg-gray-100 transition-colors">
+          <div className="h-10 w-10 rounded-full flex items-center justify-center text-white/50 hover:text-[#00a86b] hover:bg-white/10 transition-colors">
             {uploadingPhoto ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImagePlus className="w-5 h-5" />}
           </div>
         </label>
@@ -306,7 +306,7 @@ function GeneralChatWindow({ conversationId, myType, myId, myName, onBack }) {
           placeholder="Votre message..."
           disabled={sending}
           rows={2}
-          className="flex-1 min-h-14 max-h-32 min-w-0 resize-none rounded-2xl border border-slate-300 bg-white px-4 py-3 text-[15px] font-medium leading-5 text-slate-950 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40"
+          className="flex-1 min-h-14 max-h-32 min-w-0 resize-none rounded-2xl border border-white/10 bg-[#16191d] px-4 py-3 text-[15px] font-medium leading-5 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#00a86b]/40 focus:border-[#00a86b]/40"
         />
         <Button
           onClick={handleSend}
