@@ -71,7 +71,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
 
   return (
     <aside className={cn(
-      "h-screen bg-slate-900 flex flex-col transition-all duration-300 sticky top-0 shadow-xl shadow-black/20",
+      "h-screen bg-[#0d1014] flex flex-col transition-all duration-300 sticky top-0 shadow-xl shadow-black/20 border-r border-white/5",
       collapsed ? "w-[68px]" : "w-60"
     )}>
       {/* Logo */}
@@ -105,7 +105,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group",
                 isActive
-                  ? "bg-primary text-white shadow-lg shadow-primary/30"
+                  ? "bg-[#00a86b] text-white shadow-lg shadow-[#00a86b]/30"
                   : "text-white/50 hover:bg-white/8 hover:text-white/90"
               )}
             >
