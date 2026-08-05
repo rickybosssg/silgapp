@@ -164,14 +164,14 @@ export default function WhatsAppChatWindow({ conv, myEmail, myName, onBack, onCo
       </div>
 
       {/* Input */}
-      <div className="p-3 bg-white border-t border-gray-200 flex items-center gap-2 safe-area-bottom">
+      <div className="p-3 bg-[#1f2429] border-t border-white/10 flex items-center gap-2 safe-area-bottom">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Votre message..."
           disabled={sending}
-          className="flex-1 h-11 min-w-0 rounded-xl border border-gray-200 px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+          className="flex-1 h-11 min-w-0 rounded-xl border border-white/10 bg-[#16191d] px-4 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#00a86b]/30"
         />
         <Button
           size="icon"
