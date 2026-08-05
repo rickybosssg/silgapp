@@ -180,6 +180,47 @@
   .force-light .bg-card {
     background-color: rgb(255 255 255) !important;
   }
+  /* ── Fonds clairs préservés à l'intérieur de force-light ── */
+  /* (les sélecteurs :not(.force-light *) du Level 4 ne marchent pas partout) */
+  .force-light .bg-white {
+    background-color: rgb(255 255 255) !important;
+  }
+  .force-light .bg-gray-50 {
+    background-color: rgb(249 250 251) !important;
+  }
+  .force-light .bg-gray-100 {
+    background-color: rgb(243 244 246) !important;
+  }
+  .force-light .bg-slate-50 {
+    background-color: rgb(248 250 252) !important;
+  }
+  .force-light .bg-blue-50 {
+    background-color: rgb(239 246 255) !important;
+  }
+  .force-light .bg-green-50 {
+    background-color: rgb(240 253 244) !important;
+  }
+  .force-light .bg-purple-50 {
+    background-color: rgb(250 245 255) !important;
+  }
+  .force-light .bg-orange-50 {
+    background-color: rgb(255 247 237) !important;
+  }
+  .force-light .bg-red-50 {
+    background-color: rgb(254 242 242) !important;
+  }
+  .force-light .bg-amber-50 {
+    background-color: rgb(255 251 235) !important;
+  }
+  .force-light .bg-rose-50 {
+    background-color: rgb(255 241 242) !important;
+  }
+  .force-light .bg-sky-50 {
+    background-color: rgb(240 249 255) !important;
+  }
+  .force-light .bg-violet-50 {
+    background-color: rgb(245 243 255) !important;
+  }
   /* ── Empêcher la conversion des fonds clairs sur les inputs ── */
   /* bg-gray-50 et bg-white sur les inputs restent clairs (pas de conversion sombre) */
   /* pour que le texte foncé (#111827) reste lisible */
