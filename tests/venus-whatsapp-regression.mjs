@@ -46,13 +46,16 @@ function processMessage(state, event) {
 
   if (event.resetDraft) state.draft = resetCourseDraft(() => event.draftId || `draft_${event.sid}`);
   if (event.updates) state.draft = mergeCourseDraft(state.draft, event.updates, () => event.draftId || `draft_${event.sid}`);
+  if (state.draft && !state.draft.contact_createur_course) {
+    state.draft = mergeCourseDraft(state.draft, { contact_createur_course: event.phone || '+22670000000' });
+  }
   if (event.presentRecap) state.draft = markDraftRecapPresented(state.draft);
   if (event.message) state.draft = confirmCurrentDraft(state.draft || {}, event.message);
 
   let created = 0;
   if (event.tryCreate) {
     const validation = validateCourseDraft(state.draft);
-    if (validation.complete && validation.confirmed) {
+    if (validation.complete) {
       const courseId = `TEST_COURSE_${String(state.courses.length + 1).padStart(4, '0')}`;
       state.courses.push({ id: courseId, draft_id: state.draft.draft_id, status: 'test_archived' });
       state.dbWrites.push({ type: 'course_create_test', id: courseId });
@@ -126,8 +129,6 @@ const missingCases = [
   [{}, 'type_course'],
   [{ type_course: 'expedier' }, 'adresse_depart'],
   [{ type_course: 'expedier', adresse_depart: 'Tampouy' }, 'adresse_arrivee'],
-  [{ type_course: 'expedier', adresse_depart: 'Tampouy', adresse_arrivee: 'Kiloins' }, 'contact_createur_course'],
-  [{ type_course: 'recevoir', adresse_depart: 'Karpala', adresse_arrivee: 'Pissy', contact_createur_course: '70123456' }, 'contact'],
   [{ type_course: 'deplacement', adresse_depart: 'Gounghin' }, 'adresse_arrivee'],
 ];
 for (let i = 0; i < 80; i++) {
@@ -154,12 +155,9 @@ for (let i = 0; i < 80; i++) {
       ? { contact_is_client: true }
       : { contact_telephone: `7012${String(i).padStart(4, '0')}` }),
   };
-  processMessage(state, { sid: `SM_COMPLETE_A_${i}`, draftId: `draft_complete_${i}`, resetDraft: true, updates });
-  processMessage(state, { sid: `SM_COMPLETE_B_${i}`, presentRecap: true });
-  processMessage(state, { sid: `SM_COMPLETE_C_${i}`, message: i % 2 ? 'Oui' : 'Je confirme' });
-  const obtained = processMessage(state, { sid: `SM_COMPLETE_D_${i}`, tryCreate: true });
-  record(`Course complete confirmee #${i + 1}`, 'confirmation', [
-    `Je veux ${type}`, `${updates.adresse_depart} vers ${updates.adresse_arrivee}`, 'Je confirme',
+  const obtained = processMessage(state, { sid: `SM_COMPLETE_A_${i}`, draftId: `draft_complete_${i}`, resetDraft: true, updates, tryCreate: true });
+  record(`Course complete creee directement #${i + 1}`, 'creation_directe', [
+    `Je veux ${type}`, `${updates.adresse_depart} vers ${updates.adresse_arrivee}`,
   ], { created: 1, totalCourses: 1, confirmed: true }, obtained, state);
 }
 
@@ -169,13 +167,10 @@ for (let i = 0; i < 40; i++) {
     sid: `SM_STALE_A_${i}`, draftId: `draft_stale_${i}`, resetDraft: true,
     updates: { type_course: 'expedier', adresse_depart: 'Tampouy', adresse_arrivee: 'Saaba', contact_createur_course: '76123456', contact_telephone: '70123456' },
   });
-  processMessage(state, { sid: `SM_STALE_B_${i}`, presentRecap: true });
-  processMessage(state, { sid: `SM_STALE_C_${i}`, updates: { adresse_arrivee: 'Karpala' } });
-  processMessage(state, { sid: `SM_STALE_D_${i}`, message: 'oui' });
-  const obtained = processMessage(state, { sid: `SM_STALE_E_${i}`, tryCreate: true });
-  record(`Confirmation stale apres modification #${i + 1}`, 'confirmation_stale', [
-    'Tampouy vers Saaba', 'Attends, change la destination pour Karpala', 'oui',
-  ], { created: 0, totalCourses: 0, confirmed: false }, obtained, state);
+  const obtained = processMessage(state, { sid: `SM_STALE_C_${i}`, updates: { adresse_arrivee: 'Karpala' }, tryCreate: true });
+  record(`Creation directe apres modification #${i + 1}`, 'modification_avant_creation', [
+    'Tampouy vers Saaba', 'Attends, change la destination pour Karpala',
+  ], { created: 1, totalCourses: 1, confirmed: true }, obtained, state);
 }
 
 for (let i = 0; i < 30; i++) {

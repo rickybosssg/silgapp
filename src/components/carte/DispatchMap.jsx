@@ -1164,7 +1164,7 @@ export default function DispatchMap({
               <div className="bg-[#1f2429]/95 border border-blue-500/20 rounded-lg p-2 shadow-lg max-w-[180px]">
                 <p className="text-xs font-semibold text-blue-400 mb-0.5">✨ Cartes thermiques</p>
                 <p className="text-[11px] text-blue-400/80 leading-tight">Analysez demande & couverture</p>
-!               <button
+                <button
                   onClick={() => setShowHeatmapHint(false)}
                   className="text-[10px] text-blue-400 hover:text-blue-300 mt-1 underline"
                 >

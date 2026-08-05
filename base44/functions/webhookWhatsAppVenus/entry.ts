@@ -818,12 +818,14 @@ Deno.serve(async (req) => {
             if (!um.contact_createur_course || !um.contact_createur_course.trim()) {
               um.contact_createur_course = telephone;
             }
+            if (!um.contact_telephone && um.contact_is_client !== true) {
+              um.contact_is_client = true;
+              um.contact_telephone = telephone;
+            }
             const _tc = (um.type_course || '').toLowerCase().trim();
             const _hasType = ['expedier', 'recevoir', 'deplacement'].includes(_tc);
             const _hasDepart = !!(um.adresse_depart && um.adresse_depart.trim()) || um.gps_depart_lat != null;
             const _hasArrivee = !!(um.adresse_arrivee && um.adresse_arrivee.trim()) || um.gps_arrivee_lat != null;
-            const _needsContact = _tc === 'expedier' || _tc === 'recevoir';
-            const _hasContact = !!(um.contact_telephone && um.contact_telephone.trim()) || um.contact_is_client === true;
             // ── contact_createur_course : AUTO = numéro WhatsApp du client ──
             const _createurDigits = (um.contact_createur_course || '').replace(/\D/g, '');
             const _hasCreateurContact = _createurDigits.length >= 8 && _createurDigits.length <= 15;
@@ -833,7 +835,6 @@ Deno.serve(async (req) => {
             else if (!_hasDepart) _missingField = 'adresse_depart';
             else if (!_hasArrivee) _missingField = 'adresse_arrivee';
             else if (!_hasCreateurContact) _missingField = 'contact_createur_course';
-            else if (_needsContact && !_hasContact) _missingField = 'contact';
 
             if (_missingField) {
               // ── Champ obligatoire manquant → surcharger en poser_question ──
@@ -845,9 +846,6 @@ Deno.serve(async (req) => {
                 _askMsg = 'Quel est le lieu exact de récupération ? (indiquez le quartier ou un point de repère précis)';
               } else if (_missingField === 'adresse_arrivee') {
                 _askMsg = 'Quel est le lieu exact de livraison ? (indiquez le quartier ou un point de repère précis)';
-              } else if (_missingField === 'contact') {
-                const _role = _tc === 'expedier' ? 'destinataire' : 'expéditeur';
-                _askMsg = `Quel est le numéro de téléphone du ${_role} ? (Si vous êtes vous-même le ${_role}, dites-le moi)`;
               }
               reasoningResult.action = 'poser_question';
               reponseFinale = _askMsg;
@@ -937,12 +935,17 @@ Deno.serve(async (req) => {
           if (ditCreationLancee) {
             console.warn(`[WebhookVenus] 🚫 FAUSSE CRÉATION détectée — VENUS dit "création/recherche" mais course NON créée (action=${reasoningResult.action}) — remplacement par question`);
             const umCheck = { ...(pendingCourse || {}), ...reasoningResult.memoire_courte_update };
+            if (!umCheck.contact_createur_course || !umCheck.contact_createur_course.trim()) {
+              umCheck.contact_createur_course = telephone;
+            }
+            if (!umCheck.contact_telephone && umCheck.contact_is_client !== true) {
+              umCheck.contact_is_client = true;
+              umCheck.contact_telephone = telephone;
+            }
             const _tcCh = (umCheck.type_course || '').toLowerCase().trim();
             const _hasTypeCh = ['expedier', 'recevoir', 'deplacement'].includes(_tcCh);
             const _hasDepartCh = !!(umCheck.adresse_depart && umCheck.adresse_depart.trim()) || umCheck.gps_depart_lat != null;
             const _hasArriveeCh = !!(umCheck.adresse_arrivee && umCheck.adresse_arrivee.trim()) || umCheck.gps_arrivee_lat != null;
-            const _needsContactCh = _tcCh === 'expedier' || _tcCh === 'recevoir';
-            const _hasContactCh = !!(umCheck.contact_telephone && umCheck.contact_telephone.trim()) || umCheck.contact_is_client === true;
             const _hasCreateurCh = !!(umCheck.contact_createur_course && umCheck.contact_createur_course.trim());
 
             if (!_hasTypeCh) {
@@ -952,16 +955,30 @@ Deno.serve(async (req) => {
             } else if (!_hasArriveeCh) {
               reponseFinale = 'Quel est le lieu exact de livraison ? (indiquez le quartier ou un point de repère précis)';
             } else if (!_hasCreateurCh) {
-              reponseFinale = 'Quel est le numéro de téléphone de la personne qui crée cette course et que le livreur devra contacter en priorité ? (Si c\'est votre numéro, indiquez-le moi)';
-            } else if (_needsContactCh && !_hasContactCh) {
-              const _roleCh = _tcCh === 'expedier' ? 'destinataire' : 'expéditeur';
-              reponseFinale = `Quel est le numéro de téléphone du ${_roleCh} ? (Si vous êtes vous-même le ${_roleCh}, dites-le moi)`;
+              reponseFinale = "Je n'ai pas pu identifier votre numéro WhatsApp. Veuillez réessayer dans quelques instants.";
             } else {
-              // Toutes les infos sont présentes mais GPT n'a pas utilisé creer_course
-              // → forcer le récapitulatif et demander confirmation explicite
-              const typeLabelCh = { expedier: 'Envoi de colis', recevoir: 'Réception de colis', deplacement: 'Déplacement' }[_tcCh] || _tcCh;
-              const _contactDestCh = _tcCh === 'expedier' ? (umCheck.contact_telephone || 'Non renseigné') : _tcCh === 'recevoir' ? (umCheck.contact_telephone || 'Non renseigné') : 'Non renseigné';
-              reponseFinale = `Récapitulatif de votre demande :\n\n🚚 Type : ${typeLabelCh}\n📍 Départ : ${umCheck.adresse_depart || 'GPS'}\n🎯 Destination : ${umCheck.adresse_arrivee || 'GPS'}\n📞 Contact principal — créateur de la course : ${umCheck.contact_createur_course || 'Non renseigné'}\n📞 Contact destinataire : ${_contactDestCh}\n\nConfirmez-vous la création de cette course ? Répondez "oui" pour confirmer.`;
+              // Toutes les infos sont présentes: récupérer le cas où le modèle a
+              // annoncé la création sans choisir l'action technique correspondante.
+              if (courseActive) {
+                reponseFinale = `Vous avez déjà une course active (réf: ${(courseActive.id || '').slice(-6).toUpperCase()}).`;
+              } else {
+                const recovered = await creerCourseDepuisMemoire(
+                  base44, umCheck, countryCode, tarifs, telephone, profileName,
+                  conversation.silgapp_from_number,
+                );
+                if (recovered.success) {
+                  reponseFinale = recovered.message || 'Votre course a été créée. La recherche du livreur démarre.';
+                  courseCreee = true;
+                  umCheck.course_created = true;
+                  umCheck.course_id = recovered.course.id;
+                  pendingCourse = umCheck;
+                  await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+                    venus_pending_course: JSON.stringify(umCheck),
+                  });
+                } else {
+                  reponseFinale = recovered.message || "Je n'ai pas pu créer la course. Veuillez réessayer.";
+                }
+              }
             }
           }
         }

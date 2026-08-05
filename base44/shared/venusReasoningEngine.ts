@@ -384,7 +384,6 @@ export async function creerCourseDepuisMemoire(
     return { success: false, error: 'MISSING_TYPE' };
   }
 
-  const hasRequiredContact = cd.contact_telephone || cd.contact_is_client;
   const hasDepart = cd.adresse_depart || cd.gps_depart_lat != null;
   const hasArrivee = cd.adresse_arrivee || cd.gps_arrivee_lat != null;
   // ── contact_createur_course : AUTO = numéro WhatsApp du client ──
@@ -392,9 +391,15 @@ export async function creerCourseDepuisMemoire(
   if (!cd.contact_createur_course || !cd.contact_createur_course.trim()) {
     cd.contact_createur_course = telephone;
   }
+  // Parcours WhatsApp court: si aucun autre contact n'est fourni, le demandeur
+  // reste le contact opérationnel de la course.
+  if (!cd.contact_telephone && cd.contact_is_client !== true) {
+    cd.contact_is_client = true;
+    cd.contact_telephone = telephone;
+  }
   const hasCreateurContact = !!(cd.contact_createur_course && cd.contact_createur_course.trim());
 
-  if (!hasDepart || !hasArrivee || !hasRequiredContact || !hasCreateurContact) {
+  if (!hasDepart || !hasArrivee || !hasCreateurContact) {
     return { success: false, error: 'MISSING_INFO' };
   }
 
@@ -1022,9 +1027,9 @@ creer_course | suivre_course | contacter_livreur | annuler_course | modifier_inf
 nouvelle_course | course_en_cours | ancienne_course | paiement | livreur | partenaire | general
 
 ═══ INFOS REQUISES POUR creer_course ═══
-type_course, adresse_depart (ou GPS), adresse_arrivee (ou GPS), ET contact_telephone si type_course = expedier ou recevoir.
+type_course, adresse_depart (ou GPS), adresse_arrivee (ou GPS).
 - contact_createur_course = numéro WhatsApp du client (${input.telephone}). AUTOMATIQUE. NE JAMAIS demander.
-- "expedier": contact_telephone = DESTINATAIRE (obligatoire). "recevoir": contact_telephone = EXPÉDITEUR (obligatoire). "deplacement": contact destinataire FACULTATIF.
+- Si aucun autre contact n'est fourni, le numéro WhatsApp du demandeur est utilisé automatiquement.
 - Nom du destinataire/expéditeur FACULTATIF. Plusieurs numéros → utilise le PREMIER. Ne demande PAS lequel choisir.
 
 ═══ FLUX CRÉATION DE COURSE — LE PLUS COURT POSSIBLE ═══
@@ -1032,11 +1037,10 @@ RÈGLE D'OR: DÈS que toutes les infos sont présentes → action=creer_course I
 a) Si UNE info manque → action=poser_question (UNE SEULE question, combine plusieurs infos manquantes dans une phrase).
 b) Si TOUTES les infos sont présentes → action=creer_course DIRECTEMENT (sans demander "oui").
 c) Client corrige → mets à jour memoire_courte_update, puis recrée si tout est complet.
-MAXIMUM 3 questions: type → départ+arrivée → (destinataire si expedier). Puis CRÉATION DIRECTE.
+MAXIMUM 2 questions: type → départ+arrivée. Puis CRÉATION DIRECTE.
 Ne JAMAIS demander le numéro du créateur (auto=WhatsApp). Ne JAMAIS demander "quel numéro comme principal".
 Ne JAMAIS demander confirmation ("oui") avant de créer. CRÉE DÈS que les infos sont complètes.
 EXCEPTION: Si audio faible confiance → demande confirmation ("Si j'ai bien compris...") avant de créer.
-Si contact_telephone manquant → action=poser_question, JAMAIS creer_course.
 
 ═══ ACTIONS POSSIBLES ═══
 poser_question | creer_course | suivre_course | contacter_livreur | annuler_course | repondre_info | clarifier | saluer
@@ -1566,16 +1570,5 @@ export function genererMessageRelance(memoireCourte: any): string {
     return "Bonjour, j'attends toujours l'adresse de livraison pour finaliser votre demande. Vous pouvez m'indiquer le quartier ou partager la localisation.";
   }
 
-  const hasContact = memoireCourte.contact_telephone || memoireCourte.contact_is_client;
-  if (!hasContact) {
-    const typeLabel = memoireCourte.type_course === 'expedier' ? 'destinataire' : 'expéditeur';
-    return `Bonjour, j'attends toujours le numéro de téléphone du ${typeLabel} pour finaliser votre demande. Si vous êtes vous-même le ${typeLabel}, indiquez-le moi.`;
-  }
-
-  const hasCreateurContact = memoireCourte.contact_createur_course;
-  if (!hasCreateurContact) {
-    return "Bonjour, j'attends toujours le numéro de téléphone de la personne qui crée cette course et que le livreur devra contacter en priorité. Si c'est votre numéro, indiquez-le moi.";
-  }
-
-  return "Bonjour, votre demande est prête. Souhaitez-vous confirmer la création de cette course ? Répondez 'oui' pour confirmer.";
+  return "Bonjour, votre demande est complète et la recherche d'un livreur peut démarrer.";
 }

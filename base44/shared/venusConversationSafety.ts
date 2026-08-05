@@ -106,7 +106,6 @@ export function validateCourseDraft(draft: VenusCourseDraft | null | undefined):
   const hasType = ['expedier', 'recevoir', 'deplacement'].includes(typeCourse);
   const hasDepart = Boolean(String(next.adresse_depart || '').trim()) || next.gps_depart_lat != null;
   const hasArrivee = Boolean(String(next.adresse_arrivee || '').trim()) || next.gps_arrivee_lat != null;
-  const hasContact = Boolean(String(next.contact_telephone || '').trim()) || next.contact_is_client === true;
   const creatorContactDigits = String(next.contact_createur_course || '').replace(/\D/g, '');
   const hasCreatorContact = creatorContactDigits.length >= 8 && creatorContactDigits.length <= 15;
   const hasSchedule = Boolean(next.date_programmee || next.heure_programmee);
@@ -118,15 +117,12 @@ export function validateCourseDraft(draft: VenusCourseDraft | null | undefined):
   else if (!hasDepart) missingField = 'adresse_depart';
   else if (!hasArrivee) missingField = 'adresse_arrivee';
   else if (!hasCreatorContact) missingField = 'contact_createur_course';
-  else if (!hasContact) missingField = 'contact';
   else if (!validDate) missingField = 'date_programmee_invalide';
   else if (!validTime) missingField = 'heure_programmee_invalide';
 
-  const confirmed =
-    !missingField &&
-    next.recap_presented === true &&
-    next.confirmation_draft_id === next.draft_id &&
-    next.confirmation_revision === next.draft_revision;
+  // Le parcours WhatsApp standard crée dès que les données essentielles sont
+  // complètes. La confirmation explicite reste réservée aux entrées audio peu fiables.
+  const confirmed = !missingField;
 
   return {
     complete: !missingField,
