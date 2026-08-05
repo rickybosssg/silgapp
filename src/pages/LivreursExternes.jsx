@@ -473,7 +473,7 @@ export default function LivreursExternes() {
   ];
 
   return (
-    <div className="p-4 space-y-4 max-w-5xl mx-auto">
+    <div className="p-4 space-y-4 max-w-5xl mx-auto text-white">
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
