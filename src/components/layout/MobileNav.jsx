@@ -169,7 +169,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
                   <ChevronDown className={cn("w-4 h-4 text-white/40 flex-shrink-0 transition-transform", countryOpen && "rotate-180")} />
                 </button>
                 {countryOpen && (
-                  <div className="mt-1 border border-white/8 rounded-xl bg-[#2a2f36] shadow-lg max-h-56 overflow-y-auto">
+                  <div className="mt-1 border border-white/8 rounded-xl bg-[hsl(215 18% 28%)] shadow-lg max-h-56 overflow-y-auto">
                     {PAYS_SILGAPP.map((p) => (
                       <button
                         key={p.code}

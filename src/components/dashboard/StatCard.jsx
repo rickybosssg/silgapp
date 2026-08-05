@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 export default function StatCard({ title, value, icon: Icon, trend, trendLabel, className, iconBg, onClick }) {
   return (
     <Card
-      className={cn("p-5 relative overflow-hidden bg-[#2a2f36] border-white/8 text-white", onClick && "cursor-pointer hover:shadow-md hover:border-[#00a86b]/40 transition-all active:scale-95", className)}
+      className={cn("p-5 relative overflow-hidden bg-[hsl(215 18% 28%)] border-white/8 text-white", onClick && "cursor-pointer hover:shadow-md hover:border-[#00a86b]/40 transition-all active:scale-95", className)}
       onClick={onClick}
     >
       <div className="flex items-start justify-between">
