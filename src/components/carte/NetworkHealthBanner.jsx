@@ -15,8 +15,8 @@ function getNetworkHealth({ libres, enCourse, clientsGPS, clientsTotal, enAttent
       heart: "",
       label: "Réseau inactif",
       description: "Aucun utilisateur actif visible.",
-      bg: "bg-gray-100 border-gray-300",
-      text: "text-gray-700",
+      bg: "bg-white/5 border-white/10",
+      text: "text-white/70",
     };
   }
 
@@ -26,8 +26,8 @@ function getNetworkHealth({ libres, enCourse, clientsGPS, clientsTotal, enAttent
       heart: "",
       label: "Activité faible",
       description: "Très peu d'utilisateurs actifs sur le réseau.",
-      bg: "bg-yellow-50 border-yellow-300",
-      text: "text-yellow-800",
+      bg: "bg-amber-500/10 border-amber-500/20",
+      text: "text-amber-400",
     };
   }
 
@@ -37,8 +37,8 @@ function getNetworkHealth({ libres, enCourse, clientsGPS, clientsTotal, enAttent
       heart: "",
       label: "Réseau opérationnel",
       description: "Utilisateurs actifs et opérationnels.",
-      bg: "bg-green-50 border-green-300",
-      text: "text-green-800",
+      bg: "bg-[#00a86b]/10 border-[#00a86b]/20",
+      text: "text-[#00a86b]",
     };
   }
 
@@ -47,8 +47,8 @@ function getNetworkHealth({ libres, enCourse, clientsGPS, clientsTotal, enAttent
     heart: "",
     label: "Activité en cours",
     description: "Livreurs en mission, réseau actif.",
-    bg: "bg-orange-50 border-orange-300",
-    text: "text-orange-800",
+    bg: "bg-orange-500/10 border-orange-500/20",
+    text: "text-orange-400",
   };
 }
 
@@ -84,10 +84,10 @@ export default function NetworkHealthBanner({ libres, enCourse, clientsGPS, clie
 
 function StatItem({ emoji, label, value }) {
   return (
-    <span className="flex items-center gap-1 text-xs text-gray-700 font-medium whitespace-nowrap">
+    <span className="flex items-center gap-1 text-xs text-white/80 font-medium whitespace-nowrap">
       <span>{emoji}</span>
-      <span className="font-bold">{value}</span>
-      <span className="text-gray-500 font-normal">{label}</span>
+      <span className="font-bold text-white">{value}</span>
+      <span className="text-white/50 font-normal">{label}</span>
     </span>
   );
 }
