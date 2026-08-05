@@ -251,7 +251,7 @@ export default function AdminCourseForm() {
         </div>
 
         {/* Type de course — cartes raffinées */}
-        <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 overflow-hidden">
+        <div className="force-light bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 overflow-hidden">
           <div className="px-5 pt-4 pb-1">
             <div className="flex items-center gap-2 mb-1">
               <div className="w-1 h-4 bg-gradient-to-b from-rose-500 to-orange-500 rounded-full" />
@@ -306,7 +306,7 @@ export default function AdminCourseForm() {
         </div>
 
         {/* Détails — trajet visuel */}
-        <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 p-5 space-y-4">
+        <div className="force-light bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 p-5 space-y-4">
           <div className="flex items-center gap-2">
             <div className="w-1 h-4 bg-gradient-to-b from-orange-500 to-amber-500 rounded-full" />
             <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Itinéraire</p>
@@ -433,7 +433,7 @@ export default function AdminCourseForm() {
         </div>
 
         {/* Contacts */}
-        <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 p-5 space-y-4">
+        <div className="force-light bg-white rounded-[1.5rem] border border-gray-100 shadow-lg shadow-gray-100/50 p-5 space-y-4">
           <div className="flex items-center gap-2">
             <div className="w-1 h-4 bg-gradient-to-b from-sky-500 to-blue-500 rounded-full" />
             <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Contacts</p>
