@@ -7,18 +7,18 @@
 @layer base {
   :root {
     --font-inter: 'Inter', sans-serif;
-    --background: 215 14% 18%;
+    --background: 215 18% 24%;
     --foreground: 0 0% 95%;
-    --card: 215 14% 22%;
+    --card: 215 18% 28%;
     --card-foreground: 0 0% 95%;
-    --popover: 215 14% 22%;
+    --popover: 215 18% 28%;
     --popover-foreground: 0 0% 95%;
     --primary: 152 100% 34%;
     --primary-foreground: 0 0% 100%;
     --secondary: 45 100% 51%;
     --secondary-foreground: 0 0% 8%;
-    --muted: 215 14% 26%;
-    --muted-foreground: 0 0% 60%;
+    --muted: 215 18% 32%;
+    --muted-foreground: 0 0% 65%;
     --accent: 152 100% 34%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 72% 51%;
@@ -32,13 +32,13 @@
     --chart-4: 220 70% 50%;
     --chart-5: 280 65% 60%;
     --radius: 0.625rem;
-    --sidebar-background: 215 14% 14%;
+    --sidebar-background: 215 18% 20%;
     --sidebar-foreground: 0 0% 95%;
     --sidebar-primary: 152 100% 34%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 215 14% 20%;
+    --sidebar-accent: 215 18% 26%;
     --sidebar-accent-foreground: 0 0% 95%;
-    --sidebar-border: 0 0% 16%;
+    --sidebar-border: 0 0% 24%;
     --sidebar-ring: 152 100% 34%;
   }
 
