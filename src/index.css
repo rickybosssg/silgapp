@@ -7,39 +7,39 @@
 @layer base {
   :root {
     --font-inter: 'Inter', sans-serif;
-    --background: 0 0% 97%;
-    --foreground: 0 0% 8%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 8%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 8%;
-    --primary: 0 80% 50%;
+    --background: 210 6% 10%;
+    --foreground: 0 0% 95%;
+    --card: 210 6% 14%;
+    --card-foreground: 0 0% 95%;
+    --popover: 210 6% 14%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 152 100% 34%;
     --primary-foreground: 0 0% 100%;
     --secondary: 45 100% 51%;
     --secondary-foreground: 0 0% 8%;
-    --muted: 0 0% 93%;
-    --muted-foreground: 0 0% 40%;
-    --accent: 142 70% 45%;
+    --muted: 210 6% 18%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 152 100% 34%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 84% 60%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 88%;
-    --input: 0 0% 88%;
-    --ring: 0 80% 50%;
-    --chart-1: 0 80% 50%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 152 100% 34%;
+    --chart-1: 152 100% 34%;
     --chart-2: 45 100% 51%;
     --chart-3: 142 70% 45%;
     --chart-4: 220 70% 50%;
     --chart-5: 280 65% 60%;
     --radius: 0.625rem;
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 0 0% 8%;
-    --sidebar-primary: 0 80% 50%;
+    --sidebar-background: 210 6% 7%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 152 100% 34%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 95%;
-    --sidebar-accent-foreground: 0 0% 8%;
-    --sidebar-border: 0 0% 90%;
-    --sidebar-ring: 0 80% 50%;
+    --sidebar-accent: 210 6% 16%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 0 0% 16%;
+    --sidebar-ring: 152 100% 34%;
   }
 
   .dark {
@@ -178,22 +178,78 @@
     /* minimum contrast garantit */
   }
 
+  /* ── Override global : bg-white et bg-slate-50 → thème sombre SilgaMoney ── */
+  /* Sauf écran auth et composants explicites en clair */
+  .bg-white:not(.silgapp-auth-screen *):not(.force-light) {
+    background-color: hsl(210 6% 14%) !important;
+  }
+  .bg-slate-50:not(.silgapp-auth-screen *):not(.force-light) {
+    background-color: hsl(210 6% 10%) !important;
+  }
+  .bg-gray-50:not(.silgapp-auth-screen *):not(.force-light) {
+    background-color: hsl(210 6% 10%) !important;
+  }
+  .bg-gray-100:not(.silgapp-auth-screen *):not(.force-light) {
+    background-color: hsl(210 6% 16%) !important;
+  }
+
+  /* Textes gris foncé → clairs pour fond sombre */
+  .text-slate-800:not(.silgapp-auth-screen *):not(.force-light) {
+    color: #f1f5f9 !important;
+  }
+  .text-slate-700:not(.silgapp-auth-screen *):not(.force-light) {
+    color: #e2e8f0 !important;
+  }
+  .text-slate-600:not(.silgapp-auth-screen *):not(.force-light) {
+    color: #cbd5e1 !important;
+  }
+  .text-slate-500:not(.silgapp-auth-screen *):not(.force-light) {
+    color: #94a3b8 !important;
+  }
+  .text-slate-400:not(.silgapp-auth-screen *):not(.force-light) {
+    color: #64748b !important;
+  }
+  .text-gray-800:not(.silgapp-auth-screen *):not(.force-light) {
+    color: #f1f5f9 !important;
+  }
+  .text-gray-700:not(.silgapp-auth-screen *):not(.force-light) {
+    color: #e2e8f0 !important;
+  }
+  .text-gray-600:not(.silgapp-auth-screen *):not(.force-light) {
+    color: #cbd5e1 !important;
+  }
+  .text-gray-500:not(.silgapp-auth-screen *):not(.force-light) {
+    color: #94a3b8 !important;
+  }
+  .text-gray-400:not(.silgapp-auth-screen *):not(.force-light) {
+    color: #64748b !important;
+  }
+
+  /* Borders clairs → sombres */
+  .border-slate-200:not(.silgapp-auth-screen *):not(.force-light),
+  .border-slate-100:not(.silgapp-auth-screen *):not(.force-light) {
+    border-color: hsl(0 0% 20%) !important;
+  }
+  .border-gray-200:not(.silgapp-auth-screen *):not(.force-light),
+  .border-gray-100:not(.silgapp-auth-screen *):not(.force-light) {
+    border-color: hsl(0 0% 20%) !important;
+  }
+
   .bg-white.text-gray-300,
   .bg-white .text-gray-300,
   .bg-gray-50.text-gray-300,
   .bg-gray-50 .text-gray-300 {
-    color: #6b7280 !important; /* gray-500 */
+    color: #94a3b8 !important;
   }
 
   .bg-white.text-gray-400,
   .bg-white .text-gray-400,
   .bg-gray-50.text-gray-400,
-  .bg-gray-50 .text-gray-400,
   .border-gray-100.text-gray-400,
   .border-gray-100 .text-gray-400,
   .border-gray-200.text-gray-400,
   .border-gray-200 .text-gray-400 {
-    color: #4b5563 !important; /* gray-600 */
+    color: #64748b !important;
   }
 
   .bg-white .text-white\/40,
@@ -202,7 +258,7 @@
   .bg-gray-50 .text-white\/40,
   .bg-gray-50 .text-white\/50,
   .bg-gray-50 .text-white\/60 {
-    color: #374151 !important; /* gray-700 */
+    color: #94a3b8 !important;
   }
 
   .text-white\/30,
