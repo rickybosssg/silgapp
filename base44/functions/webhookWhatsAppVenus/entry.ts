@@ -814,15 +814,19 @@ Deno.serve(async (req) => {
             // Si un champ manque → on surcharge l'action en poser_question et on demande
             // l'info manquante. JAMAIS de création avec des infos incomplètes.
             const um = { ...(pendingCourse || {}), ...reasoningResult.memoire_courte_update };
+            // ── AUTO-REMPLIR contact_createur_course avec le numéro WhatsApp ──
+            if (!um.contact_createur_course || !um.contact_createur_course.trim()) {
+              um.contact_createur_course = telephone;
+            }
             const _tc = (um.type_course || '').toLowerCase().trim();
             const _hasType = ['expedier', 'recevoir', 'deplacement'].includes(_tc);
             const _hasDepart = !!(um.adresse_depart && um.adresse_depart.trim()) || um.gps_depart_lat != null;
             const _hasArrivee = !!(um.adresse_arrivee && um.adresse_arrivee.trim()) || um.gps_arrivee_lat != null;
             const _needsContact = _tc === 'expedier' || _tc === 'recevoir';
             const _hasContact = !!(um.contact_telephone && um.contact_telephone.trim()) || um.contact_is_client === true;
-            // ── contact_createur_course : OBLIGATOIRE pour toute course VENUS ──
+            // ── contact_createur_course : AUTO = numéro WhatsApp du client ──
             const _createurDigits = (um.contact_createur_course || '').replace(/\D/g, '');
-            const _hasCreateurContact = !!(um.contact_createur_course && um.contact_createur_course.trim()) && _createurDigits.length >= 8 && _createurDigits.length <= 15;
+            const _hasCreateurContact = _createurDigits.length >= 8 && _createurDigits.length <= 15;
 
             let _missingField = '';
             if (!_hasType) _missingField = 'type_course';
@@ -841,8 +845,6 @@ Deno.serve(async (req) => {
                 _askMsg = 'Quel est le lieu exact de récupération ? (indiquez le quartier ou un point de repère précis)';
               } else if (_missingField === 'adresse_arrivee') {
                 _askMsg = 'Quel est le lieu exact de livraison ? (indiquez le quartier ou un point de repère précis)';
-              } else if (_missingField === 'contact_createur_course') {
-                _askMsg = 'Quel est le numéro de téléphone de la personne qui crée cette course et que le livreur devra contacter en priorité ? (Si c\'est votre numéro, indiquez-le moi)';
               } else if (_missingField === 'contact') {
                 const _role = _tc === 'expedier' ? 'destinataire' : 'expéditeur';
                 _askMsg = `Quel est le numéro de téléphone du ${_role} ? (Si vous êtes vous-même le ${_role}, dites-le moi)`;
