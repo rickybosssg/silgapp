@@ -158,12 +158,12 @@
   input:not([type="checkbox"]):not([type="radio"]),
   textarea,
   select {
-    color: #ffffff;
+    color: #111827;
     font-size: 0.9375rem; /* 15px — lisible sur mobile */
   }
   input::placeholder,
   textarea::placeholder {
-    color: #94a3b8; /* slate-400 */
+    color: #6b7280; /* gray-500 — visible sur fond blanc */
     opacity: 1;
   }
   /* Inputs sur fond explicitement clair (force-light) */

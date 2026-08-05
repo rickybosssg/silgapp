@@ -33,7 +33,7 @@ export default function MonCodePromo({ clientProfil }) {
   };
 
   return (
-    <Card className="p-4 border-2 border-purple-200 bg-purple-50">
+    <Card className="p-4 border-2 border-purple-200 bg-purple-50 force-light">
       <div className="flex items-center gap-2 mb-3">
         <Tag className="w-5 h-5 text-purple-600" />
         <h3 className="font-bold text-purple-900">Mon code promo</h3>

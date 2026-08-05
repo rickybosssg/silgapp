@@ -60,7 +60,7 @@ export default function OngletCodePromoPartenaire({ partenaireId }) {
   };
 
   return (
-    <div className="space-y-4 pb-6">
+    <div className="space-y-4 pb-6 force-light">
       <Card className="p-5 bg-gradient-to-br from-purple-600 to-pink-600 border-0 shadow-lg">
         <div className="flex items-center gap-2 mb-3">
           <Gift className="w-5 h-5 text-white" />
