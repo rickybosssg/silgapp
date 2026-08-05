@@ -132,41 +132,41 @@ export default function OngletCodePromoLivreur({ livreurProfil }) {
       {onglet === "stats" && (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <Card className="p-4 bg-blue-50 border-blue-200">
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl shadow-sm">
               <div className="flex items-center gap-2 mb-1">
                 <Users className="w-4 h-4 text-blue-600" />
                 <p className="text-xs text-blue-700 font-semibold">Inscrits</p>
               </div>
               <p className="text-3xl font-black text-blue-700">{monCode.nb_inscrits || 0}</p>
               <p className="text-xs text-blue-500 mt-1">amis recrutés</p>
-            </Card>
+            </div>
 
-            <Card className="p-4 bg-green-50 border-green-200">
+            <div className="p-4 bg-green-50 border border-green-200 rounded-xl shadow-sm">
               <div className="flex items-center gap-2 mb-1">
                 <TrendingUp className="w-4 h-4 text-green-600" />
                 <p className="text-xs text-green-700 font-semibold">1ères courses</p>
               </div>
               <p className="text-3xl font-black text-green-700">{monCode.nb_premieres_courses || 0}</p>
               <p className="text-xs text-green-500 mt-1">courses validées</p>
-            </Card>
+            </div>
 
-            <Card className="p-4 bg-purple-50 border-purple-200">
+            <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl shadow-sm">
               <div className="flex items-center gap-2 mb-1">
                 <Gift className="w-4 h-4 text-purple-600" />
                 <p className="text-xs text-purple-700 font-semibold">Primes gagnées</p>
               </div>
               <p className="text-3xl font-black text-purple-700">{totalGagne.toLocaleString()}</p>
               <p className="text-xs text-purple-500 mt-1">FCFA déduits du dû</p>
-            </Card>
+            </div>
 
-            <Card className="p-4 bg-orange-50 border-orange-200">
+            <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl shadow-sm">
               <div className="flex items-center gap-2 mb-1">
                 <TrendingUp className="w-4 h-4 text-orange-600" />
                 <p className="text-xs text-orange-700 font-semibold">Taux conversion</p>
               </div>
               <p className="text-3xl font-black text-orange-700">{tauxConversion}%</p>
               <p className="text-xs text-orange-500 mt-1">inscrits → courses</p>
-            </Card>
+            </div>
           </div>
 
           {monCode.nb_inscrits > 0 && (

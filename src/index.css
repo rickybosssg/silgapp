@@ -176,6 +176,23 @@
   .force-light textarea::placeholder {
     color: #64748b;
   }
+  /* ── Cartes (bg-card) en blanc à l'intérieur de force-light ── */
+  .force-light .bg-card {
+    background-color: rgb(255 255 255) !important;
+  }
+  /* ── Empêcher la conversion des fonds clairs sur les inputs ── */
+  /* bg-gray-50 et bg-white sur les inputs restent clairs (pas de conversion sombre) */
+  /* pour que le texte foncé (#111827) reste lisible */
+  input.bg-gray-50,
+  textarea.bg-gray-50,
+  select.bg-gray-50 {
+    background-color: rgb(249 250 251) !important;
+  }
+  input.bg-white,
+  textarea.bg-white,
+  select.bg-white {
+    background-color: rgb(255 255 255) !important;
+  }
   /* Messages d'erreur toujours bien lisibles */
   .text-red-400 { color: #dc2626 !important; } /* forcer red-600 au lieu de red-400 sur fond blanc */
   .text-muted-foreground {
