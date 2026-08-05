@@ -349,19 +349,19 @@ export default function PartenaireDashboard() {
     : commandes.filter(c => !["livree", "annulee"].includes(c.statut)).length;
 
   return (
-    <div className="min-h-screen bg-[#16191d] pb-20">
+    <div className="min-h-screen bg-[#f5f5f7] pb-24 text-[#1d1d1f]">
       {/* ── En-tête premium ── */}
-      <div className="bg-gradient-to-br from-[#0d1014] via-[#1f2429] to-[#0d1014] text-white px-4 py-4 sticky top-0 z-20 shadow-lg border-b-2 border-[#00a86b]/30">
+      <div className="bg-white/90 backdrop-blur-xl text-slate-900 px-4 py-4 sticky top-0 z-20 shadow-[0_8px_30px_rgba(15,23,42,0.06)] border-b border-black/5">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center overflow-hidden flex-shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#007aff] flex items-center justify-center overflow-hidden flex-shrink-0 border border-blue-100">
               {etablissement.logo_url
                 ? <img src={etablissement.logo_url} alt="logo" className="w-full h-full object-cover" />
                 : (etablissementType === "boutique" ? <Store className="w-6 h-6" /> : etablissementType === "restaurant" ? <UtensilsCrossed className="w-6 h-6" /> : <Pill className="w-6 h-6" />)}
             </div>
             <div className="min-w-0">
               <h1 className="text-lg font-black leading-tight truncate">{etablissement.nom}</h1>
-              <div className="flex items-center gap-1.5 text-white/70 text-xs">
+              <div className="flex items-center gap-1.5 text-slate-500 text-xs">
                 <MapPin className="w-3 h-3 flex-shrink-0" />
                 <span className="truncate">{etablissement.quartier || etablissement.ville || ""}</span>
                 <span className={"w-1.5 h-1.5 rounded-full flex-shrink-0 " + (etablissement.ouvert ? "bg-green-400" : "bg-red-400")} />
@@ -370,7 +370,7 @@ export default function PartenaireDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors">
+            <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="w-9 h-9 rounded-xl bg-blue-50 text-[#007aff] flex items-center justify-center hover:bg-blue-100 transition-colors border border-blue-100">
               <LogOut className="w-4 h-4" />
             </button>
           </div>
@@ -384,7 +384,7 @@ export default function PartenaireDashboard() {
         {tab === "produits" && !hasPharmacie && <ProduitsManager type={etablissementType} etablissementId={etablissement.id} />}
         {tab === "livraisons" && hasPharmacie && <PharmacieLivraisons pharmacieId={etablissement.id} pharmacieNom={etablissement.nom} onNavigate={setTab} />}
         {tab === "messages" && (
-          <div className="bg-[#1f2429] rounded-2xl border border-white/8 shadow-sm overflow-hidden h-[calc(100dvh-180px)]">
+          <div className="bg-white rounded-2xl border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] overflow-hidden h-[calc(100dvh-180px)]">
             <MessagesPage myType="partenaire" myId={etablissement.id} myName={etablissement.nom} />
           </div>
         )}

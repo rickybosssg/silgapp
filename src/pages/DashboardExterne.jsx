@@ -27,10 +27,8 @@ function KpiCard({ label, value, icon: Icon, color, suffix, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`group relative overflow-hidden rounded-2xl p-3 lg:p-4 text-left transition-all duration-200 hover:scale-[1.02] hover:shadow-lg ${color} text-white`}
+      className={`group relative overflow-hidden rounded-2xl p-3 lg:p-4 text-left transition-all duration-200 hover:scale-[1.02] hover:shadow-lg ${color} text-white shadow-[0_8px_24px_rgba(15,23,42,0.08)] border border-white/15`}
     >
-      <div className="absolute -top-4 -right-4 w-20 h-20 rounded-full bg-white/10" />
-      <div className="absolute -bottom-6 -right-2 w-16 h-16 rounded-full bg-white/5" />
       <div className="relative">
         <div className="flex items-center justify-between mb-2 lg:mb-3">
           <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
@@ -166,17 +164,11 @@ export default function DashboardExterne() {
   const taux = stats.total > 0 ? Math.round((stats.livrees / stats.total) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-[hsl(215 18% 24%)] text-white">
+    <div className="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
       <div className="px-4 py-4 lg:px-6 lg:py-6 space-y-5 max-w-7xl mx-auto">
 
         {/* ── HERO HEADER ─────────────────────────────────── */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-5 sm:p-6 shadow-2xl">
-          {/* Décoration */}
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-500/10 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
-          </div>
-
+        <div className="relative overflow-hidden rounded-3xl bg-[#0879e8] p-5 sm:p-6 shadow-[0_18px_45px_rgba(0,122,255,0.24)] border border-white/20">
           <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <Link to="/">
@@ -283,13 +275,13 @@ export default function DashboardExterne() {
 
         {/* ── KPI CARDS ───────────────────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2 lg:gap-3">
-          <KpiCard label="Clients" value={compteursClients.total} icon={Users} color="bg-gradient-to-br from-violet-500 to-purple-600" onClick={() => setStatModal({ type: "clients", data: clients })} />
-          <KpiCard label="Courses" value={stats.total} icon={Package} color="bg-gradient-to-br from-blue-500 to-indigo-600" />
-          <KpiCard label="En cours" value={stats.enCours} icon={Clock} color="bg-gradient-to-br from-amber-500 to-orange-500" onClick={() => setStatModal({ type: "en_traitement", data: coursesEnTraitement })} />
-          <KpiCard label="Livrées" value={stats.livrees} icon={CheckCircle2} color="bg-gradient-to-br from-emerald-500 to-teal-500" onClick={() => setStatModal({ type: "livrees", data: coursesTerminees.filter(c => c.statut === "livree") })} />
-          <KpiCard label="Annulées" value={stats.annulees} icon={XCircle} color="bg-gradient-to-br from-rose-500 to-red-600" onClick={() => setStatModal({ type: "annulees", data: coursesTerminees.filter(c => c.statut === "annulee") })} />
-          <KpiCard label="CA du jour" value={stats.ca > 999 ? `${Math.round(stats.ca/1000)}k` : stats.ca} suffix={stats.ca <= 999 ? "F" : "F"} icon={TrendingUp} color="bg-gradient-to-br from-cyan-500 to-blue-500" onClick={() => setStatModal({ type: "ca", data: coursesTerminees.filter(c => c.statut === "livree") })} />
-          <KpiCard label="Disponibles" value={stats.libres} icon={Truck} color="bg-gradient-to-br from-primary to-red-600" onClick={() => setStatModal({ type: "livreurs_dispo", data: livreursEnLigne.filter(l => l.statut === "disponible") })} />
+          <KpiCard label="Clients" value={compteursClients.total} icon={Users} color="bg-[#5856d6]" onClick={() => setStatModal({ type: "clients", data: clients })} />
+          <KpiCard label="Courses" value={stats.total} icon={Package} color="bg-[#007aff]" />
+          <KpiCard label="En cours" value={stats.enCours} icon={Clock} color="bg-[#ff9500]" onClick={() => setStatModal({ type: "en_traitement", data: coursesEnTraitement })} />
+          <KpiCard label="Livrées" value={stats.livrees} icon={CheckCircle2} color="bg-[#30b85a]" onClick={() => setStatModal({ type: "livrees", data: coursesTerminees.filter(c => c.statut === "livree") })} />
+          <KpiCard label="Annulées" value={stats.annulees} icon={XCircle} color="bg-[#ff3b30]" onClick={() => setStatModal({ type: "annulees", data: coursesTerminees.filter(c => c.statut === "annulee") })} />
+          <KpiCard label="CA du jour" value={stats.ca > 999 ? `${Math.round(stats.ca/1000)}k` : stats.ca} suffix={stats.ca <= 999 ? "F" : "F"} icon={TrendingUp} color="bg-[#5ac8fa]" onClick={() => setStatModal({ type: "ca", data: coursesTerminees.filter(c => c.statut === "livree") })} />
+          <KpiCard label="Disponibles" value={stats.libres} icon={Truck} color="bg-[#00a86b]" onClick={() => setStatModal({ type: "livreurs_dispo", data: livreursEnLigne.filter(l => l.statut === "disponible") })} />
         </div>
 
         {/* ── SANTÉ DU DISPATCH ──────────────────────────── */}
@@ -302,10 +294,10 @@ export default function DashboardExterne() {
         <div>
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-1">Activité en direct</p>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="bg-[#1f2429] rounded-2xl border border-white/8 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] overflow-hidden">
               <ClientsEnLigne clients={clientsEnLigne} />
             </div>
-            <div className="bg-[#1f2429] rounded-2xl border border-white/8 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] overflow-hidden">
               <LivreursEnLigne livreurs={livreursEnLigne} />
             </div>
           </div>
@@ -314,7 +306,7 @@ export default function DashboardExterne() {
         {/* ── COURSES EN COURS ────────────────────────────── */}
         <div>
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-1">Courses en cours</p>
-          <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] overflow-hidden">
             <CoursesEnTraitement
               courses={filtreTypeDashboard === "tous" ? coursesEnTraitement : coursesEnTraitement.filter(c => c.type_course === filtreTypeDashboard)}
               onView={setSelectedCourse}
@@ -326,7 +318,7 @@ export default function DashboardExterne() {
         {/* ── HISTORIQUE DU JOUR ──────────────────────────── */}
         <div>
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-1">Historique du jour</p>
-          <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] overflow-hidden">
             <CoursesTerminees
               courses={coursesTerminees}
               onView={setSelectedCourse}

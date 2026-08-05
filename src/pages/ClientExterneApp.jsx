@@ -889,7 +889,7 @@ export default function ClientExterneApp() {
   const prenom = (clientProfil?.prenom || (clientProfil?.nom || "").split(" ")[0] || "Client").trim() || "Client";
 
   return (
-    <div className="min-h-screen bg-[#16191d] text-white">
+    <div className="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
       <PullToRefreshIndicator pulling={pulling} refreshing={refreshing} />
 
       {/* ── COURSES ACTIVES — bannière flottante ─────── */}
@@ -936,21 +936,21 @@ export default function ClientExterneApp() {
         </div>
       )}
 
-      <div className="px-4 pb-24" style={coursesActives.length > 0 ? { paddingTop: `${coursesActives.length * 76 + 16}px` } : { paddingTop: "16px" }}>
+      <div className="px-4 pb-32" style={coursesActives.length > 0 ? { paddingTop: `${coursesActives.length * 76 + 16}px` } : { paddingTop: "16px" }}>
         <div className="max-w-lg mx-auto space-y-4">
 
           {/* ── ONGLETS PROMO ─────────────────────── */}
           {canShowCodePromo && (
-            <div className="flex bg-[#1f2429] rounded-2xl p-1 gap-1 shadow-sm border border-white/8">
+            <div className="flex bg-white/90 backdrop-blur-xl rounded-2xl p-1 gap-1 shadow-[0_8px_30px_rgba(15,23,42,0.06)] border border-black/5">
               <button
                 onClick={() => setOngletActif("accueil")}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${ongletActif === "accueil" ? "bg-[#00a86b] text-white shadow" : "text-white/50 hover:text-white/80"}`}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${ongletActif === "accueil" ? "bg-[#007aff] text-white shadow-sm" : "text-slate-500 hover:text-slate-900"}`}
               >
                  Accueil
               </button>
               <button
                 onClick={() => setOngletActif("promo")}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${ongletActif === "promo" ? "bg-[#00a86b] text-white shadow" : "text-white/50 hover:text-white/80"}`}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${ongletActif === "promo" ? "bg-[#007aff] text-white shadow-sm" : "text-slate-500 hover:text-slate-900"}`}
               >
                  Code Promo
               </button>
@@ -997,11 +997,8 @@ export default function ClientExterneApp() {
               <PubliciteCarousel cible="clients" userId={clientProfil?.id} userType="client" />
 
               {/* ── HERO HEADER ───────────────────── */}
-              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-blue-800 to-sky-700 p-5 shadow-xl shadow-blue-200">
-                {/* Cercles déco */}
-                <div className="absolute -top-6 -right-6 w-28 h-28 bg-white/10 rounded-full" />
-                <div className="absolute -bottom-8 -left-4 w-36 h-36 bg-sky-300/10 rounded-full" />
-                <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-sky-300 via-emerald-300 to-blue-200" />
+              <div className="relative overflow-hidden rounded-3xl bg-[#0879e8] p-5 shadow-[0_18px_45px_rgba(0,122,255,0.24)] border border-white/20">
+                <div className="absolute inset-x-0 bottom-0 h-1 bg-white/25" />
                 <div className="relative">
                   <div className="flex items-start justify-between">
                     <div>
@@ -1041,10 +1038,10 @@ export default function ClientExterneApp() {
               {/* ── ACTIONS PRINCIPALES ───────────── */}
               <div className="grid grid-cols-2 gap-3">
                 <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-blue-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-blue-200"
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 text-left active:scale-[0.97] transition-all hover:shadow-md"
                   onClick={() => navigate("/client/course/expedier", { state: { position, clientProfil } })}
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-700 to-sky-500 flex items-center justify-center shadow-lg shadow-blue-200 mb-2 group-hover:scale-105 transition-transform">
+                  <div className="w-12 h-12 rounded-2xl bg-[#007aff] flex items-center justify-center shadow-sm mb-2 group-hover:scale-105 transition-transform">
                     <Package className="w-5 h-5 text-white" />
                   </div>
                   <p className="font-black text-gray-900 text-xs">Expédier</p>
@@ -1052,10 +1049,10 @@ export default function ClientExterneApp() {
                 </button>
 
                 <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-emerald-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-emerald-200"
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 text-left active:scale-[0.97] transition-all hover:shadow-md"
                   onClick={() => navigate("/client/course/recevoir", { state: { position, clientProfil } })}
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-lg shadow-green-200 mb-2 group-hover:scale-105 transition-transform">
+                  <div className="w-12 h-12 rounded-2xl bg-[#30b85a] flex items-center justify-center shadow-sm mb-2 group-hover:scale-105 transition-transform">
                     <Inbox className="w-5 h-5 text-white" />
                   </div>
                   <p className="font-black text-gray-900 text-xs">Recevoir</p>
@@ -1063,10 +1060,10 @@ export default function ClientExterneApp() {
                 </button>
 
                 <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-sky-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-sky-200"
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 text-left active:scale-[0.97] transition-all hover:shadow-md"
                   onClick={() => navigate("/client/course/deplacement", { state: { position, clientProfil } })}
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center shadow-lg shadow-sky-200 mb-2 group-hover:scale-105 transition-transform">
+                  <div className="w-12 h-12 rounded-2xl bg-[#5ac8fa] flex items-center justify-center shadow-sm mb-2 group-hover:scale-105 transition-transform">
                     <Car className="w-5 h-5 text-white" />
                   </div>
                   <p className="font-black text-gray-900 text-xs">Déplacement</p>
@@ -1074,10 +1071,10 @@ export default function ClientExterneApp() {
                 </button>
 
                 <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-violet-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-violet-200"
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 text-left active:scale-[0.97] transition-all hover:shadow-md"
                   onClick={() => setShowMessages(true)}
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-lg shadow-purple-200 mb-2 group-hover:scale-105 transition-transform">
+                  <div className="w-12 h-12 rounded-2xl bg-[#af52de] flex items-center justify-center shadow-sm mb-2 group-hover:scale-105 transition-transform">
                     <MessageCircle className="w-5 h-5 text-white" />
                   </div>
                   <p className="font-black text-gray-900 text-xs">Messages</p>
@@ -1085,10 +1082,10 @@ export default function ClientExterneApp() {
                 </button>
 
                 <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-cyan-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-cyan-200"
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 text-left active:scale-[0.97] transition-all hover:shadow-md"
                   onClick={() => navigate("/payer-silgapp")}
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-600 to-blue-700 flex items-center justify-center shadow-lg shadow-cyan-200 mb-2 group-hover:scale-105 transition-transform">
+                  <div className="w-12 h-12 rounded-2xl bg-[#007aff] flex items-center justify-center shadow-sm mb-2 group-hover:scale-105 transition-transform">
                     <Wallet className="w-5 h-5 text-white" />
                   </div>
                   <p className="font-black text-gray-900 text-xs">Payer SILGAPP</p>
@@ -1096,10 +1093,10 @@ export default function ClientExterneApp() {
                 </button>
 
                 <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-blue-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-blue-200"
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 text-left active:scale-[0.97] transition-all hover:shadow-md"
                   onClick={() => navigate("/client/boutiques")}
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-200 mb-2 group-hover:scale-105 transition-transform">
+                  <div className="w-12 h-12 rounded-2xl bg-[#5856d6] flex items-center justify-center shadow-sm mb-2 group-hover:scale-105 transition-transform">
                     <Store className="w-5 h-5 text-white" />
                   </div>
                   <p className="font-black text-gray-900 text-xs">Boutiques</p>
@@ -1107,10 +1104,10 @@ export default function ClientExterneApp() {
                 </button>
 
                 <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-amber-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-amber-200"
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 text-left active:scale-[0.97] transition-all hover:shadow-md"
                   onClick={() => navigate("/client/restaurants")}
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg shadow-orange-200 mb-2 group-hover:scale-105 transition-transform">
+                  <div className="w-12 h-12 rounded-2xl bg-[#ff9500] flex items-center justify-center shadow-sm mb-2 group-hover:scale-105 transition-transform">
                     <UtensilsCrossed className="w-5 h-5 text-white" />
                   </div>
                   <p className="font-black text-gray-900 text-xs">Restaurants</p>
@@ -1118,10 +1115,10 @@ export default function ClientExterneApp() {
                 </button>
 
                 <button
-                  className="group relative overflow-hidden rounded-2xl bg-white border border-emerald-100 shadow-sm p-5 text-left active:scale-[0.97] transition-all hover:shadow-md hover:border-emerald-200"
+                  className="group relative overflow-hidden rounded-2xl bg-white border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.07)] p-5 text-left active:scale-[0.97] transition-all hover:shadow-md"
                   onClick={() => navigate("/client/pharmacies")}
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-700 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-200 mb-2 group-hover:scale-105 transition-transform">
+                  <div className="w-12 h-12 rounded-2xl bg-[#00a86b] flex items-center justify-center shadow-sm mb-2 group-hover:scale-105 transition-transform">
                     <Pill className="w-5 h-5 text-white" />
                   </div>
                   <p className="font-black text-gray-900 text-xs">Pharmacies</p>
@@ -1132,7 +1129,7 @@ export default function ClientExterneApp() {
               {/* ── BOUTON CARTE ──────────────────── */}
               {position && (
                 <button
-                  className="w-full bg-white border border-blue-100 rounded-2xl p-4 flex items-center gap-3 shadow-sm hover:shadow-md hover:border-blue-200 transition-all active:scale-[0.98]"
+                  className="w-full bg-white border border-black/5 rounded-2xl p-4 flex items-center gap-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)] hover:shadow-md transition-all active:scale-[0.98]"
                   onClick={() => setShowMap(true)}
                 >
                   <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
@@ -1148,7 +1145,7 @@ export default function ClientExterneApp() {
               )}
 
               {/* ── RACCOURCIS ────────────────────── */}
-              <div className="bg-white rounded-2xl border border-blue-100 shadow-sm p-4">
+              <div className="bg-white rounded-2xl border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] p-4">
                 <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-3">Accès rapide</p>
                 <div className="grid grid-cols-4 gap-2">
                   {[
@@ -1205,7 +1202,7 @@ export default function ClientExterneApp() {
               {/* ── SUPPORT + TARIF ───────────────── */}
               <SupportWhatsApp />
 
-              <div className="bg-white border border-blue-100 rounded-2xl p-4 shadow-sm">
+              <div className="bg-white border border-black/5 rounded-2xl p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-8 h-8 rounded-xl bg-indigo-100 flex items-center justify-center">
                     <TrendingUp className="w-4 h-4 text-indigo-600" />

@@ -13,9 +13,9 @@ export default function LivreurStatutCard({ statut, livreur, isExterne = false }
     <div className="space-y-3">
       <div className={cn(
         "rounded-[1.75rem] p-4 flex items-center gap-4 transition-all duration-500 relative overflow-hidden border",
-        isDisponible && "bg-gradient-to-r from-[#00a86b]/20 via-teal-600/20 to-sky-600/20 text-white shadow-xl shadow-emerald-500/10 border-[#00a86b]/30",
-        isEnCourse && "bg-gradient-to-r from-sky-600/20 via-indigo-600/20 to-sky-500/20 text-white shadow-xl shadow-blue-500/10 border-sky-400/30",
-        isHorsLigne && "bg-[#1f2429] text-white/50 border-white/8 shadow-sm",
+        isDisponible && "bg-white text-slate-900 shadow-[0_8px_24px_rgba(15,23,42,0.06)] border-emerald-200",
+        isEnCourse && "bg-white text-slate-900 shadow-[0_8px_24px_rgba(15,23,42,0.06)] border-blue-200",
+        isHorsLigne && "bg-white text-slate-500 border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.06)]",
       )}>
         {/* Halo de fond décoratif */}
         {isDisponible && <div className="absolute -right-6 -top-6 w-24 h-24 bg-[#00a86b]/10 rounded-full blur-xl pointer-events-none" />}
@@ -27,11 +27,11 @@ export default function LivreurStatutCard({ statut, livreur, isExterne = false }
             "w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner",
             isDisponible && "bg-[#00a86b]/20",
             isEnCourse && "bg-sky-400/20",
-            isHorsLigne && "bg-white/5",
+            isHorsLigne && "bg-slate-100",
           )}>
             {isDisponible && <CircleCheck className="h-7 w-7 text-[#00a86b]" />}
             {isEnCourse && <Route className="h-7 w-7 text-sky-400" />}
-            {isHorsLigne && <PowerOff className="h-7 w-7 text-white/40" />}
+            {isHorsLigne && <PowerOff className="h-7 w-7 text-slate-400" />}
           </div>
           {/* Ping animé */}
           {(isDisponible || isEnCourse) && (
@@ -45,7 +45,7 @@ export default function LivreurStatutCard({ statut, livreur, isExterne = false }
         <div className="flex-1 min-w-0">
           <p className={cn(
             "font-black text-lg leading-tight",
-            isHorsLigne && "text-white/60"
+            isHorsLigne && "text-slate-500"
           )}>
             {isDisponible && "Libre"}
             {isEnCourse && "En course"}
@@ -55,7 +55,7 @@ export default function LivreurStatutCard({ statut, livreur, isExterne = false }
             "text-xs mt-0.5 leading-relaxed",
             isDisponible && "text-[#00a86b]/80",
             isEnCourse && "text-sky-300/80",
-            isHorsLigne && "text-white/40",
+            isHorsLigne && "text-slate-400",
           )}>
             {isDisponible && "Prêt à recevoir une mission"}
             {isEnCourse && "Vous êtes en déplacement"}

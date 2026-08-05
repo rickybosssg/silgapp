@@ -3,11 +3,7 @@ import { Home, Package, ShoppingBag, MessageCircle, BarChart3, Truck, Pill, Gift
 
 export default function PartenaireBottomNav({ tab, setTab, badgeCount = 0, messageBadge = 0, etablissementType, showPromo = true }) {
   const isPharmacie = etablissementType === "pharmacie";
-  const activeClasses = isPharmacie
-    ? { text: "text-emerald-400", bar: "bg-emerald-500" }
-    : etablissementType === "restaurant"
-      ? { text: "text-orange-400", bar: "bg-orange-500" }
-      : { text: "text-[#00a86b]", bar: "bg-[#00a86b]" };
+  const activeClasses = { text: "text-[#007aff]", bar: "bg-[#007aff]" };
   const baseItems = isPharmacie ? [
     { id: "home", icon: Home, label: "Accueil" },
     { id: "messages", icon: MessageCircle, label: "Messages", badge: messageBadge },
@@ -26,7 +22,7 @@ export default function PartenaireBottomNav({ tab, setTab, badgeCount = 0, messa
   const items = baseItems.filter((item) => item.id !== "promo" || showPromo);
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-30 bg-[#1f2429]/95 backdrop-blur-md border-t border-white/8 safe-area-bottom shadow-[0_-2px_10px_rgba(0,0,0,0.2)]">
+    <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/90 backdrop-blur-xl border-t border-black/5 safe-area-bottom shadow-[0_-8px_30px_rgba(15,23,42,0.08)]">
       <div className="max-w-lg mx-auto grid px-1.5 py-1" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
         {items.map(item => {
           const active = tab === item.id;
@@ -38,7 +34,7 @@ export default function PartenaireBottomNav({ tab, setTab, badgeCount = 0, messa
             >
               <div className="relative">
                 <item.icon
-                  className={"w-5 h-5 shrink-0 transition-colors " + (active ? activeClasses.text : "text-white/40")}
+                  className={"w-5 h-5 shrink-0 transition-colors " + (active ? activeClasses.text : "text-slate-400")}
                   strokeWidth={active ? 2.5 : 2}
                 />
                 {item.badge > 0 && (
@@ -47,7 +43,7 @@ export default function PartenaireBottomNav({ tab, setTab, badgeCount = 0, messa
                   </span>
                 )}
               </div>
-              <span className={"w-full truncate text-center text-[9px] sm:text-[10px] font-bold leading-tight transition-colors " + (active ? activeClasses.text : "text-white/40")}>
+              <span className={"w-full truncate text-center text-[9px] sm:text-[10px] font-bold leading-tight transition-colors " + (active ? activeClasses.text : "text-slate-400")}>
                 {item.label}
               </span>
               {active && <div className={"absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full " + activeClasses.bar} />}

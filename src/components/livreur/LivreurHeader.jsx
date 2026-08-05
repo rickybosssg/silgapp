@@ -85,22 +85,16 @@ export default function LivreurHeader({
   return (
     <div className={cn(
       "rounded-[2rem] text-white overflow-hidden relative border",
-      "shadow-2xl shadow-blue-200/70 ring-1 ring-white/10",
+      "shadow-[0_18px_45px_rgba(0,122,255,0.24)] ring-1 ring-white/10",
       isON
-        ? "bg-gradient-to-br from-slate-950 via-blue-900 to-cyan-700 border-blue-300/25"
-        : "bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 border-white/10"
+        ? "bg-[#0879e8] border-white/20"
+        : "bg-[#2c2c2e] border-white/10"
     )}>
-      {/* Halos decoratifs */}
-      {isON && <div className="absolute top-0 right-0 w-52 h-52 bg-sky-300/20 rounded-full blur-3xl pointer-events-none" />}
-      {isON && <div className="absolute -bottom-10 -left-10 w-44 h-44 bg-emerald-300/15 rounded-full blur-3xl pointer-events-none" />}
-      {isON && <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.14),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.10),transparent_40%)] pointer-events-none" />}
-      {isEnCourse && <div className="absolute top-0 left-0 w-48 h-48 bg-blue-300/15 rounded-full blur-3xl pointer-events-none" />}
-
       {/* Barre de statut coloree */}
       <div className={cn(
         "h-0.5 w-full",
-        isON && isLibre ? "bg-gradient-to-r from-emerald-300 via-sky-300 to-emerald-300" :
-        isEnCourse ? "bg-gradient-to-r from-sky-300 via-indigo-300 to-blue-300" :
+        isON && isLibre ? "bg-emerald-300" :
+        isEnCourse ? "bg-sky-200" :
         "bg-white/10"
       )} />
 
@@ -179,10 +173,10 @@ export default function LivreurHeader({
                 "flex items-center justify-center gap-1.5 w-28 h-10 rounded-2xl font-black text-[12px] shadow-lg transition-all",
                 "active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed",
                 isBlockedByEncours && !isON
-                  ? "bg-gradient-to-br from-red-700 to-red-800 text-white shadow-red-500/25"
+                  ? "bg-red-700 text-white shadow-red-500/25"
                   : isON
-                  ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-red-500/25"
-                  : "bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-emerald-500/25"
+                  ? "bg-red-500 text-white shadow-red-500/25"
+                  : "bg-emerald-500 text-white shadow-emerald-500/25"
               )}
             >
               <Power className="w-3 h-3 flex-shrink-0" />

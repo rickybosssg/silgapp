@@ -144,12 +144,9 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`relative overflow-hidden rounded-[2rem] bg-gradient-to-br ${theme.hero} text-white shadow-2xl ${theme.shadow} ring-1 ring-white/10`}
+        className="relative overflow-hidden rounded-[2rem] bg-[#0879e8] text-white shadow-[0_18px_45px_rgba(0,122,255,0.24)] ring-1 ring-white/10 border border-white/20"
       >
-        <div className="absolute -top-12 -right-12 w-40 h-40 bg-white/10 rounded-full" />
-        <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-white/5 rounded-full" />
         <div className="absolute inset-x-0 bottom-0 h-1 bg-white/20" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.16),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.10),transparent_45%)] pointer-events-none" />
 
         <div className="relative p-5 space-y-4">
           <div className="flex items-center justify-between">
@@ -230,7 +227,7 @@ export default function PartenaireHome({ etablissement, etablissementType, onNav
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
               onClick={() => onNavigate(card.id)}
-              className={`relative bg-white rounded-3xl p-4 shadow-sm shadow-blue-100/40 border ${theme.softBorder} hover:shadow-lg hover:-translate-y-0.5 transition-all text-left group active:scale-95`}
+              className="relative bg-white rounded-3xl p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] border border-black/5 hover:shadow-lg hover:-translate-y-0.5 transition-all text-left group active:scale-95"
             >
               {card.badge > 0 && (
                 <span className="absolute top-3 right-3 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center">
@@ -261,7 +258,7 @@ function HeroStat({ value, label }) {
 
 function QuickStat({ icon: Icon, value, label, color, bg }) {
   return (
-    <div className="bg-white rounded-2xl p-2.5 text-center border border-gray-50 shadow-sm">
+    <div className="bg-white rounded-2xl p-2.5 text-center border border-black/5 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
       <div className={"w-8 h-8 rounded-lg " + bg + " flex items-center justify-center mx-auto mb-1"}>
         <Icon className={"w-4 h-4 " + color} />
       </div>

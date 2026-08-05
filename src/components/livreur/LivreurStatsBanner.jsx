@@ -47,11 +47,11 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
         {/* KPI row */}
         <div className="grid grid-cols-3 gap-2.5">
           {[
-            { icon: <Package className="w-4 h-4 text-sky-400" />,   bg: "bg-sky-500/10",   val: coursesAujourdHui,       label: "Courses",   valClass: "text-sky-300" },
+            { icon: <Package className="w-4 h-4 text-[#007aff]" />, bg: "bg-blue-50", val: coursesAujourdHui, label: "Courses", valClass: "text-[#007aff]" },
             { icon: <CheckCircle className="w-4 h-4 text-[#00a86b]" />, bg: "bg-green-500/10", val: livreesToday.length,    label: "Livrées",   valClass: "text-[#00a86b]" },
             { icon: <AlertCircle className="w-4 h-4 text-orange-400" />, bg: "bg-orange-500/10", val: null, label: "Dû SILGAPP", valClass: "text-orange-400" },
           ].map((item, i) => (
-            <div key={i} className="bg-[#1f2429] rounded-3xl p-3.5 shadow-sm border border-white/8 text-center">
+            <div key={i} className="bg-white rounded-3xl p-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] border border-black/5 text-center">
               <div className={`w-9 h-9 rounded-2xl ${item.bg} flex items-center justify-center mx-auto mb-1.5`}>
                 {item.icon}
               </div>
@@ -62,27 +62,27 @@ export default function LivreurStatsBanner({ mesCourses, totalEncaisse, montantD
                   {montantDuSilga > 0 ? `${montantDuSilga.toLocaleString()}` : "0"}<span className="text-[9px] ml-0.5">F</span>
                 </p>
               )}
-              <p className="text-[10px] text-white/40 font-medium mt-0.5">{item.label}</p>
+              <p className="text-[10px] text-slate-500 font-medium mt-0.5">{item.label}</p>
             </div>
           ))}
         </div>
 
         {/* Bilan financier du jour */}
         {livreesToday.length > 0 && (
-          <div className="rounded-3xl overflow-hidden shadow-lg border border-white/8">
-            <div className="bg-[#2b3137] px-4 py-2.5 flex items-center gap-2">
-              <Banknote className="w-3.5 h-3.5 text-white/60" />
-              <p className="text-[10px] font-black text-white/60 uppercase tracking-widest">Bilan du jour</p>
+          <div className="rounded-3xl overflow-hidden shadow-[0_8px_24px_rgba(15,23,42,0.06)] border border-black/5">
+            <div className="bg-slate-50 px-4 py-2.5 flex items-center gap-2 border-b border-slate-100">
+              <Banknote className="w-3.5 h-3.5 text-slate-500" />
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Bilan du jour</p>
             </div>
-            <div className="bg-[#1f2429] grid grid-cols-3 divide-x divide-white/8">
+            <div className="bg-white grid grid-cols-3 divide-x divide-slate-100">
               {[
-                { label: "Total client", val: prixTotalToday, color: "text-white" },
+                { label: "Total client", val: prixTotalToday, color: "text-slate-900" },
                 { label: "Votre gain", val: gainToday,    color: "text-[#00a86b]" },
                 { label: "Commission SILGAPP", val: commissionToday, color: "text-orange-400" },
               ].map((s, i) => (
                 <div key={i} className="p-3 text-center">
                   <p className={`text-sm font-black ${s.color}`}>{s.val.toLocaleString()}<span className="text-[9px] ml-0.5 font-normal">F</span></p>
-                  <p className="text-[9px] text-white/40 mt-0.5">{s.label}</p>
+                  <p className="text-[9px] text-slate-500 mt-0.5">{s.label}</p>
                 </div>
               ))}
             </div>

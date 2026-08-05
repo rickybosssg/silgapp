@@ -158,7 +158,8 @@
   input:not([type="checkbox"]):not([type="radio"]),
   textarea,
   select {
-    color: hsl(var(--foreground));
+    color: #111827;
+    -webkit-text-fill-color: #111827;
     font-size: 0.9375rem; /* 15px — lisible sur mobile */
   }
   input::placeholder,
@@ -170,19 +171,55 @@
   .bg-white input,
   .bg-white textarea,
   .bg-white select,
+  .bg-gray-50 input,
+  .bg-gray-50 textarea,
+  .bg-gray-50 select,
   input.bg-white,
   textarea.bg-white,
   select.bg-white,
+  input.bg-gray-50,
+  textarea.bg-gray-50,
+  select.bg-gray-50,
+  input.text-gray-900,
+  textarea.text-gray-900,
+  select.text-gray-900,
+  input.text-slate-900,
+  textarea.text-slate-900,
+  select.text-slate-900,
   .force-light input,
   .force-light textarea,
   .force-light select {
     color: #111827 !important;
     -webkit-text-fill-color: #111827 !important;
   }
+  /* Les rares champs volontairement sombres déclarent explicitement leur texte clair. */
+  input.text-white,
+  textarea.text-white,
+  select.text-white,
+  .bg-black input,
+  .bg-black textarea,
+  .bg-black select,
+  .bg-gray-900 input,
+  .bg-gray-900 textarea,
+  .bg-gray-900 select,
+  .bg-slate-900 input,
+  .bg-slate-900 textarea,
+  .bg-slate-900 select {
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+  }
   .bg-white input::placeholder,
   .bg-white textarea::placeholder,
+  .bg-gray-50 input::placeholder,
+  .bg-gray-50 textarea::placeholder,
   input.bg-white::placeholder,
   textarea.bg-white::placeholder,
+  input.bg-gray-50::placeholder,
+  textarea.bg-gray-50::placeholder,
+  input.text-gray-900::placeholder,
+  textarea.text-gray-900::placeholder,
+  input.text-slate-900::placeholder,
+  textarea.text-slate-900::placeholder,
   .force-light input::placeholder,
   .force-light textarea::placeholder {
     color: #475569 !important;
