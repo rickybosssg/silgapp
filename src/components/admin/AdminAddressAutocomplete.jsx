@@ -194,7 +194,7 @@ export default function AdminAddressAutocomplete({
       {children}
 
       {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full max-h-56 overflow-y-auto rounded-xl bg-white border border-gray-200 shadow-lg">
+        <div className="force-light absolute z-50 mt-1 w-full max-h-56 overflow-y-auto rounded-xl bg-white border border-gray-200 shadow-lg">
           {suggestions.map((q, idx) => (
             <button
               key={q.id || idx}
@@ -222,7 +222,7 @@ export default function AdminAddressAutocomplete({
         <button
           type="button"
           onClick={handleCreateQuartier}
-          className="absolute z-50 mt-1 w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left rounded-xl bg-white border border-primary/30 shadow-lg hover:bg-primary/5 transition-colors"
+          className="force-light absolute z-50 mt-1 w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left rounded-xl bg-white border border-primary/30 shadow-lg hover:bg-primary/5 transition-colors"
         >
           <Plus className="w-4 h-4 text-primary shrink-0" />
           <span className="text-gray-700">
@@ -233,7 +233,7 @@ export default function AdminAddressAutocomplete({
 
       {/* Loading pendant la création */}
       {creating && (
-        <div className="absolute z-50 mt-1 w-full flex items-center gap-2 px-4 py-2.5 text-sm rounded-xl bg-white border border-primary/30 shadow-lg">
+        <div className="force-light absolute z-50 mt-1 w-full flex items-center gap-2 px-4 py-2.5 text-sm rounded-xl bg-white border border-primary/30 shadow-lg">
           <Loader2 className="w-4 h-4 text-primary animate-spin shrink-0" />
           <span className="text-gray-600">Recherche des coordonnées…</span>
         </div>
