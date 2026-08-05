@@ -199,7 +199,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
                 <div className={cn(
                   "absolute z-50 border border-white/15 rounded-xl shadow-2xl max-h-72 overflow-y-auto",
                   collapsed ? "left-14 bottom-0 w-52" : "left-3 right-3 bottom-full mb-2"
-                )} style={{ backgroundColor: '#1f2429' }}>
+                )} style={{ backgroundColor: '#0C2350' }}>
                   {PAYS_SILGAPP.map((p) => (
                     <button
                       key={p.code}
