@@ -166,7 +166,7 @@ export default function DashboardExterne() {
   const taux = stats.total > 0 ? Math.round((stats.livrees / stats.total) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-[#16191d] text-white">
       <div className="px-4 py-4 lg:px-6 lg:py-6 space-y-5 max-w-7xl mx-auto">
 
         {/* ── HERO HEADER ─────────────────────────────────── */}
