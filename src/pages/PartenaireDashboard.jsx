@@ -190,7 +190,7 @@ export default function PartenaireDashboard() {
   if (!user || loading) {
     return (
       <div className="min-h-screen bg-[#16191d] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#00a86b]" />
+        <Loader2 className="w-8 h-8 animate-spin text-[#007AFF]" />
       </div>
     );
   }
@@ -208,8 +208,8 @@ export default function PartenaireDashboard() {
             Retour au choix du compte
           </button>
           <div className="text-center space-y-3">
-            <div className="w-20 h-20 rounded-2xl bg-[#00a86b]/15 flex items-center justify-center mx-auto">
-              <Store className="w-10 h-10 text-[#00a86b]" />
+            <div className="w-20 h-20 rounded-2xl bg-[#007AFF]/15 flex items-center justify-center mx-auto">
+              <Store className="w-10 h-10 text-[#007AFF]" />
             </div>
             <h1 className="text-2xl font-black text-white">Espace Partenaire</h1>
             <p className="text-white/50">Que souhaitez-vous créer ?</p>
@@ -227,7 +227,7 @@ export default function PartenaireDashboard() {
                 <div><p className="font-black text-lg text-white">Un Restaurant</p><p className="text-sm text-white/50">Proposer un menu et des plats</p></div>
               </div>
             </button>
-            <button onClick={() => setTab("pharmacie_form")} className="w-full p-6 rounded-3xl border-2 border-white/10 bg-[#1f2429] hover:border-[#00a86b] hover:shadow-lg transition-all text-left">
+            <button onClick={() => setTab("pharmacie_form")} className="w-full p-6 rounded-3xl border-2 border-white/10 bg-[#1f2429] hover:border-[#007AFF] hover:shadow-lg transition-all text-left">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center"><Pill className="w-7 h-7 text-white/70" /></div>
                 <div><p className="font-black text-lg text-white">Une Pharmacie</p><p className="text-sm text-white/50">Discuter avec clients et livrer</p></div>
@@ -238,7 +238,7 @@ export default function PartenaireDashboard() {
             <button onClick={async () => {
               await base44.auth.updateMe({ silgapp_role: "" }).catch(() => {});
               window.location.reload();
-            }} className="flex items-center gap-1.5 text-sm text-[#00a86b] font-medium hover:text-[#00c47a]">
+            }} className="flex items-center gap-1.5 text-sm text-[#007AFF] font-medium hover:text-[#00c47a]">
               <ArrowLeft className="w-4 h-4" />
               Retour au choix de rôle
             </button>
@@ -285,7 +285,7 @@ export default function PartenaireDashboard() {
               await base44.auth.updateMe({ silgapp_role: "" }).catch(() => {});
               clearPersistedToken();
               base44.auth.logout();
-            }} className="flex items-center gap-1 text-xs text-[#00a86b] font-medium hover:text-[#00c47a] py-2 px-3">
+            }} className="flex items-center gap-1 text-xs text-[#007AFF] font-medium hover:text-[#00c47a] py-2 px-3">
               <ArrowLeft className="w-3.5 h-3.5" />
               Changer de rôle
             </button>
@@ -312,12 +312,12 @@ export default function PartenaireDashboard() {
               await base44.auth.updateMe({ silgapp_role: "" }).catch(() => {});
               clearPersistedToken();
               base44.auth.logout();
-            }} className="flex items-center gap-1 text-xs text-[#00a86b] font-medium hover:text-[#00c47a] py-2 px-3">
+            }} className="flex items-center gap-1 text-xs text-[#007AFF] font-medium hover:text-[#00c47a] py-2 px-3">
               <ArrowLeft className="w-3.5 h-3.5" />
               Changer de rôle
             </button>
             <span className="text-white/20">|</span>
-            <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="text-xs text-[#00a86b] underline py-2 px-3">Se déconnecter</button>
+            <button onClick={() => { clearPersistedToken(); base44.auth.logout(); }} className="text-xs text-[#007AFF] underline py-2 px-3">Se déconnecter</button>
           </div>
         </div>
       </div>
@@ -331,7 +331,7 @@ export default function PartenaireDashboard() {
   return (
     <div className="min-h-screen bg-[#16191d] pb-20">
       {/* ── En-tête premium ── */}
-      <div className="bg-gradient-to-br from-[#16191d] via-[#1f2429] to-[#16191d] text-white px-4 py-4 sticky top-0 z-20 shadow-lg border-b-2 border-[#00a86b]/30">
+      <div className="bg-gradient-to-br from-[#16191d] via-[#1f2429] to-[#16191d] text-white px-4 py-4 sticky top-0 z-20 shadow-lg border-b-2 border-[#007AFF]/30">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center overflow-hidden flex-shrink-0">

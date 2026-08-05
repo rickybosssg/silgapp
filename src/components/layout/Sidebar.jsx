@@ -105,7 +105,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group",
                 isActive
-                  ? "bg-[#00a86b] text-white shadow-lg shadow-[#00a86b]/30"
+                  ? "bg-[#007AFF] text-white shadow-lg shadow-[#007AFF]/30"
                   : "text-white/50 hover:bg-white/8 hover:text-white/90"
               )}
             >
