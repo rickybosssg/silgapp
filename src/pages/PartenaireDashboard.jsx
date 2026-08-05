@@ -331,7 +331,7 @@ export default function PartenaireDashboard() {
   return (
     <div className="min-h-screen bg-[#16191d] pb-20">
       {/* ── En-tête premium ── */}
-      <div className="bg-gradient-to-br from-[#0d1014] via-[#1f2429] to-[#0d1014] text-white px-4 py-4 sticky top-0 z-20 shadow-lg border-b-2 border-[#00a86b]/30">
+      <div className="bg-gradient-to-br from-[#16191d] via-[#1f2429] to-[#16191d] text-white px-4 py-4 sticky top-0 z-20 shadow-lg border-b-2 border-[#00a86b]/30">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center overflow-hidden flex-shrink-0">

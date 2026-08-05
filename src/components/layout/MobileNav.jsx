@@ -80,7 +80,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
   return (
     <>
       {/* ===== MOBILE HEADER ===== */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 bg-[#0d1014] border-b border-white/8 z-40 flex items-center justify-between px-4 shadow-sm safe-area-top" style={{ minHeight: '3.5rem' }}>
+      <header className="lg:hidden fixed top-0 left-0 right-0 bg-[#16191d] border-b border-white/8 z-40 flex items-center justify-between px-4 shadow-sm safe-area-top" style={{ minHeight: '3.5rem' }}>
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-[#00a86b] flex items-center justify-center shadow-sm">
             <span className="text-white font-black text-sm">S</span>
@@ -133,7 +133,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
         <div className="lg:hidden fixed inset-0 z-50" onClick={() => setShowMenu(false)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
           <div
-            className="absolute right-0 top-0 bottom-0 w-72 bg-[#0d1014] flex flex-col shadow-2xl border-l border-white/8"
+            className="absolute right-0 top-0 bottom-0 w-72 bg-[#16191d] flex flex-col shadow-2xl border-l border-white/8"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Menu header */}
@@ -169,7 +169,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
                   <ChevronDown className={cn("w-4 h-4 text-white/40 flex-shrink-0 transition-transform", countryOpen && "rotate-180")} />
                 </button>
                 {countryOpen && (
-                  <div className="mt-1 border border-white/8 rounded-xl bg-[hsl(215 18% 28%)] shadow-lg max-h-56 overflow-y-auto">
+                  <div className="mt-1 border border-white/8 rounded-xl bg-[#1f2429] shadow-lg max-h-56 overflow-y-auto">
                     {PAYS_SILGAPP.map((p) => (
                       <button
                         key={p.code}
@@ -254,7 +254,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
       )}
 
       {/* ===== MOBILE BOTTOM TAB BAR ===== */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#0d1014] border-t border-white/8 z-40 safe-area-bottom">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-[#16191d] border-t border-white/8 z-40 safe-area-bottom">
         <div className="flex items-stretch justify-around">
           {allNavItems.filter(item => bottomTabPaths.includes(item.path)).map((item) => {
             const isActive = location.pathname === item.path;

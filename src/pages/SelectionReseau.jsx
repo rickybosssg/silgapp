@@ -39,7 +39,7 @@ export default function SelectionReseau({ onSelect }) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-accent/10 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#16191d] flex items-center justify-center p-4">
       <div className="max-w-2xl w-full space-y-8">
         <div className="text-center space-y-4">
           <img 

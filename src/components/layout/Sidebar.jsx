@@ -71,7 +71,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
 
   return (
     <aside className={cn(
-      "h-screen bg-[#0d1014] flex flex-col transition-all duration-300 sticky top-0 shadow-xl shadow-black/20 border-r border-white/5",
+      "h-screen bg-[#16191d] flex flex-col transition-all duration-300 sticky top-0 shadow-xl shadow-black/20 border-r border-white/8",
       collapsed ? "w-[68px]" : "w-60"
     )}>
       {/* Logo */}
@@ -197,7 +197,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setCountryOpen(false)} />
                 <div className={cn(
-                  "absolute z-50 bg-slate-800 border border-white/15 rounded-xl shadow-2xl max-h-72 overflow-y-auto",
+                  "absolute z-50 bg-[#1f2429] border border-white/15 rounded-xl shadow-2xl max-h-72 overflow-y-auto",
                   collapsed ? "left-14 bottom-0 w-52" : "left-3 right-3 bottom-full mb-2"
                 )}>
                   {PAYS_SILGAPP.map((p) => (
