@@ -302,10 +302,10 @@ export default function DashboardExterne() {
         <div>
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-1">Activité en direct</p>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 shadow-sm overflow-hidden">
+            <div className="bg-[#1f2429] rounded-2xl border border-white/8 shadow-sm overflow-hidden">
               <ClientsEnLigne clients={clientsEnLigne} />
             </div>
-            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border border-emerald-100 shadow-sm overflow-hidden">
+            <div className="bg-[#1f2429] rounded-2xl border border-white/8 shadow-sm overflow-hidden">
               <LivreursEnLigne livreurs={livreursEnLigne} />
             </div>
           </div>
