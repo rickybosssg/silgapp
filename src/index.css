@@ -154,7 +154,7 @@
   }
 
   /* ── Lisibilité universelle — WCAG AA ── */
-  /* Texte dans les inputs toujours très lisible */
+  /* Texte dans les inputs toujours très lisible — thème sombre */
   input:not([type="checkbox"]):not([type="radio"]),
   textarea,
   select {
@@ -187,6 +187,10 @@
   .force-light textarea::placeholder {
     color: #475569 !important;
     -webkit-text-fill-color: #475569 !important;
+  }
+  .force-light input::placeholder,
+  .force-light textarea::placeholder {
+    color: #64748b;
   }
   /* Messages d'erreur toujours bien lisibles */
   .text-red-400 { color: #f87171 !important; }
