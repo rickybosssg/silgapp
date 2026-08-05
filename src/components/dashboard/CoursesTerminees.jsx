@@ -56,7 +56,7 @@ export default function CoursesTerminees({ courses, onView }) {
   const affichees = expanded ? courses : courses.slice(0, 5);
 
   return (
-    <Card className="p-0 overflow-hidden bg-[#1f2429] border-white/8">
+    <Card className="p-0 overflow-hidden bg-[#2a2f36] border-white/8">
       <div className="px-4 pt-4 pb-3 border-b border-white/8 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded-full bg-white/40" />

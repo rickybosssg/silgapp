@@ -12,7 +12,7 @@ export default function LivreursEnLigne({ livreurs = [] }) {
   const tauxGPS = livreurs.length > 0 ? Math.round((avecGPS.length / livreurs.length) * 100) : 0;
 
   return (
-    <div className="p-4 bg-[#1f2429] rounded-2xl border border-white/8">
+    <div className="p-4 bg-[#2a2f36] rounded-2xl border border-white/8">
       {/* Header cliquable */}
       <button
         onClick={() => setOpen(o => !o)}
