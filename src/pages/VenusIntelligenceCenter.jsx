@@ -171,7 +171,7 @@ export default function VenusIntelligenceCenter() {
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
                   isActive
                     ? "bg-primary text-white shadow-lg shadow-primary/30"
-                    : "text-white/50 hover:bg-white/8 hover:text-white/90"
+                    : "text-white/50 hover:bg-white/10 hover:text-white/90"
                 )}
               >
                 <Icon className="w-4 h-4 flex-shrink-0" />
@@ -211,7 +211,7 @@ export default function VenusIntelligenceCenter() {
                     onClick={() => navigateTo(tab.id)}
                     className={cn(
                       "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
-                      isActive ? "bg-primary text-white" : "text-white/50 hover:bg-white/8"
+                      isActive ? "bg-primary text-white" : "text-white/50 hover:bg-white/10"
                     )}
                   >
                     <Icon className="w-4 h-4 flex-shrink-0" />

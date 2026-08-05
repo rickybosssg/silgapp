@@ -158,81 +158,47 @@
   input:not([type="checkbox"]):not([type="radio"]),
   textarea,
   select {
-    color: #111827; /* gray-900 */
+    color: hsl(var(--foreground));
     font-size: 0.9375rem; /* 15px — lisible sur mobile */
   }
   input::placeholder,
   textarea::placeholder {
-    color: #475569; /* slate-600 */
+    color: #94a3b8;
     opacity: 1;
   }
-  /* Empêcher texte blanc sur fond clair dans les cartes */
+  /* Conserver un texte sombre dans les champs explicitement clairs. */
   .bg-white input,
-  .bg-white textarea {
-    color: #111827;
+  .bg-white textarea,
+  .bg-white select,
+  input.bg-white,
+  textarea.bg-white,
+  select.bg-white,
+  .force-light input,
+  .force-light textarea,
+  .force-light select {
+    color: #111827 !important;
+    -webkit-text-fill-color: #111827 !important;
+  }
+  .bg-white input::placeholder,
+  .bg-white textarea::placeholder,
+  input.bg-white::placeholder,
+  textarea.bg-white::placeholder,
+  .force-light input::placeholder,
+  .force-light textarea::placeholder {
+    color: #475569 !important;
+    -webkit-text-fill-color: #475569 !important;
   }
   /* Messages d'erreur toujours bien lisibles */
-  .text-red-400 { color: #dc2626 !important; } /* forcer red-600 au lieu de red-400 sur fond blanc */
+  .text-red-400 { color: #f87171 !important; }
+  .bg-white.text-red-400,
+  .bg-white .text-red-400,
+  .force-light.text-red-400,
+  .force-light .text-red-400 {
+    color: #dc2626 !important;
+  }
   .text-muted-foreground {
     color: hsl(var(--muted-foreground));
     /* minimum contrast garantit */
-  }
-
-  /* ── Override global : bg-white et bg-slate-50 → thème sombre SilgaMoney ── */
-  /* Sauf écran auth et composants explicites en clair */
-  .bg-white:not(.silgapp-auth-screen *):not(.force-light) {
-    background-color: hsl(210 6% 14%) !important;
-  }
-  .bg-slate-50:not(.silgapp-auth-screen *):not(.force-light) {
-    background-color: hsl(210 6% 10%) !important;
-  }
-  .bg-gray-50:not(.silgapp-auth-screen *):not(.force-light) {
-    background-color: hsl(210 6% 10%) !important;
-  }
-  .bg-gray-100:not(.silgapp-auth-screen *):not(.force-light) {
-    background-color: hsl(210 6% 16%) !important;
-  }
-
-  /* Textes gris foncé → clairs pour fond sombre */
-  .text-slate-800:not(.silgapp-auth-screen *):not(.force-light) {
-    color: #f1f5f9 !important;
-  }
-  .text-slate-700:not(.silgapp-auth-screen *):not(.force-light) {
-    color: #e2e8f0 !important;
-  }
-  .text-slate-600:not(.silgapp-auth-screen *):not(.force-light) {
-    color: #cbd5e1 !important;
-  }
-  .text-slate-500:not(.silgapp-auth-screen *):not(.force-light) {
-    color: #94a3b8 !important;
-  }
-  .text-slate-400:not(.silgapp-auth-screen *):not(.force-light) {
-    color: #64748b !important;
-  }
-  .text-gray-800:not(.silgapp-auth-screen *):not(.force-light) {
-    color: #f1f5f9 !important;
-  }
-  .text-gray-700:not(.silgapp-auth-screen *):not(.force-light) {
-    color: #e2e8f0 !important;
-  }
-  .text-gray-600:not(.silgapp-auth-screen *):not(.force-light) {
-    color: #cbd5e1 !important;
-  }
-  .text-gray-500:not(.silgapp-auth-screen *):not(.force-light) {
-    color: #94a3b8 !important;
-  }
-  .text-gray-400:not(.silgapp-auth-screen *):not(.force-light) {
-    color: #64748b !important;
-  }
-
-  /* Borders clairs → sombres */
-  .border-slate-200:not(.silgapp-auth-screen *):not(.force-light),
-  .border-slate-100:not(.silgapp-auth-screen *):not(.force-light) {
-    border-color: hsl(0 0% 20%) !important;
-  }
-  .border-gray-200:not(.silgapp-auth-screen *):not(.force-light),
-  .border-gray-100:not(.silgapp-auth-screen *):not(.force-light) {
-    border-color: hsl(0 0% 20%) !important;
   }
 
   .bg-white.text-gray-300,

@@ -175,7 +175,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
                         key={p.code}
                         onClick={() => { setSelectedCountry(p.code); setCountryOpen(false); }}
                         className={cn(
-                          "w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-white/8",
+                          "w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-white/10",
                           effectiveCountry === p.code ? "bg-[#00a86b]/15 text-[#00a86b] font-semibold" : "text-white/70"
                         )}
                       >
@@ -203,7 +203,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
                       "flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all",
                       isActive
                         ? "bg-[#00a86b] text-white shadow-sm"
-                        : "text-white/50 hover:bg-white/8 hover:text-white"
+                        : "text-white/50 hover:bg-white/10 hover:text-white"
                     )}
                   >
                     <Icon className="w-4 h-4 flex-shrink-0" />
