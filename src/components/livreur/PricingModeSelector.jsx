@@ -2,24 +2,24 @@ import React from "react";
 
 export default function PricingModeSelector({ pricingMode, onChange }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div className="bg-[#1f2429] rounded-2xl border border-white/8 shadow-sm overflow-hidden">
       {/* En-tête */}
       <div className="px-4 pt-4 pb-2">
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider"> MODE TARIFAIRE</p>
+        <p className="text-xs font-bold text-white/50 uppercase tracking-wider"> MODE TARIFAIRE</p>
       </div>
 
       {/* Option : Prix automatique */}
       <button
         onClick={() => onChange("automatic")}
         className={`w-full flex items-start gap-3 px-4 py-3 transition-all text-left ${
-          pricingMode === "automatic" ? "bg-green-50" : "hover:bg-gray-50"
+          pricingMode === "automatic" ? "bg-[#00a86b]/10" : "hover:bg-white/5"
         }`}
       >
         {/* Radio */}
         <div className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
           pricingMode === "automatic"
-            ? "border-green-500 bg-green-500"
-            : "border-gray-300 bg-white"
+            ? "border-[#00a86b] bg-[#00a86b]"
+            : "border-white/30 bg-transparent"
         }`}>
           {pricingMode === "automatic" && (
             <div className="w-2 h-2 rounded-full bg-white" />
@@ -29,12 +29,12 @@ export default function PricingModeSelector({ pricingMode, onChange }) {
         {/* Texte */}
         <div className="flex-1 min-w-0">
           <p className={`text-sm font-bold leading-tight ${
-            pricingMode === "automatic" ? "text-green-800" : "text-gray-700"
+            pricingMode === "automatic" ? "text-[#00a86b]" : "text-white/80"
           }`}>
             Prix automatique
           </p>
           <p className={`text-xs mt-0.5 leading-relaxed ${
-            pricingMode === "automatic" ? "text-green-700" : "text-gray-400"
+            pricingMode === "automatic" ? "text-[#00a86b]/80" : "text-white/40"
           }`}>
             Le système SILGAPP continue de calculer automatiquement le prix selon les règles actuelles.
           </p>
@@ -42,20 +42,20 @@ export default function PricingModeSelector({ pricingMode, onChange }) {
       </button>
 
       {/* Séparateur */}
-      <div className="mx-4 h-px bg-gray-100" />
+      <div className="mx-4 h-px bg-white/8" />
 
       {/* Option : Prix manuel */}
       <button
         onClick={() => onChange("manual")}
         className={`w-full flex items-start gap-3 px-4 py-3 transition-all text-left ${
-          pricingMode === "manual" ? "bg-blue-50" : "hover:bg-gray-50"
+          pricingMode === "manual" ? "bg-sky-500/10" : "hover:bg-white/5"
         }`}
       >
         {/* Radio */}
         <div className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
           pricingMode === "manual"
-            ? "border-blue-500 bg-blue-500"
-            : "border-gray-300 bg-white"
+            ? "border-sky-400 bg-sky-400"
+            : "border-white/30 bg-transparent"
         }`}>
           {pricingMode === "manual" && (
             <div className="w-2 h-2 rounded-full bg-white" />
@@ -65,12 +65,12 @@ export default function PricingModeSelector({ pricingMode, onChange }) {
         {/* Texte */}
         <div className="flex-1 min-w-0">
           <p className={`text-sm font-bold leading-tight ${
-            pricingMode === "manual" ? "text-blue-800" : "text-gray-700"
+            pricingMode === "manual" ? "text-sky-300" : "text-white/80"
           }`}>
             Prix manuel
           </p>
           <p className={`text-xs mt-0.5 leading-relaxed ${
-            pricingMode === "manual" ? "text-blue-700" : "text-gray-400"
+            pricingMode === "manual" ? "text-sky-300/80" : "text-white/40"
           }`}>
             Le livreur propose lui-même son prix après avoir accepté la course.
           </p>
