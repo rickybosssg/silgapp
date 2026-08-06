@@ -122,15 +122,16 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
   const handleReattribuer = async () => {
     setReattributing(true);
     try {
-      let livreurId = course.livreur_id;
+      let livreurId = course.livreur_id || annulationLivreur?.livreur_id;
+      let livreurNom = course.livreur_nom || annulationLivreur?.livreur_nom;
       // Si livreur_id manquant, rechercher par nom
-      if (!livreurId && course.livreur_nom) {
-        const parts = course.livreur_nom.trim().split(/\s+/);
+      if (!livreurId && livreurNom) {
+        const parts = livreurNom.trim().split(/\s+/);
         const nom = parts.pop() || "";
         const prenom = parts.join(" ");
         const filters = [];
         if (prenom) filters.push({ prenom, nom });
-        filters.push({ nom: course.livreur_nom });
+        filters.push({ nom: livreurNom });
         let found = null;
         for (const f of filters) {
           found = await base44.entities.Livreur.filter(f).catch(() => []);
@@ -147,12 +148,13 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
         statut: "livreur_en_route",
         dispatch_status: "accepte",
         livreur_id: livreurId,
+        livreur_nom: livreurNom,
         heure_acceptation: new Date().toISOString(),
         notes: (course.notes || "") + "\n[Réattribué au même livreur par admin]",
       });
       // Remettre le livreur en course
       await base44.entities.Livreur.update(livreurId, { statut: "en_course" });
-      toast.success("Course réattribuée à " + (course.livreur_nom || "ce livreur") + " — statut: En route");
+      toast.success("Course réattribuée à " + (livreurNom || "ce livreur") + " — statut: En route");
       queryClient.invalidateQueries();
       onClose();
     } catch (error) {
@@ -269,7 +271,7 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
           )}
 
           {/* Réattribuer au même livreur (course annulée) — placé ici pour être visible immédiatement */}
-          {reseau === "externe" && course.statut === "annulee" && (course.livreur_id || course.livreur_nom) && (
+          {reseau === "externe" && course.statut === "annulee" && (course.livreur_id || course.livreur_nom || annulationLivreur?.livreur_id || annulationLivreur?.livreur_nom) && (
             <div className="bg-blue-50 border-2 border-blue-300 rounded-xl p-3 space-y-2">
               <p className="text-xs font-bold text-blue-700 flex items-center gap-1.5">
                 <RotateCcw className="w-3.5 h-3.5" />
@@ -282,7 +284,7 @@ export default function CourseDetailDialog({ course, open, onClose, reseau = "in
                 onClick={handleReattribuer}
               >
                 <RotateCcw className="w-4 h-4 mr-2" />
-                Réattribuer à {course.livreur_nom}
+                Réattribuer à {course.livreur_nom || annulationLivreur?.livreur_nom}
               </Button>
             </div>
           )}
