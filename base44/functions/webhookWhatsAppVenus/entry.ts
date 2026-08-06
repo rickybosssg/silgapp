@@ -606,7 +606,7 @@ Deno.serve(async (req) => {
         if (pendingCourseConf && !pendingCourseConf.modification_mode && !pendingCourseConf.course_created) {
           const _tcC = (pendingCourseConf.type_course || '').toLowerCase().trim();
           const _hasTypeC = ['expedier', 'recevoir', 'deplacement'].includes(_tcC);
-          const _hasDepartC = !!(pendingCourseConf.adresse_depart && pendingCourseConf.adresse_depart.trim()) || pendingCourseConf.gps_depart_lat != null;
+          const _hasDepartC = !!(pendingCourseConf.adresse_depart && pendingCourseConf.adresse_depart.trim()) || pendingCourseConf.gps_depart_lat != null || pendingCourseConf.pending_location_lat != null;
           const _hasArriveeC = !!(pendingCourseConf.adresse_arrivee && pendingCourseConf.adresse_arrivee.trim()) || pendingCourseConf.gps_arrivee_lat != null;
           const _needsContactC = _tcC === 'expedier' || _tcC === 'recevoir';
           const _hasContactC = !!(pendingCourseConf.contact_telephone && pendingCourseConf.contact_telephone.trim()) || pendingCourseConf.contact_is_client === true;
@@ -772,7 +772,7 @@ Deno.serve(async (req) => {
             const um = { ...(pendingCourse || {}), ...reasoningResult.memoire_courte_update };
             const _tc = (um.type_course || '').toLowerCase().trim();
             const _hasType = ['expedier', 'recevoir', 'deplacement'].includes(_tc);
-            const _hasDepart = !!(um.adresse_depart && um.adresse_depart.trim()) || um.gps_depart_lat != null;
+            const _hasDepart = !!(um.adresse_depart && um.adresse_depart.trim()) || um.gps_depart_lat != null || um.pending_location_lat != null;
             const _hasArrivee = !!(um.adresse_arrivee && um.adresse_arrivee.trim()) || um.gps_arrivee_lat != null;
             const _needsContact = _tc === 'expedier' || _tc === 'recevoir';
             const _hasContact = !!(um.contact_telephone && um.contact_telephone.trim()) || um.contact_is_client === true;
@@ -893,7 +893,7 @@ Deno.serve(async (req) => {
             const umCheck = { ...(pendingCourse || {}), ...reasoningResult.memoire_courte_update };
             const _tcCh = (umCheck.type_course || '').toLowerCase().trim();
             const _hasTypeCh = ['expedier', 'recevoir', 'deplacement'].includes(_tcCh);
-            const _hasDepartCh = !!(umCheck.adresse_depart && umCheck.adresse_depart.trim()) || umCheck.gps_depart_lat != null;
+            const _hasDepartCh = !!(umCheck.adresse_depart && umCheck.adresse_depart.trim()) || umCheck.gps_depart_lat != null || umCheck.pending_location_lat != null;
             const _hasArriveeCh = !!(umCheck.adresse_arrivee && umCheck.adresse_arrivee.trim()) || umCheck.gps_arrivee_lat != null;
             const _needsContactCh = _tcCh === 'expedier' || _tcCh === 'recevoir';
             const _hasContactCh = !!(umCheck.contact_telephone && umCheck.contact_telephone.trim()) || umCheck.contact_is_client === true;

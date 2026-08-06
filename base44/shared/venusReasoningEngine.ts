@@ -385,7 +385,8 @@ export async function creerCourseDepuisMemoire(
   }
 
   const hasRequiredContact = cd.contact_telephone || cd.contact_is_client;
-  const hasDepart = cd.adresse_depart || cd.gps_depart_lat != null;
+  // ── Fallback GPS: pending_location_lat/lng (partagé via WhatsApp mais non encore assigné) ──
+  const hasDepart = cd.adresse_depart || cd.gps_depart_lat != null || cd.pending_location_lat != null;
   const hasArrivee = cd.adresse_arrivee || cd.gps_arrivee_lat != null;
   // ── contact_createur_course : OBLIGATOIRE pour toute course VENUS ──
   // Le numéro WhatsApp entrant ne peut être utilisé QUE si le client a confirmé
@@ -410,8 +411,8 @@ export async function creerCourseDepuisMemoire(
     statut: 'recherche_livreur',
     dispatch_status: 'en_attente',
     notes: cd.notes || '',
-    gps_depart_lat: cd.gps_depart_lat,
-    gps_depart_lng: cd.gps_depart_lng,
+    gps_depart_lat: cd.gps_depart_lat != null ? cd.gps_depart_lat : cd.pending_location_lat,
+    gps_depart_lng: cd.gps_depart_lng != null ? cd.gps_depart_lng : cd.pending_location_lng,
     gps_arrivee_lat: cd.gps_arrivee_lat,
     gps_arrivee_lng: cd.gps_arrivee_lng,
     // ── Contact principal — créateur de la course (OBLIGATOIRE) ──
