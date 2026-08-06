@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Loader2, UserCheck, UserPlus, Star, UserX, ExternalLink } from "lucide-react";
 import ClientFicheDialog from "./ClientFicheDialog";
@@ -9,42 +9,55 @@ export default function ClientPhoneDetector({ phone, countryCode, onClientFound,
   const [searching, setSearching] = useState(false);
   const [ficheOpen, setFicheOpen] = useState(false);
 
-  const normalizedPhone = normalizePhone(phone, countryCode);
+  // Refs pour éviter la boucle de re-rendu : onClientFound/onClientName sont
+  // des fonctions inline du parent qui changent à chaque rendu, ce qui recréait
+  // searchClient → relançait l'useEffect → boucle infinie.
+  const onClientFoundRef = useRef(onClientFound);
+  const onClientNameRef = useRef(onClientName);
+  onClientFoundRef.current = onClientFound;
+  onClientNameRef.current = onClientName;
 
-  const searchClient = useCallback(async () => {
-    if (!normalizedPhone || normalizedPhone.length < 8) {
+  const normalizedPhone = normalizePhone(phone, countryCode);
+  const normalizedPhoneRef = useRef(normalizedPhone);
+  normalizedPhoneRef.current = normalizedPhone;
+
+  const searchClient = useRef(async () => {
+    const np = normalizedPhoneRef.current;
+    if (!np || np.length < 8) {
       setClient(null);
       return;
     }
     setSearching(true);
     try {
-      const results = await base44.entities.ClientExterne.filter({ telephone_normalized: normalizedPhone });
+      const results = await base44.entities.ClientExterne.filter({ telephone_normalized: np });
+      // Vérifier que le téléphone n'a pas changé pendant la requête
+      if (normalizedPhoneRef.current !== np) return;
       if (results && results.length > 0) {
         setClient(results[0]);
-        onClientFound?.(results[0]);
+        onClientFoundRef.current?.(results[0]);
         if (results[0].nom && !results[0].cree_via_crm) {
-          onClientName?.(results[0].nom, results[0].prenom);
+          onClientNameRef.current?.(results[0].nom, results[0].prenom);
         }
       } else {
         setClient(null);
-        onClientFound?.(null);
+        onClientFoundRef.current?.(null);
       }
     } catch {
       setClient(null);
     } finally {
       setSearching(false);
     }
-  }, [normalizedPhone, onClientFound, onClientName]);
+  });
 
   useEffect(() => {
     if (!normalizedPhone || normalizedPhone.length < 8) {
       setClient(null);
-      onClientFound?.(null);
+      onClientFoundRef.current?.(null);
       return;
     }
-    const timer = setTimeout(searchClient, 400);
+    const timer = setTimeout(() => searchClient.current(), 400);
     return () => clearTimeout(timer);
-  }, [normalizedPhone, searchClient]);
+  }, [normalizedPhone]);
 
   if (!normalizedPhone || normalizedPhone.length < 8) return null;
 
