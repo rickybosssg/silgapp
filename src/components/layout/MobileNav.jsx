@@ -254,7 +254,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
       )}
 
       {/* ===== MOBILE BOTTOM TAB BAR ===== */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 border-t border-border z-40 safe-area-bottom bg-card">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 border-t border-white/8 z-40 safe-area-bottom" style={{ backgroundColor: '#0A1F3D' }}>
         <div className="flex items-stretch justify-around">
           {allNavItems.filter(item => bottomTabPaths.includes(item.path)).map((item) => {
             const isActive = location.pathname === item.path;
@@ -276,18 +276,18 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
                 }}
                 className={cn(
                   "flex flex-col items-center justify-center py-2 px-1 flex-1 transition-all min-h-[56px]",
-                  isActive ? "text-primary" : "text-muted-foreground"
+                  isActive ? "text-[#007AFF]" : "text-white/40"
                 )}
               >
                 <div className={cn(
                   "w-10 h-6 flex items-center justify-center rounded-full transition-all",
-                  isActive && "bg-primary/10"
+                  isActive && "bg-[#007AFF]/15"
                 )}>
                   <Icon className="w-5 h-5" />
                 </div>
                 <span className={cn(
                   "text-[10px] font-medium mt-0.5",
-                  isActive ? "text-primary" : "text-muted-foreground"
+                  isActive ? "text-[#007AFF]" : "text-white/40"
                 )}>
                   {item.label}
                 </span>
@@ -298,7 +298,7 @@ export default function MobileNav({ notificationCount = 0, demandesCount = 0, pa
           {/* Menu button */}
           <button
             onClick={() => setShowMenu(true)}
-            className="flex flex-col items-center justify-center py-2 px-1 flex-1 text-muted-foreground min-h-[56px]"
+            className="flex flex-col items-center justify-center py-2 px-1 flex-1 text-white/40 min-h-[56px]"
           >
             <div className="w-10 h-6 flex items-center justify-center rounded-full relative">
               <Menu className="w-5 h-5" />

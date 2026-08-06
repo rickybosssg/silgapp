@@ -71,9 +71,9 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
 
   return (
     <aside className={cn(
-      "h-screen flex flex-col transition-all duration-300 sticky top-0 shadow-lg shadow-black/5 border-r border-sidebar-border bg-sidebar",
+      "h-screen flex flex-col transition-all duration-300 sticky top-0 shadow-lg shadow-black/5 border-r border-white/8 bg-sidebar",
       collapsed ? "w-[68px]" : "w-60"
-    )}>
+    )} style={{ backgroundColor: '#1a1a2e' }}>
       {/* Logo */}
       <div className={cn(
         "h-16 flex items-center border-b border-sidebar-border flex-shrink-0 overflow-hidden",

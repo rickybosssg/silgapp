@@ -7,71 +7,69 @@
 @layer base {
   :root {
     --font-inter: 'Inter', sans-serif;
-    /* ── Thème Apple épuré — fond clair, texte foncé ── */
-    --background: 240 5% 96%;          /* #F5F5F7 — gris très clair Apple */
-    --foreground: 222 47% 11%;          /* #1D1D1F — texte quasi-noir Apple */
-    --card: 0 0% 100%;                  /* #FFFFFF — cartes blanches */
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 211 100% 50%;           /* #007AFF — bleu système Apple */
+    --background: 240 6% 10%;
+    --foreground: 0 0% 98%;
+    --card: 240 6% 12%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 6% 12%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 142 71% 45%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 5% 92%;            /* #E8E8ED — gris clair secondaire */
-    --secondary-foreground: 222 47% 11%;
-    --muted: 240 5% 92%;               /* gris clair pour fonds muted */
-    --muted-foreground: 215 16% 47%;    /* #6B7280 — texte secondaire lisible */
-    --accent: 211 100% 50%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 84% 60%;           /* rouge Apple */
-    --destructive-foreground: 0 0% 100%;
-    --border: 240 6% 85%;              /* #D2D2D7 — bordures Apple */
-    --input: 240 6% 85%;
-    --ring: 211 100% 50%;
-    --chart-1: 211 100% 50%;
-    --chart-2: 142 71% 45%;
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 240 4% 16%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 6% 18%;
+    --input: 240 6% 18%;
+    --ring: 142 71% 45%;
+    --chart-1: 142 71% 45%;
+    --chart-2: 211 100% 50%;
     --chart-3: 45 100% 51%;
     --chart-4: 280 65% 60%;
     --chart-5: 0 72% 51%;
-    --radius: 0.75rem;                  /* coins plus arrondis — style Apple */
-    --sidebar-background: 0 0% 100%;    /* sidebar blanche */
-    --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 211 100% 50%;
+    --radius: 0.5rem;
+    --sidebar-background: 240 6% 8%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 142 71% 45%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 5% 94%;
-    --sidebar-accent-foreground: 222 47% 11%;
-    --sidebar-border: 240 6% 88%;
-    --sidebar-ring: 211 100% 50%;
+    --sidebar-accent: 240 4% 16%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 240 6% 18%;
+    --sidebar-ring: 142 71% 45%;
   }
 
   .dark {
-    /* L'app force le mode clair — .dark jamais activé, mais gardé par cohérence */
-    --background: 240 5% 96%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 211 100% 50%;
+    --background: 240 6% 10%;
+    --foreground: 0 0% 98%;
+    --card: 240 6% 12%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 6% 12%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 142 71% 45%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 5% 92%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 240 5% 92%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 211 100% 50%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 240 6% 85%;
-    --input: 240 6% 85%;
-    --ring: 211 100% 50%;
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 211 100% 50%;
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 240 4% 16%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 6% 18%;
+    --input: 240 6% 18%;
+    --ring: 142 71% 45%;
+    --sidebar-background: 240 6% 8%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 142 71% 45%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 5% 94%;
-    --sidebar-accent-foreground: 222 47% 11%;
-    --sidebar-border: 240 6% 88%;
-    --sidebar-ring: 211 100% 50%;
+    --sidebar-accent: 240 4% 16%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 240 6% 18%;
+    --sidebar-ring: 142 71% 45%;
   }
 }
 
@@ -82,9 +80,6 @@
   body {
     @apply bg-background text-foreground font-inter;
     overscroll-behavior-y: none;
-  }
-  html {
-    color-scheme: light;
   }
   button, nav, [role="navigation"] {
     user-select: none;
@@ -106,13 +101,13 @@
     transition: transform 3s ease-in-out, -webkit-transform 3s ease-in-out;
   }
   .custom-tooltip {
-    background: rgba(255, 255, 255, 0.98) !important;
-    border: 1px solid #D2D2D7 !important;
+    background: rgba(15, 23, 42, 0.95) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
     border-radius: 8px !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
     font-size: 11px !important;
     font-weight: 600 !important;
-    color: #1D1D1F !important;
+    color: #ffffff !important;
     padding: 4px 8px !important;
   }
   .custom-tooltip::before {
@@ -143,16 +138,16 @@
     }
   }
 
-  /* ── Lisibilité des inputs : toujours du texte foncé sur fond clair ── */
+  /* ── Forcer le texte des inputs en blanc sur fond sombre ── */
   input:not([type="checkbox"]):not([type="radio"]),
   textarea,
   select {
-    color: #1D1D1F;
+    color: #ffffff;
     font-size: 0.9375rem;
   }
   input::placeholder,
   textarea::placeholder {
-    color: #86868B;
+    color: #a1a1aa;
     opacity: 1;
   }
 
