@@ -7,73 +7,70 @@
 @layer base {
   :root {
     --font-inter: 'Inter', sans-serif;
-    --background: 211 62% 14%;
-    --foreground: 0 0% 100%;
-    --card: 211 62% 19%;
-    --card-foreground: 0 0% 100%;
-    --popover: 211 62% 19%;
-    --popover-foreground: 0 0% 95%;
-    --primary: 211 100% 50%;
+    /* ── Thème Apple épuré — fond clair, texte foncé ── */
+    --background: 240 5% 96%;          /* #F5F5F7 — gris très clair Apple */
+    --foreground: 222 47% 11%;          /* #1D1D1F — texte quasi-noir Apple */
+    --card: 0 0% 100%;                  /* #FFFFFF — cartes blanches */
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 211 100% 50%;           /* #007AFF — bleu système Apple */
     --primary-foreground: 0 0% 100%;
-    --secondary: 45 100% 51%;
-    --secondary-foreground: 0 0% 8%;
-    --muted: 215 18% 32%;
-    --muted-foreground: 0 0% 65%;
+    --secondary: 240 5% 92%;            /* #E8E8ED — gris clair secondaire */
+    --secondary-foreground: 222 47% 11%;
+    --muted: 240 5% 92%;               /* gris clair pour fonds muted */
+    --muted-foreground: 215 16% 47%;    /* #6B7280 — texte secondaire lisible */
     --accent: 211 100% 50%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 20%;
-    --input: 0 0% 20%;
+    --destructive: 0 84% 60%;           /* rouge Apple */
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 6% 85%;              /* #D2D2D7 — bordures Apple */
+    --input: 240 6% 85%;
     --ring: 211 100% 50%;
     --chart-1: 211 100% 50%;
-    --chart-2: 45 100% 51%;
-    --chart-3: 142 70% 45%;
-    --chart-4: 220 70% 50%;
-    --chart-5: 280 65% 60%;
-    --radius: 0.625rem;
-    --sidebar-background: 211 62% 12%;
-    --sidebar-foreground: 0 0% 95%;
+    --chart-2: 142 71% 45%;
+    --chart-3: 45 100% 51%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 0 72% 51%;
+    --radius: 0.75rem;                  /* coins plus arrondis — style Apple */
+    --sidebar-background: 0 0% 100%;    /* sidebar blanche */
+    --sidebar-foreground: 222 47% 11%;
     --sidebar-primary: 211 100% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 211 62% 17%;
-    --sidebar-accent-foreground: 0 0% 95%;
-    --sidebar-border: 0 0% 24%;
+    --sidebar-accent: 240 5% 94%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 240 6% 88%;
     --sidebar-ring: 211 100% 50%;
   }
 
   .dark {
-    --background: 211 62% 14%;
-    --foreground: 0 0% 100%;
-    --card: 211 62% 19%;
-    --card-foreground: 0 0% 100%;
-    --popover: 211 62% 19%;
-    --popover-foreground: 0 0% 95%;
+    /* L'app force le mode clair — .dark jamais activé, mais gardé par cohérence */
+    --background: 240 5% 96%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
     --primary: 211 100% 50%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 45 100% 51%;
-    --secondary-foreground: 0 0% 8%;
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 60%;
+    --secondary: 240 5% 92%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 240 5% 92%;
+    --muted-foreground: 215 16% 47%;
     --accent: 211 100% 50%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 18%;
-    --input: 0 0% 18%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 6% 85%;
+    --input: 240 6% 85%;
     --ring: 211 100% 50%;
-    --chart-1: 211 100% 50%;
-    --chart-2: 45 100% 51%;
-    --chart-3: 142 70% 45%;
-    --chart-4: 220 70% 50%;
-    --chart-5: 280 65% 60%;
-    --sidebar-background: 211 62% 12%;
-    --sidebar-foreground: 0 0% 95%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 47% 11%;
     --sidebar-primary: 211 100% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 211 62% 17%;
-    --sidebar-accent-foreground: 0 0% 95%;
-    --sidebar-border: 0 0% 18%;
+    --sidebar-accent: 240 5% 94%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 240 6% 88%;
     --sidebar-ring: 211 100% 50%;
   }
 }
@@ -86,8 +83,7 @@
     @apply bg-background text-foreground font-inter;
     overscroll-behavior-y: none;
   }
-  /* Force mode clair par défaut pour éviter texte blanc sur fond blanc */
-  html:not(.dark) {
+  html {
     color-scheme: light;
   }
   button, nav, [role="navigation"] {
@@ -102,7 +98,7 @@
 }
 
 @layer components {
-  /* ── Transitions fluides pour les marqueurs Leaflet (suivi temps réel) ── */
+  /* ── Transitions fluides pour les marqueurs Leaflet ── */
   .livreur-marker-anim {
     transition: transform 2s linear, -webkit-transform 2s linear;
   }
@@ -110,24 +106,22 @@
     transition: transform 3s ease-in-out, -webkit-transform 3s ease-in-out;
   }
   .custom-tooltip {
-    background: rgba(255, 255, 255, 0.95) !important;
-    border: none !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    border: 1px solid #D2D2D7 !important;
     border-radius: 8px !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
     font-size: 11px !important;
     font-weight: 600 !important;
-    color: #1f2937 !important;
+    color: #1D1D1F !important;
     padding: 4px 8px !important;
   }
   .custom-tooltip::before {
     display: none !important;
   }
 
-  /* Safe area for mobile devices */
   .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom);
   }
-
   .safe-area-top {
     padding-top: max(env(safe-area-inset-top), 28px);
   }
@@ -139,219 +133,41 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
-  
-  /* Mobile optimizations */
+
   @media (max-width: 640px) {
-    /* Prevent text overflow */
     .truncate-mobile {
       @apply truncate;
     }
-
-    /* Larger touch targets */
     button, a {
       @apply min-h-[44px];
     }
   }
 
-  /* ── Lisibilité universelle — WCAG AA ── */
-  /* Texte dans les inputs toujours très lisible — thème sombre */
+  /* ── Lisibilité des inputs : toujours du texte foncé sur fond clair ── */
   input:not([type="checkbox"]):not([type="radio"]),
   textarea,
   select {
-    color: #111827;
-    font-size: 0.9375rem; /* 15px — lisible sur mobile */
+    color: #1D1D1F;
+    font-size: 0.9375rem;
   }
   input::placeholder,
   textarea::placeholder {
-    color: #6b7280; /* gray-500 — visible sur fond blanc */
+    color: #86868B;
     opacity: 1;
   }
-  /* Inputs sur fond explicitement clair (force-light) */
-  .force-light input:not([type="checkbox"]):not([type="radio"]),
-  .force-light textarea,
-  .force-light select {
-    color: #111827;
-  }
-  .force-light input::placeholder,
-  .force-light textarea::placeholder {
-    color: #64748b;
-  }
-  /* ── Cartes (bg-card) en blanc à l'intérieur de force-light ── */
-  .force-light .bg-card {
-    background-color: rgb(255 255 255) !important;
-  }
-  /* ── Fonds clairs préservés à l'intérieur de force-light ── */
-  /* (les sélecteurs :not(.force-light *) du Level 4 ne marchent pas partout) */
-  .force-light .bg-white {
-    background-color: rgb(255 255 255) !important;
-  }
-  .force-light .bg-gray-50 {
-    background-color: rgb(249 250 251) !important;
-  }
-  .force-light .bg-gray-100 {
-    background-color: rgb(243 244 246) !important;
-  }
-  .force-light .bg-slate-50 {
-    background-color: rgb(248 250 252) !important;
-  }
-  .force-light .bg-blue-50 {
-    background-color: rgb(239 246 255) !important;
-  }
-  .force-light .bg-green-50 {
-    background-color: rgb(240 253 244) !important;
-  }
-  .force-light .bg-purple-50 {
-    background-color: rgb(250 245 255) !important;
-  }
-  .force-light .bg-orange-50 {
-    background-color: rgb(255 247 237) !important;
-  }
-  .force-light .bg-red-50 {
-    background-color: rgb(254 242 242) !important;
-  }
-  .force-light .bg-amber-50 {
-    background-color: rgb(255 251 235) !important;
-  }
-  .force-light .bg-rose-50 {
-    background-color: rgb(255 241 242) !important;
-  }
-  .force-light .bg-sky-50 {
-    background-color: rgb(240 249 255) !important;
-  }
-  .force-light .bg-violet-50 {
-    background-color: rgb(245 243 255) !important;
-  }
-  /* ── Empêcher la conversion des fonds clairs sur les inputs ── */
-  /* bg-gray-50 et bg-white sur les inputs restent clairs (pas de conversion sombre) */
-  /* pour que le texte foncé (#111827) reste lisible */
-  input.bg-gray-50,
-  textarea.bg-gray-50,
-  select.bg-gray-50 {
-    background-color: rgb(249 250 251) !important;
-  }
-  input.bg-white,
-  textarea.bg-white,
-  select.bg-white {
-    background-color: rgb(255 255 255) !important;
-  }
-  /* Messages d'erreur toujours bien lisibles */
-  .text-red-400 { color: #dc2626 !important; } /* forcer red-600 au lieu de red-400 sur fond blanc */
-  .text-muted-foreground {
-    color: hsl(var(--muted-foreground));
-    /* minimum contrast garantit */
-  }
 
-  /* ── Override global : bg-white et bg-slate-50 → thème sombre SilgaMoney ── */
-  /* Sauf écran auth et composants explicites en clair (force-light) */
-  /* :not(.force-light *) exclut aussi tous les descendants d'un conteneur force-light */
-  .bg-white:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
-    background-color: hsl(215 18% 28%) !important;
-  }
-  .bg-slate-50:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
-    background-color: hsl(215 18% 24%) !important;
-  }
-  .bg-gray-50:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
-    background-color: hsl(215 18% 24%) !important;
-  }
-  .bg-gray-100:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
-    background-color: hsl(215 18% 30%) !important;
-  }
-
-  /* Textes gris foncé → clairs pour fond sombre */
-  .text-slate-900:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
-    color: #f8fafc !important;
-  }
-  .text-slate-800:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
-    color: #f1f5f9 !important;
-  }
-  .text-slate-700:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
-    color: #e2e8f0 !important;
-  }
-  .text-slate-600:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
-    color: #cbd5e1 !important;
-  }
-  .text-slate-500:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
-    color: #94a3b8 !important;
-  }
-  .text-slate-400:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
-    color: #64748b !important;
-  }
-  .text-gray-900:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
-    color: #f8fafc !important;
-  }
-  .text-gray-800:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
-    color: #f1f5f9 !important;
-  }
-  .text-gray-700:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
-    color: #e2e8f0 !important;
-  }
-  .text-gray-600:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
-    color: #cbd5e1 !important;
-  }
-  .text-gray-500:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
-    color: #94a3b8 !important;
-  }
-  .text-gray-400:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
-    color: #64748b !important;
-  }
-
-  /* Borders clairs → sombres */
-  .border-slate-200:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light),
-  .border-slate-100:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
-    border-color: hsl(0 0% 20%) !important;
-  }
-  .border-gray-200:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light),
-  .border-gray-100:not(.silgapp-auth-screen *):not(.force-light *):not(.force-light) {
-    border-color: hsl(0 0% 20%) !important;
-  }
-
-  .bg-white.text-gray-300,
-  .bg-white .text-gray-300,
-  .bg-gray-50.text-gray-300,
-  .bg-gray-50 .text-gray-300 {
-    color: #94a3b8 !important;
-  }
-
-  .bg-white.text-gray-400,
-  .bg-white .text-gray-400,
-  .bg-gray-50.text-gray-400,
-  .border-gray-100.text-gray-400,
-  .border-gray-100 .text-gray-400,
-  .border-gray-200.text-gray-400,
-  .border-gray-200 .text-gray-400 {
-    color: #64748b !important;
-  }
-
-  .bg-white .text-white\/40,
-  .bg-white .text-white\/50,
-  .bg-white .text-white\/60,
-  .bg-gray-50 .text-white\/40,
-  .bg-gray-50 .text-white\/50,
-  .bg-gray-50 .text-white\/60 {
-    color: #94a3b8 !important;
-  }
-
-  .text-white\/30,
-  .text-white\/35,
-  .text-white\/40,
-  .text-white\/50,
-  .text-white\/60 {
-    color: rgb(255 255 255 / 0.8) !important;
-  }
-
+  /* ── Écran d'authentification : style sombre dédié ── */
   .silgapp-auth-screen input:not([type="checkbox"]):not([type="radio"]) {
     color: #ffffff !important;
     -webkit-text-fill-color: #ffffff !important;
     caret-color: #ffffff !important;
     background-color: #0f0f0f !important;
   }
-
   .silgapp-auth-screen input::placeholder {
-    color: #a1a1aa !important; /* zinc-400 */
+    color: #a1a1aa !important;
     -webkit-text-fill-color: #a1a1aa !important;
     opacity: 1;
   }
-
   .silgapp-auth-screen input:-webkit-autofill,
   .silgapp-auth-screen input:-webkit-autofill:hover,
   .silgapp-auth-screen input:-webkit-autofill:focus {

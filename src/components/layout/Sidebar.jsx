@@ -71,23 +71,23 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
 
   return (
     <aside className={cn(
-      "h-screen flex flex-col transition-all duration-300 sticky top-0 shadow-xl shadow-black/20 border-r border-white/8",
+      "h-screen flex flex-col transition-all duration-300 sticky top-0 shadow-lg shadow-black/5 border-r border-sidebar-border bg-sidebar",
       collapsed ? "w-[68px]" : "w-60"
-    )} style={{ backgroundColor: '#1a1a2e' }}>
+    )}>
       {/* Logo */}
       <div className={cn(
-        "h-16 flex items-center border-b border-white/8 flex-shrink-0 overflow-hidden",
+        "h-16 flex items-center border-b border-sidebar-border flex-shrink-0 overflow-hidden",
         collapsed ? "px-4 justify-center" : "px-5 gap-3"
       )}>
         <img 
           src="https://media.base44.com/images/public/6a0ec08f3af5e1d1284254c1/2c20ad136_SILGAPPLOGO2.jpg"
           alt="SILGAPP ET"
-          className="w-9 h-9 rounded-xl flex-shrink-0 ring-2 ring-white/10"
+          className="w-9 h-9 rounded-xl flex-shrink-0 ring-2 ring-black/5"
         />
         {!collapsed && (
           <div>
-            <h1 className="font-extrabold text-sm text-white tracking-wide">SILGAPP</h1>
-            <p className="text-[10px] text-white/40">SILGAPP Livraison</p>
+            <h1 className="font-extrabold text-sm text-sidebar-foreground tracking-wide">SILGAPP</h1>
+            <p className="text-[10px] text-muted-foreground">SILGAPP Livraison</p>
           </div>
         )}
       </div>
@@ -105,8 +105,8 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group",
                 isActive
-                  ? "bg-[#007AFF] text-white shadow-lg shadow-[#007AFF]/30"
-                  : "text-white/50 hover:bg-white/8 hover:text-white/90"
+                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               )}
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
@@ -160,15 +160,15 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-white/8 flex-shrink-0">
+      <div className="border-t border-sidebar-border flex-shrink-0">
 
         {/* Sélecteur de pays — réseau externe uniquement */}
         {showCountryPicker && (
-          <div className={cn("relative border-b border-white/8", collapsed ? "px-2 py-2" : "px-3 py-2")}>
+          <div className={cn("relative border-b border-sidebar-border", collapsed ? "px-2 py-2" : "px-3 py-2")}>
             {collapsed ? (
               <button
                 onClick={() => setCountryOpen(!countryOpen)}
-                className="w-full flex items-center justify-center h-9 rounded-lg bg-white/8 hover:bg-white/15 transition-colors"
+                className="w-full flex items-center justify-center h-9 rounded-lg bg-sidebar-accent hover:bg-muted transition-colors"
                 title={effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
               >
                 <span className="text-base">
@@ -178,17 +178,17 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
             ) : (
               <button
                 onClick={() => setCountryOpen(!countryOpen)}
-                className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-white/8 hover:bg-white/15 transition-colors"
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-sidebar-accent hover:bg-muted transition-colors"
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-base flex-shrink-0">
                     {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.emoji_flag || "🌍" : "🌍"}
                   </span>
-                  <span className="text-xs font-semibold text-white/70 truncate">
+                  <span className="text-xs font-semibold text-sidebar-accent-foreground truncate">
                     {effectiveCountry ? PAYS_SILGAPP.find(p => p.code === effectiveCountry)?.nom : "Choisir un pays"}
                   </span>
                 </div>
-                <ChevronDown className={cn("w-3.5 h-3.5 text-white/40 flex-shrink-0 transition-transform", countryOpen && "rotate-180")} />
+                <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground flex-shrink-0 transition-transform", countryOpen && "rotate-180")} />
               </button>
             )}
 
@@ -197,16 +197,16 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setCountryOpen(false)} />
                 <div className={cn(
-                  "absolute z-50 border border-white/15 rounded-xl shadow-2xl max-h-72 overflow-y-auto",
+                  "absolute z-50 border border-sidebar-border rounded-xl shadow-2xl max-h-72 overflow-y-auto bg-popover",
                   collapsed ? "left-14 bottom-0 w-52" : "left-3 right-3 bottom-full mb-2"
-                )} style={{ backgroundColor: '#0C2350' }}>
+                )}>
                   {PAYS_SILGAPP.map((p) => (
                     <button
                       key={p.code}
                       onClick={() => { setSelectedCountry(p.code); setCountryOpen(false); }}
                       className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-white/10",
-                        effectiveCountry === p.code ? "bg-primary/30 text-white" : "text-white/70"
+                        "w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-sidebar-accent",
+                        effectiveCountry === p.code ? "bg-primary/10 text-primary" : "text-popover-foreground"
                       )}
                     >
                       <span className="text-base flex-shrink-0">{p.emoji_flag}</span>
@@ -224,7 +224,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
         <button
           onClick={doLogout}
           className={cn(
-            "w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-white/40 hover:text-red-400 hover:bg-red-500/10 transition-colors",
+            "w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors",
             collapsed ? "justify-center" : ""
           )}
           title="Déconnexion"
@@ -235,7 +235,7 @@ export default function Sidebar({ notificationCount = 0, demandesCount = 0, part
         {/* Collapse toggle */}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="w-full h-9 flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/5 transition-colors"
+          className="w-full h-9 flex items-center justify-center text-muted-foreground/60 hover:text-muted-foreground hover:bg-sidebar-accent transition-colors"
           title={collapsed ? "Étendre" : "Réduire"}
         >
           {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
